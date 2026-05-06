@@ -125,6 +125,86 @@ Omar Aguilera, Hector Enrique Rodriguez Lopez, Brayan Berlanga Solis, Daniela Ed
 | `/top-meseros [dias]` | Ranking de meseros (default: 7 días) |
 | `/proximas-reservas [dias]` | Próximas reservaciones (default: 14 días) |
 
+## GitHub Actions Workflows
+
+Workflows en `.github/workflows/`. Stack: **GitHub Actions (gratis) + Groq + Supabase REST + Telegram**.
+
+### Workflows activos
+
+| Workflow | Archivo | Cron | Descripción |
+|---|---|---|---|
+| Daily Briefing | `daily-briefing.yml` | `0 13 * * *` (7am MX) | Supabase → Groq llama-3.3-70b → Telegram → log agent_runs |
+
+### Secrets requeridos en GitHub (Settings → Secrets → Actions)
+
+| Secret | Descripción |
+|---|---|
+| `SUPABASE_URL` | `https://qjiomlvudfmzuvqvhwpk.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | service_role key (desde Supabase Dashboard → Settings → API) |
+| `GROQ_API_KEY` | API key de Groq Cloud |
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram |
+| `TELEGRAM_CHAT_ID_DANIEL` | Chat ID del destinatario |
+
+### Script principal
+
+`.github/scripts/daily_briefing.py` — self-contained, sin dependencias externas salvo `requests`.
+
+Flujo interno:
+1. Fetch Supabase REST API: `amalay_reservaciones` (hoy + 7 días), `calendar_sync_log` (hoy), `wansoft_kpis`
+2. Formatea bloque de datos estructurado
+3. Llama Groq con system prompt del briefing + datos → texto del briefing
+4. Envía a Telegram (split automático si >4000 chars)
+5. Inserta log en tabla `agent_runs` (non-blocking si falla)
+
+### Tabla agent_runs (crear una vez en Supabase SQL Editor)
+
+```sql
+CREATE TABLE IF NOT EXISTS agent_runs (
+  id BIGSERIAL PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  trigger_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  duration_ms INT,
+  output_summary TEXT,
+  error_message TEXT,
+  tokens_in INT,
+  tokens_out INT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Cómo agregar un nuevo workflow autónomo
+
+1. Crea `.github/scripts/nombre_script.py` siguiendo el patrón de `daily_briefing.py`:
+   - Leer config desde `os.environ`
+   - Usar `sb_get()` / `sb_post()` para Supabase REST
+   - Loguear en `agent_runs` al final
+2. Crea `.github/workflows/nombre-workflow.yml` con:
+   - `schedule` cron en UTC (MX = UTC-6, entonces 7am MX = `0 13 * * *`)
+   - `workflow_dispatch` para testing manual
+   - `env:` con todos los secrets necesarios
+   - `TRIGGER_TYPE: ${{ github.event_name }}`
+3. Setea cualquier secret nuevo: `gh secret set NOMBRE --repo ramonfaurdaniel-png/fullsite --body "valor"`
+4. Test: `gh workflow run nombre-workflow.yml --repo ramonfaurdaniel-png/fullsite`
+5. Watch: `gh run watch <run_id> --repo ramonfaurdaniel-png/fullsite`
+
+### Comandos útiles
+
+```bash
+# Trigger manual
+gh workflow run daily-briefing.yml --repo ramonfaurdaniel-png/fullsite
+
+# Ver último run
+gh run list --repo ramonfaurdaniel-png/fullsite --workflow=daily-briefing.yml --limit=5
+
+# Ver logs completos
+gh run view <run_id> --repo ramonfaurdaniel-png/fullsite --log
+
+# Ver/editar secrets
+gh secret list --repo ramonfaurdaniel-png/fullsite
+gh secret set NOMBRE --repo ramonfaurdaniel-png/fullsite
+```
+
 ## Cómo agregar nuevas routines
 
 1. Crea un archivo `.md` en `.claude/commands/nombre-comando.md`
