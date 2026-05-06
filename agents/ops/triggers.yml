@@ -1,0 +1,14 @@
+tentacle: ops
+
+triggers:
+  - id: reservas-pendientes
+    workflow: .github/workflows/reservas-pendientes.yml
+    schedule: "0 16 * * *"   # 10am MX (UTC-6)
+    description: Reservaciones próximos 5 días sin confirmar o sin teléfono
+    output: telegram
+
+  - id: wansoft-staleness
+    workflow: .github/workflows/wansoft-staleness.yml
+    schedule: "0 14 * * *"   # 8am MX (UTC-6)
+    description: Alert si wansoft_kpis.updated_at > 24h
+    output: telegram_conditional  # silent si todo OK

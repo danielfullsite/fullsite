@@ -129,11 +129,55 @@ Omar Aguilera, Hector Enrique Rodriguez Lopez, Brayan Berlanga Solis, Daniela Ed
 
 Workflows en `.github/workflows/`. Stack: **GitHub Actions (gratis) + Groq + Supabase REST + Telegram**.
 
+## War Room Multi-Agent Architecture
+
+Sistema de agentes autónomos 24/7 que monitorean, reportan y alertan sobre operaciones de AMALAY. Stack 100% gratis.
+
+### Diagrama de flujo
+
+```
+TRIGGERS (GitHub Actions cron / Telegram webhook)
+        │
+        ▼
+  ┌─────────────────────────────────────────┐
+  │          ORQUESTADOR (skeleton)         │  ← Telegram inbound → clasifica → despacha
+  └─────────────────────────────────────────┘
+        │
+  ┌─────┴────────────────────────────────┐
+  │         TENTÁCULOS                   │
+  ├──────────────┬──────────────┬────────┤
+  │   reportes   │     ops      │   kb   │  reseñas (skeleton)
+  │  daily brief │  reservas    │ lookup │
+  │  weekly rep  │  wansoft     │        │
+  └──────┬───────┴──────┬───────┘        │
+         │              │                │
+         ▼              ▼                ▼
+    Supabase REST    Supabase REST   Supabase REST
+    + Groq API       + Groq API      + Groq API
+         │              │
+         ▼              ▼
+      Telegram        Telegram       agent_runs log
+```
+
+### Tentáculos — status
+
+| Tentáculo | Status | Workflows | Blocker |
+|---|---|---|---|
+| `ops` | **active** | reservas-pendientes (10am), wansoft-staleness (8am) | — |
+| `reportes` | **active** | daily-briefing (7am), weekly-amalay (lunes 9am) | — |
+| `kb` | skeleton | kb-query.yml (pendiente) | orquestador activo |
+| `reseñas` | skeleton | gbp-monitor.yml (pendiente) | Google Cloud OAuth |
+| `orquestador` | skeleton | orquestador.yml (workflow_dispatch) | Endpoint público HTTPS |
+
 ### Workflows activos
 
-| Workflow | Archivo | Cron | Descripción |
-|---|---|---|---|
-| Daily Briefing | `daily-briefing.yml` | `0 13 * * *` (7am MX) | Supabase → Groq llama-3.3-70b → Telegram → log agent_runs |
+| Workflow | Archivo | Cron | Tentáculo | Descripción |
+|---|---|---|---|---|
+| Daily Briefing | `daily-briefing.yml` | `0 13 * * *` (7am MX) | reportes | Briefing matutino completo |
+| Reservas Pendientes | `reservas-pendientes.yml` | `0 16 * * *` (10am MX) | ops | Alerta reservas sin confirmar/sin tel |
+| Wansoft Staleness | `wansoft-staleness.yml` | `0 14 * * *` (8am MX) | ops | Alert si sync > 24h (silent si OK) |
+| Weekly Report | `weekly-amalay.yml` | `0 15 * * 1` (lunes 9am MX) | reportes | Reporte ejecutivo semanal |
+| Orquestador | `orquestador.yml` | `workflow_dispatch` | orquestador | Skeleton — router de Telegram inbound |
 
 ### Secrets requeridos en GitHub (Settings → Secrets → Actions)
 
@@ -156,9 +200,10 @@ Flujo interno:
 4. Envía a Telegram (split automático si >4000 chars)
 5. Inserta log en tabla `agent_runs` (non-blocking si falla)
 
-### Tabla agent_runs (crear una vez en Supabase SQL Editor)
+### Tablas requeridas en Supabase (correr en SQL Editor)
 
 ```sql
+-- Tabla de log de ejecuciones (requerida por todos los agentes)
 CREATE TABLE IF NOT EXISTS agent_runs (
   id BIGSERIAL PRIMARY KEY,
   agent_id TEXT NOT NULL,
@@ -169,9 +214,42 @@ CREATE TABLE IF NOT EXISTS agent_runs (
   error_message TEXT,
   tokens_in INT,
   tokens_out INT,
+  tentacle TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabla de mensajería inter-agente (para orquestador)
+CREATE TABLE IF NOT EXISTS agent_messages (
+  id BIGSERIAL PRIMARY KEY,
+  from_agent TEXT NOT NULL,
+  to_agent TEXT NOT NULL,
+  payload JSONB,
+  read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
+
+### Auth pendiente — qué se desbloquea con cada step
+
+| Auth step | Cómo hacerlo | Se desbloquea |
+|---|---|---|
+| Crear tabla `agent_runs` en Supabase SQL Editor | Correr SQL de arriba | Logging completo de todos los agentes |
+| Crear tabla `agent_messages` en Supabase SQL Editor | Correr SQL de arriba | Mensajería inter-agente |
+| Cloudflare Worker (gratis) con webhook de Telegram | Ver `agents/orquestador/triggers.yml` paso a paso | **Orquestador activo** — todos los tentáculos responden a Telegram inbound |
+| Google Cloud OAuth (GBP API) | Ver `agents/reseñas/tools.md` — 5 pasos | Tentáculo `reseñas` — monitor de Google Maps |
+| Meta Business + WhatsApp Business API | Meta Business Manager | WhatsApp inbound/outbound desde agentes |
+
+### Cómo agregar un nuevo tentáculo
+
+1. Crea carpeta `agents/nombre-tentaculo/` con 4 archivos:
+   - `CONTEXT.md` — rol, scope, status, fuentes de datos
+   - `system_prompt.md` — prompt para Groq (entre triple backticks)
+   - `triggers.yml` — cuándo y cómo dispara
+   - `tools.md` — APIs disponibles y pendientes
+2. Crea `.github/scripts/nombre_script.py` (usa `daily_briefing.py` como plantilla)
+3. Crea `.github/workflows/nombre-workflow.yml`
+4. Agrega al `WORKFLOW_MAP` en `.github/scripts/orquestador.py`
+5. Actualiza tabla de tentáculos en esta sección de CLAUDE.md
 
 ### Cómo agregar un nuevo workflow autónomo
 

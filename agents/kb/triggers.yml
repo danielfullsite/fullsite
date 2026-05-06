@@ -1,0 +1,10 @@
+tentacle: kb
+
+triggers:
+  - id: kb-inbound
+    workflow: .github/workflows/kb-query.yml
+    on: orquestador_dispatch   # activado por el orquestador, no por cron
+    description: Responde consulta inbound clasificada como "kb" por el orquestador
+    output: telegram_reply
+    status: skeleton
+    blocker: orquestador requiere webhook público (Cloudflare Worker o ngrok)

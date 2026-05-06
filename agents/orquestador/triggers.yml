@@ -1,0 +1,19 @@
+tentacle: orquestador
+
+status: SKELETON
+
+triggers:
+  - id: telegram-inbound
+    on: webhook                          # POST desde Cloudflare Worker
+    workflow: .github/workflows/orquestador.yml
+    dispatch: workflow_dispatch          # por ahora solo manual
+    description: Clasifica mensaje Telegram y despacha al tentáculo correcto
+    status: skeleton
+    blocker: endpoint público (Cloudflare Worker o equivalente)
+
+activation_steps:
+  1: "Crear Cloudflare Worker que reciba POST de Telegram webhook"
+  2: "Worker extrae mensaje y dispara GitHub Actions API (workflow_dispatch)"
+  3: "Setear GITHUB_TOKEN con permisos de actions:write en Cloudflare secrets"
+  4: "Registrar URL del Worker como webhook en Telegram: POST api.telegram.org/bot{TOKEN}/setWebhook"
+  5: "Activar orquestador.yml quitando el comentario del trigger push/webhook"

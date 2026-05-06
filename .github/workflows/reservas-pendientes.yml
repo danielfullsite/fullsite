@@ -1,0 +1,30 @@
+name: Reservas Pendientes AMALAY
+
+on:
+  schedule:
+    - cron: '0 16 * * *'   # 10am MX (UTC-6)
+  workflow_dispatch:
+
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      - name: Run reservas-pendientes
+        env:
+          SUPABASE_URL:            ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:    ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY:            ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TRIGGER_TYPE:            ${{ github.event_name }}
+        run: python .github/scripts/reservas_pendientes.py

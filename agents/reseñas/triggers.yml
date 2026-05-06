@@ -1,0 +1,20 @@
+tentacle: reseñas
+
+status: SKELETON — requiere Google Cloud auth
+
+triggers:
+  - id: gbp-monitor
+    workflow: .github/workflows/gbp-monitor.yml
+    schedule: "0 16 * * *"   # 10am MX (UTC-6)
+    description: Busca reseñas nuevas en Google Business Profile
+    output: telegram_alert_on_new
+    status: skeleton
+    blocker: Google Cloud OAuth credentials
+
+  - id: weekly-reputation
+    workflow: .github/workflows/weekly-reputation.yml
+    schedule: "0 15 * * 1"   # Lunes 9am MX
+    description: Reporte semanal de score de reputación
+    output: telegram
+    status: skeleton
+    blocker: Google Cloud OAuth credentials

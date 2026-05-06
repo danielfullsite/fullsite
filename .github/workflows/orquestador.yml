@@ -1,0 +1,48 @@
+name: Orquestador AMALAY (skeleton)
+
+# SKELETON — activar cuando haya endpoint público para webhook de Telegram
+# Para activar:
+#   1. Crear Cloudflare Worker que reciba webhook de Telegram
+#   2. Worker dispara este workflow via GitHub Actions API con inputs.message
+#   3. Reemplazar workflow_dispatch por el trigger del worker
+#   Ver: agents/orquestador/triggers.yml para pasos completos
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Mensaje de Telegram a clasificar y rutear'
+        required: true
+        type: string
+      chat_id:
+        description: 'Chat ID de respuesta'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      - name: Classify and route
+        env:
+          GROQ_API_KEY:            ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          SUPABASE_URL:            ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:    ${{ secrets.SUPABASE_SERVICE_KEY }}
+          INPUT_MESSAGE:           ${{ inputs.message }}
+          INPUT_CHAT_ID:           ${{ inputs.chat_id }}
+          GH_TOKEN:                ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO:                 ${{ github.repository }}
+        run: python .github/scripts/orquestador.py

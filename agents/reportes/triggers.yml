@@ -1,0 +1,23 @@
+tentacle: reportes
+
+triggers:
+  - id: daily-briefing
+    workflow: .github/workflows/daily-briefing.yml
+    schedule: "0 13 * * *"   # 7am MX (UTC-6)
+    description: Briefing matutino diario
+    output: telegram
+    status: active
+
+  - id: weekly-amalay
+    workflow: .github/workflows/weekly-amalay.yml
+    schedule: "0 15 * * 1"   # 9am MX lunes (UTC-6)
+    description: Reporte ejecutivo semanal
+    output: telegram
+    status: active
+
+  - id: monthly-report
+    workflow: .github/workflows/monthly-report.yml
+    schedule: "0 15 1 * *"   # 9am MX día 1 del mes
+    description: Reporte mensual de revenue
+    output: telegram
+    status: skeleton
