@@ -120,6 +120,7 @@ Omar Aguilera, Hector Enrique Rodriguez Lopez, Brayan Berlanga Solis, Daniela Ed
 
 | Comando | Descripción |
 |---|---|
+| `/morning-briefing [fecha]` | Briefing matutino: calendario, reservaciones, KPI Wansoft y 3 acciones del día (default: hoy) |
 | `/reporte-amalay [fecha]` | KPIs del día (default: hoy) |
 | `/top-meseros [dias]` | Ranking de meseros (default: 7 días) |
 | `/proximas-reservas [dias]` | Próximas reservaciones (default: 14 días) |
