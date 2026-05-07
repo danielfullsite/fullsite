@@ -476,7 +476,19 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <div id="tab-briefing" style="display:none"></div>
       <div id="tab-clientes" style="display:none"></div>
       <div id="tab-tareas" style="display:none"></div>
-      <div id="tab-contenido" style="display:none"></div>
+      <div id="tab-contenido" style="display:none">
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.1em">Tareas del agente</div>
+          <button onclick="openModal('review')" style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#1a100a;border:1px solid #2e1e0a;border-radius:6px;color:#d4c0a0;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;transition:all 0.15s">
+            <span style="font-size:18px">✉️</span>
+            <div style="flex:1">
+              <div style="font-weight:600;color:#f59e0b">Responder Review</div>
+              <div style="font-size:11px;color:#888;margin-top:2px">Genera respuesta SEO para Google Business</div>
+            </div>
+            <span style="color:#444">→</span>
+          </button>
+        </div>
+      </div>
       <div id="tab-reportes" style="display:none"></div>
       <div id="tab-wansoft" style="display:none"></div>
       <div id="tab-resenas" style="display:none"></div>
@@ -556,6 +568,23 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('content')">Cancelar</button>
       <button class="btn-save" onclick="saveContent()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-review" onclick="if(event.target===this)closeModal('review')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-h">✉️ Responder Review · Contenido</div>
+    <div class="field"><label>Texto de la review (del cliente)</label><textarea id="r-text" rows="4" placeholder="Ej: Excelente experiencia, el brunch estuvo delicioso..." style="width:100%;padding:8px;background:#0a0a0a;border:1px solid #2a2a2a;color:#e4e4e2;font-family:inherit;resize:vertical;"></textarea></div>
+    <div class="field"><label>Nombre del cliente</label><input id="r-name" type="text" placeholder="Ej: María González"></div>
+    <div class="field"><label>Estrellas</label>
+      <select id="r-stars"><option value="5">⭐⭐⭐⭐⭐ (5)</option><option value="4">⭐⭐⭐⭐ (4)</option><option value="3">⭐⭐⭐ (3)</option><option value="2">⭐⭐ (2)</option><option value="1">⭐ (1)</option></select>
+    </div>
+    <div class="field" id="r-output-field" style="display:none"><label>Respuesta generada</label><textarea id="r-output" rows="6" style="width:100%;padding:8px;background:#0a0a0a;border:1px solid #2a2a2a;color:#e4e4e2;font-family:inherit;resize:vertical;"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('review')">Cerrar</button>
+      <button class="btn-save" id="r-generate-btn" onclick="responderReview()">Generar respuesta</button>
+      <button class="btn-save" id="r-copy-btn" onclick="copiarRespuesta()" style="display:none;background:#16a34a">📋 Copiar</button>
     </div>
   </div>
 </div>
@@ -2418,6 +2447,17 @@ function renderContenido() {
   document.getElementById('tab-contenido').innerHTML = `
     <h1 class="ph">Contenido</h1>
     <p class="ps">FULLSITE · ${content.filter(c=>c.status==='published'||c.status==='active').length} publicados · ${content.filter(c=>c.status==='draft'||c.status==='idea').length} en prep.</p>
+    <div class="sec"><span class="sec-t">Tareas del agente Contenido</span></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+      <button onclick="openModal('review')" style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:linear-gradient(135deg,#1a100a,#2e1e0a);border:1px solid #3a2a10;border-radius:8px;color:#d4c0a0;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;transition:all 0.15s;min-width:280px">
+        <span style="font-size:22px">✉️</span>
+        <div style="flex:1">
+          <div style="font-weight:600;color:#f59e0b;font-size:14px">Responder Review</div>
+          <div style="font-size:11px;color:#888;margin-top:3px">Genera respuesta SEO para Google Business</div>
+        </div>
+        <span style="color:#666;font-size:18px">→</span>
+      </button>
+    </div>
     <div class="sec"><span class="sec-t">Tracker</span><button class="sec-btn" onclick="openModal('content')">＋ Contenido</button></div>
     <div class="cgrid">
       ${content.map(c=>`
@@ -2568,6 +2608,90 @@ async function deleteContent(id) {
 }
 
 // ============================================================
+// REVIEW RESPONDER (Agente Contenido)
+// ============================================================
+async function responderReview() {
+  const text = document.getElementById('r-text').value.trim();
+  const name = document.getElementById('r-name').value.trim() || 'Cliente';
+  const stars = parseInt(document.getElementById('r-stars').value);
+
+  if(!text) { alert('Pega el texto de la review primero.'); return; }
+
+  const apiKey = LS.get('warroom_api_key');
+  if(!apiKey) { alert('Configura tu API key de Groq en Ajustes primero.'); return; }
+
+  // Animar al sprite Contenido
+  const ag = WR.agents.contenido;
+  const originalState = ag.state;
+  const originalBubble = ag.bubble;
+  ag.state = 'working';
+  ag.bubble = '✍️ Escribiendo...';
+
+  // UI: bloquear botón, mostrar loading
+  const btnGen = document.getElementById('r-generate-btn');
+  btnGen.disabled = true;
+  btnGen.textContent = '✍️ Generando...';
+  btnGen.style.opacity = '0.6';
+
+  // Construir prompt
+  const isPositive = stars >= 4;
+  const tipo = isPositive ? 'POSITIVA' : 'NEGATIVA';
+  const userPrompt = `Review ${tipo} (${stars} estrellas) de ${name}:
+
+"${text}"
+
+Genera SOLO la respuesta para Google Business. Sigue las reglas del rol Contenido. NO agregues explicaciones, solo la respuesta lista para copiar/pegar.`;
+
+  // Construir system prompt completo (incluye contexto Wansoft + clientes + rol Contenido)
+  const sysPrompt = await buildSystemPrompt('contenido', userPrompt);
+
+  try {
+    const respuesta = await groqCall(sysPrompt, [{role:'user', content: userPrompt}], 500);
+
+    if(!respuesta) throw new Error('No vino respuesta de Groq');
+
+    // Mostrar respuesta
+    const outputField = document.getElementById('r-output-field');
+    const outputArea = document.getElementById('r-output');
+    const btnCopy = document.getElementById('r-copy-btn');
+
+    outputArea.value = respuesta.trim();
+    outputField.style.display = 'block';
+    btnCopy.style.display = 'inline-block';
+    btnGen.textContent = '✅ Listo';
+
+    // Sprite: estado "happy"
+    ag.state = 'happy';
+    ag.bubble = '✅ Listo';
+
+    // Después de 3s vuelve a idle
+    setTimeout(() => {
+      ag.state = originalState || 'idle';
+      ag.bubble = '';
+    }, 3000);
+
+  } catch(e) {
+    console.error('Error en responderReview:', e);
+    alert('Error generando respuesta: ' + e.message);
+    ag.state = originalState || 'idle';
+    ag.bubble = '';
+    btnGen.textContent = 'Generar respuesta';
+  } finally {
+    btnGen.disabled = false;
+    btnGen.style.opacity = '1';
+  }
+}
+
+function copiarRespuesta() {
+  const text = document.getElementById('r-output').value;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('r-copy-btn');
+    const original = btn.textContent;
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
+
 // MODALS
 // ============================================================
 function openModal(type) {

@@ -3,8 +3,10 @@ node_modules/
 .env
 .env.local
 *.log
+*.bak.*
 .vscode/
 .gstack/
 .mcp.json
 
-.octogent
+.octogent/worktrees/
+.octogent/state/
