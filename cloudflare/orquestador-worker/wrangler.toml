@@ -1,0 +1,12 @@
+name            = "telegram-orquestador-warroom"
+main            = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id      = "fd00e9e6edd331e0abe6d1e796f38172"
+
+[observability]
+enabled = true   # logs visibles en wrangler tail
+
+# Secrets (no van aquí, se setean vía: wrangler secret put NOMBRE)
+# GITHUB_TOKEN        — PAT con scope "workflow"
+# TELEGRAM_BOT_TOKEN  — token del bot
+# WEBHOOK_SECRET      — string aleatorio para validar que viene de Telegram

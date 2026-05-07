@@ -266,19 +266,63 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 4. Test: `gh workflow run nombre-workflow.yml --repo ramonfaurdaniel-png/fullsite`
 5. Watch: `gh run watch <run_id> --repo ramonfaurdaniel-png/fullsite`
 
+### Orquestador Inbound Setup
+
+El orquestador recibe mensajes de Telegram en tiempo real vía:
+`Telegram → Cloudflare Worker → GitHub Actions → tentáculo → Telegram`
+
+**Worker:** `telegram-orquestador-warroom` (cuenta `fd00e9e6edd331e0abe6d1e796f38172`)
+**Código:** `cloudflare/orquestador-worker/src/index.ts`
+**Deploy:** `bash cloudflare/orquestador-worker/deploy.sh` (requiere `CLOUDFLARE_API_TOKEN`, `GITHUB_PAT`, `TELEGRAM_BOT_TOKEN` en env)
+
+**Secrets del Worker** (setear con `wrangler secret put`):
+| Secret | Descripción |
+|---|---|
+| `GITHUB_TOKEN` | PAT con scope `workflow` — para disparar Actions desde el Worker |
+| `TELEGRAM_BOT_TOKEN` | Token del bot |
+| `WEBHOOK_SECRET` | String aleatorio — valida que el POST viene de Telegram |
+
+**Routing del orquestador** (`agents/orquestador/system_prompt.md`):
+| Mensaje | Tentáculo | Workflow disparado |
+|---|---|---|
+| `/start`, saludos | — | Menú de comandos |
+| "briefing", "ventas de hoy" | reportes | `daily-briefing.yml` |
+| "reporte semanal" | reportes | `weekly-amalay.yml` |
+| "reservas pendientes" | ops | `reservas-pendientes.yml` |
+| "wansoft", "sync" | ops | `wansoft-staleness.yml` |
+| "historial de [cliente]" | kb | skeleton |
+| "reseñas", "google" | reseñas | skeleton |
+
+**Re-deploy del Worker** (si cambias el código TypeScript):
+```bash
+! export CLOUDFLARE_API_TOKEN="..." && cd cloudflare/orquestador-worker && ~/.local/bin/wrangler deploy
+```
+
+**Ver logs en tiempo real:**
+```bash
+! ~/.local/bin/wrangler tail telegram-orquestador-warroom
+```
+
+**Re-configurar webhook de Telegram** (si cambia la URL del Worker):
+```bash
+! curl -F "url=https://telegram-orquestador-warroom.TU-SUBDOMINIO.workers.dev" \
+       -F "secret_token=TU_WEBHOOK_SECRET" \
+       "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
+```
+
 ### Comandos útiles
 
 ```bash
-# Trigger manual
+# Trigger manual de cualquier workflow
 gh workflow run daily-briefing.yml --repo ramonfaurdaniel-png/fullsite
 
-# Ver último run
-gh run list --repo ramonfaurdaniel-png/fullsite --workflow=daily-briefing.yml --limit=5
+# Ver últimos runs
+gh run list --repo ramonfaurdaniel-png/fullsite --limit=10
 
-# Ver logs completos
+# Ver logs completos de un run
 gh run view <run_id> --repo ramonfaurdaniel-png/fullsite --log
 
-# Ver/editar secrets
+# Ver/editar secrets de GitHub
 gh secret list --repo ramonfaurdaniel-png/fullsite
 gh secret set NOMBRE --repo ramonfaurdaniel-png/fullsite
 ```
