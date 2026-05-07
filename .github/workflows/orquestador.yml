@@ -1,11 +1,8 @@
-name: Orquestador AMALAY (skeleton)
+name: Orquestador AMALAY
 
-# SKELETON — activar cuando haya endpoint público para webhook de Telegram
-# Para activar:
-#   1. Crear Cloudflare Worker que reciba webhook de Telegram
-#   2. Worker dispara este workflow via GitHub Actions API con inputs.message
-#   3. Reemplazar workflow_dispatch por el trigger del worker
-#   Ver: agents/orquestador/triggers.yml para pasos completos
+# Activado via Cloudflare Worker (telegram-orquestador-warroom)
+# que recibe webhooks de Telegram y dispara este workflow via GitHub API.
+# Ver: cloudflare/orquestador-worker/ para el código del Worker.
 
 on:
   workflow_dispatch:
@@ -19,6 +16,10 @@ on:
         required: false
         default: ''
         type: string
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   route:
