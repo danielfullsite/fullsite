@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "http",
-            "url": "http://127.0.0.1:8788/api/hooks/pre-tool-use",
+            "url": "http://127.0.0.1:8787/api/hooks/pre-tool-use",
             "headers": {
               "X-Octogent-Session": "$OCTOGENT_SESSION_ID"
             },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST \"http://127.0.0.1:8788/api/hooks/session-start?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
+            "command": "curl -s -X POST \"http://127.0.0.1:8787/api/hooks/session-start?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
             "timeout": 5
           }
         ]
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST \"http://127.0.0.1:8788/api/hooks/user-prompt-submit?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
+            "command": "curl -s -X POST \"http://127.0.0.1:8787/api/hooks/user-prompt-submit?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
             "timeout": 5
           }
         ]
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "http",
-            "url": "http://127.0.0.1:8788/api/code-intel/events",
+            "url": "http://127.0.0.1:8787/api/code-intel/events",
             "headers": {
               "X-Octogent-Session": "$OCTOGENT_SESSION_ID"
             },
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "http",
-            "url": "http://127.0.0.1:8788/api/hooks/notification",
+            "url": "http://127.0.0.1:8787/api/hooks/notification",
             "headers": {
               "X-Octogent-Session": "$OCTOGENT_SESSION_ID"
             },
@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST \"http://127.0.0.1:8788/api/hooks/stop?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
+            "command": "curl -s -X POST \"http://127.0.0.1:8787/api/hooks/stop?octogent_session=$OCTOGENT_SESSION_ID\" -H 'Content-Type: application/json' -d @- || true",
             "timeout": 15
           }
         ]
