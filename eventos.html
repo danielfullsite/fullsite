@@ -396,6 +396,19 @@ body{font-family:'Jost',sans-serif;font-weight:300;background:var(--cream);color
   <div class="step-title">Resumen de tu evento</div>
   <div class="step-sub">Esta es una solicitud de reserva. Tu fecha se confirma únicamente cuando recibimos el anticipo y te mandamos confirmación por WhatsApp.</div>
 
+  <div class="summary-card" style="margin-bottom:16px;">
+    <div class="sum-title">👤 Datos de contacto</div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Tu nombre</label>
+      <input class="input" type="text" id="contact-nombre" placeholder="Nombre completo" oninput="validateContactFields()"/>
+    </div>
+    <div class="field" style="margin-bottom:4px;">
+      <label>Teléfono (10 dígitos)</label>
+      <input class="input" type="tel" id="contact-telefono" placeholder="81 1234 5678" maxlength="15" oninput="validateContactFields()"/>
+      <div id="telefono-error" style="font-size:11px;color:#e74c3c;margin-top:4px;display:none;"></div>
+    </div>
+  </div>
+
   <div class="summary-card">
     <div class="sum-title">📋 Detalles del evento</div>
     <div class="sum-row"><span class="sum-label">Fecha</span><span class="sum-val" id="sum-fecha">—</span></div>
@@ -459,6 +472,8 @@ const state = {
   pastelFlavor: '',
   entradas: [],
   deco: 'Básica (incluida)',
+  nombre: '',
+  telefono: '',
   currentStep: 1
 };
 
@@ -808,13 +823,77 @@ function buildSummary() {
   document.getElementById('sum-servicio').textContent = `$${servicio.toLocaleString()}`;
   document.getElementById('sum-total').textContent = `$${total.toLocaleString()} MXN`;
 
-  // WhatsApp
-  const msg = buildWhatsAppMsg(fechaFormatted, espacioObj?.name, total);
-  document.getElementById('btn-whatsapp').href = 'https://wa.me/528182543303?text='+encodeURIComponent(msg);
+  // WhatsApp — disabled until contact fields are valid
+  const btn = document.getElementById('btn-whatsapp');
+  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '0.4';
+  // Restore contact fields if already filled
+  if (state.nombre) document.getElementById('contact-nombre').value = state.nombre;
+  if (state.telefono) document.getElementById('contact-telefono').value = state.telefono;
+  validateContactFields();
+}
+
+// ── MX PHONE VALIDATION ──
+function normalizeMXPhone(raw) {
+  const digits = raw.replace(/\D/g, '');
+  // 10 digits: local MX number
+  if (digits.length === 10) return digits;
+  // 12 digits starting with 52: country code without +
+  if (digits.length === 12 && digits.startsWith('52')) return digits.slice(2);
+  // 13 digits starting with 521: mobile prefix
+  if (digits.length === 13 && digits.startsWith('521')) return digits.slice(3);
+  return null;
+}
+
+function validateContactFields() {
+  const nombreInput = document.getElementById('contact-nombre');
+  const telInput = document.getElementById('contact-telefono');
+  const telError = document.getElementById('telefono-error');
+  const btn = document.getElementById('btn-whatsapp');
+
+  state.nombre = nombreInput.value.trim();
+  state.telefono = telInput.value.trim();
+
+  const normalized = normalizeMXPhone(state.telefono);
+  let valid = true;
+
+  // Name required
+  if (!state.nombre) {
+    valid = false;
+  }
+
+  // Phone validation
+  if (!state.telefono) {
+    telError.style.display = 'none';
+    valid = false;
+  } else if (!normalized) {
+    telError.textContent = 'Ingresa un número mexicano válido de 10 dígitos (ej. 81 1234 5678)';
+    telError.style.display = 'block';
+    valid = false;
+  } else {
+    telError.style.display = 'none';
+  }
+
+  btn.style.pointerEvents = valid ? 'auto' : 'none';
+  btn.style.opacity = valid ? '1' : '0.4';
+
+  // Rebuild WhatsApp link if valid
+  if (valid) {
+    const fechaFormatted = state.fecha ? new Date(state.fecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
+    const espacioObj = SPACES.find(s=>s.id===state.espacio);
+    const base = state.guests * 480;
+    const servicio = Math.round(base * 0.18);
+    const total = base + servicio;
+    const msg = buildWhatsAppMsg(fechaFormatted, espacioObj?.name, total);
+    btn.href = 'https://wa.me/528182543303?text='+encodeURIComponent(msg);
+  }
 }
 
 function buildWhatsAppMsg(fecha, espacio, total) {
   let msg = `Hola! Quiero reservar un evento privado en AMALAY 🌿\n\n`;
+  msg += `👤 Nombre: ${state.nombre}\n`;
+  const normalizedPhone = normalizeMXPhone(state.telefono);
+  if (normalizedPhone) msg += `📱 Teléfono: ${normalizedPhone}\n`;
   msg += `📅 Fecha: ${fecha}\n`;
   msg += `👥 Personas: ${state.guests}\n`;
   msg += `🏡 Espacio: ${espacio}\n`;
