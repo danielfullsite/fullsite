@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>War Room — Agent Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#08080a;--surface:#111114;--card:#18181c;--border:#1c1c1f;
+  --border2:#27272a;--text:#e4e4e2;--muted:#52525b;--dim:#2a2a2f;
+  --green:#4ade80;--green-bg:#052e16;--amber:#f59e0b;--amber-bg:#301604;
+  --blue:#60a5fa;--blue-bg:#0c1a2e;--red:#f87171;--red-bg:#3a0d0d;
+  --purple:#a78bfa;--purple-bg:#1e1030;--teal:#2dd4bf;--teal-bg:#042621;
+}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;}
+button{cursor:pointer;font-family:'Syne',sans-serif;}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:48px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-weight:800;font-size:14px;letter-spacing:.18em;text-transform:uppercase;}
+.logo em{color:var(--green);font-style:normal;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.clk{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);}
+.refresh-info{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2.5s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.back-link{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);text-decoration:none;transition:color .15s;}
+.back-link:hover{color:var(--text);}
+
+/* Main */
+.main{max-width:1200px;margin:0 auto;padding:24px;}
+
+/* Page header */
+.ph{font-size:20px;font-weight:800;color:#fafafa;margin-bottom:3px;letter-spacing:-.01em;}
+.ps{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:22px;}
+
+/* KPI cards */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:2px;border-radius:10px 10px 0 0;}
+.kpi-l{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px;}
+.kpi-v{font-size:26px;font-weight:800;color:#fafafa;line-height:1;margin-bottom:3px;}
+.kpi-d{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);}
+.kpi-d.warn{color:var(--amber);}
+.kpi-d.err{color:var(--red);}
+
+/* Two-column layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
+
+/* Panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.panel-h{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
+.panel-t{font-size:12px;font-weight:700;}
+.panel-badge{font-family:'JetBrains Mono',monospace;font-size:8px;padding:2px 6px;border-radius:3px;}
+
+/* Tentacle breakdown */
+.tent-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);}
+.tent-row:last-child{border-bottom:none;}
+.tent-name{font-size:11px;font-weight:600;color:var(--text);min-width:80px;}
+.tent-bar-wrap{flex:1;height:6px;background:var(--card);border-radius:3px;overflow:hidden;}
+.tent-bar{height:6px;border-radius:3px;transition:width .6s ease;}
+.tent-stats{display:flex;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);min-width:120px;justify-content:flex-end;}
+
+/* Status breakdown */
+.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:14px 16px;}
+.status-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;}
+.status-count{font-size:22px;font-weight:800;color:#fafafa;margin-bottom:2px;}
+.status-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;}
+
+/* Timeline table */
+table{width:100%;border-collapse:collapse;}
+th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);font-weight:400;}
+td{padding:10px 16px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#0c0c0f;}
+
+/* Badges */
+.bd{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:4px;display:inline-block;}
+.bd-ok{background:var(--green-bg);color:var(--green);}
+.bd-err{background:var(--red-bg);color:var(--red);}
+.bd-run{background:var(--blue-bg);color:var(--blue);}
+.bd-warn{background:var(--amber-bg);color:var(--amber);}
+.bd-tent{background:var(--purple-bg);color:var(--purple);}
+
+/* Token chart (mini bar chart) */
+.token-chart{display:flex;align-items:flex-end;gap:3px;height:60px;padding:14px 16px;}
+.token-bar{flex:1;background:var(--green);border-radius:2px 2px 0 0;min-height:2px;transition:height .4s ease;position:relative;}
+.token-bar:hover{opacity:.8;}
+.token-bar .tooltip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border2);border-radius:4px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text);white-space:nowrap;z-index:10;}
+.token-bar:hover .tooltip{display:block;}
+
+/* Duration histogram */
+.dur-row{display:flex;align-items:center;gap:8px;padding:6px 16px;}
+.dur-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);min-width:50px;text-align:right;}
+.dur-bar-wrap{flex:1;height:8px;background:var(--card);border-radius:4px;overflow:hidden;}
+.dur-bar{height:8px;background:var(--blue);border-radius:4px;transition:width .6s ease;}
+.dur-count{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);min-width:24px;}
+
+/* Empty state */
+.empty{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);text-align:center;padding:40px 20px;line-height:1.6;}
+
+/* Loading */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Error banner */
+.error-banner{background:var(--red-bg);border:1px solid #5c1d1d;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:11px;color:var(--red);display:none;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* Responsive */
+@media(max-width:900px){
+  .kpis{grid-template-columns:repeat(2,1fr);}
+  .two-col{grid-template-columns:1fr;}
+}
+@media(max-width:600px){
+  .kpis{grid-template-columns:1fr;}
+  .main{padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <a href="fullsite.html" class="back-link">&larr; War Room</a>
+    <div class="logo">AGENT <em>DASHBOARD</em></div>
+  </div>
+  <div class="topbar-right">
+    <div class="refresh-info">
+      <span class="live-dot"></span>
+      <span id="refresh-label">Live — 30s</span>
+    </div>
+    <span class="clk" id="clock"></span>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <h1 class="ph">Agent Runs</h1>
+  <p class="ps">Ejecuciones del War Room multi-agent system &middot; Actualizado en tiempo real</p>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- KPIs -->
+  <div class="kpis" id="kpis">
+    <div class="kpi">
+      <div class="kpi-accent" style="background:var(--green)"></div>
+      <div class="kpi-l">Total runs</div>
+      <div class="kpi-v" id="kpi-total">—</div>
+      <div class="kpi-d" id="kpi-total-sub">cargando...</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:var(--blue)"></div>
+      <div class="kpi-l">Tasa de exito</div>
+      <div class="kpi-v" id="kpi-success">—</div>
+      <div class="kpi-d" id="kpi-success-sub">cargando...</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:var(--amber)"></div>
+      <div class="kpi-l">Duracion prom</div>
+      <div class="kpi-v" id="kpi-duration">—</div>
+      <div class="kpi-d" id="kpi-duration-sub">cargando...</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-accent" style="background:var(--purple)"></div>
+      <div class="kpi-l">Tokens totales</div>
+      <div class="kpi-v" id="kpi-tokens">—</div>
+      <div class="kpi-d" id="kpi-tokens-sub">cargando...</div>
+    </div>
+  </div>
+
+  <!-- Two-column: Tentacle breakdown + Status breakdown -->
+  <div class="two-col">
+    <!-- Tentacle breakdown -->
+    <div class="panel">
+      <div class="panel-h">
+        <span class="panel-t">Por tentaculo</span>
+        <span class="panel-badge bd-tent" id="tent-count">0 tentaculos</span>
+      </div>
+      <div id="tent-breakdown">
+        <div class="loading"><span class="spin"></span>Cargando...</div>
+      </div>
+    </div>
+
+    <!-- Status + Duration -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <!-- Status breakdown -->
+      <div class="panel">
+        <div class="panel-h">
+          <span class="panel-t">Por status</span>
+        </div>
+        <div class="status-grid" id="status-breakdown">
+          <div class="status-card"><div class="status-count">—</div><div class="status-label">success</div></div>
+          <div class="status-card"><div class="status-count">—</div><div class="status-label">error</div></div>
+          <div class="status-card"><div class="status-count">—</div><div class="status-label">running</div></div>
+          <div class="status-card"><div class="status-count">—</div><div class="status-label">timeout</div></div>
+        </div>
+      </div>
+
+      <!-- Duration distribution -->
+      <div class="panel">
+        <div class="panel-h">
+          <span class="panel-t">Distribucion de duracion</span>
+        </div>
+        <div id="dur-chart" style="padding:10px 0;">
+          <div class="loading"><span class="spin"></span>Cargando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Token usage mini chart -->
+  <div class="panel" style="margin-bottom:22px;">
+    <div class="panel-h">
+      <span class="panel-t">Tokens por ejecucion (ultimas 20)</span>
+      <span class="panel-badge" style="background:var(--green-bg);color:var(--green);" id="token-total">0 tokens</span>
+    </div>
+    <div class="token-chart" id="token-chart">
+      <div class="loading"><span class="spin"></span>Cargando...</div>
+    </div>
+  </div>
+
+  <!-- Recent runs table -->
+  <div class="panel">
+    <div class="panel-h">
+      <span class="panel-t">Ejecuciones recientes</span>
+      <span class="panel-badge" style="background:var(--card);color:var(--dim);" id="runs-showing">—</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Agente</th>
+            <th>Tentaculo</th>
+            <th>Trigger</th>
+            <th>Status</th>
+            <th>Duracion</th>
+            <th>Tokens</th>
+            <th>Output</th>
+          </tr>
+        </thead>
+        <tbody id="runs-table">
+          <tr><td colspan="8"><div class="loading"><span class="spin"></span>Cargando...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SB_URL = 'https://qjiomlvudfmzuvqvhwpk.supabase.co';
+const SB_KEY = 'sb_publishable_8_nNPHJT1RsfZhpXB6ARGA_6aOwZasM';
+const SB_H = {
+  'apikey': SB_KEY,
+  'Authorization': `Bearer ${SB_KEY}`,
+  'Content-Type': 'application/json'
+};
+
+const REFRESH_INTERVAL = 30000; // 30s
+let refreshTimer = null;
+
+// ============================================================
+// SUPABASE FETCH
+// ============================================================
+async function fetchRuns() {
+  const r = await fetch(
+    `${SB_URL}/rest/v1/agent_runs?select=*&order=created_at.desc&limit=100`,
+    { headers: SB_H }
+  );
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${r.statusText}`);
+  return r.json();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderKPIs(runs) {
+  const total = runs.length;
+  const success = runs.filter(r => r.status === 'success').length;
+  const errors = runs.filter(r => r.status === 'error').length;
+  const rate = total > 0 ? ((success / total) * 100).toFixed(1) : '0';
+
+  const durations = runs.filter(r => r.duration_ms != null).map(r => r.duration_ms);
+  const avgDur = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+
+  const tokensIn = runs.reduce((s, r) => s + (r.tokens_in || 0), 0);
+  const tokensOut = runs.reduce((s, r) => s + (r.tokens_out || 0), 0);
+  const tokensTotal = tokensIn + tokensOut;
+
+  document.getElementById('kpi-total').textContent = total.toLocaleString();
+  document.getElementById('kpi-total-sub').textContent = `${errors} con error`;
+  document.getElementById('kpi-total-sub').className = errors > 0 ? 'kpi-d warn' : 'kpi-d';
+
+  document.getElementById('kpi-success').textContent = `${rate}%`;
+  document.getElementById('kpi-success-sub').textContent = `${success} exitosos de ${total}`;
+
+  document.getElementById('kpi-duration').textContent = formatDuration(avgDur);
+  const maxDur = durations.length > 0 ? Math.max(...durations) : 0;
+  document.getElementById('kpi-duration-sub').textContent = `max ${formatDuration(maxDur)}`;
+  document.getElementById('kpi-duration-sub').className = avgDur > 30000 ? 'kpi-d warn' : 'kpi-d';
+
+  document.getElementById('kpi-tokens').textContent = formatNumber(tokensTotal);
+  document.getElementById('kpi-tokens-sub').textContent = `in: ${formatNumber(tokensIn)} / out: ${formatNumber(tokensOut)}`;
+}
+
+function renderTentacles(runs) {
+  const byTent = {};
+  runs.forEach(r => {
+    const t = r.tentacle || 'sin_tentaculo';
+    if (!byTent[t]) byTent[t] = { total: 0, success: 0 };
+    byTent[t].total++;
+    if (r.status === 'success') byTent[t].success++;
+  });
+
+  const entries = Object.entries(byTent).sort((a, b) => b[1].total - a[1].total);
+  const maxCount = entries.length > 0 ? entries[0][1].total : 1;
+
+  document.getElementById('tent-count').textContent = `${entries.length} tentaculo${entries.length !== 1 ? 's' : ''}`;
+
+  const colors = { reportes: 'var(--green)', ops: 'var(--amber)', kb: 'var(--blue)', orquestador: 'var(--purple)', reseñas: 'var(--teal)' };
+
+  const container = document.getElementById('tent-breakdown');
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="empty">Sin datos de tentaculos</div>';
+    return;
+  }
+
+  container.innerHTML = entries.map(([name, data]) => {
+    const pct = (data.total / maxCount * 100).toFixed(0);
+    const successRate = data.total > 0 ? ((data.success / data.total) * 100).toFixed(0) : '0';
+    const color = colors[name] || 'var(--muted)';
+    return `<div class="tent-row">
+      <span class="tent-name">${escHtml(name)}</span>
+      <div class="tent-bar-wrap"><div class="tent-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div class="tent-stats"><span>${data.total} runs</span><span>${successRate}% ok</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderStatusBreakdown(runs) {
+  const counts = { success: 0, error: 0, running: 0, timeout: 0 };
+  runs.forEach(r => {
+    const s = r.status || 'running';
+    if (counts.hasOwnProperty(s)) counts[s]++;
+    else counts.running++;
+  });
+
+  const grid = document.getElementById('status-breakdown');
+  const statusColors = {
+    success: 'var(--green)', error: 'var(--red)',
+    running: 'var(--blue)', timeout: 'var(--amber)'
+  };
+
+  grid.innerHTML = Object.entries(counts).map(([status, count]) => {
+    const color = statusColors[status] || 'var(--dim)';
+    return `<div class="status-card">
+      <div class="status-count" style="color:${color}">${count}</div>
+      <div class="status-label">${status}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDurationChart(runs) {
+  const durations = runs.filter(r => r.duration_ms != null).map(r => r.duration_ms);
+  const container = document.getElementById('dur-chart');
+
+  if (durations.length === 0) {
+    container.innerHTML = '<div class="empty">Sin datos de duracion</div>';
+    return;
+  }
+
+  const buckets = [
+    { label: '< 1s', max: 1000, count: 0 },
+    { label: '1-5s', max: 5000, count: 0 },
+    { label: '5-15s', max: 15000, count: 0 },
+    { label: '15-30s', max: 30000, count: 0 },
+    { label: '30s-1m', max: 60000, count: 0 },
+    { label: '> 1m', max: Infinity, count: 0 }
+  ];
+
+  durations.forEach(d => {
+    for (const b of buckets) {
+      if (d < b.max) { b.count++; break; }
+    }
+  });
+
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+
+  container.innerHTML = buckets.map(b => {
+    const pct = (b.count / maxCount * 100).toFixed(0);
+    return `<div class="dur-row">
+      <span class="dur-label">${b.label}</span>
+      <div class="dur-bar-wrap"><div class="dur-bar" style="width:${pct}%"></div></div>
+      <span class="dur-count">${b.count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTokenChart(runs) {
+  const container = document.getElementById('token-chart');
+  const withTokens = runs.filter(r => (r.tokens_in || 0) + (r.tokens_out || 0) > 0).slice(0, 20).reverse();
+
+  if (withTokens.length === 0) {
+    container.innerHTML = '<div class="empty">Sin datos de tokens</div>';
+    return;
+  }
+
+  const totals = withTokens.map(r => (r.tokens_in || 0) + (r.tokens_out || 0));
+  const maxT = Math.max(...totals, 1);
+  const grandTotal = totals.reduce((a, b) => a + b, 0);
+
+  document.getElementById('token-total').textContent = `${formatNumber(grandTotal)} tokens`;
+
+  container.innerHTML = withTokens.map((r, i) => {
+    const t = totals[i];
+    const h = Math.max((t / maxT) * 56, 2);
+    const color = r.status === 'error' ? 'var(--red)' : 'var(--green)';
+    const time = formatTime(r.created_at);
+    return `<div class="token-bar" style="height:${h}px;background:${color}">
+      <span class="tooltip">${escHtml(r.agent_id || '?')} — ${formatNumber(t)} tok — ${time}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderRunsTable(runs) {
+  const tbody = document.getElementById('runs-table');
+  const showing = Math.min(runs.length, 50);
+  document.getElementById('runs-showing').textContent = `${showing} de ${runs.length}`;
+
+  if (runs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty">Sin ejecuciones registradas.<br>Los agentes del War Room loguearan aqui cuando se ejecuten.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = runs.slice(0, 50).map(r => {
+    const statusClass = {
+      success: 'bd-ok', error: 'bd-err', running: 'bd-run', timeout: 'bd-warn'
+    }[r.status] || 'bd-run';
+
+    const tokens = (r.tokens_in || 0) + (r.tokens_out || 0);
+    const summary = r.output_summary
+      ? (r.output_summary.length > 60 ? r.output_summary.slice(0, 60) + '...' : r.output_summary)
+      : (r.error_message ? r.error_message.slice(0, 60) + '...' : '—');
+
+    return `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;white-space:nowrap;">${formatTimestamp(r.created_at)}</td>
+      <td style="color:var(--text);font-weight:600;">${escHtml(r.agent_id || '—')}</td>
+      <td><span class="bd bd-tent">${escHtml(r.tentacle || '—')}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;">${escHtml(r.trigger_type || '—')}</td>
+      <td><span class="bd ${statusClass}">${escHtml(r.status || '—')}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;">${r.duration_ms != null ? formatDuration(r.duration_ms) : '—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;">${tokens > 0 ? formatNumber(tokens) : '—'}</td>
+      <td style="font-size:10px;color:var(--dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escAttr(r.output_summary || r.error_message || '')}">${escHtml(summary)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return `${m}m ${s}s`;
+}
+
+function formatNumber(n) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function escHtml(s) {
+  const el = document.createElement('span');
+  el.textContent = s;
+  return el.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('clock').textContent =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} MX`;
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+async function refresh() {
+  try {
+    const runs = await fetchRuns();
+    document.getElementById('error-banner').style.display = 'none';
+    renderKPIs(runs);
+    renderTentacles(runs);
+    renderStatusBreakdown(runs);
+    renderDurationChart(runs);
+    renderTokenChart(runs);
+    renderRunsTable(runs);
+  } catch (err) {
+    const banner = document.getElementById('error-banner');
+    banner.textContent = `Error al cargar datos: ${err.message}`;
+    banner.style.display = 'block';
+    console.error('Dashboard refresh error:', err);
+  }
+}
+
+// Init
+updateClock();
+setInterval(updateClock, 1000);
+refresh();
+refreshTimer = setInterval(refresh, REFRESH_INTERVAL);
+
+</script>
+</body>
+</html>
