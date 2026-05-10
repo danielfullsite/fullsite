@@ -10,3 +10,5 @@ node_modules/
 
 .octogent/worktrees/
 .octogent/state/
+
+agents/wansoft/downloads/

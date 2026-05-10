@@ -1,0 +1,109 @@
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  Wansoft Daily Mesero Report — avance (3pm) + cierre (close)          │
+# │                                                                        │
+# │  Mónica gets TWO messages per day:                                     │
+# │  1. "avance" at 3pm MX — partial data, morning shift only             │
+# │  2. "cierre" at AMALAY close — complete day, all shifts               │
+# │                                                                        │
+# │  Note: promedios mix brunch + cafecito turns. v2 will split by shift. │
+# │                                                                        │
+# │  Schedule (MX = UTC-6, no DST):                                       │
+# │  ┌─────────────┬────────────┬──────────────┬──────────────────────┐   │
+# │  │ Type        │ Time (MX)  │ Days (MX)    │ UTC cron             │   │
+# │  ├─────────────┼────────────┼──────────────┼──────────────────────┤   │
+# │  │ avance      │ 3:00pm     │ Daily        │ 0 21 * * *           │   │
+# │  │ cierre      │ 8:30pm     │ Dom-Mie      │ 30 2 * * 1-4         │   │
+# │  │ cierre      │ 11:00pm    │ Jue-Sab      │ 0 5 * * 0,5,6        │   │
+# │  └─────────────┴────────────┴──────────────┴──────────────────────┘   │
+# │                                                                        │
+# │  AMALAY close times:                                                   │
+# │  - Dom-Mie: 5pm close → report at 8:30pm (buffer for last orders)    │
+# │  - Jue-Sab: 11pm close → report at 11pm                              │
+# │                                                                        │
+# │  Target date = today in MX timezone. All crons fire while MX date     │
+# │  is still "today" = the business day being reported.                  │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+name: Wansoft Daily Mesero Report
+
+on:
+  schedule:
+    - cron: '0 21 * * *'      # 3pm MX daily → avance
+    - cron: '30 2 * * 1-4'    # 8:30pm MX Sun-Wed → cierre
+    - cron: '0 5 * * 0,5,6'   # 11pm MX Thu-Sat → cierre
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Fecha YYYY-MM-DD (default: hoy MX)'
+        required: false
+      report_type:
+        description: 'cierre o avance'
+        type: choice
+        options:
+          - cierre
+          - avance
+        default: cierre
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      WANSOFT_USER:       ${{ secrets.WANSOFT_USER }}
+      WANSOFT_PASS:       ${{ secrets.WANSOFT_PASS }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Determine report type
+        id: params
+        run: |
+          # workflow_dispatch: use input
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.report_type }}" >> "$GITHUB_OUTPUT"
+          # schedule "0 21 * * *" = 21:00 UTC = 3pm MX = avance
+          elif [ "${{ github.event.schedule }}" = "0 21 * * *" ]; then
+            echo "type=avance" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=cierre" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine target date
+        id: date
+        run: |
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            echo "target=${{ github.event.inputs.target_date }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=$(TZ=America/Mexico_City date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run mesero report pipeline
+        working-directory: agents/wansoft
+        run: python run.py ${{ steps.date.outputs.target }} --type=${{ steps.params.outputs.type }}
+
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wansoft-debug-${{ steps.date.outputs.target }}-${{ steps.params.outputs.type }}
+          path: |
+            agents/wansoft/downloads/ERROR_*.png
+            agents/wansoft/downloads/page_dump_*.html
+          retention-days: 7
+          if-no-files-found: ignore
