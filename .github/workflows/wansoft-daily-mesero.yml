@@ -50,10 +50,11 @@ jobs:
     timeout-minutes: 10
 
     env:
-      WANSOFT_USER:       ${{ secrets.WANSOFT_USER }}
-      WANSOFT_PASS:       ${{ secrets.WANSOFT_PASS }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+      WANSOFT_USER:              ${{ secrets.WANSOFT_USER }}
+      WANSOFT_PASS:              ${{ secrets.WANSOFT_PASS }}
+      TELEGRAM_BOT_TOKEN:        ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:          ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+      TELEGRAM_CHAT_ID_MONICA:   ${{ secrets.TELEGRAM_CHAT_ID_MONICA }}
 
     steps:
       - name: Checkout

@@ -82,8 +82,8 @@ def main():
         sys.exit(EXIT_PARSE)
     log(f"Mensaje platillos generado ({len(platillos_msg)} chars)")
 
-    # Step 3: Send main message
-    log("Paso 3/4: Enviando reporte meseros a Telegram...")
+    # Step 3: Send main message to all recipients
+    log("Paso 3/4: Enviando reporte meseros...")
     try:
         from sender import send_telegram
         ok = send_telegram(message)
@@ -92,12 +92,12 @@ def main():
         sys.exit(EXIT_SEND)
 
     if not ok:
-        log("Envio de reporte meseros fallo")
+        log("Envio de reporte meseros fallo para todos los destinatarios")
         sys.exit(EXIT_SEND)
 
-    # Step 4: Send platillos message
+    # Step 4: Send platillos message to all recipients
     time.sleep(1)
-    log("Paso 4/4: Enviando detalle platillos a Telegram...")
+    log("Paso 4/4: Enviando detalle platillos...")
     try:
         ok = send_telegram(platillos_msg)
     except Exception as e:
@@ -105,7 +105,7 @@ def main():
         sys.exit(EXIT_SEND_PLATILLOS)
 
     if not ok:
-        log("Envio de detalle platillos fallo (reporte meseros ya enviado)")
+        log("Envio de detalle platillos fallo para todos (reporte meseros ya enviado)")
         sys.exit(EXIT_SEND_PLATILLOS)
 
     log("=== Pipeline completado ===")
