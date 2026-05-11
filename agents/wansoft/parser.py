@@ -12,8 +12,8 @@ import openpyxl
 EXCLUDE_MESEROS = {
     "APLICACIONES",
     "MESERO EVENTO",
-    "Oscar Ricardo",  # Supervisor caja Take Away (no atiende mesa)
-    # TODO: validar Hector Enrique con Mónica
+    "Oscar Ricardo",   # Supervisor caja Take Away (no atiende mesa)
+    "Hector Enrique",  # Cajero, confirmado por Mónica 2026-05-10
 }
 
 

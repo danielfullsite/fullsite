@@ -127,6 +127,9 @@ def test_format_message():
     if "MESERO EVENTO" in msg:
         errors.append("MESERO EVENTO should be filtered out")
 
+    if "Hector Enrique" in msg:
+        errors.append("Hector Enrique should be filtered out (cajero)")
+
     lines = msg.splitlines()
     medal_lines = [l for l in lines if l.startswith(("🥇", "🥈", "🥉"))]
     if len(medal_lines) != 3:
@@ -143,10 +146,12 @@ def test_format_message():
 
     if "Total día:" not in msg:
         errors.append("Missing 'Total día:' line")
-    if "207 personas" not in msg:
-        errors.append("Expected 207 personas in total line")
-    if "$466" not in msg:
-        errors.append("Expected general avg ~$466")
+    # Filtered: 207 - 28 (Hector Enrique) = 179 personas
+    if "179 personas" not in msg:
+        errors.append("Expected 179 personas in total line")
+    # General avg: $84,564 / 179 = ~$472
+    if "$472" not in msg:
+        errors.append("Expected general avg ~$472")
 
     return errors
 
@@ -198,16 +203,15 @@ def test_format_platillos():
         errors.append("APLICACIONES should be excluded from per-mesero bakery")
 
     bakery_total_line = [l for l in msg.splitlines() if "piezas" in l]
-    # First "piezas" line should be bakery total
+    # Bakery: Omar 5, Brayan 4, Oscar 2 = 11 (Hector excluded)
     if bakery_total_line:
-        if "13 piezas" not in bakery_total_line[0]:
-            errors.append(f"Bakery total expected 13, got: {bakery_total_line[0]}")
+        if "11 piezas" not in bakery_total_line[0]:
+            errors.append(f"Bakery total expected 11, got: {bakery_total_line[0]}")
 
-    # Postres per mesero (DESSERTS + ICE CREAM, excluding excluded meseros):
-    # Brayan: 2 (cheesecake), Hector: 3 (brownie), Oscar: 1 (ice cream) = 6
+    # Postres: Brayan 2, Oscar 1 = 3 (Hector excluded)
     if len(bakery_total_line) >= 2:
-        if "6 piezas" not in bakery_total_line[1]:
-            errors.append(f"Postres total expected 6, got: {bakery_total_line[1]}")
+        if "3 piezas" not in bakery_total_line[1]:
+            errors.append(f"Postres total expected 3, got: {bakery_total_line[1]}")
 
     # Avance mode
     avance_msg = format_platillos_message(xlsx_path, report_type="avance")
