@@ -236,6 +236,185 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
     return "\n".join(lines)
 
 
+DETALLE_SHEET = "Ventas por mesero por grupo"
+
+POSTRES_GRUPOS = {"DESSERTS", "ICE CREAM"}
+
+
+def _find_detalle_sheet(wb: openpyxl.Workbook):
+    """Find the 'Ventas por mesero por grupo' sheet."""
+    if DETALLE_SHEET in wb.sheetnames:
+        return wb[DETALLE_SHEET]
+    for name in wb.sheetnames:
+        if "grupo" in name.lower() and "mesero" in name.lower() and "resumen" not in name.lower():
+            return wb[name]
+    # Fallback: first sheet (original Wansoft layout)
+    return wb[wb.sheetnames[0]]
+
+
+def _parse_detalle_sheet(wb: openpyxl.Workbook):
+    """Parse granular platillo sheet. Returns list of row dicts."""
+    ws = _find_detalle_sheet(wb)
+
+    # Find header row with Mesero + Platillo + Cantidad
+    header_row = None
+    for row_idx, row in enumerate(
+        ws.iter_rows(min_row=1, max_row=15, values_only=False), start=1
+    ):
+        vals = [str(c.value).strip().lower() if c.value else "" for c in row]
+        if "mesero" in vals and "platillo" in vals and "cantidad" in vals:
+            header_row = row_idx
+            break
+
+    if header_row is None:
+        raise ValueError("No se encontro header row con Mesero/Platillo/Cantidad")
+
+    headers_raw = [c.value for c in ws[header_row]]
+    col_map = {}
+    for i, h in enumerate(headers_raw):
+        if h is None:
+            continue
+        hl = str(h).strip().lower()
+        if hl == "mesero":
+            col_map["mesero"] = i
+        elif hl == "grupo":
+            col_map["grupo"] = i
+        elif hl == "platillo":
+            col_map["platillo"] = i
+        elif hl == "cantidad":
+            col_map["cantidad"] = i
+
+    required = {"mesero", "grupo", "platillo", "cantidad"}
+    missing = required - set(col_map.keys())
+    if missing:
+        raise ValueError(f"Columnas faltantes en detalle: {missing}")
+
+    rows = []
+    for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+        mesero = row[col_map["mesero"]]
+        if mesero is None or str(mesero).strip() == "":
+            continue
+        platillo = str(row[col_map["platillo"]] or "").strip()
+        grupo = str(row[col_map["grupo"]] or "").strip()
+        cantidad = row[col_map["cantidad"]]
+        if cantidad is None:
+            continue
+        rows.append({
+            "mesero": str(mesero).strip(),
+            "grupo": grupo.upper(),
+            "platillo": platillo.upper(),
+            "cantidad": int(float(cantidad)),
+        })
+
+    return rows
+
+
+def _wrap_mesero_line(items: list[tuple[str, int]], max_width: int = 80) -> list[str]:
+    """Wrap 'Name N · Name N · ...' lines at ~max_width chars."""
+    lines = []
+    current = []
+    current_len = 0
+    for name, count in items:
+        entry = f"{name} {count}"
+        entry_len = len(entry) + (3 if current else 0)  # " · " separator
+        if current and current_len + entry_len > max_width:
+            lines.append(" · ".join(current))
+            current = [entry]
+            current_len = len(entry)
+        else:
+            current.append(entry)
+            current_len += entry_len
+    if current:
+        lines.append(" · ".join(current))
+    return lines
+
+
+def format_platillos_message(xlsx_path: str, report_type: str = "cierre") -> str:
+    """Parse XLSX Sheet 1 and return platillo detail WhatsApp message."""
+    from collections import defaultdict
+
+    wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
+    rows = _parse_detalle_sheet(wb)
+    report_date = _extract_date(wb)
+    wb.close()
+
+    if report_date is None:
+        m = re.search(r"(\d{4})-?(\d{2})-?(\d{2})", Path(xlsx_path).stem)
+        if m:
+            report_date = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            report_date = date.today()
+
+    # Date formatting
+    dd = f"{report_date.day:02d}"
+    mes = MESES_ES[report_date.month]
+    date_str = f"{dd} {mes}"
+
+    # Aggregations
+    hh_total = 0
+    chilaquiles_total = 0
+    bakery_by_mesero = defaultdict(int)
+    postres_by_mesero = defaultdict(int)
+
+    for r in rows:
+        platillo = r["platillo"]
+        grupo = r["grupo"]
+        mesero = r["mesero"]
+        cant = r["cantidad"]
+
+        if "HALF" in platillo and "COMBO" in platillo:
+            hh_total += cant
+        if "CHILAQUILES" in platillo:
+            chilaquiles_total += cant
+        if grupo == "BAKERY" and mesero not in EXCLUDE_MESEROS:
+            bakery_by_mesero[mesero] += cant
+        if grupo in POSTRES_GRUPOS and mesero not in EXCLUDE_MESEROS:
+            postres_by_mesero[mesero] += cant
+
+    # Sort and filter zeros
+    bakery_sorted = sorted(
+        [(m, c) for m, c in bakery_by_mesero.items() if c > 0],
+        key=lambda x: x[1], reverse=True,
+    )
+    postres_sorted = sorted(
+        [(m, c) for m, c in postres_by_mesero.items() if c > 0],
+        key=lambda x: x[1], reverse=True,
+    )
+
+    # Header
+    if report_type == "avance":
+        header = f"📊 *AMALAY · Detalle platillos · {date_str} (3pm)*"
+    else:
+        header = f"📊 *AMALAY · Detalle platillos {date_str}*"
+
+    lines = [header, ""]
+    lines.append(f"🥗 *H&H Combo:* {hh_total} vendidos")
+    lines.append(f"🌮 *Chilaquiles:* {chilaquiles_total} vendidos")
+
+    # Pan dulce por mesero
+    lines.append("")
+    lines.append("🥐 *Pan dulce por mesero:*")
+    bakery_items = [(_short_name(m), c) for m, c in bakery_sorted]
+    for line in _wrap_mesero_line(bakery_items):
+        lines.append(line)
+    bakery_total = sum(c for _, c in bakery_sorted)
+    lines.append(f"Total: {bakery_total} piezas")
+
+    # Postres por mesero
+    lines.append("")
+    lines.append("🍰 *Postres por mesero:*")
+    postres_items = [(_short_name(m), c) for m, c in postres_sorted]
+    for line in _wrap_mesero_line(postres_items):
+        lines.append(line)
+    postres_total = sum(c for _, c in postres_sorted)
+    lines.append(f"Total: {postres_total} piezas")
+
+    lines.append("")
+    lines.append("_by Fullsite ✨_")
+
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -249,3 +428,5 @@ if __name__ == "__main__":
         print(f"Error: archivo no encontrado: {args.xlsx}", file=sys.stderr)
         sys.exit(1)
     print(format_message(args.xlsx, report_type=args.report_type))
+    print()
+    print(format_platillos_message(args.xlsx, report_type=args.report_type))
