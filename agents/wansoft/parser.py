@@ -14,6 +14,8 @@ EXCLUDE_MESEROS = {
     "MESERO EVENTO",
     "Oscar Ricardo",   # Supervisor caja Take Away (no atiende mesa)
     "Hector Enrique",  # Cajero, confirmado por Mónica 2026-05-10
+    "Rodrigo Chávez",   # Cajero, confirmado por Mónica 2026-05-11
+    "Fany Elizabeth",   # Cajera, confirmada por Mónica 2026-05-11
 }
 
 
