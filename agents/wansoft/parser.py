@@ -205,7 +205,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
         medal = MEDALS[i]
         lines.append(
             f"{medal} {_short_name(r['mesero'])} {_fmt_money(r['promedio'])} "
-            f"({r['personas']} mesas)"
+            f"({r["personas"]} personas)"
         )
 
     # Rest
