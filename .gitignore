@@ -12,3 +12,4 @@ node_modules/
 .octogent/state/
 
 agents/wansoft/downloads/
+__pycache__/

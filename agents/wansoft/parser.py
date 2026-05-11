@@ -9,7 +9,18 @@ from pathlib import Path
 
 import openpyxl
 
-EXCLUDE_MESEROS = {"APLICACIONES", "MESERO EVENTO"}
+EXCLUDE_MESEROS = {
+    "APLICACIONES",
+    "MESERO EVENTO",
+    "Oscar Ricardo",  # Supervisor caja Take Away (no atiende mesa)
+    # TODO: validar Hector Enrique con Mónica
+}
+
+
+def _is_excluded(mesero: str) -> bool:
+    """Check if mesero matches any exclusion (substring, case-insensitive)."""
+    m = mesero.upper()
+    return any(ex.upper() in m for ex in EXCLUDE_MESEROS)
 
 RESUMEN_SHEET = "Resumen de ventas por mesero"
 
@@ -160,7 +171,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
             report_date = date.today()
 
     # Filter out non-mesero rows
-    filtered = [r for r in rows if r["mesero"] not in EXCLUDE_MESEROS]
+    filtered = [r for r in rows if not _is_excluded(r["mesero"])]
     if not filtered:
         return "Sin datos de meseros para este dia."
 
@@ -366,9 +377,9 @@ def format_platillos_message(xlsx_path: str, report_type: str = "cierre") -> str
             hh_total += cant
         if "CHILAQUILES" in platillo:
             chilaquiles_total += cant
-        if grupo == "BAKERY" and mesero not in EXCLUDE_MESEROS:
+        if grupo == "BAKERY" and not _is_excluded(mesero):
             bakery_by_mesero[mesero] += cant
-        if grupo in POSTRES_GRUPOS and mesero not in EXCLUDE_MESEROS:
+        if grupo in POSTRES_GRUPOS and not _is_excluded(mesero):
             postres_by_mesero[mesero] += cant
 
     # Sort and filter zeros
