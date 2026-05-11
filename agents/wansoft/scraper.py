@@ -101,7 +101,17 @@ def scrape(target_date: str) -> Path:
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=headless)
-        context = browser.new_context(accept_downloads=True)
+        context = browser.new_context(
+            accept_downloads=True,
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 800},
+            locale="es-MX",
+            timezone_id="America/Mexico_City",
+        )
         page = context.new_page()
 
         # ── Step 1: Login ────────────────────────────────────────────────
@@ -109,7 +119,10 @@ def scrape(target_date: str) -> Path:
         page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=15000)
 
         try:
-            page.wait_for_selector("input[type='text'], input[name*='ser'], input[id*='ser']", timeout=15000)
+            page.wait_for_selector(
+                "input[type='text'], input[name='Usuario'], input[id*='ser']",
+                timeout=15000,
+            )
         except PwTimeout:
             screenshot_error(page, "login_page")
             log("Error: no se encontro formulario de login")
@@ -117,28 +130,83 @@ def scrape(target_date: str) -> Path:
             sys.exit(EXIT_LOGIN_FAIL)
 
         log("Llenando credenciales...")
-        # Find username and password inputs
-        user_input = page.locator("input[type='text'], input[name*='ser'], input[id*='ser']").first
+        user_input = page.locator(
+            "input[type='text'], input[name='Usuario'], input[id*='ser']"
+        ).first
         pass_input = page.locator("input[type='password']").first
-        user_input.fill(user)
-        pass_input.fill(passwd)
+
+        # Type with delay (more human-like, avoids anti-bot)
+        user_input.click()
+        user_input.type(user, delay=50)
+
+        page.wait_for_timeout(1000)  # pause between fields
+
+        pass_input.click()
+        pass_input.type(passwd, delay=50)
+
+        page.wait_for_timeout(500)  # let client-side validation enable button
 
         # Submit
-        submit_btn = page.locator("button[type='submit'], input[type='submit'], button:has-text('Iniciar'), button:has-text('Login'), button:has-text('Entrar')").first
+        submit_btn = page.locator(
+            "button[type='submit'], input[type='submit'], "
+            "button:has-text('Ingresar'), button:has-text('Iniciar'), "
+            "button:has-text('Login'), button:has-text('Entrar')"
+        ).first
         submit_btn.click()
 
-        log("Esperando login...")
+        # ── Post-login verification ──────────────────────────────────────
+        log("Verificando login...")
+        login_ok = False
         try:
-            # Wait for navigation away from login page
-            page.wait_for_url(f"{WANSOFT_BASE}/**", timeout=20000)
-            page.wait_for_load_state("domcontentloaded")
+            # Option A: URL redirects away from login page
+            page.wait_for_url(
+                lambda url: "/Wansoft.Web/" in url and not url.rstrip("/").endswith("/Wansoft.Web"),
+                timeout=15000,
+            )
+            login_ok = True
         except PwTimeout:
-            screenshot_error(page, "login_submit")
-            log("Error: login fallido o timeout")
+            pass
+
+        if not login_ok:
+            # Option B: authenticated element appears (user name in sidebar)
+            try:
+                page.wait_for_selector(
+                    "text=D.RAMONFAUR, .user-name, .username, [class*='user']",
+                    timeout=5000,
+                )
+                login_ok = True
+            except PwTimeout:
+                pass
+
+        if not login_ok:
+            # Login failed — collect diagnostics
+            current_url = page.url
+            log(f"Login fallido. URL actual: {current_url}")
+
+            # Check if password field still has value (page didn't reload)
+            try:
+                pass_val = pass_input.input_value()
+                log(f"Password input tiene valor: {'si' if pass_val else 'no (vacio)'}")
+            except Exception:
+                log("Password input no accesible")
+
+            # Check for visible error messages
+            try:
+                error_el = page.locator(
+                    ".alert-danger, .error-message, .validation-summary-errors, "
+                    "[class*='error'], [class*='alert']"
+                ).first
+                if error_el.is_visible():
+                    error_text = error_el.text_content() or ""
+                    log(f"Mensaje de error visible: {error_text[:200]}")
+            except Exception:
+                pass
+
+            dump_page(page, "login_failed")
             browser.close()
             sys.exit(EXIT_LOGIN_FAIL)
 
-        log("Login exitoso")
+        log("Login verificado")
 
         # ── Step 2: Navigate to report ───────────────────────────────────
         log("Navegando a reporte Ventas por Mesero por Grupo...")
