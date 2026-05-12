@@ -2,7 +2,6 @@
 Persistencia a Supabase para reportes de Wansoft.
 NO bloquea el envio de Telegram si falla.
 """
-import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -56,11 +55,11 @@ def upsert_daily_report(
             "ventas_dia": agg_meseros.get("total_dia"),
             "personas_restaurant": agg_meseros.get("personas_dia"),
             "ticket_promedio_restaurant": agg_meseros.get("ticket_promedio"),
-            "meseros": json.dumps(agg_meseros.get("meseros_top", []), ensure_ascii=False),
+            "meseros": agg_meseros.get("meseros_top", []),
             # De agg_platillos
             "chilaquiles_total": agg_platillos.get("chilaquiles_total"),
             "half_half_total": agg_platillos.get("half_half_total"),
-            "platillos_top": json.dumps(agg_platillos.get("platillos_top", []), ensure_ascii=False),
+            "platillos_top": agg_platillos.get("platillos_top", []),
         }
 
         supabase.table("wansoft_daily").upsert(
