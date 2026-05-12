@@ -47,7 +47,7 @@ on:
 jobs:
   report:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     env:
       WANSOFT_USER:              ${{ secrets.WANSOFT_USER }}
