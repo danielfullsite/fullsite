@@ -64,6 +64,18 @@ export async function upsertReview(
   return data[0];
 }
 
+export async function getReviewById(
+  config: SupabaseConfig,
+  reviewId: string
+): Promise<GoogleReview | null> {
+  const res = await sbFetch(
+    config,
+    `/rest/v1/google_reviews?id=eq.${reviewId}&limit=1`
+  );
+  const data = (await res.json()) as GoogleReview[];
+  return data[0] ?? null;
+}
+
 export async function getPendingReviews(
   config: SupabaseConfig,
   clientSlug = DEFAULT_CLIENT_SLUG
