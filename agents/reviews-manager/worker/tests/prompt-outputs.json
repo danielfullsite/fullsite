@@ -1,0 +1,67 @@
+[
+  {
+    "label": "5★ con staff mencionado (Brayan)",
+    "input": {
+      "reviewerName": "Patricia Salinas",
+      "starRating": 5,
+      "comment": "El servicio de Brayan fue excelente, comida deliciosa, sin duda volvemos."
+    },
+    "draft": "¡Gracias, Patricia! 🤍 Nos da mucho gusto que Brayan te haya brindado una atención excelente y que la comida te haya encantado en AMALAY Coffee & Market. ¡Aquí en Plaza Duendes, San Pedro Garza García, te esperamos pronto para otro delicioso brunch!",
+    "wordCount": 42,
+    "model": "claude-haiku-4-5-20251001",
+    "tokensIn": 1367,
+    "tokensOut": 93
+  },
+  {
+    "label": "5★ general sin staff",
+    "input": {
+      "reviewerName": "Sofia Martínez",
+      "starRating": 5,
+      "comment": "Lugar precioso para desayunar. La terraza es muy bonita y el café estuvo muy bueno."
+    },
+    "draft": "¡Gracias, Sofia! 😊 Nos encanta saber que la terraza y nuestro café te hayan enamorado en AMALAY Coffee & Market. Es un honor que hayas elegido nuestro espacio en Plaza Duendes, San Pedro Garza García para disfrutar de un desayuno especial. ¡Te esperamos pronto!",
+    "wordCount": 44,
+    "model": "claude-haiku-4-5-20251001",
+    "tokensIn": 1370,
+    "tokensOut": 95
+  },
+  {
+    "label": "4★ feedback suave constructivo",
+    "input": {
+      "reviewerName": "Carolina Mendoza",
+      "starRating": 4,
+      "comment": "Buena comida, buen lugar. Solo un detalle: tardaron en traer los huevos pero al final todo bien."
+    },
+    "draft": "¡Gracias, Carolina! 🙌 Nos alegra que la comida y el lugar te hayan gustado en AMALAY Coffee & Market. Tomamos nota del tiempo en la orden de los huevos para seguir mejorando. ¡Aquí en Plaza Duendes, San Pedro Garza García, te esperamos pronto!",
+    "wordCount": 43,
+    "model": "claude-haiku-4-5-20251001",
+    "tokensIn": 1372,
+    "tokensOut": 89
+  },
+  {
+    "label": "3★ queja moderada",
+    "input": {
+      "reviewerName": "Roberto Cantú",
+      "starRating": 3,
+      "comment": "Servicio lento. Estuvimos esperando 25 minutos por nuestra orden. La comida cuando llegó estaba buena pero la experiencia se vio afectada."
+    },
+    "draft": "¡Gracias por tu visita, Roberto! 🙏 Lamentamos que el tiempo de espera no haya sido el ideal y lo tomamos muy en cuenta para seguir mejorando en AMALAY Coffee & Market. Nos da gusto que la comida te haya gustado. Si quieres compartir más detalles, escríbenos a hola@cafeamalay.com. ¡Aquí en Plaza Duendes, San Pedro Garza García, te esperamos pronto!",
+    "wordCount": 59,
+    "model": "claude-haiku-4-5-20251001",
+    "tokensIn": 1385,
+    "tokensOut": 127
+  },
+  {
+    "label": "1★ problema serio",
+    "input": {
+      "reviewerName": "Marcos Treviño",
+      "starRating": 1,
+      "comment": "Encontré un pelo en mi chilaquiles. El mesero ofreció cambiarlos pero la experiencia ya estaba arruinada para toda la familia. No volvemos."
+    },
+    "draft": "[URGENT_REVIEW]\n\nMarcos, lamentamos muchísimo esta situación. No refleja los estándares de higiene y calidad que buscamos en AMALAY Coffee & Market. Entendemos que la experiencia se arruinó para tu familia y lo tomamos muy en serio. Por favor escríbenos a hola@cafeamalay.com para atenderlo de inmediato y hacer las cosas bien.",
+    "wordCount": 50,
+    "model": "claude-haiku-4-5-20251001",
+    "tokensIn": 1385,
+    "tokensOut": 107
+  }
+]
