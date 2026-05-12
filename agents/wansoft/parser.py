@@ -183,7 +183,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
     # Totals across filtered meseros
     total_dia = sum(r["total"] for r in filtered)
     personas_dia = sum(r['personas'] for r in filtered)
-    general_avg = total_dia / personas_dia if personas_dia else 0
+    general_avg = total_dia / personas_dia if personas_dia else 0.0
 
     # Date formatting
     dd = f"{report_date.day:02d}"
@@ -246,7 +246,18 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
     else:
         lines.append("_Promedios mezclan turnos brunch (mañana) y cafecito (tarde) — v2 separará por turno_")
 
-    return "\n".join(lines)
+    msg = "\n".join(lines)
+    agg = {
+        "total_dia": total_dia,
+        "personas_dia": personas_dia,
+        "ticket_promedio": general_avg,
+        "meseros_top": [
+            {"nombre": _short_name(r["mesero"]), "total": r["total"],
+             "personas": r["personas"], "promedio": r["promedio"]}
+            for r in filtered
+        ],
+    }
+    return msg, agg
 
 
 DETALLE_SHEET = "Ventas por mesero por grupo"
@@ -425,7 +436,25 @@ def format_platillos_message(xlsx_path: str, report_type: str = "cierre") -> str
     lines.append("")
     lines.append("_by Fullsite ✨_")
 
-    return "\n".join(lines)
+    msg = "\n".join(lines)
+
+    # Aggregate platillo-level data by grupo for platillos_top
+    from collections import Counter
+    grupo_totals = Counter()
+    for r in rows:
+        if not _is_excluded(r["mesero"]):
+            grupo_totals[r["grupo"]] += r["cantidad"]
+    platillos_top = [
+        {"nombre": g, "total": c}
+        for g, c in grupo_totals.most_common()
+    ]
+
+    agg = {
+        "chilaquiles_total": chilaquiles_total,
+        "half_half_total": hh_total,
+        "platillos_top": platillos_top,
+    }
+    return msg, agg
 
 
 if __name__ == "__main__":
@@ -440,6 +469,8 @@ if __name__ == "__main__":
     if not Path(args.xlsx).exists():
         print(f"Error: archivo no encontrado: {args.xlsx}", file=sys.stderr)
         sys.exit(1)
-    print(format_message(args.xlsx, report_type=args.report_type))
+    msg, _ = format_message(args.xlsx, report_type=args.report_type)
+    print(msg)
     print()
-    print(format_platillos_message(args.xlsx, report_type=args.report_type))
+    plat_msg, _ = format_platillos_message(args.xlsx, report_type=args.report_type)
+    print(plat_msg)

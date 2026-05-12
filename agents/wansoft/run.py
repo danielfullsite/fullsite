@@ -68,7 +68,7 @@ def main():
     log("Paso 2/4: Parseando reporte meseros...")
     try:
         from parser import format_message, format_platillos_message
-        message = format_message(str(xlsx_path), report_type=report_type)
+        message, agg_meseros = format_message(str(xlsx_path), report_type=report_type)
     except Exception as e:
         log(f"Error en parser (meseros): {e}")
         sys.exit(EXIT_PARSE)
@@ -76,7 +76,7 @@ def main():
 
     log("Parseando detalle platillos...")
     try:
-        platillos_msg = format_platillos_message(str(xlsx_path), report_type=report_type)
+        platillos_msg, agg_platillos = format_platillos_message(str(xlsx_path), report_type=report_type)
     except Exception as e:
         log(f"Error en parser (platillos): {e}")
         sys.exit(EXIT_PARSE)
@@ -107,6 +107,18 @@ def main():
     if not ok:
         log("Envio de detalle platillos fallo para todos (reporte meseros ya enviado)")
         sys.exit(EXIT_SEND_PLATILLOS)
+
+    # Persistir a Supabase (no bloquea si falla)
+    try:
+        from supabase_client import upsert_daily_report
+        upsert_daily_report(
+            fecha=target_date,
+            report_type=report_type,
+            agg_meseros=agg_meseros,
+            agg_platillos=agg_platillos,
+        )
+    except Exception as e:
+        log(f"[supabase] persistencia fallo pero Telegram fue OK: {e}")
 
     log("=== Pipeline completado ===")
     sys.exit(EXIT_OK)
