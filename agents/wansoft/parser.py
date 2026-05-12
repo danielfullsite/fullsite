@@ -182,7 +182,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
 
     # Totals across filtered meseros
     total_dia = sum(r["total"] for r in filtered)
-    personas_dia = sum(r["personas"] for r in filtered)
+    personas_dia = sum(r['personas'] for r in filtered)
     general_avg = total_dia / personas_dia if personas_dia else 0
 
     # Date formatting
@@ -207,7 +207,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
         medal = MEDALS[i]
         lines.append(
             f"{medal} {_short_name(r['mesero'])} {_fmt_money(r['promedio'])} "
-            f"({r["personas"]} personas)"
+            f"({r['personas']} personas)"
         )
 
     # Rest
@@ -224,12 +224,12 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
             lines.append("- " + " · ".join(parts))
 
     # Top volumen note
-    personas_list = [r["personas"] for r in filtered]
+    personas_list = [r['personas'] for r in filtered]
     median_personas = statistics.median(personas_list)
     threshold = median_personas * 1.5
-    high_vol = [r for r in filtered if r["personas"] > threshold]
+    high_vol = [r for r in filtered if r['personas'] > threshold]
     if high_vol:
-        top_vol = max(high_vol, key=lambda r: r["personas"])
+        top_vol = max(high_vol, key=lambda r: r['personas'])
         lines.append("")
         lines.append(
             f"🏆 Top mesas: {_short_name(top_vol['mesero'])} ({top_vol['personas']})"
