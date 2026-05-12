@@ -28,9 +28,9 @@ name: Wansoft Daily Mesero Report
 
 on:
   schedule:
-    - cron: '0 21 * * *'      # 3pm MX daily → avance
-    - cron: '30 2 * * 1-4'    # 8:30pm MX Sun-Wed → cierre
-    - cron: '0 5 * * 0,5,6'   # 11pm MX Thu-Sat → cierre
+    - cron: '50 20 * * *'      # 3pm MX daily → avance
+    - cron: '20 2 * * 1-4'    # 8:30pm MX Sun-Wed → cierre
+    - cron: '50 4 * * 0,5,6'   # 11pm MX Thu-Sat → cierre
   workflow_dispatch:
     inputs:
       target_date:
@@ -78,8 +78,8 @@ jobs:
           # workflow_dispatch: use input
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "type=${{ github.event.inputs.report_type }}" >> "$GITHUB_OUTPUT"
-          # schedule "0 21 * * *" = 21:00 UTC = 3pm MX = avance
-          elif [ "${{ github.event.schedule }}" = "0 21 * * *" ]; then
+          # schedule "50 20 * * *" = 21:00 UTC = 3pm MX = avance
+          elif [ "${{ github.event.schedule }}" = "50 20 * * *" ]; then
             echo "type=avance" >> "$GITHUB_OUTPUT"
           else
             echo "type=cierre" >> "$GITHUB_OUTPUT"
