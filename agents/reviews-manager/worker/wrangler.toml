@@ -1,0 +1,24 @@
+name            = "reviews-manager"
+main            = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id      = "fd00e9e6edd331e0abe6d1e796f38172"
+
+[observability]
+enabled = true
+
+# Secrets (setear con: wrangler secret put NOMBRE)
+# SUPABASE_URL           — https://qjiomlvudfmzuvqvhwpk.supabase.co
+# SUPABASE_SERVICE_KEY   — service_role key
+# ANTHROPIC_API_KEY      — API key de Claude
+# GOOGLE_CLIENT_ID       — OAuth 2.0 client ID (GCP Console)
+# GOOGLE_CLIENT_SECRET   — OAuth 2.0 client secret
+# TELEGRAM_BOT_TOKEN     — Token del bot de Telegram
+# TELEGRAM_CHAT_ID       — Chat ID del destinatario
+
+# Cron triggers — cada 2 horas busca reseñas nuevas
+[triggers]
+crons = ["0 */2 * * *"]
+
+# Routes: agregar después del primer deploy
+# [routes]
+# route = "reviews-manager.TU-SUBDOMINIO.workers.dev"
