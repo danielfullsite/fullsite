@@ -98,6 +98,9 @@ Solo JSON, sin texto adicional."""},
                 ],
                 "temperature": 0, "max_tokens": 50,
             }, timeout=10)
+        if r.status_code == 429:
+            # Rate limited on date detection — just use today
+            return today_str, today_str
         raw = r.json()["choices"][0]["message"]["content"].strip()
         parsed = json.loads(raw)
         return parsed.get("start", today_str), parsed.get("end", today_str)
@@ -508,19 +511,27 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": context},
-            ],
-            "temperature": 0.2,
-            "max_tokens": 1500,
-        }, timeout=30)
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    # Retry with backoff on rate limit (429)
+    for attempt in range(4):
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": context},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1500,
+            }, timeout=30)
+        if r.status_code == 429 and attempt < 3:
+            wait = (attempt + 1) * 15  # 15s, 30s, 45s
+            print(f"[wansoft-query] Rate limited, waiting {wait}s (attempt {attempt + 1}/4)")
+            import time as _time
+            _time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
 
 
 # ── Log ─────────────────────────────────────────────────────────────────────
