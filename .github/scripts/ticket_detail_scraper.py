@@ -208,7 +208,30 @@ def compute_waiter_categories(items: list[dict]) -> dict:
             "pct": round(tickets_with_2plus / total_tickets * 100, 1) if total_tickets else 0,
         }
 
-    return dict(waiter_cats)
+    # Restaurant-only stats (excluding Market + cajeros)
+    market_cajero = ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio",
+                     "oscar ricardo", "rodrigo chávez", "rodrigo chavez", "aplicaciones", "mesero evento"]
+
+    all_tickets = defaultdict(set)  # {mesero: set of orden numbers}
+    for item in items:
+        all_tickets[item["mesero"]].add(item["orden"])
+
+    rest_tickets = 0
+    rest_ventas = 0.0
+    for mesero, ordenes in all_tickets.items():
+        is_excluded = any(ex in mesero.lower() for ex in market_cajero)
+        if not is_excluded:
+            rest_tickets += len(ordenes)
+            rest_ventas += sum(i["total"] for i in items if i["mesero"] == mesero)
+
+    result = dict(waiter_cats)
+    result["__restaurant_stats"] = {
+        "tickets": rest_tickets,
+        "ventas": round(rest_ventas, 2),
+        "ticket_promedio": round(rest_ventas / rest_tickets, 2) if rest_tickets else 0,
+    }
+
+    return result
 
 
 def build_telegram_message(waiter_cats: dict, target_date: str) -> str:

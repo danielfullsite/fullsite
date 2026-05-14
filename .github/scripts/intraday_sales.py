@@ -229,7 +229,16 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
     tickets = order_types.get("total_tickets", 0)
     personas = order_types.get("total_personas", 0)
-    ticket_avg = ventas_netas / tickets if tickets else 0
+
+    # Exclude Market staff from ticket promedio
+    market_names = ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
+    market_ventas = sum(u["total"] for u in users
+                        if any(m in u["name"].lower() for m in market_names))
+    ventas_restaurante = ventas_netas - market_ventas
+    # Estimate Market tickets (Market avg ~$50-80 per ticket)
+    market_tickets = round(market_ventas / 65) if market_ventas > 0 else 0
+    tickets_restaurante = max(tickets - market_tickets, 1)
+    ticket_avg = ventas_restaurante / tickets_restaurante if tickets_restaurante else 0
 
     # Category totals from saucers
     hh_items = filter_category(saucers, HH_KEYWORDS)
@@ -244,11 +253,12 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
 💰 VENTAS DEL DÍA
 • Ventas netas: ${ventas_netas:,.0f}
-• Ventas brutas: ${ventas_brutas:,.0f}
+• Ventas restaurante (sin Market): ${ventas_restaurante:,.0f}
+• Market: ${market_ventas:,.0f}
 • Descuentos: ${descuentos:,.0f}
-• Tickets: {tickets}
+• Tickets: {tickets} (rest: ~{tickets_restaurante})
 • Personas: {personas}
-• Ticket promedio: ${ticket_avg:,.0f}
+• Ticket promedio restaurante: ${ticket_avg:,.0f}
 
 📈 TICKET PROMEDIO POR MES"""
 
