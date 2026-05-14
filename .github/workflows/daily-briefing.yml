@@ -3,7 +3,12 @@ name: Daily Briefing AMALAY
 on:
   schedule:
     - cron: '0 13 * * *'   # 7:00am MX (UTC-6)
-  workflow_dispatch:         # trigger manual para testing
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Client ID'
+        required: false
+        default: 'amalay'
 
 jobs:
   briefing:
@@ -24,10 +29,10 @@ jobs:
 
       - name: Run Daily Briefing
         env:
+          CLIENT_ID:                ${{ github.event.inputs.client_id || 'amalay' }}
           SUPABASE_URL:             ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY:     ${{ secrets.SUPABASE_SERVICE_KEY }}
           GROQ_API_KEY:             ${{ secrets.GROQ_API_KEY }}
           TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID_DANIEL:  ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
           TRIGGER_TYPE:             ${{ github.event_name }}
         run: python .github/scripts/daily_briefing.py

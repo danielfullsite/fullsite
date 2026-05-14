@@ -7,11 +7,13 @@ Silent success si está fresco. Alert a Telegram si está stale.
 
 import os, sys, time, requests
 from datetime import datetime, timezone, timedelta
+from client_config import get_client, get_chat_ids
 
+CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID_DANIEL"]
+TG_CHAT_IDS  = get_chat_ids(CLIENT, "wansoft_staleness")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 
 sb_headers = {
@@ -38,7 +40,7 @@ def sb_post(table, data):
 def send_telegram(text):
     r = requests.post(
         f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT_ID, "text": text},
+        json={"chat_id": TG_CHAT_IDS[0] if TG_CHAT_IDS else "", "text": text},
         timeout=15)
     r.raise_for_status()
 
@@ -46,7 +48,7 @@ def send_telegram(text):
 print("[wansoft-staleness] Checking wansoft_kpis...")
 
 rows = sb_get("wansoft_kpis", [
-    ("id",     "eq.amalay"),
+    ("id",     f"eq.{CLIENT.get('kpis_row_id', 'amalay')}"),
     ("select", "updated_at,fecha_reporte,ventas_dia"),
 ])
 

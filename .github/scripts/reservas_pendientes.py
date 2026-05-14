@@ -7,12 +7,14 @@ Silent si no hay nada que hacer.
 
 import os, sys, time, requests
 from datetime import date, timedelta
+from client_config import get_client, get_chat_ids
 
+CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID_DANIEL"]
+TG_CHAT_IDS  = get_chat_ids(CLIENT, "reservas_pendientes")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 
 today    = date.today()
@@ -44,14 +46,14 @@ def send_telegram(text):
     for chunk in chunks:
         r = requests.post(
             f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-            json={"chat_id": TG_CHAT_ID, "text": chunk},
+            json={"chat_id": TG_CHAT_IDS[0] if TG_CHAT_IDS else "", "text": chunk},
             timeout=15)
         r.raise_for_status()
 
 # ── Fetch reservaciones próximos 5 días ──────────────────────────────────────
 print(f"[reservas-pendientes] Buscando reservas {today_s} → {end_date}...")
 
-reservas = sb_get("amalay_reservaciones", [
+reservas = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), [
     ("fecha",  f"gte.{today_s}"),
     ("fecha",  f"lte.{end_date}"),
     ("status", "neq.cancelled"),
@@ -94,7 +96,7 @@ else:
 
     data_str = "\n".join(items_txt)
 
-    SYSTEM = """Eres el agente operativo del restaurante AMALAY en Monterrey, México.
+    SYSTEM = f"""Eres el agente operativo de {CLIENT['display_name']}.
 Genera un mensaje de alerta conciso para Telegram. Sin markdown complejo, texto plano.
 Máximo 15 líneas. Español mexicano. Incluye código AMA-XXXX de cada reserva."""
 

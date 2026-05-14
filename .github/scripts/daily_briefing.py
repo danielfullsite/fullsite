@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Daily Briefing AMALAY
+Daily Briefing — Multi-tenant
 Flow: Supabase REST → Groq llama-3.3-70b → Telegram → log agent_runs
 """
 
@@ -11,16 +11,18 @@ import time
 import requests
 from datetime import date, timedelta, datetime, timezone
 from collections import defaultdict
+from client_config import get_client, get_tz, get_chat_ids
 
 # ── Config ──────────────────────────────────────────────────────────────────
+CLIENT           = get_client()
 SUPABASE_URL     = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY     = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY     = os.environ["GROQ_API_KEY"]
 TG_TOKEN         = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_ID       = os.environ["TELEGRAM_CHAT_ID_DANIEL"]
+TG_CHAT_IDS      = get_chat_ids(CLIENT, "daily_briefing")
 TRIGGER_TYPE     = os.environ.get("TRIGGER_TYPE", "cron")
 
-MX_TZ   = timezone(timedelta(hours=-6))
+MX_TZ   = get_tz(CLIENT)
 now_utc = datetime.now(timezone.utc)
 today   = date.today()
 
@@ -65,29 +67,30 @@ def sb_post(table, data):
     r.raise_for_status()
 
 def send_telegram(text):
-    """Send message; splits at 4096 chars if needed."""
+    """Send message to all recipients; splits at 4096 chars if needed."""
     chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
-    for chunk in chunks:
-        r = requests.post(
-            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-            json={"chat_id": TG_CHAT_ID, "text": chunk},
-            timeout=15,
-        )
-        r.raise_for_status()
+    for chat_id in TG_CHAT_IDS:
+        for chunk in chunks:
+            r = requests.post(
+                f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": chunk},
+                timeout=15,
+            )
+            r.raise_for_status()
 
 DAY_NAMES = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
 
 # ── Fetch data ───────────────────────────────────────────────────────────────
 print(f"[briefing] Fetching data for {today_str}...")
 
-reservas_hoy = sb_get("amalay_reservaciones", [
+reservas_hoy = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), [
     ("fecha",  f"eq.{today_str}"),
     ("status", "neq.cancelled"),
     ("order",  "horario_inicio.asc"),
     ("select", "*"),
 ])
 
-reservas_proximas = sb_get("amalay_reservaciones", [
+reservas_proximas = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), [
     ("fecha",  f"gte.{tomorrow_str}"),
     ("fecha",  f"lte.{week_end_str}"),
     ("status", "neq.cancelled"),
@@ -105,7 +108,7 @@ calendario = sb_get("calendar_sync_log", [
 ])
 
 wansoft_rows = sb_get("wansoft_kpis", [
-    ("id",     "eq.amalay"),
+    ("id",     f"eq.{CLIENT.get('kpis_row_id', 'amalay')}"),
     ("select", "ventas_dia,tickets_count,ticket_promedio_restaurant,ultima_venta,updated_at,fecha_reporte"),
 ])
 wansoft = wansoft_rows[0] if wansoft_rows else {}
@@ -180,7 +183,7 @@ if wansoft:
         f"  Última venta: {wansoft.get('ultima_venta','N/D')}"
     )
 
-data_block = f"""=== DATOS AMALAY {today_str} ===
+data_block = f"""=== DATOS {CLIENT['display_name']} {today_str} ===
 
 CALENDARIO HOY:
 {chr(10).join(cal_lines) if cal_lines else "  Sin eventos."}
@@ -196,12 +199,13 @@ KPI WANSOFT:
 """
 
 # ── Groq ─────────────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """Eres el asistente de operaciones del restaurante AMALAY en Monterrey, MX.
+_client_name = CLIENT['display_name']
+SYSTEM_PROMPT = f"""Eres el asistente de operaciones de {_client_name}.
 Con los datos que te paso, genera el Morning Briefing diario en texto plano conciso, optimizado para lectura mobile.
 
 ESTRUCTURA EXACTA (usa estos headers tal cual):
 
-# Morning Briefing AMALAY — YYYY-MM-DD
+# Morning Briefing {_client_name} — YYYY-MM-DD
 
 ## Calendario
 (eventos HH:MM — título, o "Sin eventos")

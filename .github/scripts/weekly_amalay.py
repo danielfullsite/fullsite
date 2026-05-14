@@ -8,11 +8,14 @@ import os, sys, time, requests
 from datetime import date, timedelta, datetime, timezone
 from collections import defaultdict
 
+from client_config import get_client, get_chat_ids
+
+CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID_DANIEL"]
+TG_CHAT_IDS  = get_chat_ids(CLIENT, "weekly")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 
 today      = date.today()
@@ -53,7 +56,7 @@ def send_telegram(text):
     for chunk in chunks:
         r = requests.post(
             f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-            json={"chat_id": TG_CHAT_ID, "text": chunk},
+            json={"chat_id": TG_CHAT_IDS[0] if TG_CHAT_IDS else "", "text": chunk},
             timeout=15)
         r.raise_for_status()
 
@@ -78,7 +81,7 @@ daily_prev = sb_get("wansoft_daily", [
 ])
 
 # Reservaciones semana pasada
-reservas = sb_get("amalay_reservaciones", [
+reservas = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), [
     ("fecha",  f"gte.{last_mon_s}"),
     ("fecha",  f"lte.{last_sun_s}"),
     ("order",  "fecha.asc"),
@@ -87,7 +90,7 @@ reservas = sb_get("amalay_reservaciones", [
 
 # wansoft_kpis para snapshot actual
 kpis_rows = sb_get("wansoft_kpis", [
-    ("id",     "eq.amalay"),
+    ("id",     f"eq.{CLIENT.get('kpis_row_id', 'amalay')}"),
     ("select", "ventas_dia,tickets_count,ticket_promedio_restaurant,updated_at,fecha_reporte"),
 ])
 kpis = kpis_rows[0] if kpis_rows else {}
@@ -155,12 +158,12 @@ NOTA: {"Solo " + str(dias_con_data) + " días tienen datos en wansoft_daily (syn
 WANSOFT SNAPSHOT ACTUAL: fecha_reporte={kpis.get('fecha_reporte','N/D')}, ventas_día=${kpis.get('ventas_dia','N/D')}
 """
 
-SYSTEM = """Eres el analista de operaciones del restaurante AMALAY en Monterrey, México.
+SYSTEM = f"""Eres el analista de operaciones de {CLIENT['display_name']}.
 Genera un reporte ejecutivo semanal conciso para el dueño del negocio.
 Texto plano, sin markdown complejo. Máximo 300 palabras. Español mexicano.
 
 ESTRUCTURA:
-Reporte Semanal AMALAY — [rango de fechas]
+Reporte Semanal {CLIENT['display_name']} — [rango de fechas]
 
 VENTAS
 (números clave con comparativa %)
