@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Wansoft Query Agent — responde preguntas sobre datos de Wansoft en tiempo real.
-Flow: Telegram question → Wansoft API scrape → Groq format → Telegram response
+Flow: Telegram question → Groq date parse → Wansoft API scrape → Groq answer → Telegram
 """
 
-import os, sys, json, time, requests
+import os, sys, json, time, re, requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
 
@@ -59,81 +59,166 @@ def parse_rows(html):
     return rows
 
 
+def wansoft_post(session, endpoint, start, end, extra=None):
+    """POST to a Wansoft endpoint and return parsed rows."""
+    data = {"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end}
+    if extra:
+        data.update(extra)
+    try:
+        r = session.post(f"{WANSOFT_URL}/{endpoint}", data=data, timeout=15)
+        return parse_rows(r.text)
+    except Exception as e:
+        return [["error", str(e)]]
+
+
+# ── Date range detection ────────────────────────────────────────────────────
+def detect_date_range(question):
+    """Use Groq to extract date range from a natural language question."""
+    now_mx = datetime.now(MX_TZ)
+    today_str = now_mx.strftime("%Y-%m-%d")
+    dow = now_mx.strftime("%A")
+
+    try:
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": f"""Hoy es {today_str} ({dow}). Extrae el rango de fechas de la pregunta.
+Responde SOLO con JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
+- "hoy" → start=end={today_str}
+- "ayer" → start=end=fecha de ayer
+- "esta semana" → lunes a hoy
+- "la semana pasada" → lunes a domingo pasado
+- "este mes" → primer día del mes a hoy
+- "mayo" → 2026-05-01 a 2026-05-31
+- Si no menciona fecha → start=end={today_str}
+Solo JSON, sin texto adicional."""},
+                    {"role": "user", "content": question},
+                ],
+                "temperature": 0, "max_tokens": 50,
+            }, timeout=10)
+        raw = r.json()["choices"][0]["message"]["content"].strip()
+        parsed = json.loads(raw)
+        return parsed.get("start", today_str), parsed.get("end", today_str)
+    except Exception:
+        return today_str, today_str
+
+
 # ── Wansoft Data Fetchers ───────────────────────────────────────────────────
 def fetch_all_wansoft_data(session, start, end):
-    """Fetch all available data from Wansoft for the given date range."""
-    data = {}
+    """Fetch ALL available data from Wansoft for the given date range."""
+    data = {"date_range": f"{start} a {end}"}
 
-    # Consolidated sales (JSON)
+    # 1. Consolidated sales (JSON)
     try:
         r = session.post(f"{WANSOFT_URL}/Reports/GetConsolidatedSales",
                          data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        data["consolidated"] = r.json()
+        data["ventas_consolidadas"] = r.json()
     except Exception as e:
-        data["consolidated"] = {"error": str(e)}
+        data["ventas_consolidadas"] = {"error": str(e)}
 
-    # Sales by user
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByUser",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        data["by_user"] = [{"name": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
-                           for r in rows if len(r) >= 5]
-    except Exception as e:
-        data["by_user"] = {"error": str(e)}
+    # 2. Sales by user (meseros)
+    rows = wansoft_post(session, "Reports/SalesByUser", start, end)
+    data["ventas_por_mesero"] = [{"mesero": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                                  for r in rows if len(r) >= 5]
 
-    # Sales by group
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByGroup",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        data["by_group"] = [{"group": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
-                            for r in rows if len(r) >= 5]
-    except Exception as e:
-        data["by_group"] = {"error": str(e)}
+    # 3. Sales by group (categorías del menú)
+    rows = wansoft_post(session, "Reports/SalesByGroup", start, end)
+    data["ventas_por_grupo"] = [{"grupo": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                                 for r in rows if len(r) >= 5]
 
-    # Sales by saucer (top 30 only to keep context small)
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesBySaucer",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        items = [{"name": r[0], "qty": r[1], "subtotal": r[2], "total": r[3], "pct": r[4]}
-                 for r in rows if len(r) >= 5]
-        data["by_saucer_top30"] = items[:30]
-        data["by_saucer_count"] = len(items)
-    except Exception as e:
-        data["by_saucer_top30"] = {"error": str(e)}
+    # 4. Sales by saucer (platillos — ALL of them)
+    rows = wansoft_post(session, "Reports/SalesBySaucer", start, end)
+    saucers = [{"platillo": r[0], "cantidad": r[1], "subtotal": r[2], "total": r[3], "pct": r[4]}
+               for r in rows if len(r) >= 5]
+    data["platillos_vendidos"] = saucers  # all items
+    data["total_platillos_distintos"] = len(saucers)
 
-    # Sales by order type (tickets + personas)
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        data["by_order_type"] = [{"type": r[0], "avg_ticket": r[1], "tickets": r[2],
-                                  "personas": r[3], "subtotal": r[4], "total": r[5]}
-                                 for r in rows if len(r) >= 6]
-    except Exception as e:
-        data["by_order_type"] = {"error": str(e)}
+    # 5. Sales by order type (tickets + personas)
+    rows = wansoft_post(session, "Reports/SalesByTypeOfOrder", start, end)
+    data["por_tipo_orden"] = [{"tipo": r[0], "ticket_promedio": r[1], "tickets": r[2],
+                                "personas": r[3], "subtotal": r[4], "total": r[5]}
+                               for r in rows if len(r) >= 6]
 
-    # Sales by payment type
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        data["by_payment"] = [{"method": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
-                              for r in rows if len(r) >= 5]
-    except Exception as e:
-        data["by_payment"] = {"error": str(e)}
+    # 6. Sales by payment type (métodos de pago)
+    rows = wansoft_post(session, "Reports/SalesByPaymentType", start, end)
+    data["metodos_pago"] = [{"metodo": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                             for r in rows if len(r) >= 5]
 
-    # Sales by hour
+    # 7. Sales by hour
+    rows = wansoft_post(session, "Reports/SalesByHours", start, end)
+    data["ventas_por_hora"] = [{"hora": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                                for r in rows if len(r) >= 5]
+
+    # 8. Sales by area (terraza, salón, etc.)
+    rows = wansoft_post(session, "Reports/SalesByArea", start, end)
+    if rows and len(rows[0]) >= 5:
+        data["ventas_por_area"] = [{"area": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                                    for r in rows if len(r) >= 5]
+
+    # 9. Sales by terminal
+    rows = wansoft_post(session, "Reports/SalesByTerminal", start, end)
+    if rows and len(rows[0]) >= 5:
+        data["ventas_por_terminal"] = [{"terminal": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
+                                        for r in rows if len(r) >= 5]
+
+    # 10. Sales by modifiers (extras)
+    rows = wansoft_post(session, "Reports/SalesByModifiers", start, end)
+    if rows and len(rows[0]) >= 4:
+        data["modificadores"] = [{"modificador": r[0], "cantidad": r[1], "total": r[2]}
+                                  for r in rows if len(r) >= 3][:30]
+
+    # 11. Discounts detail
+    rows = wansoft_post(session, "Reports/DiscountsDetail", start, end)
+    if rows and len(rows[0]) >= 3:
+        data["descuentos_detalle"] = rows[:20]
+
+    # 12. Cancellations detail
+    rows = wansoft_post(session, "Reports/CancelSalesDetail", start, end)
+    if rows and len(rows[0]) >= 3:
+        data["cancelaciones_detalle"] = rows[:20]
+
+    # 13. Nullifications
+    rows = wansoft_post(session, "Reports/SaleNullificationDetail", start, end)
+    if rows and len(rows[0]) >= 3:
+        data["anulaciones_detalle"] = rows[:20]
+
+    # 14. Courtesies (cortesías)
+    rows = wansoft_post(session, "Reports/CourtesiesDetail", start, end)
+    if rows and len(rows[0]) >= 3:
+        data["cortesias_detalle"] = rows[:20]
+
+    # 15. Tips (propinas)
     try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByHours",
-                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end})
-        rows = parse_rows(r.text)
-        data["by_hour"] = [{"hour": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
-                           for r in rows if len(r) >= 5]
-    except Exception as e:
-        data["by_hour"] = {"error": str(e)}
+        r = session.post(f"{WANSOFT_URL}/TipsModule/TipsAccountStatus",
+                         data={"subsidiaryId": SUBSIDIARY}, timeout=15)
+        tip_rows = parse_rows(r.text)
+        if tip_rows:
+            data["propinas"] = tip_rows[:20]
+    except Exception:
+        pass
+
+    # 16. Inventory — reorder point (qué falta)
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/ReorderPoint",
+                         data={"subsidiaryId": SUBSIDIARY}, timeout=15)
+        inv_rows = parse_rows(r.text)
+        if inv_rows:
+            data["inventario_punto_reorden"] = inv_rows[:20]
+    except Exception:
+        pass
+
+    # 17. Closing cash (corte de caja)
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/ClosingCash",
+                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end},
+                         timeout=15)
+        close_rows = parse_rows(r.text)
+        if close_rows:
+            data["cortes_caja"] = close_rows[:10]
+    except Exception:
+        pass
 
     return data
 
@@ -141,7 +226,8 @@ def fetch_all_wansoft_data(session, start, end):
 def fetch_historical(days=30):
     """Fetch historical data from Supabase wansoft_daily."""
     try:
-        start = (date.today() - timedelta(days=days)).isoformat()
+        now_mx = datetime.now(MX_TZ)
+        start = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
         rows = sb_get("wansoft_daily", {
             "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,"
                       "personas_restaurant,ticket_promedio_restaurant,propinas_total,"
@@ -159,26 +245,70 @@ def fetch_historical(days=30):
 SYSTEM_PROMPT = """Eres el asistente de datos de AMALAY Coffee & Market (Monterrey, MX).
 Respondes preguntas sobre ventas, meseros, platillos, inventario y operaciones usando datos reales de Wansoft.
 
+DATOS DISPONIBLES EN EL CONTEXTO:
+- ventas_consolidadas: totales de ventas, descuentos, cortesías, anulaciones
+- ventas_por_mesero: ventas de cada mesero con subtotal, IVA, total y porcentaje
+- ventas_por_grupo: ventas por categoría del menú (CHILAQUILES, COFFEE, DESSERTS, etc.)
+- platillos_vendidos: TODOS los platillos vendidos con cantidad y monto
+- por_tipo_orden: Restaurant vs Para llevar vs eCommerce con tickets y personas
+- metodos_pago: efectivo, tarjeta crédito, tarjeta débito, transferencia, etc.
+- ventas_por_hora: ventas desglosadas por hora del día
+- ventas_por_area: terraza, salón, barra (si hay datos)
+- ventas_por_terminal: por caja/iPad
+- modificadores: extras pedidos (queso extra, etc.)
+- descuentos_detalle: qué descuentos se aplicaron
+- cancelaciones_detalle: qué órdenes se cancelaron
+- anulaciones_detalle: qué se anuló
+- cortesias_detalle: qué cortesías se dieron
+- propinas: propinas por mesero (si hay datos)
+- inventario_punto_reorden: productos que están por debajo del mínimo
+- cortes_caja: cortes de caja del día
+- historical_data: datos diarios de los últimos 30 días (Supabase)
+
 REGLAS:
 - Responde en español, conciso y directo
 - Montos en MXN con símbolo $ y separador de miles
-- Si la pregunta es sobre "hoy", usa los datos de wansoft_today
-- Si es sobre fechas pasadas, usa historical_data
-- Si no tienes los datos para responder, dilo claramente
+- Si no tienes los datos para responder, di qué dato falta y sugiere cómo obtenerlo
 - No inventes datos — solo usa lo que está en el contexto
 - Formato plano (no markdown), máximo 3000 caracteres
 - Incluye totales y porcentajes cuando sea relevante
+- Si la pregunta es sobre un platillo específico, busca en platillos_vendidos
+- Si preguntan "cuántos lattes" busca por nombre parcial en platillos_vendidos
 """
 
 
 def ask_groq(question, wansoft_data, historical_data):
-    context = f"""DATOS WANSOFT HOY:
-{json.dumps(wansoft_data, ensure_ascii=False, indent=1)[:6000]}
+    # Serialize data — truncate platillos if too many
+    wd = dict(wansoft_data)
+    platillos = wd.pop("platillos_vendidos", [])
 
-DATOS HISTÓRICOS (últimos 30 días, de Supabase wansoft_daily):
-{json.dumps(historical_data[:10], ensure_ascii=False, indent=1)[:3000]}
+    # If question mentions a specific item, filter platillos to relevant ones
+    q_lower = question.lower()
+    relevant_platillos = [p for p in platillos
+                          if any(word in p["platillo"].lower() for word in q_lower.split() if len(word) > 3)]
+    if relevant_platillos:
+        wd["platillos_relevantes"] = relevant_platillos[:50]
 
-PREGUNTA DEL USUARIO: {question}"""
+    # Always include top 50 platillos
+    wd["top_50_platillos"] = platillos[:50]
+    wd["total_platillos_vendidos"] = len(platillos)
+
+    wansoft_json = json.dumps(wd, ensure_ascii=False, indent=1)
+    # Cap at 8000 chars for context
+    if len(wansoft_json) > 8000:
+        wansoft_json = wansoft_json[:8000] + "\n... (truncado)"
+
+    hist_json = json.dumps(historical_data[:15], ensure_ascii=False, indent=1)
+    if len(hist_json) > 3000:
+        hist_json = hist_json[:3000] + "\n... (truncado)"
+
+    context = f"""DATOS WANSOFT ({wd.get('date_range', 'hoy')}):
+{wansoft_json}
+
+DATOS HISTÓRICOS (últimos 30 días):
+{hist_json}
+
+PREGUNTA: {question}"""
 
     r = requests.post("https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
@@ -218,21 +348,26 @@ def main():
     print(f"[wansoft-query] Question: {MESSAGE[:100]}")
 
     try:
-        # Determine date range from question
-        now_mx = datetime.now(MX_TZ)
-        today_str = now_mx.strftime("%Y-%m-%d")
+        # Detect date range from question
+        print("[wansoft-query] Detecting date range...")
+        start_date, end_date = detect_date_range(MESSAGE)
+        print(f"[wansoft-query] Date range: {start_date} to {end_date}")
 
         # Login to Wansoft
         print("[wansoft-query] Logging into Wansoft...")
         session = wansoft_login()
 
-        # Fetch today's data
+        # Fetch all data for the date range
         print("[wansoft-query] Fetching Wansoft data...")
-        wansoft_data = fetch_all_wansoft_data(session, today_str, today_str)
+        wansoft_data = fetch_all_wansoft_data(session, start_date, end_date)
 
-        # Fetch historical
+        # Fetch historical from Supabase
         print("[wansoft-query] Fetching historical...")
         historical = fetch_historical(30)
+
+        platillos_count = wansoft_data.get("total_platillos_distintos", 0)
+        meseros_count = len(wansoft_data.get("ventas_por_mesero", []))
+        print(f"[wansoft-query] Data: {meseros_count} meseros, {platillos_count} platillos, range={start_date}..{end_date}")
 
         # Ask Groq to answer
         print("[wansoft-query] Asking Groq...")
