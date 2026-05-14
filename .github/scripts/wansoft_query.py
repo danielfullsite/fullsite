@@ -379,17 +379,37 @@ def ask_groq(question, wansoft_data, historical_data):
                 break
 
         if mesero_match and por_mesero_platillo.get(mesero_match):
-            # Show this mesero's full breakdown
-            wc_data[f"platillos_de_{mesero_match}"] = por_mesero_platillo[mesero_match]
-            wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo[mesero_match]
+            all_platillos = por_mesero_platillo[mesero_match]
+            # Filter platillos by search terms if possible
+            filtered = {k: v for k, v in all_platillos.items()
+                        if any(term in k.lower() for term in search_terms)}
+            if filtered:
+                wc_data[f"platillos_de_{mesero_match}_filtrados"] = filtered
+            else:
+                # Show top 30 by qty
+                top = dict(sorted(all_platillos.items(), key=lambda x: -x[1].get("qty", 0))[:30])
+                wc_data[f"top_platillos_de_{mesero_match}"] = top
+            wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo.get(mesero_match, {})
         elif por_mesero_grupo:
-            # Show all meseros × grupo (compact)
-            wc_data["por_mesero_grupo"] = por_mesero_grupo
+            # No specific mesero — show compact grupo breakdown per mesero
+            # Filter to search terms if they match a grupo
+            compact = {}
+            for mesero, grupos in por_mesero_grupo.items():
+                filtered_g = {k: v for k, v in grupos.items()
+                              if any(term in k.lower() for term in search_terms)}
+                if filtered_g:
+                    compact[mesero] = filtered_g
+            if compact:
+                wc_data["por_mesero_grupo_filtrado"] = compact
+            else:
+                # Show all meseros × grupo (top 5 grupos per mesero)
+                for mesero, grupos in por_mesero_grupo.items():
+                    top5 = dict(sorted(grupos.items(), key=lambda x: -x[1].get("total", 0))[:5])
+                    compact[mesero] = top5
+                wc_data["por_mesero_top_grupos"] = compact
 
-        # Always include the category summary
-        wc_data["categorias_por_mesero"] = {k: v for k, v in waiter_cats.items()
-                                             if not k.startswith("__")}
-        wc_data["restaurant_stats"] = waiter_cats.get("__restaurant_stats", {})
+        wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
+        wc_data["rango"] = waiter_cats.get("__rango", "")
 
         blocks.append("VENTAS POR MESERO × CATEGORÍA Y PLATILLO:\n"
                       + json.dumps(wc_data, ensure_ascii=False, indent=1))
