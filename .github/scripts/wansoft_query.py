@@ -189,13 +189,12 @@ def fetch_all_wansoft_data(session, start, end):
     if rows and len(rows[0]) >= 3:
         data["cortesias_detalle"] = rows[:20]
 
-    # 15. Tips (propinas)
+    # 15. Tips (propinas) — from Supabase since Wansoft uses jqGrid (JS-only)
     try:
-        r = session.post(f"{WANSOFT_URL}/TipsModule/TipsAccountStatus",
-                         data={"subsidiaryId": SUBSIDIARY}, timeout=15)
-        tip_rows = parse_rows(r.text)
-        if tip_rows:
-            data["propinas"] = tip_rows[:20]
+        kpis = sb_get("wansoft_kpis", {"select": "propinas_total,propinas_meseros", "limit": "1"})
+        if kpis and kpis[0].get("propinas_meseros"):
+            data["propinas_meseros"] = kpis[0]["propinas_meseros"]
+            data["propinas_total"] = kpis[0].get("propinas_total", 0)
     except Exception:
         pass
 
@@ -282,12 +281,21 @@ def ask_groq(question, wansoft_data, historical_data):
     wd = dict(wansoft_data)
     platillos = wd.pop("platillos_vendidos", [])
 
-    # If question mentions a specific item, filter platillos to relevant ones
+    # Smart search: if question mentions a specific item, find all matching platillos
     q_lower = question.lower()
-    relevant_platillos = [p for p in platillos
-                          if any(word in p["platillo"].lower() for word in q_lower.split() if len(word) > 3)]
+    # Extract search terms (3+ chars, skip common words)
+    skip_words = {"hoy", "ayer", "cuántos", "cuantos", "cuánto", "cuanto", "vendieron",
+                  "vendió", "vendio", "qué", "que", "cómo", "como", "los", "las", "del",
+                  "por", "para", "con", "sin", "hay", "tiene", "fueron", "total", "todos"}
+    search_terms = [w.rstrip("s") for w in q_lower.split() if len(w) > 2 and w not in skip_words]
+
+    relevant_platillos = []
+    for p in platillos:
+        name_lower = p["platillo"].lower()
+        if any(term in name_lower for term in search_terms):
+            relevant_platillos.append(p)
     if relevant_platillos:
-        wd["platillos_relevantes"] = relevant_platillos[:50]
+        wd["platillos_que_coinciden_con_busqueda"] = relevant_platillos[:50]
 
     # Always include top 50 platillos
     wd["top_50_platillos"] = platillos[:50]
