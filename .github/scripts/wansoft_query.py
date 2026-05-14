@@ -277,16 +277,16 @@ REGLAS:
 
 
 def ask_groq(question, wansoft_data, historical_data):
-    # Serialize data — truncate platillos if too many
     wd = dict(wansoft_data)
     platillos = wd.pop("platillos_vendidos", [])
+    date_range = wd.get("date_range", "hoy")
 
-    # Smart search: if question mentions a specific item, find all matching platillos
+    # Smart search: find platillos matching the question
     q_lower = question.lower()
-    # Extract search terms (3+ chars, skip common words)
     skip_words = {"hoy", "ayer", "cuántos", "cuantos", "cuánto", "cuanto", "vendieron",
                   "vendió", "vendio", "qué", "que", "cómo", "como", "los", "las", "del",
-                  "por", "para", "con", "sin", "hay", "tiene", "fueron", "total", "todos"}
+                  "por", "para", "con", "sin", "hay", "tiene", "fueron", "total", "todos",
+                  "mes", "semana", "día", "dia"}
     search_terms = [w.rstrip("s") for w in q_lower.split() if len(w) > 2 and w not in skip_words]
 
     relevant_platillos = []
@@ -294,29 +294,56 @@ def ask_groq(question, wansoft_data, historical_data):
         name_lower = p["platillo"].lower()
         if any(term in name_lower for term in search_terms):
             relevant_platillos.append(p)
+
+    # Build context in priority order — most relevant first
+    blocks = []
+
+    # Block 1: If there are matching platillos, put them FIRST
     if relevant_platillos:
-        wd["platillos_que_coinciden_con_busqueda"] = relevant_platillos[:50]
+        blocks.append(f"PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA ({len(relevant_platillos)}):\n"
+                      + json.dumps(relevant_platillos[:50], ensure_ascii=False, indent=1))
 
-    # Always include top 50 platillos
-    wd["top_50_platillos"] = platillos[:50]
-    wd["total_platillos_vendidos"] = len(platillos)
+    # Block 2: Core sales data (compact)
+    core = {
+        "ventas_consolidadas": wd.get("ventas_consolidadas"),
+        "por_tipo_orden": wd.get("por_tipo_orden"),
+        "ventas_por_mesero": wd.get("ventas_por_mesero"),
+        "ventas_por_grupo": wd.get("ventas_por_grupo"),
+        "metodos_pago": wd.get("metodos_pago"),
+    }
+    blocks.append(f"DATOS CORE ({date_range}):\n" + json.dumps(core, ensure_ascii=False, indent=1))
 
-    wansoft_json = json.dumps(wd, ensure_ascii=False, indent=1)
-    # Cap at 8000 chars for context
-    if len(wansoft_json) > 8000:
-        wansoft_json = wansoft_json[:8000] + "\n... (truncado)"
+    # Block 3: Detail data (descuentos, cancelaciones, etc.)
+    detail = {}
+    for key in ["descuentos_detalle", "cancelaciones_detalle", "anulaciones_detalle",
+                "cortesias_detalle", "propinas_meseros", "propinas_total",
+                "cortes_caja", "inventario_punto_reorden", "modificadores",
+                "ventas_por_hora", "ventas_por_area", "ventas_por_terminal"]:
+        if key in wd and wd[key]:
+            detail[key] = wd[key]
+    if detail:
+        blocks.append("DATOS DETALLE:\n" + json.dumps(detail, ensure_ascii=False, indent=1))
 
-    hist_json = json.dumps(historical_data[:15], ensure_ascii=False, indent=1)
-    if len(hist_json) > 3000:
-        hist_json = hist_json[:3000] + "\n... (truncado)"
+    # Block 4: Top platillos (always useful)
+    blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
+                  + json.dumps(platillos[:20], ensure_ascii=False, indent=1))
 
-    context = f"""DATOS WANSOFT ({wd.get('date_range', 'hoy')}):
-{wansoft_json}
+    # Block 5: Historical (compact — just last 7 days)
+    if historical_data:
+        hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
+                         "ticket_prom": r.get("ticket_promedio_restaurant"),
+                         "propinas": r.get("propinas_total")}
+                        for r in historical_data[:7]]
+        blocks.append("HISTÓRICO (últimos 7 días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
-DATOS HISTÓRICOS (últimos 30 días):
-{hist_json}
+    # Assemble context — cap total at 12000 chars
+    context = ""
+    for block in blocks:
+        if len(context) + len(block) > 12000:
+            break
+        context += block + "\n\n"
 
-PREGUNTA: {question}"""
+    context += f"PREGUNTA: {question}"
 
     r = requests.post("https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
