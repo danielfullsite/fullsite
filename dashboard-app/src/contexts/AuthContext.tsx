@@ -73,19 +73,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const initAuth = async () => {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        // Try getSession first (faster, uses local token)
+        const { data: { session } } = await supabase.auth.getSession()
+        const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
           await loadClientData(currentUser.id)
         }
-      } catch {
-        console.error('Error initializing auth')
+      } catch (err) {
+        console.error('Error initializing auth:', err)
       } finally {
         setLoading(false)
       }
     }
 
-    initAuth()
+    // Timeout safety — never stay loading forever
+    const timeout = setTimeout(() => setLoading(false), 5000)
+    initAuth().finally(() => clearTimeout(timeout))
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
