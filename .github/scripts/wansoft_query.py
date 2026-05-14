@@ -254,15 +254,41 @@ def fetch_all_wansoft_data(session, start, end):
                     for platillo, vals in platillos.items():
                         agg_platillo[mesero][platillo]["qty"] += vals.get("qty", 0)
                         agg_platillo[mesero][platillo]["total"] += vals.get("total", 0)
-                # Aggregate categories (H&H, Pan, etc.)
+                # Aggregate categories (H&H, Pan, etc.) and KPIs per mesero
                 for key, val in d.items():
                     if not key.startswith("__") and isinstance(val, dict):
                         for cat, cat_vals in val.items():
-                            if isinstance(cat_vals, dict) and "qty" in cat_vals:
+                            if not isinstance(cat_vals, dict):
+                                continue
+                            if "qty" in cat_vals:
                                 agg_cats[key][cat]["qty"] += cat_vals.get("qty", 0)
                                 agg_cats[key][cat]["total"] += cat_vals.get("total", 0)
+                            elif cat == "KPIs":
+                                # Accumulate KPI raw values for averaging later
+                                if "KPIs" not in agg_cats[key]:
+                                    agg_cats[key]["KPIs"] = {"bebidas_total": 0, "alimentos_total": 0,
+                                                              "personas": 0, "tickets": 0, "ventas_total": 0}
+                                for f in ["bebidas_total", "alimentos_total", "personas", "tickets"]:
+                                    agg_cats[key]["KPIs"][f] = agg_cats[key]["KPIs"].get(f, 0) + cat_vals.get(f, 0)
+                                agg_cats[key]["KPIs"]["ventas_total"] = agg_cats[key]["KPIs"].get("ventas_total", 0) + cat_vals.get("ticket_promedio", 0) * cat_vals.get("tickets", 0)
 
-            combined = dict(agg_cats)
+            # Compute averaged KPIs
+            combined = {}
+            for mesero, cats in agg_cats.items():
+                combined[mesero] = dict(cats)
+                if "KPIs" in cats and isinstance(cats["KPIs"], dict) and cats["KPIs"].get("personas", 0) > 0:
+                    kpi = cats["KPIs"]
+                    p = kpi["personas"] or 1
+                    t = kpi["tickets"] or 1
+                    combined[mesero]["KPIs"] = {
+                        "bebidas_por_persona": round(kpi["bebidas_total"] / p, 2),
+                        "alimentos_por_persona": round(kpi["alimentos_total"] / p, 2),
+                        "ticket_promedio": round(kpi["ventas_total"] / t, 2),
+                        "bebidas_total": kpi["bebidas_total"],
+                        "alimentos_total": kpi["alimentos_total"],
+                        "personas": kpi["personas"],
+                        "tickets": kpi["tickets"],
+                    }
             combined["__por_mesero_grupo"] = {m: dict(g) for m, g in agg_grupo.items()}
             combined["__por_mesero_platillo"] = {m: dict(p) for m, p in agg_platillo.items()}
             combined["__dias_incluidos"] = len(wc)
