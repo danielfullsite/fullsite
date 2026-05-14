@@ -135,12 +135,28 @@ def get_sales_by_saucer(session, start, end):
     return parse_html_report(r.text)
 
 
-def get_monitoring(session):
-    """Get monitoring info (tickets count, personas, etc)."""
-    r = session.post(f"{WANSOFT_URL}/Reports/GetMonitoringInfo", data={
-        "subsidiaryId": SUBSIDIARY_ID,
+def get_sales_by_order_type(session, start, end):
+    """Get sales by order type — includes ticket counts and personas."""
+    r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
+        "subsidiaryId": SUBSIDIARY_ID, "startDate": start, "endDate": end,
     })
-    return r.json()
+    soup = BeautifulSoup(r.text, "html.parser")
+    rows = soup.select(".rowReport")
+    results = []
+    total_tickets = 0
+    total_personas = 0
+    for row in rows:
+        cols = [c.text.strip() for c in row.select("div")]
+        if len(cols) >= 6:
+            try:
+                tickets = int(cols[2])
+                personas = int(cols[3])
+                total_tickets += tickets
+                total_personas += personas
+                results.append({"type": cols[0], "tickets": tickets, "personas": personas})
+            except (ValueError, IndexError):
+                pass
+    return {"types": results, "total_tickets": total_tickets, "total_personas": total_personas}
 
 
 # ── Category helpers ────────────────────────────────────────────────────────
@@ -166,27 +182,35 @@ def sum_qty(items):
 def get_monthly_ticket_avg():
     """Get ticket promedio by month from wansoft_daily."""
     try:
-        six_months_ago = (date.today() - timedelta(days=180)).isoformat()
+        now_mx = datetime.now(MX_TZ)
+        six_months_ago = (now_mx - timedelta(days=180)).strftime("%Y-%m-%d")
         rows = sb_get("wansoft_daily", {
-            "select": "fecha,ventas_dia,tickets_count,ticket_promedio_restaurant",
+            "select": "fecha,ventas_dia,ticket_promedio_restaurant",
             "fecha": f"gte.{six_months_ago}",
             "order": "fecha.asc",
         })
-        # Group by month
+        # Group by month — use ticket_promedio_restaurant average
         monthly = {}
         for row in rows:
             month = row["fecha"][:7]  # YYYY-MM
             if month not in monthly:
-                monthly[month] = {"ventas": 0, "tickets": 0}
+                monthly[month] = {"ventas": 0, "avg_sum": 0, "days": 0}
             ventas = row.get("ventas_dia") or 0
-            tickets = row.get("tickets_count") or 0
+            avg = row.get("ticket_promedio_restaurant") or 0
             monthly[month]["ventas"] += ventas
-            monthly[month]["tickets"] += tickets
+            if avg > 0:
+                monthly[month]["avg_sum"] += avg
+                monthly[month]["days"] += 1
 
         result = []
         for month, data in sorted(monthly.items()):
-            avg = data["ventas"] / data["tickets"] if data["tickets"] else 0
-            result.append({"month": month, "avg": avg, "tickets": data["tickets"]})
+            avg = data["avg_sum"] / data["days"] if data["days"] else 0
+            result.append({
+                "month": month,
+                "avg": avg,
+                "ventas": data["ventas"],
+                "days": data["days"],
+            })
         return result
     except Exception as e:
         print(f"Error getting monthly avg: {e}")
@@ -194,7 +218,7 @@ def get_monthly_ticket_avg():
 
 
 # ── Build message ───────────────────────────────────────────────────────────
-def build_message(consolidated, users, groups, saucers, monitoring, monthly_avg):
+def build_message(consolidated, users, groups, saucers, order_types, monthly_avg):
     now_mx = datetime.now(MX_TZ)
     hora = now_mx.strftime("%H:%M")
     fecha = now_mx.strftime("%d/%m/%Y")
@@ -203,16 +227,8 @@ def build_message(consolidated, users, groups, saucers, monitoring, monthly_avg)
     ventas_brutas = consolidated.get("TotalGrossSales", 0)
     descuentos = consolidated.get("TotalDiscount", 0)
 
-    # Tickets and avg check from monitoring
-    tickets = 0
-    personas = 0
-    try:
-        mon = monitoring if isinstance(monitoring, dict) else {}
-        tickets = mon.get("TotalTickets", 0) or 0
-        personas = mon.get("TotalPersons", 0) or 0
-    except Exception:
-        pass
-
+    tickets = order_types.get("total_tickets", 0)
+    personas = order_types.get("total_personas", 0)
     ticket_avg = ventas_netas / tickets if tickets else 0
 
     # Category totals from saucers
@@ -237,7 +253,7 @@ def build_message(consolidated, users, groups, saucers, monitoring, monthly_avg)
 📈 TICKET PROMEDIO POR MES"""
 
     for m in monthly_avg[-6:]:
-        msg += f"\n• {m['month']}: ${m['avg']:,.0f} ({m['tickets']} tickets)"
+        msg += f"\n• {m['month']}: ${m['avg']:,.0f} (${m['ventas']:,.0f} en {m['days']} días)"
 
     msg += f"""
 
@@ -321,7 +337,9 @@ def log_run(status, duration_ms, summary="", error=""):
 # ── Main ────────────────────────────────────────────────────────────────────
 def main():
     start = time.time()
-    today_str = date.today().isoformat()
+    # Use MX timezone for date (GitHub Actions runs in UTC)
+    now_mx = datetime.now(MX_TZ)
+    today_str = now_mx.strftime("%Y-%m-%d")
 
     try:
         print("[intraday] Logging into Wansoft...")
@@ -333,12 +351,12 @@ def main():
         users = get_sales_by_user(session, today_str, today_str)
         groups = get_sales_by_group(session, today_str, today_str)
         saucers = get_sales_by_saucer(session, today_str, today_str)
-        monitoring = get_monitoring(session)
+        order_types = get_sales_by_order_type(session, today_str, today_str)
         monthly_avg = get_monthly_ticket_avg()
 
-        print(f"[intraday] Data: consolidated OK, {len(users)} users, {len(groups)} groups, {len(saucers)} saucers")
+        print(f"[intraday] Data: consolidated OK, {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets")
 
-        msg = build_message(consolidated, users, groups, saucers, monitoring, monthly_avg)
+        msg = build_message(consolidated, users, groups, saucers, order_types, monthly_avg)
         print(f"[intraday] Message built ({len(msg)} chars)")
 
         sent = send_telegram(msg)
