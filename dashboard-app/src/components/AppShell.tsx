@@ -1,21 +1,40 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import TopNav from '@/components/TopNav'
 import ChatWidget from '@/components/ChatWidget'
+import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { loading } = useAuth()
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [showContent, setShowContent] = useState(false)
 
   // Login page gets no chrome
   if (pathname === '/login') {
     return <>{children}</>
   }
 
-  // Show loading spinner while auth is initializing
-  if (loading) {
+  // Force show after 2 seconds max — never stay loading
+  useEffect(() => {
+    const timer = setTimeout(() => setShowContent(true), 2000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Show content once auth resolves OR timeout hits
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.push('/login')
+      } else {
+        setShowContent(true)
+      }
+    }
+  }, [loading, user, router])
+
+  if (!showContent && loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
