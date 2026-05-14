@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send } from 'lucide-react'
+import { MessageCircle, X, Send, Bot, User } from 'lucide-react'
 import type { ChatMessage } from '@/lib/types'
 
 export default function ChatWidget() {
@@ -10,7 +10,7 @@ export default function ChatWidget() {
     {
       role: 'assistant',
       content:
-        'Hola, soy el asistente IA de Fullsite. Puedo ayudarte con datos de ventas, meseros, platillos y tendencias de tu restaurante. ¿En que te puedo ayudar?',
+        'Hola, soy el asistente IA de Fullsite. Puedo ayudarte con datos de ventas, meseros, platillos y tendencias de tu restaurante.',
     },
   ])
   const [input, setInput] = useState('')
@@ -72,7 +72,7 @@ export default function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-accent to-accent-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
       >
         <MessageCircle size={22} />
       </button>
@@ -80,18 +80,21 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[380px] max-h-[560px] bg-card rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden">
+    <div className="fixed bottom-6 right-6 z-50 w-[380px] max-h-[560px] bg-card rounded-2xl card-shadow-lg border border-border flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-white">
-        <div>
-          <h3 className="text-sm font-semibold text-text">Asistente IA</h3>
-          <p className="text-xs text-text-muted">
-            Powered by Claude
-          </p>
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-white to-surface">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center">
+            <Bot size={16} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text">Asistente IA</h3>
+            <p className="text-xs text-text-muted">Powered by Claude</p>
+          </div>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="text-text-muted hover:text-text transition-colors p-1"
+          className="text-text-muted hover:text-text transition-colors p-1.5 rounded-lg hover:bg-surface"
         >
           <X size={18} />
         </button>
@@ -102,13 +105,20 @@ export default function ChatWidget() {
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-2 animate-message-in ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
           >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+              msg.role === 'user'
+                ? 'bg-accent text-white'
+                : 'bg-gradient-to-br from-purple-100 to-blue-100 text-accent'
+            }`}>
+              {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
+            </div>
             <div
               className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-accent text-white'
-                  : 'bg-surface text-text'
+                  ? 'bg-accent text-white rounded-br-sm'
+                  : 'bg-surface text-text border border-border/60 rounded-bl-sm'
               }`}
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -116,14 +126,14 @@ export default function ChatWidget() {
           </div>
         ))}
 
-        {/* Suggested questions (only show if single message) */}
+        {/* Suggested questions */}
         {messages.length === 1 && (
           <div className="space-y-1.5 pt-1">
             {suggestedQuestions.map((q) => (
               <button
                 key={q}
                 onClick={() => sendMessage(q)}
-                className="w-full text-left text-xs text-text-soft bg-white border border-border rounded-lg px-3 py-2 hover:bg-accent-light hover:border-accent/30 hover:text-accent transition-colors"
+                className="w-full text-left text-xs text-text-soft bg-white border border-border rounded-lg px-3 py-2 hover:bg-accent/5 hover:border-accent/30 hover:text-accent transition-all"
               >
                 {q}
               </button>
@@ -132,16 +142,19 @@ export default function ChatWidget() {
         )}
 
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-surface rounded-xl px-4 py-3">
+          <div className="flex gap-2 animate-message-in">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
+              <Bot size={12} className="text-accent" />
+            </div>
+            <div className="bg-surface border border-border/60 rounded-xl rounded-bl-sm px-4 py-3">
               <div className="flex gap-1">
-                <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" />
+                <span className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce" />
                 <span
-                  className="w-2 h-2 bg-text-muted rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce"
                   style={{ animationDelay: '0.1s' }}
                 />
                 <span
-                  className="w-2 h-2 bg-text-muted rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce"
                   style={{ animationDelay: '0.2s' }}
                 />
               </div>
@@ -163,14 +176,20 @@ export default function ChatWidget() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                sendMessage(input)
+              }
+            }}
             placeholder="Preguntame..."
-            className="flex-1 text-sm bg-surface border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+            className="flex-1 text-sm bg-surface border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="bg-accent text-white rounded-lg px-3 py-2 hover:bg-accent/90 transition-colors disabled:opacity-40"
+            className="bg-accent text-white rounded-lg px-3 py-2 hover:bg-accent-dark transition-all disabled:opacity-40 shadow-sm"
           >
             <Send size={16} />
           </button>

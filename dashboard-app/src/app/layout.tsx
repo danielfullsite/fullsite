@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Sidebar from '@/components/Sidebar'
+import TopNav from '@/components/TopNav'
 import ChatWidget from '@/components/ChatWidget'
 
 export const metadata: Metadata = {
@@ -22,14 +22,10 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full bg-surface">
-        <div className="flex h-full">
-          <Sidebar />
-          <main className="flex-1 lg:ml-64 min-h-screen">
-            <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-              {children}
-            </div>
-          </main>
-        </div>
+        <TopNav />
+        <main className="p-6 lg:p-8 max-w-7xl mx-auto">
+          {children}
+        </main>
         <ChatWidget />
       </body>
     </html>

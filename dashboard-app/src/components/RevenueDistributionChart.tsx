@@ -1,13 +1,5 @@
 'use client'
 
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-} from 'recharts'
 import { formatCurrency } from '@/lib/format'
 
 interface Props {
@@ -27,52 +19,65 @@ const COLORS = [
 ]
 
 export default function RevenueDistributionChart({ data, title }: Props) {
-  const sorted = [...data].sort((a, b) => b.total - a.total)
-  const top6 = sorted.slice(0, 6)
-  const othersTotal = sorted.slice(6).reduce((sum, d) => sum + d.total, 0)
-  const chartData =
-    othersTotal > 0
-      ? [...top6, { nombre: 'Otros', total: othersTotal }]
-      : top6
+  const sorted = [...data].filter(d => d.total > 0).sort((a, b) => b.total - a.total)
+  const topItems = sorted.slice(0, 8)
+  const grandTotal = sorted.reduce((sum, d) => sum + d.total, 0)
+
+  if (topItems.length === 0) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-5 card-shadow h-full flex flex-col">
+        {title && (
+          <h3 className="text-sm font-semibold text-text mb-4">{title}</h3>
+        )}
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-text-muted text-sm">Sin datos de categorias</p>
+        </div>
+      </div>
+    )
+  }
+
+  const maxVal = topItems[0]?.total || 1
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5">
+    <div className="bg-card rounded-xl border border-border p-5 card-shadow h-full flex flex-col">
       {title && (
-        <h3 className="text-sm font-semibold text-text mb-4">{title}</h3>
+        <h3 className="text-sm font-semibold text-text mb-1">{title}</h3>
       )}
-      <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={90}
-              dataKey="total"
-              nameKey="nombre"
-              paddingAngle={2}
-            >
-              {chartData.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value: any) => formatCurrency(Number(value))}
-              contentStyle={{
-                background: '#fff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '12px',
-              }}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: '11px' }}
-              iconType="circle"
-              iconSize={8}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+      <p className="text-xs text-text-muted mb-4">
+        Total: {formatCurrency(grandTotal)}
+      </p>
+      <div className="space-y-3 flex-1">
+        {topItems.map((item, i) => {
+          const pct = grandTotal > 0 ? ((item.total / grandTotal) * 100) : 0
+          const barWidth = maxVal > 0 ? ((item.total / maxVal) * 100) : 0
+          return (
+            <div key={item.nombre}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  />
+                  <span className="text-xs font-medium text-text truncate">
+                    {item.nombre}
+                  </span>
+                </div>
+                <span className="text-xs tabular-nums text-text-soft ml-2 shrink-0">
+                  {pct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-surface rounded-full h-2">
+                <div
+                  className="h-2 rounded-full animate-progress transition-all"
+                  style={{
+                    width: `${barWidth}%`,
+                    backgroundColor: COLORS[i % COLORS.length],
+                  }}
+                />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

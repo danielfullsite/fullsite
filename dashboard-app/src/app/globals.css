@@ -6,16 +6,20 @@
   --color-sidebar-active: #2d2d5e;
   --color-accent: #3b82f6;
   --color-accent-light: #dbeafe;
+  --color-accent-dark: #2563eb;
   --color-surface: #f8fafc;
   --color-card: #ffffff;
   --color-success: #10b981;
   --color-success-bg: #d1fae5;
   --color-danger: #ef4444;
   --color-danger-bg: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef3c7;
   --color-text: #1e293b;
   --color-text-soft: #64748b;
   --color-text-muted: #94a3b8;
   --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -31,6 +35,63 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth transitions globally */
+a, button {
+  transition: all 0.15s ease;
+}
+
+/* Card shadow utility */
+.card-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+}
+.card-shadow-hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
+.card-shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
+
+/* KPI gradient accents */
+.kpi-accent-blue {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-left: 3px solid #3b82f6;
+}
+.kpi-accent-green {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-left: 3px solid #10b981;
+}
+.kpi-accent-amber {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-left: 3px solid #f59e0b;
+}
+.kpi-accent-purple {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border-left: 3px solid #8b5cf6;
+}
+
+/* Chat message animation */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-message-in {
+  animation: messageSlideIn 0.25s ease-out;
+}
+
+/* Progress bar animation */
+@keyframes progressGrow {
+  from { width: 0; }
+}
+.animate-progress {
+  animation: progressGrow 0.6s ease-out;
 }
 
 /* Scrollbar styling */
@@ -52,7 +113,21 @@ body {
   background: #94a3b8;
 }
 
+/* Hide scrollbar for horizontal nav */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Recharts tooltip override */
 .recharts-tooltip-wrapper {
   z-index: 50 !important;
+}
+
+/* Table row striping */
+.table-striped tbody tr:nth-child(even) {
+  background-color: #f8fafc;
 }

@@ -1,4 +1,5 @@
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '$0'
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
@@ -7,11 +8,13 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '0'
   return new Intl.NumberFormat('es-MX').format(value)
 }
 
-export function formatPercent(value: number): string {
+export function formatPercent(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '+0.0%'
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value.toFixed(1)}%`
 }
@@ -34,7 +37,8 @@ export function formatShortDate(dateStr: string): string {
   })
 }
 
-export function percentChange(current: number, previous: number): number {
-  if (previous === 0) return 0
-  return ((current - previous) / previous) * 100
+export function percentChange(current: number | null | undefined, previous: number | null | undefined): number {
+  if (!current || !previous || previous === 0) return 0
+  const result = ((current - previous) / previous) * 100
+  return isNaN(result) ? 0 : result
 }
