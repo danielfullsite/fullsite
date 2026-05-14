@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 """
-Intraday Sales Report — AMALAY
+Intraday Sales Report — Multi-tenant
 Scrapes Wansoft API directly for real-time sales data.
-Sends to Telegram at 1pm, 3pm, 10pm MX.
-
-Metrics:
-- Ventas acumuladas del día
-- Ticket promedio general
-- Ticket promedio por mes (histórico from Supabase)
-- H&H, Pan, Postres, 2da bebida totals
-- Ventas por mesero
-- Top platillos
+Sends to Telegram at 1pm, 3pm, 10pm.
 """
 
 import os
@@ -20,41 +12,32 @@ import time
 import requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
+from client_config import get_client, get_tz, get_chat_ids, is_mesero, is_market, get_wansoft_creds
 
 # ── Config ──────────────────────────────────────────────────────────────────
-WANSOFT_USER = os.environ["WANSOFT_USER"]
-WANSOFT_PASS = os.environ["WANSOFT_PASS"]
+CLIENT = get_client()
+SUBSIDIARY_ID, WANSOFT_USER, WANSOFT_PASS = get_wansoft_creds(CLIENT)
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
-SUBSIDIARY_ID = "6043"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_IDS = [
-    os.environ.get("TELEGRAM_CHAT_ID_DANIEL"),
-    os.environ.get("TELEGRAM_CHAT_ID_MONICA"),
-]
-TG_CHAT_IDS = [c for c in TG_CHAT_IDS if c]
+TG_CHAT_IDS = get_chat_ids(CLIENT, "intraday")
 
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
-MX_TZ = timezone(timedelta(hours=-6))
+MX_TZ = get_tz(CLIENT)
 
 sb_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
 }
 
-# ── Categories for tracking ─────────────────────────────────────────────────
-# Keywords to identify platillos in each category from SalesBySaucer
-HH_KEYWORDS = ["HALF", "H&H", "HALF HALF", "HALF  HALF"]
-PAN_KEYWORDS = ["TOAST", "BAGEL", "CROISSANT", "PANINI", "CROQUE", "FRENCH TOAST"]
-POSTRES_KEYWORDS = ["BROWNIE", "CHEESECAKE", "FLAN", "HELADO", "ICE CREAM",
-                     "PASTEL", "CAKE", "CHURRO", "TIRAMISÚ", "TIRAMISU",
-                     "CREPAS", "CREPE"]
-# 2da bebida: we count beverage items per ticket from SalesBySaucer
-BEBIDA_GROUPS = ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES",
-                 "FRAPPES", "SIGNATURE", "TEA & TISANAS", "SODAS",
-                 "BEBIDAS OH"]
+# ── Categories from client config ───────────────────────────────────────────
+_cats = CLIENT.get("menu_categories") or {}
+HH_KEYWORDS = _cats.get("hh", ["HALF", "H&H"])
+PAN_KEYWORDS = _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])
+POSTRES_KEYWORDS = _cats.get("postres", ["BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"])
+BEBIDA_GROUPS = CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS"]
 
 
 def sb_get(table, params):
@@ -231,9 +214,7 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     personas = order_types.get("total_personas", 0)
 
     # Exclude Market staff from ticket promedio
-    market_names = ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
-    market_ventas = sum(u["total"] for u in users
-                        if any(m in u["name"].lower() for m in market_names))
+    market_ventas = sum(u["total"] for u in users if is_market(u["name"], CLIENT))
     ventas_restaurante = ventas_netas - market_ventas
     # Estimate Market tickets (Market avg ~$50-80 per ticket)
     market_tickets = round(market_ventas / 65) if market_ventas > 0 else 0
@@ -293,13 +274,9 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     for g in sorted(bebida_groups_found, key=lambda x: -x["total"])[:5]:
         msg += f"\n  - {g['name']}: ${g['total']:,.0f}"
 
-    # Exclude cajeros/sistema and market staff from mesero ranking
-    exclude = ["oscar ricardo", "rodrigo chávez", "rodrigo chavez", "aplicaciones",
-               "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
-    meseros = [u for u in users if u["total"] > 0
-               and not any(ex in u["name"].lower() for ex in exclude)]
-    market = [u for u in users if u["total"] > 0
-              and any(ex in u["name"].lower() for ex in ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"])]
+    # Separate meseros from market staff
+    meseros = [u for u in users if u["total"] > 0 and is_mesero(u["name"], CLIENT)]
+    market = [u for u in users if u["total"] > 0 and is_market(u["name"], CLIENT)]
 
     msg += "\n\n👤 VENTAS POR MESERO"
     for u in sorted(meseros, key=lambda x: -x["total"]):

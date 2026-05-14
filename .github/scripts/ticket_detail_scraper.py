@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Ticket Detail Scraper — downloads sale detail TXT from Wansoft via Playwright.
-Parses mesero × platillo × grupo cross and saves to Supabase.
-This enables questions like "H&H por mesero" in the Telegram bot.
+Ticket Detail Scraper — Multi-tenant
+Downloads sale detail TXT from Wansoft, parses mesero × platillo × grupo cross.
 """
 
 import asyncio
@@ -13,38 +12,40 @@ import time
 import requests
 from datetime import date, timedelta, datetime, timezone
 from collections import defaultdict
+from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
 
 # ── Config ──────────────────────────────────────────────────────────────────
+CLIENT = get_client()
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
-MX_TZ = timezone(timedelta(hours=-6))
+MX_TZ = get_tz(CLIENT)
 
-# Categories to track per waiter
+# Categories from client config
+_cats = CLIENT.get("menu_categories") or {}
 CATEGORIES = {
-    "H&H": ["HALF", "HALF HALF"],
-    "Pan": ["TOAST", "BAGEL", "CROISSANT", "CROQUE", "FRENCH TOAST", "PANINI"],
-    "Postres": ["BROWNIE", "CHEESECAKE", "FLAN", "PASTEL", "CAKE", "CHURRO",
-                "TIRAMISU", "TIRAMISÚ", "CREPAS", "CREPE", "PANCAKE"],
-    "2da Bebida": [],  # Calculated differently — count beverage items per ticket
+    "H&H": _cats.get("hh", ["HALF", "HALF HALF"]),
+    "Pan": _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"]),
+    "Postres": _cats.get("postres", ["BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"]),
+    "2da Bebida": [],
 }
 
-BEBIDA_GROUPS = {"COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES",
-                 "FRAPPES", "SIGNATURE", "TEA & TISANAS", "SODAS", "BEBIDAS OH"}
+BEBIDA_GROUPS = set(CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS"])
 
 
 def download_sale_detail(target_date: str) -> str | None:
     """Download sale detail TXT from Wansoft via HTTP (no Playwright needed!)."""
+    sub_id, wuser, wpass = get_wansoft_creds(CLIENT)
     s = requests.Session()
     s.get(f"{WANSOFT_URL}/")
     r = s.post(f"{WANSOFT_URL}/", data={
-        "UserName": os.environ["WANSOFT_USER"],
-        "Password": os.environ["WANSOFT_PASS"],
+        "UserName": wuser,
+        "Password": wpass,
     }, allow_redirects=True)
     if "Dashboard" not in r.url:
         raise Exception("Login failed")
 
     # The SaleDetail page exports a pipe-delimited TXT
     r = s.get(f"{WANSOFT_URL}/Reports/SaleDetail", params={
-        "subsidiaryId": "6043",
+        "subsidiaryId": sub_id,
         "startDate": target_date,
         "endDate": target_date,
     })
@@ -58,7 +59,7 @@ def download_sale_detail(target_date: str) -> str | None:
 
     # Try the export endpoint directly
     export_r = s.post(f"{WANSOFT_URL}/Reports/ExportSaleDetail", data={
-        "subsidiaryId": "6043",
+        "subsidiaryId": sub_id,
         "startDate": target_date,
         "endDate": target_date,
     }, allow_redirects=True)
@@ -71,7 +72,7 @@ def download_sale_detail(target_date: str) -> str | None:
                      "Reports/ExportSaleDetail"]:
         try:
             r2 = s.get(f"{WANSOFT_URL}/{endpoint}", params={
-                "subsidiaryId": "6043", "startDate": target_date, "endDate": target_date,
+                "subsidiaryId": sub_id, "startDate": target_date, "endDate": target_date,
             })
             if r2.status_code == 200 and "|" in r2.text[:200]:
                 return r2.text
@@ -81,7 +82,9 @@ def download_sale_detail(target_date: str) -> str | None:
     return None
 
 
-def download_via_playwright(target_date: str) -> str | None:
+def download_via_playwright(target_date: str, sub_id: str = None, wuser: str = None, wpass: str = None) -> str | None:
+    if not sub_id:
+        sub_id, wuser, wpass = get_wansoft_creds(CLIENT)
     """Fallback: use Playwright to download the TXT."""
     try:
         import subprocess
@@ -97,8 +100,8 @@ async def dl():
         page = await ctx.new_page()
         await page.goto('{WANSOFT_URL}/', wait_until='domcontentloaded', timeout=30000)
         await asyncio.sleep(2)
-        await page.fill('input[name="UserName"]', '{os.environ["WANSOFT_USER"]}')
-        await page.fill('input[name="Password"]', '{os.environ["WANSOFT_PASS"]}')
+        await page.fill('input[name="UserName"]', '{wuser}')
+        await page.fill('input[name="Password"]', '{wpass}')
         await page.click('input[type="submit"]')
         await asyncio.sleep(5)
         await page.goto('{WANSOFT_URL}/Reports/SaleDetail', wait_until='load', timeout=30000)
@@ -268,8 +271,7 @@ def compute_waiter_categories(items: list[dict]) -> dict:
     result["__por_mesero_platillo"] = {m: dict(p) for m, p in mesero_platillos.items()}
 
     # Restaurant-only stats (excluding Market + cajeros)
-    market_cajero = ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio",
-                     "oscar ricardo", "rodrigo chávez", "rodrigo chavez", "aplicaciones", "mesero evento"]
+    market_cajero = [e.lower() for e in (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])]
 
     all_tickets = defaultdict(set)  # {mesero: set of orden numbers}
     for item in items:
@@ -352,13 +354,14 @@ def save_to_supabase(waiter_cats: dict, items: list[dict], target_date: str):
 
 def send_telegram(msg: str):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID_DANIEL")
-    if not token or not chat_id:
+    chat_ids = get_chat_ids(CLIENT, "ticket_detail")
+    if not token or not chat_ids:
         return
     chunks = [msg[i:i + 4000] for i in range(0, len(msg), 4000)]
-    for chunk in chunks:
-        requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                      json={"chat_id": chat_id, "text": chunk}, timeout=15)
+    for chat_id in chat_ids:
+        for chunk in chunks:
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                          json={"chat_id": chat_id, "text": chunk}, timeout=15)
 
 
 def main():

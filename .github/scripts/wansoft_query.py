@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
 """
-Wansoft Query Agent — responde preguntas sobre datos de Wansoft en tiempo real.
-Flow: Telegram question → Groq date parse → Wansoft API scrape → Groq answer → Telegram
+Wansoft Query Agent — Multi-tenant
+Responds to any question about Wansoft data via Telegram.
 """
 
 import os, sys, json, time, re, requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
+from client_config import get_client, get_tz, get_wansoft_creds
 
 # ── Config ──────────────────────────────────────────────────────────────────
-WANSOFT_USER = os.environ["WANSOFT_USER"]
-WANSOFT_PASS = os.environ["WANSOFT_PASS"]
+CLIENT = get_client()
+SUBSIDIARY, WANSOFT_USER, WANSOFT_PASS = get_wansoft_creds(CLIENT)
 WANSOFT_URL  = "https://www.wansoft.net/Wansoft.Web"
-SUBSIDIARY   = "6043"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ["TELEGRAM_CHAT_ID_DANIEL"]
+TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 MESSAGE      = os.environ.get("INPUT_MESSAGE", "").strip()
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 
-MX_TZ = timezone(timedelta(hours=-6))
+MX_TZ = get_tz(CLIENT)
 sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 
 
@@ -341,7 +340,10 @@ def fetch_historical(days=30):
 
 
 # ── Groq response ──────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """Eres el asistente de datos de AMALAY Coffee & Market (Monterrey, MX).
+_exclude_names = (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])
+_exclude_str = ", ".join(_exclude_names) if _exclude_names else "ninguno"
+
+SYSTEM_PROMPT = f"""Eres el asistente de datos de {CLIENT['display_name']} ({CLIENT.get('city', '')}).
 
 REGLA #1: Responde SOLO lo que se pregunta. Sin explicaciones, sin contexto extra, sin sugerencias. Directo al dato.
 
@@ -351,7 +353,7 @@ REGLA #3: Formato corto. Texto plano, sin markdown. Máximo 5 líneas para pregu
 
 REGLA #4: Montos en MXN con $. Decimales solo si son relevantes.
 
-REGLA #5: EXCLUYE SIEMPRE de rankings de meseros: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO (cajeros), Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio (Market).
+REGLA #5: EXCLUYE SIEMPRE de rankings de meseros: {_exclude_str}.
 
 REGLA #6: Para KPIs por mesero (bebidas_por_persona, alimentos_por_persona, ticket_promedio), usa DIRECTAMENTE el campo "KPIs" del mesero. NUNCA los recalcules manualmente.
 
