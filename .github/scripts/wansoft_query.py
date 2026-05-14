@@ -79,6 +79,11 @@ def detect_date_range(question):
     today_str = now_mx.strftime("%Y-%m-%d")
     dow = now_mx.strftime("%A")
 
+    from datetime import date as _date
+    yesterday_str = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
+    week_start = (now_mx - timedelta(days=now_mx.weekday())).strftime("%Y-%m-%d")
+    month_start = now_mx.strftime("%Y-%m-01")
+
     try:
         r = requests.post("https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
@@ -86,16 +91,14 @@ def detect_date_range(question):
             json={
                 "model": "claude-haiku-4-5-20251001",
                 "max_tokens": 50,
-                "system": f"""Hoy es {today_str} ({dow}). Extrae el rango de fechas de la pregunta.
-Responde SOLO con JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
-- "hoy" → start=end={today_str}
-- "ayer" → start=end=fecha de ayer
-- "esta semana" → lunes a hoy
-- "la semana pasada" → lunes a domingo pasado
-- "este mes" → primer día del mes a hoy
-- "mayo" → 2026-05-01 a 2026-05-31
-- Si no menciona fecha → start=end={today_str}
-Solo JSON, sin texto adicional.""",
+                "system": f"""Hoy es {today_str} ({dow}). Ayer fue {yesterday_str}. Extrae el rango de fechas.
+Responde SOLO JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
+- "hoy" → {{"start":"{today_str}","end":"{today_str}"}}
+- "ayer" → {{"start":"{yesterday_str}","end":"{yesterday_str}"}}
+- "esta semana" → {{"start":"{week_start}","end":"{today_str}"}}
+- "este mes" → {{"start":"{month_start}","end":"{today_str}"}}
+- Sin fecha → {{"start":"{today_str}","end":"{today_str}"}}
+Solo JSON.""",
                 "messages": [{"role": "user", "content": question}],
             }, timeout=15)
         r.raise_for_status()
