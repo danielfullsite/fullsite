@@ -1,6 +1,4 @@
-import { createClient } from './supabase-browser'
-
-const supabase = createClient()
+import { supabase } from './supabase'
 import type { WansoftDaily } from './types'
 
 function parseJsonbField<T>(value: unknown): T[] {
@@ -50,14 +48,13 @@ export async function getLatestDay(): Promise<WansoftDaily | null> {
     .gt('ventas_dia', 0)
     .order('fecha', { ascending: false })
     .limit(1)
-    .single()
 
   if (error) {
     console.error('Error fetching latest day:', error)
     return null
   }
 
-  return data ? parseRow(data) : null
+  return data && data.length > 0 ? parseRow(data[0]) : null
 }
 
 export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
