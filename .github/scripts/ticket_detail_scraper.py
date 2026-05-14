@@ -239,7 +239,6 @@ def compute_waiter_categories(items: list[dict]) -> dict:
             rest_tickets += len(ordenes)
             rest_ventas += sum(i["total"] for i in items if i["mesero"] == mesero)
 
-    result = dict(waiter_cats)
     result["__restaurant_stats"] = {
         "tickets": rest_tickets,
         "ventas": round(rest_ventas, 2),
