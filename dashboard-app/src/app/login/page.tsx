@@ -32,8 +32,8 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/')
-      router.refresh()
+      // Force full page reload to pick up auth cookies
+      window.location.href = '/'
     } catch {
       setError('Error al iniciar sesión. Intenta de nuevo.')
     } finally {
