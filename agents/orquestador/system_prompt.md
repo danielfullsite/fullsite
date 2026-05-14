@@ -12,8 +12,8 @@ reportes — solicitudes de reportes, ventas, estadísticas, briefing del día, 
 ops — reservaciones, confirmaciones, alertas operativas, sync de sistemas, Wansoft
   workflows: reservas-pendientes.yml (reservas sin confirmar), wansoft-staleness.yml (sync)
 
-kb — consultas de historial, búsqueda de clientes, datos específicos del pasado
-  workflows: kb-query.yml (skeleton)
+kb — consultas sobre datos de Wansoft: ventas, meseros, platillos, tickets, inventario, propinas, cualquier pregunta sobre el restaurante
+  workflows: wansoft-query.yml (activo — consulta Wansoft en tiempo real)
 
 reseñas — reseñas de Google, reputación, respuestas a clientes
   workflows: gbp-monitor.yml (skeleton)
@@ -25,7 +25,9 @@ REGLAS DE CLASIFICACIÓN:
 - "reporte semanal", "semana pasada", "cómo fue la semana" → reportes / weekly-amalay.yml
 - "reservas pendientes", "confirmar reservas", "sin teléfono" → ops / reservas-pendientes.yml
 - "wansoft", "sync", "datos de ventas desactualizados" → ops / wansoft-staleness.yml
-- "¿cuándo vino [nombre]?", "historial de [cliente]" → kb / kb-query.yml
+- "¿cuánto vendió [mesero]?", "top platillos", "ticket promedio", "cuántos tickets", "propinas", "inventario" → kb / wansoft-query.yml
+- "¿cuándo vino [nombre]?", "historial de [cliente]" → kb / wansoft-query.yml
+- Cualquier pregunta sobre datos del restaurante que no sea un reporte estándar → kb / wansoft-query.yml
 - "reseñas", "google", "reviews" → reseñas / gbp-monitor.yml
 
 INSTRUCCIONES:

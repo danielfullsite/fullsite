@@ -25,9 +25,11 @@ MENU = (
     "  briefing — resumen del dia (reservas, ventas, acciones)\n"
     "  reporte semanal — ventas y eventos de la semana pasada\n"
     "  reservas pendientes — alertas de reservas sin confirmar\n"
-    "  top meseros — ranking de ventas por mesero\n"
     "  wansoft — estado del sync de ventas\n"
     "  reseñas — monitoreo Google (proximamente)\n"
+    "\n"
+    "Pregunta lo que quieras sobre ventas, meseros, platillos,\n"
+    "inventario o cualquier dato de Wansoft. 24/7.\n"
     "\n"
     "Escribe en lenguaje natural, no hace falta usar comandos exactos."
 )
@@ -48,12 +50,27 @@ WORKFLOW_MAP: dict[str, str] = {
     "confirmaciones":   "reservas-pendientes.yml",
     "wansoft":          "wansoft-staleness.yml",
     "sync":             "wansoft-staleness.yml",
+    # kb — Wansoft query (24/7)
+    "kb":               "wansoft-query.yml",
+    "consulta":         "wansoft-query.yml",
+    "meseros":          "wansoft-query.yml",
+    "mesero":           "wansoft-query.yml",
+    "platillos":        "wansoft-query.yml",
+    "platillo":         "wansoft-query.yml",
+    "ticket":           "wansoft-query.yml",
+    "tickets":          "wansoft-query.yml",
+    "propinas":         "wansoft-query.yml",
+    "inventario":       "wansoft-query.yml",
+    "top":              "wansoft-query.yml",
+    "cuánto":           "wansoft-query.yml",
+    "cuanto":           "wansoft-query.yml",
+    "quién":            "wansoft-query.yml",
+    "quien":            "wansoft-query.yml",
     # skeleton
-    "kb":               None,
     "reseñas":          None,
 }
 
-SKELETON_WORKFLOWS = {"kb-query.yml", "gbp-monitor.yml", None}
+SKELETON_WORKFLOWS = {"gbp-monitor.yml", None}
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def send_telegram(text: str) -> bool:
@@ -182,7 +199,12 @@ send_telegram(
 )
 
 # ── Disparar workflow ─────────────────────────────────────────────────────────
-ok = dispatch_workflow(workflow)
+# Pass message + chat_id to wansoft-query so it can answer contextually
+inputs = {}
+if workflow == "wansoft-query.yml":
+    inputs = {"message": MESSAGE[:500], "chat_id": TG_CHAT_ID}
+
+ok = dispatch_workflow(workflow, inputs)
 if ok:
     print(f"[orquestador] Dispatched {workflow} OK")
 else:
