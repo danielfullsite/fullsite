@@ -1,0 +1,32 @@
+name: Intraday Sales Report
+
+on:
+  schedule:
+    # 1pm MX = 19:00 UTC, 3pm MX = 21:00 UTC, 10pm MX = 04:00+1 UTC
+    - cron: '0 19 * * *'   # 1:00 PM MX
+    - cron: '0 21 * * *'   # 3:00 PM MX
+    - cron: '0 4 * * *'    # 10:00 PM MX
+  workflow_dispatch:        # Manual trigger for testing
+
+env:
+  WANSOFT_USER: ${{ secrets.WANSOFT_USER }}
+  WANSOFT_PASS: ${{ secrets.WANSOFT_PASS }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  TELEGRAM_CHAT_ID_MONICA: ${{ secrets.TELEGRAM_CHAT_ID_MONICA }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+      - name: Run Intraday Sales Report
+        run: python .github/scripts/intraday_sales.py
