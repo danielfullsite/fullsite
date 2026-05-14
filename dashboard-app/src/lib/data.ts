@@ -1,4 +1,6 @@
-import { supabase } from './supabase'
+import { createClient } from './supabase-browser'
+
+const supabase = createClient()
 import type { WansoftDaily } from './types'
 
 function parseJsonbField<T>(value: unknown): T[] {
