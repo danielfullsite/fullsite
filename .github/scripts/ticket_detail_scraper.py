@@ -208,6 +208,21 @@ def compute_waiter_categories(items: list[dict]) -> dict:
             "pct": round(tickets_with_2plus / total_tickets * 100, 1) if total_tickets else 0,
         }
 
+    # Full mesero × grupo breakdown (for any query like "pizzas de Brayan")
+    mesero_grupos = defaultdict(lambda: defaultdict(lambda: {"qty": 0, "total": 0.0}))
+    mesero_platillos = defaultdict(lambda: defaultdict(lambda: {"qty": 0, "total": 0.0}))
+    for item in items:
+        mesero = item["mesero"]
+        mesero_grupos[mesero][item["grupo"]]["qty"] += item["cantidad"]
+        mesero_grupos[mesero][item["grupo"]]["total"] += item["total"]
+        mesero_platillos[mesero][item["platillo"]]["qty"] += item["cantidad"]
+        mesero_platillos[mesero][item["platillo"]]["total"] += item["total"]
+
+    result = dict(waiter_cats)
+    # Add full breakdown per mesero
+    result["__por_mesero_grupo"] = {m: dict(g) for m, g in mesero_grupos.items()}
+    result["__por_mesero_platillo"] = {m: dict(p) for m, p in mesero_platillos.items()}
+
     # Restaurant-only stats (excluding Market + cajeros)
     market_cajero = ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio",
                      "oscar ricardo", "rodrigo chávez", "rodrigo chavez", "aplicaciones", "mesero evento"]

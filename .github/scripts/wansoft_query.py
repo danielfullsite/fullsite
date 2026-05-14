@@ -278,7 +278,7 @@ DATOS DISPONIBLES EN EL CONTEXTO:
 - propinas: propinas por mesero (si hay datos)
 - inventario_punto_reorden: productos que están por debajo del mínimo
 - cortes_caja: cortes de caja del día
-- ventas_por_mesero_x_categoria: cruce mesero × categoría — H&H, Pan, Postres y 2da Bebida vendidos POR CADA MESERO (qty, total, % de tickets con 2+ bebidas)
+- ventas_por_mesero_x_categoria: cruce COMPLETO mesero × platillo/grupo — incluye H&H, Pan, Postres, 2da Bebida por mesero, ADEMÁS de __por_mesero_grupo (todos los grupos por mesero) y __por_mesero_platillo (todos los platillos por mesero). Permite responder "cuántas pizzas vendió Brayan"
 - historical_data: datos diarios de los últimos 30 días (Supabase)
 
 REGLAS:
@@ -322,13 +322,41 @@ def ask_groq(question, wansoft_data, historical_data):
     # Block 0: If waiter × category data exists and question is about H&H/pan/postres/mesero, put FIRST
     waiter_cats = wd.pop("ventas_por_mesero_x_categoria", None)
     cat_keywords = ["h&h", "half", "pan", "toast", "bagel", "postre", "dessert", "2da bebida",
-                    "segunda bebida", "bebida por mesero", "categoría", "categoria"]
+                    "segunda bebida", "bebida por mesero", "categoría", "categoria",
+                    "pizza", "chilaquile", "enchilada", "café", "cafe", "latte",
+                    "mesero vendió", "mesero vendio", "vendió cada", "vendio cada",
+                    "por mesero"]
     if waiter_cats and any(kw in q_lower for kw in cat_keywords):
-        blocks.append("VENTAS POR MESERO × CATEGORÍA (H&H, Pan, Postres, 2da Bebida):\n"
-                      + json.dumps(waiter_cats, ensure_ascii=False, indent=1))
-    elif waiter_cats:
-        # Include but not first priority
-        pass  # Will be added in detail block
+        # Extract relevant mesero×grupo or mesero×platillo data
+        wc_data = {}
+
+        # Check if question mentions a specific mesero
+        por_mesero_grupo = waiter_cats.get("__por_mesero_grupo", {})
+        por_mesero_platillo = waiter_cats.get("__por_mesero_platillo", {})
+
+        # Filter to relevant mesero if mentioned
+        mesero_match = None
+        for mesero_name in por_mesero_grupo:
+            name_parts = mesero_name.lower().split()
+            if any(part in q_lower for part in name_parts if len(part) > 3):
+                mesero_match = mesero_name
+                break
+
+        if mesero_match and por_mesero_platillo.get(mesero_match):
+            # Show this mesero's full breakdown
+            wc_data[f"platillos_de_{mesero_match}"] = por_mesero_platillo[mesero_match]
+            wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo[mesero_match]
+        elif por_mesero_grupo:
+            # Show all meseros × grupo (compact)
+            wc_data["por_mesero_grupo"] = por_mesero_grupo
+
+        # Always include the category summary
+        wc_data["categorias_por_mesero"] = {k: v for k, v in waiter_cats.items()
+                                             if not k.startswith("__")}
+        wc_data["restaurant_stats"] = waiter_cats.get("__restaurant_stats", {})
+
+        blocks.append("VENTAS POR MESERO × CATEGORÍA Y PLATILLO:\n"
+                      + json.dumps(wc_data, ensure_ascii=False, indent=1))
 
     # Block 1: If there are matching platillos, put them FIRST
     if relevant_platillos:
