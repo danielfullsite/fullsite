@@ -1,12 +1,6 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { getSupabase } from './supabase'
 
-let client: ReturnType<typeof createSupabaseClient> | null = null
-
+// Re-export the same singleton — no duplicate GoTrueClient
 export function createClient() {
-  if (client) return client
-  client = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  return client
+  return getSupabase()
 }
