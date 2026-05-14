@@ -220,19 +220,54 @@ def fetch_all_wansoft_data(session, start, end):
         pass
 
     # 18. Waiter × Category (H&H, Pan, Postres, 2da Bebida por mesero)
-    # Always get the most recent entry (covers "hoy", "este mes", etc.)
+    # Fetch all days in the date range and aggregate
     try:
         wc = sb_get("wansoft_waiter_categories", {
             "select": "fecha,data",
+            "fecha": f"gte.{start}",
             "order": "fecha.desc",
-            "limit": "1",
+            "limit": "31",
         })
-        if wc and wc[0].get("data"):
-            wc_data = wc[0]["data"]
-            if isinstance(wc_data, str):
-                wc_data = json.loads(wc_data)
-            data["ventas_por_mesero_x_categoria"] = wc_data
-            data["ventas_por_mesero_x_categoria_fecha"] = wc[0]["fecha"]
+        if not wc:
+            # Fallback: get most recent entry
+            wc = sb_get("wansoft_waiter_categories", {
+                "select": "fecha,data", "order": "fecha.desc", "limit": "1",
+            })
+        if wc:
+            # Aggregate across all days
+            from collections import defaultdict as _dd
+            agg_grupo = _dd(lambda: _dd(lambda: {"qty": 0, "total": 0.0}))
+            agg_platillo = _dd(lambda: _dd(lambda: {"qty": 0, "total": 0.0}))
+            agg_cats = _dd(lambda: _dd(lambda: {"qty": 0, "total": 0.0}))
+
+            for row in wc:
+                d = row["data"]
+                if isinstance(d, str):
+                    d = json.loads(d)
+                # Aggregate mesero × grupo
+                for mesero, grupos in d.get("__por_mesero_grupo", {}).items():
+                    for grupo, vals in grupos.items():
+                        agg_grupo[mesero][grupo]["qty"] += vals.get("qty", 0)
+                        agg_grupo[mesero][grupo]["total"] += vals.get("total", 0)
+                # Aggregate mesero × platillo
+                for mesero, platillos in d.get("__por_mesero_platillo", {}).items():
+                    for platillo, vals in platillos.items():
+                        agg_platillo[mesero][platillo]["qty"] += vals.get("qty", 0)
+                        agg_platillo[mesero][platillo]["total"] += vals.get("total", 0)
+                # Aggregate categories (H&H, Pan, etc.)
+                for key, val in d.items():
+                    if not key.startswith("__") and isinstance(val, dict):
+                        for cat, cat_vals in val.items():
+                            if isinstance(cat_vals, dict) and "qty" in cat_vals:
+                                agg_cats[key][cat]["qty"] += cat_vals.get("qty", 0)
+                                agg_cats[key][cat]["total"] += cat_vals.get("total", 0)
+
+            combined = dict(agg_cats)
+            combined["__por_mesero_grupo"] = {m: dict(g) for m, g in agg_grupo.items()}
+            combined["__por_mesero_platillo"] = {m: dict(p) for m, p in agg_platillo.items()}
+            combined["__dias_incluidos"] = len(wc)
+            combined["__rango"] = f"{wc[-1]['fecha']} a {wc[0]['fecha']}"
+            data["ventas_por_mesero_x_categoria"] = combined
     except Exception:
         pass
 
