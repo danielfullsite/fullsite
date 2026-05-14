@@ -6,6 +6,7 @@ export interface Env {
   SUPABASE_SERVICE_KEY: string;
   CHAT_ID_DANIEL: string;
   CHAT_ID_MONICA: string;
+  CHAT_ID_RAUL: string;
   // Legacy — no se usa pero no rompe nada
   GITHUB_TOKEN?: string;
 }

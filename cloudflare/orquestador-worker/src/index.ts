@@ -44,8 +44,8 @@ export default {
 
     console.log(`[warroom] from=${fromName}(${fromId}) chat=${chatId} text="${(text ?? '').slice(0, 80)}"`);
 
-    // Autorización: solo Daniel y Mónica
-    const allowedChats = [env.CHAT_ID_DANIEL, env.CHAT_ID_MONICA];
+    // Autorización: Daniel, Mónica y Raúl
+    const allowedChats = [env.CHAT_ID_DANIEL, env.CHAT_ID_MONICA, env.CHAT_ID_RAUL];
     if (!allowedChats.includes(chatId)) {
       await sendMessage(env, chatId, 'No tengo permiso para responder en este chat.');
       return new Response('OK', { status: 200 });
