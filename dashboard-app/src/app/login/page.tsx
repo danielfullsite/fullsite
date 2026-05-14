@@ -18,25 +18,29 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
+      console.log('Auth result:', { data: data?.user?.email, error: authError?.message })
+
       if (authError) {
-        if (authError.message.includes('Invalid login')) {
-          setError('Credenciales incorrectas. Verifica tu email y contrasena.')
-        } else {
-          setError(authError.message)
-        }
+        setError(authError.message)
+        setLoading(false)
         return
       }
 
-      // Force full page reload to pick up auth cookies
-      window.location.href = '/'
-    } catch {
-      setError('Error al iniciar sesión. Intenta de nuevo.')
-    } finally {
+      if (data?.session) {
+        // Success — full reload
+        window.location.href = '/'
+      } else {
+        setError('No se pudo crear la sesión. Intenta de nuevo.')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Error de conexión. Intenta de nuevo.')
       setLoading(false)
     }
   }
