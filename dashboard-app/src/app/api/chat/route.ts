@@ -29,13 +29,38 @@ export async function POST(request: NextRequest) {
       .order('fecha', { ascending: false })
       .limit(14)
 
-    // 2. Waiter × platillo data (for mesero-specific questions)
+    // 2. Detect date from question
+    const now = new Date()
+    const mxOffset = -6 * 60 * 60 * 1000
+    const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
+    const todayStr = mxNow.toISOString().split('T')[0]
+    const yesterday = new Date(mxNow.getTime() - 86400000).toISOString().split('T')[0]
+
+    let dateFilter: { start: string; end: string } | null = null
+    if (q.includes('ayer')) dateFilter = { start: yesterday, end: yesterday }
+    else if (q.includes('hoy')) dateFilter = { start: todayStr, end: todayStr }
+    else if (q.includes('semana')) {
+      const weekAgo = new Date(mxNow.getTime() - 7 * 86400000).toISOString().split('T')[0]
+      dateFilter = { start: weekAgo, end: todayStr }
+    } else if (q.includes('mes')) {
+      const monthStart = todayStr.slice(0, 8) + '01'
+      dateFilter = { start: monthStart, end: todayStr }
+    }
+
+    // 3. Waiter × platillo data
     let waiterContext = ''
-    const { data: waiterRows } = await supabase
+    let waiterQuery = supabase
       .from('wansoft_waiter_categories')
       .select('fecha, data')
       .order('fecha', { ascending: false })
-      .limit(7)
+
+    if (dateFilter) {
+      waiterQuery = waiterQuery.gte('fecha', dateFilter.start).lte('fecha', dateFilter.end)
+    } else {
+      waiterQuery = waiterQuery.limit(7)
+    }
+
+    const { data: waiterRows } = await waiterQuery
 
     if (waiterRows && waiterRows.length > 0) {
       // Detect if question mentions a specific mesero
@@ -139,7 +164,8 @@ export async function POST(request: NextRequest) {
           ? JSON.stringify(filtered)
           : JSON.stringify(Object.fromEntries(Object.entries(platillos).sort((a, b) => b[1].qty - a[1].qty).slice(0, 20)))
 
-        waiterContext = `\nDATOS DE ${meseroMatch} (${waiterRows.length} dias):\n${kpiStr}\nCategorias: ${catsStr}\nPlatillos: ${platStr}`
+        const fechas = waiterRows.map(r => r.fecha).join(', ')
+        waiterContext = `\nDATOS DE ${meseroMatch} (fechas: ${fechas}):\n${kpiStr}\nCategorias: ${catsStr}\nPlatillos: ${platStr}`
       } else {
         // All meseros KPIs
         const allKPIs = Object.entries(aggKPIs)
