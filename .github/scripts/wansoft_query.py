@@ -290,6 +290,8 @@ REGLAS:
 - Incluye totales y porcentajes cuando sea relevante
 - Si la pregunta es sobre un platillo específico, busca en platillos_vendidos
 - Si preguntan "cuántos lattes" busca por nombre parcial en platillos_vendidos
+- EXCLUYE del ranking de MESEROS: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO (cajeros/sistema) y Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio (son de Market, no meseros)
+- Si preguntan "top meseros" o "ranking", solo incluye meseros de restaurante
 """
 
 

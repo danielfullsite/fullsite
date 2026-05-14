@@ -16,13 +16,15 @@ const HELP_TEXT = `Comandos disponibles:
 /sync - Estado del ultimo sync de Wansoft
 /help - Esta lista de comandos`;
 
-// Cajeros y cuentas internas — excluir de rankings
+// Cajeros, market y cuentas internas — excluir de rankings de meseros
 const EXCLUDE_FROM_RANKING = [
   'oscar ricardo',
-  'hector enrique',
   'rodrigo chávez',
   'rodrigo chavez',
   'fany elizabeth',
+  'ericka tamara',
+  'frida vianney',
+  'jorge antonio',
   'aplicaciones',
   'mesero evento',
 ];

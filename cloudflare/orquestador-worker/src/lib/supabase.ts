@@ -42,13 +42,15 @@ export interface MeseroEntry {
   promedio: number;
 }
 
-// Cajeros y cuentas internas — excluir de rankings de meseros
+// Cajeros, market y cuentas internas — excluir de rankings de meseros
 const EXCLUDE_FROM_RANKING = [
   'oscar ricardo',
-  'hector enrique',
   'rodrigo chávez',
   'rodrigo chavez',
   'fany elizabeth',
+  'ericka tamara',
+  'frida vianney',
+  'jorge antonio',
   'aplicaciones',
   'mesero evento',
 ];

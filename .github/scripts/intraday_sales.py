@@ -283,9 +283,21 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     for g in sorted(bebida_groups_found, key=lambda x: -x["total"])[:5]:
         msg += f"\n  - {g['name']}: ${g['total']:,.0f}"
 
+    # Exclude cajeros/sistema and market staff from mesero ranking
+    exclude = ["oscar ricardo", "rodrigo chávez", "rodrigo chavez", "aplicaciones",
+               "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
+    meseros = [u for u in users if u["total"] > 0
+               and not any(ex in u["name"].lower() for ex in exclude)]
+    market = [u for u in users if u["total"] > 0
+              and any(ex in u["name"].lower() for ex in ["fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"])]
+
     msg += "\n\n👤 VENTAS POR MESERO"
-    for u in sorted(users, key=lambda x: -x["total"]):
-        if u["total"] > 0:
+    for u in sorted(meseros, key=lambda x: -x["total"]):
+        msg += f"\n• {u['name']}: ${u['total']:,.0f}"
+
+    if market:
+        msg += "\n\n🏪 MARKET"
+        for u in sorted(market, key=lambda x: -x["total"]):
             msg += f"\n• {u['name']}: ${u['total']:,.0f}"
 
     msg += f"""
