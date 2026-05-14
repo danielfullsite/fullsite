@@ -9,11 +9,12 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   BarChart,
   Bar,
   Cell,
 } from 'recharts'
-import { TrendingUp, Calendar, Target, BarChart3 } from 'lucide-react'
+import { TrendingUp, Calendar, Target, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getMonthlyData } from '@/lib/data'
@@ -108,6 +109,47 @@ export default function TendenciasPage() {
     return { totalVentas, totalTickets, totalPersonas, dias: ytdDays.length }
   }, [allData])
 
+  // Year-over-Year comparison data
+  const yoyData = useMemo(() => {
+    const currentYear = '2026'
+    const prevYear = '2025'
+    const currentMonths = monthlyAgg.filter(d => d.month.startsWith(currentYear))
+    const prevMonths = monthlyAgg.filter(d => d.month.startsWith(prevYear))
+
+    // Create paired chart data (month number as x-axis, both years as series)
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const paired: { monthNum: number; monthLabel: string; current: number; prev: number; pctChange: number }[] = []
+
+    for (let m = 1; m <= 12; m++) {
+      const mm = m.toString().padStart(2, '0')
+      const cur = currentMonths.find(d => d.month === `${currentYear}-${mm}`)
+      const prv = prevMonths.find(d => d.month === `${prevYear}-${mm}`)
+      if (cur || prv) {
+        const curVal = cur?.ventas || 0
+        const prvVal = prv?.ventas || 0
+        paired.push({
+          monthNum: m,
+          monthLabel: monthNames[m - 1],
+          current: curVal,
+          prev: prvVal,
+          pctChange: prvVal > 0 ? ((curVal - prvVal) / prvVal) * 100 : 0,
+        })
+      }
+    }
+
+    // Chart data: all months that have at least one year of data
+    const chartData = paired.map(p => ({
+      monthLabel: p.monthLabel,
+      [`${currentYear}`]: p.current || undefined,
+      [`${prevYear}`]: p.prev || undefined,
+    }))
+
+    // Table data: only months that have current year data
+    const tableData = paired.filter(p => p.current > 0)
+
+    return { chartData, tableData, currentYear, prevYear }
+  }, [monthlyAgg])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -150,7 +192,7 @@ export default function TendenciasPage() {
           accentClass="kpi-accent-blue"
         />
         <KPICard
-          label="Ticket promedio mes"
+          label="Ticket prom. mes (rest.)"
           value={currentMonth ? formatCurrency(currentMonth.ticketPromedio) : '-'}
           delta={currentMonth ? `${formatPercent(ticketMoM)} vs mes anterior` : undefined}
           deltaType={ticketMoM >= 0 ? 'up' : 'down'}
@@ -213,7 +255,7 @@ export default function TendenciasPage() {
             </div>
           </div>
           <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ticket promedio</p>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ticket promedio (rest.)</p>
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-xs text-text-soft mb-0.5">Este mes</p>
@@ -286,10 +328,132 @@ export default function TendenciasPage() {
         </div>
       </div>
 
+      {/* Year-over-Year comparison */}
+      {yoyData.chartData.length > 0 && (
+        <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
+          <h3 className="text-sm font-semibold text-text mb-1">
+            Comparativo ano anterior
+          </h3>
+          <p className="text-xs text-text-muted mb-4">
+            {yoyData.currentYear} vs {yoyData.prevYear} — ventas mensuales
+          </p>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={yoyData.chartData}>
+                <defs>
+                  <linearGradient id="colorYoyCurrent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis
+                  dataKey="monthLabel"
+                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `$${(v / 1_000_000).toFixed(1)}M`}
+                  width={60}
+                />
+                <Tooltip
+                  formatter={(value, name) => [formatCurrency(Number(value)), name]}
+                  contentStyle={{
+                    background: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={30}
+                  iconType="line"
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={yoyData.prevYear}
+                  stroke="#94a3b8"
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  fill="none"
+                  dot={{ r: 2, fill: '#94a3b8', stroke: '#fff', strokeWidth: 1 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={yoyData.currentYear}
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  fill="url(#colorYoyCurrent)"
+                  dot={{ r: 3, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                  activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Comparison table */}
+          {yoyData.tableData.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-border">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+                Detalle mensual {yoyData.currentYear} vs {yoyData.prevYear}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {yoyData.tableData.map((row) => {
+                  const isPositive = row.pctChange >= 0
+                  return (
+                    <div
+                      key={row.monthNum}
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-text">
+                          {row.monthLabel} {yoyData.currentYear.slice(2)}
+                        </span>
+                        <span className="text-xs text-text-muted ml-1.5">
+                          {formatCurrency(row.current)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {row.prev > 0 ? (
+                          <>
+                            <span className="text-xs text-text-muted">
+                              vs {formatCurrency(row.prev)}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold ${
+                                isPositive
+                                  ? 'bg-success-bg text-success'
+                                  : 'bg-danger-bg text-danger'
+                              }`}
+                            >
+                              {isPositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                              {isPositive ? '+' : ''}{row.pctChange.toFixed(1)}%
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-text-muted">Sin datos {yoyData.prevYear}</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Monthly ticket promedio */}
       <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
         <h3 className="text-sm font-semibold text-text mb-1">
-          Ticket promedio mensual
+          Ticket promedio mensual (restaurante)
         </h3>
         <p className="text-xs text-text-muted mb-4">Evolucion del ticket promedio</p>
         <div className="h-[250px]">
@@ -385,7 +549,7 @@ export default function TendenciasPage() {
 
         <div className="bg-card rounded-xl border border-border p-5 card-shadow">
           <h3 className="text-sm font-semibold text-text mb-1">
-            Ticket promedio por dia
+            Ticket promedio por dia (restaurante)
           </h3>
           <p className="text-xs text-text-muted mb-4">Promedio historico</p>
           <div className="h-[260px]">

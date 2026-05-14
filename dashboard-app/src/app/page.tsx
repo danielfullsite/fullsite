@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { DollarSign, Ticket, Users, Receipt } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import RevenueChart from '@/components/RevenueChart'
@@ -99,7 +99,7 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle={
           latestDay
-            ? `Datos al ${formatDate(latestDay.fecha)}`
+            ? `Datos al ${formatDate(latestDay.fecha)} · Excl. delivery y Market`
             : 'Cargando datos...'
         }
       />
@@ -143,10 +143,114 @@ export default function DashboardPage() {
               : undefined
           }
           deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
+          subtitle="(restaurante)"
           icon={Receipt}
           accentClass="kpi-accent-purple"
         />
       </div>
+
+      {/* AI Insights */}
+      {latestDay && recentData.length > 1 && (() => {
+        const insights: { text: string; color: 'blue' | 'green' | 'amber'; icon: React.ReactNode }[] = []
+
+        // 1. Top mesero vs last 7 days average
+        const latestMeseros = safeArray<{ nombre: string; total: number }>(latestDay.meseros)
+          .filter(m => m.nombre !== 'MESERO EVENTO')
+          .sort((a, b) => b.total - a.total)
+        if (latestMeseros.length > 0) {
+          const topMesero = latestMeseros[0]
+          const last7 = recentData.filter(d => d.fecha !== latestDay.fecha).slice(-7)
+          if (last7.length > 0) {
+            const meseroTotals = last7.map(d => {
+              const ms = safeArray<{ nombre: string; total: number }>(d.meseros)
+              const found = ms.find(m => m.nombre === topMesero.nombre)
+              return found?.total || 0
+            }).filter(t => t > 0)
+            if (meseroTotals.length > 0) {
+              const avg = meseroTotals.reduce((s, v) => s + v, 0) / meseroTotals.length
+              const pct = ((topMesero.total - avg) / avg) * 100
+              const sign = pct >= 0 ? '+' : ''
+              insights.push({
+                text: `${topMesero.nombre.split(' ')[0]} lleva ${sign}${pct.toFixed(0)}% vs promedio 7 dias`,
+                color: pct >= 0 ? 'green' : 'amber',
+                icon: pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
+              })
+            }
+          }
+        }
+
+        // 2. Best day of week from recent data
+        const dowMap: Record<string, { total: number; count: number }> = {}
+        const dowNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+        for (const d of recentData) {
+          const date = new Date(d.fecha + 'T12:00:00')
+          const name = dowNames[date.getDay()]
+          if (!dowMap[name]) dowMap[name] = { total: 0, count: 0 }
+          dowMap[name].total += d.ventas_dia || 0
+          dowMap[name].count += 1
+        }
+        const bestDow = Object.entries(dowMap)
+          .map(([name, v]) => ({ name, avg: v.count > 0 ? v.total / v.count : 0 }))
+          .sort((a, b) => b.avg - a.avg)[0]
+        if (bestDow) {
+          insights.push({
+            text: `${bestDow.name} es tu mejor dia: ${formatCurrency(Math.round(bestDow.avg))} promedio`,
+            color: 'blue',
+            icon: <Star size={14} />,
+          })
+        }
+
+        // 3. Top category today
+        const grupos = safeArray<GrupoEntry>(latestDay.ventas_por_grupo)
+          .filter(g => g.total > 0)
+          .sort((a, b) => b.total - a.total)
+        if (grupos.length > 0) {
+          insights.push({
+            text: `${grupos[0].nombre} es la categoria #1 hoy`,
+            color: 'blue',
+            icon: <ShoppingBag size={14} />,
+          })
+        }
+
+        // 4. Ticket promedio vs last 30 days average
+        const recentTickets = recentData.filter(d => d.fecha !== latestDay.fecha && d.ticket_promedio_restaurant > 0)
+        if (recentTickets.length > 0) {
+          const avgTicket = recentTickets.reduce((s, d) => s + d.ticket_promedio_restaurant, 0) / recentTickets.length
+          const pct = ((latestDay.ticket_promedio_restaurant - avgTicket) / avgTicket) * 100
+          const sign = pct >= 0 ? '+' : ''
+          insights.push({
+            text: `Ticket promedio ${sign}${pct.toFixed(0)}% vs promedio reciente`,
+            color: pct >= 0 ? 'green' : 'amber',
+            icon: pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
+          })
+        }
+
+        const colorClasses = {
+          blue: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+          green: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+          amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+        }
+
+        return (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-accent" />
+              <h3 className="text-sm font-semibold text-text">AI Insights</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {insights.map((insight, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${colorClasses[insight.color]}`}
+                >
+                  {insight.icon}
+                  {insight.text}
+                </span>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
