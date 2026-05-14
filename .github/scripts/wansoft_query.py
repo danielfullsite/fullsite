@@ -16,7 +16,8 @@ SUBSIDIARY   = "6043"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ["TELEGRAM_CHAT_ID_DANIEL"]
 MESSAGE      = os.environ.get("INPUT_MESSAGE", "").strip()
@@ -79,12 +80,13 @@ def detect_date_range(question):
     dow = now_mx.strftime("%A")
 
     try:
-        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": f"""Hoy es {today_str} ({dow}). Extrae el rango de fechas de la pregunta.
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 50,
+                "system": f"""Hoy es {today_str} ({dow}). Extrae el rango de fechas de la pregunta.
 Responde SOLO con JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
 - "hoy" → start=end={today_str}
 - "ayer" → start=end=fecha de ayer
@@ -93,15 +95,11 @@ Responde SOLO con JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
 - "este mes" → primer día del mes a hoy
 - "mayo" → 2026-05-01 a 2026-05-31
 - Si no menciona fecha → start=end={today_str}
-Solo JSON, sin texto adicional."""},
-                    {"role": "user", "content": question},
-                ],
-                "temperature": 0, "max_tokens": 50,
-            }, timeout=10)
-        if r.status_code == 429:
-            # Rate limited on date detection — just use today
-            return today_str, today_str
-        raw = r.json()["choices"][0]["message"]["content"].strip()
+Solo JSON, sin texto adicional.""",
+                "messages": [{"role": "user", "content": question}],
+            }, timeout=15)
+        r.raise_for_status()
+        raw = r.json()["content"][0]["text"].strip()
         parsed = json.loads(raw)
         return parsed.get("start", today_str), parsed.get("end", today_str)
     except Exception:
@@ -511,27 +509,17 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    # Retry with backoff on rate limit (429)
-    for attempt in range(4):
-        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": context},
-                ],
-                "temperature": 0.2,
-                "max_tokens": 1500,
-            }, timeout=30)
-        if r.status_code == 429 and attempt < 3:
-            wait = (attempt + 1) * 15  # 15s, 30s, 45s
-            print(f"[wansoft-query] Rate limited, waiting {wait}s (attempt {attempt + 1}/4)")
-            import time as _time
-            _time.sleep(wait)
-            continue
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
+    r = requests.post("https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 1500,
+            "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": context}],
+        }, timeout=30)
+    r.raise_for_status()
+    return r.json()["content"][0]["text"].strip()
 
 
 # ── Log ─────────────────────────────────────────────────────────────────────
