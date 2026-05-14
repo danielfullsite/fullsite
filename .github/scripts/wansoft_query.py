@@ -452,8 +452,6 @@ def ask_groq(question, wansoft_data, historical_data):
                         compact[mesero] = filtered_g
                 if compact:
                     wc_data["por_mesero_grupo_filtrado"] = compact
-                    compact[mesero] = top5
-                wc_data["por_mesero_top_grupos"] = compact
 
         wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
         wc_data["rango"] = waiter_cats.get("__rango", "")
