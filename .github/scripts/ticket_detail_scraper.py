@@ -251,16 +251,22 @@ def save_to_supabase(waiter_cats: dict, items: list[dict], target_date: str):
     headers = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
                "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
 
-    # Update wansoft_daily with the category breakdown
+    # Save to wansoft_waiter_categories table (upsert by fecha)
     try:
-        requests.patch(
-            f"{sb_url}/rest/v1/wansoft_daily",
-            headers=headers,
-            params={"fecha": f"eq.{target_date}"},
-            json={"platillos_top": json.dumps(waiter_cats)},
-        )
-    except Exception:
-        pass
+        row = {
+            "fecha": target_date,
+            "data": json.dumps(waiter_cats),
+            "items_count": len(items),
+            "updated_at": datetime.now(MX_TZ).isoformat(),
+        }
+        r = requests.post(f"{sb_url}/rest/v1/wansoft_waiter_categories",
+                          headers=headers, json=row, timeout=10)
+        if r.status_code in (200, 201, 204):
+            print(f"[scraper] Saved to Supabase wansoft_waiter_categories")
+        else:
+            print(f"[scraper] Supabase save: {r.status_code} {r.text[:200]}")
+    except Exception as e:
+        print(f"[scraper] Supabase error: {e}")
 
 
 def send_telegram(msg: str):

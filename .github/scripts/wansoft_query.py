@@ -219,6 +219,22 @@ def fetch_all_wansoft_data(session, start, end):
     except Exception:
         pass
 
+    # 18. Waiter × Category (H&H, Pan, Postres, 2da Bebida por mesero)
+    try:
+        wc = sb_get("wansoft_waiter_categories", {
+            "select": "fecha,data",
+            "fecha": f"eq.{start}",
+            "limit": "1",
+        })
+        if wc and wc[0].get("data"):
+            wc_data = wc[0]["data"]
+            if isinstance(wc_data, str):
+                import json as _json
+                wc_data = _json.loads(wc_data)
+            data["ventas_por_mesero_x_categoria"] = wc_data
+    except Exception:
+        pass
+
     return data
 
 
@@ -262,6 +278,7 @@ DATOS DISPONIBLES EN EL CONTEXTO:
 - propinas: propinas por mesero (si hay datos)
 - inventario_punto_reorden: productos que están por debajo del mínimo
 - cortes_caja: cortes de caja del día
+- ventas_por_mesero_x_categoria: cruce mesero × categoría — H&H, Pan, Postres y 2da Bebida vendidos POR CADA MESERO (qty, total, % de tickets con 2+ bebidas)
 - historical_data: datos diarios de los últimos 30 días (Supabase)
 
 REGLAS:
@@ -315,7 +332,8 @@ def ask_groq(question, wansoft_data, historical_data):
 
     # Block 3: Detail data (descuentos, cancelaciones, etc.)
     detail = {}
-    for key in ["descuentos_detalle", "cancelaciones_detalle", "anulaciones_detalle",
+    for key in ["ventas_por_mesero_x_categoria",
+                "descuentos_detalle", "cancelaciones_detalle", "anulaciones_detalle",
                 "cortesias_detalle", "propinas_meseros", "propinas_total",
                 "cortes_caja", "inventario_punto_reorden", "modificadores",
                 "ventas_por_hora", "ventas_por_area", "ventas_por_terminal"]:

@@ -2,8 +2,10 @@ name: Ticket Detail (Mesero x Categoría)
 
 on:
   schedule:
-    # Run at 10:30pm MX = 04:30 UTC (after last intraday report)
-    - cron: '30 4 * * *'
+    # Same cadence as intraday: 1pm, 3pm, 10pm MX
+    - cron: '5 19 * * *'    # 1:05 PM MX (5 min after intraday)
+    - cron: '5 21 * * *'    # 3:05 PM MX
+    - cron: '5 4 * * *'     # 10:05 PM MX
   workflow_dispatch:
 
 env:
