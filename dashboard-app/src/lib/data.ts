@@ -97,6 +97,32 @@ export function aggregateMeseros(
     .sort((a, b) => b.total - a.total)
 }
 
+// Get data for a date range
+export async function getDateRange(from: string, to: string): Promise<WansoftDaily[]> {
+  const data = await sbFetch(
+    'wansoft_daily',
+    `select=*&fecha=gte.${from}&fecha=lte.${to}&order=fecha.asc`
+  ) as Record<string, unknown>[]
+  return data.filter(d => (d.ventas_dia as number) > 0).map(parseRow)
+}
+
+// Aggregate payment methods across days
+export function aggregatePayments(
+  dailyData: WansoftDaily[]
+): { nombre: string; total: number }[] {
+  const map: Record<string, number> = {}
+  for (const day of dailyData) {
+    const metodos = parseJsonbField<{ nombre?: string; total?: number }>(day.pago_metodos)
+    for (const m of metodos) {
+      if (!m.nombre) continue
+      map[m.nombre] = (map[m.nombre] || 0) + (m.total || 0)
+    }
+  }
+  return Object.entries(map)
+    .map(([nombre, total]) => ({ nombre, total }))
+    .sort((a, b) => b.total - a.total)
+}
+
 // Aggregate platillos from ventas_por_grupo
 export function aggregateGrupos(
   dailyData: WansoftDaily[]

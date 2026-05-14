@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag } from 'lucide-react'
+import Link from 'next/link'
+import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag, ArrowRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import RevenueChart from '@/components/RevenueChart'
@@ -272,6 +273,25 @@ export default function DashboardPage() {
             title="Distribución por categoría"
           />
         </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        {[
+          { href: '/ventas', label: 'Ver ventas', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+          { href: '/meseros', label: 'Ver meseros', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+          { href: '/cortes', label: 'Ver cortes', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
+          { href: '/reportes', label: 'Generar reporte', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+        ].map(action => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${action.color}`}
+          >
+            {action.label}
+            <ArrowRight size={14} />
+          </Link>
+        ))}
       </div>
 
       {/* Top meseros + Payment methods */}

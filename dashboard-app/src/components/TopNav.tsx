@@ -10,14 +10,22 @@ import {
   MessageCircle,
   Calendar,
   LogOut,
+  DollarSign,
+  ClipboardList,
+  Package,
+  FileBarChart,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/ventas', label: 'Ventas', icon: DollarSign },
+  { href: '/cortes', label: 'Cortes', icon: ClipboardList },
   { href: '/meseros', label: 'Meseros', icon: Users },
   { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
   { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+  { href: '/reportes', label: 'Reportes', icon: FileBarChart },
+  { href: '/inventario', label: 'Inventario', icon: Package },
   { href: '/chat', label: 'Chat IA', icon: MessageCircle },
 ]
 
