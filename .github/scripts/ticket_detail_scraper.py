@@ -151,6 +151,12 @@ def parse_sale_detail(txt: str) -> list[dict]:
         if len(cols) > 26 and cols[26].strip() == "Si":
             continue
 
+        personas = 0
+        try:
+            personas = int(cols[6].strip())
+        except (ValueError, IndexError):
+            pass
+
         items.append({
             "orden": cols[3].strip(),
             "mesero": cols[7].strip(),
@@ -160,6 +166,7 @@ def parse_sale_detail(txt: str) -> list[dict]:
             "cantidad": int(cols[15]) if cols[15].strip().isdigit() else 1,
             "total": float(cols[13]) if cols[13].strip().replace(".", "").replace("-", "").isdigit() else 0,
             "tipo_orden": cols[4].strip(),
+            "personas": personas,
         })
 
     return items
@@ -206,6 +213,43 @@ def compute_waiter_categories(items: list[dict]) -> dict:
             "tickets_total": total_tickets,
             "tickets_with_2plus": tickets_with_2plus,
             "pct": round(tickets_with_2plus / total_tickets * 100, 1) if total_tickets else 0,
+        }
+
+    # Per-waiter KPIs: bebidas/persona, platillos/persona, ticket promedio
+    orden_data = defaultdict(lambda: {"mesero": "", "personas": 0, "total": 0.0,
+                                       "bebidas": 0, "alimentos": 0})
+    for item in items:
+        key = (item["mesero"], item["orden"])
+        od = orden_data[key]
+        od["mesero"] = item["mesero"]
+        od["personas"] = item["personas"]
+        od["total"] = item["total"]  # order total (same for all items in order)
+        if item["grupo"] in BEBIDA_GROUPS:
+            od["bebidas"] += item["cantidad"]
+        else:
+            od["alimentos"] += item["cantidad"]
+
+    mesero_kpis = defaultdict(lambda: {"tickets": 0, "personas": 0, "bebidas_total": 0,
+                                        "alimentos_total": 0, "ventas_total": 0.0})
+    for (mesero, orden), od in orden_data.items():
+        mk = mesero_kpis[mesero]
+        mk["tickets"] += 1
+        mk["personas"] += od["personas"]
+        mk["bebidas_total"] += od["bebidas"]
+        mk["alimentos_total"] += od["alimentos"]
+        mk["ventas_total"] += od["total"]
+
+    for mesero, mk in mesero_kpis.items():
+        p = mk["personas"] or 1
+        t = mk["tickets"] or 1
+        waiter_cats[mesero]["KPIs"] = {
+            "tickets": mk["tickets"],
+            "personas": mk["personas"],
+            "bebidas_por_persona": round(mk["bebidas_total"] / p, 2),
+            "alimentos_por_persona": round(mk["alimentos_total"] / p, 2),
+            "ticket_promedio": round(mk["ventas_total"] / t, 2),
+            "bebidas_total": mk["bebidas_total"],
+            "alimentos_total": mk["alimentos_total"],
         }
 
     # Full mesero × grupo breakdown (for any query like "pizzas de Brayan")

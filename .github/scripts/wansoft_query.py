@@ -314,7 +314,12 @@ DATOS DISPONIBLES EN EL CONTEXTO:
 - propinas: propinas por mesero (si hay datos)
 - inventario_punto_reorden: productos que están por debajo del mínimo
 - cortes_caja: cortes de caja del día
-- ventas_por_mesero_x_categoria: cruce COMPLETO mesero × platillo/grupo — incluye H&H, Pan, Postres, 2da Bebida por mesero, ADEMÁS de __por_mesero_grupo (todos los grupos por mesero) y __por_mesero_platillo (todos los platillos por mesero). Permite responder "cuántas pizzas vendió Brayan"
+- ventas_por_mesero_x_categoria: cruce COMPLETO mesero × platillo/grupo. Incluye por mesero:
+  * KPIs: bebidas_por_persona, alimentos_por_persona, ticket_promedio, tickets, personas
+  * H&H, Pan, Postres, 2da Bebida (qty, total, % tickets con 2+ bebidas)
+  * __por_mesero_grupo: todos los grupos vendidos por mesero
+  * __por_mesero_platillo: todos los platillos vendidos por mesero
+  Permite responder "cuántas bebidas por persona vendió Brayan", "cuántas pizzas vendió Omar"
 - historical_data: datos diarios de los últimos 30 días (Supabase)
 
 REGLAS:
@@ -358,10 +363,10 @@ def ask_groq(question, wansoft_data, historical_data):
     # Block 0: If waiter × category data exists and question is about H&H/pan/postres/mesero, put FIRST
     waiter_cats = wd.pop("ventas_por_mesero_x_categoria", None)
     cat_keywords = ["h&h", "half", "pan", "toast", "bagel", "postre", "dessert", "2da bebida",
-                    "segunda bebida", "bebida por mesero", "categoría", "categoria",
+                    "segunda bebida", "bebida", "bebidas por persona", "categoría", "categoria",
                     "pizza", "chilaquile", "enchilada", "café", "cafe", "latte",
                     "mesero vendió", "mesero vendio", "vendió cada", "vendio cada",
-                    "por mesero"]
+                    "por mesero", "por persona", "kpi", "ticket promedio"]
     if waiter_cats and any(kw in q_lower for kw in cat_keywords):
         # Extract relevant mesero×grupo or mesero×platillo data
         wc_data = {}
