@@ -73,7 +73,7 @@ export default function MeserosPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Meseros"
-        subtitle={`Performance de meseros - ultimos ${period} dias`}
+        subtitle={`Performance de meseros - últimos ${period} días`}
       />
 
       {/* Period selector */}
@@ -88,7 +88,7 @@ export default function MeserosPage() {
                 : 'bg-card border border-border text-text-soft hover:text-text hover:border-accent/30'
             }`}
           >
-            {p} dias
+            {p} días
           </button>
         ))}
       </div>
@@ -98,21 +98,21 @@ export default function MeserosPage() {
         <KPICard
           label="Total ventas meseros"
           value={formatCurrency(totalVentas)}
-          subtitle={`Ultimos ${period} dias`}
+          subtitle={`Últimos ${period} días`}
           icon={DollarSign}
           accentClass="kpi-accent-blue"
         />
         <KPICard
           label="Promedio diario"
           value={formatCurrency(avgTicket)}
-          subtitle="por dia total"
+          subtitle="por día total"
           icon={Ticket}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Meseros activos"
           value={formatNumber(meseros.length)}
-          subtitle={`en ${period} dias`}
+          subtitle={`en ${period} días`}
           icon={Users}
           accentClass="kpi-accent-amber"
         />
@@ -130,7 +130,7 @@ export default function MeserosPage() {
         <h3 className="text-sm font-semibold text-text mb-1">
           Ventas por mesero (top 10)
         </h3>
-        <p className="text-xs text-text-muted mb-4">Ultimos {period} dias</p>
+        <p className="text-xs text-text-muted mb-4">Últimos {period} días</p>
         <div className="h-[360px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">

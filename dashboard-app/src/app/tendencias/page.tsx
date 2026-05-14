@@ -178,7 +178,7 @@ export default function TendenciasPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Tendencias"
-        subtitle="Comparativos mensuales, por dia de la semana, y acumulado del ano"
+        subtitle="Comparativos mensuales, por día de la semana, y acumulado del año"
       />
 
       {/* KPIs */}
@@ -200,7 +200,7 @@ export default function TendenciasPage() {
           accentClass="kpi-accent-green"
         />
         <KPICard
-          label="Mejor dia de semana"
+          label="Mejor día de semana"
           value={bestDow?.dia || '-'}
           subtitle={bestDow ? `Prom. ${formatCurrency(bestDow.ventasPromedio)}` : ''}
           icon={Calendar}
@@ -209,7 +209,7 @@ export default function TendenciasPage() {
         <KPICard
           label="YTD Ventas"
           value={formatCurrency(ytdData.totalVentas)}
-          subtitle={`${ytdData.dias} dias con datos en ${new Date().getFullYear()}`}
+          subtitle={`${ytdData.dias} días con datos en ${new Date().getFullYear()}`}
           icon={BarChart3}
           accentClass="kpi-accent-purple"
         />
@@ -332,7 +332,7 @@ export default function TendenciasPage() {
       {yoyData.chartData.length > 0 && (
         <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
           <h3 className="text-sm font-semibold text-text mb-1">
-            Comparativo ano anterior
+            Comparativo año anterior
           </h3>
           <p className="text-xs text-text-muted mb-4">
             {yoyData.currentYear} vs {yoyData.prevYear} — ventas mensuales
@@ -455,7 +455,7 @@ export default function TendenciasPage() {
         <h3 className="text-sm font-semibold text-text mb-1">
           Ticket promedio mensual (restaurante)
         </h3>
-        <p className="text-xs text-text-muted mb-4">Evolucion del ticket promedio</p>
+        <p className="text-xs text-text-muted mb-4">Evolución del ticket promedio</p>
         <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -507,7 +507,7 @@ export default function TendenciasPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-card rounded-xl border border-border p-5 card-shadow">
           <h3 className="text-sm font-semibold text-text mb-1">
-            Venta promedio por dia
+            Venta promedio por día
           </h3>
           <p className="text-xs text-text-muted mb-4">Promedio historico</p>
           <div className="h-[260px]">
@@ -549,7 +549,7 @@ export default function TendenciasPage() {
 
         <div className="bg-card rounded-xl border border-border p-5 card-shadow">
           <h3 className="text-sm font-semibold text-text mb-1">
-            Ticket promedio por dia (restaurante)
+            Ticket promedio por día (restaurante)
           </h3>
           <p className="text-xs text-text-muted mb-4">Promedio historico</p>
           <div className="h-[260px]">
@@ -592,7 +592,7 @@ export default function TendenciasPage() {
           <h3 className="text-sm font-semibold text-text">
             Resumen Year-To-Date ({new Date().getFullYear()})
           </h3>
-          <p className="text-xs text-text-muted mt-0.5">{ytdData.dias} dias con datos</p>
+          <p className="text-xs text-text-muted mt-0.5">{ytdData.dias} días con datos</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
           <div className="p-5 text-center">

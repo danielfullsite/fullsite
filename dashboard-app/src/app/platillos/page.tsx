@@ -81,37 +81,37 @@ export default function PlatillosPage() {
     <>
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
-        title="Platillos y Categorias"
-        subtitle="Desglose de ventas por grupo y platillos destacados (30 dias)"
+        title="Platillos y Categorías"
+        subtitle="Desglose de ventas por grupo y platillos destacados (30 días)"
       />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <KPICard
-          label="Total categorias"
+          label="Total categorías"
           value={formatNumber(grupos.length)}
-          subtitle="categorias activas"
+          subtitle="categorías activas"
           icon={BarChart3}
           accentClass="kpi-accent-blue"
         />
         <KPICard
           label="Ventas totales"
           value={formatCurrency(totalAll)}
-          subtitle="30 dias"
+          subtitle="30 días"
           icon={UtensilsCrossed}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Chilaquiles"
           value={formatCurrency(totalChilaquiles)}
-          subtitle="30 dias acumulado"
+          subtitle="30 días acumulado"
           icon={Coffee}
           accentClass="kpi-accent-amber"
         />
         <KPICard
           label="Half & Half"
           value={formatCurrency(totalHH)}
-          subtitle="30 dias acumulado"
+          subtitle="30 días acumulado"
           icon={TrendingUp}
           accentClass="kpi-accent-purple"
         />
@@ -120,9 +120,9 @@ export default function PlatillosPage() {
       {/* Top categories horizontal bar chart */}
       <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
         <h3 className="text-sm font-semibold text-text mb-1">
-          Ventas por categoria (top 15)
+          Ventas por categoría (top 15)
         </h3>
-        <p className="text-xs text-text-muted mb-4">Ultimos 30 dias</p>
+        <p className="text-xs text-text-muted mb-4">Últimos 30 días</p>
         <div className="h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">
@@ -168,7 +168,7 @@ export default function PlatillosPage() {
 
       {/* Category cards grid */}
       <div className="mb-8">
-        <h3 className="text-sm font-semibold text-text mb-4">Categorias principales</h3>
+        <h3 className="text-sm font-semibold text-text mb-4">Categorías principales</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {topGrupos.slice(0, 10).map((g, i) => {
             const pct = totalAll > 0 ? ((g.total / totalAll) * 100) : 0
@@ -202,7 +202,7 @@ export default function PlatillosPage() {
           <h3 className="text-sm font-semibold text-text mb-1">
             Chilaquiles (ventas $)
           </h3>
-          <p className="text-xs text-text-muted mb-4">Tendencia 30 dias</p>
+          <p className="text-xs text-text-muted mb-4">Tendencia 30 días</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -255,7 +255,7 @@ export default function PlatillosPage() {
           <h3 className="text-sm font-semibold text-text mb-1">
             Half & Half (ventas $)
           </h3>
-          <p className="text-xs text-text-muted mb-4">Tendencia 30 dias</p>
+          <p className="text-xs text-text-muted mb-4">Tendencia 30 días</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -309,9 +309,9 @@ export default function PlatillosPage() {
       <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
         <div className="p-5 border-b border-border">
           <h3 className="text-sm font-semibold text-text">
-            Todas las categorias
+            Todas las categorías
           </h3>
-          <p className="text-xs text-text-muted mt-0.5">Ultimos 30 dias - {grupos.length} categorias</p>
+          <p className="text-xs text-text-muted mt-0.5">Últimos 30 días - {grupos.length} categorías</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-striped">

@@ -199,13 +199,13 @@ export async function POST(request: NextRequest) {
           : JSON.stringify(Object.fromEntries(Object.entries(platillos).sort((a, b) => b[1].qty - a[1].qty).slice(0, 20)))
 
         const fechas = waiterRows.map(r => r.fecha).join(', ')
-        waiterContext = `\nDATOS DE ${meseroMatch} (fechas: ${fechas}):\n${kpiStr}\nCategorias: ${catsStr}\nPlatillos: ${platStr}`
+        waiterContext = `\nDATOS DE ${meseroMatch} (fechas: ${fechas}):\n${kpiStr}\nCategorías: ${catsStr}\nPlatillos: ${platStr}`
       } else {
         // All meseros KPIs
         const allKPIs = Object.entries(aggKPIs)
           .map(([m, k]) => `${m}: ${(k.bebidas / (k.personas || 1)).toFixed(2)} beb/persona, ${k.tickets} tickets, ${k.personas} personas`)
           .join('\n')
-        if (allKPIs) waiterContext = `\nKPIs POR MESERO (${waiterRows.length} dias):\n${allKPIs}`
+        if (allKPIs) waiterContext = `\nKPIs POR MESERO (${waiterRows.length} días):\n${allKPIs}`
       }
     }
 
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
         return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(d.ticket_promedio_restaurant || 0)} | Meseros: ${topM} | Grupos: ${topG}`
       })
 
-      dailyContext = `DATOS DIARIOS (ultimos ${recentDays.length} dias):\n${lines.join('\n')}`
+      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
     }
 
     // 4. System prompt

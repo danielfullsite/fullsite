@@ -109,7 +109,7 @@ export default function DashboardPage() {
         <KPICard
           label="Ventas del dia"
           value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
-          delta={latestDay ? `${formatPercent(ventasChange)} vs dia anterior` : undefined}
+          delta={latestDay ? `${formatPercent(ventasChange)} vs día anterior` : undefined}
           deltaType={ventasChange >= 0 ? 'up' : 'down'}
           icon={DollarSign}
           accentClass="kpi-accent-blue"
@@ -117,7 +117,7 @@ export default function DashboardPage() {
         <KPICard
           label="Tickets"
           value={latestDay ? formatNumber(latestDay.tickets_count) : '-'}
-          delta={latestDay ? `${formatPercent(ticketsChange)} vs dia anterior` : undefined}
+          delta={latestDay ? `${formatPercent(ticketsChange)} vs día anterior` : undefined}
           deltaType={ticketsChange >= 0 ? 'up' : 'down'}
           icon={Ticket}
           accentClass="kpi-accent-green"
@@ -125,7 +125,7 @@ export default function DashboardPage() {
         <KPICard
           label="Personas"
           value={latestDay ? formatNumber(latestDay.personas_restaurant) : '-'}
-          delta={latestDay ? `${formatPercent(personasChange)} vs dia anterior` : undefined}
+          delta={latestDay ? `${formatPercent(personasChange)} vs día anterior` : undefined}
           deltaType={personasChange >= 0 ? 'up' : 'down'}
           icon={Users}
           accentClass="kpi-accent-amber"
@@ -139,7 +139,7 @@ export default function DashboardPage() {
           }
           delta={
             latestDay
-              ? `${formatPercent(ticketPromChange)} vs dia anterior`
+              ? `${formatPercent(ticketPromChange)} vs día anterior`
               : undefined
           }
           deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
@@ -171,7 +171,7 @@ export default function DashboardPage() {
               const pct = ((topMesero.total - avg) / avg) * 100
               const sign = pct >= 0 ? '+' : ''
               insights.push({
-                text: `${topMesero.nombre.split(' ')[0]} lleva ${sign}${pct.toFixed(0)}% vs promedio 7 dias`,
+                text: `${topMesero.nombre.split(' ')[0]} lleva ${sign}${pct.toFixed(0)}% vs promedio 7 días`,
                 color: pct >= 0 ? 'green' : 'amber',
                 icon: pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
               })
@@ -206,7 +206,7 @@ export default function DashboardPage() {
           .sort((a, b) => b.total - a.total)
         if (grupos.length > 0) {
           insights.push({
-            text: `${grupos[0].nombre} es la categoria #1 hoy`,
+            text: `${grupos[0].nombre} es la categoría #1 hoy`,
             color: 'blue',
             icon: <ShoppingBag size={14} />,
           })
@@ -260,13 +260,13 @@ export default function DashboardPage() {
               fecha: d.fecha,
               ventas_dia: d.ventas_dia,
             }))}
-            title="Ventas ultimos 30 dias"
+            title="Ventas últimos 30 días"
           />
         </div>
         <div>
           <RevenueDistributionChart
             data={safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)}
-            title="Distribucion por categoria"
+            title="Distribución por categoría"
           />
         </div>
       </div>
@@ -327,7 +327,7 @@ export default function DashboardPage() {
 
         <div className="bg-card rounded-xl border border-border p-5 card-shadow">
           <h3 className="text-sm font-semibold text-text mb-1">
-            Metodos de pago
+            Métodos de pago
           </h3>
           <p className="text-xs text-text-muted mb-4">
             {latestDay ? formatCurrency(latestDay.ventas_dia) : '-'} total

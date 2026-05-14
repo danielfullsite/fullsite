@@ -28,7 +28,7 @@ export default function ChatPage() {
     'Como van las ventas esta semana vs la semana pasada?',
     'Quien es el mesero con mejor ticket promedio?',
     'Cual es el dia de la semana con mas ventas?',
-    'Que categoria de menu vende mas?',
+    'Que categoría de menu vende mas?',
     'Como puedo subir el ticket promedio del restaurante?',
     'Dame un resumen del ultimo mes',
   ]

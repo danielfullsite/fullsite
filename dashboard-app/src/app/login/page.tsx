@@ -35,7 +35,7 @@ export default function LoginPage() {
       router.push('/')
       router.refresh()
     } catch {
-      setError('Error al iniciar sesion. Intenta de nuevo.')
+      setError('Error al iniciar sesión. Intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -102,10 +102,10 @@ export default function LoginPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Iniciando sesion...
+                  Iniciando sesión...
                 </span>
               ) : (
-                'Iniciar sesion'
+                'Iniciar sesión'
               )}
             </button>
           </form>

@@ -33,7 +33,7 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
       {title && (
         <h3 className="text-sm font-semibold text-text mb-1">{title}</h3>
       )}
-      <p className="text-xs text-text-muted mb-4">{chartData.length} dias con datos</p>
+      <p className="text-xs text-text-muted mb-4">{chartData.length} días con datos</p>
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
