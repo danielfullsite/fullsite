@@ -43,7 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .limit(1)
         .single()
 
-      if (error || !clientUser) {
+      const cid = (clientUser as { client_id: string } | null)?.client_id
+      if (error || !cid) {
         // Fallback to 'amalay' for graceful degradation
         console.warn('No client_users mapping found, falling back to amalay')
         setClientId('amalay')
@@ -51,16 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      setClientId(clientUser.client_id)
+      setClientId(cid)
 
       // Fetch client config
       const { data: client } = await supabase
         .from('clients')
         .select('id')
-        .eq('id', clientUser.client_id)
+        .eq('id', cid)
         .single()
 
-      setClientConfig(client ? { id: client.id, name: client.id } : { id: clientUser.client_id })
+      setClientConfig(client ? { id: (client as { id: string }).id, name: (client as { id: string }).id } : { id: cid })
     } catch {
       // Fallback
       console.warn('Error loading client data, falling back to amalay')
