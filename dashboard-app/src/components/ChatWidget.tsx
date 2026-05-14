@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send, Bot, User } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 
 export default function ChatWidget() {
+  const { clientId } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -43,7 +45,7 @@ export default function ChatWidget() {
         body: JSON.stringify({
           message: text,
           history: messages.slice(-6),
-          client_id: 'amalay',
+          client_id: clientId || 'amalay',
         }),
       })
 

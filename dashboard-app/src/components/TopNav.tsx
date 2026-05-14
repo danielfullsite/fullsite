@@ -9,7 +9,9 @@ import {
   TrendingUp,
   MessageCircle,
   Calendar,
+  LogOut,
 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,6 +31,7 @@ function getTodayFormatted(): string {
 
 export default function TopNav() {
   const pathname = usePathname()
+  const { user, clientConfig, signOut } = useAuth()
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-border">
@@ -70,10 +73,34 @@ export default function TopNav() {
           </nav>
         </div>
 
-        {/* Date indicator */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-text-soft shrink-0">
-          <Calendar size={13} className="text-text-muted" />
-          <span className="font-medium">Hoy: {getTodayFormatted()}</span>
+        {/* Right side: date + user info + logout */}
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Date indicator */}
+          <div className="hidden md:flex items-center gap-2 text-xs text-text-soft">
+            <Calendar size={13} className="text-text-muted" />
+            <span className="font-medium">Hoy: {getTodayFormatted()}</span>
+          </div>
+
+          {user && (
+            <>
+              {/* Client name badge */}
+              {clientConfig && (
+                <span className="hidden sm:inline-flex items-center px-2 py-1 rounded-md bg-surface text-xs font-medium text-text-soft border border-border">
+                  {clientConfig.name || clientConfig.id}
+                </span>
+              )}
+
+              {/* Logout button */}
+              <button
+                onClick={signOut}
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-danger transition-colors px-2 py-1.5 rounded-md hover:bg-danger-bg"
+                title="Cerrar sesion"
+              >
+                <LogOut size={14} />
+                <span className="hidden sm:inline">Salir</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

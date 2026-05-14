@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import TopNav from '@/components/TopNav'
-import ChatWidget from '@/components/ChatWidget'
+import { AuthProvider } from '@/contexts/AuthContext'
+import AppShell from '@/components/AppShell'
 
 export const metadata: Metadata = {
   title: 'Fullsite Dashboard',
@@ -22,11 +22,9 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full bg-surface">
-        <TopNav />
-        <main className="p-6 lg:p-8 max-w-7xl mx-auto">
-          {children}
-        </main>
-        <ChatWidget />
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   )

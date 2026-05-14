@@ -1,9 +1,43 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+async function getAuthUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Ignore - can't set cookies from route handler in some cases
+          }
+        },
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication
+    const user = await getAuthUser()
+    if (!user) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { message, history = [], client_id = 'amalay' } = await request.json()
 
     if (!message || typeof message !== 'string') {

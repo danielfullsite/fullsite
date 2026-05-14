@@ -3,9 +3,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Sparkles } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 
 export default function ChatPage() {
+  const { clientId } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
@@ -46,7 +48,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: text,
           history: messages.slice(-8),
-          client_id: 'amalay',
+          client_id: clientId || 'amalay',
         }),
       })
 
