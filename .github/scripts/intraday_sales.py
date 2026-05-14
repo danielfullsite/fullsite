@@ -378,6 +378,12 @@ def main():
 
         print(f"[intraday] Data: consolidated OK, {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets")
 
+        # Don't send report if no sales (restaurant closed or data not yet available)
+        ventas = consolidated.get("TotalSales", 0)
+        if ventas == 0 and order_types["total_tickets"] == 0:
+            print("[intraday] No sales data — skipping report")
+            return
+
         msg = build_message(consolidated, users, groups, saucers, order_types, monthly_avg)
         print(f"[intraday] Message built ({len(msg)} chars)")
 
