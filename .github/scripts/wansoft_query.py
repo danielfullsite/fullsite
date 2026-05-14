@@ -333,8 +333,10 @@ REGLAS:
 - Si preguntan "cuántos lattes" busca por nombre parcial en platillos_vendidos
 - EXCLUYE del ranking de MESEROS: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO (cajeros/sistema) y Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio (son de Market, no meseros)
 - Si preguntan "top meseros" o "ranking", solo incluye meseros de restaurante
-- TICKET PROMEDIO: siempre excluye ventas del Market. Usa restaurant_stats si están disponibles en ventas_por_mesero_x_categoria.__restaurant_stats
+- TICKET PROMEDIO: siempre excluye ventas del Market. Usa restaurant_stats si están disponibles
 - Market vende items baratos (conchas $19, snacks) que distorsionan el ticket promedio del restaurante
+- BEBIDAS POR PERSONA: usa SIEMPRE el campo "bebidas_por_persona" de los KPIs del mesero. NO lo calcules manualmente — el campo ya incluye TODAS las bebidas (coffee, jugos, smoothies, frappes, signature, etc.), no solo un grupo
+- Los KPIs por mesero incluyen: bebidas_por_persona, alimentos_por_persona, ticket_promedio, tickets, personas, bebidas_total, alimentos_total. USA ESTOS DATOS DIRECTAMENTE, no los recalcules
 """
 
 
