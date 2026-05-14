@@ -383,17 +383,23 @@ def ask_groq(question, wansoft_data, historical_data):
                 mesero_match = mesero_name
                 break
 
-        if mesero_match and por_mesero_platillo.get(mesero_match):
-            all_platillos = por_mesero_platillo[mesero_match]
-            # Filter platillos by search terms if possible
-            filtered = {k: v for k, v in all_platillos.items()
-                        if any(term in k.lower() for term in search_terms)}
-            if filtered:
-                wc_data[f"platillos_de_{mesero_match}_filtrados"] = filtered
-            else:
-                # Show top 30 by qty
-                top = dict(sorted(all_platillos.items(), key=lambda x: -x[1].get("qty", 0))[:30])
-                wc_data[f"top_platillos_de_{mesero_match}"] = top
+        if mesero_match:
+            # Always include this mesero's category summary (H&H, Pan, Postres, 2da Bebida, KPIs)
+            mesero_cats = {k: v for k, v in waiter_cats.items()
+                          if k == mesero_match and isinstance(v, dict)}
+            if mesero_cats:
+                wc_data[f"categorias_de_{mesero_match}"] = mesero_cats[mesero_match]
+
+            # Also include platillo detail if available
+            if por_mesero_platillo.get(mesero_match):
+                all_platillos = por_mesero_platillo[mesero_match]
+                filtered = {k: v for k, v in all_platillos.items()
+                            if any(term in k.lower() for term in search_terms)}
+                if filtered:
+                    wc_data[f"platillos_de_{mesero_match}_filtrados"] = filtered
+                else:
+                    top = dict(sorted(all_platillos.items(), key=lambda x: -x[1].get("qty", 0))[:20])
+                    wc_data[f"top_platillos_de_{mesero_match}"] = top
             wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo.get(mesero_match, {})
         elif por_mesero_grupo:
             # No specific mesero — show compact grupo breakdown per mesero
