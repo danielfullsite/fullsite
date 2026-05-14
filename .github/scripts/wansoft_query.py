@@ -403,21 +403,28 @@ def ask_groq(question, wansoft_data, historical_data):
                     top = dict(sorted(all_platillos.items(), key=lambda x: -x[1].get("qty", 0))[:20])
                     wc_data[f"top_platillos_de_{mesero_match}"] = top
             wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo.get(mesero_match, {})
-        elif por_mesero_grupo:
-            # No specific mesero — show compact grupo breakdown per mesero
-            # Filter to search terms if they match a grupo
-            compact = {}
-            for mesero, grupos in por_mesero_grupo.items():
-                filtered_g = {k: v for k, v in grupos.items()
-                              if any(term in k.lower() for term in search_terms)}
-                if filtered_g:
-                    compact[mesero] = filtered_g
-            if compact:
-                wc_data["por_mesero_grupo_filtrado"] = compact
-            else:
-                # Show all meseros × grupo (top 5 grupos per mesero)
+        else:
+            # No specific mesero — show KPIs for ALL meseros (compact)
+            all_kpis = {}
+            for mesero_name, mesero_data in waiter_cats.items():
+                if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
+                    continue
+                kpis = mesero_data.get("KPIs", {})
+                if kpis:
+                    all_kpis[mesero_name] = kpis
+            if all_kpis:
+                wc_data["KPIs_todos_los_meseros"] = all_kpis
+
+            # Also show grupo breakdown if search terms match
+            if por_mesero_grupo:
+                compact = {}
                 for mesero, grupos in por_mesero_grupo.items():
-                    top5 = dict(sorted(grupos.items(), key=lambda x: -x[1].get("total", 0))[:5])
+                    filtered_g = {k: v for k, v in grupos.items()
+                                  if any(term in k.lower() for term in search_terms)}
+                    if filtered_g:
+                        compact[mesero] = filtered_g
+                if compact:
+                    wc_data["por_mesero_grupo_filtrado"] = compact
                     compact[mesero] = top5
                 wc_data["por_mesero_top_grupos"] = compact
 
