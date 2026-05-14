@@ -315,6 +315,17 @@ def ask_groq(question, wansoft_data, historical_data):
     # Build context in priority order — most relevant first
     blocks = []
 
+    # Block 0: If waiter × category data exists and question is about H&H/pan/postres/mesero, put FIRST
+    waiter_cats = wd.pop("ventas_por_mesero_x_categoria", None)
+    cat_keywords = ["h&h", "half", "pan", "toast", "bagel", "postre", "dessert", "2da bebida",
+                    "segunda bebida", "bebida por mesero", "categoría", "categoria"]
+    if waiter_cats and any(kw in q_lower for kw in cat_keywords):
+        blocks.append("VENTAS POR MESERO × CATEGORÍA (H&H, Pan, Postres, 2da Bebida):\n"
+                      + json.dumps(waiter_cats, ensure_ascii=False, indent=1))
+    elif waiter_cats:
+        # Include but not first priority
+        pass  # Will be added in detail block
+
     # Block 1: If there are matching platillos, put them FIRST
     if relevant_platillos:
         blocks.append(f"PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA ({len(relevant_platillos)}):\n"
