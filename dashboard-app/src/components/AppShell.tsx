@@ -12,28 +12,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const [showContent, setShowContent] = useState(false)
 
-  // Login page gets no chrome
-  if (pathname === '/login') {
-    return <>{children}</>
-  }
-
-  // Force show after 2 seconds max — never stay loading
+  // Force show after 2 seconds max
   useEffect(() => {
     const timer = setTimeout(() => setShowContent(true), 2000)
     return () => clearTimeout(timer)
   }, [])
 
-  // Show content once auth resolves OR timeout hits
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading) {
-      if (!user) {
+      if (!user && pathname !== '/login') {
         router.push('/login')
       } else {
         setShowContent(true)
       }
     }
-  }, [loading, user, router])
+  }, [loading, user, pathname, router])
 
+  // Login page — no nav chrome
+  if (pathname === '/login') {
+    return <>{children}</>
+  }
+
+  // Loading state
   if (!showContent && loading) {
     return (
       <div className="flex items-center justify-center h-screen">
