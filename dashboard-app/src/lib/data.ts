@@ -29,7 +29,6 @@ export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> 
   const { data, error } = await supabase
     .from('wansoft_daily')
     .select('*')
-    .gt('ventas_dia', 0)
     .order('fecha', { ascending: false })
     .limit(days)
 
@@ -38,23 +37,26 @@ export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> 
     return []
   }
 
-  return (data || []).reverse().map(parseRow)
+  // Filter out zero-sales days client-side
+  const filtered = (data || []).filter((d: Record<string, unknown>) => (d.ventas_dia as number) > 0)
+  return filtered.reverse().map(parseRow)
 }
 
 export async function getLatestDay(): Promise<WansoftDaily | null> {
   const { data, error } = await supabase
     .from('wansoft_daily')
     .select('*')
-    .gt('ventas_dia', 0)
     .order('fecha', { ascending: false })
-    .limit(1)
+    .limit(5)
 
   if (error) {
     console.error('Error fetching latest day:', error)
     return null
   }
 
-  return data && data.length > 0 ? parseRow(data[0]) : null
+  // Find first day with actual sales
+  const row = (data || []).find((d: Record<string, unknown>) => (d.ventas_dia as number) > 0)
+  return row ? parseRow(row) : null
 }
 
 export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
