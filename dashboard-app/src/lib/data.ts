@@ -1,5 +1,22 @@
-import { supabase } from './supabase'
 import type { WansoftDaily } from './types'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    },
+  })
+  if (!res.ok) {
+    console.error(`Supabase fetch error: ${res.status} ${res.statusText}`)
+    return []
+  }
+  return res.json()
+}
 
 function parseJsonbField<T>(value: unknown): T[] {
   if (!value) return []
@@ -26,81 +43,29 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
 }
 
 export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> {
-  const { data, error } = await supabase
-    .from('wansoft_daily')
-    .select('*')
-    .order('fecha', { ascending: false })
-    .limit(days)
-
-  if (error) {
-    console.error('Error fetching wansoft_daily:', error)
-    return []
-  }
-
-  // Filter out zero-sales days client-side
-  const filtered = (data || []).filter((d: Record<string, unknown>) => (d.ventas_dia as number) > 0)
+  const data = await sbFetch('wansoft_daily', `select=*&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
+  const filtered = data.filter(d => (d.ventas_dia as number) > 0)
   return filtered.reverse().map(parseRow)
 }
 
 export async function getLatestDay(): Promise<WansoftDaily | null> {
-  const { data, error } = await supabase
-    .from('wansoft_daily')
-    .select('*')
-    .order('fecha', { ascending: false })
-    .limit(5)
-
-  if (error) {
-    console.error('Error fetching latest day:', error)
-    return null
-  }
-
-  // Find first day with actual sales
-  const row = (data || []).find((d: Record<string, unknown>) => (d.ventas_dia as number) > 0)
+  const data = await sbFetch('wansoft_daily', 'select=*&order=fecha.desc&limit=5') as Record<string, unknown>[]
+  const row = data.find(d => (d.ventas_dia as number) > 0)
   return row ? parseRow(row) : null
 }
 
 export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
-  const { data, error } = await supabase
-    .from('wansoft_daily')
-    .select('*')
-    .eq('fecha', fecha)
-    .single()
-
-  if (error) {
-    console.error('Error fetching day data:', error)
-    return null
-  }
-
-  return data ? parseRow(data) : null
+  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&limit=1`) as Record<string, unknown>[]
+  return data.length > 0 ? parseRow(data[0]) : null
 }
 
 export async function getMonthlyData(): Promise<WansoftDaily[]> {
-  const { data, error } = await supabase
-    .from('wansoft_daily')
-    .select('*')
-    .order('fecha', { ascending: true })
-
-  if (error) {
-    console.error('Error fetching monthly data:', error)
-    return []
-  }
-
-  return (data || []).map(parseRow)
+  const data = await sbFetch('wansoft_daily', 'select=*&order=fecha.asc&limit=1000') as Record<string, unknown>[]
+  return data.map(parseRow)
 }
 
 export async function getWaiterCategories(days: number = 7) {
-  const { data, error } = await supabase
-    .from('wansoft_waiter_categories')
-    .select('*')
-    .order('fecha', { ascending: false })
-    .limit(days)
-
-  if (error) {
-    console.error('Error fetching waiter categories:', error)
-    return []
-  }
-
-  return data || []
+  return sbFetch('wansoft_waiter_categories', `select=*&order=fecha.desc&limit=${days}`)
 }
 
 // Aggregate mesero data across multiple days
