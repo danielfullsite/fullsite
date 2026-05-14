@@ -220,18 +220,19 @@ def fetch_all_wansoft_data(session, start, end):
         pass
 
     # 18. Waiter × Category (H&H, Pan, Postres, 2da Bebida por mesero)
+    # Always get the most recent entry (covers "hoy", "este mes", etc.)
     try:
         wc = sb_get("wansoft_waiter_categories", {
             "select": "fecha,data",
-            "fecha": f"eq.{start}",
+            "order": "fecha.desc",
             "limit": "1",
         })
         if wc and wc[0].get("data"):
             wc_data = wc[0]["data"]
             if isinstance(wc_data, str):
-                import json as _json
-                wc_data = _json.loads(wc_data)
+                wc_data = json.loads(wc_data)
             data["ventas_por_mesero_x_categoria"] = wc_data
+            data["ventas_por_mesero_x_categoria_fecha"] = wc[0]["fecha"]
     except Exception:
         pass
 
