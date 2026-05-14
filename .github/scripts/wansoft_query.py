@@ -103,9 +103,27 @@ Solo JSON.""",
             }, timeout=15)
         r.raise_for_status()
         raw = r.json()["content"][0]["text"].strip()
-        parsed = json.loads(raw)
-        return parsed.get("start", today_str), parsed.get("end", today_str)
-    except Exception:
+        # Extract JSON from response (may have extra text)
+        import re
+        json_match = re.search(r'\{[^}]+\}', raw)
+        if json_match:
+            parsed = json.loads(json_match.group())
+        else:
+            parsed = json.loads(raw)
+        start = parsed.get("start", today_str)
+        end = parsed.get("end", today_str)
+        print(f"[wansoft-query] Date detection raw: {raw} → {start} to {end}")
+        return start, end
+    except Exception as e:
+        # Fallback: simple keyword detection
+        q = question.lower()
+        if "ayer" in q:
+            return yesterday_str, yesterday_str
+        elif "esta semana" in q or "semana" in q:
+            return week_start, today_str
+        elif "este mes" in q or "mes" in q:
+            return month_start, today_str
+        print(f"[wansoft-query] Date detection fallback: {today_str} (error: {e})")
         return today_str, today_str
 
 
