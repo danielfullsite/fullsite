@@ -61,7 +61,7 @@ export default function Sidebar() {
   const { user, clientConfig, signOut } = useAuth()
 
   const sidebarContent = (
-    <aside className="sidebar flex flex-col h-full">
+    <aside className="sidebar flex flex-col h-full w-[240px] min-w-[240px]">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-100">
         <Link href="/" className="flex items-center logo-hover">

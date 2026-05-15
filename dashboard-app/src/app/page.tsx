@@ -130,7 +130,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Summary Cards — 4 across like Toast */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           label="Ventas del dia"
           value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
