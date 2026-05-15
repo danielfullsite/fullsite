@@ -11,8 +11,9 @@ import {
   MODIFIERS_AGREGAR,
   formatMXN,
   generateId,
+  saveOrder,
 } from '@/lib/pos-data'
-import type { OrderItem, MenuItem } from '@/lib/pos-data'
+import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   ChefHat,
   Grid3X3,
@@ -378,6 +379,15 @@ function POSContent() {
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
+  // Toast state
+  const [toast, setToast] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
   useEffect(() => {
     const update = () => {
       setClock(
@@ -465,10 +475,32 @@ function POSContent() {
   const iva = subtotalAfterDiscount * IVA_RATE
   const total = subtotalAfterDiscount + iva
 
-  const handleSendToKitchen = () => {
-    if (orderItems.length === 0) return
-    setSentToKitchen(true)
-    setTimeout(() => setSentToKitchen(false), 2000)
+  const handleSendToKitchen = async () => {
+    if (orderItems.length === 0 || saving) return
+    setSaving(true)
+    const order: Order = {
+      id: generateId(),
+      mesa,
+      mesero,
+      personas,
+      status: 'enviada',
+      items: orderItems,
+      subtotal,
+      iva,
+      total,
+      descuento: discount,
+      notas: orderNotes || undefined,
+      createdAt: new Date(),
+    }
+    const ok = await saveOrder(order)
+    setSaving(false)
+    if (ok) {
+      setSentToKitchen(true)
+      showToast('Orden enviada a cocina')
+      setTimeout(() => setSentToKitchen(false), 2000)
+    } else {
+      showToast('Error al guardar orden')
+    }
   }
 
   const handleCloseOrder = () => {
@@ -476,7 +508,31 @@ function POSContent() {
     setShowPayment(true)
   }
 
-  const handlePayment = (_method: string) => {
+  const handlePayment = async (method: string) => {
+    setSaving(true)
+    const order: Order = {
+      id: generateId(),
+      mesa,
+      mesero,
+      personas,
+      status: 'cerrada',
+      items: orderItems,
+      subtotal,
+      iva,
+      total,
+      descuento: discount,
+      metodoPago: method,
+      notas: orderNotes || undefined,
+      createdAt: new Date(),
+      closedAt: new Date(),
+    }
+    const ok = await saveOrder(order)
+    setSaving(false)
+    if (ok) {
+      showToast(`Cuenta cerrada - ${method}`)
+    } else {
+      showToast('Error al cerrar cuenta')
+    }
     setOrderItems([])
     setDiscount(0)
     setOrderNotes('')
@@ -725,15 +781,15 @@ function POSContent() {
           <div className="px-4 py-3 border-t border-slate-700 flex gap-3">
             <button
               onClick={handleSendToKitchen}
-              disabled={orderItems.length === 0}
+              disabled={orderItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
             >
               <Send size={20} />
-              {sentToKitchen ? 'Enviado!' : 'Enviar a cocina'}
+              {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Enviar a cocina'}
             </button>
             <button
               onClick={handleCloseOrder}
-              disabled={orderItems.length === 0}
+              disabled={orderItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
             >
               <CreditCard size={20} />
@@ -800,6 +856,13 @@ function POSContent() {
           onApply={handleApplyDiscount}
           onCancel={() => setShowDiscount(false)}
         />
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
+          {toast}
+        </div>
       )}
 
       {/* Payment Modal */}
