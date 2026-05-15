@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/demo']
-  const isPublicPage = publicPages.includes(pathname)
+  const isPublicPage = publicPages.includes(pathname) || pathname.startsWith('/pos')
 
   useEffect(() => {
     if (!loading) {
