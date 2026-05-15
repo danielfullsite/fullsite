@@ -15,7 +15,6 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) { setError(authError.message); setLoading(false); return }
@@ -27,101 +26,110 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen relative">
-      {/* Full background */}
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80')` }} />
-      <div className="absolute inset-0 bg-black/65" />
-
-      {/* Content centered */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6">
-        {/* Logo */}
-        <div className="mb-8">
-          <span className="text-white font-black text-4xl tracking-tight">
-            fullsite
-            <span className="inline-block w-3.5 h-3.5 bg-emerald-400 ml-1 mb-1 rounded-none" />
-          </span>
-        </div>
-
-        {/* Login card */}
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <div className="p-8 sm:p-10">
-            <h2 className="text-2xl font-bold text-slate-900 mb-1">Iniciar sesión</h2>
-            <p className="text-slate-400 text-sm mb-8">Ingresa a tu panel de operaciones</p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-xs font-semibold text-slate-500 mb-1.5">
-                  Correo electrónico
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nombre@empresa.com"
-                  required
-                  disabled={loading}
-                  className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 focus:bg-white transition-all"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-xs font-semibold text-slate-500 mb-1.5">
-                  Contraseña
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 focus:bg-white transition-all"
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-100 text-red-500 rounded-xl px-4 py-3 text-sm">{error}</div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-slate-900 text-white font-semibold text-sm rounded-xl px-4 py-3.5 hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
-              >
-                {loading ? (
-                  <><span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> Ingresando...</>
-                ) : (
-                  <>Ingresar <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" /></>
-                )}
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-slate-50 px-8 sm:px-10 py-4 border-t border-slate-100">
-            <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
-              <a href="/privacidad" className="hover:text-slate-600 transition-colors">Privacidad</a>
-              <span className="text-slate-200">·</span>
-              <a href="/terminos" className="hover:text-slate-600 transition-colors">Términos</a>
-              <span className="text-slate-200">·</span>
-              <a href="/seguridad" className="hover:text-slate-600 transition-colors">Seguridad</a>
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left — photo */}
+      <div className="hidden lg:block lg:w-[55%] relative">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80')` }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+        <div className="relative z-10 flex flex-col justify-end h-full p-12 pb-16">
+          <p className="text-emerald-400 text-sm font-semibold mb-3 tracking-wide uppercase">Fullsite Platform</p>
+          <h1 className="text-4xl font-bold text-white leading-tight max-w-lg">
+            Inteligencia operativa para restaurantes
+          </h1>
+          <p className="text-white/50 text-base mt-4 max-w-md">
+            Ventas, meseros, platillos, tendencias — todo impulsado por IA.
+          </p>
+          <div className="flex items-center gap-8 mt-8">
+            <div>
+              <p className="text-xl font-bold text-white">580+</p>
+              <p className="text-xs text-white/40">Días de historial</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">17</p>
+              <p className="text-xs text-white/40">Módulos</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">24/7</p>
+              <p className="text-xs text-white/40">Asistente IA</p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Stats below card */}
-        <div className="flex items-center gap-10 mt-10">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-white">580+</p>
-            <p className="text-xs text-white/40">Días de historial</p>
+      {/* Right — white form panel */}
+      <div className="flex-1 bg-white flex flex-col items-center justify-center px-8 py-12 lg:px-16">
+        <div className="w-full max-w-sm">
+          {/* Logo */}
+          <div className="mb-12">
+            <span className="text-slate-900 font-black text-3xl tracking-tight">
+              fullsite
+              <span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+            </span>
           </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-white">17</p>
-            <p className="text-xs text-white/40">Módulos</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-white">24/7</p>
-            <p className="text-xs text-white/40">Asistente IA</p>
+
+          {/* Header */}
+          <h2 className="text-2xl font-bold text-slate-900 mb-1">Bienvenido</h2>
+          <p className="text-slate-400 text-sm mb-10">Inicia sesión para continuar</p>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Correo electrónico
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nombre@empresa.com"
+                required
+                disabled={loading}
+                className="w-full text-sm border border-slate-300 rounded-lg px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                className="w-full text-sm border border-slate-300 rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm">{error}</div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-500 text-white font-semibold text-sm rounded-lg px-4 py-3.5 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
+            >
+              {loading ? (
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Ingresando...</>
+              ) : (
+                <>Continuar <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" /></>
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-12 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-400 text-center">
+              <a href="/privacidad" className="hover:text-slate-600 transition-colors">Privacidad</a>
+              {' · '}
+              <a href="/terminos" className="hover:text-slate-600 transition-colors">Términos</a>
+              {' · '}
+              <a href="/seguridad" className="hover:text-slate-600 transition-colors">Seguridad</a>
+            </p>
           </div>
         </div>
       </div>
