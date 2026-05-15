@@ -363,7 +363,7 @@ REGLA #8: NUNCA dupliques meseros. Cada mesero aparece UNA sola vez. Si ves el m
 
 REGLA #9: Si no tienes dato de un mesero, NO lo listes. Solo lista los que tienen dato.
 
-REGLA #10: Para ticket promedio por mesero, usa el campo "ticket_promedio" de KPIs. Si no existe, calcula ventas_total / tickets. Redondea a entero.
+REGLA #10: Ticket promedio = ventas / PERSONAS (no tickets). Una mesa con 4 personas y cuenta de $2,000 = $500 por persona. Usa el campo "ticket_promedio" de KPIs que ya está calculado así.
 
 EJEMPLOS DE RESPUESTAS CORRECTAS:
 

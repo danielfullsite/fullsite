@@ -250,7 +250,7 @@ def compute_waiter_categories(items: list[dict]) -> dict:
             "personas": mk["personas"],
             "bebidas_por_persona": round(mk["bebidas_total"] / p, 2),
             "alimentos_por_persona": round(mk["alimentos_total"] / p, 2),
-            "ticket_promedio": round(mk["ventas_total"] / t, 2),
+            "ticket_promedio": round(mk["ventas_total"] / p, 2),  # ventas / personas (not tickets)
             "bebidas_total": mk["bebidas_total"],
             "alimentos_total": mk["alimentos_total"],
         }
