@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   UserCheck,
   ShoppingCart,
+  Monitor,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -57,6 +58,12 @@ const navSections = [
       { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
       { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/reportes', label: 'Reportes', icon: FileBarChart },
+    ],
+  },
+  {
+    label: 'POS',
+    items: [
+      { href: '/pos', label: 'Punto de Venta', icon: Monitor },
     ],
   },
   {

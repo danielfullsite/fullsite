@@ -34,6 +34,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  // POS pages: full screen, dark theme, no sidebar
+  const isPosPage = pathname.startsWith('/pos')
+  if (isPosPage) {
+    if (!showContent && loading) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-slate-900">
+          <div className="text-center">
+            <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-400 text-sm">Cargando POS...</p>
+          </div>
+        </div>
+      )
+    }
+    return <main className="min-h-screen bg-slate-900">{children}</main>
+  }
+
   if (!showContent && loading) {
     return (
       <div className="flex items-center justify-center h-screen">
