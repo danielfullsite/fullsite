@@ -54,6 +54,19 @@ export interface MenuCategory {
 export interface OrderItem {
   id: string
   menuItemId: string
+  nombre: string
+  precio: number
+  cantidad: number
+  modificadores: string[]  // ["Sin cebolla", "Extra queso +$25"]
+  notas: string
+  precioExtra: number      // sum of extra modifiers
+  subtotal: number         // (precio + precioExtra) * cantidad
+}
+
+// Keep legacy alias for any other pages that import the old shape
+export interface OrderItemLegacy {
+  id: string
+  menuItemId: string
   name: string
   price: number
   quantity: number
@@ -61,6 +74,27 @@ export interface OrderItem {
   status: 'pendiente' | 'preparando' | 'listo' | 'entregado'
   createdAt: Date
 }
+
+export interface ModificadorAgregar {
+  name: string
+  price: number
+}
+
+export const MODIFIERS_QUITAR = [
+  'Sin cebolla', 'Sin chile', 'Sin crema', 'Sin queso',
+  'Sin pan', 'Sin salsa', 'Sin jitomate', 'Sin aguacate'
+]
+
+export const MODIFIERS_AGREGAR: ModificadorAgregar[] = [
+  { name: 'Extra queso', price: 25 },
+  { name: 'Extra aguacate', price: 35 },
+  { name: 'Extra proteína', price: 45 },
+  { name: 'Extra huevo', price: 20 },
+  { name: 'Extra salsa', price: 0 },
+  { name: 'Leche de almendra', price: 15 },
+  { name: 'Leche de avena', price: 15 },
+  { name: 'Shot extra', price: 20 },
+]
 
 export interface Order {
   id: string
