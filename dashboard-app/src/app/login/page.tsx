@@ -96,22 +96,33 @@ export default function LoginPage() {
 
         {/* Right — login card */}
         <div className="flex items-center justify-center w-full lg:w-[480px] lg:min-w-[480px] p-6">
-          <div className="w-full max-w-[380px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-10">
-            {/* Mobile logo */}
-            <div className="lg:hidden text-center mb-8">
-              <span className="text-slate-900 font-black text-2xl tracking-tight">
-                fullsite
-                <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
-              </span>
+          <div className="w-full max-w-[420px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-10 lg:p-12">
+            {/* Logo inside card */}
+            <div className="flex items-center justify-center mb-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-slate-900 rounded-2xl flex items-center justify-center">
+                  <span className="text-white font-black text-lg">f</span>
+                </div>
+                <div>
+                  <span className="text-slate-900 font-black text-xl tracking-tight">
+                    fullsite
+                    <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+                  </span>
+                  <p className="text-[11px] text-slate-400 -mt-0.5 tracking-wide">PANEL DE OPERACIONES</p>
+                </div>
+              </div>
             </div>
 
+            {/* Divider */}
+            <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8" />
+
             {/* Form header */}
-            <div className="mb-8">
-              <h2 className="text-[28px] font-bold text-slate-900 tracking-tight">
-                Iniciar sesión
+            <div className="mb-7">
+              <h2 className="text-[22px] font-bold text-slate-900 tracking-tight">
+                Bienvenido de vuelta
               </h2>
-              <p className="text-slate-400 text-[15px] mt-2">
-                Accede a tu panel de operaciones
+              <p className="text-slate-400 text-[14px] mt-1">
+                Ingresa tus credenciales para continuar
               </p>
             </div>
 
