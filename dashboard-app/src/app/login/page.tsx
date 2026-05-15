@@ -115,9 +115,18 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-text-muted mt-6">
-          Fullsite Dashboard &mdash; Acceso restringido
-        </p>
+        <div className="text-center mt-6 space-y-2">
+          <p className="text-xs text-text-muted">
+            Fullsite Dashboard &mdash; Acceso restringido
+          </p>
+          <p className="text-xs text-text-muted">
+            <a href="/privacidad" className="hover:text-accent transition-colors">Privacidad</a>
+            {' | '}
+            <a href="/terminos" className="hover:text-accent transition-colors">Terminos</a>
+            {' | '}
+            <a href="/seguridad" className="hover:text-accent transition-colors">Seguridad</a>
+          </p>
+        </div>
       </div>
     </div>
   )

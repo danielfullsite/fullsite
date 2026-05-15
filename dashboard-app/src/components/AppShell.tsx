@@ -18,19 +18,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
+  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos']
+  const isPublicPage = publicPages.includes(pathname)
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading) {
-      if (!user && pathname !== '/login') {
+      if (!user && !isPublicPage) {
         router.push('/login')
       } else {
         setShowContent(true)
       }
     }
-  }, [loading, user, pathname, router])
+  }, [loading, user, pathname, router, isPublicPage])
 
-  // Login page — no nav chrome
-  if (pathname === '/login') {
+  // Public pages — no nav chrome
+  if (isPublicPage) {
     return <>{children}</>
   }
 
