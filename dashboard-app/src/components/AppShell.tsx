@@ -101,7 +101,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <div className="p-6 lg:p-8 max-w-7xl">
+        <div className="p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>
