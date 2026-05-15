@@ -17,7 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
-  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos']
+  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/demo']
   const isPublicPage = publicPages.includes(pathname)
 
   useEffect(() => {
