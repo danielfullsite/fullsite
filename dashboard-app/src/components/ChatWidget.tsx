@@ -6,10 +6,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 
 const quickQuestions = [
-  '\u00BFC\u00F3mo van las ventas hoy?',
-  '\u00BFQui\u00E9n es mi mejor mesero?',
-  '\u00BFQu\u00E9 d\u00EDa vendo m\u00E1s?',
-  '\u00BFC\u00F3mo subo el ticket promedio?',
+  '¿Cómo van las ventas hoy?',
+  '¿Quién es mi mejor mesero?',
+  '¿Qué día vendo más?',
+  '¿Cómo subo el ticket promedio?',
 ]
 
 function formatTime(date: Date) {
@@ -71,7 +71,7 @@ export default function ChatWidget() {
         {
           role: 'assistant',
           content:
-            'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API est\u00E9n configuradas.',
+            'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API estén configuradas.',
           timestamp: new Date(),
         },
       ])
@@ -100,10 +100,10 @@ export default function ChatWidget() {
             <Sparkles size={18} className="text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">Asistente IA</h3>
+            <h3 className="text-sm font-semibold text-white">fullsite. IA</h3>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-300" />
-              <p className="text-[11px] text-blue-100">Powered by Claude</p>
+              <p className="text-[11px] text-blue-100">Pregúntame lo que quieras</p>
             </div>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function ChatWidget() {
                 sendMessage(input)
               }
             }}
-            placeholder="Preg\u00FAntame lo que quieras..."
+            placeholder="Escribe tu pregunta..."
             className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-slate-900 placeholder:text-slate-400"
             disabled={isLoading}
           />
