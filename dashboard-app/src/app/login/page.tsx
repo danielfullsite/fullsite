@@ -30,7 +30,11 @@ export default function LoginPage() {
       {/* Left — photo */}
       <div className="hidden lg:block lg:w-[55%] relative">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80')` }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
+        {/* Logo centered on photo */}
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+          <img src="/logo-fullsite.png" alt="fullsite" className="w-72 opacity-90 drop-shadow-2xl" />
+        </div>
         <div className="relative z-10 flex flex-col justify-end h-full p-12 pb-16">
           <p className="text-emerald-400 text-sm font-semibold mb-3 tracking-wide uppercase">Fullsite Platform</p>
           <h1 className="text-4xl font-bold text-white leading-tight max-w-lg">
