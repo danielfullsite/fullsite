@@ -18,7 +18,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/demo']
-  const isPublicPage = publicPages.includes(pathname) || pathname.startsWith('/pos')
+  const isPosRoute = pathname.startsWith('/pos')
+  const isPublicPage = publicPages.includes(pathname) || isPosRoute
 
   useEffect(() => {
     if (!loading) {
@@ -30,12 +31,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, router, isPublicPage])
 
-  if (isPublicPage) {
-    return <>{children}</>
-  }
-
-  // POS pages: full screen, dark theme, no sidebar
-  const isPosPage = pathname.startsWith('/pos')
+  // POS pages: full screen, dark theme, no sidebar — check FIRST
+  const isPosPage = isPosRoute
   if (isPosPage) {
     if (!showContent && loading) {
       return (
@@ -48,6 +45,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       )
     }
     return <main className="min-h-screen bg-slate-900">{children}</main>
+  }
+
+  // Other public pages (login, privacy, etc.)
+  if (isPublicPage) {
+    return <>{children}</>
   }
 
   if (!showContent && loading) {
