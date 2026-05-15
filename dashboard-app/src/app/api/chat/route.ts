@@ -30,12 +30,32 @@ async function getAuthUser() {
   return user
 }
 
+// Simple rate limiting — max 20 requests per minute per user
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now()
+  const entry = rateLimitMap.get(userId)
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(userId, { count: 1, resetTime: now + 60000 })
+    return true
+  }
+  if (entry.count >= 20) return false
+  entry.count++
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const user = await getAuthUser()
     if (!user) {
       return Response.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Rate limiting
+    if (!checkRateLimit(user.id)) {
+      return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 200 })
     }
 
     const { message, history = [], client_id = 'amalay' } = await request.json()

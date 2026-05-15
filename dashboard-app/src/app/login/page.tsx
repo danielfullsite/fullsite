@@ -23,7 +23,9 @@ export default function LoginPage() {
         password,
       })
 
-      console.log('Auth result:', { data: data?.user?.email, error: authError?.message })
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Auth result:', { error: authError?.message })
+      }
 
       if (authError) {
         setError(authError.message)

@@ -34,11 +34,8 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        console.log('Dashboard: fetching data...')
         const recent = await getRecentDays(30)
-        console.log('Dashboard: got recent days:', recent.length)
         const latest = await getLatestDay()
-        console.log('Dashboard: got latest day:', latest?.fecha)
         setRecentData(recent)
         setLatestDay(latest)
         if (recent.length >= 2) {
