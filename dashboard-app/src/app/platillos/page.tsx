@@ -48,8 +48,8 @@ export default function PlatillosPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-soft text-sm font-medium">Cargando datos...</p>
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -81,48 +81,48 @@ export default function PlatillosPage() {
     <>
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
-        title="Platillos y Categorías"
-        subtitle="Desglose de ventas por grupo y platillos destacados (30 días)"
+        title="Platillos y Categorias"
+        subtitle="Desglose de ventas por grupo y platillos destacados (30 dias)"
       />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <KPICard
-          label="Total categorías"
+          label="Total categorias"
           value={formatNumber(grupos.length)}
-          subtitle="categorías activas"
+          subtitle="categorias activas"
           icon={BarChart3}
           accentClass="kpi-accent-blue"
         />
         <KPICard
           label="Ventas totales"
           value={formatCurrency(totalAll)}
-          subtitle="30 días"
+          subtitle="30 dias"
           icon={UtensilsCrossed}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Chilaquiles"
           value={formatCurrency(totalChilaquiles)}
-          subtitle="30 días acumulado"
+          subtitle="30 dias acumulado"
           icon={Coffee}
           accentClass="kpi-accent-amber"
         />
         <KPICard
           label="Half & Half"
           value={formatCurrency(totalHH)}
-          subtitle="30 días acumulado"
+          subtitle="30 dias acumulado"
           icon={TrendingUp}
           accentClass="kpi-accent-purple"
         />
       </div>
 
       {/* Top categories horizontal bar chart */}
-      <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-        <h3 className="text-sm font-semibold text-text mb-1">
-          Ventas por categoría (top 15)
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          Ventas por categoria (top 15)
         </h3>
-        <p className="text-xs text-text-muted mb-4">Últimos 30 días</p>
+        <p className="text-xs text-slate-400 mb-5">Ultimos 30 dias</p>
         <div className="h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">
@@ -151,9 +151,9 @@ export default function PlatillosPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                 }}
               />
               <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={20}>
@@ -168,26 +168,26 @@ export default function PlatillosPage() {
 
       {/* Category cards grid */}
       <div className="mb-8">
-        <h3 className="text-sm font-semibold text-text mb-4">Categorías principales</h3>
+        <h3 className="text-sm font-semibold text-slate-900 mb-4">Categorias principales</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {topGrupos.slice(0, 10).map((g, i) => {
             const pct = totalAll > 0 ? ((g.total / totalAll) * 100) : 0
             return (
               <div
                 key={g.nombre}
-                className="bg-card rounded-xl border border-border p-4 card-shadow hover:card-shadow-hover transition-all duration-200 hover:-translate-y-0.5"
+                className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
               >
                 <div
                   className="w-3 h-3 rounded-full mb-3"
                   style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
                 />
-                <p className="text-xs font-medium text-text-soft truncate mb-1">
+                <p className="text-xs font-medium text-slate-500 truncate mb-1">
                   {g.nombre}
                 </p>
-                <p className="text-lg font-bold text-text tabular-nums">
+                <p className="text-lg font-bold text-slate-900 tabular-nums">
                   {formatCurrency(g.total)}
                 </p>
-                <p className="text-xs text-text-muted tabular-nums mt-0.5">
+                <p className="text-xs text-slate-400 tabular-nums mt-0.5">
                   {pct.toFixed(1)}% del total
                 </p>
               </div>
@@ -198,11 +198,11 @@ export default function PlatillosPage() {
 
       {/* Chilaquiles & H&H trend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
             Chilaquiles (ventas $)
           </h3>
-          <p className="text-xs text-text-muted mb-4">Tendencia 30 días</p>
+          <p className="text-xs text-slate-400 mb-5">Tendencia 30 dias</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -232,9 +232,9 @@ export default function PlatillosPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Area
@@ -251,11 +251,11 @@ export default function PlatillosPage() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
             Half & Half (ventas $)
           </h3>
-          <p className="text-xs text-text-muted mb-4">Tendencia 30 días</p>
+          <p className="text-xs text-slate-400 mb-5">Tendencia 30 dias</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -285,9 +285,9 @@ export default function PlatillosPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Area
@@ -306,22 +306,22 @@ export default function PlatillosPage() {
       </div>
 
       {/* Categories table */}
-      <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-        <div className="p-5 border-b border-border">
-          <h3 className="text-sm font-semibold text-text">
-            Todas las categorías
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200/80">
+          <h3 className="text-sm font-semibold text-slate-900">
+            Todas las categorias
           </h3>
-          <p className="text-xs text-text-muted mt-0.5">Últimos 30 días - {grupos.length} categorías</p>
+          <p className="text-xs text-slate-400 mt-0.5">Ultimos 30 dias - {grupos.length} categorias</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-striped">
             <thead>
-              <tr className="border-b border-border bg-surface/50">
-                <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">#</th>
-                <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Categoria</th>
-                <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider w-40">Progreso</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Total ventas</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">% del total</th>
+              <tr className="border-b border-slate-200/80 bg-slate-50/50">
+                <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">#</th>
+                <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Categoria</th>
+                <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider w-40">Progreso</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Total ventas</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">% del total</th>
               </tr>
             </thead>
             <tbody>
@@ -331,20 +331,20 @@ export default function PlatillosPage() {
                 return (
                   <tr
                     key={g.nombre}
-                    className="border-b border-border/50 hover:bg-accent/5 transition-colors"
+                    className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors"
                   >
-                    <td className="py-3 px-4 text-sm text-text-muted tabular-nums font-medium">{i + 1}</td>
+                    <td className="py-3 px-4 text-sm text-slate-400 tabular-nums font-medium">{i + 1}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         <div
                           className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
                         />
-                        <span className="text-sm font-medium text-text">{g.nombre}</span>
+                        <span className="text-sm font-medium text-slate-900">{g.nombre}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="w-full bg-surface rounded-full h-1.5">
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
                         <div
                           className="h-1.5 rounded-full animate-progress"
                           style={{
@@ -354,11 +354,11 @@ export default function PlatillosPage() {
                         />
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-text">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                       {formatCurrency(g.total)}
                     </td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-accent/10 text-accent">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
                         {pct}%
                       </span>
                     </td>

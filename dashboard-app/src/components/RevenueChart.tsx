@@ -29,18 +29,18 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
   }))
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5 card-shadow">
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
       {title && (
-        <h3 className="text-sm font-semibold text-text mb-1">{title}</h3>
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">{title}</h3>
       )}
-      <p className="text-xs text-text-muted mb-4">{chartData.length} días con datos</p>
+      <p className="text-xs text-slate-400 mb-5">{chartData.length} dias con datos</p>
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
-                <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.08} />
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.06} />
                 <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
               </linearGradient>
             </defs>
@@ -64,9 +64,9 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
               contentStyle={{
                 background: '#ffffff',
                 border: 'none',
-                borderRadius: '10px',
+                borderRadius: '12px',
                 fontSize: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                 padding: '10px 14px',
               }}
               cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}

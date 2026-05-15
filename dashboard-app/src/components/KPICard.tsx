@@ -12,6 +12,15 @@ interface KPICardProps {
   accentClass?: string
 }
 
+const iconBgMap: Record<string, string> = {
+  'kpi-accent-blue': 'bg-blue-50 text-blue-500',
+  'kpi-accent-green': 'bg-emerald-50 text-emerald-500',
+  'kpi-accent-amber': 'bg-amber-50 text-amber-500',
+  'kpi-accent-purple': 'bg-purple-50 text-purple-500',
+  'kpi-accent-pink': 'bg-pink-50 text-pink-500',
+  'kpi-accent-cyan': 'bg-cyan-50 text-cyan-500',
+}
+
 export default function KPICard({
   label,
   value,
@@ -21,24 +30,26 @@ export default function KPICard({
   icon: Icon,
   accentClass,
 }: KPICardProps) {
+  const iconStyle = accentClass ? iconBgMap[accentClass] || 'bg-slate-50 text-slate-500' : 'bg-slate-50 text-slate-500'
+
   return (
     <div
-      className={`bg-card rounded-xl p-5 card-shadow hover:card-shadow-hover transition-all duration-200 hover:-translate-y-0.5 ${
-        accentClass || 'border border-border'
+      className={`bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 hover:shadow-md transition-shadow duration-200 ${
+        accentClass || ''
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-text-soft text-xs font-medium uppercase tracking-wider mb-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
             {label}
           </p>
-          <p className="text-3xl font-bold tracking-tight text-text truncate">
+          <p className="text-3xl font-bold tracking-tight text-slate-900 truncate">
             {value}
           </p>
         </div>
         {Icon && (
-          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0 ml-3">
-            <Icon size={20} className="text-accent" />
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ml-3 ${iconStyle}`}>
+            <Icon size={20} />
           </div>
         )}
       </div>
@@ -47,10 +58,10 @@ export default function KPICard({
           <span
             className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
               deltaType === 'up'
-                ? 'bg-success-bg text-success'
+                ? 'bg-emerald-50 text-emerald-600'
                 : deltaType === 'down'
-                ? 'bg-danger-bg text-danger'
-                : 'bg-border-light text-text-muted'
+                ? 'bg-red-50 text-red-600'
+                : 'bg-slate-100 text-slate-500'
             }`}
           >
             {deltaType === 'up' && <TrendingUp size={12} />}
@@ -61,7 +72,7 @@ export default function KPICard({
         </div>
       )}
       {subtitle && (
-        <p className="text-text-muted text-xs mt-2">{subtitle}</p>
+        <p className="text-slate-400 text-xs mt-2">{subtitle}</p>
       )}
     </div>
   )

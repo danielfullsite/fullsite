@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { DollarSign, Ticket, Users, Receipt } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays } from '@/lib/data'
@@ -9,12 +9,12 @@ import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/li
 import type { WansoftDaily } from '@/lib/types'
 
 const HEATMAP_COLORS = [
-  { min: 0, max: 0, bg: 'bg-gray-100', text: 'text-gray-400' },
-  { min: 1, max: 20000, bg: 'bg-red-100', text: 'text-red-700' },
-  { min: 20001, max: 40000, bg: 'bg-orange-100', text: 'text-orange-700' },
-  { min: 40001, max: 60000, bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  { min: 60001, max: 80000, bg: 'bg-lime-100', text: 'text-lime-700' },
-  { min: 80001, max: Infinity, bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  { min: 0, max: 0, bg: 'bg-slate-100', text: 'text-slate-400', hex: '#e2e8f0' },
+  { min: 1, max: 20000, bg: 'bg-red-100', text: 'text-red-700', hex: '#fecaca' },
+  { min: 20001, max: 40000, bg: 'bg-orange-100', text: 'text-orange-700', hex: '#fed7aa' },
+  { min: 40001, max: 60000, bg: 'bg-yellow-100', text: 'text-yellow-700', hex: '#fef08a' },
+  { min: 60001, max: 80000, bg: 'bg-lime-100', text: 'text-lime-700', hex: '#d9f99d' },
+  { min: 80001, max: Infinity, bg: 'bg-emerald-100', text: 'text-emerald-700', hex: '#a7f3d0' },
 ]
 
 function getHeatColor(value: number) {
@@ -86,8 +86,8 @@ export default function CortesPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-soft text-sm font-medium">Cargando datos...</p>
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -102,20 +102,18 @@ export default function CortesPage() {
       />
 
       {/* Period selector */}
-      <div className="flex gap-2 mb-6">
-        {([30, 60, 90] as const).map(p => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              period === p
-                ? 'bg-accent text-white shadow-sm'
-                : 'bg-card border border-border text-text-soft hover:text-text hover:border-accent/30'
-            }`}
-          >
-            {p} dias
-          </button>
-        ))}
+      <div className="mb-6">
+        <div className="segmented-control">
+          {([30, 60, 90] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={period === p ? 'active' : ''}
+            >
+              {p} dias
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -152,19 +150,19 @@ export default function CortesPage() {
       </div>
 
       {/* Calendar Heatmap */}
-      <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-        <h3 className="text-sm font-semibold text-text mb-1">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Mapa de calor de ventas
         </h3>
-        <p className="text-xs text-text-muted mb-4">Verde = ventas altas, Rojo = ventas bajas</p>
+        <p className="text-xs text-slate-400 mb-4">Verde = ventas altas, Rojo = ventas bajas</p>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-xs text-text-muted">Menor</span>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs text-slate-400">Menor</span>
           {HEATMAP_COLORS.slice(1).map((c, i) => (
-            <div key={i} className={`w-5 h-5 rounded ${c.bg}`} />
+            <div key={i} className={`w-5 h-5 rounded-md ${c.bg} border border-white shadow-sm`} />
           ))}
-          <span className="text-xs text-text-muted">Mayor</span>
+          <span className="text-xs text-slate-400">Mayor</span>
         </div>
 
         <div className="flex gap-1 overflow-x-auto pb-2">
@@ -179,10 +177,10 @@ export default function CortesPage() {
                 return (
                   <div
                     key={day.fecha}
-                    className={`w-8 h-8 rounded flex items-center justify-center cursor-default ${color.bg}`}
+                    className={`w-9 h-9 rounded-md flex items-center justify-center cursor-default ${color.bg} border border-white/50 shadow-sm transition-transform hover:scale-110`}
                     title={`${dateStr}: ${formatCurrency(day.ventas)}`}
                   >
-                    <span className={`text-[8px] font-bold ${color.text}`}>
+                    <span className={`text-[9px] font-bold ${color.text}`}>
                       {new Date(day.fecha + 'T12:00:00').getDate()}
                     </span>
                   </div>
@@ -195,41 +193,67 @@ export default function CortesPage() {
 
       {/* Efectivo vs Tarjeta summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Total Efectivo</p>
-          <p className="text-2xl font-bold text-text">{formatCurrency(totalEfectivo)}</p>
-          <p className="text-xs text-text-muted mt-1">
-            {totalVentas > 0 ? ((totalEfectivo / totalVentas) * 100).toFixed(1) : 0}% del total
-          </p>
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
+              <Banknote size={20} className="text-emerald-500" />
+            </div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Efectivo</p>
+          </div>
+          <p className="text-3xl font-bold text-slate-900">{formatCurrency(totalEfectivo)}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 bg-slate-100 rounded-full h-2">
+              <div
+                className="h-2 rounded-full bg-emerald-500 animate-progress"
+                style={{ width: `${totalVentas > 0 ? (totalEfectivo / totalVentas) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="text-xs text-slate-500 font-medium tabular-nums">
+              {totalVentas > 0 ? ((totalEfectivo / totalVentas) * 100).toFixed(1) : 0}%
+            </span>
+          </div>
         </div>
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Total Tarjeta</p>
-          <p className="text-2xl font-bold text-text">{formatCurrency(totalTarjeta)}</p>
-          <p className="text-xs text-text-muted mt-1">
-            {totalVentas > 0 ? ((totalTarjeta / totalVentas) * 100).toFixed(1) : 0}% del total
-          </p>
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+              <CreditCard size={20} className="text-blue-500" />
+            </div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Tarjeta</p>
+          </div>
+          <p className="text-3xl font-bold text-slate-900">{formatCurrency(totalTarjeta)}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 bg-slate-100 rounded-full h-2">
+              <div
+                className="h-2 rounded-full bg-blue-500 animate-progress"
+                style={{ width: `${totalVentas > 0 ? (totalTarjeta / totalVentas) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="text-xs text-slate-500 font-medium tabular-nums">
+              {totalVentas > 0 ? ((totalTarjeta / totalVentas) * 100).toFixed(1) : 0}%
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Daily cortes table */}
-      <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-        <div className="p-5 border-b border-border">
-          <h3 className="text-sm font-semibold text-text">Cortes diarios</h3>
-          <p className="text-xs text-text-muted mt-0.5">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200/80">
+          <h3 className="text-sm font-semibold text-slate-900">Cortes diarios</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
             {periodData.length} dias - Totales acumulados abajo
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-striped">
-            <thead>
-              <tr className="border-b border-border bg-surface/50">
-                <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Fecha</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Ventas</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Tickets</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Personas</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Ticket Prom.</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Efectivo</th>
-                <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Tarjeta</th>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-slate-200/80 bg-slate-50/80 backdrop-blur-sm">
+                <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Fecha</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Ventas</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Tickets</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Personas</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Ticket Prom.</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Efectivo</th>
+                <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Tarjeta</th>
               </tr>
             </thead>
             <tbody>
@@ -239,11 +263,11 @@ export default function CortesPage() {
                 return (
                   <tr
                     key={d.fecha}
-                    className="border-b border-border/50 hover:bg-accent/5 transition-colors"
+                    className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors"
                   >
                     <td className="py-3 px-4">
-                      <div>
-                        <span className="text-sm font-medium text-text">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-900">
                           {new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
                             weekday: 'short',
                             day: 'numeric',
@@ -251,28 +275,28 @@ export default function CortesPage() {
                           })}
                         </span>
                         {prev && (
-                          <span className={`ml-2 text-xs font-semibold ${change >= 0 ? 'text-success' : 'text-danger'}`}>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                             {change >= 0 ? '+' : ''}{change.toFixed(0)}%
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-text">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                       {formatCurrency(d.ventas_dia)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
                       {formatNumber(d.tickets_count)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
                       {formatNumber(d.personas_restaurant)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
                       {formatCurrency(d.ticket_promedio_restaurant)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
                       {formatCurrency(d.efectivo)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
+                    <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
                       {formatCurrency(d.tarjeta)}
                     </td>
                   </tr>
@@ -280,24 +304,24 @@ export default function CortesPage() {
               })}
             </tbody>
             <tfoot>
-              <tr className="bg-surface/80 border-t-2 border-border">
-                <td className="py-3.5 px-4 text-sm font-bold text-text">TOTAL</td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-accent">
+              <tr className="bg-slate-50/80 border-t-2 border-slate-200">
+                <td className="py-3.5 px-4 text-sm font-bold text-slate-900">TOTAL</td>
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
                   {formatCurrency(totalVentas)}
                 </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                   {formatNumber(totalTickets)}
                 </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                   {formatNumber(totalPersonas)}
                 </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                   {formatCurrency(avgTicket)}
                 </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                   {formatCurrency(totalEfectivo)}
                 </td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
                   {formatCurrency(totalTarjeta)}
                 </td>
               </tr>

@@ -116,7 +116,6 @@ export default function TendenciasPage() {
     const currentMonths = monthlyAgg.filter(d => d.month.startsWith(currentYear))
     const prevMonths = monthlyAgg.filter(d => d.month.startsWith(prevYear))
 
-    // Create paired chart data (month number as x-axis, both years as series)
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     const paired: { monthNum: number; monthLabel: string; current: number; prev: number; pctChange: number }[] = []
 
@@ -137,14 +136,12 @@ export default function TendenciasPage() {
       }
     }
 
-    // Chart data: all months that have at least one year of data
     const chartData = paired.map(p => ({
       monthLabel: p.monthLabel,
       [`${currentYear}`]: p.current || undefined,
       [`${prevYear}`]: p.prev || undefined,
     }))
 
-    // Table data: only months that have current year data
     const tableData = paired.filter(p => p.current > 0)
 
     return { chartData, tableData, currentYear, prevYear }
@@ -154,8 +151,8 @@ export default function TendenciasPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-soft text-sm font-medium">Cargando datos...</p>
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -178,7 +175,7 @@ export default function TendenciasPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Tendencias"
-        subtitle="Comparativos mensuales, por día de la semana, y acumulado del año"
+        subtitle="Comparativos mensuales, por dia de la semana, y acumulado del ano"
       />
 
       {/* KPIs */}
@@ -200,7 +197,7 @@ export default function TendenciasPage() {
           accentClass="kpi-accent-green"
         />
         <KPICard
-          label="Mejor día de semana"
+          label="Mejor dia de semana"
           value={bestDow?.dia || '-'}
           subtitle={bestDow ? `Prom. ${formatCurrency(bestDow.ventasPromedio)}` : ''}
           icon={Calendar}
@@ -209,7 +206,7 @@ export default function TendenciasPage() {
         <KPICard
           label="YTD Ventas"
           value={formatCurrency(ytdData.totalVentas)}
-          subtitle={`${ytdData.dias} días con datos en ${new Date().getFullYear()}`}
+          subtitle={`${ytdData.dias} dias con datos en ${new Date().getFullYear()}`}
           icon={BarChart3}
           accentClass="kpi-accent-purple"
         />
@@ -218,69 +215,55 @@ export default function TendenciasPage() {
       {/* Monthly comparison cards */}
       {currentMonth && prevMonth && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ventas totales</p>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-text-soft mb-0.5">Este mes</p>
-                <p className="text-xl font-bold text-text">{formatCurrency(currentMonth.ventas)}</p>
+          {[
+            {
+              label: 'Ventas totales',
+              current: formatCurrency(currentMonth.ventas),
+              prev: formatCurrency(prevMonth.ventas),
+              change: ventasMoM,
+            },
+            {
+              label: 'Tickets',
+              current: formatNumber(currentMonth.tickets),
+              prev: formatNumber(prevMonth.tickets),
+              change: percentChange(currentMonth.tickets, prevMonth.tickets),
+            },
+            {
+              label: 'Ticket promedio (rest.)',
+              current: formatCurrency(currentMonth.ticketPromedio),
+              prev: formatCurrency(prevMonth.ticketPromedio),
+              change: ticketMoM,
+            },
+          ].map((card) => (
+            <div key={card.label} className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 hover:shadow-md transition-shadow">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{card.label}</p>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Este mes</p>
+                  <p className="text-xl font-bold text-slate-900">{card.current}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400 mb-0.5">Mes anterior</p>
+                  <p className="text-lg font-semibold text-slate-400">{card.prev}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-text-soft mb-0.5">Mes anterior</p>
-                <p className="text-lg font-semibold text-text-soft">{formatCurrency(prevMonth.ventas)}</p>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-border">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ventasMoM >= 0 ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}>
-                {formatPercent(ventasMoM)}
-              </span>
-            </div>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Tickets</p>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-text-soft mb-0.5">Este mes</p>
-                <p className="text-xl font-bold text-text">{formatNumber(currentMonth.tickets)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-text-soft mb-0.5">Mes anterior</p>
-                <p className="text-lg font-semibold text-text-soft">{formatNumber(prevMonth.tickets)}</p>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-border">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${percentChange(currentMonth.tickets, prevMonth.tickets) >= 0 ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}>
-                {formatPercent(percentChange(currentMonth.tickets, prevMonth.tickets))}
-              </span>
-            </div>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ticket promedio (rest.)</p>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-text-soft mb-0.5">Este mes</p>
-                <p className="text-xl font-bold text-text">{formatCurrency(currentMonth.ticketPromedio)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-text-soft mb-0.5">Mes anterior</p>
-                <p className="text-lg font-semibold text-text-soft">{formatCurrency(prevMonth.ticketPromedio)}</p>
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${card.change >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  {card.change >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                  {formatPercent(card.change)}
+                </span>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-border">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ticketMoM >= 0 ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}>
-                {formatPercent(ticketMoM)}
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
       {/* Monthly revenue trend */}
-      <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-        <h3 className="text-sm font-semibold text-text mb-1">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Ventas mensuales
         </h3>
-        <p className="text-xs text-text-muted mb-4">{monthlyAgg.length} meses de datos</p>
+        <p className="text-xs text-slate-400 mb-5">{monthlyAgg.length} meses de datos</p>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -309,9 +292,9 @@ export default function TendenciasPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                 }}
               />
               <Area
@@ -330,12 +313,12 @@ export default function TendenciasPage() {
 
       {/* Year-over-Year comparison */}
       {yoyData.chartData.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-          <h3 className="text-sm font-semibold text-text mb-1">
-            Comparativo año anterior
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            Comparativo ano anterior
           </h3>
-          <p className="text-xs text-text-muted mb-4">
-            {yoyData.currentYear} vs {yoyData.prevYear} — ventas mensuales
+          <p className="text-xs text-slate-400 mb-5">
+            {yoyData.currentYear} vs {yoyData.prevYear} -- ventas mensuales
           </p>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -365,9 +348,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Legend
@@ -400,8 +383,8 @@ export default function TendenciasPage() {
 
           {/* Comparison table */}
           {yoyData.tableData.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-border">
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                 Detalle mensual {yoyData.currentYear} vs {yoyData.prevYear}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -410,27 +393,27 @@ export default function TendenciasPage() {
                   return (
                     <div
                       key={row.monthNum}
-                      className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface"
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
                     >
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-text">
+                        <span className="text-sm font-medium text-slate-900">
                           {row.monthLabel} {yoyData.currentYear.slice(2)}
                         </span>
-                        <span className="text-xs text-text-muted ml-1.5">
+                        <span className="text-xs text-slate-400 ml-1.5">
                           {formatCurrency(row.current)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">
                         {row.prev > 0 ? (
                           <>
-                            <span className="text-xs text-text-muted">
+                            <span className="text-xs text-slate-400">
                               vs {formatCurrency(row.prev)}
                             </span>
                             <span
                               className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold ${
                                 isPositive
-                                  ? 'bg-success-bg text-success'
-                                  : 'bg-danger-bg text-danger'
+                                  ? 'bg-emerald-50 text-emerald-600'
+                                  : 'bg-red-50 text-red-600'
                               }`}
                             >
                               {isPositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
@@ -438,7 +421,7 @@ export default function TendenciasPage() {
                             </span>
                           </>
                         ) : (
-                          <span className="text-xs text-text-muted">Sin datos {yoyData.prevYear}</span>
+                          <span className="text-xs text-slate-400">Sin datos {yoyData.prevYear}</span>
                         )}
                       </div>
                     </div>
@@ -451,11 +434,11 @@ export default function TendenciasPage() {
       )}
 
       {/* Monthly ticket promedio */}
-      <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-        <h3 className="text-sm font-semibold text-text mb-1">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Ticket promedio mensual (restaurante)
         </h3>
-        <p className="text-xs text-text-muted mb-4">Evolución del ticket promedio</p>
+        <p className="text-xs text-slate-400 mb-5">Evolucion del ticket promedio</p>
         <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -484,9 +467,9 @@ export default function TendenciasPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                 }}
               />
               <Area
@@ -505,11 +488,11 @@ export default function TendenciasPage() {
 
       {/* Day of week */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
-            Venta promedio por día
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            Venta promedio por dia
           </h3>
-          <p className="text-xs text-text-muted mb-4">Promedio historico</p>
+          <p className="text-xs text-slate-400 mb-5">Promedio historico</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -532,9 +515,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Bar dataKey="ventasPromedio" radius={[6, 6, 0, 0]} barSize={32}>
@@ -547,11 +530,11 @@ export default function TendenciasPage() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
-            Ticket promedio por día (restaurante)
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            Ticket promedio por dia (restaurante)
           </h3>
-          <p className="text-xs text-text-muted mb-4">Promedio historico</p>
+          <p className="text-xs text-slate-400 mb-5">Promedio historico</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -574,9 +557,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Bar dataKey="ticketPromedio" fill="#10b981" radius={[6, 6, 0, 0]} barSize={32} />
@@ -587,29 +570,29 @@ export default function TendenciasPage() {
       </div>
 
       {/* YTD Summary */}
-      <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-        <div className="p-5 border-b border-border">
-          <h3 className="text-sm font-semibold text-text">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200/80">
+          <h3 className="text-sm font-semibold text-slate-900">
             Resumen Year-To-Date ({new Date().getFullYear()})
           </h3>
-          <p className="text-xs text-text-muted mt-0.5">{ytdData.dias} días con datos</p>
+          <p className="text-xs text-slate-400 mt-0.5">{ytdData.dias} dias con datos</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Ventas totales</p>
-            <p className="text-2xl font-bold text-text">{formatCurrency(ytdData.totalVentas)}</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ventas totales</p>
+            <p className="text-2xl font-bold text-slate-900">{formatCurrency(ytdData.totalVentas)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Tickets</p>
-            <p className="text-2xl font-bold text-text">{formatNumber(ytdData.totalTickets)}</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Tickets</p>
+            <p className="text-2xl font-bold text-slate-900">{formatNumber(ytdData.totalTickets)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Personas</p>
-            <p className="text-2xl font-bold text-text">{formatNumber(ytdData.totalPersonas)}</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Personas</p>
+            <p className="text-2xl font-bold text-slate-900">{formatNumber(ytdData.totalPersonas)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Ticket promedio</p>
-            <p className="text-2xl font-bold text-text">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ticket promedio</p>
+            <p className="text-2xl font-bold text-slate-900">
               {ytdData.totalTickets > 0 ? formatCurrency(Math.round(ytdData.totalVentas / ytdData.totalTickets)) : '-'}
             </p>
           </div>

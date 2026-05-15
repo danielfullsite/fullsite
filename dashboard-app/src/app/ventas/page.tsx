@@ -3,14 +3,14 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
 } from 'recharts'
-import { DollarSign, Receipt, Tag, Gift } from 'lucide-react'
+import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getDateRange, aggregatePayments, aggregateGrupos } from '@/lib/data'
@@ -72,7 +72,6 @@ export default function VentasPage() {
       const result = await getDateRange(dates.from, dates.to)
       setData(result)
 
-      // Calculate previous period for comparison
       const fromDate = new Date(dates.from + 'T12:00:00')
       const toDate = new Date(dates.to + 'T12:00:00')
       const diff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -118,8 +117,8 @@ export default function VentasPage() {
   const topGrupos = grupos.slice(0, 10)
   const grupoMax = topGrupos[0]?.total || 1
 
-  // Daily revenue for bar chart
-  const dailyBars = data.map(d => ({
+  // Daily revenue for area chart
+  const dailyChart = data.map(d => ({
     fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
     ventas: d.ventas_dia,
   }))
@@ -127,8 +126,8 @@ export default function VentasPage() {
   const presets: { key: Preset; label: string }[] = [
     { key: 'hoy', label: 'Hoy' },
     { key: 'ayer', label: 'Ayer' },
-    { key: 'semana', label: 'Esta semana' },
-    { key: 'mes', label: 'Este mes' },
+    { key: 'semana', label: 'Semana' },
+    { key: 'mes', label: 'Mes' },
     { key: 'custom', label: 'Personalizado' },
   ]
 
@@ -140,18 +139,14 @@ export default function VentasPage() {
         subtitle={`${dates.from} al ${dates.to} ${data.length > 0 ? `- ${data.length} dias con datos` : ''}`}
       />
 
-      {/* Date range picker */}
+      {/* Segmented date range picker */}
       <div className="flex flex-wrap items-end gap-3 mb-6">
-        <div className="flex gap-1.5">
+        <div className="segmented-control">
           {presets.map(p => (
             <button
               key={p.key}
               onClick={() => setPreset(p.key)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                preset === p.key
-                  ? 'bg-accent text-white shadow-sm'
-                  : 'bg-card border border-border text-text-soft hover:text-text hover:border-accent/30'
-              }`}
+              className={preset === p.key ? 'active' : ''}
             >
               {p.label}
             </button>
@@ -163,14 +158,14 @@ export default function VentasPage() {
               type="date"
               value={customFrom}
               onChange={e => setCustomFrom(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm border border-border bg-card text-text"
+              className="px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
-            <span className="text-text-muted text-sm">a</span>
+            <span className="text-slate-400 text-sm">a</span>
             <input
               type="date"
               value={customTo}
               onChange={e => setCustomTo(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm border border-border bg-card text-text"
+              className="px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
           </div>
         )}
@@ -179,8 +174,8 @@ export default function VentasPage() {
       {loading ? (
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
-            <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-text-soft text-sm font-medium">Cargando datos...</p>
+            <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -219,16 +214,22 @@ export default function VentasPage() {
             />
           </div>
 
-          {/* Daily sales bar chart */}
-          {dailyBars.length > 1 && (
-            <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-              <h3 className="text-sm font-semibold text-text mb-1">
+          {/* Daily sales area chart */}
+          {dailyChart.length > 1 && (
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">
                 Ventas por dia
               </h3>
-              <p className="text-xs text-text-muted mb-4">{data.length} dias</p>
+              <p className="text-xs text-slate-400 mb-5">{data.length} dias</p>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dailyBars}>
+                  <AreaChart data={dailyChart}>
+                    <defs>
+                      <linearGradient id="colorVentasDiarias" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis
                       dataKey="fecha"
@@ -249,13 +250,21 @@ export default function VentasPage() {
                       contentStyle={{
                         background: '#fff',
                         border: 'none',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         fontSize: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                       }}
                     />
-                    <Bar dataKey="ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
-                  </BarChart>
+                    <Area
+                      type="monotone"
+                      dataKey="ventas"
+                      stroke="#3b82f6"
+                      strokeWidth={2.5}
+                      fill="url(#colorVentasDiarias)"
+                      dot={false}
+                      activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -263,11 +272,11 @@ export default function VentasPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Payment methods */}
-            <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-              <h3 className="text-sm font-semibold text-text mb-1">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">
                 Metodos de pago
               </h3>
-              <p className="text-xs text-text-muted mb-4">
+              <p className="text-xs text-slate-400 mb-5">
                 Total: {formatCurrency(paymentTotal)}
               </p>
               {payments.length > 0 ? (
@@ -283,14 +292,14 @@ export default function VentasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }}
                             />
-                            <span className="text-sm font-medium text-text">{p.nombre}</span>
+                            <span className="text-sm font-medium text-slate-700">{p.nombre}</span>
                           </div>
-                          <span className="text-sm font-bold text-text tabular-nums">
+                          <span className="text-sm font-bold text-slate-900 tabular-nums">
                             {formatCurrency(p.total)}{' '}
-                            <span className="text-text-muted text-xs font-normal">({pct}%)</span>
+                            <span className="text-slate-400 text-xs font-normal">({pct}%)</span>
                           </span>
                         </div>
-                        <div className="w-full bg-surface rounded-full h-2">
+                        <div className="w-full bg-slate-100 rounded-full h-2">
                           <div
                             className="h-2 rounded-full animate-progress"
                             style={{
@@ -304,16 +313,16 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-text-muted text-sm py-8 text-center">Sin datos de metodos de pago</p>
+                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de metodos de pago</p>
               )}
             </div>
 
             {/* Revenue distribution by category */}
-            <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-              <h3 className="text-sm font-semibold text-text mb-1">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">
                 Distribucion por categoria
               </h3>
-              <p className="text-xs text-text-muted mb-4">
+              <p className="text-xs text-slate-400 mb-5">
                 Top 10 categorias
               </p>
               {topGrupos.length > 0 ? (
@@ -330,13 +339,13 @@ export default function VentasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
                             />
-                            <span className="text-xs font-medium text-text truncate">{g.nombre}</span>
+                            <span className="text-xs font-medium text-slate-700 truncate">{g.nombre}</span>
                           </div>
-                          <span className="text-xs tabular-nums text-text-soft ml-2 shrink-0">
+                          <span className="text-xs tabular-nums text-slate-500 ml-2 shrink-0">
                             {formatCurrency(g.total)} ({pct}%)
                           </span>
                         </div>
-                        <div className="w-full bg-surface rounded-full h-1.5">
+                        <div className="w-full bg-slate-100 rounded-full h-1.5">
                           <div
                             className="h-1.5 rounded-full animate-progress"
                             style={{
@@ -350,29 +359,38 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-text-muted text-sm py-8 text-center">Sin datos de categorias</p>
+                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de categorias</p>
               )}
             </div>
           </div>
 
           {/* Sales by order type */}
-          <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-            <h3 className="text-sm font-semibold text-text mb-1">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">
               Desglose por tipo de orden
             </h3>
-            <p className="text-xs text-text-muted mb-4">Restaurante vs Para llevar</p>
+            <p className="text-xs text-slate-400 mb-5">Restaurante vs Para llevar</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-surface rounded-xl p-4 text-center">
-                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Personas restaurante</p>
-                <p className="text-2xl font-bold text-text">{data.reduce((s, d) => s + (d.personas_restaurant || 0), 0).toLocaleString()}</p>
+              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+                <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Store size={18} className="text-blue-500" />
+                </div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Personas restaurante</p>
+                <p className="text-2xl font-bold text-slate-900">{data.reduce((s, d) => s + (d.personas_restaurant || 0), 0).toLocaleString()}</p>
               </div>
-              <div className="bg-surface rounded-xl p-4 text-center">
-                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Ordenes para llevar</p>
-                <p className="text-2xl font-bold text-text">{data.reduce((s, d) => s + (d.ordenes_llevar || 0), 0).toLocaleString()}</p>
+              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+                <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <ShoppingBag size={18} className="text-emerald-500" />
+                </div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ordenes para llevar</p>
+                <p className="text-2xl font-bold text-slate-900">{data.reduce((s, d) => s + (d.ordenes_llevar || 0), 0).toLocaleString()}</p>
               </div>
-              <div className="bg-surface rounded-xl p-4 text-center">
-                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">Propinas totales</p>
-                <p className="text-2xl font-bold text-text">{formatCurrency(data.reduce((s, d) => s + (d.propinas_total || 0), 0))}</p>
+              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+                <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Smartphone size={18} className="text-purple-500" />
+                </div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Propinas totales</p>
+                <p className="text-2xl font-bold text-slate-900">{formatCurrency(data.reduce((s, d) => s + (d.propinas_total || 0), 0))}</p>
               </div>
             </div>
           </div>

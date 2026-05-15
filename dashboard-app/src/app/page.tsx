@@ -2,9 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag, ArrowRight } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag, ArrowRight, ArrowUpRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
-import PageHeader from '@/components/PageHeader'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, aggregateMeseros } from '@/lib/data'
@@ -60,8 +59,8 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-soft text-sm font-medium">Cargando datos...</p>
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -95,22 +94,47 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="AMALAY Coffee & Market"
-        title="Dashboard"
-        subtitle={
-          latestDay
-            ? `Datos al ${formatDate(latestDay.fecha)} · Excl. delivery y Market`
-            : 'Cargando datos...'
-        }
-      />
+      {/* Hero section */}
+      <div className="mb-8">
+        <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-1.5">
+          AMALAY Coffee & Market
+        </p>
+        <div className="flex items-baseline gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Dashboard
+          </h1>
+          {latestDay && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-400">
+                {formatDate(latestDay.fecha)}
+              </span>
+              <span className="text-xs text-slate-300">|</span>
+              <span className="text-xs text-slate-400">Excl. delivery y Market</span>
+            </div>
+          )}
+        </div>
+
+        {/* Large revenue hero */}
+        {latestDay && (
+          <div className="mt-4 flex items-end gap-3">
+            <span className="text-4xl font-extrabold text-slate-900 tracking-tight">
+              {formatCurrency(latestDay.ventas_dia)}
+            </span>
+            <span className={`inline-flex items-center gap-1 text-sm font-semibold mb-1 ${ventasChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {ventasChange >= 0 ? <ArrowUpRight size={16} /> : <TrendingDown size={16} />}
+              {formatPercent(ventasChange)}
+            </span>
+            <span className="text-sm text-slate-400 mb-1">vs dia anterior</span>
+          </div>
+        )}
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <KPICard
           label="Ventas del dia"
           value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
-          delta={latestDay ? `${formatPercent(ventasChange)} vs día anterior` : undefined}
+          delta={latestDay ? `${formatPercent(ventasChange)} vs dia anterior` : undefined}
           deltaType={ventasChange >= 0 ? 'up' : 'down'}
           icon={DollarSign}
           accentClass="kpi-accent-blue"
@@ -118,7 +142,7 @@ export default function DashboardPage() {
         <KPICard
           label="Tickets"
           value={latestDay ? formatNumber(latestDay.tickets_count) : '-'}
-          delta={latestDay ? `${formatPercent(ticketsChange)} vs día anterior` : undefined}
+          delta={latestDay ? `${formatPercent(ticketsChange)} vs dia anterior` : undefined}
           deltaType={ticketsChange >= 0 ? 'up' : 'down'}
           icon={Ticket}
           accentClass="kpi-accent-green"
@@ -126,7 +150,7 @@ export default function DashboardPage() {
         <KPICard
           label="Personas"
           value={latestDay ? formatNumber(latestDay.personas_restaurant) : '-'}
-          delta={latestDay ? `${formatPercent(personasChange)} vs día anterior` : undefined}
+          delta={latestDay ? `${formatPercent(personasChange)} vs dia anterior` : undefined}
           deltaType={personasChange >= 0 ? 'up' : 'down'}
           icon={Users}
           accentClass="kpi-accent-amber"
@@ -140,7 +164,7 @@ export default function DashboardPage() {
           }
           delta={
             latestDay
-              ? `${formatPercent(ticketPromChange)} vs día anterior`
+              ? `${formatPercent(ticketPromChange)} vs dia anterior`
               : undefined
           }
           deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
@@ -154,7 +178,6 @@ export default function DashboardPage() {
       {latestDay && recentData.length > 1 && (() => {
         const insights: { text: string; color: 'blue' | 'green' | 'amber'; icon: React.ReactNode }[] = []
 
-        // 1. Top mesero vs last 7 days average
         const latestMeseros = safeArray<{ nombre: string; total: number }>(latestDay.meseros)
           .filter(m => m.nombre !== 'MESERO EVENTO')
           .sort((a, b) => b.total - a.total)
@@ -172,7 +195,7 @@ export default function DashboardPage() {
               const pct = ((topMesero.total - avg) / avg) * 100
               const sign = pct >= 0 ? '+' : ''
               insights.push({
-                text: `${topMesero.nombre.split(' ')[0]} lleva ${sign}${pct.toFixed(0)}% vs promedio 7 días`,
+                text: `${topMesero.nombre.split(' ')[0]} lleva ${sign}${pct.toFixed(0)}% vs promedio 7 dias`,
                 color: pct >= 0 ? 'green' : 'amber',
                 icon: pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
               })
@@ -180,7 +203,6 @@ export default function DashboardPage() {
           }
         }
 
-        // 2. Best day of week from recent data
         const dowMap: Record<string, { total: number; count: number }> = {}
         const dowNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
         for (const d of recentData) {
@@ -201,19 +223,17 @@ export default function DashboardPage() {
           })
         }
 
-        // 3. Top category today
         const grupos = safeArray<GrupoEntry>(latestDay.ventas_por_grupo)
           .filter(g => g.total > 0)
           .sort((a, b) => b.total - a.total)
         if (grupos.length > 0) {
           insights.push({
-            text: `${grupos[0].nombre} es la categoría #1 hoy`,
+            text: `${grupos[0].nombre} es la categoria #1 hoy`,
             color: 'blue',
             icon: <ShoppingBag size={14} />,
           })
         }
 
-        // 4. Ticket promedio vs last 30 days average
         const recentTickets = recentData.filter(d => d.fecha !== latestDay.fecha && d.ticket_promedio_restaurant > 0)
         if (recentTickets.length > 0) {
           const avgTicket = recentTickets.reduce((s, d) => s + d.ticket_promedio_restaurant, 0) / recentTickets.length
@@ -227,16 +247,16 @@ export default function DashboardPage() {
         }
 
         const colorClasses = {
-          blue: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
-          green: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-          amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+          blue: 'bg-blue-50 text-blue-700 border border-blue-100',
+          green: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+          amber: 'bg-amber-50 text-amber-700 border border-amber-100',
         }
 
         return (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
-              <Sparkles size={16} className="text-accent" />
-              <h3 className="text-sm font-semibold text-text">AI Insights</h3>
+              <Sparkles size={16} className="text-blue-500" />
+              <h3 className="text-sm font-semibold text-slate-900">AI Insights</h3>
             </div>
             <div className="flex flex-wrap gap-2">
               {insights.map((insight, i) => (
@@ -253,32 +273,13 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="lg:col-span-2">
-          <RevenueChart
-            data={recentData.map((d) => ({
-              fecha: d.fecha,
-              ventas_dia: d.ventas_dia,
-            }))}
-            title="Ventas últimos 30 días"
-          />
-        </div>
-        <div>
-          <RevenueDistributionChart
-            data={safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)}
-            title="Distribución por categoría"
-          />
-        </div>
-      </div>
-
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {[
-          { href: '/ventas', label: 'Ver ventas', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
-          { href: '/meseros', label: 'Ver meseros', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-          { href: '/cortes', label: 'Ver cortes', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
-          { href: '/reportes', label: 'Generar reporte', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+          { href: '/ventas', label: 'Ver ventas', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100' },
+          { href: '/meseros', label: 'Ver meseros', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100' },
+          { href: '/cortes', label: 'Ver cortes', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100' },
+          { href: '/reportes', label: 'Generar reporte', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100' },
         ].map(action => (
           <Link
             key={action.href}
@@ -291,25 +292,44 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2">
+          <RevenueChart
+            data={recentData.map((d) => ({
+              fecha: d.fecha,
+              ventas_dia: d.ventas_dia,
+            }))}
+            title="Ventas ultimos 30 dias"
+          />
+        </div>
+        <div>
+          <RevenueDistributionChart
+            data={safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)}
+            title="Distribucion por categoria"
+          />
+        </div>
+      </div>
+
       {/* Top meseros + Payment methods */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
             Top meseros del dia
           </h3>
-          <p className="text-xs text-text-muted mb-4">Ranking por ventas</p>
+          <p className="text-xs text-slate-400 mb-5">Ranking por ventas</p>
           {topMeseros.length === 0 ? (
-            <p className="text-text-muted text-sm">Sin datos de meseros</p>
+            <p className="text-slate-400 text-sm">Sin datos de meseros</p>
           ) : (
             <div className="space-y-4">
               {topMeseros.map((m, i) => {
                 const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
                 const colors = [
-                  { bg: 'bg-accent/10', text: 'text-accent', bar: '#3b82f6' },
-                  { bg: 'bg-success/10', text: 'text-success', bar: '#10b981' },
-                  { bg: 'bg-warning/10', text: 'text-warning', bar: '#f59e0b' },
-                  { bg: 'bg-danger/10', text: 'text-danger', bar: '#ef4444' },
-                  { bg: 'bg-text-muted/10', text: 'text-text-soft', bar: '#94a3b8' },
+                  { bg: 'bg-blue-50', text: 'text-blue-600', bar: '#3b82f6' },
+                  { bg: 'bg-emerald-50', text: 'text-emerald-600', bar: '#10b981' },
+                  { bg: 'bg-amber-50', text: 'text-amber-600', bar: '#f59e0b' },
+                  { bg: 'bg-red-50', text: 'text-red-600', bar: '#ef4444' },
+                  { bg: 'bg-slate-100', text: 'text-slate-500', bar: '#94a3b8' },
                 ]
                 const color = colors[i] || colors[4]
                 return (
@@ -321,15 +341,15 @@ export default function DashboardPage() {
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text truncate">
+                        <p className="text-sm font-medium text-slate-900 truncate">
                           {m.nombre}
                         </p>
                       </div>
-                      <p className="text-sm font-bold text-text tabular-nums">
+                      <p className="text-sm font-bold text-slate-900 tabular-nums">
                         {formatCurrency(m.total)}
                       </p>
                     </div>
-                    <div className="ml-10 w-auto bg-surface rounded-full h-2">
+                    <div className="ml-10 w-auto bg-slate-100 rounded-full h-2">
                       <div
                         className="h-2 rounded-full animate-progress"
                         style={{
@@ -345,11 +365,11 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5 card-shadow">
-          <h3 className="text-sm font-semibold text-text mb-1">
-            Métodos de pago
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            Metodos de pago
           </h3>
-          <p className="text-xs text-text-muted mb-4">
+          <p className="text-xs text-slate-400 mb-5">
             {latestDay ? formatCurrency(latestDay.ventas_dia) : '-'} total
           </p>
           {paymentMethods.length > 0 ? (
@@ -367,18 +387,18 @@ export default function DashboardPage() {
                           className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: barColors[i % barColors.length] }}
                         />
-                        <span className="text-sm font-medium text-text">
+                        <span className="text-sm font-medium text-slate-700">
                           {p.nombre}
                         </span>
                       </div>
-                      <span className="text-sm font-bold text-text tabular-nums">
+                      <span className="text-sm font-bold text-slate-900 tabular-nums">
                         {formatCurrency(p.total)}{' '}
-                        <span className="text-text-muted text-xs font-normal">
+                        <span className="text-slate-400 text-xs font-normal">
                           ({pct}%)
                         </span>
                       </span>
                     </div>
-                    <div className="w-full bg-surface rounded-full h-2">
+                    <div className="w-full bg-slate-100 rounded-full h-2">
                       <div
                         className="h-2 rounded-full animate-progress"
                         style={{
@@ -393,7 +413,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex items-center justify-center py-8">
-              <p className="text-text-muted text-sm">Sin datos de pagos para este dia</p>
+              <p className="text-slate-400 text-sm">Sin datos de pagos para este dia</p>
             </div>
           )}
         </div>

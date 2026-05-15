@@ -74,7 +74,7 @@ export default function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-accent to-accent-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
       >
         <MessageCircle size={22} />
       </button>
@@ -82,21 +82,21 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[380px] max-h-[560px] bg-card rounded-2xl card-shadow-lg border border-border flex flex-col overflow-hidden">
+    <div className="fixed bottom-6 right-6 z-50 w-[380px] max-h-[560px] bg-white rounded-2xl shadow-xl border border-slate-200/80 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-white to-surface">
+      <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
             <Bot size={16} className="text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-text">Asistente IA</h3>
-            <p className="text-xs text-text-muted">Powered by Claude</p>
+            <h3 className="text-sm font-semibold text-slate-900">Asistente IA</h3>
+            <p className="text-[11px] text-slate-400">Powered by Claude</p>
           </div>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="text-text-muted hover:text-text transition-colors p-1.5 rounded-lg hover:bg-surface"
+          className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-100"
         >
           <X size={18} />
         </button>
@@ -111,16 +111,16 @@ export default function ChatWidget() {
           >
             <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
               msg.role === 'user'
-                ? 'bg-accent text-white'
-                : 'bg-gradient-to-br from-purple-100 to-blue-100 text-accent'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gradient-to-br from-purple-100 to-blue-100 text-blue-600'
             }`}>
               {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
             </div>
             <div
               className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-accent text-white rounded-br-sm'
-                  : 'bg-surface text-text border border-border/60 rounded-bl-sm'
+                  ? 'bg-blue-500 text-white rounded-br-sm'
+                  : 'bg-slate-50 text-slate-900 border border-slate-200/80 rounded-bl-sm'
               }`}
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -135,7 +135,7 @@ export default function ChatWidget() {
               <button
                 key={q}
                 onClick={() => sendMessage(q)}
-                className="w-full text-left text-xs text-text-soft bg-white border border-border rounded-lg px-3 py-2 hover:bg-accent/5 hover:border-accent/30 hover:text-accent transition-all"
+                className="w-full text-left text-xs text-slate-600 bg-white border border-slate-200/80 rounded-lg px-3 py-2 hover:bg-blue-50/50 hover:border-blue-200 hover:text-blue-700 transition-all shadow-sm"
               >
                 {q}
               </button>
@@ -146,17 +146,17 @@ export default function ChatWidget() {
         {isLoading && (
           <div className="flex gap-2 animate-message-in">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
-              <Bot size={12} className="text-accent" />
+              <Bot size={12} className="text-blue-600" />
             </div>
-            <div className="bg-surface border border-border/60 rounded-xl rounded-bl-sm px-4 py-3">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl rounded-bl-sm px-4 py-3">
               <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce" />
+                <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" />
                 <span
-                  className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"
                   style={{ animationDelay: '0.1s' }}
                 />
                 <span
-                  className="w-1.5 h-1.5 bg-text-muted/60 rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"
                   style={{ animationDelay: '0.2s' }}
                 />
               </div>
@@ -167,7 +167,7 @@ export default function ChatWidget() {
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-border bg-white">
+      <div className="px-4 py-3 border-t border-slate-200/80 bg-white">
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -185,13 +185,13 @@ export default function ChatWidget() {
               }
             }}
             placeholder="Preguntame..."
-            className="flex-1 text-sm bg-surface border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+            className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="bg-accent text-white rounded-lg px-3 py-2 hover:bg-accent-dark transition-all disabled:opacity-40 shadow-sm"
+            className="bg-blue-500 text-white rounded-lg px-3 py-2 hover:bg-blue-600 transition-all disabled:opacity-40 shadow-sm"
           >
             <Send size={16} />
           </button>

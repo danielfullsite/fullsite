@@ -28,7 +28,7 @@ export default function ChatPage() {
     'Como van las ventas esta semana vs la semana pasada?',
     'Quien es el mesero con mejor ticket promedio?',
     'Cual es el dia de la semana con mas ventas?',
-    'Que categoría de menu vende mas?',
+    'Que categoria de menu vende mas?',
     'Como puedo subir el ticket promedio del restaurante?',
     'Dame un resumen del ultimo mes',
   ]
@@ -89,7 +89,7 @@ export default function ChatPage() {
         subtitle="Asistente inteligente con acceso a los datos del restaurante"
       />
 
-      <div className="bg-card rounded-xl border border-border card-shadow flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}>
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}>
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
           {messages.map((msg, i) => (
@@ -100,8 +100,8 @@ export default function ChatPage() {
               {/* Avatar */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                 msg.role === 'user'
-                  ? 'bg-accent text-white'
-                  : 'bg-gradient-to-br from-purple-100 to-blue-100 text-accent'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gradient-to-br from-purple-100 to-blue-100 text-blue-600'
               }`}>
                 {msg.role === 'user' ? <User size={15} /> : <Bot size={15} />}
               </div>
@@ -110,8 +110,8 @@ export default function ChatPage() {
               <div
                 className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-accent text-white rounded-br-md'
-                    : 'bg-surface text-text border border-border rounded-bl-md'
+                    ? 'bg-blue-500 text-white rounded-br-md'
+                    : 'bg-slate-50 text-slate-900 border border-slate-200/80 rounded-bl-md'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -123,15 +123,15 @@ export default function ChatPage() {
           {messages.length === 1 && (
             <div className="pt-2 max-w-2xl">
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles size={14} className="text-accent" />
-                <p className="text-xs font-semibold text-text-soft uppercase tracking-wider">Preguntas sugeridas</p>
+                <Sparkles size={14} className="text-blue-500" />
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Preguntas sugeridas</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {suggestedQuestions.map((q) => (
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
-                    className="text-left text-sm text-text-soft bg-white border border-border rounded-xl px-4 py-3 hover:bg-accent/5 hover:border-accent/30 hover:text-accent transition-all duration-150"
+                    className="text-left text-sm text-slate-600 bg-white border border-slate-200/80 rounded-xl px-4 py-3 hover:bg-blue-50/50 hover:border-blue-200 hover:text-blue-700 transition-all duration-150 shadow-sm"
                   >
                     {q}
                   </button>
@@ -143,17 +143,17 @@ export default function ChatPage() {
           {isLoading && (
             <div className="flex gap-3 animate-message-in">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
-                <Bot size={15} className="text-accent" />
+                <Bot size={15} className="text-blue-600" />
               </div>
-              <div className="bg-surface border border-border rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1.5">
-                  <span className="w-2 h-2 bg-text-muted/60 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" />
                   <span
-                    className="w-2 h-2 bg-text-muted/60 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
                     style={{ animationDelay: '0.15s' }}
                   />
                   <span
-                    className="w-2 h-2 bg-text-muted/60 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
                     style={{ animationDelay: '0.3s' }}
                   />
                 </div>
@@ -164,7 +164,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 border-t border-border bg-white/80 backdrop-blur-sm">
+        <div className="px-6 py-4 border-t border-slate-200/80 bg-white/80 backdrop-blur-sm">
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -179,19 +179,19 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               placeholder="Escribe tu pregunta..."
               rows={1}
-              className="flex-1 text-sm bg-surface border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none transition-all"
+              className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-all text-slate-900 placeholder:text-slate-400"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="bg-accent text-white rounded-xl px-5 py-3 hover:bg-accent-dark transition-all disabled:opacity-40 disabled:hover:bg-accent flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow"
+              className="bg-blue-500 text-white rounded-xl px-5 py-3 hover:bg-blue-600 transition-all disabled:opacity-40 disabled:hover:bg-blue-500 flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow"
             >
               <Send size={16} />
               <span className="hidden sm:inline">Enviar</span>
             </button>
           </form>
-          <p className="text-xs text-text-muted text-center mt-2.5">
+          <p className="text-[11px] text-slate-400 text-center mt-2.5">
             Powered by Claude Haiku -- Las respuestas se basan en datos reales del restaurante
           </p>
         </div>
