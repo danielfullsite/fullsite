@@ -85,7 +85,7 @@ export default function ReportesPage() {
       />
 
       {/* Report selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {reportOptions.map(opt => {
           const Icon = opt.icon
           const isActive = reportType === opt.key
@@ -184,7 +184,7 @@ export default function ReportesPage() {
 
           <div className="p-6">
             {/* Summary KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               {[
                 { label: 'Ventas netas', value: formatCurrency(reportData.totalVentas) },
                 { label: 'Ventas brutas', value: formatCurrency(reportData.totalBrutas) },

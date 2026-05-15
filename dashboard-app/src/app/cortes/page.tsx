@@ -117,7 +117,7 @@ export default function CortesPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Ventas acumuladas"
           value={formatCurrency(totalVentas)}

@@ -53,7 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden">
         <Sidebar />
       </div>
-      <main className="min-h-screen overflow-auto">
+      <main className="min-h-screen overflow-auto pt-14 lg:pt-0">
         <div className="p-4 sm:p-6 lg:p-8">
           {children}
         </div>

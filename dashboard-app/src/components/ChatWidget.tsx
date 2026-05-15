@@ -92,7 +92,7 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[400px] max-h-[580px] bg-white rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden animate-widget-in">
+    <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-[400px] h-[100dvh] sm:h-auto sm:max-h-[580px] bg-white sm:rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden animate-widget-in">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-gradient-to-r from-blue-500 to-indigo-600">
         <div className="flex items-center gap-3">

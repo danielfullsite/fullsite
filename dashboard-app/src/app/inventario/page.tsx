@@ -26,7 +26,7 @@ export default function InventarioPage() {
         subtitle="Control de inventario y punto de reorden"
       />
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Modulo de inventario"
           value="Demo"

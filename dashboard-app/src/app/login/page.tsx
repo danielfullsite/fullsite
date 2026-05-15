@@ -41,8 +41,14 @@ export default function LoginPage() {
       </div>
 
       {/* Right — white form panel */}
-      <div className="flex-1 bg-white flex flex-col items-center justify-center px-8 py-12 lg:px-16">
+      <div className="flex-1 bg-white flex flex-col items-center justify-center px-6 py-10 sm:px-8 sm:py-12 lg:px-16">
         <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8 text-center">
+            <span className="text-[#1a1a1a] font-black text-3xl tracking-tight">
+              fullsite<span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+            </span>
+          </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Bienvenido</h2>
           <p className="text-slate-400 text-sm mb-10">Inicia sesión para continuar</p>
 

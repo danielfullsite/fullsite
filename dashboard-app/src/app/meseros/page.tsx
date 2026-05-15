@@ -296,7 +296,7 @@ export default function MeserosPage() {
       />
 
       {/* Tabs — segmented control style */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
         <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-0.5">
           {([
             { key: 'ventas' as Tab, label: 'Ventas', icon: BarChart3 },
@@ -345,7 +345,7 @@ export default function MeserosPage() {
       {tab === 'ventas' && (
         <div className="space-y-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <KPICard
               label="Total ventas meseros"
               value={formatCurrency(totalVentas)}
@@ -390,7 +390,7 @@ export default function MeserosPage() {
                 <span className="text-xs font-medium text-blue-500">Top 10</span>
               </div>
             </div>
-            <div className="h-[400px]">
+            <div className="h-[300px] sm:h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
                   <defs>
@@ -589,7 +589,7 @@ export default function MeserosPage() {
                       <span className="text-xs font-medium text-purple-600">Radar</span>
                     </div>
                   </div>
-                  <div className="h-[380px]">
+                  <div className="h-[280px] sm:h-[380px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
                         <PolarGrid stroke="#e2e8f0" />
@@ -845,7 +845,7 @@ export default function MeserosPage() {
                           Top Categorías
                         </h4>
                         <p className="text-xs text-slate-400 mb-4">{selectedWaiter.grupos.length} categorías vendidas</p>
-                        <div className="h-[350px]">
+                        <div className="h-[250px] sm:h-[350px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
                               data={selectedWaiter.grupos.slice(0, 10).map((g, gi) => ({
@@ -901,7 +901,7 @@ export default function MeserosPage() {
                           Top Platillos
                         </h4>
                         <p className="text-xs text-slate-400 mb-4">{selectedWaiter.platillos.length} platillos vendidos</p>
-                        <div className="h-[350px]">
+                        <div className="h-[250px] sm:h-[350px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
                               data={selectedWaiter.platillos.slice(0, 10).map((p, pi) => ({

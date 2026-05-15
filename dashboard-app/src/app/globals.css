@@ -20,10 +20,21 @@
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 768px) {
+  button, a, input, select {
+    min-height: 44px;
+  }
 }
 
 body {

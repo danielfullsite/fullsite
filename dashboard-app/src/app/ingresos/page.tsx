@@ -76,7 +76,7 @@ export default function IngresosPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <KPICard
               label="Efectivo"
               value={formatCurrency(totalEfectivo)}
@@ -160,7 +160,7 @@ export default function IngresosPage() {
                 Flujo diario de efectivo y tarjeta
               </h3>
               <p className="text-xs text-slate-400 mb-5">{data.length} dias</p>
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dailyChart}>
                     <defs>

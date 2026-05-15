@@ -179,7 +179,7 @@ export default function TendenciasPage() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Ventas mes actual"
           value={currentMonth ? formatCurrency(currentMonth.ventas) : '-'}
@@ -264,7 +264,7 @@ export default function TendenciasPage() {
           Ventas mensuales
         </h3>
         <p className="text-xs text-slate-400 mb-5">{monthlyAgg.length} meses de datos</p>
-        <div className="h-[300px]">
+        <div className="h-[250px] sm:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
               <defs>
@@ -320,7 +320,7 @@ export default function TendenciasPage() {
           <p className="text-xs text-slate-400 mb-5">
             {yoyData.currentYear} vs {yoyData.prevYear} -- ventas mensuales
           </p>
-          <div className="h-[300px]">
+          <div className="h-[250px] sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={yoyData.chartData}>
                 <defs>
@@ -439,7 +439,7 @@ export default function TendenciasPage() {
           Ticket promedio mensual (restaurante)
         </h3>
         <p className="text-xs text-slate-400 mb-5">Evolución del ticket promedio</p>
-        <div className="h-[250px]">
+        <div className="h-[200px] sm:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
               <defs>
@@ -493,7 +493,7 @@ export default function TendenciasPage() {
             Venta promedio por día
           </h3>
           <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
-          <div className="h-[260px]">
+          <div className="h-[220px] sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -535,7 +535,7 @@ export default function TendenciasPage() {
             Ticket promedio por día (restaurante)
           </h3>
           <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
-          <div className="h-[260px]">
+          <div className="h-[220px] sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -577,7 +577,7 @@ export default function TendenciasPage() {
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">{ytdData.dias} días con datos</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           <div className="p-5 text-center">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ventas totales</p>
             <p className="text-2xl font-bold text-slate-900">{formatCurrency(ytdData.totalVentas)}</p>

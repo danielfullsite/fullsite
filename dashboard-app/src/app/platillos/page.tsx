@@ -86,7 +86,7 @@ export default function PlatillosPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Total categorías"
           value={formatNumber(grupos.length)}
@@ -123,7 +123,7 @@ export default function PlatillosPage() {
           Ventas por categoría (top 15)
         </h3>
         <p className="text-xs text-slate-400 mb-5">Últimos 30 días</p>
-        <div className="h-[480px]">
+        <div className="h-[350px] sm:h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
@@ -203,7 +203,7 @@ export default function PlatillosPage() {
             Chilaquiles (ventas $)
           </h3>
           <p className="text-xs text-slate-400 mb-5">Tendencia 30 días</p>
-          <div className="h-[220px]">
+          <div className="h-[180px] sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
                 <defs>
@@ -256,7 +256,7 @@ export default function PlatillosPage() {
             Half & Half (ventas $)
           </h3>
           <p className="text-xs text-slate-400 mb-5">Tendencia 30 días</p>
-          <div className="h-[220px]">
+          <div className="h-[180px] sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
                 <defs>

@@ -67,7 +67,7 @@ export default function NominaPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <KPICard
               label="Total nomina del mes"
               value="Conectar datos"

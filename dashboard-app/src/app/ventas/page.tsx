@@ -181,7 +181,7 @@ export default function VentasPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <KPICard
               label="Ventas netas"
               value={formatCurrency(totalVentasNetas)}
@@ -221,7 +221,7 @@ export default function VentasPage() {
                 Ventas por día
               </h3>
               <p className="text-xs text-slate-400 mb-5">{data.length} días</p>
-              <div className="h-[300px]">
+              <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dailyChart}>
                     <defs>

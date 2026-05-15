@@ -50,7 +50,7 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
         </div>
       )}
       <p className="text-xs text-slate-400 mb-5 ml-9">{chartData.length} días con datos</p>
-      <div className="h-[280px]">
+      <div className="h-[220px] sm:h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
             <defs>

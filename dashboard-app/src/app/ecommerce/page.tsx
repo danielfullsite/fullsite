@@ -121,7 +121,7 @@ export default function EcommercePage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <KPICard
               label="Ventas eCommerce"
               value={formatCurrency(ecommerceData.totalEcommerce)}
@@ -211,7 +211,7 @@ export default function EcommercePage() {
                       Comparativo por canal
                     </h3>
                     <p className="text-xs text-slate-400 mb-5">Total acumulado</p>
-                    <div className="h-[250px]">
+                    <div className="h-[200px] sm:h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={ecommerceData.channels}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -253,7 +253,7 @@ export default function EcommercePage() {
                     Tendencia mensual eCommerce
                   </h3>
                   <p className="text-xs text-slate-400 mb-5">Ventas por mes</p>
-                  <div className="h-[300px]">
+                  <div className="h-[250px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={ecommerceData.monthly}>
                         <defs>

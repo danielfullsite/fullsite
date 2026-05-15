@@ -112,21 +112,21 @@ export default function ChatPage() {
   return (
     <div
       className="flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
-      style={{ height: 'calc(100vh - 80px)' }}
+      style={{ height: 'calc(100dvh - 80px)' }}
     >
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+      <div className="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
             <Sparkles size={20} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg font-semibold text-slate-900">Asistente IA</h1>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               Preg&uacute;ntame sobre ventas, meseros, platillos y m&aacute;s
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full px-3 py-1">
+          <div className="ml-auto hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full px-3 py-1 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-[11px] text-slate-500 font-medium">Powered by Claude</span>
           </div>
@@ -134,7 +134,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
         {!hasMessages ? (
           /* Welcome state */
           <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto">
@@ -147,7 +147,7 @@ export default function ChatPage() {
             <p className="text-sm text-slate-500 mb-8">
               Tengo acceso a los datos del restaurante en tiempo real
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
               {suggestionCards.map((card) => (
                 <button
                   key={card.title}
@@ -241,7 +241,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input bar */}
-      <div className="px-6 py-4 border-t border-slate-200 bg-white shrink-0">
+      <div className="px-4 sm:px-6 py-4 border-t border-slate-200 bg-white shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault()
