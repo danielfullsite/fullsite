@@ -88,12 +88,19 @@ function getElapsedMinutes(date: Date): number {
 }
 
 export default function CocinaPage() {
-  const [orders, setOrders] = useState<KitchenOrder[]>(DEMO_ORDERS)
+  const [orders, setOrders] = useState<KitchenOrder[]>([])
+  const [mounted, setMounted] = useState(false)
   const [, setTick] = useState(0)
 
-  // Update elapsed times every 30s
+  // Only render dynamic content after mount (fixes hydration mismatch)
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30000)
+    setOrders(DEMO_ORDERS)
+    setMounted(true)
+  }, [])
+
+  // Update elapsed times every 10s
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 10000)
     return () => clearInterval(interval)
   }, [])
 
