@@ -1,9 +1,6 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-sidebar: #1a1a2e;
-  --color-sidebar-hover: #252547;
-  --color-sidebar-active: #2d2d5e;
   --color-accent: #3b82f6;
   --color-accent-light: #dbeafe;
   --color-accent-dark: #2563eb;
@@ -32,8 +29,6 @@
 body {
   font-family: var(--font-sans);
   background-color: var(--color-surface);
-  background-image: radial-gradient(circle, #e2e8f0 0.8px, transparent 0.8px);
-  background-size: 24px 24px;
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -44,36 +39,92 @@ a, button {
   transition: all 0.15s ease;
 }
 
-/* Card shadow utility */
-.card-shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-}
-.card-shadow-hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-}
-.card-shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+/* ========== SIDEBAR ========== */
+.sidebar {
+  width: 240px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
 }
 
-/* KPI gradient accents */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.sidebar-nav-item:hover {
+  color: #1e293b;
+  background: #f8fafc;
+}
+
+.sidebar-nav-item.active {
+  color: #3b82f6;
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: #3b82f6;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  padding: 16px 12px 6px;
+}
+
+/* ========== CARDS ========== */
+.dash-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.2s ease;
+}
+
+.dash-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ========== KPI ACCENT BORDERS ========== */
 .kpi-accent-blue {
-  border-left: 4px solid #3b82f6;
+  border-left: 3px solid #3b82f6;
 }
 .kpi-accent-green {
-  border-left: 4px solid #10b981;
+  border-left: 3px solid #10b981;
 }
 .kpi-accent-amber {
-  border-left: 4px solid #f59e0b;
+  border-left: 3px solid #f59e0b;
 }
 .kpi-accent-purple {
-  border-left: 4px solid #8b5cf6;
+  border-left: 3px solid #8b5cf6;
 }
-.kpi-accent-pink {
-  border-left: 4px solid #ec4899;
-}
-.kpi-accent-cyan {
-  border-left: 4px solid #06b6d4;
-}
+
+/* ========== ANIMATIONS ========== */
 
 /* Chat message animation */
 @keyframes messageSlideIn {
@@ -107,7 +158,21 @@ a, button {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Scrollbar styling */
+/* Pulse dot for live indicator */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulse-ring 2s ease infinite;
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -126,7 +191,6 @@ a, button {
   background: #94a3b8;
 }
 
-/* Hide scrollbar for horizontal nav */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -135,167 +199,12 @@ a, button {
   display: none;
 }
 
-/* === PREMIUM DESIGN SYSTEM === */
-
-/* Glassmorphism cards */
-.glass-card {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Gradient text */
-.gradient-text {
-  background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Premium card with glow on hover */
-.premium-card {
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  transition: all 0.3s ease;
-}
-.premium-card:hover {
-  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-  transform: translateY(-2px);
-}
-
-/* Animated gradient border */
-.gradient-border {
-  position: relative;
-  background: white;
-  border-radius: 16px;
-}
-.gradient-border::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 17px;
-  padding: 1px;
-  background: linear-gradient(135deg, #3b82f6, #10b981, #f59e0b);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-.gradient-border:hover::before {
-  opacity: 1;
-}
-
-/* Subtle dot grid background pattern */
-.grid-bg {
-  background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-/* Pulse dot for live indicator */
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: pulse-ring 2s ease infinite;
-}
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-/* KPI card gradient backgrounds */
-.kpi-bg-blue {
-  background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 60%);
-}
-.kpi-bg-green {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 60%);
-}
-.kpi-bg-amber {
-  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 60%);
-}
-.kpi-bg-purple {
-  background: linear-gradient(135deg, #faf5ff 0%, #ffffff 60%);
-}
-
-/* KPI bottom glow accents */
-.kpi-glow-blue {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px -4px rgba(59, 130, 246, 0.15);
-}
-.kpi-glow-green {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px -4px rgba(16, 185, 129, 0.15);
-}
-.kpi-glow-amber {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px -4px rgba(245, 158, 11, 0.15);
-}
-.kpi-glow-purple {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px -4px rgba(139, 92, 246, 0.15);
-}
-
-/* Hero revenue number */
-.hero-revenue {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-}
-
-/* Insights card gradient bg */
-.insights-gradient {
-  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 50%, #fffbeb 100%);
-  border: 1px solid rgba(59, 130, 246, 0.1);
-}
-
-/* Quick action card */
-.quick-action-card {
-  transition: all 0.25s ease;
-}
-.quick-action-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-}
-
-/* Nav dot indicator */
-.nav-active-dot {
-  position: relative;
-}
-.nav-active-dot::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #3b82f6;
-}
-
-/* Logo hover animation */
-.logo-hover {
-  transition: transform 0.3s ease;
-}
-.logo-hover:hover {
-  transform: scale(1.03);
-}
-.logo-hover:hover .logo-dot {
-  animation: logo-pulse 0.6s ease;
-}
-@keyframes logo-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.5); }
-}
-
 /* Recharts tooltip override */
 .recharts-tooltip-wrapper {
   z-index: 50 !important;
 }
 
-/* Table row striping & hover */
+/* Table row hover */
 .table-striped tbody tr:nth-child(even) {
   background-color: rgba(248, 250, 252, 0.5);
 }
@@ -327,4 +236,24 @@ a, button {
   background: #ffffff;
   color: #1e293b;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+/* Logo hover */
+.logo-hover {
+  transition: transform 0.2s ease;
+}
+.logo-hover:hover {
+  transform: scale(1.02);
+}
+
+/* premium-card kept for backward compat on sub-pages */
+.premium-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: box-shadow 0.2s ease;
+}
+.premium-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }

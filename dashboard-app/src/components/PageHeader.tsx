@@ -7,16 +7,16 @@ interface PageHeaderProps {
 
 export default function PageHeader({ title, subtitle, eyebrow, action }: PageHeaderProps) {
   return (
-    <div className="mb-8 flex items-end justify-between">
+    <div className="mb-6 flex items-end justify-between">
       <div>
         {eyebrow && (
-          <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-1.5">
+          <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-1">
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">
           {title}
-        </h1>
+        </h2>
         {subtitle && (
           <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
         )}

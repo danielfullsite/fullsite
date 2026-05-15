@@ -13,26 +13,12 @@ interface KPICardProps {
 }
 
 const iconBgMap: Record<string, string> = {
-  'kpi-accent-blue': 'bg-blue-100/80 text-blue-600',
-  'kpi-accent-green': 'bg-emerald-100/80 text-emerald-600',
-  'kpi-accent-amber': 'bg-amber-100/80 text-amber-600',
-  'kpi-accent-purple': 'bg-purple-100/80 text-purple-600',
-  'kpi-accent-pink': 'bg-pink-100/80 text-pink-600',
-  'kpi-accent-cyan': 'bg-cyan-100/80 text-cyan-600',
-}
-
-const gradientBgMap: Record<string, string> = {
-  'kpi-accent-blue': 'kpi-bg-blue',
-  'kpi-accent-green': 'kpi-bg-green',
-  'kpi-accent-amber': 'kpi-bg-amber',
-  'kpi-accent-purple': 'kpi-bg-purple',
-}
-
-const glowMap: Record<string, string> = {
-  'kpi-accent-blue': 'kpi-glow-blue',
-  'kpi-accent-green': 'kpi-glow-green',
-  'kpi-accent-amber': 'kpi-glow-amber',
-  'kpi-accent-purple': 'kpi-glow-purple',
+  'kpi-accent-blue': 'bg-blue-50 text-blue-600',
+  'kpi-accent-green': 'bg-emerald-50 text-emerald-600',
+  'kpi-accent-amber': 'bg-amber-50 text-amber-600',
+  'kpi-accent-purple': 'bg-purple-50 text-purple-600',
+  'kpi-accent-pink': 'bg-pink-50 text-pink-600',
+  'kpi-accent-cyan': 'bg-cyan-50 text-cyan-600',
 }
 
 export default function KPICard({
@@ -44,38 +30,34 @@ export default function KPICard({
   icon: Icon,
   accentClass,
 }: KPICardProps) {
-  const iconStyle = accentClass ? iconBgMap[accentClass] || 'bg-slate-100 text-slate-500' : 'bg-slate-100 text-slate-500'
-  const gradientBg = accentClass ? gradientBgMap[accentClass] || '' : ''
-  const glowStyle = accentClass ? glowMap[accentClass] || '' : ''
+  const iconStyle = accentClass ? iconBgMap[accentClass] || 'bg-slate-50 text-slate-500' : 'bg-slate-50 text-slate-500'
 
   return (
-    <div
-      className={`rounded-2xl border border-slate-200/60 p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 gradient-border ${gradientBg} ${glowStyle}`}
-    >
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 transition-shadow duration-200 hover:shadow-md">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
             {label}
           </p>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <p className="text-2xl font-bold tracking-tight text-slate-900 truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {value}
           </p>
         </div>
         {Icon && (
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ml-3 ${iconStyle}`}>
-            <Icon size={22} strokeWidth={2} />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ml-3 ${iconStyle}`}>
+            <Icon size={20} strokeWidth={1.8} />
           </div>
         )}
       </div>
       {delta && (
-        <div className="mt-3.5 flex items-center gap-1.5">
+        <div className="mt-3 flex items-center gap-1.5">
           <span
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            className={`inline-flex items-center gap-1 text-xs font-medium ${
               deltaType === 'up'
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                ? 'text-emerald-600'
                 : deltaType === 'down'
-                ? 'bg-red-50 text-red-600 border border-red-100'
-                : 'bg-slate-100 text-slate-500 border border-slate-200'
+                ? 'text-red-500'
+                : 'text-slate-500'
             }`}
           >
             {deltaType === 'up' && <TrendingUp size={12} />}
@@ -86,7 +68,7 @@ export default function KPICard({
         </div>
       )}
       {subtitle && (
-        <p className="text-slate-400 text-xs mt-2">{subtitle}</p>
+        <p className="text-slate-400 text-xs mt-1.5">{subtitle}</p>
       )}
     </div>
   )

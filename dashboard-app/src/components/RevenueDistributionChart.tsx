@@ -26,7 +26,7 @@ export default function RevenueDistributionChart({ data, title }: Props) {
 
   if (topItems.length === 0) {
     return (
-      <div className="premium-card p-6 h-full flex flex-col">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
         {title && (
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
@@ -45,7 +45,7 @@ export default function RevenueDistributionChart({ data, title }: Props) {
   const maxVal = topItems[0]?.total || 1
 
   return (
-    <div className="premium-card p-6 h-full flex flex-col">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
       {title && (
         <div className="flex items-center gap-2 mb-1">
           <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
@@ -77,9 +77,9 @@ export default function RevenueDistributionChart({ data, title }: Props) {
                   {pct.toFixed(0)}%
                 </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="h-2 rounded-full animate-progress transition-all"
+                  className="h-1.5 rounded-full animate-progress transition-all"
                   style={{
                     width: `${barWidth}%`,
                     backgroundColor: COLORS[i % COLORS.length],

@@ -10,105 +10,161 @@ import {
   MessageCircle,
   Menu,
   X,
+  DollarSign,
+  ClipboardList,
+  Package,
+  FileBarChart,
+  LogOut,
+  Calendar,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 
-const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/meseros', label: 'Meseros', icon: Users },
-  { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
-  { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
-  { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+const navSections = [
+  {
+    label: 'Principal',
+    items: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/ventas', label: 'Ventas', icon: DollarSign },
+      { href: '/cortes', label: 'Cortes', icon: ClipboardList },
+    ],
+  },
+  {
+    label: 'Reportes',
+    items: [
+      { href: '/meseros', label: 'Meseros', icon: Users },
+      { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
+      { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+    ],
+  },
+  {
+    label: 'Herramientas',
+    items: [
+      { href: '/reportes', label: 'Reportes', icon: FileBarChart },
+      { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+    ],
+  },
 ]
+
+function getTodayFormatted(): string {
+  return new Date().toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
 
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { user, clientConfig, signOut } = useAuth()
+
+  const sidebarContent = (
+    <aside className="sidebar flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-slate-100">
+        <Link href="/" className="flex items-center logo-hover">
+          <span className="text-[#1a1a1a] font-black text-xl tracking-tight">
+            fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+          </span>
+        </Link>
+      </div>
+
+      {/* Navigation sections */}
+      <nav className="flex-1 px-3 py-2 overflow-y-auto">
+        {navSections.map((section) => (
+          <div key={section.label}>
+            <div className="sidebar-section-label">{section.label}</div>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== '/' && pathname.startsWith(item.href))
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <Icon size={18} strokeWidth={isActive ? 2.2 : 1.8} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-4 border-t border-slate-100">
+        {/* Date */}
+        <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+          <Calendar size={12} />
+          <span className="font-medium">{getTodayFormatted()}</span>
+        </div>
+
+        {/* Connection status */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="pulse-dot" />
+          <span className="text-xs text-slate-500 font-medium">Conectado</span>
+        </div>
+
+        {/* Client name */}
+        {clientConfig && (
+          <p className="text-[11px] text-slate-400 mb-3 truncate">
+            {clientConfig.name || clientConfig.id}
+          </p>
+        )}
+
+        {/* Logout */}
+        {user && (
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-50"
+          >
+            <LogOut size={14} />
+            <span>Cerrar sesion</span>
+          </button>
+        )}
+      </div>
+    </aside>
+  )
 
   return (
     <>
       {/* Mobile hamburger */}
       <button
-        className="fixed top-4 left-4 z-50 lg:hidden bg-sidebar text-white p-2 rounded-lg shadow-lg"
+        className="fixed top-4 left-4 z-50 lg:hidden bg-white text-slate-700 p-2 rounded-lg shadow-md border border-slate-200"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Overlay */}
+      {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 left-0 h-full w-64 bg-sidebar z-40
-          flex flex-col
-          transition-transform duration-200
-          lg:translate-x-0
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
+      {/* Desktop sidebar — always visible */}
+      <div className="hidden lg:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar — slide in */}
+      <div
+        className={`lg:hidden fixed top-0 left-0 h-full z-40 transition-transform duration-200 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
-        {/* Logo */}
-        <div className="px-6 py-6 border-b border-white/10">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">F</span>
-            </div>
-            <div>
-              <span className="text-white font-semibold text-lg tracking-tight">
-                Fullsite
-              </span>
-              <span className="text-accent text-lg">.</span>
-            </div>
-          </Link>
-          <p className="text-white/40 text-xs mt-1">Restaurant Operations</p>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/' && pathname.startsWith(item.href))
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                  transition-colors duration-150
-                  ${
-                    isActive
-                      ? 'bg-sidebar-active text-white'
-                      : 'text-white/60 hover:text-white hover:bg-sidebar-hover'
-                  }
-                `}
-              >
-                <Icon size={18} />
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/10">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            <span className="text-white/40 text-xs">Conectado a Supabase</span>
-          </div>
-          <p className="text-white/25 text-[10px] mt-2">
-            AMALAY Coffee & Market
-          </p>
-        </div>
-      </aside>
+        {sidebarContent}
+      </div>
     </>
   )
 }
