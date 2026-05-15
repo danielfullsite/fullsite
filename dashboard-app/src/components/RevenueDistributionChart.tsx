@@ -1,6 +1,7 @@
 'use client'
 
 import { formatCurrency } from '@/lib/format'
+import { PieChart } from 'lucide-react'
 
 interface Props {
   data: { nombre: string; total: number }[]
@@ -25,9 +26,14 @@ export default function RevenueDistributionChart({ data, title }: Props) {
 
   if (topItems.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 h-full flex flex-col hover:shadow-md transition-shadow">
+      <div className="premium-card p-6 h-full flex flex-col">
         {title && (
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">{title}</h3>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+              <PieChart size={14} className="text-purple-500" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+          </div>
         )}
         <div className="flex-1 flex items-center justify-center">
           <p className="text-slate-400 text-sm">Sin datos de categorias</p>
@@ -39,11 +45,16 @@ export default function RevenueDistributionChart({ data, title }: Props) {
   const maxVal = topItems[0]?.total || 1
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 h-full flex flex-col hover:shadow-md transition-shadow">
+    <div className="premium-card p-6 h-full flex flex-col">
       {title && (
-        <h3 className="text-sm font-semibold text-slate-900 mb-1">{title}</h3>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+            <PieChart size={14} className="text-purple-500" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        </div>
       )}
-      <p className="text-xs text-slate-400 mb-5">
+      <p className="text-xs text-slate-400 mb-5 ml-9">
         Total: {formatCurrency(grandTotal)}
       </p>
       <div className="space-y-3.5 flex-1">
@@ -66,7 +77,7 @@ export default function RevenueDistributionChart({ data, title }: Props) {
                   {pct.toFixed(0)}%
                 </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2">
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                 <div
                   className="h-2 rounded-full animate-progress transition-all"
                   style={{

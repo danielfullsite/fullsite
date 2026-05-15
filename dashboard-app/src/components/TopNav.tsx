@@ -55,10 +55,10 @@ export default function TopNav() {
         href={item.href}
         className={`
           flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] font-medium whitespace-nowrap
-          rounded-md transition-all duration-150
+          rounded-md transition-all duration-150 relative
           ${
             isActive
-              ? 'bg-blue-50 text-blue-600'
+              ? 'bg-blue-50 text-blue-600 nav-active-dot'
               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
           }
         `}
@@ -70,13 +70,13 @@ export default function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200/80">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-14 justify-between">
         <div className="flex items-center">
           {/* Logo */}
-          <Link href="/" className="flex items-center shrink-0 mr-6">
+          <Link href="/" className="flex items-center shrink-0 mr-6 logo-hover">
             <span className="text-[#1a1a1a] font-black text-xl tracking-tight">
-              fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              fullsite<span className="logo-dot inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </Link>
 
@@ -93,8 +93,9 @@ export default function TopNav() {
 
         {/* Right side: date + user info + logout */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Date indicator */}
-          <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 px-2.5 py-1.5 rounded-md">
+          {/* Date indicator with live pulse */}
+          <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-50/80 px-2.5 py-1.5 rounded-md border border-slate-100">
+            <div className="pulse-dot" />
             <Calendar size={12} />
             <span className="font-medium">{getTodayFormatted()}</span>
           </div>

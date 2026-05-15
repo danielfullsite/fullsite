@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag, ArrowRight, ArrowUpRight } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, Sparkles, TrendingDown, TrendingUp, Star, ShoppingBag, ArrowRight, ArrowUpRight, CreditCard, Award, FileBarChart, ClipboardList } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -20,6 +20,20 @@ function safeArray<T>(val: unknown): T[] {
     } catch {
       return []
     }
+  }
+  return []
+}
+
+/** Find the most recent day in recentData that has non-empty data for a given jsonb field */
+function findRecentDataForField<T>(
+  recentData: WansoftDaily[],
+  fieldName: 'ventas_por_grupo' | 'pago_metodos',
+): T[] {
+  // Walk backwards (most recent first)
+  for (let i = recentData.length - 1; i >= 0; i--) {
+    const arr = safeArray<T>(recentData[i][fieldName])
+    const filtered = (arr as Array<{ total?: number }>).filter(item => (item.total || 0) > 0)
+    if (filtered.length > 0) return filtered as T[]
   }
   return []
 }
@@ -87,9 +101,19 @@ export default function DashboardPage() {
     : []
   const topMeseroMax = topMeseros[0]?.total || 1
 
-  const paymentMethods = safeArray<PagoMetodoEntry>(latestDay?.pago_metodos)
-    .filter((p) => p.total > 0)
-    .sort((a, b) => b.total - a.total)
+  // Use fallback: if latestDay has no data, search recent days
+  const gruposData = safeArray<GrupoEntry>(latestDay?.ventas_por_grupo).filter(g => g.total > 0).length > 0
+    ? safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)
+    : findRecentDataForField<GrupoEntry>(recentData, 'ventas_por_grupo')
+
+  const paymentMethods = (() => {
+    const latestPayments = safeArray<PagoMetodoEntry>(latestDay?.pago_metodos)
+      .filter((p) => p.total > 0)
+      .sort((a, b) => b.total - a.total)
+    if (latestPayments.length > 0) return latestPayments
+    return findRecentDataForField<PagoMetodoEntry>(recentData, 'pago_metodos')
+      .sort((a, b) => (b as PagoMetodoEntry).total - (a as PagoMetodoEntry).total)
+  })()
   const paymentMax = paymentMethods[0]?.total || 1
 
   return (
@@ -114,23 +138,27 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Large revenue hero */}
+        {/* Large revenue hero — centerpiece */}
         {latestDay && (
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-4xl font-extrabold text-slate-900 tracking-tight">
-              {formatCurrency(latestDay.ventas_dia)}
-            </span>
-            <span className={`inline-flex items-center gap-1 text-sm font-semibold mb-1 ${ventasChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {ventasChange >= 0 ? <ArrowUpRight size={16} /> : <TrendingDown size={16} />}
-              {formatPercent(ventasChange)}
-            </span>
-            <span className="text-sm text-slate-400 mb-1">vs dia anterior</span>
+          <div className="mt-5 relative">
+            <div className="flex items-end gap-4">
+              <span className="text-5xl sm:text-6xl font-extrabold gradient-text hero-revenue">
+                {formatCurrency(latestDay.ventas_dia)}
+              </span>
+              <div className="flex flex-col gap-1 mb-2">
+                <span className={`inline-flex items-center gap-1 text-sm font-bold px-2.5 py-0.5 rounded-full ${ventasChange >= 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                  {ventasChange >= 0 ? <ArrowUpRight size={14} /> : <TrendingDown size={14} />}
+                  {formatPercent(ventasChange)}
+                </span>
+                <span className="text-xs text-slate-400">vs dia anterior</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
         <KPICard
           label="Ventas del dia"
           value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
@@ -174,7 +202,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* AI Insights */}
+      {/* AI Insights — premium gradient card */}
       {latestDay && recentData.length > 1 && (() => {
         const insights: { text: string; color: 'blue' | 'green' | 'amber'; icon: React.ReactNode }[] = []
 
@@ -247,22 +275,24 @@ export default function DashboardPage() {
         }
 
         const colorClasses = {
-          blue: 'bg-blue-50 text-blue-700 border border-blue-100',
-          green: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-          amber: 'bg-amber-50 text-amber-700 border border-amber-100',
+          blue: 'bg-white/70 text-blue-700 border border-blue-200/50 shadow-sm',
+          green: 'bg-white/70 text-emerald-700 border border-emerald-200/50 shadow-sm',
+          amber: 'bg-white/70 text-amber-700 border border-amber-200/50 shadow-sm',
         }
 
         return (
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles size={16} className="text-blue-500" />
+          <div className="mb-8 insights-gradient rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-100/80 flex items-center justify-center">
+                <Sparkles size={14} className="text-blue-600" />
+              </div>
               <h3 className="text-sm font-semibold text-slate-900">AI Insights</h3>
             </div>
             <div className="flex flex-wrap gap-2">
               {insights.map((insight, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${colorClasses[insight.color]}`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm ${colorClasses[insight.color]}`}
                 >
                   {insight.icon}
                   {insight.text}
@@ -273,23 +303,29 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      {/* Quick actions — premium cards with icons */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         {[
-          { href: '/ventas', label: 'Ver ventas', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100' },
-          { href: '/meseros', label: 'Ver meseros', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100' },
-          { href: '/cortes', label: 'Ver cortes', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100' },
-          { href: '/reportes', label: 'Generar reporte', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100' },
-        ].map(action => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${action.color}`}
-          >
-            {action.label}
-            <ArrowRight size={14} />
-          </Link>
-        ))}
+          { href: '/ventas', label: 'Ver ventas', icon: DollarSign, color: 'bg-blue-50 text-blue-700 border-blue-100', iconBg: 'bg-blue-100 text-blue-600' },
+          { href: '/meseros', label: 'Ver meseros', icon: Award, color: 'bg-emerald-50 text-emerald-700 border-emerald-100', iconBg: 'bg-emerald-100 text-emerald-600' },
+          { href: '/cortes', label: 'Ver cortes', icon: ClipboardList, color: 'bg-amber-50 text-amber-700 border-amber-100', iconBg: 'bg-amber-100 text-amber-600' },
+          { href: '/reportes', label: 'Generar reporte', icon: FileBarChart, color: 'bg-purple-50 text-purple-700 border-purple-100', iconBg: 'bg-purple-100 text-purple-600' },
+        ].map(action => {
+          const ActionIcon = action.icon
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={`quick-action-card flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium border transition-all ${action.color}`}
+            >
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${action.iconBg}`}>
+                <ActionIcon size={15} />
+              </div>
+              <span className="flex-1">{action.label}</span>
+              <ArrowRight size={14} className="opacity-40" />
+            </Link>
+          )
+        })}
       </div>
 
       {/* Charts */}
@@ -305,19 +341,24 @@ export default function DashboardPage() {
         </div>
         <div>
           <RevenueDistributionChart
-            data={safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)}
+            data={gruposData}
             title="Distribucion por categoria"
           />
         </div>
       </div>
 
-      {/* Top meseros + Payment methods */}
+      {/* Top meseros + Payment methods — premium cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">
-            Top meseros del dia
-          </h3>
-          <p className="text-xs text-slate-400 mb-5">Ranking por ventas</p>
+        <div className="premium-card p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <Award size={14} className="text-emerald-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Top meseros del dia
+            </h3>
+          </div>
+          <p className="text-xs text-slate-400 mb-5 ml-9">Ranking por ventas</p>
           {topMeseros.length === 0 ? (
             <p className="text-slate-400 text-sm">Sin datos de meseros</p>
           ) : (
@@ -325,10 +366,10 @@ export default function DashboardPage() {
               {topMeseros.map((m, i) => {
                 const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
                 const colors = [
-                  { bg: 'bg-blue-50', text: 'text-blue-600', bar: '#3b82f6' },
-                  { bg: 'bg-emerald-50', text: 'text-emerald-600', bar: '#10b981' },
-                  { bg: 'bg-amber-50', text: 'text-amber-600', bar: '#f59e0b' },
-                  { bg: 'bg-red-50', text: 'text-red-600', bar: '#ef4444' },
+                  { bg: 'bg-blue-100/80', text: 'text-blue-600', bar: '#3b82f6' },
+                  { bg: 'bg-emerald-100/80', text: 'text-emerald-600', bar: '#10b981' },
+                  { bg: 'bg-amber-100/80', text: 'text-amber-600', bar: '#f59e0b' },
+                  { bg: 'bg-red-100/80', text: 'text-red-500', bar: '#ef4444' },
                   { bg: 'bg-slate-100', text: 'text-slate-500', bar: '#94a3b8' },
                 ]
                 const color = colors[i] || colors[4]
@@ -336,7 +377,7 @@ export default function DashboardPage() {
                   <div key={m.nombre}>
                     <div className="flex items-center gap-3 mb-1.5">
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${color.bg} ${color.text}`}
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold ${color.bg} ${color.text}`}
                       >
                         {i + 1}
                       </div>
@@ -349,7 +390,7 @@ export default function DashboardPage() {
                         {formatCurrency(m.total)}
                       </p>
                     </div>
-                    <div className="ml-10 w-auto bg-slate-100 rounded-full h-2">
+                    <div className="ml-11 w-auto bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="h-2 rounded-full animate-progress"
                         style={{
@@ -365,11 +406,16 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">
-            Metodos de pago
-          </h3>
-          <p className="text-xs text-slate-400 mb-5">
+        <div className="premium-card p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+              <CreditCard size={14} className="text-violet-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Metodos de pago
+            </h3>
+          </div>
+          <p className="text-xs text-slate-400 mb-5 ml-9">
             {latestDay ? formatCurrency(latestDay.ventas_dia) : '-'} total
           </p>
           {paymentMethods.length > 0 ? (
@@ -398,7 +444,7 @@ export default function DashboardPage() {
                         </span>
                       </span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="h-2 rounded-full animate-progress"
                         style={{

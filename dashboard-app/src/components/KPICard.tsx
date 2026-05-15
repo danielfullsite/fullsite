@@ -13,12 +13,26 @@ interface KPICardProps {
 }
 
 const iconBgMap: Record<string, string> = {
-  'kpi-accent-blue': 'bg-blue-50 text-blue-500',
-  'kpi-accent-green': 'bg-emerald-50 text-emerald-500',
-  'kpi-accent-amber': 'bg-amber-50 text-amber-500',
-  'kpi-accent-purple': 'bg-purple-50 text-purple-500',
-  'kpi-accent-pink': 'bg-pink-50 text-pink-500',
-  'kpi-accent-cyan': 'bg-cyan-50 text-cyan-500',
+  'kpi-accent-blue': 'bg-blue-100/80 text-blue-600',
+  'kpi-accent-green': 'bg-emerald-100/80 text-emerald-600',
+  'kpi-accent-amber': 'bg-amber-100/80 text-amber-600',
+  'kpi-accent-purple': 'bg-purple-100/80 text-purple-600',
+  'kpi-accent-pink': 'bg-pink-100/80 text-pink-600',
+  'kpi-accent-cyan': 'bg-cyan-100/80 text-cyan-600',
+}
+
+const gradientBgMap: Record<string, string> = {
+  'kpi-accent-blue': 'kpi-bg-blue',
+  'kpi-accent-green': 'kpi-bg-green',
+  'kpi-accent-amber': 'kpi-bg-amber',
+  'kpi-accent-purple': 'kpi-bg-purple',
+}
+
+const glowMap: Record<string, string> = {
+  'kpi-accent-blue': 'kpi-glow-blue',
+  'kpi-accent-green': 'kpi-glow-green',
+  'kpi-accent-amber': 'kpi-glow-amber',
+  'kpi-accent-purple': 'kpi-glow-purple',
 }
 
 export default function KPICard({
@@ -30,38 +44,38 @@ export default function KPICard({
   icon: Icon,
   accentClass,
 }: KPICardProps) {
-  const iconStyle = accentClass ? iconBgMap[accentClass] || 'bg-slate-50 text-slate-500' : 'bg-slate-50 text-slate-500'
+  const iconStyle = accentClass ? iconBgMap[accentClass] || 'bg-slate-100 text-slate-500' : 'bg-slate-100 text-slate-500'
+  const gradientBg = accentClass ? gradientBgMap[accentClass] || '' : ''
+  const glowStyle = accentClass ? glowMap[accentClass] || '' : ''
 
   return (
     <div
-      className={`bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 hover:shadow-md transition-shadow duration-200 ${
-        accentClass || ''
-      }`}
+      className={`rounded-2xl border border-slate-200/60 p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 gradient-border ${gradientBg} ${glowStyle}`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
             {label}
           </p>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 truncate">
+          <p className="text-3xl font-bold tracking-tight text-slate-900 truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {value}
           </p>
         </div>
         {Icon && (
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ml-3 ${iconStyle}`}>
-            <Icon size={20} />
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ml-3 ${iconStyle}`}>
+            <Icon size={22} strokeWidth={2} />
           </div>
         )}
       </div>
       {delta && (
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3.5 flex items-center gap-1.5">
           <span
-            className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
               deltaType === 'up'
-                ? 'bg-emerald-50 text-emerald-600'
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                 : deltaType === 'down'
-                ? 'bg-red-50 text-red-600'
-                : 'bg-slate-100 text-slate-500'
+                ? 'bg-red-50 text-red-600 border border-red-100'
+                : 'bg-slate-100 text-slate-500 border border-slate-200'
             }`}
           >
             {deltaType === 'up' && <TrendingUp size={12} />}
