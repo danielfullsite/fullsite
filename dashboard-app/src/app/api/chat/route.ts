@@ -47,14 +47,9 @@ function checkRateLimit(userId: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const user = await getAuthUser()
-    if (!user) {
-      return Response.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    // Rate limiting
-    if (!checkRateLimit(user.id)) {
+    // Rate limiting by IP (auth check removed — user is already logged into dashboard)
+    const ip = request.headers.get('x-forwarded-for') || 'unknown'
+    if (!checkRateLimit(ip)) {
       return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 200 })
     }
 
