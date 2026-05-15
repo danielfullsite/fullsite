@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -10,17 +10,68 @@ import {
   CartesianGrid,
   Tooltip,
   Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Legend,
 } from 'recharts'
-import { DollarSign, Ticket, Users, Trophy } from 'lucide-react'
+import {
+  DollarSign,
+  Ticket,
+  Users,
+  Trophy,
+  ChevronUp,
+  ChevronDown,
+  Award,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Target,
+  User,
+  ChevronRight,
+} from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays, aggregateMeseros, getWaiterCategories } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import type { WansoftDaily, WaiterCategoryData } from '@/lib/types'
 
-const BAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1']
+const COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+]
+
+const RADAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 type Tab = 'ventas' | 'kpis' | 'detalle'
+type SortKey = 'nombre' | 'total' | 'promedio' | 'dias' | 'pct'
+type SortDir = 'asc' | 'desc'
+
+const MEDAL_COLORS: Record<number, { bg: string; text: string; icon: string }> = {
+  0: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '1' },
+  1: { bg: 'bg-slate-100', text: 'text-slate-600', icon: '2' },
+  2: { bg: 'bg-orange-100', text: 'text-orange-700', icon: '3' },
+}
+
+interface WaiterKpi {
+  nombre: string
+  totalVentas: number
+  mesas: number
+  personas: number
+  hh: number
+  pan: number
+  postres: number
+  bebida2: number
+  dias: number
+  ticketPromedio: number
+  bebidasPorPersona: number
+  alimentosPorPersona: number
+  pctSegundaBebida: number
+  grupos: { cat: string; total: number }[]
+  platillos: { cat: string; total: number }[]
+}
 
 export default function MeserosPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
@@ -28,6 +79,9 @@ export default function MeserosPage() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<7 | 14 | 30>(7)
   const [tab, setTab] = useState<Tab>('ventas')
+  const [sortKey, setSortKey] = useState<SortKey>('total')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [selectedMesero, setSelectedMesero] = useState<string>('')
 
   useEffect(() => {
     async function load() {
@@ -52,9 +106,7 @@ export default function MeserosPage() {
 
   const totalVentas = meseros.reduce((sum, m) => sum + m.total, 0)
   const totalTicketDays = meseros.reduce((sum, m) => sum + m.dias, 0)
-  const avgTicket = totalTicketDays > 0
-    ? Math.round(totalVentas / totalTicketDays)
-    : 0
+  const avgDaily = totalTicketDays > 0 ? Math.round(totalVentas / totalTicketDays) : 0
   const topMesero = meseros[0]
   const topMeseroMax = topMesero?.total || 1
 
@@ -62,11 +114,33 @@ export default function MeserosPage() {
     nombre: m.nombre.split(' ').slice(0, 2).join(' '),
     total: m.total,
     promedio: m.promedio,
-    fill: BAR_COLORS[i % BAR_COLORS.length],
+    fill: COLORS[i % COLORS.length],
   }))
 
+  // Sorted meseros for table
+  const sortedMeseros = useMemo(() => {
+    const arr = meseros.map(m => ({
+      ...m,
+      pct: totalVentas > 0 ? (m.total / totalVentas) * 100 : 0,
+    }))
+    return arr.sort((a, b) => {
+      const mult = sortDir === 'asc' ? 1 : -1
+      if (sortKey === 'nombre') return mult * a.nombre.localeCompare(b.nombre)
+      return mult * ((a[sortKey] as number) - (b[sortKey] as number))
+    })
+  }, [meseros, sortKey, sortDir, totalVentas])
+
+  const handleSort = useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }, [sortKey])
+
   // Aggregate waiter KPIs from wansoft_waiter_categories
-  const waiterKpis = useMemo(() => {
+  const waiterKpis: WaiterKpi[] = useMemo(() => {
     if (waiterData.length === 0) return []
     const map: Record<string, {
       totalVentas: number
@@ -77,7 +151,10 @@ export default function MeserosPage() {
       postres: number
       bebida2: number
       dias: number
+      ticketSums: number
+      ticketCount: number
       grupos: Record<string, number>
+      platillos: Record<string, number>
     }> = {}
 
     for (const entry of waiterData) {
@@ -85,15 +162,21 @@ export default function MeserosPage() {
       if (!d || typeof d !== 'object') continue
       for (const [nombre, info] of Object.entries(d)) {
         if (nombre.startsWith('__') || !nombre || nombre === 'MESERO EVENTO') continue
+        const lowerName = nombre.toLowerCase()
+        if (lowerName.includes('cajero') || lowerName.includes('market')) continue
         const w = info as Record<string, unknown>
         if (!map[nombre]) {
-          map[nombre] = { totalVentas: 0, totalMesas: 0, totalPersonas: 0, hh: 0, pan: 0, postres: 0, bebida2: 0, dias: 0, grupos: {} }
+          map[nombre] = { totalVentas: 0, totalMesas: 0, totalPersonas: 0, hh: 0, pan: 0, postres: 0, bebida2: 0, dias: 0, ticketSums: 0, ticketCount: 0, grupos: {}, platillos: {} }
         }
         const kpis = w.KPIs as Record<string, number> | undefined
         if (kpis) {
           map[nombre].totalVentas += kpis.total_ventas || 0
           map[nombre].totalMesas += kpis.mesas || 0
           map[nombre].totalPersonas += kpis.personas || 0
+          if (kpis.ticket_promedio) {
+            map[nombre].ticketSums += kpis.ticket_promedio
+            map[nombre].ticketCount += 1
+          }
         }
         map[nombre].hh += (w['H&H'] as number) || 0
         map[nombre].pan += (w.Pan as number) || 0
@@ -101,11 +184,16 @@ export default function MeserosPage() {
         map[nombre].bebida2 += (w['2da Bebida'] as number) || 0
         map[nombre].dias += 1
 
-        // Aggregate per-waiter group sales
         const grupoData = w.__por_mesero_grupo as Record<string, number> | undefined
         if (grupoData) {
           for (const [cat, val] of Object.entries(grupoData)) {
             map[nombre].grupos[cat] = (map[nombre].grupos[cat] || 0) + (val || 0)
+          }
+        }
+        const platilloData = w.__por_mesero_platillo as Record<string, number> | undefined
+        if (platilloData) {
+          for (const [cat, val] of Object.entries(platilloData)) {
+            map[nombre].platillos[cat] = (map[nombre].platillos[cat] || 0) + (val || 0)
           }
         }
       }
@@ -122,13 +210,64 @@ export default function MeserosPage() {
         postres: d.postres,
         bebida2: d.bebida2,
         dias: d.dias,
-        alimentosPorPersona: d.totalPersonas > 0 ? (d.totalVentas / d.totalPersonas) : 0,
+        ticketPromedio: d.ticketCount > 0 ? Math.round(d.ticketSums / d.ticketCount) : 0,
+        bebidasPorPersona: d.totalPersonas > 0 ? d.hh / d.totalPersonas : 0,
+        alimentosPorPersona: d.totalPersonas > 0 ? d.totalVentas / d.totalPersonas : 0,
+        pctSegundaBebida: d.totalPersonas > 0 ? (d.bebida2 / d.totalPersonas) * 100 : 0,
         grupos: Object.entries(d.grupos)
+          .map(([cat, total]) => ({ cat, total }))
+          .sort((a, b) => b.total - a.total),
+        platillos: Object.entries(d.platillos)
           .map(([cat, total]) => ({ cat, total }))
           .sort((a, b) => b.total - a.total),
       }))
       .sort((a, b) => b.totalVentas - a.totalVentas)
   }, [waiterData])
+
+  // Averages for KPI comparison
+  const kpiAverages = useMemo(() => {
+    if (waiterKpis.length === 0) return { bebidasPorPersona: 0, alimentosPorPersona: 0, ticketPromedio: 0, pctSegundaBebida: 0 }
+    const n = waiterKpis.length
+    return {
+      bebidasPorPersona: waiterKpis.reduce((s, w) => s + w.bebidasPorPersona, 0) / n,
+      alimentosPorPersona: waiterKpis.reduce((s, w) => s + w.alimentosPorPersona, 0) / n,
+      ticketPromedio: waiterKpis.reduce((s, w) => s + w.ticketPromedio, 0) / n,
+      pctSegundaBebida: waiterKpis.reduce((s, w) => s + w.pctSegundaBebida, 0) / n,
+    }
+  }, [waiterKpis])
+
+  // Radar data for top 5 meseros
+  const radarData = useMemo(() => {
+    const top5 = waiterKpis.slice(0, 5)
+    if (top5.length === 0) return []
+    const maxBebidas = Math.max(...top5.map(w => w.bebidasPorPersona), 1)
+    const maxAlimentos = Math.max(...top5.map(w => w.alimentosPorPersona), 1)
+    const maxTicket = Math.max(...top5.map(w => w.ticketPromedio), 1)
+    const maxBebida2 = Math.max(...top5.map(w => w.pctSegundaBebida), 1)
+
+    const metrics = [
+      { metric: 'Bebidas/persona', key: 'bebidasPorPersona', max: maxBebidas },
+      { metric: 'Alimentos/persona', key: 'alimentosPorPersona', max: maxAlimentos },
+      { metric: 'Ticket promedio', key: 'ticketPromedio', max: maxTicket },
+      { metric: '% 2da Bebida', key: 'pctSegundaBebida', max: maxBebida2 },
+    ]
+
+    return metrics.map(m => {
+      const point: Record<string, string | number> = { metric: m.metric }
+      top5.forEach((w, i) => {
+        const shortName = w.nombre.split(' ').slice(0, 2).join(' ')
+        const raw = w[m.key as keyof WaiterKpi] as number
+        point[shortName] = Math.round((raw / m.max) * 100)
+      })
+      return point
+    })
+  }, [waiterKpis])
+
+  // Selected mesero detail
+  const selectedWaiter = useMemo(() => {
+    if (!selectedMesero) return null
+    return waiterKpis.find(w => w.nombre === selectedMesero) || null
+  }, [selectedMesero, waiterKpis])
 
   if (loading) {
     return (
@@ -141,6 +280,13 @@ export default function MeserosPage() {
     )
   }
 
+  const SortIcon = ({ field }: { field: SortKey }) => {
+    if (sortKey !== field) return <ChevronDown size={12} className="text-text-muted/40 ml-1" />
+    return sortDir === 'desc'
+      ? <ChevronDown size={12} className="text-accent ml-1" />
+      : <ChevronUp size={12} className="text-accent ml-1" />
+  }
+
   return (
     <>
       <PageHeader
@@ -149,48 +295,57 @@ export default function MeserosPage() {
         subtitle={`Performance de meseros - ultimos ${period} dias`}
       />
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-border">
-        {([
-          { key: 'ventas' as Tab, label: 'Ventas' },
-          { key: 'kpis' as Tab, label: 'KPIs' },
-          { key: 'detalle' as Tab, label: 'Detalle' },
-        ]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${
-              tab === t.key
-                ? 'border-accent text-accent'
-                : 'border-transparent text-text-soft hover:text-text'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — segmented control style */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-0.5">
+          {([
+            { key: 'ventas' as Tab, label: 'Ventas', icon: BarChart3 },
+            { key: 'kpis' as Tab, label: 'KPIs', icon: Target },
+            { key: 'detalle' as Tab, label: 'Detalle', icon: User },
+          ]).map(t => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  tab === t.key
+                    ? 'bg-white text-text shadow-sm'
+                    : 'text-text-soft hover:text-text'
+                }`}
+              >
+                <Icon size={15} />
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
 
-      {tab === 'ventas' && (
-        <>
-          {/* Period selector */}
-          <div className="flex gap-2 mb-6">
+        {/* Period selector — segmented control */}
+        {tab === 'ventas' && (
+          <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-0.5">
             {([7, 14, 30] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                   period === p
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'bg-card border border-border text-text-soft hover:text-text hover:border-accent/30'
+                    ? 'bg-white text-text shadow-sm'
+                    : 'text-text-soft hover:text-text'
                 }`}
               >
-                {p} dias
+                {p}d
               </button>
             ))}
           </div>
+        )}
+      </div>
 
+      {/* TAB: VENTAS */}
+      {tab === 'ventas' && (
+        <div className="space-y-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <KPICard
               label="Total ventas meseros"
               value={formatCurrency(totalVentas)}
@@ -200,7 +355,7 @@ export default function MeserosPage() {
             />
             <KPICard
               label="Promedio diario"
-              value={formatCurrency(avgTicket)}
+              value={formatCurrency(avgDaily)}
               subtitle="por dia total"
               icon={Ticket}
               accentClass="kpi-accent-green"
@@ -221,15 +376,31 @@ export default function MeserosPage() {
             />
           </div>
 
-          {/* Bar chart */}
-          <div className="bg-card rounded-xl border border-border p-5 card-shadow mb-8">
-            <h3 className="text-sm font-semibold text-text mb-1">
-              Ventas por mesero (top 10)
-            </h3>
-            <p className="text-xs text-text-muted mb-4">Ultimos {period} dias</p>
-            <div className="h-[360px]">
+          {/* Horizontal bar chart — top 10 */}
+          <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
+                  Top 10 Meseros por Ventas
+                </h3>
+                <p className="text-xs text-text-muted mt-1">Ultimos {period} dias</p>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/5 rounded-lg">
+                <BarChart3 size={14} className="text-accent" />
+                <span className="text-xs font-medium text-accent">Top 10</span>
+              </div>
+            </div>
+            <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical">
+                <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <defs>
+                    {COLORS.map((color, i) => (
+                      <linearGradient key={i} id={`barGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={color} stopOpacity={0.85} />
+                        <stop offset="100%" stopColor={color} stopOpacity={1} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis
                     type="number"
@@ -241,28 +412,26 @@ export default function MeserosPage() {
                   <YAxis
                     type="category"
                     dataKey="nombre"
-                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
+                    tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }}
                     axisLine={false}
                     tickLine={false}
-                    width={130}
+                    width={140}
                   />
                   <Tooltip
                     formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                     contentStyle={{
                       background: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '12px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '13px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -5px rgba(0,0,0,0.04)',
+                      padding: '10px 14px',
                     }}
+                    cursor={{ fill: 'rgba(59,130,246,0.04)' }}
                   />
-                  <Bar
-                    dataKey="total"
-                    radius={[0, 6, 6, 0]}
-                    barSize={24}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={index} fill={entry.fill} />
+                  <Bar dataKey="total" radius={[0, 8, 8, 0]} barSize={28}>
+                    {chartData.map((_entry, index) => (
+                      <Cell key={index} fill={`url(#barGrad${index})`} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -270,89 +439,118 @@ export default function MeserosPage() {
             </div>
           </div>
 
-          {/* Detailed table */}
-          <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-            <div className="p-5 border-b border-border">
-              <h3 className="text-sm font-semibold text-text">
-                Detalle por mesero
-              </h3>
-              <p className="text-xs text-text-muted mt-0.5">Todos los meseros activos</p>
+          {/* Ranking table */}
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
+                    Ranking Completo
+                  </h3>
+                  <p className="text-xs text-text-muted mt-1">{meseros.length} meseros activos en {period} dias</p>
+                </div>
+                <span className="text-xs text-text-muted bg-slate-50 px-3 py-1.5 rounded-full font-medium">
+                  Click columna para ordenar
+                </span>
+              </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full table-striped">
+              <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-surface/50">
-                    <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
+                  <tr className="bg-slate-50/80">
+                    <th className="text-left text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider w-12">
                       #
                     </th>
-                    <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
-                      Mesero
+                    <th
+                      onClick={() => handleSort('nombre')}
+                      className="text-left text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-accent transition-colors"
+                    >
+                      <span className="inline-flex items-center">Mesero <SortIcon field="nombre" /></span>
                     </th>
-                    <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider w-48">
+                    <th className="text-left text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider w-44">
                       Progreso
                     </th>
-                    <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
-                      Total ventas
+                    <th
+                      onClick={() => handleSort('total')}
+                      className="text-right text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-accent transition-colors"
+                    >
+                      <span className="inline-flex items-center justify-end">Ventas <SortIcon field="total" /></span>
                     </th>
-                    <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
-                      Prom. diario
+                    <th
+                      onClick={() => handleSort('promedio')}
+                      className="text-right text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-accent transition-colors"
+                    >
+                      <span className="inline-flex items-center justify-end">Prom. Diario <SortIcon field="promedio" /></span>
                     </th>
-                    <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
-                      Dias
+                    <th
+                      onClick={() => handleSort('dias')}
+                      className="text-right text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-accent transition-colors"
+                    >
+                      <span className="inline-flex items-center justify-end">Dias <SortIcon field="dias" /></span>
                     </th>
-                    <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">
-                      % total
+                    <th
+                      onClick={() => handleSort('pct')}
+                      className="text-right text-[11px] font-semibold text-text-soft py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-accent transition-colors"
+                    >
+                      <span className="inline-flex items-center justify-end">% del Total <SortIcon field="pct" /></span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {meseros.map((m, i) => {
-                    const pct = totalVentas > 0
-                      ? ((m.total / totalVentas) * 100).toFixed(1)
-                      : '0'
+                  {sortedMeseros.map((m, i) => {
+                    const origIndex = meseros.findIndex(om => om.nombre === m.nombre)
                     const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
+                    const medal = MEDAL_COLORS[origIndex]
                     return (
                       <tr
                         key={m.nombre}
-                        className="border-b border-border/50 hover:bg-accent/5 transition-colors"
+                        className={`border-b border-slate-100/80 hover:bg-blue-50/40 transition-colors duration-150 ${
+                          i % 2 === 1 ? 'bg-slate-50/40' : ''
+                        }`}
                       >
-                        <td className="py-3.5 px-4 text-sm text-text-muted tabular-nums font-medium">
-                          {i + 1}
+                        <td className="py-3.5 px-5">
+                          {medal ? (
+                            <div className={`w-7 h-7 rounded-full ${medal.bg} flex items-center justify-center`}>
+                              <Award size={14} className={medal.text} />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-text-muted tabular-nums font-medium pl-1.5">{origIndex + 1}</span>
+                          )}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-5">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                              style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
+                              style={{ backgroundColor: COLORS[origIndex % COLORS.length] }}
                             >
                               {m.nombre.charAt(0)}
                             </div>
                             <span className="text-sm font-medium text-text">{m.nombre}</span>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4">
-                          <div className="w-full bg-surface rounded-full h-2">
+                        <td className="py-3.5 px-5">
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                             <div
-                              className="h-2 rounded-full animate-progress"
+                              className="h-2 rounded-full animate-progress transition-all duration-500"
                               style={{
                                 width: `${barWidth}%`,
-                                backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                                background: `linear-gradient(90deg, ${COLORS[origIndex % COLORS.length]}cc, ${COLORS[origIndex % COLORS.length]})`,
                               }}
                             />
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-text">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums font-bold text-text">
                           {formatCurrency(m.total)}
                         </td>
-                        <td className="py-3.5 px-4 text-sm text-right tabular-nums text-text-soft">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-text-soft">
                           {formatCurrency(m.promedio)}
                         </td>
-                        <td className="py-3.5 px-4 text-sm text-right tabular-nums text-text-soft">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-text-soft">
                           {m.dias}
                         </td>
-                        <td className="py-3.5 px-4 text-sm text-right tabular-nums">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-accent/10 text-accent">
-                            {pct}%
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/8 text-accent">
+                            {m.pct.toFixed(1)}%
                           </span>
                         </td>
                       </tr>
@@ -362,149 +560,413 @@ export default function MeserosPage() {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
+      {/* TAB: KPIs */}
       {tab === 'kpis' && (
-        <>
+        <div className="space-y-6">
           {waiterKpis.length === 0 ? (
-            <div className="bg-card rounded-xl border border-border p-12 card-shadow text-center">
+            <div className="bg-white rounded-xl border border-slate-200/80 p-16 shadow-sm text-center">
+              <Target size={40} className="text-text-muted/30 mx-auto mb-4" />
               <p className="text-text-muted text-sm">Sin datos de KPIs de meseros disponibles</p>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-              <div className="p-5 border-b border-border">
-                <h3 className="text-sm font-semibold text-text">KPIs por mesero</h3>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Datos de {waiterData.length} dias - Ventas, mesas, personas, y productos clave
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full table-striped">
-                  <thead>
-                    <tr className="border-b border-border bg-surface/50">
-                      <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">#</th>
-                      <th className="text-left text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Mesero</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Ventas</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Mesas</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Personas</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">$/persona</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">H&H</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Pan</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Postres</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">2da Bebida</th>
-                      <th className="text-right text-xs font-semibold text-text-soft py-3.5 px-4 uppercase tracking-wider">Dias</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {waiterKpis.map((w, i) => (
-                      <tr
+            <>
+              {/* Radar chart — top 5 comparison */}
+              {radarData.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
+                        Comparativa Top 5 Meseros
+                      </h3>
+                      <p className="text-xs text-text-muted mt-1">
+                        Rendimiento relativo en metricas clave (normalizado a 100)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 rounded-lg">
+                      <Target size={14} className="text-purple-600" />
+                      <span className="text-xs font-medium text-purple-600">Radar</span>
+                    </div>
+                  </div>
+                  <div className="h-[380px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis
+                          dataKey="metric"
+                          tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          tick={{ fontSize: 10, fill: '#94a3b8' }}
+                          tickCount={5}
+                        />
+                        {waiterKpis.slice(0, 5).map((w, i) => {
+                          const shortName = w.nombre.split(' ').slice(0, 2).join(' ')
+                          return (
+                            <Radar
+                              key={shortName}
+                              name={shortName}
+                              dataKey={shortName}
+                              stroke={RADAR_COLORS[i]}
+                              fill={RADAR_COLORS[i]}
+                              fillOpacity={0.1}
+                              strokeWidth={2}
+                            />
+                          )
+                        })}
+                        <Legend
+                          wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#fff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                            padding: '10px 14px',
+                          }}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* KPI Cards grid */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
+                    Metricas por Mesero
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    {waiterData.length} dias analizados &middot; Verde = sobre el promedio
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {waiterKpis.map((w, i) => {
+                    const metrics = [
+                      {
+                        label: 'Bebidas/persona',
+                        value: w.bebidasPorPersona.toFixed(2),
+                        avg: kpiAverages.bebidasPorPersona,
+                        actual: w.bebidasPorPersona,
+                        prefix: '',
+                      },
+                      {
+                        label: 'Alimentos/persona',
+                        value: formatCurrency(Math.round(w.alimentosPorPersona)),
+                        avg: kpiAverages.alimentosPorPersona,
+                        actual: w.alimentosPorPersona,
+                        prefix: '',
+                      },
+                      {
+                        label: 'Ticket promedio',
+                        value: formatCurrency(w.ticketPromedio),
+                        avg: kpiAverages.ticketPromedio,
+                        actual: w.ticketPromedio,
+                        prefix: '',
+                      },
+                      {
+                        label: '2da Bebida',
+                        value: `${w.pctSegundaBebida.toFixed(1)}%`,
+                        avg: kpiAverages.pctSegundaBebida,
+                        actual: w.pctSegundaBebida,
+                        prefix: '',
+                      },
+                    ]
+                    return (
+                      <div
                         key={w.nombre}
-                        className="border-b border-border/50 hover:bg-accent/5 transition-colors"
+                        className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
                       >
-                        <td className="py-3 px-4 text-sm text-text-muted">{i + 1}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                              style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
-                            >
-                              {w.nombre.charAt(0)}
-                            </div>
-                            <span className="text-sm font-medium text-text truncate max-w-[180px]">{w.nombre}</span>
+                        {/* Header with accent */}
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                            style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                          >
+                            {w.nombre.charAt(0)}
                           </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-text">
-                          {formatCurrency(w.totalVentas)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatNumber(w.mesas)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatNumber(w.personas)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums font-semibold text-text">
-                          {formatCurrency(Math.round(w.alimentosPorPersona))}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatCurrency(w.hh)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatCurrency(w.pan)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatCurrency(w.postres)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {formatCurrency(w.bebida2)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums text-text-soft">
-                          {w.dias}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-semibold text-text truncate">{w.nombre}</h4>
+                            <p className="text-xs text-text-muted">
+                              {formatCurrency(w.totalVentas)} &middot; {w.personas} personas &middot; {w.dias} dias
+                            </p>
+                          </div>
+                        </div>
+                        {/* Metrics */}
+                        <div className="grid grid-cols-2 gap-px bg-slate-100">
+                          {metrics.map((m) => {
+                            const isAbove = m.actual >= m.avg
+                            return (
+                              <div key={m.label} className="bg-white px-4 py-3.5">
+                                <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1">{m.label}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-lg font-bold text-text tabular-nums">{m.value}</span>
+                                  {isAbove ? (
+                                    <TrendingUp size={14} className="text-emerald-500" />
+                                  ) : (
+                                    <TrendingDown size={14} className="text-red-400" />
+                                  )}
+                                </div>
+                                <p className={`text-[10px] font-medium mt-0.5 ${isAbove ? 'text-emerald-600' : 'text-red-400'}`}>
+                                  {isAbove ? 'Sobre' : 'Bajo'} promedio
+                                </p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
 
+      {/* TAB: DETALLE */}
       {tab === 'detalle' && (
-        <>
+        <div className="space-y-6">
           {waiterKpis.length === 0 ? (
-            <div className="bg-card rounded-xl border border-border p-12 card-shadow text-center">
+            <div className="bg-white rounded-xl border border-slate-200/80 p-16 shadow-sm text-center">
+              <User size={40} className="text-text-muted/30 mx-auto mb-4" />
               <p className="text-text-muted text-sm">Sin datos de detalle por mesero disponibles</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {waiterKpis.filter(w => w.grupos.length > 0).map((w, wi) => (
-                <div key={w.nombre} className="bg-card rounded-xl border border-border card-shadow overflow-hidden">
-                  <div className="p-5 border-b border-border flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                      style={{ backgroundColor: BAR_COLORS[wi % BAR_COLORS.length] }}
+            <>
+              {/* Mesero selector */}
+              <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+                <label className="text-sm font-semibold text-text uppercase tracking-wider block mb-3">
+                  Seleccionar Mesero
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {waiterKpis.map((w, i) => (
+                    <button
+                      key={w.nombre}
+                      onClick={() => setSelectedMesero(w.nombre === selectedMesero ? '' : w.nombre)}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border ${
+                        selectedMesero === w.nombre
+                          ? 'border-accent bg-accent/5 text-accent shadow-sm'
+                          : 'border-slate-200 bg-white text-text-soft hover:border-accent/40 hover:text-text'
+                      }`}
                     >
-                      {w.nombre.charAt(0)}
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      >
+                        {w.nombre.charAt(0)}
+                      </div>
+                      {w.nombre.split(' ').slice(0, 2).join(' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected mesero detail */}
+              {selectedWaiter && (
+                <div className="space-y-6">
+                  {/* KPIs vs average */}
+                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+                    <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                        style={{ backgroundColor: COLORS[waiterKpis.findIndex(w => w.nombre === selectedMesero) % COLORS.length] }}
+                      >
+                        {selectedWaiter.nombre.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-text">{selectedWaiter.nombre}</h3>
+                        <p className="text-xs text-text-muted">
+                          {formatCurrency(selectedWaiter.totalVentas)} total &middot; {selectedWaiter.personas} personas &middot; {selectedWaiter.mesas} mesas &middot; {selectedWaiter.dias} dias
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-text">{w.nombre}</h3>
-                      <p className="text-xs text-text-muted">
-                        Total: {formatCurrency(w.totalVentas)} - {w.grupos.length} categorias
-                      </p>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {w.grupos.slice(0, 12).map((g, gi) => {
-                        const maxG = w.grupos[0]?.total || 1
-                        const barW = maxG > 0 ? ((g.total / maxG) * 100) : 0
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-100">
+                      {[
+                        {
+                          label: 'Bebidas/persona',
+                          val: selectedWaiter.bebidasPorPersona,
+                          avg: kpiAverages.bebidasPorPersona,
+                          fmt: (v: number) => v.toFixed(2),
+                        },
+                        {
+                          label: 'Alimentos/persona',
+                          val: selectedWaiter.alimentosPorPersona,
+                          avg: kpiAverages.alimentosPorPersona,
+                          fmt: (v: number) => formatCurrency(Math.round(v)),
+                        },
+                        {
+                          label: 'Ticket promedio',
+                          val: selectedWaiter.ticketPromedio,
+                          avg: kpiAverages.ticketPromedio,
+                          fmt: (v: number) => formatCurrency(v),
+                        },
+                        {
+                          label: '2da Bebida',
+                          val: selectedWaiter.pctSegundaBebida,
+                          avg: kpiAverages.pctSegundaBebida,
+                          fmt: (v: number) => `${v.toFixed(1)}%`,
+                        },
+                      ].map(kpi => {
+                        const diff = kpi.val - kpi.avg
+                        const isAbove = diff >= 0
+                        const pctDiff = kpi.avg > 0 ? Math.abs((diff / kpi.avg) * 100).toFixed(0) : '0'
                         return (
-                          <div key={g.cat} className="bg-surface rounded-lg p-3">
-                            <p className="text-xs font-medium text-text-soft truncate mb-1">{g.cat}</p>
-                            <p className="text-sm font-bold text-text tabular-nums mb-1.5">
-                              {formatCurrency(g.total)}
-                            </p>
-                            <div className="w-full bg-white rounded-full h-1">
-                              <div
-                                className="h-1 rounded-full"
-                                style={{
-                                  width: `${barW}%`,
-                                  backgroundColor: BAR_COLORS[gi % BAR_COLORS.length],
-                                }}
-                              />
+                          <div key={kpi.label} className="bg-white p-5">
+                            <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2">{kpi.label}</p>
+                            <p className="text-2xl font-bold text-text tabular-nums mb-1">{kpi.fmt(kpi.val)}</p>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                isAbove ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                              }`}>
+                                {isAbove ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                                {pctDiff}%
+                              </span>
+                              <span className="text-[10px] text-text-muted">vs promedio ({kpi.fmt(kpi.avg)})</span>
                             </div>
                           </div>
                         )
                       })}
                     </div>
                   </div>
+
+                  {/* Charts: Categories and Platillos side by side */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Top categories */}
+                    {selectedWaiter.grupos.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+                        <h4 className="text-sm font-semibold text-text uppercase tracking-wider mb-1">
+                          Top Categorias
+                        </h4>
+                        <p className="text-xs text-text-muted mb-4">{selectedWaiter.grupos.length} categorias vendidas</p>
+                        <div className="h-[350px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={selectedWaiter.grupos.slice(0, 10).map((g, gi) => ({
+                                nombre: g.cat.length > 20 ? g.cat.slice(0, 18) + '..' : g.cat,
+                                total: g.total,
+                                fill: COLORS[gi % COLORS.length],
+                              }))}
+                              layout="vertical"
+                              margin={{ left: 5, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <XAxis
+                                type="number"
+                                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                              />
+                              <YAxis
+                                type="category"
+                                dataKey="nombre"
+                                tick={{ fontSize: 11, fill: '#475569', fontWeight: 500 }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={120}
+                              />
+                              <Tooltip
+                                formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
+                                contentStyle={{
+                                  background: '#fff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                                  padding: '10px 14px',
+                                }}
+                              />
+                              <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={22}>
+                                {selectedWaiter.grupos.slice(0, 10).map((_g, gi) => (
+                                  <Cell key={gi} fill={COLORS[gi % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top platillos */}
+                    {selectedWaiter.platillos.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+                        <h4 className="text-sm font-semibold text-text uppercase tracking-wider mb-1">
+                          Top Platillos
+                        </h4>
+                        <p className="text-xs text-text-muted mb-4">{selectedWaiter.platillos.length} platillos vendidos</p>
+                        <div className="h-[350px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={selectedWaiter.platillos.slice(0, 10).map((p, pi) => ({
+                                nombre: p.cat.length > 20 ? p.cat.slice(0, 18) + '..' : p.cat,
+                                total: p.total,
+                                fill: COLORS[pi % COLORS.length],
+                              }))}
+                              layout="vertical"
+                              margin={{ left: 5, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <XAxis
+                                type="number"
+                                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                              />
+                              <YAxis
+                                type="category"
+                                dataKey="nombre"
+                                tick={{ fontSize: 11, fill: '#475569', fontWeight: 500 }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={120}
+                              />
+                              <Tooltip
+                                formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
+                                contentStyle={{
+                                  background: '#fff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                                  padding: '10px 14px',
+                                }}
+                              />
+                              <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={22}>
+                                {selectedWaiter.platillos.slice(0, 10).map((_p, pi) => (
+                                  <Cell key={pi} fill={COLORS[pi % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+
+              {/* Prompt to select */}
+              {!selectedWaiter && (
+                <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-accent/5 flex items-center justify-center mx-auto mb-4">
+                    <ChevronRight size={28} className="text-accent/40" />
+                  </div>
+                  <p className="text-text-soft text-sm font-medium">Selecciona un mesero arriba para ver su detalle</p>
+                  <p className="text-text-muted text-xs mt-1">Categorias, platillos, y comparativa con el promedio</p>
+                </div>
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
     </>
   )
