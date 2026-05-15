@@ -95,8 +95,8 @@ export default function LoginPage() {
         </div>
 
         {/* Right — login card */}
-        <div className="flex items-center justify-center w-full lg:w-[480px] lg:min-w-[480px] p-6">
-          <div className="w-full max-w-[420px] bg-white backdrop-blur-xl rounded-3xl shadow-2xl p-10 lg:p-12">
+        <div className="flex items-center justify-center w-full lg:w-[500px] lg:min-w-[500px] p-8">
+          <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-2xl p-9 lg:p-11">
             {/* Form header */}
             <div className="mb-8">
               <h2 className="text-[26px] font-bold text-slate-900 tracking-tight">
