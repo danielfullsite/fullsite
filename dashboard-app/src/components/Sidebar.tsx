@@ -16,6 +16,11 @@ import {
   FileBarChart,
   LogOut,
   Calendar,
+  HandCoins,
+  Banknote,
+  FileSpreadsheet,
+  UserCheck,
+  ShoppingCart,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -35,13 +40,28 @@ const navSections = [
       { href: '/meseros', label: 'Meseros', icon: Users },
       { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
       { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+      { href: '/propinas', label: 'Propinas', icon: HandCoins },
+    ],
+  },
+  {
+    label: 'Finanzas',
+    items: [
+      { href: '/ingresos', label: 'Ingresos', icon: Banknote },
+      { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
+      { href: '/nomina', label: 'Nomina', icon: UserCheck },
+    ],
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
+      { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/reportes', label: 'Reportes', icon: FileBarChart },
     ],
   },
   {
     label: 'Herramientas',
     items: [
-      { href: '/reportes', label: 'Reportes', icon: FileBarChart },
-      { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
     ],
   },
@@ -127,7 +147,7 @@ export default function Sidebar() {
             className="flex items-center gap-2 text-xs text-slate-400 hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-50"
           >
             <LogOut size={14} />
-            <span>Cerrar sesión</span>
+            <span>Cerrar sesion</span>
           </button>
         )}
       </div>
