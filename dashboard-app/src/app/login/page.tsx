@@ -31,9 +31,12 @@ export default function LoginPage() {
       <div className="hidden lg:block lg:w-[55%] relative">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80')` }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
-        {/* Logo centered on photo */}
+        {/* Logo centered on photo — white text */}
         <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <img src="/logo-fullsite.png" alt="fullsite" className="w-72 opacity-90 drop-shadow-2xl" />
+          <span className="text-white font-black text-7xl tracking-tight drop-shadow-2xl">
+            fullsite
+            <span className="inline-block w-5 h-5 bg-emerald-400 ml-1 mb-1 rounded-none" />
+          </span>
         </div>
         <div className="relative z-10 flex flex-col justify-end h-full p-12 pb-16">
           <p className="text-emerald-400 text-sm font-semibold mb-3 tracking-wide uppercase">Fullsite Platform</p>
@@ -61,17 +64,8 @@ export default function LoginPage() {
       </div>
 
       {/* Right — white form panel */}
-      <div className="flex-1 bg-white flex flex-col px-8 py-12 lg:px-16">
-        {/* Logo top */}
-        <div className="mb-auto">
-          <span className="text-slate-900 font-black text-2xl tracking-tight">
-            fullsite
-            <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
-          </span>
-        </div>
-
-        {/* Form centered */}
-        <div className="w-full max-w-sm mx-auto">
+      <div className="flex-1 bg-white flex flex-col items-center justify-center px-8 py-12 lg:px-16">
+        <div className="w-full max-w-sm">
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Bienvenido</h2>
           <p className="text-slate-400 text-sm mb-10">Inicia sesión para continuar</p>
 
@@ -137,8 +131,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Bottom spacer */}
-        <div className="mb-auto" />
       </div>
     </div>
   )
