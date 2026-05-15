@@ -57,17 +57,17 @@ export default function LoginPage() {
       </div>
 
       {/* Right — white form panel */}
-      <div className="flex-1 bg-white flex flex-col items-center justify-center px-8 py-12 lg:px-16">
-        <div className="w-full max-w-sm">
-          {/* Logo */}
-          <div className="mb-12">
-            <span className="text-slate-900 font-black text-3xl tracking-tight">
-              fullsite
-              <span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
-            </span>
-          </div>
+      <div className="flex-1 bg-white flex flex-col px-8 py-12 lg:px-16">
+        {/* Logo top */}
+        <div className="mb-auto">
+          <span className="text-slate-900 font-black text-2xl tracking-tight">
+            fullsite
+            <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+          </span>
+        </div>
 
-          {/* Header */}
+        {/* Form centered */}
+        <div className="w-full max-w-sm mx-auto">
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Bienvenido</h2>
           <p className="text-slate-400 text-sm mb-10">Inicia sesión para continuar</p>
 
@@ -132,6 +132,9 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+
+        {/* Bottom spacer */}
+        <div className="mb-auto" />
       </div>
     </div>
   )
