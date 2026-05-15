@@ -386,6 +386,11 @@ def main():
     items = parse_sale_detail(txt)
     print(f"[scraper] Parsed {len(items)} items (excluding modifiers)")
 
+    # Don't send empty reports
+    if len(items) == 0:
+        print("[scraper] No items — skipping report")
+        return
+
     waiter_cats = compute_waiter_categories(items)
     print(f"[scraper] Computed categories for {len(waiter_cats)} waiters")
 
