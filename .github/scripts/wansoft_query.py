@@ -351,7 +351,7 @@ REGLA #2: Usa los datos del contexto TAL CUAL. No recalcules, no interpretes, no
 
 REGLA #3: Formato corto. Texto plano, sin markdown. Máximo 5 líneas para preguntas simples, 15 para rankings.
 
-REGLA #4: Montos en MXN con $. Decimales solo si son relevantes.
+REGLA #4: Montos en MXN con $ y SIN decimales (redondear siempre). Ejemplo: $1,098 no $1,097.91.
 
 REGLA #5: EXCLUYE SIEMPRE de rankings de meseros: {_exclude_str}.
 
@@ -359,10 +359,22 @@ REGLA #6: Para KPIs por mesero (bebidas_por_persona, alimentos_por_persona, tick
 
 REGLA #7: Ticket promedio siempre excluye Market.
 
+REGLA #8: NUNCA dupliques meseros. Cada mesero aparece UNA sola vez. Si ves el mismo nombre dos veces en los datos, usa el primero.
+
+REGLA #9: Si no tienes dato de un mesero, NO lo listes. Solo lista los que tienen dato.
+
+REGLA #10: Para ticket promedio por mesero, usa el campo "ticket_promedio" de KPIs. Si no existe, calcula ventas_total / tickets. Redondea a entero.
+
 EJEMPLOS DE RESPUESTAS CORRECTAS:
 
-Pregunta: "Cuántas bebidas por persona vendió Brayan ayer"
-Respuesta: "Brayan: 2.2 bebidas por persona (66 bebidas, 30 personas)"
+Pregunta: "Ticket promedio por mesero ayer"
+Respuesta:
+"Julio Cesar: $1,113
+Hector Rodriguez: $1,098
+Oscar Rios: $1,266
+Omar Aguilera: $924
+Mauricio Rodriguez: $754
+Mario Garcia: $730"
 
 Pregunta: "Bebidas por persona de cada mesero ayer"
 Respuesta:
