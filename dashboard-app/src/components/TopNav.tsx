@@ -113,7 +113,7 @@ export default function TopNav() {
               <button
                 onClick={signOut}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-md hover:bg-red-50"
-                title="Cerrar sesion"
+                title="Cerrar sesión"
               >
                 <LogOut size={14} />
                 <span className="hidden sm:inline">Salir</span>

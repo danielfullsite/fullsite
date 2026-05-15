@@ -18,7 +18,7 @@ export default function PageHeader({ title, subtitle, eyebrow, action }: PageHea
           {title}
         </h2>
         {subtitle && (
-          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+          <p className="text-slate-400 text-sm mt-1">{subtitle}</p>
         )}
       </div>
       {action && <div>{action}</div>}

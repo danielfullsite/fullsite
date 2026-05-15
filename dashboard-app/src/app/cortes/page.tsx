@@ -98,7 +98,7 @@ export default function CortesPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Cortes de Caja"
-        subtitle={`Historico de cortes diarios - ultimos ${period} dias`}
+        subtitle={`Histórico de cortes diarios - últimos ${period} días`}
       />
 
       {/* Period selector */}
@@ -110,14 +110,14 @@ export default function CortesPage() {
               onClick={() => setPeriod(p)}
               className={period === p ? 'active' : ''}
             >
-              {p} dias
+              {p} días
             </button>
           ))}
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Ventas acumuladas"
           value={formatCurrency(totalVentas)}
@@ -129,14 +129,14 @@ export default function CortesPage() {
         <KPICard
           label="Tickets totales"
           value={formatNumber(totalTickets)}
-          subtitle={`${period} dias`}
+          subtitle={`${period} días`}
           icon={Ticket}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Personas atendidas"
           value={formatNumber(totalPersonas)}
-          subtitle={`${period} dias`}
+          subtitle={`${period} días`}
           icon={Users}
           accentClass="kpi-accent-amber"
         />
@@ -150,7 +150,7 @@ export default function CortesPage() {
       </div>
 
       {/* Calendar Heatmap */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Mapa de calor de ventas
         </h3>
@@ -192,8 +192,8 @@ export default function CortesPage() {
       </div>
 
       {/* Efectivo vs Tarjeta summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
               <Banknote size={20} className="text-emerald-500" />
@@ -213,7 +213,7 @@ export default function CortesPage() {
             </span>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
               <CreditCard size={20} className="text-blue-500" />
@@ -236,17 +236,17 @@ export default function CortesPage() {
       </div>
 
       {/* Daily cortes table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-        <div className="p-6 border-b border-slate-200/80">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200">
           <h3 className="text-sm font-semibold text-slate-900">Cortes diarios</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            {periodData.length} dias - Totales acumulados abajo
+            {periodData.length} días - Totales acumulados abajo
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-striped">
             <thead className="sticky top-0 z-10">
-              <tr className="border-b border-slate-200/80 bg-slate-50/80 backdrop-blur-sm">
+              <tr className="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
                 <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Fecha</th>
                 <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Ventas</th>
                 <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Tickets</th>

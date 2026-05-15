@@ -49,7 +49,7 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
           </div>
         </div>
       )}
-      <p className="text-xs text-slate-400 mb-5 ml-9">{chartData.length} dias con datos</p>
+      <p className="text-xs text-slate-400 mb-5 ml-9">{chartData.length} días con datos</p>
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData}>
@@ -78,11 +78,10 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
               formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
               contentStyle={{
                 background: '#fff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
+                border: 'none',
+                borderRadius: '8px',
                 fontSize: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                padding: '8px 12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               }}
               cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
             />

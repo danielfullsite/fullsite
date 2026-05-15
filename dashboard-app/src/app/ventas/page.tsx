@@ -136,7 +136,7 @@ export default function VentasPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Ventas Detalladas"
-        subtitle={`${dates.from} al ${dates.to} ${data.length > 0 ? `- ${data.length} dias con datos` : ''}`}
+        subtitle={`${dates.from} al ${dates.to} ${data.length > 0 ? `- ${data.length} días con datos` : ''}`}
       />
 
       {/* Segmented date range picker */}
@@ -181,7 +181,7 @@ export default function VentasPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 gap-3 mb-6">
             <KPICard
               label="Ventas netas"
               value={formatCurrency(totalVentasNetas)}
@@ -208,7 +208,7 @@ export default function VentasPage() {
             <KPICard
               label="Devoluciones"
               value={formatCurrency(totalDevoluciones)}
-              subtitle="Cortesias y devoluciones"
+              subtitle="Cortesías y devoluciones"
               icon={Gift}
               accentClass="kpi-accent-purple"
             />
@@ -216,11 +216,11 @@ export default function VentasPage() {
 
           {/* Daily sales area chart */}
           {dailyChart.length > 1 && (
-            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
               <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                Ventas por dia
+                Ventas por día
               </h3>
-              <p className="text-xs text-slate-400 mb-5">{data.length} dias</p>
+              <p className="text-xs text-slate-400 mb-5">{data.length} días</p>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dailyChart}>
@@ -250,9 +250,9 @@ export default function VentasPage() {
                       contentStyle={{
                         background: '#fff',
                         border: 'none',
-                        borderRadius: '12px',
+                        borderRadius: '8px',
                         fontSize: '12px',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                       }}
                     />
                     <Area
@@ -270,11 +270,11 @@ export default function VentasPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Payment methods */}
-            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
               <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                Metodos de pago
+                Métodos de pago
               </h3>
               <p className="text-xs text-slate-400 mb-5">
                 Total: {formatCurrency(paymentTotal)}
@@ -313,17 +313,17 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de metodos de pago</p>
+                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de métodos de pago</p>
               )}
             </div>
 
             {/* Revenue distribution by category */}
-            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
               <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                Distribucion por categoria
+                Distribución por categoría
               </h3>
               <p className="text-xs text-slate-400 mb-5">
-                Top 10 categorias
+                Top 10 categorías
               </p>
               {topGrupos.length > 0 ? (
                 <div className="space-y-3">
@@ -359,13 +359,13 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de categorias</p>
+                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de categorías</p>
               )}
             </div>
           </div>
 
           {/* Sales by order type */}
-          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
             <h3 className="text-sm font-semibold text-slate-900 mb-1">
               Desglose por tipo de orden
             </h3>

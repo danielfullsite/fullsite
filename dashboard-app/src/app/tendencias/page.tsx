@@ -74,7 +74,7 @@ export default function TendenciasPage() {
   // Day of week aggregation
   const dowAgg = useMemo(() => {
     const dows: Record<number, { ventas: number; personas: number; tickets: number; dias: number }> = {}
-    const dowNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+    const dowNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
     for (const d of allData) {
       const date = new Date(d.fecha + 'T12:00:00')
       const dow = date.getDay()
@@ -175,11 +175,11 @@ export default function TendenciasPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Tendencias"
-        subtitle="Comparativos mensuales, por dia de la semana, y acumulado del ano"
+        subtitle="Comparativos mensuales, por día de la semana, y acumulado del año"
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <KPICard
           label="Ventas mes actual"
           value={currentMonth ? formatCurrency(currentMonth.ventas) : '-'}
@@ -197,7 +197,7 @@ export default function TendenciasPage() {
           accentClass="kpi-accent-green"
         />
         <KPICard
-          label="Mejor dia de semana"
+          label="Mejor día de semana"
           value={bestDow?.dia || '-'}
           subtitle={bestDow ? `Prom. ${formatCurrency(bestDow.ventasPromedio)}` : ''}
           icon={Calendar}
@@ -206,7 +206,7 @@ export default function TendenciasPage() {
         <KPICard
           label="YTD Ventas"
           value={formatCurrency(ytdData.totalVentas)}
-          subtitle={`${ytdData.dias} dias con datos en ${new Date().getFullYear()}`}
+          subtitle={`${ytdData.dias} días con datos en ${new Date().getFullYear()}`}
           icon={BarChart3}
           accentClass="kpi-accent-purple"
         />
@@ -214,7 +214,7 @@ export default function TendenciasPage() {
 
       {/* Monthly comparison cards */}
       {currentMonth && prevMonth && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           {[
             {
               label: 'Ventas totales',
@@ -235,7 +235,7 @@ export default function TendenciasPage() {
               change: ticketMoM,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 hover:shadow-md transition-shadow">
+            <div key={card.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{card.label}</p>
               <div className="flex items-end justify-between">
                 <div>
@@ -259,7 +259,7 @@ export default function TendenciasPage() {
       )}
 
       {/* Monthly revenue trend */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Ventas mensuales
         </h3>
@@ -292,9 +292,9 @@ export default function TendenciasPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '8px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 }}
               />
               <Area
@@ -313,9 +313,9 @@ export default function TendenciasPage() {
 
       {/* Year-over-Year comparison */}
       {yoyData.chartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">
-            Comparativo ano anterior
+            Comparativo año anterior
           </h3>
           <p className="text-xs text-slate-400 mb-5">
             {yoyData.currentYear} vs {yoyData.prevYear} -- ventas mensuales
@@ -348,9 +348,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Legend
@@ -434,11 +434,11 @@ export default function TendenciasPage() {
       )}
 
       {/* Monthly ticket promedio */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <h3 className="text-sm font-semibold text-slate-900 mb-1">
           Ticket promedio mensual (restaurante)
         </h3>
-        <p className="text-xs text-slate-400 mb-5">Evolucion del ticket promedio</p>
+        <p className="text-xs text-slate-400 mb-5">Evolución del ticket promedio</p>
         <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -467,9 +467,9 @@ export default function TendenciasPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '8px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 }}
               />
               <Area
@@ -487,12 +487,12 @@ export default function TendenciasPage() {
       </div>
 
       {/* Day of week */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">
-            Venta promedio por dia
+            Venta promedio por día
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Promedio historico</p>
+          <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -515,9 +515,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Bar dataKey="ventasPromedio" radius={[6, 6, 0, 0]} barSize={32}>
@@ -530,11 +530,11 @@ export default function TendenciasPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">
-            Ticket promedio por dia (restaurante)
+            Ticket promedio por día (restaurante)
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Promedio historico</p>
+          <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -557,9 +557,9 @@ export default function TendenciasPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Bar dataKey="ticketPromedio" fill="#10b981" radius={[6, 6, 0, 0]} barSize={32} />
@@ -570,12 +570,12 @@ export default function TendenciasPage() {
       </div>
 
       {/* YTD Summary */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-        <div className="p-6 border-b border-slate-200/80">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200">
           <h3 className="text-sm font-semibold text-slate-900">
             Resumen Year-To-Date ({new Date().getFullYear()})
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">{ytdData.dias} dias con datos</p>
+          <p className="text-xs text-slate-400 mt-0.5">{ytdData.dias} días con datos</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           <div className="p-5 text-center">

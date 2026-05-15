@@ -81,48 +81,48 @@ export default function PlatillosPage() {
     <>
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
-        title="Platillos y Categorias"
-        subtitle="Desglose de ventas por grupo y platillos destacados (30 dias)"
+        title="Platillos y Categorías"
+        subtitle="Desglose de ventas por grupo y platillos destacados (30 días)"
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <KPICard
-          label="Total categorias"
+          label="Total categorías"
           value={formatNumber(grupos.length)}
-          subtitle="categorias activas"
+          subtitle="categorías activas"
           icon={BarChart3}
           accentClass="kpi-accent-blue"
         />
         <KPICard
           label="Ventas totales"
           value={formatCurrency(totalAll)}
-          subtitle="30 dias"
+          subtitle="30 días"
           icon={UtensilsCrossed}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Chilaquiles"
           value={formatCurrency(totalChilaquiles)}
-          subtitle="30 dias acumulado"
+          subtitle="30 días acumulado"
           icon={Coffee}
           accentClass="kpi-accent-amber"
         />
         <KPICard
           label="Half & Half"
           value={formatCurrency(totalHH)}
-          subtitle="30 dias acumulado"
+          subtitle="30 días acumulado"
           icon={TrendingUp}
           accentClass="kpi-accent-purple"
         />
       </div>
 
       {/* Top categories horizontal bar chart */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <h3 className="text-sm font-semibold text-slate-900 mb-1">
-          Ventas por categoria (top 15)
+          Ventas por categoría (top 15)
         </h3>
-        <p className="text-xs text-slate-400 mb-5">Ultimos 30 dias</p>
+        <p className="text-xs text-slate-400 mb-5">Últimos 30 días</p>
         <div className="h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">
@@ -151,9 +151,9 @@ export default function PlatillosPage() {
                 contentStyle={{
                   background: '#fff',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '8px',
                   fontSize: '12px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 }}
               />
               <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={20}>
@@ -167,15 +167,15 @@ export default function PlatillosPage() {
       </div>
 
       {/* Category cards grid */}
-      <div className="mb-8">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Categorias principales</h3>
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-slate-900 mb-4">Categorías principales</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {topGrupos.slice(0, 10).map((g, i) => {
             const pct = totalAll > 0 ? ((g.total / totalAll) * 100) : 0
             return (
               <div
                 key={g.nombre}
-                className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+                className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
               >
                 <div
                   className="w-3 h-3 rounded-full mb-3"
@@ -197,12 +197,12 @@ export default function PlatillosPage() {
       </div>
 
       {/* Chilaquiles & H&H trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">
             Chilaquiles (ventas $)
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Tendencia 30 dias</p>
+          <p className="text-xs text-slate-400 mb-5">Tendencia 30 días</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -232,9 +232,9 @@ export default function PlatillosPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Area
@@ -251,11 +251,11 @@ export default function PlatillosPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-slate-900 mb-1">
             Half & Half (ventas $)
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Tendencia 30 dias</p>
+          <p className="text-xs text-slate-400 mb-5">Tendencia 30 días</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={specialTrend}>
@@ -285,9 +285,9 @@ export default function PlatillosPage() {
                   contentStyle={{
                     background: '#fff',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     fontSize: '12px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 />
                 <Area
@@ -306,17 +306,17 @@ export default function PlatillosPage() {
       </div>
 
       {/* Categories table */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-        <div className="p-6 border-b border-slate-200/80">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-slate-200">
           <h3 className="text-sm font-semibold text-slate-900">
-            Todas las categorias
+            Todas las categorías
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Ultimos 30 dias - {grupos.length} categorias</p>
+          <p className="text-xs text-slate-400 mt-0.5">Últimos 30 días - {grupos.length} categorías</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-striped">
             <thead>
-              <tr className="border-b border-slate-200/80 bg-slate-50/50">
+              <tr className="border-b border-slate-200 bg-slate-50/50">
                 <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">#</th>
                 <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Categoria</th>
                 <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider w-40">Progreso</th>

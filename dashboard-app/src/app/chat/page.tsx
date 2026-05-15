@@ -12,7 +12,7 @@ export default function ChatPage() {
     {
       role: 'assistant',
       content:
-        'Hola, soy el asistente IA de Fullsite para AMALAY Coffee & Market. Tengo acceso a los datos de ventas, meseros, platillos y tendencias del restaurante. Preguntame lo que necesites.',
+        'Hola, soy el asistente IA de Fullsite para AMALAY Coffee & Market. Tengo acceso a los datos de ventas, meseros, platillos y tendencias del restaurante. Pregúntame lo que necesites.',
     },
   ])
   const [input, setInput] = useState('')
@@ -25,12 +25,12 @@ export default function ChatPage() {
   }, [messages])
 
   const suggestedQuestions = [
-    'Como van las ventas esta semana vs la semana pasada?',
-    'Quien es el mesero con mejor ticket promedio?',
-    'Cual es el dia de la semana con mas ventas?',
-    'Que categoria de menu vende mas?',
-    'Como puedo subir el ticket promedio del restaurante?',
-    'Dame un resumen del ultimo mes',
+    '¿Cómo van las ventas esta semana vs la semana pasada?',
+    '¿Quién es el mesero con mejor ticket promedio?',
+    '¿Cuál es el día de la semana con más ventas?',
+    '¿Qué categoría de menú vende más?',
+    '¿Cómo puedo subir el ticket promedio del restaurante?',
+    'Dame un resumen del último mes',
   ]
 
   async function sendMessage(text: string) {
@@ -65,7 +65,7 @@ export default function ChatPage() {
         {
           role: 'assistant',
           content:
-            'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API esten configuradas en .env.local.',
+            'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API estén configuradas en .env.local.',
         },
       ])
     } finally {
@@ -89,7 +89,7 @@ export default function ChatPage() {
         subtitle="Asistente inteligente con acceso a los datos del restaurante"
       />
 
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 120px)', minHeight: '500px' }}>
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
           {messages.map((msg, i) => (
@@ -111,7 +111,7 @@ export default function ChatPage() {
                 className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-blue-500 text-white rounded-br-md'
-                    : 'bg-slate-50 text-slate-900 border border-slate-200/80 rounded-bl-md'
+                    : 'bg-slate-50 text-slate-900 border border-slate-200 rounded-bl-md'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -131,7 +131,7 @@ export default function ChatPage() {
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
-                    className="text-left text-sm text-slate-600 bg-white border border-slate-200/80 rounded-xl px-4 py-3 hover:bg-blue-50/50 hover:border-blue-200 hover:text-blue-700 transition-all duration-150 shadow-sm"
+                    className="text-left text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:bg-blue-50/50 hover:border-blue-200 hover:text-blue-700 transition-all duration-150 shadow-sm"
                   >
                     {q}
                   </button>
@@ -145,7 +145,7 @@ export default function ChatPage() {
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
                 <Bot size={15} className="text-blue-600" />
               </div>
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1.5">
                   <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" />
                   <span
@@ -164,7 +164,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 border-t border-slate-200/80 bg-white/80 backdrop-blur-sm">
+        <div className="px-6 py-4 border-t border-slate-200 bg-white/80 backdrop-blur-sm">
           <form
             onSubmit={(e) => {
               e.preventDefault()

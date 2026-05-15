@@ -119,7 +119,7 @@ export default function DashboardPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
-            Resumen del dia
+            Resumen del día
           </h2>
           {latestDay && (
             <span className="text-sm text-slate-400">
@@ -132,7 +132,7 @@ export default function DashboardPage() {
       {/* KPI Summary Cards — 4 across like Toast */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <KPICard
-          label="Ventas del dia"
+          label="Ventas del día"
           value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
           delta={latestDay ? `${formatPercent(ventasChange)} vs ayer` : undefined}
           deltaType={ventasChange >= 0 ? 'up' : 'down'}
@@ -181,7 +181,7 @@ export default function DashboardPage() {
             fecha: d.fecha,
             ventas_dia: d.ventas_dia,
           }))}
-          title="Ventas ultimos 30 dias"
+          title="Ventas últimos 30 días"
         />
       </div>
 
@@ -194,7 +194,7 @@ export default function DashboardPage() {
               <Award size={14} className="text-emerald-600" />
             </div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Top meseros del dia
+              Top meseros del día
             </h3>
           </div>
           <p className="text-xs text-slate-400 mb-5 ml-9">Ranking por ventas</p>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
         {/* Categories — horizontal bars */}
         <RevenueDistributionChart
           data={gruposData}
-          title="Distribucion por categoria"
+          title="Distribución por categoría"
         />
       </div>
 
@@ -260,7 +260,7 @@ export default function DashboardPage() {
               <CreditCard size={14} className="text-violet-600" />
             </div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Metodos de pago
+              Métodos de pago
             </h3>
           </div>
           <p className="text-xs text-slate-400 mb-5 ml-9">
@@ -307,7 +307,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex items-center justify-center py-8">
-              <p className="text-slate-400 text-sm">Sin datos de pagos para este dia</p>
+              <p className="text-slate-400 text-sm">Sin datos de pagos para este día</p>
             </div>
           )}
         </div>

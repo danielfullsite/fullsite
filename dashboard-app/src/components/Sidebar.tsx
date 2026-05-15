@@ -127,7 +127,7 @@ export default function Sidebar() {
             className="flex items-center gap-2 text-xs text-slate-400 hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-50"
           >
             <LogOut size={14} />
-            <span>Cerrar sesion</span>
+            <span>Cerrar sesión</span>
           </button>
         )}
       </div>

@@ -10,9 +10,9 @@ import type { WansoftDaily } from '@/lib/types'
 type ReportType = 'ventas' | 'meseros' | 'platillos' | 'tendencias'
 
 const reportOptions: { key: ReportType; label: string; icon: typeof DollarSign; description: string; color: string }[] = [
-  { key: 'ventas', label: 'Reporte de Ventas', icon: DollarSign, description: 'Resumen de ventas netas, brutas, descuentos y metodos de pago', color: 'blue' },
-  { key: 'meseros', label: 'Reporte de Meseros', icon: Users, description: 'Ranking de meseros por ventas, promedio diario y dias activos', color: 'emerald' },
-  { key: 'platillos', label: 'Reporte de Platillos', icon: UtensilsCrossed, description: 'Desglose por categoria de menu y productos mas vendidos', color: 'amber' },
+  { key: 'ventas', label: 'Reporte de Ventas', icon: DollarSign, description: 'Resumen de ventas netas, brutas, descuentos y métodos de pago', color: 'blue' },
+  { key: 'meseros', label: 'Reporte de Meseros', icon: Users, description: 'Ranking de meseros por ventas, promedio diario y días activos', color: 'emerald' },
+  { key: 'platillos', label: 'Reporte de Platillos', icon: UtensilsCrossed, description: 'Desglose por categoría de menú y productos más vendidos', color: 'amber' },
   { key: 'tendencias', label: 'Reporte de Tendencias', icon: TrendingUp, description: 'Comparativos mensuales, dia de la semana y ticket promedio', color: 'purple' },
 ]
 
@@ -97,7 +97,7 @@ export default function ReportesPage() {
               className={`text-left p-5 rounded-xl border transition-all duration-200 ${
                 isActive
                   ? 'border-blue-200 bg-white shadow-md ring-1 ring-blue-500/10'
-                  : 'border-slate-200/80 bg-white shadow-sm hover:shadow-md hover:border-slate-300'
+                  : 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300'
               }`}
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
@@ -115,7 +115,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Date range + generate */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md transition-shadow mb-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Fecha inicio</label>
@@ -146,7 +146,7 @@ export default function ReportesPage() {
           <button
             disabled
             className="px-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-sm font-medium flex items-center gap-2 cursor-not-allowed"
-            title="Proximamente"
+            title="Próximamente"
           >
             <Download size={16} />
             Generar PDF
@@ -166,9 +166,9 @@ export default function ReportesPage() {
 
       {/* Report output */}
       {generated && reportData && !loading && (
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
           {/* Report header */}
-          <div className="p-6 border-b border-slate-200/80 bg-slate-50/30">
+          <div className="p-6 border-b border-slate-200 bg-slate-50/30">
             <div className="flex items-center gap-3 mb-2">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconColorMap[selectedReport.color].activeBg}`}>
                 <selectedReport.icon size={20} className={iconColorMap[selectedReport.color].active} />
@@ -176,7 +176,7 @@ export default function ReportesPage() {
               <div>
                 <h2 className="text-lg font-bold text-slate-900">{selectedReport.label}</h2>
                 <p className="text-xs text-slate-400">
-                  Del {from} al {to} - {reportData.dias} dias con datos
+                  Del {from} al {to} - {reportData.dias} días con datos
                 </p>
               </div>
             </div>
@@ -203,12 +203,12 @@ export default function ReportesPage() {
             {/* Report-specific content */}
             {reportType === 'ventas' && (
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Metodos de pago</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Métodos de pago</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full table-striped">
                     <thead>
-                      <tr className="border-b border-slate-200/80 bg-slate-50/50">
-                        <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Metodo</th>
+                      <tr className="border-b border-slate-200 bg-slate-50/50">
+                        <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Método</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Total</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">%</th>
                       </tr>
@@ -235,7 +235,7 @@ export default function ReportesPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full table-striped">
                     <thead>
-                      <tr className="border-b border-slate-200/80 bg-slate-50/50">
+                      <tr className="border-b border-slate-200 bg-slate-50/50">
                         <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">#</th>
                         <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Mesero</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Total ventas</th>
@@ -272,13 +272,13 @@ export default function ReportesPage() {
 
             {reportType === 'platillos' && (
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">Ventas por categoria</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Ventas por categoría</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full table-striped">
                     <thead>
-                      <tr className="border-b border-slate-200/80 bg-slate-50/50">
+                      <tr className="border-b border-slate-200 bg-slate-50/50">
                         <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">#</th>
-                        <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Categoria</th>
+                        <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Categoría</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Total</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">%</th>
                       </tr>
@@ -311,7 +311,7 @@ export default function ReportesPage() {
                 <div className="overflow-x-auto max-h-96 overflow-y-auto">
                   <table className="w-full table-striped">
                     <thead className="sticky top-0 z-10">
-                      <tr className="border-b border-slate-200/80 bg-slate-50/80 backdrop-blur-sm">
+                      <tr className="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
                         <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Fecha</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Ventas</th>
                         <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Tickets</th>
@@ -344,7 +344,7 @@ export default function ReportesPage() {
 
       {/* Empty state */}
       {!generated && !loading && (
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-12 text-center hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center hover:shadow-md transition-shadow">
           <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <FileBarChart size={32} className="text-blue-500" />
           </div>

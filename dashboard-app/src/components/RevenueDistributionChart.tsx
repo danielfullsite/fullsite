@@ -36,7 +36,7 @@ export default function RevenueDistributionChart({ data, title }: Props) {
           </div>
         )}
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-400 text-sm">Sin datos de categorias</p>
+          <p className="text-slate-400 text-sm">Sin datos de categorías</p>
         </div>
       </div>
     )
