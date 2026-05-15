@@ -1,16 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw } from 'lucide-react'
-import { getKitchenOrders, updateOrderStatus } from '@/lib/pos-data'
-import type { KitchenOrderFromDB } from '@/lib/pos-data'
+import { ArrowLeft, Clock, ChefHat, Check, Flame } from 'lucide-react'
 
 interface KitchenItem {
-  nombre: string
-  cantidad: number
-  modificadores?: string[]
-  notas?: string
+  name: string
+  quantity: number
+  modifiers?: string
 }
 
 interface KitchenOrder {
@@ -18,56 +15,81 @@ interface KitchenOrder {
   mesa: number
   mesero: string
   items: KitchenItem[]
-  status: 'enviada' | 'preparando' | 'lista'
+  status: 'nueva' | 'preparando' | 'lista'
   createdAt: Date
-  notas: string | null
 }
 
-function parseDBOrder(row: KitchenOrderFromDB): KitchenOrder {
-  let items: KitchenItem[] = []
-  try {
-    const parsed = typeof row.items === 'string' ? JSON.parse(row.items) : row.items
-    items = (parsed as Array<Record<string, unknown>>).map((i) => ({
-      nombre: (i.nombre as string) || (i.name as string) || '',
-      cantidad: (i.cantidad as number) || (i.quantity as number) || 1,
-      modificadores: (i.modificadores as string[]) || [],
-      notas: (i.notas as string) || '',
-    }))
-  } catch {
-    // items stays empty
-  }
-  return {
-    id: row.id,
-    mesa: row.mesa,
-    mesero: row.mesero,
-    items,
-    status: row.status as KitchenOrder['status'],
-    createdAt: new Date(row.created_at),
-    notas: row.notas,
-  }
-}
+// Demo kitchen orders
+const DEMO_ORDERS: KitchenOrder[] = [
+  {
+    id: 'k1',
+    mesa: 7,
+    mesero: 'Daniela Rico',
+    items: [
+      { name: 'Chilaquiles', quantity: 2 },
+      { name: 'Avocado Toast', quantity: 1 },
+      { name: 'Cafe Americano', quantity: 3 },
+      { name: 'Jugo de Naranja', quantity: 2 },
+    ],
+    status: 'nueva',
+    createdAt: new Date(Date.now() - 2 * 60000),
+  },
+  {
+    id: 'k2',
+    mesa: 5,
+    mesero: 'Brayan Berlanga',
+    items: [
+      { name: 'Half & Half', quantity: 1 },
+      { name: 'Cafe Latte', quantity: 2 },
+    ],
+    status: 'preparando',
+    createdAt: new Date(Date.now() - 8 * 60000),
+  },
+  {
+    id: 'k3',
+    mesa: 2,
+    mesero: 'Omar Aguilera',
+    items: [
+      { name: 'Enchiladas Suizas', quantity: 1 },
+      { name: 'Salmon Bagel', quantity: 1 },
+      { name: 'Capuchino', quantity: 2 },
+    ],
+    status: 'preparando',
+    createdAt: new Date(Date.now() - 12 * 60000),
+  },
+  {
+    id: 'k4',
+    mesa: 9,
+    mesero: 'Hector Rodriguez',
+    items: [
+      { name: 'French Toast', quantity: 2 },
+      { name: 'Pancakes', quantity: 1 },
+      { name: 'Chai Latte', quantity: 3 },
+    ],
+    status: 'lista',
+    createdAt: new Date(Date.now() - 18 * 60000),
+  },
+  {
+    id: 'k5',
+    mesa: 12,
+    mesero: 'Oscar Rios',
+    items: [
+      { name: 'Miss Benedict', quantity: 2 },
+      { name: 'Cheesecake', quantity: 1 },
+      { name: 'Frappe Mokka', quantity: 2 },
+    ],
+    status: 'nueva',
+    createdAt: new Date(Date.now() - 1 * 60000),
+  },
+]
 
 function getElapsedMinutes(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / 60000)
 }
 
 export default function CocinaPage() {
-  const [orders, setOrders] = useState<KitchenOrder[]>([])
-  const [loading, setLoading] = useState(true)
+  const [orders, setOrders] = useState<KitchenOrder[]>(DEMO_ORDERS)
   const [, setTick] = useState(0)
-
-  const fetchOrders = useCallback(async () => {
-    const rows = await getKitchenOrders()
-    setOrders(rows.map(parseDBOrder))
-    setLoading(false)
-  }, [])
-
-  // Initial load + poll every 5 seconds
-  useEffect(() => {
-    fetchOrders()
-    const interval = setInterval(fetchOrders, 5000)
-    return () => clearInterval(interval)
-  }, [fetchOrders])
 
   // Update elapsed times every 30s
   useEffect(() => {
@@ -75,28 +97,26 @@ export default function CocinaPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const advanceStatus = async (id: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'enviada' ? 'preparando' : 'lista'
-    // Optimistic update
+  const advanceStatus = (id: string) => {
     setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status: nextStatus as KitchenOrder['status'] } : order
-      )
+      prev.map((order) => {
+        if (order.id !== id) return order
+        if (order.status === 'nueva') return { ...order, status: 'preparando' }
+        if (order.status === 'preparando') return { ...order, status: 'lista' }
+        return order
+      })
     )
-    await updateOrderStatus(id, nextStatus)
   }
 
-  const dismissOrder = async (id: string) => {
-    // Mark as entregada (effectively removes from kitchen view)
+  const dismissOrder = (id: string) => {
     setOrders((prev) => prev.filter((o) => o.id !== id))
-    await updateOrderStatus(id, 'entregada')
   }
 
   const statusConfig: Record<
     string,
     { bg: string; border: string; badge: string; badgeText: string; label: string }
   > = {
-    enviada: {
+    nueva: {
       bg: 'bg-slate-800',
       border: 'border-white/20',
       badge: 'bg-white',
@@ -119,10 +139,10 @@ export default function CocinaPage() {
     },
   }
 
-  // Sort: enviada first, then preparando, then lista
+  // Sort: nueva first, then preparando, then lista
   const sortedOrders = [...orders].sort((a, b) => {
-    const priority: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
-    return (priority[a.status] ?? 3) - (priority[b.status] ?? 3)
+    const priority = { nueva: 0, preparando: 1, lista: 2 }
+    return priority[a.status] - priority[b.status]
   })
 
   return (
@@ -140,20 +160,13 @@ export default function CocinaPage() {
             <ChefHat size={24} className="text-emerald-400" />
             <h1 className="text-xl font-bold">Cocina</h1>
           </div>
-          <button
-            onClick={() => fetchOrders()}
-            className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors text-slate-300"
-            title="Refrescar"
-          >
-            <RefreshCw size={18} />
-          </button>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-white" />
             <span className="text-sm text-slate-300">
-              Nuevas ({orders.filter((o) => o.status === 'enviada').length})
+              Nuevas ({orders.filter((o) => o.status === 'nueva').length})
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -173,22 +186,17 @@ export default function CocinaPage() {
 
       {/* Orders Grid */}
       <div className="flex-1 overflow-y-auto p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
-            <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : sortedOrders.length === 0 ? (
+        {sortedOrders.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-500">
             <div className="text-center">
               <ChefHat size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-xl">No hay ordenes pendientes</p>
-              <p className="text-sm mt-2">Se actualiza cada 5 segundos</p>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedOrders.map((order) => {
-              const config = statusConfig[order.status] ?? statusConfig.enviada
+              const config = statusConfig[order.status]
               const elapsed = getElapsedMinutes(order.createdAt)
               const isUrgent = elapsed > 15 && order.status !== 'lista'
 
@@ -229,40 +237,24 @@ export default function CocinaPage() {
                   {/* Items */}
                   <div className="flex-1 space-y-2 mb-4">
                     {order.items.map((item, i) => (
-                      <div key={i}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-emerald-400 w-6">
-                            {item.cantidad}x
-                          </span>
-                          <span className="text-[16px] font-medium">
-                            {item.nombre}
-                          </span>
-                        </div>
-                        {item.modificadores && item.modificadores.length > 0 && (
-                          <p className="text-slate-400 text-xs ml-8">
-                            {item.modificadores.join(' · ')}
-                          </p>
-                        )}
-                        {item.notas && (
-                          <p className="text-slate-500 text-xs italic ml-8">
-                            {item.notas}
-                          </p>
-                        )}
+                      <div
+                        key={i}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="text-lg font-bold text-emerald-400 w-6">
+                          {item.quantity}x
+                        </span>
+                        <span className="text-[16px] font-medium">
+                          {item.name}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  {/* Order notes */}
-                  {order.notas && (
-                    <p className="text-amber-400/80 text-xs italic mb-3 border-t border-slate-700 pt-2">
-                      Nota: {order.notas}
-                    </p>
-                  )}
-
                   {/* Action button */}
-                  {order.status === 'enviada' && (
+                  {order.status === 'nueva' && (
                     <button
-                      onClick={() => advanceStatus(order.id, order.status)}
+                      onClick={() => advanceStatus(order.id)}
                       className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px] flex items-center justify-center gap-2"
                     >
                       <Flame size={20} />
@@ -271,7 +263,7 @@ export default function CocinaPage() {
                   )}
                   {order.status === 'preparando' && (
                     <button
-                      onClick={() => advanceStatus(order.id, order.status)}
+                      onClick={() => advanceStatus(order.id)}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px] flex items-center justify-center gap-2"
                     >
                       <Check size={20} />
