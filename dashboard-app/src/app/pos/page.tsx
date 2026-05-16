@@ -7,7 +7,6 @@ import {
   MENU_CATEGORIES,
   MESEROS,
   IVA_RATE,
-  MODIFIERS_QUITAR,
   MODIFIERS_AGREGAR,
   MANAGER_PINS,
   formatMXN,
@@ -15,6 +14,11 @@ import {
   saveOrder,
   logAudit,
   deductIngredientsForOrder,
+  getRecipes,
+  getIngredients,
+  type RecipeRow,
+  type Ingredient,
+  type ModificadorAgregar,
 } from '@/lib/pos-data'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
@@ -57,11 +61,17 @@ export default function POSPage() {
 interface ModifierModalProps {
   item: MenuItem
   existingOrder?: OrderItem | null
+  recipeIngredients: string[]  // ingredient names from recipe — these become "quitar" options
   onConfirm: (orderItem: OrderItem) => void
   onCancel: () => void
 }
 
-function ModifierModal({ item, existingOrder, onConfirm, onCancel }: ModifierModalProps) {
+function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCancel }: ModifierModalProps) {
+  // Dynamic "quitar" options from recipe ingredients
+  const quitarOptions = recipeIngredients.length > 0
+    ? recipeIngredients.map(name => `Sin ${name}`)
+    : ['Sin cebolla', 'Sin chile', 'Sin crema', 'Sin queso', 'Sin salsa', 'Sin jitomate', 'Sin aguacate']
+
   const [quitarChecked, setQuitarChecked] = useState<Set<string>>(
     () => new Set(existingOrder?.modificadores.filter(m => m.startsWith('Sin ')) ?? [])
   )
@@ -147,11 +157,13 @@ function ModifierModal({ item, existingOrder, onConfirm, onCancel }: ModifierMod
         </div>
 
         <div className="px-5 py-4 space-y-5">
-          {/* Quitar section */}
+          {/* Quitar section — dynamic from recipe ingredients */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Quitar</h4>
+            <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">
+              Quitar {recipeIngredients.length > 0 && <span className="text-slate-600 normal-case font-normal">({recipeIngredients.length} ingredientes)</span>}
+            </h4>
             <div className="grid grid-cols-2 gap-2">
-              {MODIFIERS_QUITAR.map(mod => (
+              {quitarOptions.map(mod => (
                 <label
                   key={mod}
                   className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
@@ -555,6 +567,41 @@ function POSContent() {
   // Modifier modal state
   const [modifierItem, setModifierItem] = useState<MenuItem | null>(null)
   const [editingOrderItem, setEditingOrderItem] = useState<OrderItem | null>(null)
+
+  // Recipe data for dynamic modifiers
+  const [allRecipes, setAllRecipes] = useState<RecipeRow[]>([])
+  const [allIngredients, setAllIngredients] = useState<Ingredient[]>([])
+
+  useEffect(() => {
+    (async () => {
+      const [r, i] = await Promise.all([getRecipes(), getIngredients()])
+      setAllRecipes(r)
+      setAllIngredients(i)
+    })()
+  }, [])
+
+  // Get ingredient names for a specific menu item
+  const getRecipeIngredients = useCallback((itemName: string): string[] => {
+    const name = itemName.toLowerCase()
+    const ingMap = new Map(allIngredients.map(i => [i.id, i]))
+
+    // Find matching recipe rows
+    const rows = allRecipes.filter(r => {
+      const rName = r.menu_item_name.toLowerCase()
+      return rName === name || rName.includes(name) || name.includes(rName)
+    })
+
+    // Get unique ingredient names, capitalize first letter
+    const names = new Set<string>()
+    for (const row of rows) {
+      const ing = ingMap.get(row.ingredient_id)
+      const ingName = ing?.name || row.ingredient_id
+      // Skip very generic ingredients (water, oil, salt, pepper)
+      if (['agua de filtro', 'aceite vegetal', 'sal', 'pimienta', 'aceite de oliva'].includes(ingName.toLowerCase())) continue
+      names.add(ingName.charAt(0).toUpperCase() + ingName.slice(1))
+    }
+    return Array.from(names).slice(0, 12) // max 12 options
+  }, [allRecipes, allIngredients])
 
   // Menu search
   const [menuSearch, setMenuSearch] = useState('')
@@ -1174,6 +1221,7 @@ function POSContent() {
         <ModifierModal
           item={modifierItem}
           existingOrder={editingOrderItem}
+          recipeIngredients={getRecipeIngredients(modifierItem.name)}
           onConfirm={handleModifierConfirm}
           onCancel={handleModifierCancel}
         />
