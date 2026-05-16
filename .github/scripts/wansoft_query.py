@@ -327,7 +327,7 @@ def fetch_all_wansoft_data(session, start, end):
     return data
 
 
-def fetch_historical(days=30):
+def fetch_historical(days=60):
     """Fetch historical data from Supabase wansoft_daily."""
     try:
         now_mx = datetime.now(MX_TZ)
@@ -466,27 +466,29 @@ def ask_groq(question, wansoft_data, historical_data):
                     wc_data[f"top_platillos_de_{mesero_match}"] = top
             wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo.get(mesero_match, {})
         else:
-            # No specific mesero — show KPIs for ALL meseros (compact)
-            all_kpis = {}
+            # No specific mesero — show compact summary for ALL meseros
+            # Format: mesero → {KPIs + all categories} in one compact dict
+            all_meseros = {}
             for mesero_name, mesero_data in waiter_cats.items():
                 if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
                     continue
+                compact_m = {}
                 kpis = mesero_data.get("KPIs", {})
                 if kpis:
-                    all_kpis[mesero_name] = kpis
-            if all_kpis:
-                wc_data["KPIs_todos_los_meseros"] = all_kpis
-
-            # Also show grupo breakdown if search terms match
-            if por_mesero_grupo:
-                compact = {}
-                for mesero, grupos in por_mesero_grupo.items():
-                    filtered_g = {k: v for k, v in grupos.items()
-                                  if any(term in k.lower() for term in search_terms)}
-                    if filtered_g:
-                        compact[mesero] = filtered_g
-                if compact:
-                    wc_data["por_mesero_grupo_filtrado"] = compact
+                    compact_m["bebidas_por_persona"] = kpis.get("bebidas_por_persona", 0)
+                    compact_m["alimentos_por_persona"] = kpis.get("alimentos_por_persona", 0)
+                    compact_m["ticket_promedio"] = kpis.get("ticket_promedio", 0)
+                    compact_m["personas"] = kpis.get("personas", 0)
+                    compact_m["tickets"] = kpis.get("tickets", 0)
+                # Add all categories (H&H, Pan, Postres, 2da Bebida)
+                for cat, cat_vals in mesero_data.items():
+                    if cat == "KPIs" or not isinstance(cat_vals, dict):
+                        continue
+                    if "qty" in cat_vals:
+                        compact_m[cat] = f"{cat_vals['qty']}pzas/${cat_vals.get('total',0):,.0f}"
+                if compact_m:
+                    all_meseros[mesero_name] = compact_m
+            wc_data["todos_los_meseros"] = all_meseros
 
         wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
         wc_data["rango"] = waiter_cats.get("__rango", "")
@@ -525,20 +527,23 @@ def ask_groq(question, wansoft_data, historical_data):
     blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
                   + json.dumps(platillos[:20], ensure_ascii=False, indent=1))
 
-    # Block 5: Historical (compact — just last 7 days)
+    # Block 5: Historical — include more days if question asks for history
+    hist_keywords = ["historial", "historia", "abril", "marzo", "últimos", "ultimos", "mejorado", "tendencia", "comparar"]
+    wants_history = any(kw in q_lower for kw in hist_keywords)
+    hist_limit = 60 if wants_history else 7
     if historical_data:
         hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
-                         "ticket_prom": r.get("ticket_promedio_restaurant"),
-                         "propinas": r.get("propinas_total")}
-                        for r in historical_data[:7]]
-        blocks.append("HISTÓRICO (últimos 7 días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
+                         "ticket_prom": r.get("ticket_promedio_restaurant")}
+                        for r in historical_data[:hist_limit]]
+        blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
-    # Assemble context — cap total at 12000 chars
+    # Assemble context — cap total at 25000 chars
     context = ""
     for block in blocks:
-        if len(context) + len(block) > 12000:
+        if len(context) + len(block) > 25000:
             break
         context += block + "\n\n"
+    print(f"[wansoft-query] Context size: {len(context)} chars, {len(blocks)} blocks")
 
     context += f"PREGUNTA: {question}"
 
