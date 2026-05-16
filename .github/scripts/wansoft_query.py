@@ -453,7 +453,7 @@ def ask_groq(question, wansoft_data, historical_data):
 
         # Filter to relevant mesero if mentioned
         # Exclude generic words and excluded staff from matching
-        _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones"]
+        _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones", "hector enrique"]
         _skip_match = {"mesero", "total", "ranking", "todos", "ayer", "mayo", "bebida", "persona"}
         mesero_match = None
         for mesero_name in por_mesero_grupo:
@@ -486,7 +486,7 @@ def ask_groq(question, wansoft_data, historical_data):
         else:
             # No specific mesero — show compact summary for ALL meseros
             # Filter out excluded meseros from the data
-            _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones"]
+            _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones", "hector enrique"]
             all_meseros = {}
             for mesero_name, mesero_data in waiter_cats.items():
                 if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
@@ -597,15 +597,24 @@ def ask_groq(question, wansoft_data, historical_data):
     wants_history = any(kw in q_lower for kw in hist_keywords)
     hist_limit = 90 if wants_history else 7
     if historical_data:
-        hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
-                         "ticket_prom": r.get("ticket_promedio_restaurant")}
-                        for r in historical_data[:hist_limit]]
-        blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
+        if wants_history:
+            # Ultra-compact: one line per day
+            hist_lines = ["HISTÓRICO TICKET PROMEDIO DIARIO:"]
+            for r in reversed(historical_data[:hist_limit]):
+                tp = r.get("ticket_promedio_restaurant")
+                if tp:
+                    hist_lines.append(f"  {r['fecha']}: ${round(tp)}")
+            blocks.append("\n".join(hist_lines))
+        else:
+            hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
+                             "ticket_prom": r.get("ticket_promedio_restaurant")}
+                            for r in historical_data[:hist_limit]]
+            blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
-    # Assemble context — cap total at 35000 chars
+    # Assemble context — cap total at 40000 chars
     context = ""
     for block in blocks:
-        if len(context) + len(block) > 35000:
+        if len(context) + len(block) > 40000:
             break
         context += block + "\n\n"
     print(f"[wansoft-query] Context size: {len(context)} chars, {len(blocks)} blocks")
