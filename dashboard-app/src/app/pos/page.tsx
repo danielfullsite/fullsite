@@ -577,6 +577,9 @@ function POSContent() {
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
+  // Mobile view toggle
+  const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu')
+
   // Toast state
   const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -820,119 +823,60 @@ function POSContent() {
   return (
     <div className="h-screen flex flex-col text-white overflow-hidden">
       {/* Top Bar */}
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <span className="text-white font-black text-lg tracking-tight">
-            fullsite
-            <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
-          </span>
-          <span className="text-slate-400 text-sm font-medium">POS</span>
-          <div className="h-5 w-px bg-slate-600" />
-          <Link
-            href="/pos/mesas"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <Grid3X3 size={16} />
-            Mesas
-          </Link>
-          <Link
-            href="/pos/cocina"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <ChefHat size={16} />
-            Cocina
-          </Link>
-          <Link
-            href="/pos/recetas"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <BookOpen size={16} />
-            Recetas
-          </Link>
-          <Link
-            href="/pos/compras"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <ShoppingCart size={16} />
-            Compras
-          </Link>
-          <Link
-            href="/pos/inventario"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <Package size={16} />
-            Inventario
-          </Link>
-          <Link
-            href="/pos/auditoria"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
-          >
-            <FileText size={16} />
-            Auditoria
-          </Link>
+      <header className="flex flex-col bg-slate-800 border-b border-slate-700 flex-shrink-0">
+        {/* Row 1: Logo + Nav (scrollable on mobile) */}
+        <div className="flex items-center justify-between px-3 py-2 overflow-x-auto">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-white font-black text-lg tracking-tight">
+              fullsite
+              <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
+            </span>
+            <div className="h-5 w-px bg-slate-600" />
+            <Link href="/pos/mesas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Grid3X3 size={14} />Mesas</Link>
+            <Link href="/pos/cocina" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ChefHat size={14} />Cocina</Link>
+            <Link href="/pos/recetas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><BookOpen size={14} />Recetas</Link>
+            <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>
+            <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>
+            <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400 flex-shrink-0 ml-2">
+            <Clock size={14} />
+            <span className="text-xs font-mono">{clock}</span>
+          </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          {/* Table selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-slate-400 text-sm">Mesa</label>
-            <select
-              value={mesa}
-              onChange={(e) => setMesa(Number(e.target.value))}
-              className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 min-h-[44px]"
-            >
-              {Array.from({ length: 16 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Personas */}
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-slate-400" />
-            <select
-              value={personas}
-              onChange={(e) => setPersonas(Number(e.target.value))}
-              className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 min-h-[44px]"
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Mesero selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-slate-400 text-sm">Mesero</label>
-            <select
-              value={mesero}
-              onChange={(e) => setMesero(e.target.value)}
-              className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 min-h-[44px]"
-            >
-              {MESEROS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Clock */}
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Clock size={16} />
-            <span className="text-sm font-mono">{clock}</span>
-          </div>
+        {/* Row 2: Selectors (compact on mobile) */}
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-700/50 overflow-x-auto">
+          <select value={mesa} onChange={(e) => setMesa(Number(e.target.value))} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
+            {Array.from({ length: 16 }, (_, i) => (<option key={i + 1} value={i + 1}>Mesa {i + 1}</option>))}
+          </select>
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
+            {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1} pers</option>))}
+          </select>
+          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px] flex-1 min-w-0">
+            {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
+          </select>
+        </div>
+        {/* Row 3: Mobile tab toggle (only visible on mobile) */}
+        <div className="flex md:hidden border-t border-slate-700/50">
+          <button
+            onClick={() => setMobileView('menu')}
+            className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${mobileView === 'menu' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
+          >
+            Menu
+          </button>
+          <button
+            onClick={() => setMobileView('order')}
+            className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors relative ${mobileView === 'order' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+          >
+            Orden {activeItems.length > 0 && <span className="ml-1 bg-emerald-500 text-white text-xs rounded-full px-1.5 py-0.5">{activeItems.length}</span>}
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel -- Current Order (60%) */}
-        <div className="w-[60%] flex flex-col border-r border-slate-700 bg-slate-900">
+        {/* Left Panel -- Current Order (60% desktop, full on mobile when active) */}
+        <div className={`md:w-[60%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
           {/* Order header */}
           <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50">
             <h2 className="text-lg font-semibold">
@@ -1129,8 +1073,8 @@ function POSContent() {
           </div>
         </div>
 
-        {/* Right Panel -- Menu (40%) */}
-        <div className="w-[40%] flex flex-col bg-slate-850">
+        {/* Right Panel -- Menu (40% desktop, full on mobile when active) */}
+        <div className={`md:w-[40%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
           {/* Category tabs */}
           <div className="flex gap-1 px-3 py-3 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
             {MENU_CATEGORIES.map((cat) => (
@@ -1150,12 +1094,12 @@ function POSContent() {
 
           {/* Menu items grid */}
           <div className="flex-1 overflow-y-auto p-3">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {activeCategory.items.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => handleMenuItemTap(item)}
-                  className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors min-h-[100px] flex flex-col justify-between"
+                  onClick={() => { handleMenuItemTap(item); setMobileView('order') }}
+                  className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors min-h-[80px] md:min-h-[100px] flex flex-col justify-between"
                 >
                   <span className="font-medium text-[14px] leading-tight">
                     {item.name}
