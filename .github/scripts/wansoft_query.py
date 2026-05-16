@@ -327,7 +327,7 @@ def fetch_all_wansoft_data(session, start, end):
     return data
 
 
-def fetch_historical(days=60):
+def fetch_historical(days=90):
     """Fetch historical data from Supabase wansoft_daily."""
     try:
         now_mx = datetime.now(MX_TZ)
@@ -338,7 +338,7 @@ def fetch_historical(days=60):
                       "meseros,platillos_top,ventas_por_grupo,pago_metodos",
             "fecha": f"gte.{start}",
             "order": "fecha.desc",
-            "limit": "60",
+            "limit": "100",
         })
         return rows
     except Exception as e:
@@ -395,6 +395,18 @@ Respuesta: "Brayan vendió 5 pizzas: 3 Margarita ($3,180) y 2 Prosciuto ($2,197)
 
 Pregunta: "Cuánto vendimos ayer"
 Respuesta: "Ventas netas: $64,263"
+
+Pregunta: "Quién vendió más H&H ayer"
+Respuesta: Usa el campo "H&H" de cada mesero en todos_los_meseros. Ejemplo:
+"Más H&H: Brayan Berlanga (5 pzas, $1,435)
+Menos H&H: Mario Garcia (0 pzas)"
+
+Pregunta: "Extras/upselling por mesero"
+Respuesta: Usa el campo "bebidas_por_persona" y "alimentos_por_persona" de cada mesero. Más bebidas por persona = mejor upselling de bebidas. Si hay datos de modificadores totales, inclúyelos. Si no hay cruce de extras POR MESERO di "No tengo desglose de extras individuales por mesero, pero sí tengo bebidas por persona" y muestra eso.
+
+REGLA #11: En los datos de todos_los_meseros, "H&H" significa Half & Half. "Pan" incluye toast y bagels. "2da Bebida" es segunda bebida del comensal. Estos son los indicadores de upselling.
+
+REGLA #12: Para historial de ticket promedio, muestra TODOS los días disponibles, empezando desde el más antiguo. No omitas ningún día.
 """
 
 
@@ -467,10 +479,13 @@ def ask_groq(question, wansoft_data, historical_data):
             wc_data[f"grupos_de_{mesero_match}"] = por_mesero_grupo.get(mesero_match, {})
         else:
             # No specific mesero — show compact summary for ALL meseros
-            # Format: mesero → {KPIs + all categories} in one compact dict
+            # Filter out excluded meseros from the data
+            _excl_lower = [e.lower() for e in _exclude_names]
             all_meseros = {}
             for mesero_name, mesero_data in waiter_cats.items():
                 if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
+                    continue
+                if any(ex in mesero_name.lower() for ex in _excl_lower):
                     continue
                 compact_m = {}
                 kpis = mesero_data.get("KPIs", {})
