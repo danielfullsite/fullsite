@@ -603,6 +603,7 @@ def ask_groq(question, wansoft_data, historical_data):
                 tp = r.get("ticket_promedio_restaurant")
                 if tp:
                     hist_lines.append(f"  {r['fecha']}: ${round(tp)}")
+            print(f"[wansoft-query] History block: {len(hist_lines)-1} days, {len(chr(10).join(hist_lines))} chars")
             # Insert at position 1 (after rankings) so it doesn't get cut
             blocks.insert(1, "\n".join(hist_lines))
         else:
@@ -626,7 +627,7 @@ def ask_groq(question, wansoft_data, historical_data):
                  "Content-Type": "application/json"},
         json={
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 1500,
+            "max_tokens": 4000,
             "system": SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": context}],
         }, timeout=30)
