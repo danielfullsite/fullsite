@@ -200,7 +200,8 @@ export const MODIFIERS_AGREGAR: ModificadorAgregar[] = [
 // This connects every platillo to its recipe for dynamic modifiers + inventory deduction
 export const RECIPE_ALIASES: Record<string, string[]> = {
   // Chilaquiles & Enchiladas
-  'chilaquiles': ['chilaquiles verdes', 'chilaquiles rojos'],
+  'chilaquiles verdes': ['chilaquiles verdes'],
+  'chilaquiles rojos': ['chilaquiles rojos'],
   'chilaquiles light': ['chilaquiles ligth', 'chilaquiles light'],
   'enchiladas suizas': ['enchiladas suizas'],
   // Eggs & Keto
@@ -219,8 +220,8 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'chai latte frio': ['chai latte'],
   'mocca latte caliente': ['mocca latte'],
   // Toast & Bagels
-  'avocado toast': ['avo toast', 'avocado toast'],
-  'amalay salmon special toast': ['amalay smoked salmon & avocado toast', 'amalay  salmon & avo toast'],
+  'avocado toast': ['avo toast'],
+  'amalay salmon special toast': ['amalay smoked salmon & avocado toast'],
   'el mexicano toast': ['el mexicano toast', 'mexicano'],
   'salmon bagel': ['salmon bagel'],
   // Everyday Specials
@@ -302,7 +303,8 @@ export interface Mesa {
 export const MENU_CATEGORIES: MenuCategory[] = [
   {
     id: 'chilaquiles', name: 'Chilaquiles & Enchiladas', items: [
-      { id: 'c1', name: 'Chilaquiles', price: 292 },
+      { id: 'c1a', name: 'Chilaquiles Verdes', price: 292 },
+      { id: 'c1b', name: 'Chilaquiles Rojos', price: 292 },
       { id: 'c2', name: 'Chilaquiles Light', price: 304 },
       { id: 'c3', name: 'Enchiladas Suizas', price: 261 },
     ]
