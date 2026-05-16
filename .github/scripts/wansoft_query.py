@@ -480,7 +480,7 @@ def ask_groq(question, wansoft_data, historical_data):
         else:
             # No specific mesero — show compact summary for ALL meseros
             # Filter out excluded meseros from the data
-            _excl_lower = [e.lower() for e in _exclude_names]
+            _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones"]
             all_meseros = {}
             for mesero_name, mesero_data in waiter_cats.items():
                 if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
@@ -544,8 +544,8 @@ def ask_groq(question, wansoft_data, historical_data):
                 if qty > 0:
                     rankings.append(f"  {m}: {qty} pzas (${total:,})")
 
-            # Put rankings as plain text FIRST (not inside JSON)
-            blocks.append("\n".join(rankings))
+            # Put rankings as plain text FIRST — insert at position 0
+            blocks.insert(0, "\n".join(rankings))
 
         wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
         wc_data["rango"] = waiter_cats.get("__rango", "")
