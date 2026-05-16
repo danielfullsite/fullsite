@@ -592,19 +592,19 @@ def ask_groq(question, wansoft_data, historical_data):
     blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
                   + json.dumps(platillos[:20], ensure_ascii=False, indent=1))
 
-    # Block 5: Historical — include more days if question asks for history
+    # Block 5: Historical
     hist_keywords = ["historial", "historia", "abril", "marzo", "últimos", "ultimos", "mejorado", "tendencia", "comparar"]
     wants_history = any(kw in q_lower for kw in hist_keywords)
     hist_limit = 90 if wants_history else 7
     if historical_data:
         if wants_history:
-            # Ultra-compact: one line per day
             hist_lines = ["HISTÓRICO TICKET PROMEDIO DIARIO:"]
             for r in reversed(historical_data[:hist_limit]):
                 tp = r.get("ticket_promedio_restaurant")
                 if tp:
                     hist_lines.append(f"  {r['fecha']}: ${round(tp)}")
-            blocks.append("\n".join(hist_lines))
+            # Insert at position 1 (after rankings) so it doesn't get cut
+            blocks.insert(1, "\n".join(hist_lines))
         else:
             hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
                              "ticket_prom": r.get("ticket_promedio_restaurant")}
