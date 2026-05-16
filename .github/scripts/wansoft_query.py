@@ -495,12 +495,13 @@ def ask_groq(question, wansoft_data, historical_data):
                     compact_m["ticket_promedio"] = kpis.get("ticket_promedio", 0)
                     compact_m["personas"] = kpis.get("personas", 0)
                     compact_m["tickets"] = kpis.get("tickets", 0)
-                # Add all categories (H&H, Pan, Postres, 2da Bebida)
+                # Add all categories (H&H, Pan, Postres, 2da Bebida) as explicit numbers
                 for cat, cat_vals in mesero_data.items():
                     if cat == "KPIs" or not isinstance(cat_vals, dict):
                         continue
                     if "qty" in cat_vals:
-                        compact_m[cat] = f"{cat_vals['qty']}pzas/${cat_vals.get('total',0):,.0f}"
+                        compact_m[f"{cat}_qty"] = cat_vals['qty']
+                        compact_m[f"{cat}_total"] = round(cat_vals.get('total', 0))
                 if compact_m:
                     all_meseros[mesero_name] = compact_m
             wc_data["todos_los_meseros"] = all_meseros
@@ -545,17 +546,17 @@ def ask_groq(question, wansoft_data, historical_data):
     # Block 5: Historical — include more days if question asks for history
     hist_keywords = ["historial", "historia", "abril", "marzo", "últimos", "ultimos", "mejorado", "tendencia", "comparar"]
     wants_history = any(kw in q_lower for kw in hist_keywords)
-    hist_limit = 60 if wants_history else 7
+    hist_limit = 90 if wants_history else 7
     if historical_data:
         hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
                          "ticket_prom": r.get("ticket_promedio_restaurant")}
                         for r in historical_data[:hist_limit]]
         blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
-    # Assemble context — cap total at 25000 chars
+    # Assemble context — cap total at 35000 chars
     context = ""
     for block in blocks:
-        if len(context) + len(block) > 25000:
+        if len(context) + len(block) > 35000:
             break
         context += block + "\n\n"
     print(f"[wansoft-query] Context size: {len(context)} chars, {len(blocks)} blocks")
