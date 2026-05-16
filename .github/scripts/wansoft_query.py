@@ -320,8 +320,9 @@ def fetch_all_wansoft_data(session, start, end):
             combined["__dias_incluidos"] = len(wc)
             combined["__rango"] = f"{wc[-1]['fecha']} a {wc[0]['fecha']}"
             data["ventas_por_mesero_x_categoria"] = combined
-    except Exception:
-        pass
+            print(f"[wansoft-query] Waiter categories loaded: {len(wc)} days, {len([k for k in combined if not k.startswith('__')])} meseros")
+    except Exception as e:
+        print(f"[wansoft-query] Waiter categories FAILED: {e}")
 
     return data
 
@@ -425,8 +426,12 @@ def ask_groq(question, wansoft_data, historical_data):
                     "segunda bebida", "bebida", "bebidas por persona", "categoría", "categoria",
                     "pizza", "chilaquile", "enchilada", "café", "cafe", "latte",
                     "mesero vendió", "mesero vendio", "vendió cada", "vendio cada",
+                    "upselling", "up selling", "extras", "extra", "mesero que más", "mesero que menos",
+                    "quién vendió", "quien vendio", "quién fue", "quien fue",
                     "por mesero", "por persona", "kpi", "ticket promedio"]
-    if waiter_cats and any(kw in q_lower for kw in cat_keywords):
+    matched_kw = [kw for kw in cat_keywords if kw in q_lower]
+    print(f"[wansoft-query] Waiter cats exists: {waiter_cats is not None}, matched keywords: {matched_kw[:5]}")
+    if waiter_cats and matched_kw:
         # Extract relevant mesero×grupo or mesero×platillo data
         wc_data = {}
 
