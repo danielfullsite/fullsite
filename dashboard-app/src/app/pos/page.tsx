@@ -9,6 +9,7 @@ import {
   IVA_RATE,
   MODIFIERS_AGREGAR,
   MANAGER_PINS,
+  RECIPE_ALIASES,
   formatMXN,
   generateId,
   saveOrder,
@@ -585,11 +586,24 @@ function POSContent() {
     const name = itemName.toLowerCase()
     const ingMap = new Map(allIngredients.map(i => [i.id, i]))
 
-    // Find matching recipe rows
-    const rows = allRecipes.filter(r => {
-      const rName = r.menu_item_name.toLowerCase()
-      return rName === name || rName.includes(name) || name.includes(rName)
-    })
+    // Use alias map first
+    const aliases = RECIPE_ALIASES[name]
+    let rows: RecipeRow[] = []
+
+    if (aliases) {
+      for (const alias of aliases) {
+        const matched = allRecipes.filter(r => r.menu_item_name.toLowerCase() === alias.toLowerCase())
+        if (matched.length > 0) { rows = matched; break }
+      }
+    }
+
+    // Fallback: partial match
+    if (rows.length === 0) {
+      rows = allRecipes.filter(r => {
+        const rName = r.menu_item_name.toLowerCase()
+        return rName === name || rName.includes(name) || name.includes(rName)
+      })
+    }
 
     // Get unique ingredient names, capitalize first letter
     const names = new Set<string>()

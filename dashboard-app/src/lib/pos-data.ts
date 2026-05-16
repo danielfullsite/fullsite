@@ -196,6 +196,82 @@ export const MODIFIERS_AGREGAR: ModificadorAgregar[] = [
   { name: 'Shot extra', price: 20 },
 ]
 
+// Map POS menu item names → recipe names in database
+// This connects every platillo to its recipe for dynamic modifiers + inventory deduction
+export const RECIPE_ALIASES: Record<string, string[]> = {
+  // Chilaquiles & Enchiladas
+  'chilaquiles': ['chilaquiles verdes', 'chilaquiles rojos'],
+  'chilaquiles light': ['chilaquiles ligth', 'chilaquiles light'],
+  'enchiladas suizas': ['enchiladas suizas'],
+  // Eggs & Keto
+  'machacado con huevo': ['machacado con huevo', 'machaca con huevo'],
+  'half & half combo': ['half & half combo'],
+  'garden omelet': ['garden omelet', 'garden omelette'],
+  'combo fit': ['combo fit'],
+  'egg and pancake combo': ['combo kids pancake & eggs'],
+  'miss benedict': ['miss. benedict', 'miss benedict- salmon', 'miss benedict panela wallander'],
+  // Coffee
+  'cafe americano': ['cafe americano'],
+  'capuchino caliente': ['capuchino'],
+  'cafe latte caliente': ['cafe latte'],
+  'latte frio': ['latte frio'],
+  'matcha latte frio': ['matcha latte'],
+  'chai latte frio': ['chai latte'],
+  'mocca latte caliente': ['mocca latte'],
+  // Toast & Bagels
+  'avocado toast': ['avo toast', 'avocado toast'],
+  'amalay salmon special toast': ['amalay smoked salmon & avocado toast', 'amalay  salmon & avo toast'],
+  'el mexicano toast': ['el mexicano toast', 'mexicano'],
+  'salmon bagel': ['salmon bagel'],
+  // Everyday Specials
+  'combo amalay': ['combo amalay'],
+  'french toast': ['french toast'],
+  // Signature
+  'mimosa clasica': ['mimosa clasica'],
+  'chamoyada de mango': ['chamoyada de mango'],
+  // Croissants
+  'croque madame amalay': ['croque madame', 'mumma"s breakfast croissant', "mumy's breakfast croissant"],
+  'croissant nutella': ['croissant nutella'],
+  'turkey & swiss croissant': ['turkey & swiss croisaint', "nell's turkey & swiss"],
+  'croissant almendra': ['croissant almendra'],
+  // Jugos
+  'jugo de naranja natural': ['jugo de naranja'],
+  'jugo verde de la casa': ['jugo verde'],
+  'jugo be inmune': ['jugo be inmune'],
+  'jugo dr detox': ['jugo dr detox'],
+  'jugo u glow': ['jugo u glow'],
+  // Fresh Drinks
+  'limonada natural': ['limonada natural'],
+  'limonada de frutos rojos': ['limonada de frutos rojos'],
+  // Smoothies
+  'smoothie mango-matcha': ['smoothie mango matcha'],
+  'smoothie pink flamingo': ['smoothie pink flamingo'],
+  'smoothie tropical coconut': ['smoothie tropical coconut'],
+  // Frappes
+  'frappe matcha': ['frappe matcha'],
+  'frappe mango-maracuya': ['frappe mango maracuya'],
+  // Pancakes & Waffles
+  'classic pancakes': ['classic buttermilk pancakes', 'classic butermilk pancakes'],
+  // Paninis
+  'chicken panini': ['turkey pannini', 'turkey panini'],
+  // Pizzas & Pastas
+  'pasta mamarosa': ['pasta pacceri al pesto'],
+  'pizza pepperoni': ['pizza pepperoni'],
+  'pizza margarita': ['pizza margarita'],
+  // Bowls
+  'acai love bowl': ['acai love'],
+  'fruit bowl': ['plato de berrys', 'plato granola con berries'],
+  // Postres
+  'cheesecake': ['cheesecake'],
+  'carrot cake': ['carrot cake', 'coffe cake'],
+  // Bakery
+  'concha de mantequilla': ['concha de mantequilla'],
+  'healthy crunchy mix': ['healthy & crunchy', 'healty munchies'],
+  // Tea
+  'te chai': ['te chai'],
+  'te verde': ['te verde'],
+}
+
 export interface Order {
   id: string
   mesa: number
@@ -758,7 +834,6 @@ export async function deductIngredientsForOrder(
   const alerts: string[] = []
 
   // 2. For each order item, find matching recipe and deduct
-  // Group recipes by menu_item_id for faster lookup
   const recipesByName = new Map<string, typeof recipes>()
   for (const r of recipes) {
     const key = r.menu_item_name.toLowerCase()
@@ -768,16 +843,27 @@ export async function deductIngredientsForOrder(
 
   for (const item of items) {
     const itemName = item.nombre.toLowerCase()
+    let recipeRows: typeof recipes = []
 
-    // Priority 1: exact match on recipe name
-    let recipeRows = recipesByName.get(itemName) ?? []
+    // Priority 1: use alias map
+    const aliases = RECIPE_ALIASES[itemName]
+    if (aliases) {
+      for (const alias of aliases) {
+        const rows = recipesByName.get(alias.toLowerCase())
+        if (rows && rows.length > 0) { recipeRows = rows; break }
+      }
+    }
 
-    // Priority 2: find the BEST single match (most specific name that contains the item name)
+    // Priority 2: exact match on recipe name
+    if (recipeRows.length === 0) {
+      recipeRows = recipesByName.get(itemName) ?? []
+    }
+
+    // Priority 3: best single partial match
     if (recipeRows.length === 0) {
       let bestMatch: { name: string; rows: typeof recipes } | null = null
       for (const [name, rows] of recipesByName) {
         if (name.includes(itemName) || itemName.includes(name)) {
-          // Prefer shorter name (more specific) or exact containment
           if (!bestMatch || Math.abs(name.length - itemName.length) < Math.abs(bestMatch.name.length - itemName.length)) {
             bestMatch = { name, rows }
           }
