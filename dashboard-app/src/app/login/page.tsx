@@ -16,12 +16,37 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-      if (authError) { setError(authError.message); setLoading(false); return }
-      if (data?.session) { window.location.href = '/' }
-      else { setError('No se pudo crear la sesión.'); setLoading(false) }
+      // Use fetch directly to avoid SDK hanging issue
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error_description || data.msg || 'Credenciales incorrectas')
+        setLoading(false)
+        return
+      }
+      // Set session in Supabase client
+      if (data.access_token) {
+        await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        })
+        window.location.href = '/'
+      } else {
+        setError('No se pudo crear la sesión.')
+        setLoading(false)
+      }
     } catch {
-      setError('Error de conexión.'); setLoading(false)
+      setError('Error de conexión.')
+      setLoading(false)
     }
   }
 
