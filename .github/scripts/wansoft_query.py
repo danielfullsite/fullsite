@@ -506,6 +506,46 @@ def ask_groq(question, wansoft_data, historical_data):
                     all_meseros[mesero_name] = compact_m
             wc_data["todos_los_meseros"] = all_meseros
 
+            # Pre-build rankings as plain text so AI doesn't miss them
+            rankings = []
+            # H&H ranking
+            hh_rank = [(m, d.get("H&H_qty", 0), d.get("H&H_total", 0)) for m, d in all_meseros.items()]
+            hh_rank.sort(key=lambda x: -x[1])
+            rankings.append("RANKING H&H POR MESERO:")
+            for m, qty, total in hh_rank:
+                rankings.append(f"  {m}: {qty} pzas (${total:,})")
+
+            # 2da Bebida ranking
+            beb_rank = [(m, d.get("2da Bebida_qty", 0)) for m, d in all_meseros.items()]
+            beb_rank.sort(key=lambda x: -x[1])
+            rankings.append("\nRANKING 2DA BEBIDA POR MESERO:")
+            for m, qty in beb_rank:
+                rankings.append(f"  {m}: {qty} pzas")
+
+            # Bebidas por persona ranking
+            bp_rank = [(m, d.get("bebidas_por_persona", 0)) for m, d in all_meseros.items()]
+            bp_rank.sort(key=lambda x: -x[1])
+            rankings.append("\nRANKING BEBIDAS POR PERSONA:")
+            for m, bp in bp_rank:
+                rankings.append(f"  {m}: {bp}")
+
+            # Pan ranking
+            pan_rank = [(m, d.get("Pan_qty", 0), d.get("Pan_total", 0)) for m, d in all_meseros.items()]
+            pan_rank.sort(key=lambda x: -x[1])
+            rankings.append("\nRANKING PAN/TOAST/BAGEL POR MESERO:")
+            for m, qty, total in pan_rank:
+                rankings.append(f"  {m}: {qty} pzas (${total:,})")
+
+            # Postres ranking
+            post_rank = [(m, d.get("Postres_qty", 0), d.get("Postres_total", 0)) for m, d in all_meseros.items()]
+            post_rank.sort(key=lambda x: -x[1])
+            rankings.append("\nRANKING POSTRES POR MESERO:")
+            for m, qty, total in post_rank:
+                if qty > 0:
+                    rankings.append(f"  {m}: {qty} pzas (${total:,})")
+
+            wc_data["rankings_precalculados"] = "\n".join(rankings)
+
         wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
         wc_data["rango"] = waiter_cats.get("__rango", "")
 
