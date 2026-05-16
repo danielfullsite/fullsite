@@ -1195,6 +1195,46 @@ export async function getFacturas(): Promise<Factura[]> {
   return res.json()
 }
 
+// ─── Recipe Details (presentation, elaboration, allergens) ──────────────────
+
+export interface RecipeDetail {
+  id: string
+  name: string
+  category: string | null
+  portion_size: string | null
+  prep_time: string | null
+  cook_time: string | null
+  serving_temp: string | null
+  plate: string | null
+  presentation: string | null
+  elaboration: string | null
+  equipment: string | null
+  allergens: string[] | null
+}
+
+export async function getRecipeDetail(name: string): Promise<RecipeDetail | null> {
+  // Search by name (partial match)
+  const encoded = encodeURIComponent(name)
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_recipe_details?name=ilike.*${encoded}*&limit=1`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return null
+  const rows = await res.json()
+  if (rows.length === 0) {
+    // Try by id
+    const id = name.toLowerCase().replace(/ /g, '_').replace(/'/g, '').slice(0, 40)
+    const res2 = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_recipe_details?id=ilike.*${encodeURIComponent(id)}*&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res2.ok) return null
+    const rows2 = await res2.json()
+    return rows2[0] || null
+  }
+  return rows[0]
+}
+
 export async function updateFacturaStatus(
   id: string, status: string, extra?: Record<string, unknown>
 ): Promise<boolean> {

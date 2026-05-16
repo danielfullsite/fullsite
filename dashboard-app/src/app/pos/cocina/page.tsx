@@ -6,8 +6,9 @@ import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X
 import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
+  getRecipeDetail,
   MANAGER_PINS, RECIPE_ALIASES, formatMXN,
-  type KitchenOrderFromDB,
+  type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 
 function getElapsedMinutes(dateStr: string): number {
@@ -29,6 +30,17 @@ export default function CocinaPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Recipe detail modal
+  const [recipeDetail, setRecipeDetail] = useState<RecipeDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  const showRecipeDetail = async (itemName: string) => {
+    setLoadingDetail(true)
+    const detail = await getRecipeDetail(itemName)
+    setRecipeDetail(detail)
+    setLoadingDetail(false)
+  }
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -252,7 +264,10 @@ export default function CocinaPage() {
                           {item.cancelled ? '✕' : `${item.cantidad || item.quantity || 1}x`}
                         </span>
                         <div className="flex-1">
-                          <span className={`text-sm ${item.cancelled ? 'line-through text-red-400' : 'text-white'}`}>{item.nombre || item.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (!item.cancelled) showRecipeDetail(item.nombre || item.name || '') }}
+                            className={`text-sm text-left ${item.cancelled ? 'line-through text-red-400' : 'text-white underline decoration-dotted underline-offset-2 hover:text-emerald-400'}`}
+                          >{item.nombre || item.name}</button>
                           {item.cancelled && (
                             <p className="text-red-500 text-[10px]">Cancelado: {item.cancelReason} — {item.cancelledBy}</p>
                           )}
@@ -292,6 +307,113 @@ export default function CocinaPage() {
           </div>
         )}
       </div>
+      {/* Recipe Detail Modal */}
+      {(recipeDetail || loadingDetail) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setRecipeDetail(null)} />
+          <div className="relative bg-slate-800 border border-emerald-700/40 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl mx-4">
+            {loadingDetail ? (
+              <div className="p-12 text-center">
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              </div>
+            ) : recipeDetail ? (
+              <>
+                <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-5 py-4 rounded-t-2xl z-10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">{recipeDetail.name}</h3>
+                      {recipeDetail.category && <p className="text-emerald-400 text-sm">{recipeDetail.category}</p>}
+                    </div>
+                    <button onClick={() => setRecipeDetail(null)} className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-300">
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-5 py-4 space-y-4">
+                  {/* Info rápida */}
+                  <div className="flex gap-3 flex-wrap">
+                    {recipeDetail.prep_time && (
+                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-slate-400 text-[10px] uppercase">Prep</p>
+                        <p className="text-white font-semibold text-sm">{recipeDetail.prep_time}</p>
+                      </div>
+                    )}
+                    {recipeDetail.cook_time && (
+                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-slate-400 text-[10px] uppercase">Coccion</p>
+                        <p className="text-white font-semibold text-sm">{recipeDetail.cook_time}</p>
+                      </div>
+                    )}
+                    {recipeDetail.serving_temp && (
+                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-slate-400 text-[10px] uppercase">Temp</p>
+                        <p className="text-white font-semibold text-sm">{recipeDetail.serving_temp}°</p>
+                      </div>
+                    )}
+                    {recipeDetail.portion_size && (
+                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-slate-400 text-[10px] uppercase">Porcion</p>
+                        <p className="text-white font-semibold text-sm">{recipeDetail.portion_size}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Plato */}
+                  {recipeDetail.plate && (
+                    <div className="bg-blue-900/30 border border-blue-700/40 rounded-xl px-4 py-3">
+                      <p className="text-blue-400 text-xs font-semibold uppercase mb-1">Plato</p>
+                      <p className="text-white text-sm">{recipeDetail.plate}</p>
+                    </div>
+                  )}
+
+                  {/* Presentación */}
+                  {recipeDetail.presentation && (
+                    <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-xl px-4 py-3">
+                      <p className="text-emerald-400 text-xs font-semibold uppercase mb-1">Presentacion</p>
+                      <p className="text-white text-sm whitespace-pre-wrap">{recipeDetail.presentation}</p>
+                    </div>
+                  )}
+
+                  {/* Elaboración */}
+                  {recipeDetail.elaboration && (
+                    <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl px-4 py-3">
+                      <p className="text-amber-400 text-xs font-semibold uppercase mb-1">Elaboracion</p>
+                      <p className="text-white text-sm whitespace-pre-wrap">{recipeDetail.elaboration}</p>
+                    </div>
+                  )}
+
+                  {/* Equipo */}
+                  {recipeDetail.equipment && (
+                    <div className="bg-slate-700/40 rounded-xl px-4 py-3">
+                      <p className="text-slate-400 text-xs font-semibold uppercase mb-1">Equipo</p>
+                      <p className="text-white text-sm">{recipeDetail.equipment}</p>
+                    </div>
+                  )}
+
+                  {/* Alérgenos */}
+                  {recipeDetail.allergens && recipeDetail.allergens.length > 0 && (
+                    <div className="bg-red-900/20 border border-red-700/30 rounded-xl px-4 py-3">
+                      <p className="text-red-400 text-xs font-semibold uppercase mb-2">Alergenos</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(typeof recipeDetail.allergens === 'string' ? JSON.parse(recipeDetail.allergens) : recipeDetail.allergens).map((a: string, i: number) => (
+                          <span key={i} className="bg-red-900/40 text-red-300 text-xs px-2 py-1 rounded-full">{a}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center text-slate-500">
+                <p>Sin datos de presentacion para este platillo</p>
+                <button onClick={() => setRecipeDetail(null)} className="mt-3 text-sm text-slate-400 underline">Cerrar</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Cancel Item Modal */}
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
