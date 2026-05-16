@@ -673,7 +673,7 @@ def main():
 
         # Fetch historical from Supabase
         print("[wansoft-query] Fetching historical...")
-        historical = fetch_historical(30)
+        historical = fetch_historical(90)
 
         platillos_count = wansoft_data.get("total_platillos_distintos", 0)
         meseros_count = len(wansoft_data.get("ventas_por_mesero", []))
