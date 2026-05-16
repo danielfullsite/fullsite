@@ -452,10 +452,16 @@ def ask_groq(question, wansoft_data, historical_data):
         por_mesero_platillo = waiter_cats.get("__por_mesero_platillo", {})
 
         # Filter to relevant mesero if mentioned
+        # Exclude generic words and excluded staff from matching
+        _excl_lower = [e.lower() for e in _exclude_names] + ["mesero evento", "aplicaciones"]
+        _skip_match = {"mesero", "total", "ranking", "todos", "ayer", "mayo", "bebida", "persona"}
         mesero_match = None
         for mesero_name in por_mesero_grupo:
+            if any(ex in mesero_name.lower() for ex in _excl_lower):
+                continue
             name_parts = mesero_name.lower().split()
-            if any(part in q_lower for part in name_parts if len(part) > 3):
+            matching_parts = [p for p in name_parts if len(p) > 3 and p not in _skip_match and p in q_lower]
+            if matching_parts:
                 mesero_match = mesero_name
                 break
 
