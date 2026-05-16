@@ -758,13 +758,33 @@ export async function deductIngredientsForOrder(
   const alerts: string[] = []
 
   // 2. For each order item, find matching recipe and deduct
+  // Group recipes by menu_item_id for faster lookup
+  const recipesByName = new Map<string, typeof recipes>()
+  for (const r of recipes) {
+    const key = r.menu_item_name.toLowerCase()
+    if (!recipesByName.has(key)) recipesByName.set(key, [])
+    recipesByName.get(key)!.push(r)
+  }
+
   for (const item of items) {
-    // Try matching by menu_item_name (case-insensitive partial match)
     const itemName = item.nombre.toLowerCase()
-    const recipeRows = recipes.filter(r =>
-      r.menu_item_name.toLowerCase().includes(itemName) ||
-      itemName.includes(r.menu_item_name.toLowerCase())
-    )
+
+    // Priority 1: exact match on recipe name
+    let recipeRows = recipesByName.get(itemName) ?? []
+
+    // Priority 2: find the BEST single match (most specific name that contains the item name)
+    if (recipeRows.length === 0) {
+      let bestMatch: { name: string; rows: typeof recipes } | null = null
+      for (const [name, rows] of recipesByName) {
+        if (name.includes(itemName) || itemName.includes(name)) {
+          // Prefer shorter name (more specific) or exact containment
+          if (!bestMatch || Math.abs(name.length - itemName.length) < Math.abs(bestMatch.name.length - itemName.length)) {
+            bestMatch = { name, rows }
+          }
+        }
+      }
+      if (bestMatch) recipeRows = bestMatch.rows
+    }
 
     if (recipeRows.length === 0) continue
 

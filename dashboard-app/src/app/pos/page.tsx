@@ -37,6 +37,7 @@ import {
   BookOpen,
   Package,
   ShoppingCart,
+  Wine,
 } from 'lucide-react'
 
 export default function POSPage() {
@@ -837,6 +838,7 @@ function POSContent() {
             <div className="h-5 w-px bg-slate-600" />
             <Link href="/pos/mesas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Grid3X3 size={14} />Mesas</Link>
             <Link href="/pos/cocina" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ChefHat size={14} />Cocina</Link>
+            <Link href="/pos/barra" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Wine size={14} />Barra</Link>
             <Link href="/pos/recetas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><BookOpen size={14} />Recetas</Link>
             <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>
             <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>
