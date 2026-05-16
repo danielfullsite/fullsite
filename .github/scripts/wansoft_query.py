@@ -544,12 +544,15 @@ def ask_groq(question, wansoft_data, historical_data):
                 if qty > 0:
                     rankings.append(f"  {m}: {qty} pzas (${total:,})")
 
-            wc_data["rankings_precalculados"] = "\n".join(rankings)
+            # Put rankings as plain text FIRST (not inside JSON)
+            blocks.append("\n".join(rankings))
 
         wc_data["dias_incluidos"] = waiter_cats.get("__dias_incluidos", 1)
         wc_data["rango"] = waiter_cats.get("__rango", "")
 
-        blocks.append("VENTAS POR MESERO × CATEGORÍA Y PLATILLO:\n"
+        # Remove todos_los_meseros from JSON to save space (rankings already have the data)
+        wc_data.pop("todos_los_meseros", None)
+        blocks.append("DATOS MESERO × CATEGORÍA:\n"
                       + json.dumps(wc_data, ensure_ascii=False, indent=1))
 
     # Block 1: If there are matching platillos, put them FIRST
