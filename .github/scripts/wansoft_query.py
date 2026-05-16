@@ -243,12 +243,17 @@ def fetch_all_wansoft_data(session, start, end):
     # 18. Waiter × Category (H&H, Pan, Postres, 2da Bebida por mesero)
     # Fetch all days in the date range and aggregate
     try:
-        wc = sb_get("wansoft_waiter_categories", {
+        wc_params = {
             "select": "fecha,data",
-            "fecha": f"gte.{start}",
             "order": "fecha.desc",
             "limit": "31",
-        })
+        }
+        # Use PostgREST AND filter for date range
+        if start == end:
+            wc_params["fecha"] = f"eq.{start}"
+        else:
+            wc_params["and"] = f"(fecha.gte.{start},fecha.lte.{end})"
+        wc = sb_get("wansoft_waiter_categories", wc_params)
         if not wc:
             # Fallback: get most recent entry
             wc = sb_get("wansoft_waiter_categories", {
