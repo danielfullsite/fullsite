@@ -19,6 +19,125 @@
 //   created_at TIMESTAMPTZ DEFAULT NOW(),
 //   closed_at TIMESTAMPTZ
 // );
+//
+// -- BLINDAJE: Immutable audit log (nothing deleteable)
+// CREATE TABLE pos_audit_log (
+//   id BIGSERIAL PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   order_id TEXT,
+//   action TEXT NOT NULL,
+//   actor TEXT NOT NULL,
+//   mesa INTEGER,
+//   details JSONB,
+//   reason TEXT,
+//   approved_by TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+// CREATE INDEX idx_audit_order ON pos_audit_log(order_id);
+// CREATE INDEX idx_audit_action ON pos_audit_log(action);
+// CREATE INDEX idx_audit_created ON pos_audit_log(created_at DESC);
+//
+// -- Actions: order_created, order_sent_kitchen, order_closed, order_cancelled,
+// --          item_added, item_modified, item_cancelled, quantity_changed,
+// --          discount_applied, discount_removed, status_changed, payment_processed
+//
+// -- INVENTARIO: Ingredients + Recipes + Stock
+// CREATE TABLE pos_ingredients (
+//   id TEXT PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   name TEXT NOT NULL,
+//   unit TEXT NOT NULL,            -- 'g', 'ml', 'pz', 'kg', 'lt'
+//   cost_per_unit NUMERIC DEFAULT 0,
+//   category TEXT,                 -- 'proteina', 'lacteo', 'vegetal', 'pan', 'bebida', 'condimento', 'otro'
+//   active BOOLEAN DEFAULT true,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+//
+// CREATE TABLE pos_recipes (
+//   id BIGSERIAL PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   menu_item_id TEXT NOT NULL,     -- references MENU_CATEGORIES item id
+//   menu_item_name TEXT NOT NULL,
+//   ingredient_id TEXT NOT NULL REFERENCES pos_ingredients(id),
+//   quantity NUMERIC NOT NULL,      -- amount of ingredient per 1 unit of platillo
+//   created_at TIMESTAMPTZ DEFAULT NOW(),
+//   UNIQUE(client_id, menu_item_id, ingredient_id)
+// );
+//
+// CREATE TABLE pos_inventory (
+//   id BIGSERIAL PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   ingredient_id TEXT NOT NULL REFERENCES pos_ingredients(id),
+//   stock NUMERIC NOT NULL DEFAULT 0,
+//   reorder_point NUMERIC DEFAULT 0,
+//   reorder_quantity NUMERIC DEFAULT 0,
+//   last_restock TIMESTAMPTZ,
+//   updated_at TIMESTAMPTZ DEFAULT NOW(),
+//   UNIQUE(client_id, ingredient_id)
+// );
+//
+// CREATE TABLE pos_inventory_movements (
+//   id BIGSERIAL PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   ingredient_id TEXT NOT NULL REFERENCES pos_ingredients(id),
+//   movement_type TEXT NOT NULL,    -- 'deduction', 'restock', 'adjustment', 'waste'
+//   quantity NUMERIC NOT NULL,
+//   order_id TEXT,
+//   actor TEXT,
+//   notes TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+// CREATE INDEX idx_inv_mov_ingredient ON pos_inventory_movements(ingredient_id);
+// CREATE INDEX idx_inv_mov_created ON pos_inventory_movements(created_at DESC);
+//
+// -- COMPRAS: Purchase Orders + Facturas
+// CREATE TABLE pos_purchase_orders (
+//   id TEXT PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   supplier TEXT NOT NULL,
+//   status TEXT DEFAULT 'borrador',   -- borrador, enviada, recibida, facturada, pagada, cancelada
+//   created_by TEXT NOT NULL,
+//   approved_by TEXT,
+//   notes TEXT,
+//   subtotal NUMERIC DEFAULT 0,
+//   iva NUMERIC DEFAULT 0,
+//   total NUMERIC DEFAULT 0,
+//   ai_suggested BOOLEAN DEFAULT false,
+//   sent_at TIMESTAMPTZ,
+//   received_at TIMESTAMPTZ,
+//   received_by TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+//
+// CREATE TABLE pos_purchase_order_items (
+//   id BIGSERIAL PRIMARY KEY,
+//   order_id TEXT NOT NULL REFERENCES pos_purchase_orders(id),
+//   ingredient_id TEXT NOT NULL,
+//   ingredient_name TEXT NOT NULL,
+//   quantity_ordered NUMERIC NOT NULL,
+//   quantity_received NUMERIC,
+//   unit TEXT NOT NULL,
+//   unit_cost NUMERIC DEFAULT 0,
+//   total_cost NUMERIC DEFAULT 0,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+//
+// CREATE TABLE pos_facturas (
+//   id TEXT PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   purchase_order_id TEXT REFERENCES pos_purchase_orders(id),
+//   supplier TEXT NOT NULL,
+//   folio TEXT,
+//   subtotal NUMERIC DEFAULT 0,
+//   iva NUMERIC DEFAULT 0,
+//   total NUMERIC DEFAULT 0,
+//   status TEXT DEFAULT 'capturada',  -- capturada, aprobada, pagada
+//   captured_by TEXT NOT NULL,
+//   approved_by TEXT,
+//   paid_at TIMESTAMPTZ,
+//   notes TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
 
 export interface MenuItem {
   id: string
@@ -354,4 +473,590 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   )
   if (!res.ok) return []
   return res.json()
+}
+
+// ─── BLINDAJE: Audit Trail (nothing deleteable) ────────────────────────────
+
+export type AuditAction =
+  | 'order_created'
+  | 'order_sent_kitchen'
+  | 'order_closed'
+  | 'order_cancelled'
+  | 'item_added'
+  | 'item_modified'
+  | 'item_cancelled'
+  | 'quantity_changed'
+  | 'discount_applied'
+  | 'discount_removed'
+  | 'status_changed'
+  | 'payment_processed'
+
+export interface AuditEvent {
+  client_id?: string
+  order_id?: string
+  action: AuditAction
+  actor: string
+  mesa?: number
+  details?: Record<string, unknown>
+  reason?: string
+  approved_by?: string
+}
+
+export async function logAudit(event: AuditEvent): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_audit_log`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        client_id: event.client_id || 'amalay',
+        order_id: event.order_id,
+        action: event.action,
+        actor: event.actor,
+        mesa: event.mesa,
+        details: event.details ? JSON.stringify(event.details) : null,
+        reason: event.reason,
+        approved_by: event.approved_by,
+      }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+export interface AuditLogEntry {
+  id: number
+  client_id: string
+  order_id: string | null
+  action: string
+  actor: string
+  mesa: number | null
+  details: string | null
+  reason: string | null
+  approved_by: string | null
+  created_at: string
+}
+
+export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntry[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?order=created_at.desc&limit=${limit}&offset=${offset}`,
+    {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      cache: 'no-store',
+    }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntry[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?order_id=eq.${orderId}&order=created_at.asc`,
+    {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      cache: 'no-store',
+    }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+// Manager PINs for approval (in production, these come from the DB)
+export const MANAGER_PINS: Record<string, string> = {
+  '1234': 'Eduardo',
+  '5678': 'Monica',
+  '9012': 'Daniel',
+}
+
+// ─── INVENTORY & RECIPES ────────────────────────────────────────────────────
+
+export interface Ingredient {
+  id: string
+  client_id: string
+  name: string
+  unit: string
+  cost_per_unit: number
+  category: string
+  supplier: string
+  yield_factor: number
+  active: boolean
+}
+
+export interface RecipeRow {
+  id: number
+  menu_item_id: string
+  menu_item_name: string
+  ingredient_id: string
+  quantity: number
+  unit: string
+  // joined
+  ingredient_name?: string
+  ingredient_unit?: string
+}
+
+export interface InventoryItem {
+  id: number
+  ingredient_id: string
+  stock: number
+  reorder_point: number
+  reorder_quantity: number
+  last_restock: string | null
+  updated_at: string
+  // joined
+  ingredient_name?: string
+  ingredient_unit?: string
+  ingredient_category?: string
+  ingredient_cost?: number
+}
+
+export interface InventoryMovement {
+  id: number
+  ingredient_id: string
+  movement_type: string
+  quantity: number
+  order_id: string | null
+  actor: string | null
+  notes: string | null
+  created_at: string
+}
+
+// ─── Ingredients CRUD ───────────────────────────────────────────────────────
+
+export async function getIngredients(): Promise<Ingredient[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&order=name.asc&limit=500`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+// ─── Recipes CRUD ───────────────────────────────────────────────────────────
+
+export async function getRecipes(): Promise<RecipeRow[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&order=menu_item_name.asc&limit=1000`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&menu_item_id=eq.${encodeURIComponent(menuItemId)}&limit=50`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name: string; ingredient_id: string; quantity: number; unit: string }): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ client_id: 'amalay', ...row }),
+  })
+  return res.ok
+}
+
+export async function deleteRecipeRow(id: number): Promise<boolean> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_recipes?id=eq.${id}`,
+    { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+  )
+  return res.ok
+}
+
+// ─── Inventory ──────────────────────────────────────────────────────────────
+
+export async function getInventory(): Promise<InventoryItem[]> {
+  // Get inventory + join ingredient info client-side
+  const [invRes, ingRes] = await Promise.all([
+    fetch(
+      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&order=ingredient_id.asc&limit=500`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    ),
+    fetch(
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&limit=500`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    ),
+  ])
+  if (!invRes.ok || !ingRes.ok) return []
+  const inv: InventoryItem[] = await invRes.json()
+  const ing: Ingredient[] = await ingRes.json()
+  const ingMap = new Map(ing.map(i => [i.id, i]))
+  return inv.map(item => {
+    const ingredient = ingMap.get(item.ingredient_id)
+    return {
+      ...item,
+      ingredient_name: ingredient?.name ?? item.ingredient_id,
+      ingredient_unit: ingredient?.unit ?? '',
+      ingredient_category: ingredient?.category ?? '',
+      ingredient_cost: ingredient?.cost_per_unit ?? 0,
+    }
+  })
+}
+
+export async function updateInventoryStock(ingredientId: string, newStock: number): Promise<boolean> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&ingredient_id=eq.${ingredientId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ stock: newStock, updated_at: new Date().toISOString() }),
+    }
+  )
+  return res.ok
+}
+
+export async function logInventoryMovement(movement: {
+  ingredient_id: string; movement_type: string; quantity: number;
+  order_id?: string; actor?: string; notes?: string;
+}): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ client_id: 'amalay', ...movement }),
+  })
+  return res.ok
+}
+
+// ─── Auto-deduction: deduct recipe ingredients when order sent to kitchen ───
+
+export async function deductIngredientsForOrder(
+  items: OrderItem[],
+  orderId: string,
+  actor: string,
+): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[] }> {
+  // 1. Get all recipes
+  const recipes = await getRecipes()
+  const inventory = await getInventory()
+  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
+
+  const deductions: { ingredient: string; amount: number; unit: string; newStock: number }[] = []
+  const alerts: string[] = []
+
+  // 2. For each order item, find matching recipe and deduct
+  for (const item of items) {
+    // Try matching by menu_item_name (case-insensitive partial match)
+    const itemName = item.nombre.toLowerCase()
+    const recipeRows = recipes.filter(r =>
+      r.menu_item_name.toLowerCase().includes(itemName) ||
+      itemName.includes(r.menu_item_name.toLowerCase())
+    )
+
+    if (recipeRows.length === 0) continue
+
+    for (const row of recipeRows) {
+      const deductAmount = row.quantity * item.cantidad
+      const inv = invMap.get(row.ingredient_id)
+      if (!inv) continue
+
+      const newStock = Math.max(0, inv.stock - deductAmount)
+
+      // Update stock
+      await updateInventoryStock(row.ingredient_id, newStock)
+
+      // Log movement
+      await logInventoryMovement({
+        ingredient_id: row.ingredient_id,
+        movement_type: 'deduction',
+        quantity: -deductAmount,
+        order_id: orderId,
+        actor,
+        notes: `${item.cantidad}x ${item.nombre}`,
+      })
+
+      deductions.push({
+        ingredient: inv.ingredient_name ?? row.ingredient_id,
+        amount: deductAmount,
+        unit: row.unit || inv.ingredient_unit || '',
+        newStock,
+      })
+
+      // Check reorder point
+      if (newStock <= inv.reorder_point) {
+        alerts.push(`${inv.ingredient_name}: ${newStock.toFixed(2)} ${inv.ingredient_unit} (punto de reorden: ${inv.reorder_point})`)
+      }
+
+      // Update local map
+      inv.stock = newStock
+    }
+  }
+
+  return { success: true, deductions, alerts }
+}
+
+export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.amalay&order=created_at.desc&limit=${limit}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+// ─── PURCHASE ORDERS & FACTURAS ─────────────────────────────────────────────
+
+export interface PurchaseOrder {
+  id: string
+  client_id: string
+  supplier: string
+  status: string
+  created_by: string
+  approved_by: string | null
+  notes: string | null
+  subtotal: number
+  iva: number
+  total: number
+  ai_suggested: boolean
+  sent_at: string | null
+  received_at: string | null
+  received_by: string | null
+  created_at: string
+  items?: PurchaseOrderItem[]
+}
+
+export interface PurchaseOrderItem {
+  id: number
+  order_id: string
+  ingredient_id: string
+  ingredient_name: string
+  quantity_ordered: number
+  quantity_received: number | null
+  unit: string
+  unit_cost: number
+  total_cost: number
+}
+
+export interface Factura {
+  id: string
+  client_id: string
+  purchase_order_id: string | null
+  supplier: string
+  folio: string | null
+  subtotal: number
+  iva: number
+  total: number
+  status: string
+  captured_by: string
+  approved_by: string | null
+  paid_at: string | null
+  notes: string | null
+  created_at: string
+}
+
+// Get unique suppliers from ingredients
+export async function getSuppliers(): Promise<string[]> {
+  const ingredients = await getIngredients()
+  const suppliers = new Set(ingredients.map(i => i.supplier).filter(Boolean))
+  return Array.from(suppliers).sort()
+}
+
+// AI-suggested OC: items below reorder point
+export async function getSuggestedPurchaseItems(): Promise<{
+  supplier: string
+  items: { ingredient_id: string; name: string; unit: string; current_stock: number; reorder_point: number; suggested_qty: number; unit_cost: number }[]
+}[]> {
+  const inventory = await getInventory()
+  const ingredients = await getIngredients()
+  const ingMap = new Map(ingredients.map(i => [i.id, i]))
+
+  const lowStock = inventory.filter(i => i.stock <= i.reorder_point)
+  const bySupplier = new Map<string, typeof lowStock>()
+
+  for (const item of lowStock) {
+    const ing = ingMap.get(item.ingredient_id)
+    const supplier = ing?.supplier || 'Sin proveedor'
+    if (!bySupplier.has(supplier)) bySupplier.set(supplier, [])
+    bySupplier.get(supplier)!.push(item)
+  }
+
+  return Array.from(bySupplier.entries()).map(([supplier, items]) => ({
+    supplier,
+    items: items.map(item => ({
+      ingredient_id: item.ingredient_id,
+      name: item.ingredient_name ?? item.ingredient_id,
+      unit: item.ingredient_unit ?? '',
+      current_stock: item.stock,
+      reorder_point: item.reorder_point,
+      suggested_qty: item.reorder_quantity || item.reorder_point * 2,
+      unit_cost: item.ingredient_cost ?? 0,
+    })),
+  }))
+}
+
+// CRUD for Purchase Orders
+export async function createPurchaseOrder(po: {
+  id: string; supplier: string; created_by: string; notes?: string;
+  subtotal: number; iva: number; total: number; ai_suggested?: boolean;
+  items: { ingredient_id: string; ingredient_name: string; quantity_ordered: number; unit: string; unit_cost: number; total_cost: number }[]
+}): Promise<boolean> {
+  // Insert order
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_purchase_orders`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      id: po.id, client_id: 'amalay', supplier: po.supplier, status: 'borrador',
+      created_by: po.created_by, notes: po.notes || null,
+      subtotal: po.subtotal, iva: po.iva, total: po.total,
+      ai_suggested: po.ai_suggested || false,
+    }),
+  })
+  if (!res.ok) return false
+
+  // Insert items
+  const itemRows = po.items.map(item => ({
+    order_id: po.id, ingredient_id: item.ingredient_id, ingredient_name: item.ingredient_name,
+    quantity_ordered: item.quantity_ordered, unit: item.unit,
+    unit_cost: item.unit_cost, total_cost: item.total_cost,
+  }))
+  const res2 = await fetch(`${SUPABASE_URL}/rest/v1/pos_purchase_order_items`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(itemRows),
+  })
+  return res2.ok
+}
+
+export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_purchase_orders?client_id=eq.amalay&order=created_at.desc&limit=100`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function getPurchaseOrderItems(orderId: string): Promise<PurchaseOrderItem[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?order_id=eq.${orderId}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function updatePurchaseOrderStatus(
+  id: string, status: string, extra?: Record<string, unknown>
+): Promise<boolean> {
+  const body: Record<string, unknown> = { status, ...extra }
+  if (status === 'enviada') body.sent_at = new Date().toISOString()
+  if (status === 'recibida') body.received_at = new Date().toISOString()
+
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_purchase_orders?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    }
+  )
+  return res.ok
+}
+
+// Receive items at almacén (update quantity_received)
+export async function receiveOrderItems(
+  orderId: string, received: { item_id: number; quantity_received: number }[]
+): Promise<boolean> {
+  for (const r of received) {
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_purchase_order_items?id=eq.${r.item_id}`,
+      {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ quantity_received: r.quantity_received }),
+      }
+    )
+  }
+  return true
+}
+
+// Restock inventory when OC is received
+export async function restockFromPurchaseOrder(
+  orderId: string, items: PurchaseOrderItem[], actor: string
+): Promise<void> {
+  const inventory = await getInventory()
+  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
+
+  for (const item of items) {
+    const qty = item.quantity_received ?? item.quantity_ordered
+    const inv = invMap.get(item.ingredient_id)
+    if (inv) {
+      const newStock = inv.stock + qty
+      await updateInventoryStock(item.ingredient_id, newStock)
+      await logInventoryMovement({
+        ingredient_id: item.ingredient_id,
+        movement_type: 'restock',
+        quantity: qty,
+        order_id: orderId,
+        actor,
+        notes: `OC ${orderId} - ${item.ingredient_name}`,
+      })
+    }
+  }
+}
+
+// CRUD for Facturas
+export async function createFactura(factura: {
+  id: string; purchase_order_id?: string; supplier: string; folio?: string;
+  subtotal: number; iva: number; total: number; captured_by: string; notes?: string;
+}): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_facturas`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      id: factura.id, client_id: 'amalay', purchase_order_id: factura.purchase_order_id || null,
+      supplier: factura.supplier, folio: factura.folio || null,
+      subtotal: factura.subtotal, iva: factura.iva, total: factura.total,
+      status: 'capturada', captured_by: factura.captured_by, notes: factura.notes || null,
+    }),
+  })
+  return res.ok
+}
+
+export async function getFacturas(): Promise<Factura[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_facturas?client_id=eq.amalay&order=created_at.desc&limit=100`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function updateFacturaStatus(
+  id: string, status: string, extra?: Record<string, unknown>
+): Promise<boolean> {
+  const body: Record<string, unknown> = { status, ...extra }
+  if (status === 'pagada') body.paid_at = new Date().toISOString()
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_facturas?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    }
+  )
+  return res.ok
 }

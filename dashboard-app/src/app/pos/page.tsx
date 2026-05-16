@@ -9,9 +9,12 @@ import {
   IVA_RATE,
   MODIFIERS_QUITAR,
   MODIFIERS_AGREGAR,
+  MANAGER_PINS,
   formatMXN,
   generateId,
   saveOrder,
+  logAudit,
+  deductIngredientsForOrder,
 } from '@/lib/pos-data'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
@@ -19,7 +22,6 @@ import {
   Grid3X3,
   Minus,
   Plus,
-  Trash2,
   X,
   CreditCard,
   Banknote,
@@ -29,6 +31,12 @@ import {
   Percent,
   StickyNote,
   Pencil,
+  ShieldAlert,
+  Ban,
+  FileText,
+  BookOpen,
+  Package,
+  ShoppingCart,
 } from 'lucide-react'
 
 export default function POSPage() {
@@ -348,6 +356,184 @@ function DiscountModal({ subtotal, onApply, onCancel }: DiscountModalProps) {
   )
 }
 
+// ─── Cancel Item Modal (requires reason + manager PIN) ─────────────────────
+
+interface CancelModalProps {
+  itemName: string
+  onConfirm: (reason: string, managerName: string) => void
+  onCancel: () => void
+}
+
+function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
+  const [reason, setReason] = useState('')
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+
+  const CANCEL_REASONS = [
+    'Cliente cambio de opinion',
+    'Platillo agotado',
+    'Error del mesero',
+    'Preparacion incorrecta',
+    'Tiempo de espera excesivo',
+    'Otro',
+  ]
+
+  const handleConfirm = () => {
+    if (!reason) { setError('Selecciona un motivo'); return }
+    if (!pin) { setError('Ingresa PIN de gerente'); return }
+    const manager = MANAGER_PINS[pin]
+    if (!manager) { setError('PIN invalido'); return }
+    onConfirm(reason, manager)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="relative bg-slate-800 border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
+            <ShieldAlert size={20} className="text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Cancelar item</h3>
+            <p className="text-red-400 text-sm">{itemName}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">Motivo de cancelacion</label>
+            <div className="grid grid-cols-2 gap-2">
+              {CANCEL_REASONS.map(r => (
+                <button
+                  key={r}
+                  onClick={() => { setReason(r); setError('') }}
+                  className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors min-h-[44px] ${
+                    reason === r
+                      ? 'bg-red-900/40 border border-red-600 text-white'
+                      : 'bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">PIN de gerente</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+              placeholder="****"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+            />
+          </div>
+
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold transition-colors min-h-[48px]">
+            Volver
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+          >
+            <Ban size={18} />
+            Cancelar item
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Void Order Modal (requires reason + manager PIN) ──────────────────────
+
+interface VoidOrderModalProps {
+  mesa: number
+  total: number
+  onConfirm: (reason: string, managerName: string) => void
+  onCancel: () => void
+}
+
+function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProps) {
+  const [reason, setReason] = useState('')
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+
+  const handleConfirm = () => {
+    if (!reason.trim()) { setError('Escribe el motivo'); return }
+    if (!pin) { setError('Ingresa PIN de gerente'); return }
+    const manager = MANAGER_PINS[pin]
+    if (!manager) { setError('PIN invalido'); return }
+    onConfirm(reason, manager)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="relative bg-slate-800 border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
+            <ShieldAlert size={20} className="text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Anular orden completa</h3>
+            <p className="text-red-400 text-sm">Mesa {mesa} · {formatMXN(total)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">Motivo de anulacion</label>
+            <textarea
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setError('') }}
+              placeholder="Describe el motivo..."
+              rows={3}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">PIN de gerente</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+              placeholder="****"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+            />
+          </div>
+
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold transition-colors min-h-[48px]">
+            Volver
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+          >
+            <Ban size={18} />
+            Anular orden
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main POS Content ───────────────────────────────────────────────────────
 
 function POSContent() {
@@ -375,6 +561,18 @@ function POSContent() {
 
   // Order-level notes
   const [orderNotes, setOrderNotes] = useState('')
+
+  // Cancel modal state
+  const [cancellingItem, setCancellingItem] = useState<OrderItem | null>(null)
+
+  // Void order modal state
+  const [showVoidOrder, setShowVoidOrder] = useState(false)
+
+  // Cancelled items (kept for audit — shown with strikethrough)
+  const [cancelledItems, setCancelledItems] = useState<Set<string>>(new Set())
+
+  // Order ID for audit trail (generated once per order)
+  const [orderId] = useState(() => generateId())
 
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
@@ -430,61 +628,105 @@ function POSContent() {
     setOrderItems(prev => {
       const existingIndex = prev.findIndex(oi => oi.id === orderItem.id)
       if (existingIndex >= 0) {
-        // Update existing
+        const old = prev[existingIndex]
+        logAudit({
+          order_id: orderId, action: 'item_modified', actor: mesero, mesa,
+          details: {
+            item: orderItem.nombre,
+            from: { cantidad: old.cantidad, modificadores: old.modificadores, notas: old.notas },
+            to: { cantidad: orderItem.cantidad, modificadores: orderItem.modificadores, notas: orderItem.notas },
+          },
+        })
         const next = [...prev]
         next[existingIndex] = orderItem
         return next
       }
-      // Add new
+      logAudit({
+        order_id: orderId, action: 'item_added', actor: mesero, mesa,
+        details: { item: orderItem.nombre, cantidad: orderItem.cantidad, precio: orderItem.precio, modificadores: orderItem.modificadores },
+      })
       return [...prev, orderItem]
     })
-    // Flash animation
     setFlashItemId(orderItem.id)
     setTimeout(() => setFlashItemId(null), 500)
     setModifierItem(null)
     setEditingOrderItem(null)
-  }, [])
+  }, [orderId, mesero, mesa])
 
   const handleModifierCancel = useCallback(() => {
     setModifierItem(null)
     setEditingOrderItem(null)
   }, [])
 
-  const removeItem = useCallback((id: string) => {
-    setOrderItems((prev) => prev.filter((oi) => oi.id !== id))
-  }, [])
+  // Cancel item (requires reason + manager PIN — NEVER delete)
+  const handleCancelItem = useCallback((reason: string, managerName: string) => {
+    if (!cancellingItem) return
+    logAudit({
+      order_id: orderId, action: 'item_cancelled', actor: mesero, mesa,
+      details: { item: cancellingItem.nombre, cantidad: cancellingItem.cantidad, precio: cancellingItem.subtotal },
+      reason,
+      approved_by: managerName,
+    })
+    setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
+    setCancellingItem(null)
+    showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
+  }, [cancellingItem, orderId, mesero, mesa])
+
+  // Void entire order
+  const handleVoidOrder = useCallback((reason: string, managerName: string) => {
+    const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
+    logAudit({
+      order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
+      details: { items: orderItems.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, subtotal: i.subtotal })), total: voidTotal },
+      reason,
+      approved_by: managerName,
+    })
+    setOrderItems([])
+    setCancelledItems(new Set())
+    setDiscount(0)
+    setOrderNotes('')
+    setShowVoidOrder(false)
+    showToast(`Orden anulada — aprobado por ${managerName}`)
+  }, [orderId, mesero, mesa, orderItems])
 
   const updateQuantity = useCallback((id: string, delta: number) => {
-    setOrderItems((prev) =>
-      prev
-        .map((oi) =>
-          oi.id === id
-            ? {
-                ...oi,
-                cantidad: Math.max(0, oi.cantidad + delta),
-                subtotal: (oi.precio + oi.precioExtra) * Math.max(0, oi.cantidad + delta),
-              }
-            : oi
-        )
-        .filter((oi) => oi.cantidad > 0)
-    )
-  }, [])
+    setOrderItems((prev) => {
+      const item = prev.find(oi => oi.id === id)
+      if (item) {
+        const newQty = Math.max(1, item.cantidad + delta)
+        logAudit({
+          order_id: orderId, action: 'quantity_changed', actor: mesero, mesa,
+          details: { item: item.nombre, from: item.cantidad, to: newQty },
+        })
+      }
+      return prev.map((oi) =>
+        oi.id === id
+          ? {
+              ...oi,
+              cantidad: Math.max(1, oi.cantidad + delta),
+              subtotal: (oi.precio + oi.precioExtra) * Math.max(1, oi.cantidad + delta),
+            }
+          : oi
+      )
+    })
+  }, [orderId, mesero, mesa])
 
-  const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0)
+  const activeItems = orderItems.filter(i => !cancelledItems.has(i.id))
+  const subtotal = activeItems.reduce((sum, item) => sum + item.subtotal, 0)
   const subtotalAfterDiscount = Math.max(0, subtotal - discount)
   const iva = subtotalAfterDiscount * IVA_RATE
   const total = subtotalAfterDiscount + iva
 
   const handleSendToKitchen = async () => {
-    if (orderItems.length === 0 || saving) return
+    if (activeItems.length === 0 || saving) return
     setSaving(true)
     const order: Order = {
-      id: generateId(),
+      id: orderId,
       mesa,
       mesero,
       personas,
       status: 'enviada',
-      items: orderItems,
+      items: activeItems,
       subtotal,
       iva,
       total,
@@ -493,14 +735,32 @@ function POSContent() {
       createdAt: new Date(),
     }
     const ok = await saveOrder(order)
-    setSaving(false)
     if (ok) {
+      logAudit({
+        order_id: orderId, action: 'order_sent_kitchen', actor: mesero, mesa,
+        details: { items_count: activeItems.length, total },
+      })
+
+      // Auto-deduct ingredients from inventory
+      const result = await deductIngredientsForOrder(activeItems, orderId, mesero)
+      if (result.deductions.length > 0) {
+        logAudit({
+          order_id: orderId, action: 'order_sent_kitchen', actor: 'Sistema',
+          details: { inventory_deductions: result.deductions.length, alerts: result.alerts.length },
+        })
+      }
+      if (result.alerts.length > 0) {
+        showToast(`Orden enviada — ${result.alerts.length} alertas de inventario`)
+      } else {
+        showToast('Orden enviada a cocina')
+      }
+
       setSentToKitchen(true)
-      showToast('Orden enviada a cocina')
       setTimeout(() => setSentToKitchen(false), 2000)
     } else {
       showToast('Error al guardar orden')
     }
+    setSaving(false)
   }
 
   const handleCloseOrder = () => {
@@ -511,12 +771,12 @@ function POSContent() {
   const handlePayment = async (method: string) => {
     setSaving(true)
     const order: Order = {
-      id: generateId(),
+      id: orderId,
       mesa,
       mesero,
       personas,
       status: 'cerrada',
-      items: orderItems,
+      items: activeItems,
       subtotal,
       iva,
       total,
@@ -527,19 +787,32 @@ function POSContent() {
       closedAt: new Date(),
     }
     const ok = await saveOrder(order)
-    setSaving(false)
     if (ok) {
+      logAudit({
+        order_id: orderId, action: 'payment_processed', actor: mesero, mesa,
+        details: { method, total, descuento: discount },
+      })
+      logAudit({
+        order_id: orderId, action: 'order_closed', actor: mesero, mesa,
+        details: { method, items_count: activeItems.length, total },
+      })
       showToast(`Cuenta cerrada - ${method}`)
     } else {
       showToast('Error al cerrar cuenta')
     }
+    setSaving(false)
     setOrderItems([])
+    setCancelledItems(new Set())
     setDiscount(0)
     setOrderNotes('')
     setShowPayment(false)
   }
 
   const handleApplyDiscount = (amount: number) => {
+    logAudit({
+      order_id: orderId, action: 'discount_applied', actor: mesero, mesa,
+      details: { amount, subtotal },
+    })
     setDiscount(amount)
     setShowDiscount(false)
   }
@@ -568,6 +841,34 @@ function POSContent() {
           >
             <ChefHat size={16} />
             Cocina
+          </Link>
+          <Link
+            href="/pos/recetas"
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
+          >
+            <BookOpen size={16} />
+            Recetas
+          </Link>
+          <Link
+            href="/pos/compras"
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
+          >
+            <ShoppingCart size={16} />
+            Compras
+          </Link>
+          <Link
+            href="/pos/inventario"
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
+          >
+            <Package size={16} />
+            Inventario
+          </Link>
+          <Link
+            href="/pos/auditoria"
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm"
+          >
+            <FileText size={16} />
+            Auditoria
           </Link>
         </div>
 
@@ -650,72 +951,91 @@ function POSContent() {
               </div>
             ) : (
               <div className="space-y-1">
-                {orderItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 py-3 px-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 transition-all ${
-                      flashItemId === item.id ? 'ring-2 ring-emerald-500 bg-emerald-900/20' : ''
-                    }`}
-                  >
-                    {/* Quantity controls */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
-                        className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-8 text-center font-semibold text-lg">
-                        {item.cantidad}
+                {orderItems.map((item) => {
+                  const isCancelled = cancelledItems.has(item.id)
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 py-3 px-3 rounded-lg transition-all ${
+                        isCancelled
+                          ? 'bg-red-950/30 border border-red-900/30 opacity-60'
+                          : flashItemId === item.id
+                          ? 'ring-2 ring-emerald-500 bg-emerald-900/20'
+                          : 'bg-slate-800/60 hover:bg-slate-800'
+                      }`}
+                    >
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
+                          disabled={isCancelled}
+                          className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className="w-8 text-center font-semibold text-lg">
+                          {item.cantidad}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
+                          disabled={isCancelled}
+                          className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+
+                      {/* Item name + modifiers */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium text-[15px] ${isCancelled ? 'line-through text-red-400' : ''}`}>
+                          {item.nombre}
+                        </p>
+                        {isCancelled && (
+                          <p className="text-red-500 text-xs font-semibold">CANCELADO</p>
+                        )}
+                        {item.modificadores.length > 0 && (
+                          <p className="text-slate-400 text-xs mt-0.5 truncate">
+                            {item.modificadores.join(' · ')}
+                          </p>
+                        )}
+                        {item.notas && (
+                          <p className="text-slate-500 text-xs italic mt-0.5 truncate">
+                            {item.notas}
+                          </p>
+                        )}
+                        <p className="text-slate-400 text-sm">
+                          {formatMXN(item.precio + item.precioExtra)} c/u
+                        </p>
+                      </div>
+
+                      {/* Line total */}
+                      <span className={`font-semibold text-lg w-24 text-right flex-shrink-0 ${isCancelled ? 'line-through text-red-400/60' : ''}`}>
+                        {formatMXN(item.subtotal)}
                       </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
-                        className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
 
-                    {/* Item name + modifiers */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[15px]">{item.nombre}</p>
-                      {item.modificadores.length > 0 && (
-                        <p className="text-slate-400 text-xs mt-0.5 truncate">
-                          {item.modificadores.join(' · ')}
-                        </p>
+                      {!isCancelled && (
+                        <>
+                          {/* Edit */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
+                            className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition-colors"
+                          >
+                            <Pencil size={14} />
+                          </button>
+
+                          {/* Cancel (NOT delete — requires reason + manager PIN) */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
+                            className="w-9 h-9 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center transition-colors"
+                            title="Cancelar item (requiere gerente)"
+                          >
+                            <Ban size={14} />
+                          </button>
+                        </>
                       )}
-                      {item.notas && (
-                        <p className="text-slate-500 text-xs italic mt-0.5 truncate">
-                          {item.notas}
-                        </p>
-                      )}
-                      <p className="text-slate-400 text-sm">
-                        {formatMXN(item.precio + item.precioExtra)} c/u
-                      </p>
                     </div>
-
-                    {/* Line total */}
-                    <span className="font-semibold text-lg w-24 text-right flex-shrink-0">
-                      {formatMXN(item.subtotal)}
-                    </span>
-
-                    {/* Edit */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                      className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition-colors"
-                    >
-                      <Pencil size={14} />
-                    </button>
-
-                    {/* Remove */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeItem(item.id) }}
-                      className="w-9 h-9 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -734,12 +1054,23 @@ function POSContent() {
               </button>
               {discount > 0 && (
                 <button
-                  onClick={() => setDiscount(0)}
+                  onClick={() => {
+                    logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
+                    setDiscount(0)
+                  }}
                   className="px-2 py-2 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 text-sm transition-colors min-h-[40px]"
                 >
                   <X size={14} />
                 </button>
               )}
+              <button
+                onClick={() => setShowVoidOrder(true)}
+                disabled={orderItems.length === 0}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 text-sm transition-colors min-h-[40px] ml-auto"
+              >
+                <ShieldAlert size={14} />
+                Anular orden
+              </button>
             </div>
 
             {/* Order notes */}
@@ -855,6 +1186,25 @@ function POSContent() {
           subtotal={subtotal}
           onApply={handleApplyDiscount}
           onCancel={() => setShowDiscount(false)}
+        />
+      )}
+
+      {/* Cancel Item Modal (blindaje) */}
+      {cancellingItem && (
+        <CancelModal
+          itemName={`${cancellingItem.cantidad}x ${cancellingItem.nombre}`}
+          onConfirm={handleCancelItem}
+          onCancel={() => setCancellingItem(null)}
+        />
+      )}
+
+      {/* Void Order Modal (blindaje) */}
+      {showVoidOrder && (
+        <VoidOrderModal
+          mesa={mesa}
+          total={total}
+          onConfirm={handleVoidOrder}
+          onCancel={() => setShowVoidOrder(false)}
         />
       )}
 

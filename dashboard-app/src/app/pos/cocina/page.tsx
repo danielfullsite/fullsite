@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw } from 'lucide-react'
-import { getKitchenOrders, updateOrderStatus, type KitchenOrderFromDB } from '@/lib/pos-data'
+import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -27,13 +27,17 @@ export default function CocinaPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const advanceStatus = async (id: string, currentStatus: string) => {
+  const advanceStatus = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     let newStatus = ''
     if (currentStatus === 'enviada') newStatus = 'preparando'
     else if (currentStatus === 'preparando') newStatus = 'lista'
     else if (currentStatus === 'lista') newStatus = 'entregada'
     if (newStatus) {
       await updateOrderStatus(id, newStatus)
+      logAudit({
+        order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
+        details: { from: currentStatus, to: newStatus, mesero },
+      })
       fetchOrders()
     }
   }
@@ -138,7 +142,7 @@ export default function CocinaPage() {
                   </div>
 
                   <button
-                    onClick={() => advanceStatus(order.id, order.status)}
+                    onClick={() => advanceStatus(order.id, order.status, order.mesa, order.mesero)}
                     className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                       order.status === 'enviada' ? 'bg-amber-500 hover:bg-amber-400 text-black' :
                       order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
