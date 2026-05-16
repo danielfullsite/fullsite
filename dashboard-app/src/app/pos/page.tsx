@@ -43,6 +43,9 @@ import {
   Package,
   ShoppingCart,
   Wine,
+  MessageCircle,
+  Send as SendIcon,
+  Loader2,
 } from 'lucide-react'
 
 export default function POSPage() {
@@ -1340,6 +1343,137 @@ function POSContent() {
           </div>
         </div>
       )}
+
+      {/* AI Copilot Chat */}
+      <POSChat />
     </div>
+  )
+}
+
+// ─── AI Copilot Chat (floating) ─────────────────────────────────────────────
+
+function POSChat() {
+  const [open, setOpen] = useState(false)
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const send = async () => {
+    if (!input.trim() || loading) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg, history: messages.slice(-6) }),
+      })
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Sin respuesta' }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar' }])
+    }
+    setLoading(false)
+  }
+
+  return (
+    <>
+      {/* Floating button */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105"
+        >
+          <MessageCircle size={24} />
+        </button>
+      )}
+
+      {/* Chat panel */}
+      {open && (
+        <div className="fixed bottom-0 right-0 z-50 w-full sm:w-[400px] h-[500px] sm:h-[600px] sm:bottom-6 sm:right-6 bg-slate-800 border border-slate-700 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
+                <MessageCircle size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">fullsite IA</p>
+                <p className="text-emerald-400 text-[11px]">Copiloto operativo</p>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-lg bg-slate-600 hover:bg-slate-500 flex items-center justify-center text-slate-300">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <MessageCircle size={32} className="mx-auto mb-3 text-slate-600" />
+                <p className="text-slate-400 text-sm">Pregunta lo que quieras</p>
+                <div className="mt-4 space-y-2">
+                  {[
+                    '¿Quién está vendiendo más hoy?',
+                    '¿Cuál es el ticket promedio esta semana?',
+                    '¿Qué mesero tiene más cancelaciones?',
+                  ].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setInput(q); }}
+                      className="block w-full text-left px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-300 text-xs transition-colors"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-emerald-600 text-white rounded-br-sm'
+                    : 'bg-slate-700 text-slate-200 rounded-bl-sm'
+                }`}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-700 text-slate-400 px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
+                  <Loader2 size={16} className="animate-spin" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="px-3 py-3 border-t border-slate-700 flex-shrink-0">
+            <div className="flex gap-2">
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && send()}
+                placeholder="Pregunta algo..."
+                className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                onClick={send}
+                disabled={!input.trim() || loading}
+                className="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white flex items-center justify-center flex-shrink-0"
+              >
+                <SendIcon size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
