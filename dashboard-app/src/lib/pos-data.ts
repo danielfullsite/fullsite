@@ -185,16 +185,58 @@ export const MODIFIERS_QUITAR = [
   'Sin pan', 'Sin salsa', 'Sin jitomate', 'Sin aguacate'
 ]
 
-export const MODIFIERS_AGREGAR: ModificadorAgregar[] = [
+// Extras by category type
+export const MODIFIERS_AGREGAR_FOOD: ModificadorAgregar[] = [
   { name: 'Extra queso', price: 25 },
   { name: 'Extra aguacate', price: 35 },
   { name: 'Extra proteina', price: 45 },
   { name: 'Extra huevo', price: 20 },
   { name: 'Extra salsa', price: 0 },
+]
+
+export const MODIFIERS_AGREGAR_COFFEE: ModificadorAgregar[] = [
+  { name: 'Shot extra', price: 20 },
   { name: 'Leche de almendra', price: 15 },
   { name: 'Leche de avena', price: 15 },
-  { name: 'Shot extra', price: 20 },
+  { name: 'Leche deslactosada', price: 10 },
+  { name: 'Jarabe de vainilla', price: 15 },
+  { name: 'Crema batida', price: 10 },
 ]
+
+export const MODIFIERS_AGREGAR_DRINKS: ModificadorAgregar[] = [
+  { name: 'Leche de almendra', price: 15 },
+  { name: 'Leche de avena', price: 15 },
+  { name: 'Extra fruta', price: 20 },
+  { name: 'Proteina whey', price: 25 },
+]
+
+export const MODIFIERS_AGREGAR_NONE: ModificadorAgregar[] = []
+
+// Legacy export for compatibility
+export const MODIFIERS_AGREGAR = MODIFIERS_AGREGAR_FOOD
+
+// Beverage categories (no "quitar" options, drink-specific extras)
+const BEVERAGE_CATEGORIES = ['coffee', 'tea', 'fresh', 'smoothies', 'frappes', 'signature', 'alcohol']
+const COFFEE_CATEGORIES = ['coffee', 'tea']
+// Items with no modifiers at all
+const NO_MODIFIER_CATEGORIES = ['sodas']
+
+export function getModifiersForCategory(categoryId: string): {
+  quitarOptions: string[]
+  agregarOptions: ModificadorAgregar[]
+} {
+  if (NO_MODIFIER_CATEGORIES.includes(categoryId)) {
+    return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_NONE }
+  }
+  if (COFFEE_CATEGORIES.includes(categoryId)) {
+    return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_COFFEE }
+  }
+  if (BEVERAGE_CATEGORIES.includes(categoryId)) {
+    return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_DRINKS }
+  }
+  // Food items — use recipe ingredients for "quitar", food extras for "agregar"
+  return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_FOOD }
+}
 
 // Map POS menu item names → recipe names in database
 // This connects every platillo to its recipe for dynamic modifiers + inventory deduction

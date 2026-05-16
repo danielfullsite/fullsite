@@ -7,7 +7,6 @@ import {
   MENU_CATEGORIES,
   MESEROS,
   IVA_RATE,
-  MODIFIERS_AGREGAR,
   MANAGER_PINS,
   RECIPE_ALIASES,
   formatMXN,
@@ -17,6 +16,7 @@ import {
   deductIngredientsForOrder,
   getRecipes,
   getIngredients,
+  getModifiersForCategory,
   type RecipeRow,
   type Ingredient,
   type ModificadorAgregar,
@@ -62,16 +62,19 @@ export default function POSPage() {
 interface ModifierModalProps {
   item: MenuItem
   existingOrder?: OrderItem | null
-  recipeIngredients: string[]  // ingredient names from recipe — these become "quitar" options
+  recipeIngredients: string[]
+  categoryId: string
   onConfirm: (orderItem: OrderItem) => void
   onCancel: () => void
 }
 
-function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCancel }: ModifierModalProps) {
-  // Dynamic "quitar" options from recipe ingredients
+function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onConfirm, onCancel }: ModifierModalProps) {
+  const { quitarOptions: defaultQuitar, agregarOptions } = getModifiersForCategory(categoryId)
+
+  // Dynamic "quitar" options from recipe ingredients (food only)
   const quitarOptions = recipeIngredients.length > 0
     ? recipeIngredients.map(name => `Sin ${name}`)
-    : ['Sin cebolla', 'Sin chile', 'Sin crema', 'Sin queso', 'Sin salsa', 'Sin jitomate', 'Sin aguacate']
+    : defaultQuitar
 
   const [quitarChecked, setQuitarChecked] = useState<Set<string>>(
     () => new Set(existingOrder?.modificadores.filter(m => m.startsWith('Sin ')) ?? [])
@@ -104,7 +107,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCa
     })
   }
 
-  const precioExtra = MODIFIERS_AGREGAR
+  const precioExtra = agregarOptions
     .filter(m => agregarChecked.has(m.name))
     .reduce((sum, m) => sum + m.price, 0)
 
@@ -114,7 +117,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCa
     const mods: string[] = []
     quitarChecked.forEach(m => mods.push(m))
     agregarChecked.forEach(name => {
-      const mod = MODIFIERS_AGREGAR.find(m => m.name === name)
+      const mod = agregarOptions.find(m => m.name === name)
       if (mod) {
         mods.push(mod.price > 0 ? `${mod.name} +$${mod.price}` : mod.name)
       }
@@ -159,7 +162,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCa
 
         <div className="px-5 py-4 space-y-5">
           {/* Quitar section — dynamic from recipe ingredients */}
-          <div>
+          {quitarOptions.length > 0 && <div>
             <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">
               Quitar {recipeIngredients.length > 0 && <span className="text-slate-600 normal-case font-normal">({recipeIngredients.length} ingredientes)</span>}
             </h4>
@@ -194,13 +197,13 @@ function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCa
                 </label>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Agregar section */}
-          <div>
+          {agregarOptions.length > 0 && <div>
             <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Agregar</h4>
             <div className="grid grid-cols-2 gap-2">
-              {MODIFIERS_AGREGAR.map(mod => (
+              {agregarOptions.map(mod => (
                 <label
                   key={mod.name}
                   className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
@@ -235,7 +238,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, onConfirm, onCa
                 </label>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Notas */}
           <div>
@@ -567,6 +570,7 @@ function POSContent() {
 
   // Modifier modal state
   const [modifierItem, setModifierItem] = useState<MenuItem | null>(null)
+  const [modifierCategoryId, setModifierCategoryId] = useState<string>('')
   const [editingOrderItem, setEditingOrderItem] = useState<OrderItem | null>(null)
 
   // Recipe data for dynamic modifiers
@@ -672,9 +676,16 @@ function POSContent() {
     MENU_CATEGORIES.find((c) => c.id === selectedCategory) || MENU_CATEGORIES[0]
 
   // Open modifier modal for a new item
-  const handleMenuItemTap = useCallback((item: MenuItem) => {
+  const handleMenuItemTap = useCallback((item: MenuItem, catId?: string) => {
     setEditingOrderItem(null)
     setModifierItem(item)
+    // Find category for this item
+    if (catId) {
+      setModifierCategoryId(catId)
+    } else {
+      const cat = MENU_CATEGORIES.find(c => c.items.some(i => i.id === item.id))
+      setModifierCategoryId(cat?.id ?? '')
+    }
   }, [])
 
   // Open modifier modal to edit an existing order item
@@ -1157,11 +1168,11 @@ function POSContent() {
             <div className="flex-1 overflow-y-auto p-3">
               {(() => {
                 const term = menuSearch.toLowerCase()
-                const results: { item: MenuItem; category: string }[] = []
+                const results: { item: MenuItem; category: string; catId: string }[] = []
                 for (const cat of MENU_CATEGORIES) {
                   for (const item of cat.items) {
                     if (item.name.toLowerCase().includes(term)) {
-                      results.push({ item, category: cat.name })
+                      results.push({ item, category: cat.name, catId: cat.id })
                     }
                   }
                 }
@@ -1170,10 +1181,10 @@ function POSContent() {
                 }
                 return (
                   <div className="space-y-2">
-                    {results.map(({ item, category }) => (
+                    {results.map(({ item, category, catId }) => (
                       <button
                         key={item.id}
-                        onClick={() => { handleMenuItemTap(item); setMobileView('order') }}
+                        onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
                         className="w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors flex items-center justify-between"
                       >
                         <div>
@@ -1212,7 +1223,7 @@ function POSContent() {
                   {activeCategory.items.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => { handleMenuItemTap(item); setMobileView('order') }}
+                      onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
                       className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors min-h-[80px] md:min-h-[100px] flex flex-col justify-between"
                     >
                       <span className="font-medium text-[14px] leading-tight">
@@ -1236,6 +1247,7 @@ function POSContent() {
           item={modifierItem}
           existingOrder={editingOrderItem}
           recipeIngredients={getRecipeIngredients(modifierItem.name)}
+          categoryId={modifierCategoryId}
           onConfirm={handleModifierConfirm}
           onCancel={handleModifierCancel}
         />
