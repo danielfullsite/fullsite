@@ -71,10 +71,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   useEffect(() => {
-    // Get initial session
     const initAuth = async () => {
       try {
-        // Try getSession first (faster, uses local token)
+        // First check localStorage for tokens (set by login page)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+        const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+        const stored = localStorage.getItem(storageKey)
+
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored)
+            if (parsed.user) {
+              setUser(parsed.user)
+              await loadClientData(parsed.user.id)
+              setLoading(false)
+              return
+            }
+          } catch { /* ignore parse errors */ }
+        }
+
+        // Fallback: try SDK getSession
         const { data: { session } } = await supabase.auth.getSession()
         const currentUser = session?.user ?? null
         setUser(currentUser)
