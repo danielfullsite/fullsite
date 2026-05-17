@@ -296,3 +296,15 @@ a, button {
 .premium-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
+
+/* Print styles for PDF export */
+@media print {
+  body { background: white !important; }
+  nav, header, .sidebar, [class*="Sidebar"], [class*="ChatWidget"],
+  button, input[type="date"], select { display: none !important; }
+  .grid.lg\:grid-cols-\[240px_1fr\] { display: block !important; }
+  main { padding: 0 !important; margin: 0 !important; }
+  * { color: black !important; border-color: #ddd !important; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 4px 8px; font-size: 11px; }
+}

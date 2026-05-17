@@ -185,9 +185,9 @@ export default function ReportesPage() {
             {loading ? 'Generando...' : 'Generar reporte'}
           </button>
           <button
-            disabled
-            className="px-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-sm font-medium flex items-center gap-2 cursor-not-allowed"
-            title="Próximamente"
+            onClick={() => window.print()}
+            disabled={!generated || data.length === 0}
+            className="px-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Download size={16} />
             Generar PDF
