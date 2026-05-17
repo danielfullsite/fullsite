@@ -70,15 +70,16 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
-    // 1. Recent daily data (90 days for history questions)
+    // 1. Recent daily data (use fetch to avoid SDK issues)
     const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado'].some(kw => q.includes(kw))
     const histLimit = wantsHistory ? 90 : 14
-    const { data: recentDays } = await supabase
-      .from('wansoft_daily')
-      .select('fecha, ventas_dia, ventas_brutas, descuentos, tickets_count, personas_restaurant, ticket_promedio_restaurant, efectivo, tarjeta, meseros, ventas_por_grupo, pago_metodos')
-      .gt('ventas_dia', 0)
-      .order('fecha', { ascending: false })
-      .limit(histLimit)
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const dailyRes = await fetch(
+      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+    )
+    const recentDays = dailyRes.ok ? await dailyRes.json() : []
 
     // 2. Detect date from question
     const now = new Date()
@@ -98,20 +99,35 @@ export async function POST(request: NextRequest) {
       dateFilter = { start: monthStart, end: todayStr }
     }
 
-    // 3. Waiter × platillo data
+    // 3. Waiter × platillo data (use fetch to avoid SDK hanging)
     let waiterContext = ''
-    let waiterQuery = supabase
-      .from('wansoft_waiter_categories')
-      .select('fecha, data')
-      .order('fecha', { ascending: false })
 
+    let wcParams = 'select=fecha,data&order=fecha.desc'
     if (dateFilter) {
-      waiterQuery = waiterQuery.gte('fecha', dateFilter.start).lte('fecha', dateFilter.end)
+      if (dateFilter.start === dateFilter.end) {
+        wcParams += `&fecha=eq.${dateFilter.start}`
+      } else {
+        wcParams += `&and=(fecha.gte.${dateFilter.start},fecha.lte.${dateFilter.end})`
+      }
     } else {
-      waiterQuery = waiterQuery.limit(7)
+      wcParams += '&limit=7'
     }
 
-    const { data: waiterRows } = await waiterQuery
+    const wcRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+      cache: 'no-store',
+    })
+    const waiterRows = wcRes.ok ? await wcRes.json() : []
+
+    // If no results for specific date, fallback to most recent
+    if (waiterRows.length === 0 && dateFilter) {
+      const fallbackRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=1`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+        cache: 'no-store',
+      })
+      const fallbackRows = fallbackRes.ok ? await fallbackRes.json() : []
+      if (fallbackRows.length > 0) waiterRows.push(...fallbackRows)
+    }
 
     if (waiterRows && waiterRows.length > 0) {
       // Detect if question mentions a specific mesero
@@ -237,14 +253,14 @@ export async function POST(request: NextRequest) {
         .filter(({ qty }) => qty > 0)
         .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
 
-      const fechas = waiterRows.map(r => r.fecha).join(', ')
+      const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
       waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${Object.keys(filteredMeseros).length} meseros (fechas: ${fechas})`
     }
 
     // 3. Build daily context
     let dailyContext = 'No hay datos disponibles.'
     if (recentDays && recentDays.length > 0) {
-      const lines = recentDays.map(d => {
+      const lines = recentDays.map((d: Record<string, unknown>) => {
         const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros) : [])
         const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
           .map((m: { nombre: string; total: number }) => `${m.nombre}:$${m.total}`).join(', ')
@@ -253,7 +269,7 @@ export async function POST(request: NextRequest) {
         const topG = grupos.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
           .map((g: { nombre: string; total: number }) => `${g.nombre}:$${g.total}`).join(', ')
 
-        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(d.ticket_promedio_restaurant || 0)} | Meseros: ${topM} | Grupos: ${topG}`
+        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)} | Meseros: ${topM} | Grupos: ${topG}`
       })
 
       dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
