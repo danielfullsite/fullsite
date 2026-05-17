@@ -44,6 +44,7 @@ import {
   ShoppingCart,
   Wine,
   MessageCircle,
+  Receipt,
   Send as SendIcon,
   Loader2,
 } from 'lucide-react'
@@ -631,6 +632,9 @@ function POSContent() {
   const [showDiscount, setShowDiscount] = useState(false)
   const [discount, setDiscount] = useState(0)
 
+  // Propina
+  const [propina, setPropina] = useState(0)
+
   // Order-level notes
   const [orderNotes, setOrderNotes] = useState('')
 
@@ -872,13 +876,13 @@ function POSContent() {
     if (ok) {
       logAudit({
         order_id: orderId, action: 'payment_processed', actor: mesero, mesa,
-        details: { method, total, descuento: discount },
+        details: { method, total, descuento: discount, propina },
       })
       logAudit({
         order_id: orderId, action: 'order_closed', actor: mesero, mesa,
-        details: { method, items_count: activeItems.length, total },
+        details: { method, items_count: activeItems.length, total, propina },
       })
-      showToast(`Cuenta cerrada - ${method}`)
+      showToast(`Cuenta cerrada - ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
     } else {
       showToast('Error al cerrar cuenta')
     }
@@ -886,6 +890,7 @@ function POSContent() {
     setOrderItems([])
     setCancelledItems(new Set())
     setDiscount(0)
+    setPropina(0)
     setOrderNotes('')
     setShowPayment(false)
   }
@@ -918,6 +923,7 @@ function POSContent() {
             <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>
             <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>
             <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>
+            <Link href="/pos/corte" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Receipt size={14} />Corte</Link>
           </div>
           <div className="flex items-center gap-1.5 text-slate-400 flex-shrink-0 ml-2">
             <Clock size={14} />
@@ -926,7 +932,14 @@ function POSContent() {
         </div>
         {/* Row 2: Selectors (compact on mobile) */}
         <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-700/50 overflow-x-auto">
-          <select value={mesa} onChange={(e) => setMesa(Number(e.target.value))} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
+          <select value={mesa} onChange={(e) => {
+            const newMesa = Number(e.target.value)
+            if (orderItems.length > 0 && newMesa !== mesa) {
+              logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
+              showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
+            }
+            setMesa(newMesa)
+          }} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
             {Array.from({ length: 16 }, (_, i) => (<option key={i + 1} value={i + 1}>Mesa {i + 1}</option>))}
           </select>
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
@@ -1305,16 +1318,46 @@ function POSContent() {
               </button>
             </div>
 
-            <div className="text-center mb-6">
+            <div className="text-center mb-4">
               <p className="text-slate-400 text-sm mb-1">
                 Mesa {mesa} · {mesero}
               </p>
               <p className="text-4xl font-bold text-white">{formatMXN(total)}</p>
               {discount > 0 && (
-                <p className="text-red-400 text-sm mt-1">Descuento aplicado: -{formatMXN(discount)}</p>
+                <p className="text-red-400 text-sm mt-1">Descuento: -{formatMXN(discount)}</p>
               )}
-              {orderNotes && (
-                <p className="text-slate-400 text-sm italic mt-1">{orderNotes}</p>
+            </div>
+
+            {/* Propina */}
+            <div className="mb-4">
+              <p className="text-slate-400 text-sm mb-2">Propina</p>
+              <div className="flex gap-2">
+                {[0, 10, 15, 20].map(pct => (
+                  <button
+                    key={pct}
+                    onClick={() => setPropina(pct === 0 ? 0 : Math.round(total * pct / 100))}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      (pct === 0 && propina === 0) || (pct > 0 && propina === Math.round(total * pct / 100))
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {pct === 0 ? 'Sin' : `${pct}%`}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={propina || ''}
+                  onChange={e => setPropina(Number(e.target.value) || 0)}
+                  placeholder="$"
+                  className="w-20 bg-slate-700 border border-slate-600 rounded-lg px-2 py-2.5 text-white text-sm text-center focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              {propina > 0 && (
+                <p className="text-emerald-400 text-sm mt-2 text-center">
+                  Total + propina: {formatMXN(total + propina)}
+                </p>
               )}
             </div>
 
