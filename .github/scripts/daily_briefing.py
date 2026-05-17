@@ -230,18 +230,23 @@ ESTRUCTURA EXACTA (usa estos headers tal cual):
 ## Próximas reservaciones
 (una línea por día: YYYY-MM-DD (día): N evento(s) — nombres — total px)
 
-## Ventas (Wansoft)
-(KPIs; si los datos tienen más de 24h de antigüedad, inicia con: ⚠️ DATA STALE — último sync: fecha hora)
+## Ventas (ayer)
+(Muestra los KPIs tal cual vienen en los datos. NO digas DATA STALE si la fecha es de ayer o hoy.)
+
+## Top meseros (ayer)
+(Top 5 meseros por ventas)
 
 ## Top 3 acciones
-(exactamente 3 bullets, específicos y accionables; ejemplos: sin teléfono de contacto, sync caído, status pending sin confirmar, anomalías de datos)
+(exactamente 3 bullets, específicos y accionables basados en los datos de ayer; ejemplos: mesero con bajo ticket promedio, reservaciones sin confirmar, tendencia de ventas)
 
 REGLAS:
 - Español
-- Montos en MXN: $X,XXX.XX
-- Sin emojis excepto ⚠️ para data stale
+- Montos en MXN: $X,XXX sin decimales
+- Sin emojis
 - Máximo 10 líneas por sección
-- Texto plano, sin markdown complejo"""
+- Texto plano, sin markdown complejo
+- Los datos de ventas son de AYER — son frescos, NO son stale
+- Las acciones deben ser operativas y basadas en datos reales"""
 
 print("[briefing] Calling Groq...")
 groq_resp = requests.post(
