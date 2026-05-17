@@ -49,6 +49,47 @@ export default function ReportesPage() {
     }
   }, [from, to])
 
+  const exportExcel = useCallback(() => {
+    if (!data || data.length === 0) return
+
+    // Build CSV (opens in Excel)
+    const headers = ['Fecha', 'Ventas Netas', 'Ventas Brutas', 'Descuentos', 'Tickets', 'Personas', 'Ticket Promedio', 'Propinas']
+    const rows = data.map(d => [
+      d.fecha,
+      d.ventas_dia || 0,
+      d.ventas_brutas || 0,
+      d.descuentos || 0,
+      d.tickets_count || 0,
+      d.personas_restaurant || 0,
+      d.ticket_promedio_restaurant ? Math.round(d.ticket_promedio_restaurant) : 0,
+      d.propinas_total || 0,
+    ])
+
+    // Add meseros sheet data
+    const meseros = aggregateMeseros(data)
+    const meserosHeaders = ['Mesero', 'Ventas', 'Dias Activos', 'Promedio Diario']
+    const meserosRows = meseros.map(m => [m.nombre, m.total, m.dias, Math.round(m.total / (m.dias || 1))])
+
+    // Build CSV with BOM for Excel compatibility
+    const bom = '\uFEFF'
+    let csv = bom
+    csv += 'REPORTE DE ' + reportType.toUpperCase() + ' — ' + from + ' a ' + to + '\n\n'
+    csv += headers.join(',') + '\n'
+    rows.forEach(r => { csv += r.join(',') + '\n' })
+    csv += '\n\nMESEROS\n'
+    csv += meserosHeaders.join(',') + '\n'
+    meserosRows.forEach(r => { csv += r.join(',') + '\n' })
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reporte_${reportType}_${from}_${to}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [data, reportType, from, to])
+
   const selectedReport = reportOptions.find(r => r.key === reportType)!
 
   // Report data
@@ -150,6 +191,14 @@ export default function ReportesPage() {
           >
             <Download size={16} />
             Generar PDF
+          </button>
+          <button
+            onClick={exportExcel}
+            disabled={!generated || data.length === 0}
+            className="px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <Download size={16} />
+            Generar Excel
           </button>
         </div>
       </div>
