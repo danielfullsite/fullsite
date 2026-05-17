@@ -39,13 +39,29 @@ export default function BarraPage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const prevCountRef = { current: 0 }
+
+  const playSound = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.value = 660; osc.type = 'sine'; gain.gain.value = 0.3
+      osc.start(); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+      osc.stop(ctx.currentTime + 0.4)
+    } catch { /* */ }
+  }
+
   const fetchOrders = async () => {
     const allOrders = await getKitchenOrders()
-    // Filter orders that have at least one beverage item
     const barraOrders = allOrders.filter(order => {
       const items: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
       return items.some(item => isBeverage(item.nombre || item.name || ''))
     })
+    const newEnviadas = barraOrders.filter(o => o.status === 'enviada').length
+    if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
+    prevCountRef.current = newEnviadas
     setOrders(barraOrders)
     setLoading(false)
   }

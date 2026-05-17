@@ -59,8 +59,45 @@ export default function CocinaPage() {
     'Tiempo de espera excesivo',
   ]
 
+  const prevOrderCountRef = { current: 0 }
+
+  const playNotificationSound = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      osc.type = 'sine'
+      gain.gain.value = 0.3
+      osc.start()
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+      osc.stop(ctx.currentTime + 0.5)
+      // Second beep
+      setTimeout(() => {
+        const osc2 = ctx.createOscillator()
+        const gain2 = ctx.createGain()
+        osc2.connect(gain2)
+        gain2.connect(ctx.destination)
+        osc2.frequency.value = 1100
+        osc2.type = 'sine'
+        gain2.gain.value = 0.3
+        osc2.start()
+        gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+        osc2.stop(ctx.currentTime + 0.5)
+      }, 200)
+    } catch { /* audio not available */ }
+  }
+
   const fetchOrders = async () => {
     const data = await getKitchenOrders()
+    // Play sound if new 'enviada' orders appeared
+    const newEnviadas = data.filter(o => o.status === 'enviada').length
+    if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
+      playNotificationSound()
+    }
+    prevOrderCountRef.current = newEnviadas
     setOrders(data)
     setLoading(false)
   }
