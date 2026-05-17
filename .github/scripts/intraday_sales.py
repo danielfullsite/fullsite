@@ -355,6 +355,29 @@ def main():
 
         print(f"[intraday] Data: consolidated OK, {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets")
 
+        # Save hourly sales to Supabase for historical analysis
+        try:
+            hours_html = session.post(f"{WANSOFT_URL}/Reports/SalesByHours",
+                data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15).text
+            hours_soup = BeautifulSoup(hours_html, "html.parser")
+            hours_data = []
+            for row in hours_soup.select(".rowReport"):
+                cols = [c.text.strip() for c in row.select("div")]
+                if len(cols) >= 5:
+                    hours_data.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3], "pct": cols[4]})
+            if hours_data:
+                sb_headers = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                              "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                              "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+                requests.post(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly",
+                    headers=sb_headers,
+                    json={"fecha": today_str, "client_id": "amalay", "data": json.dumps(hours_data),
+                          "updated_at": datetime.now(timezone.utc).isoformat()},
+                    timeout=10)
+                print(f"[intraday] Saved {len(hours_data)} hourly entries to Supabase")
+        except Exception as e:
+            print(f"[intraday] Hourly save failed (non-blocking): {e}")
+
         # Don't send report if no sales (restaurant closed or data not yet available)
         ventas = consolidated.get("TotalSales", 0)
         if ventas == 0 and order_types["total_tickets"] == 0:

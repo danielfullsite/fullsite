@@ -45,6 +45,7 @@ import {
   Wine,
   MessageCircle,
   Receipt,
+  QrCode,
   Send as SendIcon,
   Loader2,
 } from 'lucide-react'
@@ -657,6 +658,33 @@ function POSContent() {
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
+  // Staff role from session
+  const [staffRole, setStaffRole] = useState('admin')
+  const [staffName, setStaffName] = useState('')
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('pos_staff')
+      if (saved) {
+        const s = JSON.parse(saved)
+        setStaffRole(s.role || 'admin')
+        setStaffName(s.name || '')
+      }
+    } catch { /* */ }
+  }, [])
+
+  // Role permissions
+  const canSee = (section: string) => {
+    const perms: Record<string, string[]> = {
+      mesero: ['mesas', 'cocina', 'barra'],
+      cajero: ['mesas', 'cocina', 'barra', 'corte'],
+      cocina: ['cocina'],
+      barra: ['barra'],
+      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr'],
+      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr'],
+    }
+    return (perms[staffRole] || perms.admin).includes(section)
+  }
+
   // Mobile view toggle
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu')
 
@@ -920,18 +948,22 @@ function POSContent() {
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
             </span>
             <div className="h-5 w-px bg-slate-600" />
-            <Link href="/pos/mesas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Grid3X3 size={14} />Mesas</Link>
-            <Link href="/pos/cocina" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ChefHat size={14} />Cocina</Link>
-            <Link href="/pos/barra" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Wine size={14} />Barra</Link>
-            <Link href="/pos/recetas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><BookOpen size={14} />Recetas</Link>
-            <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>
-            <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>
-            <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>
-            <Link href="/pos/corte" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Receipt size={14} />Corte</Link>
+            {canSee('mesas') && <Link href="/pos/mesas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Grid3X3 size={14} />Mesas</Link>}
+            {canSee('cocina') && <Link href="/pos/cocina" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ChefHat size={14} />Cocina</Link>}
+            {canSee('barra') && <Link href="/pos/barra" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Wine size={14} />Barra</Link>}
+            {canSee('recetas') && <Link href="/pos/recetas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><BookOpen size={14} />Recetas</Link>}
+            {canSee('compras') && <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>}
+            {canSee('inventario') && <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>}
+            {canSee('auditoria') && <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>}
+            {canSee('corte') && <Link href="/pos/corte" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Receipt size={14} />Corte</Link>}
+            {canSee('qr') && <Link href="/pos/qr" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><QrCode size={14} />QR</Link>}
           </div>
-          <div className="flex items-center gap-1.5 text-slate-400 flex-shrink-0 ml-2">
-            <Clock size={14} />
-            <span className="text-xs font-mono">{clock}</span>
+          <div className="flex items-center gap-3 text-slate-400 flex-shrink-0 ml-2">
+            {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
+            <div className="flex items-center gap-1">
+              <Clock size={14} />
+              <span className="text-xs font-mono">{clock}</span>
+            </div>
           </div>
         </div>
         {/* Row 2: Selectors (compact on mobile) */}
