@@ -16,7 +16,6 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      // Use fetch directly to avoid SDK hanging issue
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -33,12 +32,17 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      // Set session in Supabase client
       if (data.access_token) {
-        await supabase.auth.setSession({
+        // Store tokens directly in localStorage (skip SDK setSession which hangs)
+        const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+        localStorage.setItem(storageKey, JSON.stringify({
           access_token: data.access_token,
           refresh_token: data.refresh_token,
-        })
+          expires_at: data.expires_at,
+          expires_in: data.expires_in,
+          token_type: data.token_type,
+          user: data.user,
+        }))
         window.location.href = '/'
       } else {
         setError('No se pudo crear la sesión.')
