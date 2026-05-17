@@ -173,12 +173,12 @@ for fecha in sorted(by_date):
 wansoft_fmt = "  Sin datos."
 if wansoft:
     fecha = wansoft.get("fecha", "N/D")
-    ventas = wansoft.get("ventas_dia", 0)
-    tickets = wansoft.get("tickets_count", 0)
-    personas = wansoft.get("personas_restaurant", 0)
-    tp = wansoft.get("ticket_promedio_restaurant", 0)
-    propinas = wansoft.get("propinas_total", 0)
-    descuentos = wansoft.get("descuentos", 0)
+    ventas = wansoft.get("ventas_dia") or 0
+    tickets = wansoft.get("tickets_count") or 0
+    personas = wansoft.get("personas_restaurant") or 0
+    tp = wansoft.get("ticket_promedio_restaurant") or 0
+    propinas = wansoft.get("propinas_total") or 0
+    descuentos = wansoft.get("descuentos") or 0
 
     # Top meseros
     meseros_raw = wansoft.get("meseros", [])
