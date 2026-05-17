@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
         }
 
         const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
-        waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${meseroList.length} meseros (fechas: ${fechas})`
+        waiterContext = `\nDATOS DE MESEROS DEL DIA ${fechas} (USAR ESTOS PARA RESPONDER SOBRE "AYER" O LA FECHA INDICADA):\n\n${rankings.join('\n')}`
         console.log(`[chat] Rankings OK: ${rankings.length} lines, ${meseroList.length} meseros, ${waiterContext.length} chars`)
       } catch (err) {
         console.error('[chat] Rankings error:', err)
