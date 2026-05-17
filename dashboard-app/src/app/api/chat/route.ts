@@ -70,13 +70,15 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
-    // 1. Recent daily data (last 14 days)
+    // 1. Recent daily data (90 days for history questions)
+    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado'].some(kw => q.includes(kw))
+    const histLimit = wantsHistory ? 90 : 14
     const { data: recentDays } = await supabase
       .from('wansoft_daily')
       .select('fecha, ventas_dia, ventas_brutas, descuentos, tickets_count, personas_restaurant, ticket_promedio_restaurant, efectivo, tarjeta, meseros, ventas_por_grupo, pago_metodos')
       .gt('ventas_dia', 0)
       .order('fecha', { ascending: false })
-      .limit(14)
+      .limit(histLimit)
 
     // 2. Detect date from question
     const now = new Date()
@@ -186,42 +188,57 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Build context based on question
-      if (meseroMatch) {
-        // Filter search terms from question
-        const skipWords = new Set(['cuantos', 'cuántos', 'cuanto', 'cuánto', 'vendio', 'vendió', 'hoy', 'ayer', 'mes', 'semana', 'cada', 'por', 'persona', 'los', 'las', 'del', 'que', 'qué'])
-        const searchTerms = q.split(/\s+/).filter(w => w.length > 2 && !skipWords.has(w)).map(w => w.replace(/s$/, ''))
+      // Exclude list
+      const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
+        'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
 
-        const platillos = aggPlatillo[meseroMatch] || {}
-        const filtered = Object.fromEntries(
-          Object.entries(platillos).filter(([name]) =>
-            searchTerms.some(t => name.toLowerCase().includes(t))
-          )
-        )
+      // Build pre-calculated rankings (plain text so AI reads them)
+      const rankings: string[] = []
+      const filteredMeseros: Record<string, { kpis: typeof aggKPIs[string]; cats: Record<string, { qty: number; total: number }> }> = {}
 
-        const kpi = aggKPIs[meseroMatch]
-        const kpiStr = kpi
-          ? `KPIs: ${(kpi.bebidas / (kpi.personas || 1)).toFixed(2)} bebidas/persona, ${(kpi.alimentos / (kpi.personas || 1)).toFixed(2)} alimentos/persona, ${kpi.tickets} tickets, ${kpi.personas} personas`
-          : ''
-
-        const cats = aggCats[meseroMatch]
-        const catsStr = cats
-          ? Object.entries(cats).map(([c, v]) => `${c}: ${v.qty} pzas ($${v.total.toLocaleString()})`).join(', ')
-          : ''
-
-        const platStr = Object.keys(filtered).length > 0
-          ? JSON.stringify(filtered)
-          : JSON.stringify(Object.fromEntries(Object.entries(platillos).sort((a, b) => b[1].qty - a[1].qty).slice(0, 20)))
-
-        const fechas = waiterRows.map(r => r.fecha).join(', ')
-        waiterContext = `\nDATOS DE ${meseroMatch} (fechas: ${fechas}):\n${kpiStr}\nCategorías: ${catsStr}\nPlatillos: ${platStr}`
-      } else {
-        // All meseros KPIs
-        const allKPIs = Object.entries(aggKPIs)
-          .map(([m, k]) => `${m}: ${(k.bebidas / (k.personas || 1)).toFixed(2)} beb/persona, ${k.tickets} tickets, ${k.personas} personas`)
-          .join('\n')
-        if (allKPIs) waiterContext = `\nKPIs POR MESERO (${waiterRows.length} días):\n${allKPIs}`
+      for (const [name, kpi] of Object.entries(aggKPIs)) {
+        if (excludeNames.some(ex => name.toLowerCase().includes(ex))) continue
+        filteredMeseros[name] = { kpis: kpi, cats: aggCats[name] || {} }
       }
+
+      // H&H ranking
+      rankings.push('RANKING H&H POR MESERO:')
+      Object.entries(filteredMeseros)
+        .map(([m, d]) => ({ m, qty: d.cats['H&H']?.qty || 0, total: d.cats['H&H']?.total || 0 }))
+        .sort((a, b) => b.qty - a.qty)
+        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
+
+      // 2da Bebida ranking
+      rankings.push('\nRANKING 2DA BEBIDA POR MESERO:')
+      Object.entries(filteredMeseros)
+        .map(([m, d]) => ({ m, qty: d.cats['2da Bebida']?.qty || 0 }))
+        .sort((a, b) => b.qty - a.qty)
+        .forEach(({ m, qty }) => rankings.push(`  ${m}: ${qty} pzas`))
+
+      // Bebidas por persona
+      rankings.push('\nRANKING BEBIDAS POR PERSONA:')
+      Object.entries(filteredMeseros)
+        .map(([m, d]) => ({ m, bp: d.kpis.personas > 0 ? +(d.kpis.bebidas / d.kpis.personas).toFixed(2) : 0 }))
+        .sort((a, b) => b.bp - a.bp)
+        .forEach(({ m, bp }) => rankings.push(`  ${m}: ${bp}`))
+
+      // Pan ranking
+      rankings.push('\nRANKING PAN/TOAST/BAGEL POR MESERO:')
+      Object.entries(filteredMeseros)
+        .map(([m, d]) => ({ m, qty: d.cats['Pan']?.qty || 0, total: d.cats['Pan']?.total || 0 }))
+        .sort((a, b) => b.qty - a.qty)
+        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
+
+      // Postres ranking
+      rankings.push('\nRANKING POSTRES POR MESERO:')
+      Object.entries(filteredMeseros)
+        .map(([m, d]) => ({ m, qty: d.cats['Postres']?.qty || 0, total: d.cats['Postres']?.total || 0 }))
+        .sort((a, b) => b.qty - a.qty)
+        .filter(({ qty }) => qty > 0)
+        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
+
+      const fechas = waiterRows.map(r => r.fecha).join(', ')
+      waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${Object.keys(filteredMeseros).length} meseros (fechas: ${fechas})`
     }
 
     // 3. Build daily context
@@ -243,15 +260,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. System prompt
-    const systemPrompt = `Eres el asistente de datos de AMALAY Coffee & Market (San Pedro Garza García, MX).
+    const systemPrompt = `Eres el copiloto operativo de AMALAY Coffee & Market (San Pedro Garza García, MX).
 
-REGLA #1: Responde SOLO lo que se pregunta. Sin explicaciones extra.
+REGLA #1: Responde SOLO lo que se pregunta. Directo al dato.
 REGLA #2: Usa los datos del contexto TAL CUAL. No recalcules.
-REGLA #3: Formato corto. Sin markdown. Maximo 5 lineas para preguntas simples.
-REGLA #4: Montos en MXN con $.
-REGLA #5: EXCLUYE de rankings de meseros: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO (cajeros), Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio (Market).
-REGLA #6: Para KPIs (bebidas_por_persona, etc.) usa los datos precalculados, NUNCA recalcules.
+REGLA #3: Formato corto. Maximo 5 lineas para preguntas simples, 20 para rankings.
+REGLA #4: Montos en MXN con $ y SIN decimales.
+REGLA #5: EXCLUYE SIEMPRE de rankings: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique.
+REGLA #6: H&H = Half & Half. Los RANKINGS PRECALCULADOS ya están filtrados — úsalos directamente.
 REGLA #7: Si no tienes el dato, di "No tengo ese dato" y punto.
+REGLA #8: Para historial, muestra TODOS los días disponibles.
 
 ${dailyContext}
 ${waiterContext}`
@@ -268,7 +286,7 @@ ${waiterContext}`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 4000,
       system: systemPrompt,
       messages,
     })
