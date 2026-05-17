@@ -204,6 +204,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      console.log(`[chat] aggKPIs: ${Object.keys(aggKPIs).length} meseros, aggCats: ${Object.keys(aggCats).length} meseros, waiterRows: ${waiterRows.length}`)
+
       // Exclude list
       const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
         'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
@@ -255,6 +257,7 @@ export async function POST(request: NextRequest) {
 
       const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
       waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${Object.keys(filteredMeseros).length} meseros (fechas: ${fechas})`
+      console.log(`[chat] Rankings: ${rankings.length} lines, filteredMeseros: ${Object.keys(filteredMeseros).length}, waiterContext: ${waiterContext.length} chars`)
     }
 
     // 3. Build daily context
