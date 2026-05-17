@@ -204,60 +204,53 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log(`[chat] aggKPIs: ${Object.keys(aggKPIs).length} meseros, aggCats: ${Object.keys(aggCats).length} meseros, waiterRows: ${waiterRows.length}`)
+      try {
+        const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
+          'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
 
-      // Exclude list
-      const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
-        'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
+        const rankings: string[] = []
 
-      // Build pre-calculated rankings (plain text so AI reads them)
-      const rankings: string[] = []
-      const filteredMeseros: Record<string, { kpis: typeof aggKPIs[string]; cats: Record<string, { qty: number; total: number }> }> = {}
+        // Build simple text rankings
+        const meseroList = Object.entries(aggKPIs).filter(([name]) =>
+          !excludeNames.some(ex => name.toLowerCase().includes(ex))
+        )
 
-      for (const [name, kpi] of Object.entries(aggKPIs)) {
-        if (excludeNames.some(ex => name.toLowerCase().includes(ex))) continue
-        filteredMeseros[name] = { kpis: kpi, cats: aggCats[name] || {} }
+        rankings.push('RANKING H&H POR MESERO:')
+        for (const [m] of meseroList) {
+          const hh = aggCats[m]?.['H&H']
+          rankings.push(`  ${m}: ${hh ? hh.qty : 0} pzas ($${hh ? Math.round(hh.total) : 0})`)
+        }
+
+        rankings.push('\nRANKING 2DA BEBIDA POR MESERO:')
+        for (const [m] of meseroList) {
+          const bd = aggCats[m]?.['2da Bebida']
+          rankings.push(`  ${m}: ${bd ? bd.qty : 0} pzas`)
+        }
+
+        rankings.push('\nRANKING BEBIDAS POR PERSONA:')
+        for (const [m, k] of meseroList) {
+          const bp = k.personas > 0 ? (k.bebidas / k.personas).toFixed(2) : '0'
+          rankings.push(`  ${m}: ${bp}`)
+        }
+
+        rankings.push('\nRANKING PAN/TOAST/BAGEL POR MESERO:')
+        for (const [m] of meseroList) {
+          const pan = aggCats[m]?.['Pan']
+          rankings.push(`  ${m}: ${pan ? pan.qty : 0} pzas ($${pan ? Math.round(pan.total) : 0})`)
+        }
+
+        rankings.push('\nRANKING POSTRES POR MESERO:')
+        for (const [m] of meseroList) {
+          const post = aggCats[m]?.['Postres']
+          if (post && post.qty > 0) rankings.push(`  ${m}: ${post.qty} pzas ($${Math.round(post.total)})`)
+        }
+
+        const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
+        waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${meseroList.length} meseros (fechas: ${fechas})`
+        console.log(`[chat] Rankings OK: ${rankings.length} lines, ${meseroList.length} meseros, ${waiterContext.length} chars`)
+      } catch (err) {
+        console.error('[chat] Rankings error:', err)
       }
-
-      // H&H ranking
-      rankings.push('RANKING H&H POR MESERO:')
-      Object.entries(filteredMeseros)
-        .map(([m, d]) => ({ m, qty: d.cats['H&H']?.qty || 0, total: d.cats['H&H']?.total || 0 }))
-        .sort((a, b) => b.qty - a.qty)
-        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
-
-      // 2da Bebida ranking
-      rankings.push('\nRANKING 2DA BEBIDA POR MESERO:')
-      Object.entries(filteredMeseros)
-        .map(([m, d]) => ({ m, qty: d.cats['2da Bebida']?.qty || 0 }))
-        .sort((a, b) => b.qty - a.qty)
-        .forEach(({ m, qty }) => rankings.push(`  ${m}: ${qty} pzas`))
-
-      // Bebidas por persona
-      rankings.push('\nRANKING BEBIDAS POR PERSONA:')
-      Object.entries(filteredMeseros)
-        .map(([m, d]) => ({ m, bp: d.kpis.personas > 0 ? +(d.kpis.bebidas / d.kpis.personas).toFixed(2) : 0 }))
-        .sort((a, b) => b.bp - a.bp)
-        .forEach(({ m, bp }) => rankings.push(`  ${m}: ${bp}`))
-
-      // Pan ranking
-      rankings.push('\nRANKING PAN/TOAST/BAGEL POR MESERO:')
-      Object.entries(filteredMeseros)
-        .map(([m, d]) => ({ m, qty: d.cats['Pan']?.qty || 0, total: d.cats['Pan']?.total || 0 }))
-        .sort((a, b) => b.qty - a.qty)
-        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
-
-      // Postres ranking
-      rankings.push('\nRANKING POSTRES POR MESERO:')
-      Object.entries(filteredMeseros)
-        .map(([m, d]) => ({ m, qty: d.cats['Postres']?.qty || 0, total: d.cats['Postres']?.total || 0 }))
-        .sort((a, b) => b.qty - a.qty)
-        .filter(({ qty }) => qty > 0)
-        .forEach(({ m, qty, total }) => rankings.push(`  ${m}: ${qty} pzas ($${Math.round(total)})`))
-
-      const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
-      waiterContext = `\n${rankings.join('\n')}\n\nDatos de ${Object.keys(filteredMeseros).length} meseros (fechas: ${fechas})`
-      console.log(`[chat] Rankings: ${rankings.length} lines, filteredMeseros: ${Object.keys(filteredMeseros).length}, waiterContext: ${waiterContext.length} chars`)
     }
 
     // 3. Build daily context
