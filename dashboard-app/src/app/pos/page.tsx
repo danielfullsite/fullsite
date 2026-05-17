@@ -632,6 +632,10 @@ function POSContent() {
   const [showDiscount, setShowDiscount] = useState(false)
   const [discount, setDiscount] = useState(0)
 
+  // Split de cuenta
+  const [showSplit, setShowSplit] = useState(false)
+  const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1 or 2)
+
   // Propina
   const [propina, setPropina] = useState(0)
 
@@ -1149,15 +1153,22 @@ function POSContent() {
           <div className="px-4 py-3 border-t border-slate-700 flex gap-3">
             <button
               onClick={handleSendToKitchen}
-              disabled={orderItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
             >
               <Send size={20} />
               {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Enviar a cocina'}
             </button>
             <button
+              onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
+              disabled={activeItems.length === 0 || saving}
+              className="flex-[0.5] flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-sm transition-colors min-h-[56px]"
+            >
+              Split
+            </button>
+            <button
               onClick={handleCloseOrder}
-              disabled={orderItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
             >
               <CreditCard size={20} />
@@ -1301,6 +1312,100 @@ function POSContent() {
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium animate-fade-in">
           {toast}
+        </div>
+      )}
+
+      {/* Split de Cuenta Modal */}
+      {showSplit && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg border border-slate-700 max-h-[85vh] overflow-y-auto mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Split de cuenta — Mesa {mesa}</h3>
+              <button onClick={() => setShowSplit(false)} className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+                <X size={20} />
+              </button>
+            </div>
+            <p className="text-slate-400 text-sm mb-4">Toca cada item para asignarlo a Cuenta 1 o Cuenta 2</p>
+
+            <div className="space-y-2 mb-6">
+              {activeItems.map(item => {
+                const cuenta = splitAssignments[item.id] || 1
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setSplitAssignments(prev => ({ ...prev, [item.id]: cuenta === 1 ? 2 : 1 }))}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                      cuenta === 1 ? 'bg-blue-900/30 border border-blue-700/50' : 'bg-purple-900/30 border border-purple-700/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                        cuenta === 1 ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                      }`}>C{cuenta}</span>
+                      <span className="text-white text-sm">{item.cantidad}x {item.nombre}</span>
+                    </div>
+                    <span className="text-white font-semibold">{formatMXN(item.subtotal)}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Totals per cuenta */}
+            {(() => {
+              const cuenta1Items = activeItems.filter(i => (splitAssignments[i.id] || 1) === 1)
+              const cuenta2Items = activeItems.filter(i => splitAssignments[i.id] === 2)
+              const total1 = cuenta1Items.reduce((s, i) => s + i.subtotal, 0)
+              const total2 = cuenta2Items.reduce((s, i) => s + i.subtotal, 0)
+              const iva1 = total1 * IVA_RATE
+              const iva2 = total2 * IVA_RATE
+              return (
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-center">
+                    <p className="text-blue-400 text-xs font-bold mb-1">CUENTA 1</p>
+                    <p className="text-white text-xl font-bold">{formatMXN(total1 + iva1)}</p>
+                    <p className="text-blue-400/60 text-xs">{cuenta1Items.length} items</p>
+                  </div>
+                  <div className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-4 text-center">
+                    <p className="text-purple-400 text-xs font-bold mb-1">CUENTA 2</p>
+                    <p className="text-white text-xl font-bold">{formatMXN(total2 + iva2)}</p>
+                    <p className="text-purple-400/60 text-xs">{cuenta2Items.length} items</p>
+                  </div>
+                </div>
+              )
+            })()}
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowSplit(false)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold min-h-[48px]">
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  // Pay cuenta 1 first, then cuenta 2
+                  const cuenta2Items = activeItems.filter(i => splitAssignments[i.id] === 2)
+                  if (cuenta2Items.length === 0) {
+                    // No split needed — just close normally
+                    setShowSplit(false)
+                    setShowPayment(true)
+                    return
+                  }
+                  logAudit({
+                    order_id: orderId, action: 'status_changed', actor: mesero, mesa,
+                    details: {
+                      type: 'split_cuenta',
+                      cuenta1_items: activeItems.filter(i => (splitAssignments[i.id] || 1) === 1).length,
+                      cuenta2_items: cuenta2Items.length,
+                    },
+                  })
+                  setShowSplit(false)
+                  setShowPayment(true)
+                  showToast('Cuenta dividida — cobra Cuenta 1 primero')
+                }}
+                className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold min-h-[48px]"
+              >
+                Dividir y cobrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

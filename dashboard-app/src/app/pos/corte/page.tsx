@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat } from 'lucide-react'
-import { formatMXN, getAuditLog, type AuditLogEntry } from '@/lib/pos-data'
+import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, X } from 'lucide-react'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, MANAGER_PINS, type AuditLogEntry } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -51,6 +51,36 @@ export default function CortePage() {
     setOrders(o)
     setAuditLog(a)
     setLoading(false)
+  }
+
+  // Reabrir cuenta
+  const [reopenTarget, setReopenTarget] = useState<OrderFromDB | null>(null)
+  const [reopenPin, setReopenPin] = useState('')
+  const [reopenError, setReopenError] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  const handleReopen = async () => {
+    if (!reopenTarget) return
+    if (!reopenPin) { setReopenError('Ingresa PIN'); return }
+    const manager = MANAGER_PINS[reopenPin]
+    if (!manager) { setReopenError('PIN invalido'); return }
+
+    const ok = await reopenOrder(reopenTarget.id)
+    if (ok) {
+      logAudit({
+        order_id: reopenTarget.id, action: 'status_changed', actor: manager,
+        mesa: reopenTarget.mesa,
+        details: { type: 'order_reopened', mesero: reopenTarget.mesero, total: reopenTarget.total },
+        reason: 'Cuenta reabierta por gerente',
+        approved_by: manager,
+      })
+      setToast(`Cuenta Mesa ${reopenTarget.mesa} reabierta — aprobado por ${manager}`)
+      setTimeout(() => setToast(null), 3000)
+      fetchData()
+    }
+    setReopenTarget(null)
+    setReopenPin('')
+    setReopenError('')
   }
 
   useEffect(() => { fetchData() }, [selectedDate])
@@ -256,12 +286,83 @@ export default function CortePage() {
             </div>
           </div>
 
+          {/* Ordenes cerradas — con opción de reabrir */}
+          <div className="mt-6 bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+              <Receipt size={18} className="text-slate-400" />
+              Ordenes cerradas ({orders.filter(o => o.status === 'cerrada').length})
+            </h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {orders.filter(o => o.status === 'cerrada').map(order => (
+                <div key={order.id} className="flex items-center justify-between px-3 py-2.5 bg-slate-700/40 rounded-lg">
+                  <div>
+                    <span className="text-white text-sm font-medium">Mesa {order.mesa}</span>
+                    <span className="text-slate-400 text-xs ml-2">{order.mesero}</span>
+                    <span className="text-slate-500 text-xs ml-2">{order.metodo_pago}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-semibold text-sm">{formatMXN(order.total)}</span>
+                    <button
+                      onClick={() => setReopenTarget(order)}
+                      className="px-2 py-1.5 bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 rounded-lg text-xs flex items-center gap-1 transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      Reabrir
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Status */}
           <div className="mt-6 flex gap-4 text-sm text-slate-500">
             <span>Abiertas: {stats.ordenesAbiertas}</span>
             <span>Cerradas: {stats.ordenesCerradas}</span>
             <span>Canceladas: {stats.ordenesCanceladas}</span>
           </div>
+        </div>
+      )}
+
+      {/* Reabrir Modal */}
+      {reopenTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setReopenTarget(null)} />
+          <div className="relative bg-slate-800 border border-amber-700/40 rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <ShieldAlert size={24} className="text-amber-400" />
+              <div>
+                <h3 className="text-lg font-bold text-white">Reabrir cuenta</h3>
+                <p className="text-amber-400 text-sm">Mesa {reopenTarget.mesa} · {formatMXN(reopenTarget.total)}</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">PIN de gerente</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={reopenPin}
+                onChange={e => { setReopenPin(e.target.value.replace(/\D/g, '')); setReopenError('') }}
+                placeholder="****"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            {reopenError && <p className="text-red-400 text-sm text-center mt-2">{reopenError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => setReopenTarget(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold">Cancelar</button>
+              <button onClick={handleReopen} className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold flex items-center justify-center gap-2">
+                <RotateCcw size={18} />Reabrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+          {toast}
         </div>
       )}
     </div>

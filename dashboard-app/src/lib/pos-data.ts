@@ -1235,6 +1235,27 @@ export async function getRecipeDetail(name: string): Promise<RecipeDetail | null
   return rows[0]
 }
 
+export async function getClosedOrders(date: string): Promise<{ id: string; mesa: number; mesero: string; total: number; metodo_pago: string; closed_at: string; items: string }[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_orders?status=eq.cerrada&created_at=gte.${date}T00:00:00&created_at=lte.${date}T23:59:59&order=closed_at.desc&limit=50`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function reopenOrder(orderId: string): Promise<boolean> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`,
+    {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'enviada', closed_at: null, metodo_pago: null }),
+    }
+  )
+  return res.ok
+}
+
 export async function updateFacturaStatus(
   id: string, status: string, extra?: Record<string, unknown>
 ): Promise<boolean> {
