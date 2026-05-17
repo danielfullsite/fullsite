@@ -290,8 +290,9 @@ REGLA #6: H&H = Half & Half. Los RANKINGS PRECALCULADOS ya están filtrados — 
 REGLA #7: Si no tienes el dato, di "No tengo ese dato" y punto.
 REGLA #8: Para historial, muestra TODOS los días disponibles.
 
-${dailyContext}
-${waiterContext}`
+${waiterContext}
+
+${dailyContext}`
 
     const anthropic = new Anthropic({ apiKey })
 
