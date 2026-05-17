@@ -107,10 +107,20 @@ calendario = sb_get("calendar_sync_log", [
     ("limit",       "20"),
 ])
 
-wansoft_rows = sb_get("wansoft_kpis", [
-    ("id",     f"eq.{CLIENT.get('kpis_row_id', 'amalay')}"),
-    ("select", "ventas_dia,tickets_count,ticket_promedio_restaurant,ultima_venta,updated_at,fecha_reporte"),
+# Get yesterday's sales from wansoft_daily (fresh data, not stale wansoft_kpis)
+yesterday_str = (today - timedelta(days=1)).isoformat()
+wansoft_rows = sb_get("wansoft_daily", [
+    ("fecha", f"eq.{yesterday_str}"),
+    ("select", "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros,updated_at"),
+    ("limit", "1"),
 ])
+# Fallback: try today
+if not wansoft_rows:
+    wansoft_rows = sb_get("wansoft_daily", [
+        ("select", "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros,updated_at"),
+        ("order", "fecha.desc"),
+        ("limit", "1"),
+    ])
 wansoft = wansoft_rows[0] if wansoft_rows else {}
 
 print(f"[briefing] reservas_hoy={len(reservas_hoy)}, proximas={len(reservas_proximas)}, "
@@ -159,28 +169,32 @@ for fecha in sorted(by_date):
         f"  {fecha} ({day_name}): {len(items)} evento(s) — {nombres} — {px_total} px"
     )
 
-# Wansoft staleness
-wansoft_stale = ""
-wansoft_fmt   = "  Sin datos."
+# Wansoft data formatting
+wansoft_fmt = "  Sin datos."
 if wansoft:
-    upd_str = wansoft.get("updated_at", "")
-    if upd_str:
-        upd_dt   = datetime.fromisoformat(upd_str.replace("Z", "+00:00"))
-        hrs_diff = (now_utc - upd_dt).total_seconds() / 3600
-        if hrs_diff > 24:
-            days_diff = int(hrs_diff // 24)
-            rem_hrs   = int(hrs_diff % 24)
-            upd_local = upd_dt.astimezone(MX_TZ).strftime("%H:%M")
-            wansoft_stale = (
-                f"  STALE {days_diff}d {rem_hrs}h — "
-                f"último sync: {wansoft.get('fecha_reporte','')} {upd_local} hrs\n"
-            )
+    fecha = wansoft.get("fecha", "N/D")
+    ventas = wansoft.get("ventas_dia", 0)
+    tickets = wansoft.get("tickets_count", 0)
+    personas = wansoft.get("personas_restaurant", 0)
+    tp = wansoft.get("ticket_promedio_restaurant", 0)
+    propinas = wansoft.get("propinas_total", 0)
+    descuentos = wansoft.get("descuentos", 0)
+
+    # Top meseros
+    meseros_raw = wansoft.get("meseros", [])
+    if isinstance(meseros_raw, str):
+        meseros_raw = json.loads(meseros_raw)
+    top_meseros = sorted(meseros_raw, key=lambda m: m.get("total", 0), reverse=True)[:5]
+    meseros_str = ", ".join(f"{m.get('nombre','?')}: ${m.get('total',0):,.0f}" for m in top_meseros)
+
     wansoft_fmt = (
-        f"{wansoft_stale}"
-        f"  Ventas día: ${wansoft.get('ventas_dia','N/D')}\n"
-        f"  Tickets: {wansoft.get('tickets_count') or 'N/D'}\n"
-        f"  Ticket promedio: ${wansoft.get('ticket_promedio_restaurant') or 'N/D'}\n"
-        f"  Última venta: {wansoft.get('ultima_venta','N/D')}"
+        f"  Fecha: {fecha}\n"
+        f"  Ventas netas: ${ventas:,.0f}\n"
+        f"  Tickets: {tickets or 'N/D'} | Personas: {personas or 'N/D'}\n"
+        f"  Ticket promedio: ${tp:,.0f}\n"
+        f"  Propinas: ${propinas:,.0f}\n"
+        f"  Descuentos: ${descuentos:,.0f}\n"
+        f"  Top meseros: {meseros_str or 'N/D'}"
     )
 
 data_block = f"""=== DATOS {CLIENT['display_name']} {today_str} ===
