@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     const q = message.toLowerCase()
 
     // 1. Recent daily data (use fetch to avoid SDK issues)
-    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado'].some(kw => q.includes(kw))
-    const histLimit = wantsHistory ? 90 : 14
+    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos'].some(kw => q.includes(kw))
+    const histLimit = wantsHistory ? 90 : 30
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const dailyRes = await fetch(
