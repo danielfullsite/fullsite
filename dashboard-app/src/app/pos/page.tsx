@@ -1062,10 +1062,126 @@ function POSContent() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content — 3 column layout on desktop */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel -- Current Order (60% desktop, full on mobile when active) */}
-        <div className={`md:w-[60%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
+        {/* Left Sidebar -- Categories (hidden on mobile) */}
+        <div className="hidden md:flex flex-col w-[180px] bg-slate-800/80 border-r border-slate-700 overflow-y-auto flex-shrink-0">
+          <div className="p-2 space-y-1">
+            {MENU_CATEGORIES.map((cat) => {
+              const catIcons: Record<string, string> = {
+                chilaquiles: '🌮', eggs: '🍳', coffee: '☕', toast: '🍞', especiales: '⭐',
+                signature: '🍸', croissants: '🥐', jugos: '🧃', fresh: '🍋', smoothies: '🥤',
+                frappes: '🧊', pancakes: '🥞', paninis: '🥪', pizzas: '🍕', bowls: '🥗',
+                postres: '🍰', bakery: '🧁', sodas: '🥤', tea: '🍵', alcohol: '🍷',
+              }
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => { setSelectedCategory(cat.id); setMenuSearch('') }}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left ${
+                    selectedCategory === cat.id
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                      : 'text-slate-400 hover:bg-slate-700/60 hover:text-white'
+                  }`}
+                >
+                  <span className="text-base">{catIcons[cat.id] || '🍽️'}</span>
+                  <span className="truncate text-xs">{cat.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Center Panel -- Menu Items (hidden on mobile when order active) */}
+        <div className={`md:flex flex-col flex-1 bg-slate-900/50 border-r border-slate-700 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
+          {/* Search bar */}
+          <div className="px-3 pt-3 pb-2 flex-shrink-0">
+            <input
+              type="text"
+              value={menuSearch}
+              onChange={(e) => setMenuSearch(e.target.value)}
+              placeholder="🔍 Buscar platillo..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          {/* Mobile category tabs (only on mobile) */}
+          <div className="flex md:hidden gap-1 px-3 py-2 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
+            {MENU_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { setSelectedCategory(cat.id); setMenuSearch('') }}
+                className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[40px] ${
+                  selectedCategory === cat.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {menuSearch.trim() ? (
+            /* Search results */
+            <div className="flex-1 overflow-y-auto p-3">
+              {(() => {
+                const term = menuSearch.toLowerCase()
+                const results: { item: MenuItem; category: string; catId: string }[] = []
+                for (const cat of MENU_CATEGORIES) {
+                  for (const item of cat.items) {
+                    if (item.name.toLowerCase().includes(term)) {
+                      results.push({ item, category: cat.name, catId: cat.id })
+                    }
+                  }
+                }
+                if (results.length === 0) {
+                  return <p className="text-slate-500 text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>
+                }
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {results.map(({ item, category, catId }) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
+                        className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 hover:border-emerald-600/40 rounded-xl p-3 text-left transition-all flex flex-col justify-between min-h-[100px] group"
+                      >
+                        <div>
+                          <span className="font-medium text-sm text-white group-hover:text-emerald-400 transition-colors leading-tight block">{item.name}</span>
+                          <span className="text-slate-500 text-[10px] mt-0.5 block">{category}</span>
+                        </div>
+                        <span className="text-emerald-400 font-bold text-base mt-2">{formatMXN(item.price)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+          ) : (
+            /* Menu items grid */
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {activeCategory.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
+                    className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 hover:border-emerald-600/40 rounded-xl p-3 text-left transition-all min-h-[90px] md:min-h-[100px] flex flex-col justify-between group"
+                  >
+                    <span className="font-medium text-sm text-white group-hover:text-emerald-400 transition-colors leading-tight">
+                      {item.name}
+                    </span>
+                    <span className="text-emerald-400 font-bold text-base mt-2">
+                      {formatMXN(item.price)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel -- Current Order */}
+        <div className={`md:w-[320px] md:flex flex-col bg-slate-900 flex-shrink-0 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
           {/* Order header */}
           <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50">
             <h2 className="text-lg font-semibold">
@@ -1269,95 +1385,7 @@ function POSContent() {
           </div>
         </div>
 
-        {/* Right Panel -- Menu (40% desktop, full on mobile when active) */}
-        <div className={`md:w-[40%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
-          {/* Search bar */}
-          <div className="px-3 pt-3 pb-2 flex-shrink-0">
-            <input
-              type="text"
-              value={menuSearch}
-              onChange={(e) => setMenuSearch(e.target.value)}
-              placeholder="Buscar platillo..."
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {menuSearch.trim() ? (
-            /* Search results across all categories */
-            <div className="flex-1 overflow-y-auto p-3">
-              {(() => {
-                const term = menuSearch.toLowerCase()
-                const results: { item: MenuItem; category: string; catId: string }[] = []
-                for (const cat of MENU_CATEGORIES) {
-                  for (const item of cat.items) {
-                    if (item.name.toLowerCase().includes(term)) {
-                      results.push({ item, category: cat.name, catId: cat.id })
-                    }
-                  }
-                }
-                if (results.length === 0) {
-                  return <p className="text-slate-500 text-center py-8">Sin resultados para &ldquo;{menuSearch}&rdquo;</p>
-                }
-                return (
-                  <div className="space-y-2">
-                    {results.map(({ item, category, catId }) => (
-                      <button
-                        key={item.id}
-                        onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-medium text-[15px] text-white">{item.name}</span>
-                          <span className="text-slate-500 text-xs ml-2">{category}</span>
-                        </div>
-                        <span className="text-emerald-400 font-semibold">{formatMXN(item.price)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-          ) : (
-            <>
-              {/* Category tabs */}
-              <div className="flex gap-1 px-3 py-2 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
-                {MENU_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[40px] ${
-                      selectedCategory === cat.id
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Menu items grid */}
-              <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {activeCategory.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors min-h-[80px] md:min-h-[100px] flex flex-col justify-between"
-                    >
-                      <span className="font-medium text-[14px] leading-tight">
-                        {item.name}
-                      </span>
-                      <span className="text-emerald-400 font-semibold text-base mt-2">
-                        {formatMXN(item.price)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* Old menu panel removed — now in center column */}
       </div>
 
       {/* Modifier Modal */}
