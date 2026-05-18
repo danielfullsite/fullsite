@@ -378,6 +378,23 @@ def main():
         except Exception as e:
             print(f"[intraday] Hourly save failed (non-blocking): {e}")
 
+        # Save ventas_por_grupo to wansoft_daily so historical category queries work
+        try:
+            if groups:
+                grupo_data = [{"nombre": g["grupo"], "total": float(g["subtotal"].replace(",","")) if isinstance(g["subtotal"], str) else g["subtotal"]}
+                              for g in groups if g.get("grupo")]
+                sb_h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                        "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+                requests.patch(
+                    f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&report_type=eq.cierre",
+                    headers=sb_h,
+                    json={"ventas_por_grupo": json.dumps(grupo_data), "updated_at": datetime.now(timezone.utc).isoformat()},
+                    timeout=10)
+                print(f"[intraday] Updated ventas_por_grupo in wansoft_daily ({len(grupo_data)} categories)")
+        except Exception as e:
+            print(f"[intraday] ventas_por_grupo save failed (non-blocking): {e}")
+
         # Don't send report if no sales (restaurant closed or data not yet available)
         ventas = consolidated.get("TotalSales", 0)
         if ventas == 0 and order_types["total_tickets"] == 0:
