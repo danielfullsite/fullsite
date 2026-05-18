@@ -657,6 +657,32 @@ function POSContent() {
   // Propina
   const [propina, setPropina] = useState(0)
 
+  // Load active order for selected mesa
+  const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
+  useEffect(() => {
+    const loadMesaOrder = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        )
+        if (res.ok) {
+          const rows = await res.json()
+          if (rows.length > 0 && rows[0].id !== loadedOrderId) {
+            const order = rows[0]
+            const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+            setOrderItems(items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled))
+            setMesero(order.mesero || MESEROS[0])
+            setPersonas(order.personas || 2)
+            setDiscount(order.descuento || 0)
+            setLoadedOrderId(order.id)
+          }
+        }
+      } catch { /* */ }
+    }
+    if (orderItems.length === 0) loadMesaOrder()
+  }, [mesa])
+
   // Order-level notes
   const [orderNotes, setOrderNotes] = useState('')
 
