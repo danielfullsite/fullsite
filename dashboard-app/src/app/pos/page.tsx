@@ -567,7 +567,20 @@ function POSContent() {
   )
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
-  const [mesero, setMesero] = useState<string>(MESEROS[0])
+  const [mesero, setMesero] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('pos_staff')
+        if (saved) {
+          const s = JSON.parse(saved)
+          // Match staff name to MESEROS list
+          const match = MESEROS.find(m => m.toLowerCase().includes(s.name?.toLowerCase()?.split(' ')[0] || ''))
+          if (match) return match
+        }
+      } catch { /* */ }
+    }
+    return MESEROS[0]
+  })
   const [personas, setPersonas] = useState<number>(2)
   const [clock, setClock] = useState<string>('')
   const [showPayment, setShowPayment] = useState(false)

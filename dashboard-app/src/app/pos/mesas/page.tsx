@@ -1,11 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users } from 'lucide-react'
+import { ArrowLeft, Users, Calendar } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+interface Reserva {
+  codigo_reserva: string
+  nombre: string
+  guests: number
+  horario_inicio: string
+  espacio: string
+  status: string
+}
 
 // Simulated occupied tables for demo
 const DEMO_STATE: Record<number, Partial<Mesa>> = {
@@ -24,6 +36,14 @@ export default function MesasPage() {
       ...(DEMO_STATE[m.number] || {}),
     }))
   )
+  const [reservas, setReservas] = useState<Reserva[]>([])
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    fetch(`${SUPABASE_URL}/rest/v1/amalay_reservaciones?fecha=eq.${today}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    }).then(r => r.json()).then(setReservas).catch(() => {})
+  }, [])
 
   const statusColor: Record<string, string> = {
     disponible: 'bg-emerald-900/50 border-emerald-600 hover:bg-emerald-800/60',
@@ -140,6 +160,31 @@ export default function MesasPage() {
             </button>
           ))}
         </div>
+
+        {/* Reservaciones de hoy */}
+        {reservas.length > 0 && (
+          <div className="max-w-5xl mx-auto mt-6">
+            <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+              <Calendar size={18} className="text-amber-400" />
+              Reservaciones hoy ({reservas.length})
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {reservas.map(r => (
+                <div key={r.codigo_reserva} className="bg-amber-900/20 border border-amber-700/30 rounded-xl px-4 py-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-amber-400 font-bold text-sm">{r.horario_inicio?.slice(0, 5)}</span>
+                    <span className="text-amber-400/60 text-xs">{r.codigo_reserva}</span>
+                  </div>
+                  <p className="text-white font-medium">{r.nombre}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-slate-400 text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
+                    <span className="text-slate-500 text-xs">{r.espacio}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
