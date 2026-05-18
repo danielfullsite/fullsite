@@ -567,18 +567,53 @@ def ask_groq(question, wansoft_data, historical_data):
                   + json.dumps(platillos[:20], ensure_ascii=False, indent=1))
 
     # Block 5: Historical
-    hist_keywords = ["historial", "historia", "abril", "marzo", "últimos", "ultimos", "mejorado", "tendencia", "comparar"]
+    hist_keywords = ["historial", "historia", "abril", "marzo", "últimos", "ultimos", "mejorado", "tendencia", "comparar", "semana pasada", "semana anterior"]
     wants_history = any(kw in q_lower for kw in hist_keywords)
     hist_limit = 90 if wants_history else 7
+
+    # Check if question asks about a specific category (Bakery, Coffee, etc.)
+    category_keywords = {
+        "bakery": "BAKERY", "coffee": "COFFEE HOT/ICE", "cafe": "COFFEE HOT/ICE",
+        "chilaquile": "CHILAQUILES & ENCHILADAS", "eggs": "EGGS & KETO", "keto": "EGGS & KETO",
+        "toast": "TOAST & BAGELS", "bagel": "TOAST & BAGELS", "pan": "TOAST & BAGELS",
+        "smoothie": "SMOOTHIES", "juice": "JUGOS", "jugo": "JUGOS",
+        "pizza": "PIZZAS & PASTAS", "pasta": "PIZZAS & PASTAS",
+        "postre": "DESSERTS", "dessert": "DESSERTS", "postres": "DESSERTS",
+        "croissant": "CROISSANTS BREAKFAST", "panini": "PANINIS",
+        "bowl": "BOWLS", "signature": "SIGNATURE", "fresh": "FRESH DRINKS",
+        "frappe": "FRAPPES", "pancake": "PANCAKES & WAFFLES", "waffle": "PANCAKES & WAFFLES",
+        "soda": "SODAS", "tea": "TEA & TISANAS", "alcohol": "BEBIDAS OH",
+        "market": "HEALTHY SNACKS & MARKET",
+    }
+    asked_category = None
+    for kw, cat_name in category_keywords.items():
+        if kw in q_lower:
+            asked_category = cat_name
+            break
+
     if historical_data:
         if wants_history:
-            hist_lines = ["HISTÓRICO TICKET PROMEDIO DIARIO:"]
+            hist_lines = ["HISTÓRICO DIARIO:"]
             for r in reversed(historical_data[:hist_limit]):
                 tp = r.get("ticket_promedio_restaurant")
-                if tp:
-                    hist_lines.append(f"  {r['fecha']}: ${round(tp)}")
-            print(f"[wansoft-query] History block: {len(hist_lines)-1} days, {len(chr(10).join(hist_lines))} chars")
-            # Insert at position 1 (after rankings) so it doesn't get cut
+                ventas = r.get("ventas_dia", 0)
+                line = f"  {r['fecha']}: Ventas ${round(ventas or 0):,} | TP ${round(tp or 0)}"
+
+                # Add category data if asked
+                if asked_category:
+                    grupos = r.get("ventas_por_grupo", [])
+                    if isinstance(grupos, str):
+                        try: grupos = json.loads(grupos)
+                        except: grupos = []
+                    total_dia = ventas or 1
+                    for g in (grupos or []):
+                        if g.get("nombre", "").upper() == asked_category.upper():
+                            pct = (g["total"] / total_dia * 100) if total_dia > 0 else 0
+                            line += f" | {asked_category}: ${round(g['total']):,} ({pct:.1f}%)"
+                            break
+
+                hist_lines.append(line)
+            print(f"[wansoft-query] History block: {len(hist_lines)-1} days, cat={asked_category}")
             blocks.insert(1, "\n".join(hist_lines))
         else:
             hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
