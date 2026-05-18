@@ -605,10 +605,11 @@ def ask_groq(question, wansoft_data, historical_data):
                     if isinstance(grupos, str):
                         try: grupos = json.loads(grupos)
                         except: grupos = []
-                    total_dia = ventas or 1
+                    # Use sum of all groups as denominator (same as Wansoft)
+                    total_grupos = sum(g.get("total", 0) for g in (grupos or []))
                     for g in (grupos or []):
                         if g.get("nombre", "").upper() == asked_category.upper():
-                            pct = (g["total"] / total_dia * 100) if total_dia > 0 else 0
+                            pct = (g["total"] / total_grupos * 100) if total_grupos > 0 else 0
                             line += f" | {asked_category}: ${round(g['total']):,} ({pct:.1f}%)"
                             break
 
