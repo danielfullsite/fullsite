@@ -1123,13 +1123,23 @@ function POSContent() {
         {/* Left Panel -- Current Order (60% desktop, full on mobile when active) */}
         <div className={`md:w-[60%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
           {/* Order header */}
-          <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50">
-            <h2 className="text-lg font-semibold">
-              Mesa {mesa}{' '}
-              <span className="text-slate-400 font-normal text-sm">
-                · {personas} personas · {mesero}
-              </span>
-            </h2>
+          {/* Order header — Wansoft style */}
+          <div className="px-3 py-2 border-b border-slate-700 bg-slate-800/50">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-bold">
+                Mesa {mesa}
+                <span className="text-slate-400 font-normal text-sm ml-2">{personas} pers · {mesero}</span>
+              </h2>
+              <span className="text-emerald-400 font-bold text-xl">{formatMXN(total)}</span>
+            </div>
+            {/* Silla selector */}
+            <div className="flex gap-1">
+              {Array.from({ length: personas }, (_, i) => i + 1).map(s => (
+                <button key={s} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium text-slate-300 min-h-[32px]">
+                  Silla {s}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Order items list */}

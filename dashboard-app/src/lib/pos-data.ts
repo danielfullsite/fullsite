@@ -161,6 +161,7 @@ export interface OrderItem {
   notas: string
   precioExtra: number      // sum of extra modifiers
   subtotal: number         // (precio + precioExtra) * cantidad
+  silla?: number           // seat/person number (1, 2, 3...)
 }
 
 // Keep legacy alias for any other pages that import the old shape
@@ -483,6 +484,35 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     id: 'alcohol', name: 'Bebidas OH', items: [
       { id: 'al1', name: 'Cerveza Artesanal', price: 95 },
       { id: 'al2', name: 'Vino Copa Tinto', price: 150 },
+    ]
+  },
+  {
+    id: 'market-cafe', name: 'Market: Cafe', items: [
+      { id: 'mk1', name: 'Cafe de Grano 250g', price: 180 },
+      { id: 'mk2', name: 'Cafe de Grano 500g', price: 320 },
+      { id: 'mk3', name: 'Cafe Molido 250g', price: 170 },
+    ]
+  },
+  {
+    id: 'market-snacks', name: 'Market: Snacks', items: [
+      { id: 'mk4', name: 'Granola Organica', price: 170 },
+      { id: 'mk5', name: 'Healthy Crunchy Mix', price: 170 },
+      { id: 'mk6', name: 'Chips de Jamaica', price: 85 },
+      { id: 'mk7', name: 'Churritos de Amaranto', price: 65 },
+    ]
+  },
+  {
+    id: 'market-dulce', name: 'Market: Dulce', items: [
+      { id: 'mk8', name: 'Mermelada Artesanal', price: 120 },
+      { id: 'mk9', name: 'Miel de Abeja 500ml', price: 180 },
+      { id: 'mk10', name: 'Galletas Artesanales', price: 95 },
+    ]
+  },
+  {
+    id: 'market-bebidas', name: 'Market: Bebidas', items: [
+      { id: 'mk11', name: 'Kombucha 500ml', price: 75 },
+      { id: 'mk12', name: 'Jugo Cold Pressed', price: 85 },
+      { id: 'mk13', name: 'Agua Mineral Premium', price: 45 },
     ]
   },
 ]
