@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList } from 'lucide-react'
+import { AreaChart, BarChart, DonutChart } from '@tremor/react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -247,14 +248,72 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Main chart — full width */}
-      <div className="mb-6">
-        <RevenueChart
-          data={recentData.map((d) => ({
-            fecha: d.fecha,
-            ventas_dia: d.ventas_dia,
-          }))}
-          title="Ventas últimos 30 días"
+      {/* Tremor Charts — 2 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Ventas trend */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Ventas</h3>
+          <p className="text-xs text-slate-400 mb-4">Ultimos 30 dias</p>
+          <AreaChart
+            className="h-48"
+            data={[...recentData].reverse().map(d => ({
+              fecha: d.fecha.slice(5),
+              Ventas: Math.round(d.ventas_dia || 0),
+            }))}
+            index="fecha"
+            categories={['Ventas']}
+            colors={['emerald']}
+            valueFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+            showLegend={false}
+            showGridLines={false}
+            curveType="monotone"
+          />
+        </div>
+
+        {/* Ticket promedio trend */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Ticket promedio</h3>
+          <p className="text-xs text-slate-400 mb-4">Tendencia diaria</p>
+          <AreaChart
+            className="h-48"
+            data={[...recentData].reverse().map(d => ({
+              fecha: d.fecha.slice(5),
+              'Ticket Prom': Math.round(d.ticket_promedio_restaurant || 0),
+            }))}
+            index="fecha"
+            categories={['Ticket Prom']}
+            colors={['blue']}
+            valueFormatter={(v) => `$${v}`}
+            showLegend={false}
+            showGridLines={false}
+            curveType="monotone"
+          />
+        </div>
+      </div>
+
+      {/* Ventas por dia de semana — BarChart */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">Ventas por dia de la semana</h3>
+        <p className="text-xs text-slate-400 mb-4">Promedio ultimos 30 dias</p>
+        <BarChart
+          className="h-48"
+          data={(() => {
+            const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+            const byDay: Record<number, number[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+            for (const d of recentData) {
+              const dow = new Date(d.fecha + 'T12:00:00').getDay()
+              if (d.ventas_dia > 0) byDay[dow].push(d.ventas_dia)
+            }
+            return dayNames.map((name, i) => ({
+              dia: name,
+              Promedio: byDay[i].length > 0 ? Math.round(byDay[i].reduce((s, v) => s + v, 0) / byDay[i].length) : 0,
+            }))
+          })()}
+          index="dia"
+          categories={['Promedio']}
+          colors={['violet']}
+          valueFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+          showLegend={false}
         />
       </div>
 
