@@ -22,6 +22,7 @@ import {
   UserCheck,
   ShoppingCart,
   Monitor,
+  Settings,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -70,6 +71,12 @@ const navSections = [
     label: 'Herramientas',
     items: [
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { href: '/admin/menu', label: 'Administrar Menu', icon: Settings },
     ],
   },
 ]
