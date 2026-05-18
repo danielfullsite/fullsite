@@ -1,7 +1,7 @@
 'use client'
 
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/format'
-import { PieChart } from 'lucide-react'
 
 interface Props {
   data: { nombre: string; total: number }[]
@@ -9,86 +9,71 @@ interface Props {
 }
 
 const COLORS = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
-  '#84cc16',
+  '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+  '#f97316', '#6366f1', '#14b8a6', '#e11d48',
 ]
 
 export default function RevenueDistributionChart({ data, title }: Props) {
   const sorted = [...data].filter(d => d.total > 0).sort((a, b) => b.total - a.total)
-  const topItems = sorted.slice(0, 8)
-  const grandTotal = sorted.reduce((sum, d) => sum + d.total, 0)
-
-  if (topItems.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
-        {title && (
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-              <PieChart size={14} className="text-purple-500" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-          </div>
-        )}
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-slate-400 text-sm">Sin datos de categorías</p>
-        </div>
-      </div>
-    )
-  }
-
-  const maxVal = topItems[0]?.total || 1
+  const total = sorted.reduce((s, d) => s + d.total, 0)
+  const top8 = sorted.slice(0, 8)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
-      {title && (
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-            <PieChart size={14} className="text-purple-500" />
-          </div>
-          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-slate-900">{title || 'Distribucion por categoria'}</h3>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">Total: {formatCurrency(total)}</p>
+
+      <div className="flex items-center gap-6">
+        {/* Donut Chart */}
+        <div className="w-[160px] h-[160px] flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={top8}
+                dataKey="total"
+                nameKey="nombre"
+                cx="50%"
+                cy="50%"
+                innerRadius={45}
+                outerRadius={75}
+                paddingAngle={2}
+                stroke="none"
+              >
+                {top8.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value) => formatCurrency(Number(value))}
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+                }}
+                itemStyle={{ color: '#fff', fontSize: '12px' }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
-      )}
-      <p className="text-xs text-slate-400 mb-5 ml-9">
-        Total: {formatCurrency(grandTotal)}
-      </p>
-      <div className="space-y-3.5 flex-1">
-        {topItems.map((item, i) => {
-          const pct = grandTotal > 0 ? ((item.total / grandTotal) * 100) : 0
-          const barWidth = maxVal > 0 ? ((item.total / maxVal) * 100) : 0
-          return (
-            <div key={item.nombre}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                  />
-                  <span className="text-xs font-medium text-slate-700 truncate">
-                    {item.nombre}
-                  </span>
-                </div>
-                <span className="text-xs tabular-nums text-slate-500 ml-2 shrink-0">
-                  {pct.toFixed(0)}%
-                </span>
+
+        {/* Legend */}
+        <div className="flex-1 space-y-2">
+          {top8.map((item, i) => {
+            const pct = total > 0 ? ((item.total / total) * 100).toFixed(0) : '0'
+            return (
+              <div key={item.nombre} className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <span className="text-xs text-slate-600 flex-1 truncate">{item.nombre}</span>
+                <span className="text-xs font-semibold text-slate-400">{pct}%</span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="h-1.5 rounded-full animate-progress transition-all"
-                  style={{
-                    width: `${barWidth}%`,
-                    backgroundColor: COLORS[i % COLORS.length],
-                  }}
-                />
-              </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </div>
   )

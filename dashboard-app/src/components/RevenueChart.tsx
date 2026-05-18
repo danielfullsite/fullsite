@@ -8,9 +8,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  ReferenceDot,
 } from 'recharts'
 import { formatCurrency, formatShortDate } from '@/lib/format'
-import { TrendingUp } from 'lucide-react'
 
 interface RevenueChartProps {
   data: { fecha: string; ventas_dia: number }[]
@@ -18,7 +18,6 @@ interface RevenueChartProps {
 }
 
 export default function RevenueChart({ data, title }: RevenueChartProps) {
-  // Filter out trailing days with ventas_dia = 0
   let trimmedData = [...data]
   while (trimmedData.length > 0 && trimmedData[trimmedData.length - 1].ventas_dia <= 0) {
     trimmedData.pop()
@@ -26,37 +25,40 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
 
   const chartData = trimmedData.map((d) => ({
     fecha: formatShortDate(d.fecha),
-    ventas: d.ventas_dia,
+    Ventas: d.ventas_dia,
   }))
 
-  // Find min and max
-  let minIdx = 0
-  let maxIdx = 0
-  chartData.forEach((d, i) => {
-    if (d.ventas < chartData[minIdx].ventas) minIdx = i
-    if (d.ventas > chartData[maxIdx].ventas) maxIdx = i
-  })
+  const maxVal = Math.max(...chartData.map(d => d.Ventas))
+  const minVal = Math.min(...chartData.map(d => d.Ventas))
+  const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-      {title && (
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-              <TrendingUp size={14} className="text-blue-500" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">{title || 'Ventas'}</h3>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(total)}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{chartData.length} dias</p>
+        </div>
+        <div className="flex gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-slate-500">Max: {formatCurrency(maxVal)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+            <span className="text-slate-500">Min: {formatCurrency(minVal)}</span>
           </div>
         </div>
-      )}
-      <p className="text-xs text-slate-400 mb-5 ml-9">{chartData.length} días con datos</p>
-      <div className="h-[220px] sm:h-[280px]">
+      </div>
+      <div className="h-[240px] sm:h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData}>
+          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+              <linearGradient id="gradientVentas" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="50%" stopColor="#10b981" stopOpacity={0.1} />
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -77,38 +79,28 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
             <Tooltip
               formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
               contentStyle={{
-                background: '#fff',
+                backgroundColor: '#0f172a',
                 border: 'none',
-                borderRadius: '8px',
-                fontSize: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
               }}
-              cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
+              itemStyle={{ color: '#10b981', fontSize: '13px', fontWeight: 600 }}
+              labelStyle={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}
+              cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Area
               type="monotone"
-              dataKey="ventas"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              fill="url(#colorVentas)"
+              dataKey="Ventas"
+              stroke="#10b981"
+              strokeWidth={2.5}
+              fill="url(#gradientVentas)"
               dot={false}
-              activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+              activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      {chartData.length > 2 && (
-        <div className="flex items-center gap-4 mt-3 ml-9 text-xs text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-            Max: {formatCurrency(chartData[maxIdx].ventas)}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-            Min: {formatCurrency(chartData[minIdx].ventas)}
-          </span>
-        </div>
-      )}
     </div>
   )
 }
