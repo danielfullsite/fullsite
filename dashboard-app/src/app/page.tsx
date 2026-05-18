@@ -94,6 +94,22 @@ export default function DashboardPage() {
       )
     : 0
 
+  // Same day last week comparison (like Wansoft)
+  const sameDayLastWeek = (() => {
+    if (!latestDay || recentData.length < 8) return null
+    const latestDate = new Date(latestDay.fecha)
+    const targetDate = new Date(latestDate.getTime() - 7 * 86400000)
+    const targetStr = targetDate.toISOString().split('T')[0]
+    return recentData.find(d => d.fecha === targetStr) || null
+  })()
+
+  const vsLastWeek = latestDay && sameDayLastWeek
+    ? percentChange(latestDay.ventas_dia, sameDayLastWeek.ventas_dia)
+    : null
+  const vsLastWeekAmount = latestDay && sameDayLastWeek
+    ? latestDay.ventas_dia - sameDayLastWeek.ventas_dia
+    : null
+
   const topMeseros = latestDay
     ? aggregateMeseros([latestDay]).slice(0, 5)
     : []
@@ -173,6 +189,31 @@ export default function DashboardPage() {
           accentClass="kpi-accent-purple"
         />
       </div>
+
+      {/* Week comparison banner — like Wansoft */}
+      {vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
+        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              {vsLastWeek >= 0
+                ? <TrendingUp size={20} className="text-emerald-600" />
+                : <TrendingDown size={20} className="text-red-600" />}
+              <div>
+                <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {formatPercent(vsLastWeek)} vs mismo dia semana pasada
+                </p>
+                <p className="text-sm text-slate-500">
+                  {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {sameDayLastWeek.fecha}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-slate-500">Semana pasada</p>
+              <p className="font-semibold text-slate-700">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main chart — full width */}
       <div className="mb-6">
