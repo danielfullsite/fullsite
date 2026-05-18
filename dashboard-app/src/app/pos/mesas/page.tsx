@@ -109,6 +109,10 @@ export default function MesasPage() {
     cuenta: mesas.filter(m => m.status === 'cuenta').length,
   }
 
+  const totalPersonas = mesas.reduce((s, m) => s + (m.personas || 0), 0)
+  const totalVentas = mesas.reduce((s, m) => s + (m.total || 0), 0)
+  const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
+
   return (
     <div className="h-screen flex flex-col text-white">
       <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
@@ -118,7 +122,7 @@ export default function MesasPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold">Mesas</h1>
-            <p className="text-slate-400 text-sm">En tiempo real · {activeOrders.length} ordenes activas</p>
+            <p className="text-slate-400 text-sm">{activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}</p>
           </div>
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
@@ -167,12 +171,17 @@ export default function MesasPage() {
                         <div className="flex items-center justify-between mt-1">
                           <div className="flex items-center gap-1 text-slate-400 text-sm">
                             <Users size={14} />
-                            <span>{mesa.personas}</span>
+                            <span className="font-semibold text-white">{mesa.personas}</span>
                           </div>
                           {mesa.total != null && (
                             <span className="text-white font-semibold">{formatMXN(mesa.total)}</span>
                           )}
                         </div>
+                        {mesa.personas && mesa.personas > 0 && mesa.total ? (
+                          <p className="text-xs text-slate-500 mt-1">
+                            TP: <span className="text-emerald-400 font-semibold">{formatMXN(mesa.total / mesa.personas)}</span>/pers
+                          </p>
+                        ) : null}
                       </>
                     ) : (
                       <p className="text-slate-500 text-sm">{mesa.capacity} lugares</p>
