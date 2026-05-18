@@ -81,23 +81,69 @@ export default function DashboardPage() {
     )
   }
 
-  const ventasChange = latestDay && prevDay
-    ? percentChange(latestDay.ventas_dia, prevDay.ventas_dia)
-    : 0
-  const ticketsChange = latestDay && prevDay
-    ? percentChange(latestDay.tickets_count, prevDay.tickets_count)
-    : 0
-  const personasChange = latestDay && prevDay
-    ? percentChange(latestDay.personas_restaurant, prevDay.personas_restaurant)
-    : 0
-  const ticketPromChange = latestDay && prevDay
-    ? percentChange(
-        latestDay.ticket_promedio_restaurant,
-        prevDay.ticket_promedio_restaurant
-      )
-    : 0
+  // Period-aware calculations
+  const periodData = (() => {
+    if (period === 'dia') {
+      const ventas = latestDay?.ventas_dia || 0
+      const tickets = latestDay?.tickets_count || 0
+      const personas = latestDay?.personas_restaurant || 0
+      const tp = latestDay?.ticket_promedio_restaurant || 0
+      const propinas = latestDay?.propinas_total || 0
+      const descuentos = latestDay?.descuentos || 0
+      const brutas = latestDay?.ventas_brutas || 0
+      const prevVentas = prevDay?.ventas_dia || 0
+      const prevTickets = prevDay?.tickets_count || 0
+      const prevPersonas = prevDay?.personas_restaurant || 0
+      const prevTp = prevDay?.ticket_promedio_restaurant || 0
+      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs ayer' }
+    }
+    if (period === 'semana') {
+      const last7 = recentData.slice(0, 7)
+      const prev7 = recentData.slice(7, 14)
+      const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
+      const ventas = sum(last7, 'ventas_dia')
+      const tickets = sum(last7, 'tickets_count')
+      const personas = sum(last7, 'personas_restaurant')
+      const tp = personas > 0 ? ventas / personas : 0
+      const propinas = sum(last7, 'propinas_total')
+      const descuentos = sum(last7, 'descuentos')
+      const brutas = sum(last7, 'ventas_brutas')
+      const prevVentas = sum(prev7, 'ventas_dia')
+      const prevTickets = sum(prev7, 'tickets_count')
+      const prevPersonas = sum(prev7, 'personas_restaurant')
+      const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
+      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs semana anterior' }
+    }
+    // mes
+    const thisMonth = recentData.filter(d => d.fecha.slice(0, 7) === (latestDay?.fecha || '').slice(0, 7))
+    const lastMonthStr = (() => {
+      if (!latestDay) return ''
+      const d = new Date(latestDay.fecha)
+      d.setMonth(d.getMonth() - 1)
+      return d.toISOString().slice(0, 7)
+    })()
+    const lastMonth = recentData.filter(d => d.fecha.slice(0, 7) === lastMonthStr)
+    const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
+    const ventas = sum(thisMonth, 'ventas_dia')
+    const tickets = sum(thisMonth, 'tickets_count')
+    const personas = sum(thisMonth, 'personas_restaurant')
+    const tp = personas > 0 ? ventas / personas : 0
+    const propinas = sum(thisMonth, 'propinas_total')
+    const descuentos = sum(thisMonth, 'descuentos')
+    const brutas = sum(thisMonth, 'ventas_brutas')
+    const prevVentas = sum(lastMonth, 'ventas_dia')
+    const prevTickets = sum(lastMonth, 'tickets_count')
+    const prevPersonas = sum(lastMonth, 'personas_restaurant')
+    const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
+    return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs mes anterior' }
+  })()
 
-  // Same day last week comparison (like Wansoft)
+  const ventasChange = periodData.prevVentas > 0 ? percentChange(periodData.ventas, periodData.prevVentas) : 0
+  const ticketsChange = periodData.prevTickets > 0 ? percentChange(periodData.tickets, periodData.prevTickets) : 0
+  const personasChange = periodData.prevPersonas > 0 ? percentChange(periodData.personas, periodData.prevPersonas) : 0
+  const ticketPromChange = periodData.prevTp > 0 ? percentChange(periodData.tp, periodData.prevTp) : 0
+
+  // Same day last week comparison
   const sameDayLastWeek = (() => {
     if (!latestDay || recentData.length < 8) return null
     const latestDate = new Date(latestDay.fecha)
@@ -164,61 +210,52 @@ export default function DashboardPage() {
       {/* KPI Summary Cards — 4 across like Toast */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
-          label="Ventas del día"
-          value={latestDay ? formatCurrency(latestDay.ventas_dia) : '-'}
-          delta={latestDay ? `${formatPercent(ventasChange)} vs ayer` : undefined}
+          label={period === 'dia' ? 'Ventas del dia' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
+          value={formatCurrency(periodData.ventas)}
+          delta={`${formatPercent(ventasChange)} ${periodData.label}`}
           deltaType={ventasChange >= 0 ? 'up' : 'down'}
           icon={DollarSign}
           accentClass="kpi-accent-blue"
         />
         <KPICard
           label="Tickets"
-          value={latestDay ? formatNumber(latestDay.tickets_count) : '-'}
-          delta={latestDay ? `${formatPercent(ticketsChange)} vs ayer` : undefined}
+          value={formatNumber(periodData.tickets)}
+          delta={`${formatPercent(ticketsChange)} ${periodData.label}`}
           deltaType={ticketsChange >= 0 ? 'up' : 'down'}
           icon={Ticket}
           accentClass="kpi-accent-green"
         />
         <KPICard
           label="Personas"
-          value={latestDay ? formatNumber(latestDay.personas_restaurant) : '-'}
-          delta={latestDay ? `${formatPercent(personasChange)} vs ayer` : undefined}
+          value={formatNumber(periodData.personas)}
+          delta={`${formatPercent(personasChange)} ${periodData.label}`}
           deltaType={personasChange >= 0 ? 'up' : 'down'}
           icon={Users}
           accentClass="kpi-accent-amber"
         />
         <KPICard
           label="Ticket promedio"
-          value={
-            latestDay
-              ? formatCurrency(latestDay.ticket_promedio_restaurant)
-              : '-'
-          }
-          delta={
-            latestDay
-              ? `${formatPercent(ticketPromChange)} vs ayer`
-              : undefined
-          }
+          value={formatCurrency(periodData.tp)}
+          delta={`${formatPercent(ticketPromChange)} ${periodData.label}`}
           deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
-          subtitle="(restaurante)"
           icon={Receipt}
           accentClass="kpi-accent-purple"
         />
       </div>
 
-      {/* Extra KPI row — Propinas + Descuentos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
-          <p className="text-xs text-slate-500 font-medium">Propinas</p>
-          <p className="text-lg font-bold text-slate-900">{latestDay ? formatCurrency(latestDay.propinas_total || 0) : '-'}</p>
+      {/* Extra KPI row — Propinas + Descuentos + Brutas */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
+          <p className="text-xs text-slate-500 font-medium mb-1">Propinas</p>
+          <p className="text-xl font-bold text-emerald-600">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
-          <p className="text-xs text-slate-500 font-medium">Descuentos</p>
-          <p className="text-lg font-bold text-red-600">{latestDay ? formatCurrency(latestDay.descuentos || 0) : '-'}</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
+          <p className="text-xs text-slate-500 font-medium mb-1">Descuentos</p>
+          <p className="text-xl font-bold text-red-500">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
-          <p className="text-xs text-slate-500 font-medium">Ventas brutas</p>
-          <p className="text-lg font-bold text-slate-900">{latestDay ? formatCurrency(latestDay.ventas_brutas || 0) : '-'}</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
+          <p className="text-xs text-slate-500 font-medium mb-1">Ventas brutas</p>
+          <p className="text-xl font-bold text-slate-900">{formatCurrency(periodData.brutas)}</p>
         </div>
       </div>
 
