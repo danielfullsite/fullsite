@@ -701,6 +701,46 @@ function POSContent() {
   // Mobile view toggle
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu')
 
+  // Ready orders notification
+  const [readyOrders, setReadyOrders] = useState(0)
+  useEffect(() => {
+    const checkReady = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?status=eq.lista&select=id&limit=50`,
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        )
+        if (res.ok) {
+          const rows = await res.json()
+          const count = rows.length
+          if (count > readyOrders && readyOrders > 0) {
+            // Play notification sound
+            try {
+              const ctx = new AudioContext()
+              const osc = ctx.createOscillator()
+              const gain = ctx.createGain()
+              osc.connect(gain); gain.connect(ctx.destination)
+              osc.frequency.value = 523; osc.type = 'sine'; gain.gain.value = 0.2
+              osc.start(); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+              osc.stop(ctx.currentTime + 0.3)
+              setTimeout(() => {
+                const o2 = ctx.createOscillator(); const g2 = ctx.createGain()
+                o2.connect(g2); g2.connect(ctx.destination)
+                o2.frequency.value = 659; o2.type = 'sine'; g2.gain.value = 0.2
+                o2.start(); g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+                o2.stop(ctx.currentTime + 0.3)
+              }, 150)
+            } catch { /* */ }
+          }
+          setReadyOrders(count)
+        }
+      } catch { /* */ }
+    }
+    checkReady()
+    const interval = setInterval(checkReady, 5000)
+    return () => clearInterval(interval)
+  }, [readyOrders])
+
   // Toast state
   const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -972,6 +1012,11 @@ function POSContent() {
             {canSee('qr') && <Link href="/pos/qr" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><QrCode size={14} />QR</Link>}
           </div>
           <div className="flex items-center gap-3 text-slate-400 flex-shrink-0 ml-2">
+            {readyOrders > 0 && (
+              <Link href="/pos/cocina" className="flex items-center gap-1 bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
+                {readyOrders} listas
+              </Link>
+            )}
             {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
             <div className="flex items-center gap-1">
               <Clock size={14} />
