@@ -1,0 +1,29 @@
+name: Proactive Alerts
+on:
+  schedule:
+    - cron: '0 20 * * *'   # 2pm MX (UTC-6)
+    - cron: '0 22 * * *'   # 4pm MX (UTC-6)
+  workflow_dispatch:
+
+jobs:
+  alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+      - name: Run Proactive Alerts
+        working-directory: .github/scripts
+        env:
+          CLIENT_ID: amalay
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TELEGRAM_CHAT_ID_MONICA: ${{ secrets.TELEGRAM_CHAT_ID_MONICA }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TRIGGER_TYPE: ${{ github.event_name }}
+        run: python proactive_alerts.py
