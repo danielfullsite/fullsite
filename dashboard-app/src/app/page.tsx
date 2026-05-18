@@ -36,11 +36,14 @@ function findRecentDataForField<T>(
   return []
 }
 
+type Period = 'dia' | 'semana' | 'mes'
+
 export default function DashboardPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [latestDay, setLatestDay] = useState<WansoftDaily | null>(null)
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<Period>('dia')
 
   useEffect(() => {
     async function load() {
@@ -131,17 +134,30 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Page header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Page header with period selector */}
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
-            Resumen del día
+            {period === 'dia' ? 'Resumen del dia' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {latestDay && (
             <span className="text-sm text-slate-400">
               {formatDate(latestDay.fecha)}
             </span>
           )}
+        </div>
+        <div className="flex bg-slate-100 rounded-lg p-0.5">
+          {(['dia', 'semana', 'mes'] as Period[]).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -188,6 +204,22 @@ export default function DashboardPage() {
           icon={Receipt}
           accentClass="kpi-accent-purple"
         />
+      </div>
+
+      {/* Extra KPI row — Propinas + Descuentos */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+          <p className="text-xs text-slate-500 font-medium">Propinas</p>
+          <p className="text-lg font-bold text-slate-900">{latestDay ? formatCurrency(latestDay.propinas_total || 0) : '-'}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+          <p className="text-xs text-slate-500 font-medium">Descuentos</p>
+          <p className="text-lg font-bold text-red-600">{latestDay ? formatCurrency(latestDay.descuentos || 0) : '-'}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+          <p className="text-xs text-slate-500 font-medium">Ventas brutas</p>
+          <p className="text-lg font-bold text-slate-900">{latestDay ? formatCurrency(latestDay.ventas_brutas || 0) : '-'}</p>
+        </div>
       </div>
 
       {/* Week comparison banner — like Wansoft */}
