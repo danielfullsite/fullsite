@@ -1246,39 +1246,39 @@ function POSContent() {
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-lg transition-all min-h-[64px]"
             >
-              <Send size={20} />
-              {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Enviar a cocina'}
+              <Send size={22} />
+              {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Cocina'}
             </button>
             <button
               onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.5] flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-sm transition-colors min-h-[56px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-sm transition-all min-h-[64px]"
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-lg transition-all min-h-[64px]"
             >
-              <CreditCard size={20} />
-              Cerrar cuenta
+              <CreditCard size={22} />
+              Cobrar
             </button>
           </div>
         </div>
 
         {/* Right Panel -- Menu (40% desktop, full on mobile when active) */}
         <div className={`md:w-[40%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
-          {/* Search bar */}
+          {/* Search bar — big touch target */}
           <div className="px-3 pt-3 pb-2 flex-shrink-0">
             <input
               type="text"
               value={menuSearch}
               onChange={(e) => setMenuSearch(e.target.value)}
-              placeholder="Buscar platillo..."
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+              placeholder="🔍 Buscar platillo..."
+              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-5 py-3.5 text-white placeholder-slate-400 text-base focus:outline-none focus:border-emerald-500 min-h-[50px]"
             />
           </div>
 
@@ -1304,13 +1304,13 @@ function POSContent() {
                       <button
                         key={item.id}
                         onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors flex items-center justify-between"
+                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 rounded-xl px-4 py-4 text-left transition-colors flex items-center justify-between min-h-[60px]"
                       >
                         <div>
-                          <span className="font-medium text-[15px] text-white">{item.name}</span>
+                          <span className="font-semibold text-base text-white">{item.name}</span>
                           <span className="text-slate-500 text-xs ml-2">{category}</span>
                         </div>
-                        <span className="text-emerald-400 font-semibold">{formatMXN(item.price)}</span>
+                        <span className="text-emerald-400 font-bold text-lg">{formatMXN(item.price)}</span>
                       </button>
                     ))}
                   </div>
@@ -1319,16 +1319,16 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category tabs */}
-              <div className="flex gap-1 px-3 py-2 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
+              {/* Category tabs — big touch targets */}
+              <div className="flex gap-2 px-3 py-2.5 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
                 {MENU_CATEGORIES.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[40px] ${
+                    className={`px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all min-h-[48px] ${
                       selectedCategory === cat.id
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500'
                     }`}
                   >
                     {cat.name}
@@ -1336,19 +1336,19 @@ function POSContent() {
                 ))}
               </div>
 
-              {/* Menu items grid */}
+              {/* Menu items grid — big touch cards */}
               <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {activeCategory.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-xl p-3 text-left transition-colors min-h-[80px] md:min-h-[100px] flex flex-col justify-between"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 hover:border-emerald-600/40 rounded-2xl p-4 text-left transition-all min-h-[100px] flex flex-col justify-between"
                     >
-                      <span className="font-medium text-[14px] leading-tight">
+                      <span className="font-semibold text-[15px] leading-tight text-white">
                         {item.name}
                       </span>
-                      <span className="text-emerald-400 font-semibold text-base mt-2">
+                      <span className="text-emerald-400 font-bold text-lg mt-2">
                         {formatMXN(item.price)}
                       </span>
                     </button>
