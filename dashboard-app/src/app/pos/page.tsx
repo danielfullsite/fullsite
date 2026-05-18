@@ -692,8 +692,8 @@ function POSContent() {
       cajero: ['mesas', 'cocina', 'barra', 'corte'],
       cocina: ['cocina'],
       barra: ['barra'],
-      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr'],
-      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr'],
+      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial'],
+      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial'],
     }
     return (perms[staffRole] || perms.admin).includes(section)
   }
@@ -1010,6 +1010,8 @@ function POSContent() {
             {canSee('auditoria') && <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>}
             {canSee('corte') && <Link href="/pos/corte" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Receipt size={14} />Corte</Link>}
             {canSee('qr') && <Link href="/pos/qr" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><QrCode size={14} />QR</Link>}
+            {canSee('turno') && <Link href="/pos/turno" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Clock size={14} />Turno</Link>}
+            {canSee('historial') && <Link href="/pos/historial" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Hist</Link>}
           </div>
           <div className="flex items-center gap-3 text-slate-400 flex-shrink-0 ml-2">
             {readyOrders > 0 && (
