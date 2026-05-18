@@ -46,6 +46,7 @@ import {
   MessageCircle,
   Receipt,
   QrCode,
+  Menu,
   Send as SendIcon,
   Loader2,
 } from 'lucide-react'
@@ -639,6 +640,9 @@ function POSContent() {
     return Array.from(names).slice(0, 12) // max 12 options
   }, [allRecipes, allIngredients])
 
+  // Nav hamburger
+  const [showNav, setShowNav] = useState(false)
+
   // Menu search
   const [menuSearch, setMenuSearch] = useState('')
 
@@ -993,25 +997,16 @@ function POSContent() {
     <div className="h-screen flex flex-col text-white overflow-hidden">
       {/* Top Bar */}
       <header className="flex flex-col bg-slate-800 border-b border-slate-700 flex-shrink-0">
-        {/* Row 1: Logo + Nav (scrollable on mobile) */}
-        <div className="flex items-center justify-between px-3 py-2 overflow-x-auto">
-          <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowNav(!showNav)} className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 flex items-center justify-center transition-colors">
+              {showNav ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <span className="text-white font-black text-lg tracking-tight">
               fullsite
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
             </span>
-            <div className="h-5 w-px bg-slate-600" />
-            {canSee('mesas') && <Link href="/pos/mesas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Grid3X3 size={14} />Mesas</Link>}
-            {canSee('cocina') && <Link href="/pos/cocina" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ChefHat size={14} />Cocina</Link>}
-            {canSee('barra') && <Link href="/pos/barra" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Wine size={14} />Barra</Link>}
-            {canSee('recetas') && <Link href="/pos/recetas" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><BookOpen size={14} />Recetas</Link>}
-            {canSee('compras') && <Link href="/pos/compras" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><ShoppingCart size={14} />Compras</Link>}
-            {canSee('inventario') && <Link href="/pos/inventario" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Package size={14} />Inv</Link>}
-            {canSee('auditoria') && <Link href="/pos/auditoria" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Audit</Link>}
-            {canSee('corte') && <Link href="/pos/corte" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Receipt size={14} />Corte</Link>}
-            {canSee('qr') && <Link href="/pos/qr" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><QrCode size={14} />QR</Link>}
-            {canSee('turno') && <Link href="/pos/turno" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><Clock size={14} />Turno</Link>}
-            {canSee('historial') && <Link href="/pos/historial" className="flex items-center gap-1 text-slate-400 hover:text-white text-xs"><FileText size={14} />Hist</Link>}
           </div>
           <div className="flex items-center gap-3 text-slate-400 flex-shrink-0 ml-2">
             {readyOrders > 0 && (
@@ -1063,6 +1058,41 @@ function POSContent() {
       </header>
 
       {/* Main Content */}
+      {/* Nav overlay */}
+      {showNav && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
+          <div className="w-64 bg-slate-800 border-r border-slate-700 p-4 shadow-2xl overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <p className="text-slate-500 text-xs font-semibold uppercase mb-3">Navegacion</p>
+            <div className="space-y-1">
+              {[
+                { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
+                { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
+                { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
+                { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
+                { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
+                { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
+                { href: '/pos/auditoria', icon: FileText, label: 'Auditoria', section: 'auditoria' },
+                { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
+                { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
+                { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
+                { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
+              ].filter(item => canSee(item.section)).map(item => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setShowNav(false)}
+                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-300 hover:bg-slate-700 hover:text-white active:bg-emerald-900/30 transition-colors min-h-[48px]"
+                >
+                  <item.icon size={18} />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 bg-black/50" />
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel -- Current Order (60% desktop, full on mobile when active) */}
         <div className={`md:w-[60%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
