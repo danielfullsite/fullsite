@@ -140,7 +140,13 @@ function parseJsonb(val: unknown): unknown {
 }
 
 export async function getDeepTable(table: string, limit: number = 30) {
-  const data = await sbFetch(table, `select=*&order=fecha.desc&limit=${limit}`) as Record<string, unknown>[]
+  // Try ordering by fecha first, fall back to updated_at
+  let data = await sbFetch(table, `select=*&order=updated_at.desc&limit=${limit}`) as Record<string, unknown>[]
+  if (data.length === 0) {
+    // Try without ordering in case column doesn't exist
+    data = await sbFetch(table, `select=*&limit=${limit}`) as Record<string, unknown>[]
+  }
+  console.log(`[getDeepTable] ${table}: ${data.length} rows`)
   return data.map(row => ({ ...row, data: parseJsonb(row.data) }))
 }
 
