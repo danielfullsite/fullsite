@@ -88,15 +88,53 @@ export async function POST(request: NextRequest) {
     const todayStr = mxNow.toISOString().split('T')[0]
     const yesterday = new Date(mxNow.getTime() - 86400000).toISOString().split('T')[0]
 
+    // Parse date ranges: "1 de mayo a 18 de mayo", "del 5 al 12 de mayo", "mayo", etc.
+    const monthMap: Record<string, string> = {
+      enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
+      julio: '07', agosto: '08', septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
+    }
     let dateFilter: { start: string; end: string } | null = null
-    if (q.includes('ayer')) dateFilter = { start: yesterday, end: yesterday }
-    else if (q.includes('hoy')) dateFilter = { start: todayStr, end: todayStr }
-    else if (q.includes('semana')) {
-      const weekAgo = new Date(mxNow.getTime() - 7 * 86400000).toISOString().split('T')[0]
-      dateFilter = { start: weekAgo, end: todayStr }
-    } else if (q.includes('mes')) {
-      const monthStart = todayStr.slice(0, 8) + '01'
-      dateFilter = { start: monthStart, end: todayStr }
+
+    // Try explicit date range: "1 de mayo a 18 de mayo" or "del 1 al 18 de mayo"
+    const rangeMatch = q.match(/(\d{1,2})\s*(?:de\s+)?(\w+)\s*(?:a|al|hasta|a\s+el)\s*(\d{1,2})\s*(?:de\s+)?(\w+)/)
+    const rangeMatch2 = q.match(/del?\s*(\d{1,2})\s*al?\s*(\d{1,2})\s*(?:de\s+)?(\w+)/)
+
+    if (rangeMatch) {
+      const [, d1, m1, d2, m2] = rangeMatch
+      const mm1 = monthMap[m1.toLowerCase()]
+      const mm2 = monthMap[m2.toLowerCase()]
+      if (mm1 && mm2) {
+        const year = todayStr.slice(0, 4)
+        dateFilter = { start: `${year}-${mm1}-${d1.padStart(2, '0')}`, end: `${year}-${mm2}-${d2.padStart(2, '0')}` }
+      }
+    } else if (rangeMatch2) {
+      const [, d1, d2, m] = rangeMatch2
+      const mm = monthMap[m.toLowerCase()]
+      if (mm) {
+        const year = todayStr.slice(0, 4)
+        dateFilter = { start: `${year}-${mm}-${d1.padStart(2, '0')}`, end: `${year}-${mm}-${d2.padStart(2, '0')}` }
+      }
+    }
+
+    if (!dateFilter) {
+      if (q.includes('ayer')) dateFilter = { start: yesterday, end: yesterday }
+      else if (q.includes('hoy')) dateFilter = { start: todayStr, end: todayStr }
+      else if (q.includes('semana')) {
+        const weekAgo = new Date(mxNow.getTime() - 7 * 86400000).toISOString().split('T')[0]
+        dateFilter = { start: weekAgo, end: todayStr }
+      } else if (q.includes('mes')) {
+        const monthStart = todayStr.slice(0, 8) + '01'
+        dateFilter = { start: monthStart, end: todayStr }
+      } else {
+        // Check for single month name: "mayo", "abril"
+        for (const [name, num] of Object.entries(monthMap)) {
+          if (q.includes(name)) {
+            const year = todayStr.slice(0, 4)
+            dateFilter = { start: `${year}-${num}-01`, end: `${year}-${num}-31` }
+            break
+          }
+        }
+      }
     }
 
     // 3. Waiter × platillo data (use fetch to avoid SDK hanging)
@@ -245,8 +283,35 @@ export async function POST(request: NextRequest) {
           if (post && post.qty > 0) rankings.push(`  ${m}: ${post.qty} pzas ($${Math.round(post.total)})`)
         }
 
+        // Per-day category breakdown (for "cuántos H&H por día" queries)
+        const perDayLines: string[] = ['\nDESGLOSE POR DÍA Y CATEGORÍA:']
+        for (const row of waiterRows) {
+          const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data
+          const dayTotals: Record<string, { qty: number; total: number }> = {}
+          for (const [key, val] of Object.entries(d)) {
+            if (key.startsWith('__') || typeof val !== 'object' || val === null) continue
+            for (const [cat, catVal] of Object.entries(val as Record<string, unknown>)) {
+              if (cat === 'KPIs' || typeof catVal !== 'object' || catVal === null) continue
+              const cv = catVal as Record<string, number>
+              if ('qty' in cv) {
+                if (!dayTotals[cat]) dayTotals[cat] = { qty: 0, total: 0 }
+                dayTotals[cat].qty += cv.qty || 0
+                dayTotals[cat].total += cv.total || 0
+              }
+            }
+          }
+          if (Object.keys(dayTotals).length > 0) {
+            const parts = Object.entries(dayTotals)
+              .filter(([, v]) => v.qty > 0)
+              .sort((a, b) => b[1].total - a[1].total)
+              .map(([cat, v]) => `${cat}:${v.qty}pzas/$${Math.round(v.total)}`)
+              .join(', ')
+            perDayLines.push(`  ${row.fecha}: ${parts}`)
+          }
+        }
+
         const fechas = waiterRows.map((r: { fecha: string }) => r.fecha).join(', ')
-        waiterContext = `\nDATOS DE MESEROS DEL DIA ${fechas} (USAR ESTOS PARA RESPONDER SOBRE "AYER" O LA FECHA INDICADA):\n\n${rankings.join('\n')}`
+        waiterContext = `\nDATOS DE MESEROS DEL DIA ${fechas} (USAR ESTOS PARA RESPONDER SOBRE "AYER" O LA FECHA INDICADA):\n\n${rankings.join('\n')}${perDayLines.length > 1 ? '\n' + perDayLines.join('\n') : ''}`
         console.log(`[chat] Rankings OK: ${rankings.length} lines, ${meseroList.length} meseros, ${waiterContext.length} chars`)
       } catch (err) {
         console.error('[chat] Rankings error:', err)
@@ -296,6 +361,8 @@ REGLAS:
 - Cuando detectes anomalía: compara vs promedio histórico disponible
 - Los datos diarios incluyen "Meseros:" con ventas POR MESERO POR DIA. Para saber cuanto vendió un mesero en la semana, SUMA sus ventas de cada día. "Semana pasada" = últimos 7 días. NUNCA digas "no tengo ese dato" si el nombre del mesero aparece en los datos diarios.
 - Los datos diarios incluyen "Grupos:" con ventas por categoría POR DIA. Para historial de una categoría, usa esos datos y suma.
+- El DESGLOSE POR DÍA Y CATEGORÍA muestra H&H, Pan, Postres, 2da Bebida por día. Para preguntas como "cuántos H&H se vendieron del 1 al 18 de mayo", usa este desglose y lista CADA DÍA individualmente.
+- NUNCA digas "no tengo ese dato" si la categoría aparece en el desglose diario. Busca el dato día por día y listalos.
 
 MÉTRICAS CLAVE A MONITOREAR:
 1. Ticket promedio por comensal (y por mesero)
