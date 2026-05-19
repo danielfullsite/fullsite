@@ -294,6 +294,8 @@ REGLAS:
 - Prioriza insights que ayuden al gerente a actuar HOY
 - Para historial, muestra TODOS los días disponibles
 - Cuando detectes anomalía: compara vs promedio histórico disponible
+- Los datos diarios incluyen "Meseros:" con ventas POR MESERO POR DIA. Para saber cuanto vendió un mesero en la semana, SUMA sus ventas de cada día. "Semana pasada" = últimos 7 días. NUNCA digas "no tengo ese dato" si el nombre del mesero aparece en los datos diarios.
+- Los datos diarios incluyen "Grupos:" con ventas por categoría POR DIA. Para historial de una categoría, usa esos datos y suma.
 
 MÉTRICAS CLAVE A MONITOREAR:
 1. Ticket promedio por comensal (y por mesero)
