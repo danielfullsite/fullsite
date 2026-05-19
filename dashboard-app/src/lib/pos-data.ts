@@ -722,31 +722,44 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function saveOrder(order: Order): Promise<boolean> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({
-      client_id: 'amalay',
-      mesa: order.mesa,
-      mesero: order.mesero,
-      personas: order.personas,
-      status: order.status,
-      subtotal: order.subtotal,
-      iva: order.iva,
-      total: order.total,
-      descuento: order.descuento,
-      metodo_pago: order.metodoPago ?? null,
-      notas: order.notas ?? null,
-      items: JSON.stringify(order.items),
-      closed_at: order.closedAt ? order.closedAt.toISOString() : null,
-    }),
-  })
-  return res.ok
+  const orderData = {
+    client_id: 'amalay',
+    mesa: order.mesa,
+    mesero: order.mesero,
+    personas: order.personas,
+    status: order.status,
+    subtotal: order.subtotal,
+    iva: order.iva,
+    total: order.total,
+    descuento: order.descuento,
+    metodo_pago: order.metodoPago ?? null,
+    notas: order.notas ?? null,
+    items: JSON.stringify(order.items),
+    closed_at: order.closedAt ? order.closedAt.toISOString() : null,
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(orderData),
+    })
+    return res.ok
+  } catch {
+    // Offline — save to localStorage queue
+    if (typeof window !== 'undefined') {
+      const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+      queue.push({ table: 'pos_orders', data: orderData, timestamp: Date.now(), synced: false })
+      localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+      console.log('[offline] Order saved to queue — will sync when online')
+    }
+    return true // Return true so the UI continues normally
+  }
 }
 
 export async function updateOrderStatus(

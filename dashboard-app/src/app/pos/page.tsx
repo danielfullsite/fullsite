@@ -640,6 +640,38 @@ function POSContent() {
     return Array.from(names).slice(0, 12) // max 12 options
   }, [allRecipes, allIngredients])
 
+  // Online/offline status
+  const [online, setOnline] = useState(true)
+  const [pendingSync, setPendingSync] = useState(0)
+  useEffect(() => {
+    setOnline(navigator.onLine)
+    const goOnline = async () => {
+      setOnline(true)
+      // Sync offline queue
+      try {
+        const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+        const pending = queue.filter((q: { synced: boolean }) => !q.synced)
+        for (const item of pending) {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${item.table}`, {
+            method: 'POST',
+            headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify(item.data),
+          })
+          if (res.ok) item.synced = true
+        }
+        localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+        setPendingSync(queue.filter((q: { synced: boolean }) => !q.synced).length)
+      } catch { /* */ }
+    }
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    // Check pending on mount
+    const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+    setPendingSync(queue.filter((q: { synced: boolean }) => !q.synced).length)
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline) }
+  }, [])
+
   // Nav hamburger
   const [showNav, setShowNav] = useState(false)
 
@@ -1035,6 +1067,16 @@ function POSContent() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-slate-400 flex-shrink-0 ml-2">
+            {!online && (
+              <span className="flex items-center gap-1 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-bold">
+                Offline {pendingSync > 0 && `(${pendingSync})`}
+              </span>
+            )}
+            {pendingSync > 0 && online && (
+              <span className="flex items-center gap-1 bg-amber-600 text-white px-2 py-1 rounded-full text-xs font-bold">
+                Sync {pendingSync}
+              </span>
+            )}
             {readyOrders > 0 && (
               <Link href="/pos/cocina" className="flex items-center gap-1 bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
                 {readyOrders} listas
