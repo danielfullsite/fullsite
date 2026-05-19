@@ -80,7 +80,25 @@ export default function TurnoPage() {
     const manager = MANAGER_PINS[closePin]
     if (!manager) { setCloseError('PIN invalido'); return }
 
-    const efectivoSistema = activeTurno.fondo_inicial // TODO: calculate from actual cash orders
+    // Calculate actual cash from orders during this shift
+    let cashFromOrders = 0
+    try {
+      const ordersRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodoPago&status=eq.cerrada&client_id=eq.amalay&createdAt=gte.${activeTurno.opened_at}`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      )
+      if (ordersRes.ok) {
+        const orders = await ordersRes.json()
+        cashFromOrders = orders
+          .filter((o: Record<string, unknown>) => {
+            const method = ((o.metodoPago as string) || '').toLowerCase()
+            return method.includes('efectivo') || method.includes('cash')
+          })
+          .reduce((sum: number, o: Record<string, unknown>) => sum + (Number(o.total) || 0), 0)
+      }
+    } catch { /* fallback to fondo_inicial if query fails */ }
+
+    const efectivoSistema = activeTurno.fondo_inicial + cashFromOrders
     const diferencia = Number(fondoFinal) - efectivoSistema
 
     const res = await fetch(

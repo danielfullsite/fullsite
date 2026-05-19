@@ -1014,6 +1014,7 @@ function POSContent() {
       iva,
       total,
       descuento: discount,
+      propina: propina > 0 ? propina : undefined,
       metodoPago: method,
       notas: orderNotes || undefined,
       createdAt: new Date(),
@@ -1398,7 +1399,7 @@ function POSContent() {
                 const results: { item: MenuItem; category: string; catId: string }[] = []
                 for (const cat of MENU_CATEGORIES) {
                   for (const item of cat.items) {
-                    if (item.name.toLowerCase().includes(term)) {
+                    if (item.price > 0 && item.name.toLowerCase().includes(term)) {
                       results.push({ item, category: cat.name, catId: cat.id })
                     }
                   }
@@ -1429,7 +1430,7 @@ function POSContent() {
             <>
               {/* Category tabs — big touch targets */}
               <div className="flex gap-2 px-3 py-2.5 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
-                {MENU_CATEGORIES.map((cat) => (
+                {MENU_CATEGORIES.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
@@ -1447,7 +1448,7 @@ function POSContent() {
               {/* Menu items grid — BIG touch cards for tablet */}
               <div className="flex-1 overflow-y-auto p-3">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {activeCategory.items.map((item) => (
+                  {activeCategory.items.filter(item => item.price > 0).map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}

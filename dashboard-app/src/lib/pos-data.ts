@@ -327,6 +327,7 @@ export interface Order {
   iva: number
   total: number
   descuento: number
+  propina?: number
   metodoPago?: string
   notas?: string
   createdAt: Date
