@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+"""
+Climate + Events Agent — Multi-tenant
+Cruza pronóstico del clima + eventos locales con historial de ventas.
+Envía insights accionables a Telegram cada mañana (8am MX).
+
+"Mañana llueve y es martes — históricamente tus ventas bajan 25%."
+"Hay juego de Tigres a las 8pm, tus ventas de cerveza suben 40%."
+"""
+
+import os
+import sys
+import json
+import time
+import requests
+from datetime import datetime, timedelta, timezone, date
+from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
+
+# ── Config ──────────────────────────────────────────────────────────────────
+CLIENT = get_client()
+MX_TZ = get_tz(CLIENT)
+SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_CHAT_IDS = get_chat_ids(CLIENT, "intraday")
+TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
+
+# OpenWeatherMap free tier (1000 calls/day)
+OWM_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
+
+# AMALAY is in San Pedro Garza García, Monterrey metro
+CITY_LAT = 25.6514
+CITY_LON = -100.2895
+CITY_NAME = "Monterrey"
+
+sb_headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+}
+
+# ── Mexican holidays 2026 ────────────────────────────────────────────────
+HOLIDAYS_MX = {
+    "2026-01-01": "Año Nuevo",
+    "2026-02-02": "Día de la Constitución",
+    "2026-03-16": "Natalicio de Benito Juárez",
+    "2026-05-01": "Día del Trabajo",
+    "2026-05-05": "Batalla de Puebla",
+    "2026-05-10": "Día de las Madres",
+    "2026-05-15": "Día del Maestro",
+    "2026-06-21": "Día del Padre",
+    "2026-09-16": "Independencia de México",
+    "2026-10-12": "Día de la Raza",
+    "2026-11-02": "Día de Muertos",
+    "2026-11-16": "Revolución Mexicana",
+    "2026-12-12": "Día de la Virgen de Guadalupe",
+    "2026-12-24": "Nochebuena",
+    "2026-12-25": "Navidad",
+    "2026-12-31": "Fin de Año",
+}
+
+# Bridge days (puentes) — add as they're announced
+PUENTES = {
+    # "2026-03-17": "Puente Benito Juárez",
+}
+
+# ── Weather ──────────────────────────────────────────────────────────────
+def get_weather_forecast():
+    """Get 3-day forecast from OpenWeatherMap."""
+    if not OWM_KEY:
+        print("[weather] No OPENWEATHER_API_KEY, using fallback")
+        return get_weather_fallback()
+
+    try:
+        r = requests.get(
+            "https://api.openweathermap.org/data/2.5/forecast",
+            params={
+                "lat": CITY_LAT, "lon": CITY_LON,
+                "appid": OWM_KEY, "units": "metric", "lang": "es",
+                "cnt": 24,  # 3 days (8 per day × 3)
+            },
+            timeout=10,
+        )
+        if not r.ok:
+            print(f"[weather] API error: {r.status_code}")
+            return get_weather_fallback()
+
+        data = r.json()
+        forecasts = []
+        for item in data.get("list", []):
+            dt = datetime.fromtimestamp(item["dt"], tz=MX_TZ)
+            forecasts.append({
+                "fecha": dt.strftime("%Y-%m-%d"),
+                "hora": dt.strftime("%H:%M"),
+                "temp": item["main"]["temp"],
+                "feels_like": item["main"]["feels_like"],
+                "humidity": item["main"]["humidity"],
+                "description": item["weather"][0]["description"],
+                "icon": item["weather"][0]["main"],  # Rain, Clear, Clouds, etc.
+                "rain_mm": item.get("rain", {}).get("3h", 0),
+                "wind_speed": item["wind"]["speed"],
+            })
+        return forecasts
+    except Exception as e:
+        print(f"[weather] Error: {e}")
+        return get_weather_fallback()
+
+
+def get_weather_fallback():
+    """Fallback: use wttr.in (no API key needed)."""
+    try:
+        r = requests.get(f"https://wttr.in/{CITY_NAME}?format=j1", timeout=10)
+        if not r.ok:
+            return []
+        data = r.json()
+        forecasts = []
+        for day in data.get("weather", [])[:3]:
+            fecha = day["date"]
+            for hour in day.get("hourly", []):
+                forecasts.append({
+                    "fecha": fecha,
+                    "hora": f"{int(hour['time'])//100:02d}:00",
+                    "temp": float(hour["tempC"]),
+                    "feels_like": float(hour["FeelsLikeC"]),
+                    "humidity": int(hour["humidity"]),
+                    "description": hour.get("lang_es", [{}])[0].get("value", hour.get("weatherDesc", [{}])[0].get("value", "")),
+                    "icon": hour.get("weatherCode", ""),
+                    "rain_mm": float(hour.get("precipMM", 0)),
+                    "wind_speed": float(hour.get("windspeedKmph", 0)) / 3.6,
+                })
+        return forecasts
+    except Exception as e:
+        print(f"[weather fallback] Error: {e}")
+        return []
+
+
+def summarize_day_weather(forecasts, fecha):
+    """Summarize weather for a specific date."""
+    day_f = [f for f in forecasts if f["fecha"] == fecha]
+    if not day_f:
+        return None
+
+    temps = [f["temp"] for f in day_f]
+    rain = sum(f["rain_mm"] for f in day_f)
+    descriptions = [f["description"] for f in day_f]
+    icons = [f["icon"] for f in day_f]
+
+    rain_hours = sum(1 for f in day_f if f["rain_mm"] > 0.5)
+    is_rainy = rain > 2 or rain_hours >= 2
+    is_hot = max(temps) > 35
+    is_cold = min(temps) < 15
+
+    # Most common weather
+    from collections import Counter
+    main_weather = Counter(descriptions).most_common(1)[0][0] if descriptions else "despejado"
+
+    return {
+        "fecha": fecha,
+        "temp_min": round(min(temps)),
+        "temp_max": round(max(temps)),
+        "rain_mm": round(rain, 1),
+        "rain_hours": rain_hours,
+        "is_rainy": is_rainy,
+        "is_hot": is_hot,
+        "is_cold": is_cold,
+        "description": main_weather,
+        "humidity_avg": round(sum(f["humidity"] for f in day_f) / len(day_f)),
+    }
+
+
+# ── Events ───────────────────────────────────────────────────────────────
+def get_events_for_date(fecha_str):
+    """Get events for a specific date."""
+    events = []
+
+    # Holidays
+    if fecha_str in HOLIDAYS_MX:
+        events.append({"type": "holiday", "name": HOLIDAYS_MX[fecha_str], "impact": "high"})
+
+    # Puentes
+    if fecha_str in PUENTES:
+        events.append({"type": "puente", "name": PUENTES[fecha_str], "impact": "high"})
+
+    # Day before holiday (people go out)
+    tomorrow = (datetime.strptime(fecha_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if tomorrow in HOLIDAYS_MX:
+        events.append({"type": "vispera", "name": f"Víspera de {HOLIDAYS_MX[tomorrow]}", "impact": "medium"})
+
+    # Weekend detection
+    dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    dow = dt.weekday()
+    if dow == 4:  # Friday
+        events.append({"type": "weekend", "name": "Viernes", "impact": "medium"})
+    elif dow == 5:
+        events.append({"type": "weekend", "name": "Sábado", "impact": "high"})
+    elif dow == 6:
+        events.append({"type": "weekend", "name": "Domingo", "impact": "high"})
+
+    # Quincena (15th and last day of month)
+    day = dt.day
+    if day == 15 or day == 16:
+        events.append({"type": "quincena", "name": "Quincena", "impact": "medium"})
+    last_day = (dt.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    if day == last_day.day or day == 1:
+        events.append({"type": "quincena", "name": "Fin de quincena", "impact": "medium"})
+
+    return events
+
+
+# ── Historical Analysis ──────────────────────────────────────────────────
+def get_historical_data():
+    """Get last 90 days of sales from Supabase."""
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/wansoft_daily",
+            headers=sb_headers,
+            params={
+                "select": "fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant",
+                "ventas_dia": "gt.0",
+                "order": "fecha.desc",
+                "limit": "90",
+            },
+            timeout=10,
+        )
+        return r.json() if r.ok else []
+    except:
+        return []
+
+
+def analyze_dow_pattern(historical, target_dow):
+    """Get average sales for a specific day of week."""
+    same_dow = []
+    for d in historical:
+        dt = datetime.strptime(d["fecha"], "%Y-%m-%d")
+        if dt.weekday() == target_dow:
+            same_dow.append(d)
+
+    if not same_dow:
+        return None
+
+    avg_ventas = sum(d.get("ventas_dia", 0) for d in same_dow) / len(same_dow)
+    avg_personas = sum(d.get("personas_restaurant", 0) for d in same_dow) / len(same_dow)
+    avg_tp = sum(d.get("ticket_promedio_restaurant", 0) for d in same_dow) / len(same_dow)
+
+    return {
+        "avg_ventas": round(avg_ventas),
+        "avg_personas": round(avg_personas),
+        "avg_tp": round(avg_tp),
+        "sample_size": len(same_dow),
+    }
+
+
+def find_rainy_day_impact(historical, forecasts):
+    """Compare rainy vs non-rainy days in history."""
+    # We don't have historical weather, so estimate from sales variance
+    # Days with significantly lower sales than DOW average = likely bad weather
+    by_dow = {}
+    for d in historical:
+        dt = datetime.strptime(d["fecha"], "%Y-%m-%d")
+        dow = dt.weekday()
+        if dow not in by_dow:
+            by_dow[dow] = []
+        by_dow[dow].append(d.get("ventas_dia", 0))
+
+    # Calculate coefficient of variation per DOW
+    impacts = {}
+    for dow, ventas in by_dow.items():
+        if len(ventas) < 3:
+            continue
+        avg = sum(ventas) / len(ventas)
+        below_avg = [v for v in ventas if v < avg * 0.8]  # 20%+ below average
+        if below_avg and avg > 0:
+            pct_drop = round((1 - sum(below_avg) / len(below_avg) / avg) * 100)
+            impacts[dow] = pct_drop
+
+    return impacts
+
+
+# ── Build Message ────────────────────────────────────────────────────────
+def build_message(today_str, weather_today, weather_tomorrow, events_today, events_tomorrow, historical, dow_stats_today, dow_stats_tomorrow):
+    now_mx = datetime.now(MX_TZ)
+    day_names = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    today_name = day_names[now_mx.weekday()]
+
+    tomorrow = (now_mx + timedelta(days=1))
+    tomorrow_str = tomorrow.strftime("%Y-%m-%d")
+    tomorrow_name = day_names[tomorrow.weekday()]
+
+    msg = f"🌤 CLIMA + EVENTOS — {today_name} {now_mx.strftime('%d/%m')}\n\n"
+
+    # Today's weather
+    if weather_today:
+        msg += f"HOY ({today_name}):\n"
+        emoji = "🌧" if weather_today["is_rainy"] else "🔥" if weather_today["is_hot"] else "❄️" if weather_today["is_cold"] else "☀️"
+        msg += f"{emoji} {weather_today['description'].capitalize()}\n"
+        msg += f"🌡 {weather_today['temp_min']}°–{weather_today['temp_max']}°C"
+        if weather_today["rain_mm"] > 0:
+            msg += f" · 🌧 {weather_today['rain_mm']}mm ({weather_today['rain_hours']}h de lluvia)"
+        msg += f"\n💧 Humedad: {weather_today['humidity_avg']}%\n"
+
+    # Today's events
+    if events_today:
+        msg += "\n📅 EVENTOS HOY:\n"
+        for e in events_today:
+            icon = "🎉" if e["type"] == "holiday" else "🌉" if e["type"] == "puente" else "💰" if e["type"] == "quincena" else "🎊" if e["type"] == "vispera" else "📆"
+            msg += f"  {icon} {e['name']}\n"
+
+    # Today's prediction
+    if dow_stats_today:
+        msg += f"\n📊 PROMEDIO {today_name.upper()}:\n"
+        msg += f"  Ventas: ${dow_stats_today['avg_ventas']:,} · {dow_stats_today['avg_personas']} personas · TP ${dow_stats_today['avg_tp']}\n"
+        msg += f"  (basado en {dow_stats_today['sample_size']} {today_name}s)\n"
+
+    # Weather impact insight
+    if weather_today and weather_today["is_rainy"] and dow_stats_today:
+        rain_impacts = find_rainy_day_impact(historical, [])
+        dow = datetime.strptime(today_str, "%Y-%m-%d").weekday()
+        if dow in rain_impacts:
+            msg += f"\n⚠️ Los {today_name}s malos históricamente bajan ~{rain_impacts[dow]}% vs promedio.\n"
+            estimated = round(dow_stats_today["avg_ventas"] * (1 - rain_impacts[dow] / 100))
+            msg += f"  Estimado con lluvia: ~${estimated:,}\n"
+
+    if weather_today and weather_today["is_rainy"]:
+        msg += "\n💡 ACCIÓN: Prepara menos ingredientes perecederos. Activa promo de bebidas calientes.\n"
+    elif weather_today and weather_today["is_hot"]:
+        msg += "\n💡 ACCIÓN: Refuerza bebidas frías, smoothies y frappes. Asegura hielo suficiente.\n"
+
+    # Tomorrow preview
+    msg += f"\n{'─' * 30}\n"
+    msg += f"MAÑANA ({tomorrow_name} {tomorrow.strftime('%d/%m')}):\n"
+
+    if weather_tomorrow:
+        emoji = "🌧" if weather_tomorrow["is_rainy"] else "🔥" if weather_tomorrow["is_hot"] else "❄️" if weather_tomorrow["is_cold"] else "☀️"
+        msg += f"{emoji} {weather_tomorrow['description'].capitalize()} · {weather_tomorrow['temp_min']}°–{weather_tomorrow['temp_max']}°C"
+        if weather_tomorrow["rain_mm"] > 0:
+            msg += f" · 🌧 {weather_tomorrow['rain_mm']}mm"
+        msg += "\n"
+
+    if events_tomorrow:
+        for e in events_tomorrow:
+            icon = "🎉" if e["type"] == "holiday" else "💰" if e["type"] == "quincena" else "📆"
+            msg += f"  {icon} {e['name']}\n"
+
+    if dow_stats_tomorrow:
+        msg += f"  Prom. {tomorrow_name}: ${dow_stats_tomorrow['avg_ventas']:,}\n"
+
+    # Preparation tips
+    tips = []
+    if events_tomorrow and any(e["type"] in ("holiday", "puente") for e in events_tomorrow):
+        tips.append("Día festivo mañana — revisa inventario para volumen alto o cierre")
+    if events_today and any(e["type"] == "quincena" for e in events_today):
+        tips.append("Quincena — espera más tráfico y tickets más altos")
+    if weather_tomorrow and weather_tomorrow["is_rainy"]:
+        tips.append("Lluvia mañana — ajusta compras de perecederos")
+
+    if tips:
+        msg += "\n📋 PREPARAR:\n"
+        for tip in tips:
+            msg += f"  • {tip}\n"
+
+    return msg
+
+
+# ── Telegram ─────────────────────────────────────────────────────────────
+def send_telegram(msg):
+    sent = 0
+    for chat_id in TG_CHAT_IDS:
+        if not chat_id:
+            continue
+        chunks = [msg[i:i + 4000] for i in range(0, len(msg), 4000)]
+        for chunk in chunks:
+            r = requests.post(
+                f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": chunk},
+            )
+            if r.ok:
+                sent += 1
+    return sent
+
+
+# ── Main ─────────────────────────────────────────────────────────────────
+def main():
+    start = time.time()
+    now_mx = datetime.now(MX_TZ)
+    today_str = now_mx.strftime("%Y-%m-%d")
+    tomorrow_str = (now_mx + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    print(f"[climate] Starting for {CLIENT['id']} on {today_str}")
+
+    # 1. Get weather
+    print("[climate] Fetching weather...")
+    forecasts = get_weather_forecast()
+    print(f"[climate] Got {len(forecasts)} forecast entries")
+
+    weather_today = summarize_day_weather(forecasts, today_str)
+    weather_tomorrow = summarize_day_weather(forecasts, tomorrow_str)
+
+    # 2. Get events
+    events_today = get_events_for_date(today_str)
+    events_tomorrow = get_events_for_date(tomorrow_str)
+    print(f"[climate] Events today: {len(events_today)}, tomorrow: {len(events_tomorrow)}")
+
+    # 3. Get historical data
+    print("[climate] Fetching historical...")
+    historical = get_historical_data()
+    print(f"[climate] Got {len(historical)} days of history")
+
+    dow_today = now_mx.weekday()
+    dow_tomorrow = (now_mx + timedelta(days=1)).weekday()
+    dow_stats_today = analyze_dow_pattern(historical, dow_today)
+    dow_stats_tomorrow = analyze_dow_pattern(historical, dow_tomorrow)
+
+    # 4. Build and send message
+    msg = build_message(today_str, weather_today, weather_tomorrow,
+                        events_today, events_tomorrow, historical,
+                        dow_stats_today, dow_stats_tomorrow)
+
+    print(f"\n{msg}")
+
+    sent = send_telegram(msg)
+    elapsed = int((time.time() - start) * 1000)
+    print(f"\n[climate] Sent to {sent} chats in {elapsed}ms")
+
+    # Log
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_runs",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={
+                "agent_id": "climate-events",
+                "trigger_type": TRIGGER_TYPE,
+                "status": "success",
+                "duration_ms": elapsed,
+                "output_summary": f"weather: {'rain' if weather_today and weather_today['is_rainy'] else 'clear'}, events: {len(events_today)}+{len(events_tomorrow)}",
+                "tentacle": "ops",
+            },
+        )
+    except:
+        pass
+
+
+if __name__ == "__main__":
+    main()

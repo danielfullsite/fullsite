@@ -1,0 +1,33 @@
+name: Climate + Events Agent
+
+on:
+  schedule:
+    # 8am MX = 14:00 UTC (before restaurant opens)
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Client ID'
+        required: false
+        default: 'amalay'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  climate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run Climate + Events Agent
+        run: python .github/scripts/climate_events_agent.py
