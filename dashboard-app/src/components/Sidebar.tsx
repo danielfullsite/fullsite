@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { canAccessPage } from '@/contexts/AuthContext'
 
 const navSections = [
   {
@@ -98,7 +99,7 @@ function getTodayFormatted(): string {
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { user, clientConfig, signOut } = useAuth()
+  const { user, role, clientConfig, signOut } = useAuth()
 
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-slate-200 bg-white">
@@ -113,11 +114,14 @@ export default function Sidebar() {
 
       {/* Navigation sections */}
       <nav className="flex-1 px-3 py-2 overflow-y-auto">
-        {navSections.map((section) => (
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter(item => canAccessPage(role, item.href))
+          if (visibleItems.length === 0) return null
+          return (
           <div key={section.label}>
             <div className="sidebar-section-label">{section.label}</div>
             <div className="space-y-0.5">
-              {section.items.map((item) => {
+              {visibleItems.map((item) => {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== '/' && pathname.startsWith(item.href))
@@ -136,7 +140,8 @@ export default function Sidebar() {
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Footer */}

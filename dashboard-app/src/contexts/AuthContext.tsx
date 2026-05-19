@@ -4,8 +4,34 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
 
+// Dashboard roles — controls page visibility
+// dueño: sees EVERYTHING (financials, gastos, nómina, P&L, all agents)
+// gerente: sees operations (ventas, meseros, inventario, coach) but NOT financials
+// staff: sees only POS-related pages
+export type DashboardRole = 'dueño' | 'gerente' | 'staff'
+
+// Role-based page access
+const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/proveedores', '/food-cost']
+const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/ecommerce', '/reportes', '/coach', '/chat']
+const STAFF_PAGES = ['/pos']
+
+export function canAccessPage(role: DashboardRole, path: string): boolean {
+  if (role === 'dueño') return true
+  if (role === 'gerente') return !FINANCIAL_PAGES.some(p => path.startsWith(p)) || OPERATIONS_PAGES.some(p => path === p || path.startsWith(p + '/'))
+  if (role === 'staff') return STAFF_PAGES.some(p => path.startsWith(p))
+  return false
+}
+
+// Map emails to roles (in production, move to Supabase table)
+const ROLE_MAP: Record<string, DashboardRole> = {
+  'ramonfaur.daniel@gmail.com': 'dueño',
+  'monica@fullsite.mx': 'dueño',
+  // Add more users here or migrate to DB
+}
+
 interface AuthContextType {
   user: User | null
+  role: DashboardRole
   clientId: string | null
   clientConfig: { id: string; name?: string } | null
   loading: boolean
@@ -14,6 +40,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  role: 'staff',
   clientId: null,
   clientConfig: null,
   loading: true,
@@ -28,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [clientId, setClientId] = useState<string | null>(null)
   const [clientConfig, setClientConfig] = useState<{ id: string; name?: string } | null>(null)
+  const [role, setRole] = useState<DashboardRole>('staff')
   const [loading, setLoading] = useState(true)
 
   // createBrowserClient from @supabase/ssr is a singleton by default
@@ -83,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const parsed = JSON.parse(stored)
             if (parsed.user) {
               setUser(parsed.user)
+              setRole(ROLE_MAP[parsed.user.email || ''] || 'gerente')
               await loadClientData(parsed.user.id)
               setLoading(false)
               return
@@ -95,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
+          setRole(ROLE_MAP[currentUser.email || ''] || 'gerente')
           await loadClientData(currentUser.id)
         }
       } catch (err) {
@@ -114,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
+          setRole(ROLE_MAP[currentUser.email || ''] || 'gerente')
           await loadClientData(currentUser.id)
         } else {
           setClientId(null)
@@ -137,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, clientId, clientConfig, loading, signOut }}>
+    <AuthContext.Provider value={{ user, role, clientId, clientConfig, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )
