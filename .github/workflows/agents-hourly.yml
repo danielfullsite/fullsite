@@ -1,0 +1,47 @@
+name: Agents — Hourly (Anomalías + Predicción + Upselling)
+
+on:
+  schedule:
+    # 2pm MX = 20:00 UTC, 4pm = 22:00, 6pm = 00:00+1
+    - cron: '0 20 * * *'   # 2pm MX
+    - cron: '0 22 * * *'   # 4pm MX
+    - cron: '0 0 * * *'    # 6pm MX
+  workflow_dispatch:
+    inputs:
+      client_id:
+        default: 'amalay'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  anomaly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests beautifulsoup4
+      - run: python .github/scripts/anomaly_detector.py
+
+  predictor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests beautifulsoup4
+      - run: python .github/scripts/close_predictor.py
+
+  upselling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests beautifulsoup4
+      - run: python .github/scripts/upselling_agent.py

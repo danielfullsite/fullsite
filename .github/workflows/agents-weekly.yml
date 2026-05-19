@@ -1,0 +1,91 @@
+name: Agents — Weekly (Staffing + Menu + Suppliers + Anti-Fraud + Tips + Waste)
+
+on:
+  schedule:
+    # Monday 8am MX = 14:00 UTC Mon — Staffing
+    # Monday 9:30am MX = 15:30 UTC Mon — Menu Engineering
+    # Wednesday 9am MX = 15:00 UTC Wed — Suppliers
+    # Thursday 9am MX = 15:00 UTC Thu — Waste
+    # Friday 9am MX = 15:00 UTC Fri — Anti-Fraud
+    # Friday 5pm MX = 23:00 UTC Fri — Tips
+    - cron: '0 14 * * 1'    # Mon 8am MX — Staffing
+    - cron: '30 15 * * 1'   # Mon 9:30am MX — Menu Engineering
+    - cron: '0 15 * * 3'    # Wed 9am MX — Suppliers
+    - cron: '0 15 * * 4'    # Thu 9am MX — Waste
+    - cron: '0 15 * * 5'    # Fri 9am MX — Anti-Fraud
+    - cron: '0 23 * * 5'    # Fri 5pm MX — Tips
+  workflow_dispatch:
+    inputs:
+      client_id:
+        default: 'amalay'
+      agent:
+        description: 'Which agent to run (all, staffing, menu, suppliers, waste, antifraud, tips)'
+        default: 'all'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  staffing:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 14 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/staffing_optimizer.py
+
+  menu-engineering:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 15 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/menu_engineering.py
+
+  suppliers:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/supplier_monitor.py
+
+  waste:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 4'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/waste_detector.py
+
+  antifraud:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 5'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/antifraud_agent.py
+
+  tips:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 23 * * 5'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/tips_analyzer.py
