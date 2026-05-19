@@ -860,6 +860,9 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
         approved_by: event.approved_by,
       }),
     })
+    if (!res.ok) {
+      console.warn(`[audit] Failed to log "${event.action}" for order ${event.order_id}: ${res.status} ${res.statusText}`)
+    }
     return res.ok
   } catch {
     return false
