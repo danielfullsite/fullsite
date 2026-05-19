@@ -131,8 +131,21 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Create account */}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            ¿No tienes cuenta?{' '}
+            <a
+              href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20crear%20una%20cuenta%20en%20Fullsite."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-600 font-medium hover:text-emerald-700 transition-colors"
+            >
+              Contáctanos
+            </a>
+          </p>
+
           {/* Footer */}
-          <div className="mt-12 pt-6 border-t border-slate-100">
+          <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-xs text-slate-400 text-center">
               <a href="/privacidad" className="hover:text-slate-600 transition-colors">Privacidad</a>
               {' · '}
