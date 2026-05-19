@@ -26,6 +26,7 @@ import {
   Sparkles,
   PieChart,
   Truck,
+  Bot,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -76,6 +77,7 @@ const navSections = [
   {
     label: 'Herramientas',
     items: [
+      { href: '/agentes', label: 'Agentes IA', icon: Bot },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
     ],
