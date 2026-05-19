@@ -692,6 +692,7 @@ function POSContent() {
 
   // Load active order for selected mesa
   const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
+  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null)
   useEffect(() => {
     const loadMesaOrder = async () => {
       try {
@@ -709,6 +710,7 @@ function POSContent() {
             setPersonas(order.personas || 2)
             setDiscount(order.descuento || 0)
             setLoadedOrderId(order.id)
+            setLoadedUpdatedAt(order.updated_at || order.created_at || null)
           }
         }
       } catch { /* */ }
@@ -954,6 +956,26 @@ function POSContent() {
   const handleSendToKitchen = async () => {
     if (activeItems.length === 0 || saving) return
     setSaving(true)
+
+    // Multi-user conflict check: if we loaded an existing order, verify it hasn't been modified since
+    if (loadedOrderId && loadedUpdatedAt) {
+      try {
+        const checkRes = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at&limit=1`,
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        )
+        if (checkRes.ok) {
+          const rows = await checkRes.json()
+          if (rows.length > 0) {
+            const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
+            if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
+              showToast('Esta orden fue modificada por otro usuario')
+            }
+          }
+        }
+      } catch { /* proceed anyway */ }
+    }
+
     const order: Order = {
       id: orderId,
       mesa,

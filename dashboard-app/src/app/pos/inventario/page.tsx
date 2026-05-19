@@ -17,6 +17,10 @@ export default function InventarioPage() {
   const [sortKey, setSortKey] = useState<SortKey>('status')
   const [tab, setTab] = useState<'stock' | 'movements'>('stock')
 
+  const staffStr = typeof window !== 'undefined' ? sessionStorage.getItem('pos_staff') : null
+  const staffRole = staffStr ? JSON.parse(staffStr).role : 'mesero'
+  const showCosts = staffRole !== 'mesero'
+
   const fetchData = async () => {
     setLoading(true)
     const [inv, mov] = await Promise.all([getInventory(), getInventoryMovements(100)])
@@ -123,10 +127,12 @@ export default function InventarioPage() {
           <p className="text-emerald-400 text-2xl font-bold">{stats.ok}</p>
           <p className="text-emerald-400/70 text-xs">OK</p>
         </div>
-        <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl px-4 py-3">
-          <p className="text-blue-400 text-2xl font-bold">{formatMXN(stats.totalValue)}</p>
-          <p className="text-blue-400/70 text-xs">Valor total</p>
-        </div>
+        {showCosts && (
+          <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl px-4 py-3">
+            <p className="text-blue-400 text-2xl font-bold">{formatMXN(stats.totalValue)}</p>
+            <p className="text-blue-400/70 text-xs">Valor total</p>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -257,9 +263,11 @@ export default function InventarioPage() {
                       </div>
 
                       {/* Value */}
-                      <div className="w-24 text-right flex-shrink-0">
-                        <p className="text-slate-400 text-sm">{formatMXN(item.stock * (item.ingredient_cost ?? 0))}</p>
-                      </div>
+                      {showCosts && (
+                        <div className="w-24 text-right flex-shrink-0">
+                          <p className="text-slate-400 text-sm">{formatMXN(item.stock * (item.ingredient_cost ?? 0))}</p>
+                        </div>
+                      )}
 
                       {/* Status badge */}
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${config.bg} ${config.text} border ${config.border}`}>
