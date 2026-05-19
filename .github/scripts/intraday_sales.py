@@ -378,22 +378,79 @@ def main():
         except Exception as e:
             print(f"[intraday] Hourly save failed (non-blocking): {e}")
 
-        # Save ventas_por_grupo to wansoft_daily so historical category queries work
+        # Save ALL fields to wansoft_daily so dashboard pages work
         try:
+            sb_h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                    "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                    "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+
+            update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+
+            # Ventas brutas y descuentos
+            if consolidated:
+                update_data["ventas_brutas"] = consolidated.get("TotalGrossSales", 0)
+                update_data["descuentos"] = consolidated.get("TotalDiscounts", 0)
+
+            # Tickets y personas from order_types
+            if order_types:
+                update_data["tickets_count"] = order_types.get("total_tickets", 0)
+                update_data["personas_restaurant"] = order_types.get("total_personas", 0)
+
+            # Ventas por grupo
             if groups:
-                grupo_data = [{"nombre": g["grupo"], "total": float(g["subtotal"].replace(",","")) if isinstance(g["subtotal"], str) else g["subtotal"]}
+                grupo_data = [{"nombre": g["grupo"], "total": float(str(g["subtotal"]).replace(",","")) if g.get("subtotal") else 0}
                               for g in groups if g.get("grupo")]
-                sb_h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
-                        "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
-                        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
-                requests.patch(
-                    f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&report_type=eq.cierre",
-                    headers=sb_h,
-                    json={"ventas_por_grupo": json.dumps(grupo_data), "updated_at": datetime.now(timezone.utc).isoformat()},
-                    timeout=10)
-                print(f"[intraday] Updated ventas_por_grupo in wansoft_daily ({len(grupo_data)} categories)")
+                update_data["ventas_por_grupo"] = json.dumps(grupo_data)
+
+            # Meseros
+            if users:
+                _excl = [e.lower() for e in (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])]
+                mesero_data = []
+                for u in users:
+                    name = u.get("mesero", "")
+                    if any(ex in name.lower() for ex in _excl):
+                        continue
+                    total = float(str(u.get("total", "0")).replace(",","").replace("$",""))
+                    if total > 0:
+                        mesero_data.append({"nombre": name, "total": total})
+                if mesero_data:
+                    update_data["meseros"] = json.dumps(mesero_data)
+
+            # Pago metodos - fetch from Wansoft
+            try:
+                pay_html = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",
+                    data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15).text
+                pay_soup = BeautifulSoup(pay_html, "html.parser")
+                pago_data = []
+                for row in pay_soup.select(".rowReport"):
+                    cols = [c.text.strip() for c in row.select("div")]
+                    if len(cols) >= 4:
+                        pago_data.append({"nombre": cols[0], "total": float(cols[3].replace(",","").replace("$",""))})
+                if pago_data:
+                    update_data["pago_metodos"] = json.dumps(pago_data)
+            except: pass
+
+            # Propinas - fetch from Wansoft kpis in Supabase
+            try:
+                kpis = requests.get(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_kpis",
+                    headers={"apikey": os.environ["SUPABASE_SERVICE_KEY"], "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"},
+                    params={"select": "propinas_total", "limit": "1"}, timeout=10).json()
+                if kpis and kpis[0].get("propinas_total"):
+                    update_data["propinas_total"] = kpis[0]["propinas_total"]
+            except: pass
+
+            # Ticket promedio
+            ventas_dia = update_data.get("ventas_dia") or consolidated.get("TotalSales", 0)
+            personas = update_data.get("personas_restaurant", 0)
+            if personas and personas > 0:
+                update_data["ticket_promedio_restaurant"] = round(ventas_dia / personas, 2)
+
+            requests.patch(
+                f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}",
+                headers=sb_h, json=update_data, timeout=10)
+            print(f"[intraday] Updated wansoft_daily with {len(update_data)} fields")
         except Exception as e:
-            print(f"[intraday] ventas_por_grupo save failed (non-blocking): {e}")
+            print(f"[intraday] wansoft_daily update failed (non-blocking): {e}")
 
         # Don't send report if no sales (restaurant closed or data not yet available)
         ventas = consolidated.get("TotalSales", 0)
