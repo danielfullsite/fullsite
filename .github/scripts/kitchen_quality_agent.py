@@ -53,7 +53,7 @@ def get_recent_daily(days=7):
     now_mx = datetime.now(MX_TZ)
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
     return sb_get("wansoft_daily", {
-        "select": "fecha,ventas_dia,devoluciones,descuentos,tickets_count,platillos_top,ventas_por_grupo",
+        "select": "fecha,ventas_dia,descuentos,tickets_count,ventas_por_grupo",
         "fecha": f"gte.{start_date}",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
@@ -64,7 +64,7 @@ def get_recent_daily(days=7):
 def get_historical_avg(days=30):
     """Fetch longer history for baseline comparison."""
     return sb_get("wansoft_daily", {
-        "select": "fecha,devoluciones,descuentos,tickets_count,ventas_dia",
+        "select": "fecha,descuentos,tickets_count,ventas_dia",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
         "limit": str(days),
@@ -143,7 +143,7 @@ def analyze_weekly_patterns(recent):
         return insights
 
     # Track devoluciones trend
-    devs = [(d["fecha"], d.get("devoluciones", 0) or 0) for d in recent]
+    devs = [(d.get("fecha", ""), d.get("devoluciones", 0) or 0) for d in recent]
     if all(d[1] > 0 for d in devs[:3]):
         # Check if trend is increasing
         if len(devs) >= 3 and devs[0][1] > devs[1][1] > devs[2][1]:

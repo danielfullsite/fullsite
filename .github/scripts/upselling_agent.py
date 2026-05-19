@@ -187,7 +187,25 @@ def analyze_mesero_upselling(today_kpis, waiter_cats):
     # Build per-mesero category stats
     mesero_stats = defaultdict(lambda: {"postres": 0, "pan": 0, "hh": 0, "bebidas_2": 0, "total": 0})
 
-    for item in data:
+    # data can be a dict {mesero_name: {KPIs: ..., H&H: {qty, total}, ...}} or a list
+    items = []
+    if isinstance(data, dict):
+        for mesero_name, mesero_data in data.items():
+            if mesero_name.startswith("__") or not isinstance(mesero_data, dict):
+                continue
+            if not is_mesero(mesero_name, CLIENT):
+                continue
+            for cat_name, cat_val in mesero_data.items():
+                if cat_name == "KPIs" or not isinstance(cat_val, dict):
+                    continue
+                items.append({"mesero": mesero_name, "categoria": cat_name,
+                              "cantidad": cat_val.get("qty", 0), "total": cat_val.get("total", 0)})
+    elif isinstance(data, list):
+        items = data
+
+    for item in items:
+        if isinstance(item, str):
+            continue
         mesero = item.get("mesero") or item.get("nombre") or ""
         if not mesero or not is_mesero(mesero, CLIENT):
             continue

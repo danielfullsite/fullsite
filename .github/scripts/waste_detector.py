@@ -189,7 +189,11 @@ def analyze_purchases(suppliers_data, daily_data):
         if not data:
             continue
 
-        for supplier in data:
+        # data can be list of dicts or a dict
+        items = data if isinstance(data, list) else [{"nombre": k, "total": v} for k, v in data.items()] if isinstance(data, dict) else []
+        for supplier in items:
+            if isinstance(supplier, str):
+                continue
             nombre = supplier.get("nombre") or supplier.get("name") or supplier.get("proveedor") or ""
             monto = supplier.get("total") or supplier.get("monto") or supplier.get("amount") or 0
             if isinstance(monto, str):
