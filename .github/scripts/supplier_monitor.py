@@ -317,17 +317,40 @@ def main():
         )
         print(f"[supplier] Consumption alerts: {len(consumption_alerts)}")
 
-    # 3. Build and send
-    # Only send if there's something to report
-    if not has_data and not price_changes and not concentration and not consumption_alerts:
-        print("[supplier] No data available, skipping message")
-        elapsed = int((time.time() - start) * 1000)
-    else:
-        msg = build_message(price_changes, concentration, consumption_alerts, has_data)
-        print(f"\n{msg}")
-        sent = send_telegram(msg)
-        elapsed = int((time.time() - start) * 1000)
-        print(f"[supplier] Sent to {sent} chats in {elapsed}ms")
+    # 3. Build structured data and save to DB
+    structured_data = {
+        "price_changes": price_changes,
+        "vendor_concentration": concentration,
+        "consumption_alerts": consumption_alerts,
+        "has_data": has_data,
+    }
+
+    risky_vendors = [v for v in concentration if v.get("is_risky")]
+    big_increases = [pc for pc in price_changes if pc.get("pct_change", 0) > 0.10]
+    priority = "warning" if (risky_vendors or big_increases or consumption_alerts) else "info"
+    summary = f"{len(price_changes)} cambios precio, {len(risky_vendors)} proveedores riesgosos"
+
+    today_str = now_mx.strftime("%Y-%m-%d")
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "suppliers",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[supplier] Saved to agent_results")
+    except Exception as e:
+        print(f"[supplier] Error saving to DB: {e}")
+
+    elapsed = int((time.time() - start) * 1000)
+    print(f"[supplier] Done in {elapsed}ms — {summary}")
 
     # 4. Log
     try:

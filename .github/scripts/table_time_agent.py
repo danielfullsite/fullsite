@@ -310,20 +310,48 @@ def main():
         print("[table_time] No analysis possible — skipping")
         return
 
-    # 4. Build and send
-    msg = build_message(analysis, today_kpis)
+    # 4. Build structured data and save to DB
+    structured_data = {
+        "analysis": analysis,
+        "ordenes_abiertas": today_kpis.get("ordenes_abiertas", 0) or 0,
+        "total_ordenes_mxn": today_kpis.get("total_ordenes_mxn", 0) or 0,
+    }
+
+    # Determine priority based on throughput issues
+    priority = "info"
+    if analysis.get("source") == "wansoft_estimate":
+        tph = analysis.get("tickets_per_hour", 0)
+        hist_tph = analysis.get("hist_avg_tph", 0)
+        if hist_tph > 0 and tph > 0 and tph < hist_tph * 0.85:
+            priority = "warning"
+
+    if analysis.get("source") == "pos":
+        summary = f"Tiempo promedio mesa: {analysis.get('avg_minutes', 0)} min ({analysis.get('orders', 0)} ordenes)"
+    else:
+        summary = f"Tickets/hora: {analysis.get('tickets_per_hour', 0)} (hist: {analysis.get('hist_avg_tph', 0)})"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "table-time",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[table_time] Saved to agent_results")
+    except Exception as e:
+        print(f"[table_time] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
+    print(f"[table_time] Done in {elapsed}ms — {summary}")
 
-    if not msg:
-        print("[table_time] No insights to report — silent")
-        log_run("success", elapsed, "no_insights")
-        return
-
-    print(f"\n{msg}")
-    sent = send_telegram(msg)
-    print(f"[table_time] Sent to {sent} chats in {elapsed}ms")
-
-    log_run("success", elapsed, f"source={analysis['source']}, sent to {sent}")
+    log_run("success", elapsed, f"source={analysis['source']}")
 
 
 def log_run(status, elapsed, summary):

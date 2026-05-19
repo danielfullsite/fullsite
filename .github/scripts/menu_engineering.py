@@ -350,18 +350,68 @@ def main():
     classified = classify_bcg(categories, food_cost_data)
     recommendations = generate_recommendations(classified)
 
-    # 3. Build and send
-    msg = build_message(classified, recommendations, len(sales_data))
-    print(f"\n{msg}")
+    # 3. Build structured data
+    estrellas = sum(1 for c in classified if c["quadrant"] == "Estrella")
+    perros = sum(1 for c in classified if c["quadrant"] == "Perro")
 
-    sent = send_telegram(msg)
-    elapsed = int((time.time() - start) * 1000)
-    print(f"[menu_eng] Sent to {sent} chats in {elapsed}ms")
+    by_quadrant = {}
+    for c in classified:
+        q = c["quadrant"]
+        if q not in by_quadrant:
+            by_quadrant[q] = []
+        by_quadrant[q].append({
+            "nombre": c["nombre"],
+            "total_30d": c["total_30d"],
+            "daily_avg": c["daily_avg"],
+            "margin_pct": c["margin_pct"],
+            "food_cost_pct": c["food_cost_pct"],
+            "frequency": round(c["frequency"], 2),
+        })
 
-    # 4. Log
+    total_rev = sum(c["total_30d"] for c in classified)
+    revenue_distribution = {}
+    for quad in ["Estrella", "Caballo", "Rompecabezas", "Perro"]:
+        items = [c for c in classified if c["quadrant"] == quad]
+        rev = sum(i["total_30d"] for i in items)
+        revenue_distribution[quad] = {"total": rev, "pct": round(rev / total_rev * 100, 1) if total_rev > 0 else 0}
+
+    structured_data = {
+        "categories": by_quadrant,
+        "revenue_distribution": revenue_distribution,
+        "recommendations": recommendations,
+        "total_categories": len(classified),
+        "total_revenue_30d": total_rev,
+        "analysis_days": len(sales_data),
+    }
+
+    summary = f"{estrellas} estrellas, {perros} perros, {len(recommendations)} recomendaciones"
+
+    # 4. Save to DB
+    now_mx = datetime.now(MX_TZ)
+    today_str = now_mx.strftime("%Y-%m-%d")
     try:
-        estrellas = sum(1 for c in classified if c["quadrant"] == "Estrella")
-        perros = sum(1 for c in classified if c["quadrant"] == "Perro")
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "menu-engineering",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": "info",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[menu_eng] Saved to agent_results")
+    except Exception as e:
+        print(f"[menu_eng] Error saving to DB: {e}")
+
+    elapsed = int((time.time() - start) * 1000)
+    print(f"[menu_eng] Done in {elapsed}ms — {summary}")
+
+    # 5. Log
+    try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_runs",
             headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},

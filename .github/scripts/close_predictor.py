@@ -278,15 +278,64 @@ def main():
     comparisons = get_comparison_days(now_mx)
     historical = get_historical_same_dow(now_mx, weeks=4)
 
-    # 4. Build and send
-    msg = build_message(today_data, projected, comparisons, historical, current_hour)
-    print(f"\n{msg}")
+    # 4. Build structured data
+    today_groups = today_data.get("ventas_por_grupo") or []
+    boosts = []
+    for label, keywords in [
+        ("Postres", ["DESSERT", "BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"]),
+        ("Half & Half", ["HALF", "H&H"]),
+        ("Pan", ["TOAST", "BAGEL", "CROISSANT"]),
+    ]:
+        boost = estimate_category_boost(today_groups, historical, keywords, label)
+        if boost and boost["gap"] > 100:
+            boosts.append(boost)
 
-    sent = send_telegram(msg)
+    remaining = projected - current_ventas
+    pct_done = (current_ventas / projected * 100) if projected > 0 else 0
+    avg_dow = sum(float(d.get("ventas_dia") or 0) for d in historical) / len(historical) if historical else 0
+
+    structured_data = {
+        "current_ventas": current_ventas,
+        "current_tickets": int(today_data.get("tickets_count") or 0),
+        "current_tp": float(today_data.get("ticket_promedio_restaurant") or 0),
+        "projected": projected,
+        "remaining": remaining,
+        "pct_done": round(pct_done, 1),
+        "current_hour": current_hour,
+        "comparisons": {
+            k: {"ventas_dia": float(v.get("ventas_dia") or 0)}
+            for k, v in comparisons.items()
+        },
+        "avg_dow": round(avg_dow),
+        "boosts": boosts,
+    }
+
+    priority = "warning" if projected < avg_dow * 0.85 else "info"
+    summary = f"Proyección: ${projected:,.0f} (avance {pct_done:.0f}%)"
+
+    # 5. Save to DB
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "predictor",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[close_predictor] Saved to agent_results")
+    except Exception as e:
+        print(f"[close_predictor] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
-    print(f"[close_predictor] Sent to {sent} chats in {elapsed}ms")
+    print(f"[close_predictor] Done in {elapsed}ms — {summary}")
 
-    # 5. Log
+    # 6. Log
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_runs",

@@ -447,16 +447,47 @@ def main():
     dow_stats_today = analyze_dow_pattern(historical, dow_today)
     dow_stats_tomorrow = analyze_dow_pattern(historical, dow_tomorrow)
 
-    # 4. Build and send message
-    msg = build_message(today_str, weather_today, weather_tomorrow,
-                        events_today, events_tomorrow, historical,
-                        dow_stats_today, dow_stats_tomorrow)
+    # 4. Build structured data and save to DB
+    rain_impacts = find_rainy_day_impact(historical, [])
+    dow_impact = rain_impacts.get(dow_today, 0) if weather_today and weather_today.get("is_rainy") else 0
+    estimated_rainy = round(dow_stats_today["avg_ventas"] * (1 - dow_impact / 100)) if dow_stats_today and dow_impact > 0 else None
 
-    print(f"\n{msg}")
+    structured_data = {
+        "weather_today": weather_today,
+        "weather_tomorrow": weather_tomorrow,
+        "events_today": events_today,
+        "events_tomorrow": events_tomorrow,
+        "dow_stats_today": dow_stats_today,
+        "dow_stats_tomorrow": dow_stats_tomorrow,
+        "rain_impact_pct": dow_impact,
+        "estimated_rainy_ventas": estimated_rainy,
+    }
 
-    sent = send_telegram(msg)
+    is_rainy = weather_today and weather_today.get("is_rainy")
+    priority = "warning" if is_rainy else "info"
+    weather_desc = weather_today["description"] if weather_today else "sin datos"
+    summary = f"{weather_desc}, {len(events_today)} eventos hoy"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "climate",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[climate] Saved to agent_results")
+    except Exception as e:
+        print(f"[climate] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
-    print(f"\n[climate] Sent to {sent} chats in {elapsed}ms")
+    print(f"[climate] Done in {elapsed}ms — {summary}")
 
     # Log
     try:
@@ -468,7 +499,7 @@ def main():
                 "trigger_type": TRIGGER_TYPE,
                 "status": "success",
                 "duration_ms": elapsed,
-                "output_summary": f"weather: {'rain' if weather_today and weather_today['is_rainy'] else 'clear'}, events: {len(events_today)}+{len(events_tomorrow)}",
+                "output_summary": f"weather: {'rain' if is_rainy else 'clear'}, events: {len(events_today)}+{len(events_tomorrow)}",
                 "tentacle": "ops",
             },
         )

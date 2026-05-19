@@ -254,7 +254,11 @@ def analyze_waste_estimate(food_cost_data, suppliers_data, daily_data):
             data = json.loads(data)
         if not data:
             continue
-        for supplier in data:
+        # data can be list of dicts or a dict — normalize
+        items = data if isinstance(data, list) else [{"nombre": k, "total": v} for k, v in data.items()] if isinstance(data, dict) else []
+        for supplier in items:
+            if isinstance(supplier, str):
+                continue
             monto = supplier.get("total") or supplier.get("monto") or 0
             if isinstance(monto, str):
                 try:
@@ -470,20 +474,44 @@ def main():
     total = len(fc_insights) + len(purchase_insights) + len(waste_insights) + len(shrinkage_insights)
     print(f"[waste] Found {total} insights")
 
-    # 3. Build and send
-    msg = build_message(fc_insights, purchase_insights, waste_insights, shrinkage_insights, daily_data)
+    # 3. Build structured data and save to DB
+    all_insights = fc_insights + purchase_insights + waste_insights + shrinkage_insights
+    structured_data = {
+        "food_cost_insights": fc_insights,
+        "purchase_insights": purchase_insights,
+        "waste_insights": waste_insights,
+        "shrinkage_insights": shrinkage_insights,
+        "total_ventas": total_ventas,
+        "total_insights": total,
+        "analysis_days": len(daily_data),
+    }
+
+    has_high = any(i.get("prioridad") == "alta" for i in all_insights)
+    priority = "warning" if has_high else "info"
+    summary = f"{total} hallazgos de costos/desperdicios" if total > 0 else "Sin hallazgos"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "waste",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[waste] Saved to agent_results")
+    except Exception as e:
+        print(f"[waste] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
+    print(f"[waste] Done in {elapsed}ms — {summary}")
 
-    if not msg:
-        print("[waste] No actionable insights — silent")
-        log_run("success", elapsed, "no_insights")
-        return
-
-    print(f"\n{msg}")
-    sent = send_telegram(msg)
-    print(f"[waste] Sent to {sent} chats in {elapsed}ms")
-
-    log_run("success", elapsed, f"{total} insights, sent to {sent}")
+    log_run("success", elapsed, f"{total} insights")
 
 
 def log_run(status, elapsed, summary):

@@ -384,20 +384,51 @@ def main():
 
     print(f"[tips] Meseros ranked: {len(mesero_ranking)}, Correlations: {len(correlations)}")
 
-    # 3. Build and send
-    msg = build_message(mesero_ranking, correlations, daily_data)
+    # 3. Build structured data and save to DB
+    total_ventas = sum(d.get("ventas_dia", 0) or 0 for d in daily_data)
+    total_tickets = sum(d.get("tickets_count", 0) or 0 for d in daily_data)
+
+    structured_data = {
+        "mesero_ranking": mesero_ranking,
+        "correlations": correlations,
+        "totals": {
+            "propinas": total_propinas,
+            "ventas": total_ventas,
+            "tickets": total_tickets,
+            "propina_rate": round(total_propinas / total_ventas * 100, 1) if total_ventas > 0 else 0,
+            "propina_per_ticket": round(total_propinas / total_tickets) if total_tickets > 0 else 0,
+        },
+        "analysis_days": len(daily_data),
+    }
+
+    priority = "info"
+    if total_ventas > 0 and total_propinas / total_ventas < 0.08:
+        priority = "warning"
+
+    summary = f"${total_propinas:,.0f} propinas, {len(mesero_ranking)} meseros analizados"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "tips",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[tips] Saved to agent_results")
+    except Exception as e:
+        print(f"[tips] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
+    print(f"[tips] Done in {elapsed}ms — {summary}")
 
-    if not msg:
-        print("[tips] No data to report — silent")
-        log_run("success", elapsed, "no_data")
-        return
-
-    print(f"\n{msg}")
-    sent = send_telegram(msg)
-    print(f"[tips] Sent to {sent} chats in {elapsed}ms")
-
-    log_run("success", elapsed, f"{len(mesero_ranking)} meseros, {len(correlations)} patterns, sent to {sent}")
+    log_run("success", elapsed, f"{len(mesero_ranking)} meseros, {len(correlations)} patterns")
 
 
 def log_run(status, elapsed, summary):

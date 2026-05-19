@@ -335,20 +335,46 @@ def main():
     total = len(cancel_insights) + len(pattern_insights) + len(dpt_insights)
     print(f"[kitchen] Found {total} insights")
 
-    # 3. Build and send
-    msg = build_message(cancel_insights, pattern_insights, dpt_insights, today_data)
+    # 3. Build structured data and save to DB
+    all_insights = cancel_insights + pattern_insights + dpt_insights
+    structured_data = {
+        "cancel_insights": cancel_insights,
+        "pattern_insights": pattern_insights,
+        "descuento_per_ticket_insights": dpt_insights,
+        "today_stats": {
+            "ventas": today_data.get("ventas_dia", 0) or 0,
+            "devoluciones": today_data.get("devoluciones", 0) or 0,
+            "descuentos": today_data.get("descuentos", 0) or 0,
+        } if today_data else {},
+        "total_insights": total,
+    }
+
+    has_high = any(i.get("prioridad") == "alta" for i in all_insights)
+    priority = "warning" if has_high else "info"
+    summary = f"{total} problemas de calidad detectados" if total > 0 else "Sin problemas de calidad"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "kitchen",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[kitchen] Saved to agent_results")
+    except Exception as e:
+        print(f"[kitchen] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
+    print(f"[kitchen] Done in {elapsed}ms — {summary}")
 
-    if not msg:
-        print("[kitchen] No issues to report — silent")
-        log_run("success", elapsed, "no_issues")
-        return
-
-    print(f"\n{msg}")
-    sent = send_telegram(msg)
-    print(f"[kitchen] Sent to {sent} chats in {elapsed}ms")
-
-    log_run("success", elapsed, f"{total} insights, sent to {sent}")
+    log_run("success", elapsed, f"{total} insights")
 
 
 def log_run(status, elapsed, summary):

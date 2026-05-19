@@ -394,20 +394,42 @@ def main():
     total_insights = len(upsell_insights) + len(mesero_insights) + len(bebida_insights)
     print(f"[upselling] Found {total_insights} insights")
 
-    # 5. Build and send
-    msg = build_message(upsell_insights, mesero_insights, bebida_insights, today_kpis)
-    if not msg:
-        print("[upselling] No insights to report — silent")
-        elapsed = int((time.time() - start) * 1000)
-        log_run("success", elapsed, "no_insights")
-        return
+    # 5. Build structured data and save to DB
+    all_insights = upsell_insights + bebida_insights + mesero_insights
+    structured_data = {
+        "opportunities": upsell_insights,
+        "mesero_insights": mesero_insights,
+        "bebida_insights": bebida_insights,
+        "today_ventas": ventas,
+        "today_tickets": today_kpis.get("tickets_count", 0) or 0,
+        "total_insights": total_insights,
+    }
 
-    print(f"\n{msg}")
-    sent = send_telegram(msg)
+    priority = "warning" if total_insights > 3 else "info" if total_insights > 0 else "info"
+    summary = f"{total_insights} oportunidades de upselling" if total_insights > 0 else "Sin oportunidades"
+
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "upselling",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[upselling] Saved to agent_results")
+    except Exception as e:
+        print(f"[upselling] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
-    print(f"[upselling] Sent to {sent} chats in {elapsed}ms")
+    print(f"[upselling] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"{total_insights} insights, sent to {sent}")
+    log_run("success", elapsed, f"{total_insights} insights")
 
 
 def log_run(status, elapsed, summary):

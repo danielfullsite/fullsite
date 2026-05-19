@@ -283,15 +283,42 @@ def main():
     issues = detect_staffing_issues(by_dow)
     mesero_patterns = detect_mesero_patterns(data)
 
-    # 3. Build and send
-    msg = build_message(schedule, issues, mesero_patterns)
-    print(f"\n{msg}")
+    # 3. Build structured data
+    structured_data = {
+        "schedule": [s for s in schedule if s],
+        "issues": issues,
+        "mesero_patterns": mesero_patterns,
+        "analysis_days": len(data),
+    }
 
-    sent = send_telegram(msg)
+    has_issues = len(issues) > 0
+    priority = "warning" if has_issues else "info"
+    summary = f"{len(issues)} ajustes sugeridos, {len(mesero_patterns)} patrones de meseros"
+
+    # 4. Save to DB
+    today_str = now_mx.strftime("%Y-%m-%d")
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "staffing",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[staffing] Saved to agent_results")
+    except Exception as e:
+        print(f"[staffing] Error saving to DB: {e}")
+
     elapsed = int((time.time() - start) * 1000)
-    print(f"[staffing] Sent to {sent} chats in {elapsed}ms")
+    print(f"[staffing] Done in {elapsed}ms — {summary}")
 
-    # 4. Log
+    # 5. Log
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_runs",

@@ -307,17 +307,64 @@ def main():
 
     elapsed = int((time.time() - start) * 1000)
 
-    # 4. Only send if there are anomalies
+    # 4. Determine priority
+    has_high = any(a["severity"] == "high" for a in anomalies)
+    priority = "critical" if has_high else "warning" if anomalies else "info"
+
+    # 5. Build structured data for DB
+    hist_ventas = [float(d.get("ventas_dia") or 0) for d in historical if d.get("ventas_dia")]
+    avg_ventas = sum(hist_ventas) / len(hist_ventas) if hist_ventas else 0
+    structured_data = {
+        "anomalies": [
+            {
+                "type": a["type"],
+                "severity": a["severity"],
+                "message": a["message"],
+            }
+            for a in anomalies
+        ],
+        "today_ventas": float(today_data.get("ventas_dia") or 0),
+        "today_tp": float(today_data.get("ticket_promedio_restaurant") or 0),
+        "avg_ventas": round(avg_ventas),
+        "total_anomalies": len(anomalies),
+        "thresholds": {
+            "ventas": VENTAS_THRESHOLD,
+            "ticket": TICKET_THRESHOLD,
+            "mesero": MESERO_THRESHOLD,
+            "category": CATEGORY_THRESHOLD,
+        },
+    }
+
+    # 6. Save to DB
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "anomaly",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": f"{len(anomalies)} anomalías detectadas" if anomalies else "Sin anomalías",
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[anomaly] Saved to agent_results")
+    except Exception as e:
+        print(f"[anomaly] Error saving to DB: {e}")
+
+    # 7. Send Telegram ONLY when priority=critical
     sent = 0
-    if anomalies:
+    if anomalies and priority == "critical":
         msg = build_message(anomalies)
         print(f"\n{msg}")
         sent = send_telegram(msg)
         print(f"[anomaly] Sent to {sent} chats")
     else:
-        print("[anomaly] No anomalies detected, no message sent")
+        print(f"[anomaly] {len(anomalies)} anomalies, priority={priority}, no Telegram")
 
-    # 5. Log
+    # 8. Log
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_runs",
@@ -327,7 +374,7 @@ def main():
                 "trigger_type": TRIGGER_TYPE,
                 "status": "success",
                 "duration_ms": elapsed,
-                "output_summary": f"anomalies: {len(anomalies)}, sent: {sent}",
+                "output_summary": f"anomalies: {len(anomalies)}, priority: {priority}, sent: {sent}",
                 "tentacle": "ops",
             },
         )

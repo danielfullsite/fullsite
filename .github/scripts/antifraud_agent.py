@@ -393,15 +393,63 @@ def main():
     risk_score = calculate_risk_score(all_findings)
     print(f"[antifraud] Findings: {len(all_findings)}, Risk: {risk_score}/100")
 
-    # 3. Build and send
-    msg = build_message(all_findings, risk_score, data)
-    print(f"\n{msg}")
+    # 3. Build structured data
+    total_ventas = sum(float(d.get("ventas_dia") or 0) for d in data)
+    total_descuentos = sum(float(d.get("descuentos") or 0) for d in data)
+    total_devoluciones = sum(float(d.get("devoluciones") or 0) for d in data)
+    total_efectivo = sum(float(d.get("efectivo") or 0) for d in data)
 
-    sent = send_telegram(msg)
+    structured_data = {
+        "risk_score": risk_score,
+        "findings": all_findings,
+        "total_findings": len(all_findings),
+        "summary_stats": {
+            "ventas": total_ventas,
+            "descuentos": total_descuentos,
+            "devoluciones": total_devoluciones,
+            "efectivo": total_efectivo,
+            "descuento_pct": round(total_descuentos / total_ventas * 100, 1) if total_ventas > 0 else 0,
+            "efectivo_pct": round(total_efectivo / total_ventas * 100, 1) if total_ventas > 0 else 0,
+        },
+        "analysis_days": len(data),
+    }
+
+    priority = "critical" if risk_score > 50 else "warning" if risk_score > 25 else "info"
+    summary = f"Riesgo {risk_score}/100, {len(all_findings)} hallazgos"
+
+    # 4. Save to DB
+    today_str = now_mx.strftime("%Y-%m-%d")
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/agent_results",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "client_id": CLIENT["id"],
+                "agent_id": "antifraud",
+                "fecha": today_str,
+                "data": json.dumps(structured_data),
+                "summary": summary,
+                "priority": priority,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        print(f"[antifraud] Saved to agent_results")
+    except Exception as e:
+        print(f"[antifraud] Error saving to DB: {e}")
+
+    # 5. Send Telegram ONLY when risk > 50
+    sent = 0
+    if risk_score > 50:
+        msg = build_message(all_findings, risk_score, data)
+        print(f"\n{msg}")
+        sent = send_telegram(msg)
+        print(f"[antifraud] Sent to {sent} chats")
+    else:
+        print(f"[antifraud] Risk {risk_score}/100, no Telegram")
+
     elapsed = int((time.time() - start) * 1000)
-    print(f"[antifraud] Sent to {sent} chats in {elapsed}ms")
 
-    # 4. Log
+    # 6. Log
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_runs",
@@ -411,7 +459,7 @@ def main():
                 "trigger_type": TRIGGER_TYPE,
                 "status": "success",
                 "duration_ms": elapsed,
-                "output_summary": f"findings: {len(all_findings)}, risk: {risk_score}/100",
+                "output_summary": f"findings: {len(all_findings)}, risk: {risk_score}/100, sent: {sent}",
                 "tentacle": "ops",
             },
         )
