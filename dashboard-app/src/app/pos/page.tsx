@@ -1098,13 +1098,13 @@ function POSContent() {
               showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
             }
             setMesa(newMesa)
-          }} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
+          }} className="bg-slate-700 text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px]">
             {Array.from({ length: 16 }, (_, i) => (<option key={i + 1} value={i + 1}>Mesa {i + 1}</option>))}
           </select>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px]">
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-slate-700 text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px]">
             {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1} pers</option>))}
           </select>
-          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-slate-700 text-white rounded-lg px-2 py-1.5 text-sm border border-slate-600 min-h-[36px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-slate-700 text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
@@ -1162,8 +1162,8 @@ function POSContent() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel -- Current Order (60% desktop, full on mobile when active) */}
-        <div className={`md:w-[60%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
+        {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
+        <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-slate-700 bg-slate-900 ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
           {/* Order header */}
           {/* Order header — Wansoft style */}
           <div className="px-3 py-2 border-b border-slate-700 bg-slate-800/50">
@@ -1354,7 +1354,7 @@ function POSContent() {
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-lg transition-all min-h-[64px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
             >
               <Send size={22} />
               {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Cocina'}
@@ -1362,14 +1362,14 @@ function POSContent() {
             <button
               onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-sm transition-all min-h-[64px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-6 rounded-2xl text-base transition-all min-h-[72px]"
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-5 rounded-2xl text-lg transition-all min-h-[64px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
             >
               <CreditCard size={22} />
               Cobrar
@@ -1377,8 +1377,8 @@ function POSContent() {
           </div>
         </div>
 
-        {/* Right Panel -- Menu (40% desktop, full on mobile when active) */}
-        <div className={`md:w-[40%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
+        {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
+        <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
           {/* Search bar — big touch target */}
           <div className="px-3 pt-3 pb-2 flex-shrink-0">
             <input
@@ -1433,7 +1433,7 @@ function POSContent() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-4 py-3 rounded-xl text-sm font-semibold whitespace-nowrap transition-all min-h-[48px] ${
+                    className={`px-5 py-3.5 rounded-xl text-base font-bold whitespace-nowrap transition-all min-h-[52px] ${
                       selectedCategory === cat.id
                         ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500'
@@ -1444,19 +1444,19 @@ function POSContent() {
                 ))}
               </div>
 
-              {/* Menu items grid — big touch cards */}
+              {/* Menu items grid — BIG touch cards for tablet */}
               <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {activeCategory.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 hover:border-emerald-600/40 rounded-2xl p-4 text-left transition-all min-h-[100px] flex flex-col justify-between"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl p-5 text-left transition-all min-h-[110px] flex flex-col justify-between"
                     >
-                      <span className="font-semibold text-[15px] leading-tight text-white">
+                      <span className="font-bold text-base leading-tight text-white">
                         {item.name}
                       </span>
-                      <span className="text-emerald-400 font-bold text-lg mt-2">
+                      <span className="text-emerald-400 font-bold text-xl mt-2">
                         {formatMXN(item.price)}
                       </span>
                     </button>
