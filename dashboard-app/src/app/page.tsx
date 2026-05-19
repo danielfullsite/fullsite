@@ -279,13 +279,13 @@ export default function DashboardPage() {
             </span>
           )}
         </div>
-        <div className="flex bg-slate-100 rounded-lg p-0.5">
+        <div className="flex bg-slate-900 rounded-xl p-1 gap-1">
           {(['dia', 'semana', 'mes'] as Period[]).map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                period === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
               {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
