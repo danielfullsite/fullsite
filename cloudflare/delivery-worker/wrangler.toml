@@ -1,0 +1,16 @@
+name = "delivery-webhook"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+# Non-secret vars go here
+
+# Secrets (set with: wrangler secret put SECRET_NAME)
+# SUPABASE_URL
+# SUPABASE_SERVICE_KEY
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID
+# UBEREATS_CLIENT_SECRET
+# RAPPI_API_KEY
+# DIDI_APP_SECRET
+# WEBHOOK_SECRET

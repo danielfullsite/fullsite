@@ -92,6 +92,35 @@ export default function CocinaPage() {
 
   const fetchOrders = async () => {
     const data = await getKitchenOrders()
+
+    // Also fetch delivery orders (nueva/preparando)
+    try {
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const delRes = await fetch(
+        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.amalay&order=created_at.desc`,
+        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+      )
+      if (delRes.ok) {
+        const deliveryOrders = await delRes.json()
+        for (const d of deliveryOrders) {
+          const platformBadge: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi', didi: '🔶 Didi' }
+          const items = typeof d.items === 'string' ? JSON.parse(d.items) : d.items || []
+          data.push({
+            id: d.id,
+            mesa: 0,
+            mesero: platformBadge[d.platform] || d.platform,
+            status: d.status === 'nueva' ? 'enviada' : d.status,
+            items: JSON.stringify(items.map((i: { name: string; qty: number; notes?: string; modifiers?: string }) => ({
+              nombre: i.name, cantidad: i.qty, notas: i.notes || '', modificadores: i.modifiers || '',
+            }))),
+            created_at: d.created_at,
+            notas: d.notes || `${d.customer_name} · $${d.total}`,
+          } as KitchenOrderFromDB)
+        }
+      }
+    } catch { /* delivery table might not exist yet */ }
+
     // Play sound if new 'enviada' orders appeared
     const newEnviadas = data.filter(o => o.status === 'enviada').length
     if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
