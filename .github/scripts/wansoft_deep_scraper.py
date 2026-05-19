@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 """
 Wansoft Deep Scraper — Multi-tenant
-Scrapes 8 additional Wansoft endpoints for deep operational intelligence:
-1. PersonsByHour → traffic patterns
-2. TipByUser → service quality
-3. GetCostBySaucer → food cost / margins
-4. GetInventoryBySubsidiary → stock levels
-5. GetPhysicalInventoryVsSystem → shrinkage detection
-6. ShopBySupplier → vendor spend
-7. GetUserHoursWorkedReport → labor cost
-8. GetIncomeStatemetByMonthInYear → P&L
-
+Scrapes ALL available Wansoft endpoints for deep operational intelligence.
+Handles both JSON and HTML responses. Logs everything for debugging.
 Runs daily at 11pm MX via GitHub Actions.
 """
 
@@ -18,6 +10,7 @@ import os
 import sys
 import json
 import time
+import traceback
 import requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
@@ -57,18 +50,6 @@ def wansoft_session():
     return s
 
 
-def parse_html_rows(html):
-    """Parse Wansoft HTML report rows into list of column arrays."""
-    soup = BeautifulSoup(html, "html.parser")
-    rows = soup.select(".rowReport")
-    results = []
-    for row in rows:
-        cols = [c.text.strip() for c in row.select("div")]
-        if cols:
-            results.append(cols)
-    return results
-
-
 def safe_float(val):
     try:
         return float(str(val).replace("$", "").replace(",", "").replace("%", "").strip())
@@ -78,9 +59,76 @@ def safe_float(val):
 
 def safe_int(val):
     try:
-        return int(str(val).replace(",", "").strip())
+        return int(float(str(val).replace(",", "").strip()))
     except (ValueError, TypeError):
         return 0
+
+
+def parse_html_rows(html):
+    """Parse .rowReport rows → list of column arrays."""
+    soup = BeautifulSoup(html, "html.parser")
+    rows = soup.select(".rowReport")
+    results = []
+    for row in rows:
+        cols = [c.text.strip() for c in row.select("div")]
+        if cols and any(c for c in cols):
+            results.append(cols)
+    return results
+
+
+def parse_any_table(html):
+    """Try to parse any table structure from HTML."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Try .rowReport first
+    rows = soup.select(".rowReport")
+    if rows:
+        results = []
+        for row in rows:
+            cols = [c.text.strip() for c in row.select("div")]
+            if cols and any(c for c in cols):
+                results.append(cols)
+        return results
+
+    # Try regular table
+    tables = soup.select("table")
+    if tables:
+        results = []
+        for tr in tables[0].select("tr"):
+            cols = [td.text.strip() for td in tr.select("td")]
+            if cols and any(c for c in cols):
+                results.append(cols)
+        return results
+
+    # Try any divs with data pattern
+    all_divs = soup.select("div[class*='row'], div[class*='item'], div[class*='record']")
+    if all_divs:
+        results = []
+        for div in all_divs:
+            text = div.get_text(separator="|").strip()
+            if text:
+                results.append(text.split("|"))
+        return results
+
+    return []
+
+
+def try_json_or_html(response):
+    """Try to parse response as JSON first, then HTML."""
+    try:
+        data = response.json()
+        if data:
+            return {"type": "json", "data": data}
+    except (ValueError, json.JSONDecodeError):
+        pass
+
+    rows = parse_any_table(response.text)
+    if rows:
+        return {"type": "html", "data": rows}
+
+    # Return raw text snippet for debugging
+    text = response.text[:500].strip()
+    return {"type": "empty", "data": [], "raw_preview": text}
 
 
 def sb_upsert(table, data):
@@ -92,391 +140,471 @@ def sb_upsert(table, data):
         timeout=15,
     )
     if not r.ok:
-        print(f"  [!] Supabase upsert {table} failed: {r.status_code} {r.text[:200]}")
+        print(f"    [!] Supabase {table}: {r.status_code} {r.text[:200]}")
+    else:
+        print(f"    [✓] Saved to {table}")
     return r.ok
 
 
-# ── 1. Personas por hora ──────────────────────────────────────────────────
-def scrape_persons_by_hour(session, fecha):
-    print("[deep] 1/8 PersonsByHour...")
+def wansoft_post(session, path, data=None, timeout=30):
+    """POST to Wansoft and return parsed result."""
+    url = f"{WANSOFT_URL}/{path}"
+    r = session.post(url, data=data or {}, timeout=timeout)
+    return try_json_or_html(r), r.status_code
+
+
+# ── Scrape Functions ─────────────────────────────────────────────────────
+
+def scrape_endpoint(session, name, path, params, table, transform_fn):
+    """Generic scraper: hit endpoint, transform data, save to Supabase."""
+    print(f"\n  [{name}] → {path}")
     try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByHours", data={
-            "subsidiaryId": SUBSIDIARY_ID, "startDate": fecha, "endDate": fecha,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 5:
-                data.append({
-                    "hora": cols[0],
-                    "ventas": safe_float(cols[3]),
-                    "pct": cols[4] if len(cols) > 4 else "",
-                })
+        result, status = wansoft_post(session, path, params)
+        print(f"    Status: {status}, Type: {result['type']}, Items: {len(result['data']) if isinstance(result['data'], list) else 'dict'}")
 
-        # Also fetch persons by hour if available
-        try:
-            r2 = session.post(f"{WANSOFT_URL}/Reports/PersonsByHour", data={
-                "subsidiaryId": SUBSIDIARY_ID, "startDate": fecha, "endDate": fecha,
-            }, timeout=30)
-            persons_rows = parse_html_rows(r2.text)
-            for i, cols in enumerate(persons_rows):
-                if len(cols) >= 2 and i < len(data):
-                    data[i]["personas"] = safe_int(cols[1])
-        except Exception as e:
-            print(f"  [!] PersonsByHour failed: {e}")
+        if result["type"] == "empty":
+            preview = result.get("raw_preview", "")[:150]
+            print(f"    Empty response. Preview: {preview}")
+            return None
 
-        if data:
-            sb_upsert("wansoft_persons_hourly", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} hours")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 2. Propinas por mesero ────────────────────────────────────────────────
-def scrape_tips_by_user(session, fecha):
-    print("[deep] 2/8 TipByUser...")
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByUser", data={
-            "subsidiaryId": SUBSIDIARY_ID, "startDate": fecha, "endDate": fecha,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 6:
-                propinas = safe_float(cols[5]) if len(cols) > 5 else 0
-                tickets = safe_int(cols[2]) if len(cols) > 2 else 0
-                data.append({
-                    "mesero": cols[0],
-                    "ventas": safe_float(cols[3]),
-                    "tickets": tickets,
-                    "propinas": propinas,
-                    "propina_promedio": round(propinas / tickets, 2) if tickets > 0 else 0,
-                })
-
-        if data:
-            sb_upsert("wansoft_tips", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} meseros with tips")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 3. Costo por platillo ────────────────────────────────────────────────
-def scrape_food_cost(session, fecha):
-    print("[deep] 3/8 GetCostBySaucer...")
-    try:
-        r = session.post(f"{WANSOFT_URL}/Reports/GetCostBySaucer", data={
-            "subsidiaryId": SUBSIDIARY_ID, "startDate": fecha, "endDate": fecha,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 4:
-                precio = safe_float(cols[2]) if len(cols) > 2 else 0
-                costo = safe_float(cols[3]) if len(cols) > 3 else 0
-                margen_pct = round((1 - costo / precio) * 100, 1) if precio > 0 else 0
-                data.append({
-                    "platillo": cols[0],
-                    "qty": safe_int(cols[1]) if len(cols) > 1 else 0,
-                    "precio": precio,
-                    "costo": costo,
-                    "margen_pct": margen_pct,
-                })
-
-        if data:
-            sb_upsert("wansoft_food_cost", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} items with cost")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 4. Inventario actual ─────────────────────────────────────────────────
-def scrape_inventory(session, fecha):
-    print("[deep] 4/8 GetInventoryBySubsidiary...")
-    try:
-        r = session.post(f"{WANSOFT_URL}/Inventory/GetInventoryBySubsidiary", data={
-            "subsidiaryId": SUBSIDIARY_ID,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 4:
-                data.append({
-                    "producto": cols[0],
-                    "existencia": safe_float(cols[1]),
-                    "unidad": cols[2] if len(cols) > 2 else "",
-                    "costo_unitario": safe_float(cols[3]) if len(cols) > 3 else 0,
-                    "costo_total": safe_float(cols[4]) if len(cols) > 4 else 0,
-                })
-
-        if data:
-            sb_upsert("wansoft_inventory", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} products")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 5. Físico vs Sistema ─────────────────────────────────────────────────
-def scrape_shrinkage(session, fecha):
-    print("[deep] 5/8 PhysicalInventoryVsSystem...")
-    try:
-        r = session.post(f"{WANSOFT_URL}/Inventory/GetPhysicalInventoryVsSystem", data={
-            "subsidiaryId": SUBSIDIARY_ID,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 4:
-                sistema = safe_float(cols[1])
-                fisico = safe_float(cols[2])
-                diff = fisico - sistema
-                data.append({
-                    "producto": cols[0],
-                    "sistema": sistema,
-                    "fisico": fisico,
-                    "diferencia": round(diff, 2),
-                    "costo_diferencia": safe_float(cols[3]) if len(cols) > 3 else 0,
-                })
-
-        # Only save items with differences
-        data_with_diff = [d for d in data if abs(d["diferencia"]) > 0.01]
-        if data_with_diff:
-            sb_upsert("wansoft_shrinkage", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data_with_diff),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data_with_diff)} items with differences (of {len(data)} total)")
+        transformed = transform_fn(result)
+        if transformed and (isinstance(transformed, list) and len(transformed) > 0 or isinstance(transformed, dict) and len(transformed) > 0):
+            return transformed
         else:
-            print(f"  OK: {len(data)} items, no differences")
-        return data
+            print(f"    No data after transform")
+            return None
     except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
+        print(f"    ERROR: {e}")
+        return None
 
 
-# ── 6. Compras por proveedor ─────────────────────────────────────────────
-def scrape_suppliers(session, fecha):
-    print("[deep] 6/8 ShopBySupplier...")
-    try:
-        # Last 30 days
-        start = (datetime.strptime(fecha, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-        r = session.post(f"{WANSOFT_URL}/Reports/ShopBySupplier", data={
-            "subsidiaryId": SUBSIDIARY_ID, "startDate": start, "endDate": fecha,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 3:
-                data.append({
-                    "proveedor": cols[0],
-                    "num_compras": safe_int(cols[1]) if len(cols) > 1 else 0,
-                    "total": safe_float(cols[2]) if len(cols) > 2 else safe_float(cols[-1]),
-                })
-
-        if data:
-            sb_upsert("wansoft_suppliers", {
-                "client_id": CLIENT["id"], "fecha": fecha, "periodo": "month",
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} suppliers")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 7. Horas trabajadas ──────────────────────────────────────────────────
-def scrape_labor(session, fecha):
-    print("[deep] 7/8 GetUserHoursWorkedReport...")
-    try:
-        r = session.post(f"{WANSOFT_URL}/Staff/GetAccessControlReport", data={
-            "subsidiaryId": SUBSIDIARY_ID, "startDate": fecha, "endDate": fecha,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-        data = []
-        for cols in rows:
-            if len(cols) >= 3:
-                data.append({
-                    "empleado": cols[0],
-                    "entrada": cols[1] if len(cols) > 1 else "",
-                    "salida": cols[2] if len(cols) > 2 else "",
-                    "horas": safe_float(cols[3]) if len(cols) > 3 else 0,
-                })
-
-        if data:
-            sb_upsert("wansoft_labor", {
-                "client_id": CLIENT["id"], "fecha": fecha,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data)} employees")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return []
-
-
-# ── 8. Estado de resultados ──────────────────────────────────────────────
-def scrape_pnl(session, fecha):
-    print("[deep] 8/8 IncomeStatement...")
-    try:
-        year = fecha[:4]
-        r = session.post(f"{WANSOFT_URL}/Reports/GetIncomeStatemetByMonthInYear", data={
-            "subsidiaryId": SUBSIDIARY_ID, "year": year,
-        }, timeout=30)
-        rows = parse_html_rows(r.text)
-
-        # Parse the P&L structure
-        data = {"year": year, "months": {}}
-        current_section = ""
-        for cols in rows:
-            if len(cols) >= 2:
-                label = cols[0].strip()
-                if label:
-                    values = [safe_float(c) for c in cols[1:]]
-                    data["months"][label] = values
-
-        periodo = fecha[:7]  # YYYY-MM
-        if data["months"]:
-            sb_upsert("wansoft_pnl", {
-                "client_id": CLIENT["id"], "periodo": periodo,
-                "data": json.dumps(data),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
-            print(f"  OK: {len(data['months'])} P&L line items")
-        return data
-    except Exception as e:
-        print(f"  [!] Error: {e}")
-        return {}
-
-
-# ── Telegram ──────────────────────────────────────────────────────────────
-def send_telegram(msg):
-    for chat_id in TG_CHAT_IDS:
-        if not chat_id:
-            continue
-        chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
-        for chunk in chunks:
-            requests.post(
-                f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": chunk},
-            )
-
-
-# ── Log ───────────────────────────────────────────────────────────────────
-def log_run(status, duration_ms, summary="", error=""):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers=sb_headers,
-            json={
-                "agent_id": "wansoft-deep-scraper",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": duration_ms,
-                "output_summary": summary[:500],
-                "error_message": error[:500] if error else None,
-                "tentacle": "ops",
-            },
-        )
-    except Exception:
-        pass
-
-
-# ── Main ──────────────────────────────────────────────────────────────────
 def main():
     start = time.time()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
+    month_start = today_str[:8] + "01"
+    thirty_ago = (now_mx - timedelta(days=30)).strftime("%Y-%m-%d")
+    year = today_str[:4]
 
-    print(f"[deep] Starting deep scraper for {CLIENT['id']} on {today_str}")
+    print(f"{'='*60}")
+    print(f"WANSOFT DEEP SCRAPER — {today_str}")
+    print(f"Client: {CLIENT['id']}, Subsidiary: {SUBSIDIARY_ID}")
+    print(f"{'='*60}")
 
     try:
         session = wansoft_session()
-        print("[deep] Login OK")
-
-        results = {}
-        results["persons"] = scrape_persons_by_hour(session, today_str)
-        results["tips"] = scrape_tips_by_user(session, today_str)
-        results["food_cost"] = scrape_food_cost(session, today_str)
-        results["inventory"] = scrape_inventory(session, today_str)
-        results["shrinkage"] = scrape_shrinkage(session, today_str)
-        results["suppliers"] = scrape_suppliers(session, today_str)
-        results["labor"] = scrape_labor(session, today_str)
-        results["pnl"] = scrape_pnl(session, today_str)
-
-        # Build summary
-        summary_parts = []
-        for key, data in results.items():
-            count = len(data) if isinstance(data, list) else (len(data.get("months", {})) if isinstance(data, dict) else 0)
-            if count > 0:
-                summary_parts.append(f"{key}: {count}")
-
-        summary = f"Deep scrape {today_str}: {', '.join(summary_parts)}"
-        print(f"\n[deep] {summary}")
-
-        # Send Telegram summary
-        msg = f"🔍 DEEP SCRAPE — {today_str}\n\n"
-        if results["persons"]:
-            msg += f"⏰ Personas/hora: {len(results['persons'])} franjas\n"
-        if results["tips"]:
-            total_tips = sum(d.get("propinas", 0) for d in results["tips"])
-            msg += f"💰 Propinas: ${total_tips:,.0f} ({len(results['tips'])} meseros)\n"
-        if results["food_cost"]:
-            avg_margin = sum(d.get("margen_pct", 0) for d in results["food_cost"]) / len(results["food_cost"]) if results["food_cost"] else 0
-            msg += f"📊 Food cost: {len(results['food_cost'])} platillos, margen prom. {avg_margin:.0f}%\n"
-        if results["inventory"]:
-            msg += f"📦 Inventario: {len(results['inventory'])} productos\n"
-        if results["shrinkage"]:
-            shrink_items = [d for d in results["shrinkage"] if abs(d.get("diferencia", 0)) > 0.01]
-            if shrink_items:
-                msg += f"⚠️ Merma: {len(shrink_items)} productos con diferencia\n"
-        if results["suppliers"]:
-            total_spend = sum(d.get("total", 0) for d in results["suppliers"])
-            msg += f"🛒 Proveedores: {len(results['suppliers'])}, gasto ${total_spend:,.0f}\n"
-        if results["labor"]:
-            msg += f"👥 Labor: {len(results['labor'])} empleados\n"
-        if results["pnl"] and results["pnl"].get("months"):
-            msg += f"📈 P&L: {len(results['pnl']['months'])} líneas\n"
-
-        send_telegram(msg)
-
-        elapsed = int((time.time() - start) * 1000)
-        log_run("success", elapsed, summary)
-        print(f"[deep] Done in {elapsed}ms")
-
+        print("[✓] Login OK\n")
     except Exception as e:
-        elapsed = int((time.time() - start) * 1000)
-        error_msg = str(e)
-        print(f"[deep] ERROR: {error_msg}")
-        log_run("error", elapsed, error=error_msg)
-        send_telegram(f"❌ Deep scraper error: {error_msg[:200]}")
+        print(f"[✗] Login FAILED: {e}")
         sys.exit(1)
+
+    results = {}
+    base_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}
+    range_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": thirty_ago, "endDate": today_str}
+    month_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": month_start, "endDate": today_str}
+
+    # ══════════════════════════════════════════════════════════════
+    # SALES ENDPOINTS
+    # ══════════════════════════════════════════════════════════════
+    print("━━━ SALES ━━━")
+
+    # 1. Sales by hour (already in intraday but we want personas too)
+    def transform_hours(r):
+        if r["type"] == "html":
+            return [{"hora": c[0], "ventas": safe_float(c[3]) if len(c) > 3 else safe_float(c[-1]),
+                      "pct": c[4] if len(c) > 4 else ""} for c in r["data"] if len(c) >= 2]
+        return r["data"] if isinstance(r["data"], list) else []
+
+    hours = scrape_endpoint(session, "SalesByHours", "Reports/SalesByHours", base_params,
+                            "wansoft_persons_hourly", transform_hours)
+    if hours:
+        sb_upsert("wansoft_persons_hourly", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(hours), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["ventas_hora"] = len(hours)
+
+    # 2. Sales by area
+    def transform_generic(r):
+        if r["type"] == "json": return r["data"]
+        if r["type"] == "html":
+            return [{"nombre": c[0], "total": safe_float(c[-1])} for c in r["data"] if len(c) >= 2]
+        return []
+
+    areas = scrape_endpoint(session, "SalesByArea", "Reports/SalesByArea", base_params,
+                            None, transform_generic)
+    if areas:
+        results["areas"] = len(areas)
+
+    # 3. Sales by terminal
+    terminals = scrape_endpoint(session, "SalesByTerminal", "Reports/SalesByTerminal", base_params,
+                                None, transform_generic)
+    if terminals:
+        results["terminales"] = len(terminals)
+
+    # 4. Discounts detail
+    discounts = scrape_endpoint(session, "DiscountsDetail", "Reports/DiscountsDetail", base_params,
+                                None, transform_generic)
+    if discounts:
+        results["descuentos_detalle"] = len(discounts)
+
+    # 5. Cancellations detail
+    cancels = scrape_endpoint(session, "CancelSalesDetail", "Reports/CancelSalesDetail", base_params,
+                              None, transform_generic)
+    if cancels:
+        results["cancelaciones"] = len(cancels)
+
+    # 6. Voids detail
+    voids = scrape_endpoint(session, "SaleNullificationDetail", "Reports/SaleNullificationDetail", base_params,
+                            None, transform_generic)
+    if voids:
+        results["anulaciones"] = len(voids)
+
+    # 7. Courtesies
+    courtesies = scrape_endpoint(session, "CourtesiesDetail", "Reports/CourtesiesDetail", base_params,
+                                 None, transform_generic)
+    if courtesies:
+        results["cortesias"] = len(courtesies)
+
+    # 8. Sales by modifiers (extras)
+    modifiers = scrape_endpoint(session, "SalesByModifiers", "Reports/SalesByModifiers", base_params,
+                                None, transform_generic)
+    if modifiers:
+        results["modificadores"] = len(modifiers)
+
+    # ══════════════════════════════════════════════════════════════
+    # TIPS
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ TIPS ━━━")
+
+    def transform_tips(r):
+        if r["type"] == "html":
+            data = []
+            for c in r["data"]:
+                if len(c) >= 4:
+                    data.append({"mesero": c[0], "ventas": safe_float(c[3]) if len(c) > 3 else 0,
+                                 "tickets": safe_int(c[2]) if len(c) > 2 else 0,
+                                 "propinas": safe_float(c[5]) if len(c) > 5 else safe_float(c[-1])})
+            return data
+        if r["type"] == "json": return r["data"]
+        return []
+
+    tips = scrape_endpoint(session, "SalesByUser+Tips", "Reports/SalesByUser", base_params,
+                           "wansoft_tips", transform_tips)
+    if tips:
+        for t in tips:
+            t["propina_promedio"] = round(t.get("propinas", 0) / t["tickets"], 2) if t.get("tickets", 0) > 0 else 0
+        sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(tips), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["propinas"] = len(tips)
+
+    # ══════════════════════════════════════════════════════════════
+    # FOOD COST & MENU
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ FOOD COST ━━━")
+
+    # Cost by saucer (dish-level margins)
+    def transform_cost(r):
+        if r["type"] == "html":
+            data = []
+            for c in r["data"]:
+                if len(c) >= 3:
+                    precio = safe_float(c[2]) if len(c) > 2 else 0
+                    costo = safe_float(c[3]) if len(c) > 3 else 0
+                    margen = round((1 - costo/precio) * 100, 1) if precio > 0 else 0
+                    data.append({"platillo": c[0], "qty": safe_int(c[1]),
+                                 "precio": precio, "costo": costo, "margen_pct": margen})
+            return data
+        if r["type"] == "json": return r["data"]
+        return []
+
+    food_cost = scrape_endpoint(session, "GetCostBySaucer", "Reports/GetCostBySaucer",
+                                {**base_params}, "wansoft_food_cost", transform_cost)
+    if not food_cost:
+        # Try monthly range
+        food_cost = scrape_endpoint(session, "GetCostBySaucer(month)", "Reports/GetCostBySaucer",
+                                    {**month_params}, "wansoft_food_cost", transform_cost)
+    if food_cost:
+        sb_upsert("wansoft_food_cost", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(food_cost), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["food_cost"] = len(food_cost)
+
+    # Cost by group (category-level)
+    cost_group = scrape_endpoint(session, "GetCostByGroup", "Reports/GetCostByGroup",
+                                 {**month_params}, None, transform_generic)
+    if cost_group:
+        results["costo_grupo"] = len(cost_group)
+
+    # Saucers with cost (master list)
+    saucers_cost = scrape_endpoint(session, "GetSaucersWithCost", "Reports/GetSaucersWithCost",
+                                   {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if saucers_cost:
+        results["platillos_con_costo"] = len(saucers_cost)
+
+    # ══════════════════════════════════════════════════════════════
+    # INVENTORY
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ INVENTORY ━━━")
+
+    def transform_inventory(r):
+        if r["type"] == "html":
+            return [{"producto": c[0], "existencia": safe_float(c[1]),
+                     "unidad": c[2] if len(c) > 2 else "",
+                     "costo_unitario": safe_float(c[3]) if len(c) > 3 else 0,
+                     "costo_total": safe_float(c[4]) if len(c) > 4 else 0}
+                    for c in r["data"] if len(c) >= 2]
+        if r["type"] == "json": return r["data"]
+        return []
+
+    inventory = scrape_endpoint(session, "GetInventoryBySubsidiary", "Inventory/GetInventoryBySubsidiary",
+                                {"subsidiaryId": SUBSIDIARY_ID}, "wansoft_inventory", transform_inventory)
+    if inventory:
+        sb_upsert("wansoft_inventory", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(inventory), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["inventario"] = len(inventory)
+
+    # Inventory statement (movements)
+    inv_statement = scrape_endpoint(session, "GetInventoryStatement", "Inventory/GetInventoryStatementBySubsidiary",
+                                    {"subsidiaryId": SUBSIDIARY_ID, **month_params}, None, transform_generic)
+    if inv_statement:
+        results["mov_inventario"] = len(inv_statement)
+
+    # Reorder point
+    reorder = scrape_endpoint(session, "ReorderPoint", "Inventory/GetReorderPointReport",
+                              {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if reorder:
+        results["reorden"] = len(reorder)
+
+    # Physical vs system
+    def transform_shrinkage(r):
+        if r["type"] == "html":
+            data = []
+            for c in r["data"]:
+                if len(c) >= 3:
+                    sistema = safe_float(c[1])
+                    fisico = safe_float(c[2])
+                    data.append({"producto": c[0], "sistema": sistema, "fisico": fisico,
+                                 "diferencia": round(fisico - sistema, 2),
+                                 "costo_diferencia": safe_float(c[3]) if len(c) > 3 else 0})
+            return [d for d in data if abs(d["diferencia"]) > 0.01]
+        if r["type"] == "json": return r["data"]
+        return []
+
+    shrinkage = scrape_endpoint(session, "PhysicalVsSystem", "Inventory/GetPhysicalInventoryVsSystem",
+                                {"subsidiaryId": SUBSIDIARY_ID}, "wansoft_shrinkage", transform_shrinkage)
+    if shrinkage:
+        sb_upsert("wansoft_shrinkage", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(shrinkage), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["merma"] = len(shrinkage)
+
+    # Products in recipes vs not
+    in_recipes = scrape_endpoint(session, "ProductsInRecipes", "Inventory/GetProductsThatAreInRecipes",
+                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if in_recipes:
+        results["prod_en_recetas"] = len(in_recipes)
+
+    not_in_recipes = scrape_endpoint(session, "ProductsNotInRecipes", "Inventory/GetProductsThatAreNotInRecipes",
+                                     {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if not_in_recipes:
+        results["prod_sin_receta"] = len(not_in_recipes)
+
+    # ══════════════════════════════════════════════════════════════
+    # PROCUREMENT / SUPPLIERS
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ PROCUREMENT ━━━")
+
+    suppliers = scrape_endpoint(session, "ShopBySupplier", "Reports/ShopBySupplier",
+                                range_params, "wansoft_suppliers", transform_generic)
+    if suppliers:
+        sb_upsert("wansoft_suppliers", {"client_id": CLIENT["id"], "fecha": today_str, "periodo": "month",
+                   "data": json.dumps(suppliers), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["proveedores"] = len(suppliers)
+
+    # Shop by product
+    shop_product = scrape_endpoint(session, "ShopByProduct", "Reports/ShopByProduct",
+                                   range_params, None, transform_generic)
+    if shop_product:
+        results["compras_producto"] = len(shop_product)
+
+    # Purchase orders issued
+    po_issued = scrape_endpoint(session, "PO_Issued", "Purchasing/GetPurchaseOrderIssued",
+                                {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if po_issued:
+        results["ordenes_compra"] = len(po_issued)
+
+    # Supplier list
+    supplier_list = scrape_endpoint(session, "SupplierList", "Purchasing/GetSupplierList",
+                                    {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if supplier_list:
+        results["lista_proveedores"] = len(supplier_list)
+
+    # ══════════════════════════════════════════════════════════════
+    # LABOR / STAFF
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ LABOR ━━━")
+
+    def transform_labor(r):
+        if r["type"] == "html":
+            return [{"empleado": c[0], "entrada": c[1] if len(c) > 1 else "",
+                     "salida": c[2] if len(c) > 2 else "",
+                     "horas": safe_float(c[3]) if len(c) > 3 else 0}
+                    for c in r["data"] if len(c) >= 1]
+        if r["type"] == "json": return r["data"]
+        return []
+
+    labor = scrape_endpoint(session, "AccessControl", "Staff/GetAccessControlReport",
+                            base_params, "wansoft_labor", transform_labor)
+    if labor:
+        sb_upsert("wansoft_labor", {"client_id": CLIENT["id"], "fecha": today_str,
+                   "data": json.dumps(labor), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["labor"] = len(labor)
+
+    # Hours worked
+    hours_worked = scrape_endpoint(session, "HoursWorked", "Staff/GetUserHoursWorkedReport",
+                                   base_params, None, transform_labor)
+    if hours_worked:
+        results["horas_trabajadas"] = len(hours_worked)
+
+    # POS users list
+    pos_users = scrape_endpoint(session, "PosUsers", "Staff/GetPosUsersList",
+                                {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if pos_users:
+        results["usuarios_pos"] = len(pos_users)
+
+    # Shift list
+    shifts = scrape_endpoint(session, "Shifts", "Staff/GetShiftList",
+                             {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if shifts:
+        results["turnos"] = len(shifts)
+
+    # ══════════════════════════════════════════════════════════════
+    # FINANCE / CASH
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ FINANCE ━━━")
+
+    # Income statement
+    def transform_pnl(r):
+        if r["type"] == "html":
+            return {c[0]: [safe_float(v) for v in c[1:]] for c in r["data"] if len(c) >= 2}
+        if r["type"] == "json": return r["data"]
+        return {}
+
+    pnl = scrape_endpoint(session, "IncomeStatement", "Reports/GetIncomeStatemetByMonthInYear",
+                           {"subsidiaryId": SUBSIDIARY_ID, "year": year}, "wansoft_pnl", transform_pnl)
+    if pnl:
+        sb_upsert("wansoft_pnl", {"client_id": CLIENT["id"], "periodo": today_str[:7],
+                   "data": json.dumps({"year": year, "months": pnl}),
+                   "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["pnl"] = len(pnl)
+
+    # Cash closing
+    cash_closing = scrape_endpoint(session, "ClosingCash", "Reports/ClosingCash",
+                                   base_params, None, transform_generic)
+    if cash_closing:
+        results["corte_caja"] = len(cash_closing)
+
+    # Cash flow
+    cash_flow = scrape_endpoint(session, "CashFlow", "Finance/GetCashFlowList",
+                                {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if cash_flow:
+        results["flujo_caja"] = len(cash_flow)
+
+    # Cash withdrawals
+    withdrawals = scrape_endpoint(session, "CashWithdrawals", "Reports/GetCashWithdrawalReport",
+                                  base_params, None, transform_generic)
+    if withdrawals:
+        results["retiros"] = len(withdrawals)
+
+    # Bank deposits
+    deposits = scrape_endpoint(session, "BankDeposits", "Finance/GetBankDepositList",
+                               {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if deposits:
+        results["depositos"] = len(deposits)
+
+    # ══════════════════════════════════════════════════════════════
+    # ECOMMERCE
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ ECOMMERCE ━━━")
+
+    orders_status = scrape_endpoint(session, "EcomOrders", "ECommerce/GetGeneralOrderStatusList",
+                                    {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if orders_status:
+        results["ecommerce_orders"] = len(orders_status)
+
+    ecom_menu = scrape_endpoint(session, "EcomMenu", "ECommerce/GetECommerceMenuStatusList",
+                                {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if ecom_menu:
+        results["ecommerce_menu"] = len(ecom_menu)
+
+    # ══════════════════════════════════════════════════════════════
+    # BILLING / TAX
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ BILLING ━━━")
+
+    invoices = scrape_endpoint(session, "Invoices", "Billing/GetDocumentList",
+                               {**month_params, "subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if invoices:
+        results["facturas"] = len(invoices)
+
+    # ══════════════════════════════════════════════════════════════
+    # MENU / CONFIG (static, but useful)
+    # ══════════════════════════════════════════════════════════════
+    print("\n━━━ MENU CONFIG ━━━")
+
+    groups = scrape_endpoint(session, "Groups", "Menu/GetGroupList",
+                             {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if groups:
+        results["grupos_menu"] = len(groups)
+
+    saucers = scrape_endpoint(session, "Saucers", "Menu/GetSaucerList",
+                              {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if saucers:
+        results["platillos_menu"] = len(saucers)
+
+    complements = scrape_endpoint(session, "Complements", "Menu/GetComplementaryList",
+                                  {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if complements:
+        results["modificadores_menu"] = len(complements)
+
+    promotions = scrape_endpoint(session, "Promotions", "Menu/GetPromotionList",
+                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+    if promotions:
+        results["promociones"] = len(promotions)
+
+    # ══════════════════════════════════════════════════════════════
+    # SUMMARY
+    # ══════════════════════════════════════════════════════════════
+    elapsed = int((time.time() - start) * 1000)
+
+    print(f"\n{'='*60}")
+    print(f"RESULTS — {len(results)} endpoints with data")
+    print(f"{'='*60}")
+    for k, v in sorted(results.items()):
+        print(f"  {k}: {v}")
+    print(f"\nTotal time: {elapsed}ms")
+
+    # Telegram summary
+    msg = f"🔍 DEEP SCRAPE — {today_str}\n{len(results)} endpoints con datos:\n\n"
+    for k, v in sorted(results.items()):
+        msg += f"• {k}: {v}\n"
+    msg += f"\n⏱ {elapsed/1000:.1f}s"
+
+    send_telegram(msg)
+
+    # Log
+    try:
+        requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs", headers=sb_headers,
+                      json={"agent_id": "wansoft-deep-scraper", "trigger_type": TRIGGER_TYPE,
+                            "status": "success", "duration_ms": elapsed,
+                            "output_summary": json.dumps(results)[:500], "tentacle": "ops"})
+    except: pass
+
+
+def send_telegram(msg):
+    for chat_id in TG_CHAT_IDS:
+        if not chat_id: continue
+        chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+        for chunk in chunks:
+            requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                          json={"chat_id": chat_id, "text": chunk})
 
 
 if __name__ == "__main__":
