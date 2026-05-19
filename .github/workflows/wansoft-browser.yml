@@ -1,0 +1,35 @@
+name: Wansoft Browser Scraper (Playwright)
+
+on:
+  schedule:
+    # 11:15pm MX = 05:15+1 UTC (15 min after deep scraper)
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Client ID'
+        required: false
+        default: 'amalay'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  browser-scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 playwright
+          playwright install chromium
+      - name: Run Wansoft Browser Scraper
+        run: python .github/scripts/wansoft_browser_scraper.py
