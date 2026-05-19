@@ -23,6 +23,16 @@ import {
 } from '@/lib/pos-data'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
+  printTicketCSS,
+  printTicketBluetooth,
+  printKitchenTicketCSS,
+  isBluetoothAvailable,
+  isBluetoothConnected,
+  connectBluetoothPrinter,
+  disconnectBluetoothPrinter,
+  getBluetoothPrinterName,
+} from '@/lib/printer'
+import {
   ChefHat,
   Grid3X3,
   Minus,
@@ -49,6 +59,8 @@ import {
   Menu,
   Send as SendIcon,
   Loader2,
+  Printer,
+  Bluetooth,
 } from 'lucide-react'
 
 export default function POSPage() {
@@ -675,6 +687,43 @@ function POSContent() {
   // Nav hamburger
   const [showNav, setShowNav] = useState(false)
 
+  // Bluetooth printer
+  const [btPrinter, setBtPrinter] = useState<string | null>(null)
+  const [btConnecting, setBtConnecting] = useState(false)
+  const hasBluetooth = typeof window !== 'undefined' && isBluetoothAvailable()
+
+  const handleConnectPrinter = async () => {
+    if (isBluetoothConnected()) {
+      await disconnectBluetoothPrinter()
+      setBtPrinter(null)
+      showToast('Impresora desconectada')
+      return
+    }
+    setBtConnecting(true)
+    try {
+      const name = await connectBluetoothPrinter()
+      setBtPrinter(name)
+      showToast(`Impresora ${name} conectada`)
+    } catch (e) {
+      showToast(`Error: ${e instanceof Error ? e.message : 'No se pudo conectar'}`)
+    }
+    setBtConnecting(false)
+  }
+
+  const handlePrintTicket = async (order: Order) => {
+    if (isBluetoothConnected()) {
+      try {
+        await printTicketBluetooth(order)
+        showToast('Ticket impreso')
+      } catch {
+        // Fallback to CSS print
+        printTicketCSS(order)
+      }
+    } else {
+      printTicketCSS(order)
+    }
+  }
+
   // Menu search
   const [menuSearch, setMenuSearch] = useState('')
 
@@ -1010,6 +1059,8 @@ function POSContent() {
       } else {
         showToast('Orden enviada a cocina')
       }
+      // Print kitchen ticket
+      printKitchenTicketCSS(order)
 
       setSentToKitchen(true)
       setTimeout(() => setSentToKitchen(false), 2000)
@@ -1073,6 +1124,8 @@ function POSContent() {
 
       // Fully done (no split, or Cuenta 2 paid)
       showToast(`Cuenta cerrada - ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
+      // Auto-print ticket
+      handlePrintTicket(order)
     } else {
       showToast('Error al cerrar cuenta')
     }
@@ -1126,6 +1179,18 @@ function POSContent() {
               <Link href="/pos/cocina" className="flex items-center gap-1 bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
                 {readyOrders} listas
               </Link>
+            )}
+            {hasBluetooth && (
+              <button
+                onClick={handleConnectPrinter}
+                disabled={btConnecting}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                  btPrinter ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                <Bluetooth size={12} />
+                {btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}
+              </button>
             )}
             {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
             <div className="flex items-center gap-1">
