@@ -175,7 +175,7 @@ def format_message(xlsx_path: str, report_type: str = "cierre") -> str:
     # Filter out non-mesero rows
     filtered = [r for r in rows if not _is_excluded(r["mesero"])]
     if not filtered:
-        return "Sin datos de meseros para este dia."
+        return "Sin datos de meseros para este dia.", {}
 
     # Sort by promedio descending
     filtered.sort(key=lambda r: r["promedio"], reverse=True)
