@@ -487,32 +487,205 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'market-cafe', name: 'Market: Cafe', items: [
-      { id: 'mk1', name: 'Cafe de Grano 250g', price: 180 },
-      { id: 'mk2', name: 'Cafe de Grano 500g', price: 320 },
-      { id: 'mk3', name: 'Cafe Molido 250g', price: 170 },
+    id: 'mkt-cafe', name: 'Mkt: Cafe', items: [
+      { id: 'mk1', name: 'Cafe Grano 300g', price: 0 },
+      { id: 'mk2', name: 'Cafe Grano 500g', price: 0 },
+      { id: 'mk3', name: 'Cafe Molido 300g', price: 0 },
+      { id: 'mk4', name: 'Cafe Molido 500g', price: 0 },
+      { id: 'mk5', name: 'Vaso Cafe Refill', price: 0 },
+      { id: 'mk6', name: 'Termo Chico Cafe', price: 0 },
     ]
   },
   {
-    id: 'market-snacks', name: 'Market: Snacks', items: [
-      { id: 'mk4', name: 'Granola Organica', price: 170 },
-      { id: 'mk5', name: 'Healthy Crunchy Mix', price: 170 },
-      { id: 'mk6', name: 'Chips de Jamaica', price: 85 },
-      { id: 'mk7', name: 'Churritos de Amaranto', price: 65 },
+    id: 'mkt-galletas', name: 'Mkt: Galletas', items: [
+      { id: 'mk10', name: 'Galletas Bote Chico 20pz', price: 0 },
+      { id: 'mk11', name: 'Galletas Bote 420g', price: 0 },
+      { id: 'mk12', name: 'Galletas Bote Mediano 180g', price: 0 },
+      { id: 'mk13', name: 'Galletas Paq 3pzs', price: 0 },
+      { id: 'mk14', name: 'Galleta Sin Gluten', price: 0 },
+      { id: 'mk15', name: 'Nucelli Brownie Vegan', price: 0 },
+      { id: 'mk16', name: 'Nucelli Galleta Chocochips', price: 0 },
+      { id: 'mk17', name: 'Brule Brownie Brittle', price: 0 },
+      { id: 'mk18', name: 'Brule Galleta GF Chocolate', price: 0 },
+      { id: 'mk19', name: 'Keto Cookie 120g', price: 0 },
     ]
   },
   {
-    id: 'market-dulce', name: 'Market: Dulce', items: [
-      { id: 'mk8', name: 'Mermelada Artesanal', price: 120 },
-      { id: 'mk9', name: 'Miel de Abeja 500ml', price: 180 },
-      { id: 'mk10', name: 'Galletas Artesanales', price: 95 },
+    id: 'mkt-snacks', name: 'Mkt: Snacks', items: [
+      { id: 'mk20', name: 'Healthy Crunch Mix 300g', price: 0 },
+      { id: 'mk21', name: 'Healthy Crunch Mix 60g', price: 0 },
+      { id: 'mk22', name: 'Mix Enchilado Chico', price: 0 },
+      { id: 'mk23', name: 'Mix Enchilado Grande', price: 0 },
+      { id: 'mk24', name: 'Mix Salud Omega 3 100g', price: 0 },
+      { id: 'mk25', name: 'Pasa Chocolate Amargo 170g', price: 0 },
+      { id: 'mk26', name: 'Manglo Mango Enchilado 120g', price: 0 },
+      { id: 'mk27', name: 'Manglo Mango Enchilado 300g', price: 0 },
+      { id: 'mk28', name: 'Mango Seco Natural 120g', price: 0 },
+      { id: 'mk29', name: 'Mango Seco Natural 300g', price: 0 },
+      { id: 'mk30', name: 'Chips Pepino Limon 200g', price: 0 },
+      { id: 'mk31', name: 'Chips Pepino Salsa 200g', price: 0 },
+      { id: 'mk32', name: 'Chips Jamaica 40g', price: 0 },
+      { id: 'mk33', name: 'Granola Keto 125g', price: 0 },
+      { id: 'mk34', name: 'Granola 250g', price: 0 },
     ]
   },
   {
-    id: 'market-bebidas', name: 'Market: Bebidas', items: [
-      { id: 'mk11', name: 'Kombucha 500ml', price: 75 },
-      { id: 'mk12', name: 'Jugo Cold Pressed', price: 85 },
-      { id: 'mk13', name: 'Agua Mineral Premium', price: 45 },
+    id: 'mkt-amaranth', name: 'Mkt: Amaranth', items: [
+      { id: 'mk40', name: 'Cacahuate Chipotle 142g', price: 0 },
+      { id: 'mk41', name: 'Cacahuate Habanero 142g', price: 0 },
+      { id: 'mk42', name: 'Cacahuate Limon 142g', price: 0 },
+      { id: 'mk43', name: 'Cacahuate Sal Himalaya 142g', price: 0 },
+      { id: 'mk44', name: 'Charris Chipotle 142g', price: 0 },
+      { id: 'mk45', name: 'Charris Habanero 142g', price: 0 },
+      { id: 'mk46', name: 'Charris Limon 142g', price: 0 },
+      { id: 'mk47', name: 'Papas Desh Chipotle 100g', price: 0 },
+      { id: 'mk48', name: 'Papas Desh Jalapeno 100g', price: 0 },
+      { id: 'mk49', name: 'Obleas Dif Sabores 58g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-smarty', name: 'Mkt: Smarty Chips', items: [
+      { id: 'mk50', name: 'Jicama Adobada 170g', price: 0 },
+      { id: 'mk51', name: 'Jicama Adobada 50g', price: 0 },
+      { id: 'mk52', name: 'Jicama Habanero 170g', price: 0 },
+      { id: 'mk53', name: 'Jicama Limon 170g', price: 0 },
+      { id: 'mk54', name: 'Jicama Limon 50g', price: 0 },
+      { id: 'mk55', name: 'Jicama Natural 170g', price: 0 },
+      { id: 'mk56', name: 'Jicama Natural 50g', price: 0 },
+      { id: 'mk57', name: 'Jicama Torito 170g', price: 0 },
+      { id: 'mk58', name: 'Jicama Torito 50g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-sanutri', name: 'Mkt: Sanutri', items: [
+      { id: 'mk60', name: 'Churritos Chipotle 300g', price: 0 },
+      { id: 'mk61', name: 'Churritos Fuego 300g', price: 0 },
+      { id: 'mk62', name: 'Churritos Mix Crunch 300g', price: 0 },
+      { id: 'mk63', name: 'Churritos Nopal 300g', price: 0 },
+      { id: 'mk64', name: 'Churritos Sal y Limon 300g', price: 0 },
+      { id: 'mk65', name: 'Churritos Chile Limon 300g', price: 0 },
+      { id: 'mk66', name: 'Churritos Habanero 300g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-dulces', name: 'Mkt: Dulces', items: [
+      { id: 'mk70', name: 'Guayabate Guayaba 100g', price: 0 },
+      { id: 'mk71', name: 'Guayabate Tabletas 100g', price: 0 },
+      { id: 'mk72', name: 'Guayabate Tejocote 100g', price: 0 },
+      { id: 'mk73', name: 'Nubits Tamarindo 30g', price: 0 },
+      { id: 'mk74', name: 'Vamara Ciruela Enchilada 250g', price: 0 },
+      { id: 'mk75', name: 'Vamara Datil Enchilado 220g', price: 0 },
+      { id: 'mk76', name: 'Vamara Mix Enchilado 220g', price: 0 },
+      { id: 'mk77', name: 'Vamara Manzana Enchilada 180g', price: 0 },
+      { id: 'mk78', name: 'Duraznero Durazno/Chile 250g', price: 0 },
+      { id: 'mk79', name: 'Duraznero Fresa/Chile 250g', price: 0 },
+      { id: 'mk80', name: 'Duraznero Mango/Chile 250g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-proteina', name: 'Mkt: Proteina', items: [
+      { id: 'mk90', name: 'Habits Cacao 488g', price: 0 },
+      { id: 'mk91', name: 'Habits Vainilla 488g', price: 0 },
+      { id: 'mk92', name: 'Habits Matcha-Vainilla 488g', price: 0 },
+      { id: 'mk93', name: 'Habits Maca-Cacao 488g', price: 0 },
+      { id: 'mk94', name: 'Habits Natural 488g', price: 0 },
+      { id: 'mk95', name: 'Habits High Perf Cacao 578g', price: 0 },
+      { id: 'mk96', name: 'Habits High Perf Vainilla 578g', price: 0 },
+      { id: 'mk97', name: 'Habits Creatina 300g', price: 0 },
+      { id: 'mk98', name: 'Habits Colageno 250g', price: 0 },
+      { id: 'mk99', name: 'Birdman Falcon Chocolate 510g', price: 0 },
+      { id: 'mk100', name: 'Birdman Falcon Vainilla 510g', price: 0 },
+      { id: 'mk101', name: 'Birdman Fitmingo Moka 510g', price: 0 },
+      { id: 'mk102', name: 'Birdman Creatina 450g', price: 0 },
+      { id: 'mk103', name: 'Vital Proteins Collagen 567g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-suplementos', name: 'Mkt: Suplementos', items: [
+      { id: 'mk110', name: 'Olly Sleep 50 Gummies', price: 0 },
+      { id: 'mk111', name: 'Olly Sleep Extra 70 Gummies', price: 0 },
+      { id: 'mk112', name: 'Olly Kids Sleep 50 Gummies', price: 0 },
+      { id: 'mk113', name: 'Olly Womens Multi 90pz', price: 0 },
+      { id: 'mk114', name: 'Olly Glowing Skin 50 Gummies', price: 0 },
+      { id: 'mk115', name: 'Olly Beauty 60 Gummies', price: 0 },
+      { id: 'mk116', name: 'Calm Magnesium Raspberry 60pz', price: 0 },
+      { id: 'mk117', name: 'Calm Magnesium Orange 453g', price: 0 },
+      { id: 'mk118', name: 'Calm Sleep Gummies 240', price: 0 },
+      { id: 'mk119', name: 'Force Factor Mushrooms 60pz', price: 0 },
+      { id: 'mk120', name: 'Natrol Melatonine 150 Tab', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-te', name: 'Mkt: Te & Infusiones', items: [
+      { id: 'mk130', name: 'Te Jengibre Limon 100g', price: 0 },
+      { id: 'mk131', name: 'Te Mora de la Selva 220g', price: 0 },
+      { id: 'mk132', name: 'Te Petalo Mio 100g', price: 0 },
+      { id: 'mk133', name: 'Te Ponche Guayaba 150g', price: 0 },
+      { id: 'mk134', name: 'Raices Matcha Mix 125g', price: 0 },
+      { id: 'mk135', name: 'Raices Golden Mane 250g', price: 0 },
+      { id: 'mk136', name: 'Raices Reishi Cacao 250g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-lanona', name: 'Mkt: La Nona', items: [
+      { id: 'mk140', name: 'Doraditas Keto/Almendras 120g', price: 0 },
+      { id: 'mk141', name: 'Doraditas Vegana/Platano 130g', price: 0 },
+      { id: 'mk142', name: 'Doraditas Avena/Stevia 130g', price: 0 },
+      { id: 'mk143', name: 'Doraditas Chocolate/Avena 130g', price: 0 },
+      { id: 'mk144', name: 'Gorditas Avena/Stevia 270g', price: 0 },
+      { id: 'mk145', name: 'Gorditas Chocolate/Avena 270g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-rojamaica', name: 'Mkt: Rojamaica', items: [
+      { id: 'mk150', name: 'Chips de Rojamaica 40g', price: 0 },
+      { id: 'mk151', name: 'Dip de Rojamaica 320g', price: 0 },
+      { id: 'mk152', name: 'Jamaica Enchilada 50g', price: 0 },
+      { id: 'mk153', name: 'Salsa Rojamaica 250g', price: 0 },
+      { id: 'mk154', name: 'Salsa Rojamaica 520g', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-belleza', name: 'Mkt: Belleza', items: [
+      { id: 'mk160', name: 'Hand & Body Lotion 500ml', price: 0 },
+      { id: 'mk161', name: 'Hand Wash 500ml', price: 0 },
+      { id: 'mk162', name: 'Mali Bronceador Cacao 100ml', price: 0 },
+      { id: 'mk163', name: 'Mali Bronceador Carrot 100ml', price: 0 },
+      { id: 'mk164', name: 'Mali Bronceador Sun 100ml', price: 0 },
+      { id: 'mk165', name: 'Mali Tanning Foam 200ml', price: 0 },
+      { id: 'mk166', name: 'Renew Jabon Corporal 355ml', price: 0 },
+      { id: 'mk167', name: 'Renew Locion 237ml', price: 0 },
+      { id: 'mk168', name: 'Melaleuca Gel', price: 0 },
+      { id: 'mk169', name: 'Aceite Melaleuca 15ml', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-accesorios', name: 'Mkt: Accesorios', items: [
+      { id: 'mk170', name: 'Taza Ceramica Blanca', price: 0 },
+      { id: 'mk171', name: 'Taza Ceramica Verde', price: 0 },
+      { id: 'mk172', name: 'Taza Termica', price: 0 },
+      { id: 'mk173', name: 'Termo Grande 1.2L', price: 0 },
+      { id: 'mk174', name: 'Totebag', price: 0 },
+      { id: 'mk175', name: 'Libreta c/ Pluma', price: 0 },
+      { id: 'mk176', name: 'Velita Decoracion', price: 0 },
+      { id: 'mk177', name: 'Gift Card', price: 0 },
+      { id: 'mk178', name: 'Tarjeta de Regalo', price: 0 },
+      { id: 'mk179', name: 'Ramekin Corazon', price: 0 },
+      { id: 'mk180', name: 'Jarra Infusora', price: 0 },
+      { id: 'mk181', name: 'Planta Chica', price: 0 },
+      { id: 'mk182', name: 'Planta Grande', price: 0 },
+    ]
+  },
+  {
+    id: 'mkt-libros', name: 'Mkt: Libros', items: [
+      { id: 'mk190', name: 'Como Hacer Que Te Pasen Cosas Buenas', price: 0 },
+      { id: 'mk191', name: 'Encuentra Tu Persona Vitamina', price: 0 },
+      { id: 'mk192', name: 'Human Kind', price: 0 },
+      { id: 'mk193', name: 'Kidness', price: 0 },
+      { id: 'mk194', name: 'Las Cosas Que No Nos Dijeron', price: 0 },
+      { id: 'mk195', name: 'Recupera Tu Mente', price: 0 },
+      { id: 'mk196', name: 'The Hidden Power', price: 0 },
+      { id: 'mk197', name: 'The War For Kidness', price: 0 },
     ]
   },
 ]
