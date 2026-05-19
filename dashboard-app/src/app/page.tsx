@@ -6,6 +6,7 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
+import CoachPanel from '@/components/CoachPanel'
 import { getRecentDays, getLatestDay, aggregateMeseros } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
@@ -283,6 +284,11 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Coach Panel */}
+      <div className="mb-6">
+        <CoachPanel />
+      </div>
 
       {/* Main chart — full width */}
       <div className="mb-6">

@@ -23,6 +23,7 @@ import {
   ShoppingCart,
   Monitor,
   Settings,
+  Sparkles,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -70,6 +71,7 @@ const navSections = [
   {
     label: 'Herramientas',
     items: [
+      { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
     ],
   },
