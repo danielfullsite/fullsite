@@ -1,0 +1,121 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Truck, DollarSign, ShoppingCart, BarChart3 } from 'lucide-react'
+import { getLatestDeep } from '@/lib/data'
+import { formatCurrency } from '@/lib/format'
+
+interface SupplierItem {
+  proveedor?: string
+  nombre?: string
+  total: number
+  num_compras?: number
+}
+
+export default function ProveedoresPage() {
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fecha, setFecha] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const row = await getLatestDeep('wansoft_suppliers')
+        if (row?.data) {
+          // Data might be array or dict
+          const d = row.data
+          if (Array.isArray(d)) {
+            setSuppliers(d)
+          } else if (typeof d === 'object' && d !== null) {
+            // Convert dict to array
+            const arr = Object.entries(d as Record<string, unknown>).map(([key, val]) => ({
+              proveedor: key,
+              total: typeof val === 'number' ? val : 0,
+            }))
+            setSuppliers(arr)
+          }
+          setFecha(row.fecha as string || '')
+        }
+      } catch (err) {
+        console.error('Error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const totalSpend = suppliers.reduce((s, sup) => s + (sup.total || 0), 0)
+  const sorted = [...suppliers].sort((a, b) => (b.total || 0) - (a.total || 0))
+  const topSupplier = sorted[0]
+  const topPct = totalSpend > 0 && topSupplier ? Math.round((topSupplier.total / totalSpend) * 100) : 0
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
+  }
+
+  return (
+    <>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">Proveedores</h2>
+        <p className="text-sm text-slate-400">Gasto por proveedor ultimos 30 dias {fecha && `· ${fecha}`}</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><Truck size={16} className="text-blue-500" /><span className="text-xs text-slate-500 font-medium">Proveedores</span></div>
+          <p className="text-2xl font-bold text-slate-900">{suppliers.length}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-500" /><span className="text-xs text-slate-500 font-medium">Gasto total</span></div>
+          <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalSpend)}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><ShoppingCart size={16} className="text-emerald-500" /><span className="text-xs text-slate-500 font-medium">Top proveedor</span></div>
+          <p className="text-lg font-bold text-slate-900 truncate">{topSupplier?.proveedor || topSupplier?.nombre || '--'}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-amber-500" /><span className="text-xs text-slate-500 font-medium">Concentracion</span></div>
+          <p className="text-2xl font-bold text-amber-600">{topPct}%</p>
+          <p className="text-xs text-slate-400">del gasto en 1 proveedor</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        {sorted.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-sm">Sin datos de proveedores. El scraper corre diario.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-slate-100 text-slate-500">
+                <th className="text-left px-4 py-3 font-medium">#</th>
+                <th className="text-left px-4 py-3 font-medium">Proveedor</th>
+                <th className="text-right px-4 py-3 font-medium">Compras</th>
+                <th className="text-right px-4 py-3 font-medium">Total</th>
+                <th className="text-right px-4 py-3 font-medium">% del gasto</th>
+                <th className="px-4 py-3 font-medium w-40"></th>
+              </tr></thead>
+              <tbody>{sorted.map((sup, i) => {
+                const pct = totalSpend > 0 ? (sup.total / totalSpend) * 100 : 0
+                return (
+                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-400">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{sup.proveedor || sup.nombre || 'N/A'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{sup.num_compras || '--'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{formatCurrency(sup.total)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-500">{pct.toFixed(1)}%</td>
+                    <td className="px-4 py-3">
+                      <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}

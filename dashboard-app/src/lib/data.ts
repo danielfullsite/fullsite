@@ -129,6 +129,27 @@ export function aggregatePayments(
     .sort((a, b) => b.total - a.total)
 }
 
+// ── Deep scraper tables ──────────────────────────────────────────────────
+
+function parseJsonb(val: unknown): unknown {
+  if (!val) return null
+  if (typeof val === 'string') {
+    try { return JSON.parse(val) } catch { return val }
+  }
+  return val
+}
+
+export async function getDeepTable(table: string, limit: number = 30) {
+  const data = await sbFetch(table, `select=*&order=fecha.desc&limit=${limit}`) as Record<string, unknown>[]
+  return data.map(row => ({ ...row, data: parseJsonb(row.data) }))
+}
+
+export async function getLatestDeep(table: string): Promise<{ fecha: string; data: unknown; [key: string]: unknown } | null> {
+  const data = await sbFetch(table, `select=*&order=fecha.desc&limit=1`) as Record<string, unknown>[]
+  if (data.length === 0) return null
+  return { ...data[0], fecha: (data[0].fecha as string) || '', data: parseJsonb(data[0].data) }
+}
+
 // Aggregate platillos from ventas_por_grupo
 export function aggregateGrupos(
   dailyData: WansoftDaily[]

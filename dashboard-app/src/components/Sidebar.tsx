@@ -24,6 +24,8 @@ import {
   Monitor,
   Settings,
   Sparkles,
+  PieChart,
+  Truck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -57,8 +59,10 @@ const navSections = [
   {
     label: 'Operaciones',
     items: [
-      { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
       { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/food-cost', label: 'Food Cost', icon: PieChart },
+      { href: '/proveedores', label: 'Proveedores', icon: Truck },
+      { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
       { href: '/reportes', label: 'Reportes', icon: FileBarChart },
     ],
   },
