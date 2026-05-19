@@ -196,13 +196,19 @@ def analyze_purchases(suppliers_data, daily_data):
                 continue
             nombre = supplier.get("nombre") or supplier.get("name") or supplier.get("proveedor") or ""
             monto = supplier.get("total") or supplier.get("monto") or supplier.get("amount") or 0
+            if isinstance(monto, (list, dict)):
+                continue
             if isinstance(monto, str):
                 try:
                     monto = float(monto.replace(",", "").replace("$", ""))
                 except:
                     monto = 0
-            total_purchases += monto
-            supplier_totals[nombre] += monto
+            try:
+                monto = float(monto)
+                total_purchases += monto
+                supplier_totals[nombre] += monto
+            except (TypeError, ValueError):
+                continue
 
     if total_purchases == 0:
         return insights
