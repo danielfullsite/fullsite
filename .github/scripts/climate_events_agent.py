@@ -39,28 +39,40 @@ sb_headers = {
 }
 
 # ── Mexican holidays 2026 ────────────────────────────────────────────────
+# ── Holidays relevant for a CAFÉ (not sports bar) ────────────────────────
+# Impact: how does this holiday affect a brunch/coffee place?
 HOLIDAYS_MX = {
-    "2026-01-01": "Año Nuevo",
-    "2026-02-02": "Día de la Constitución",
-    "2026-03-16": "Natalicio de Benito Juárez",
-    "2026-05-01": "Día del Trabajo",
-    "2026-05-05": "Batalla de Puebla",
-    "2026-05-10": "Día de las Madres",
-    "2026-05-15": "Día del Maestro",
-    "2026-06-21": "Día del Padre",
-    "2026-09-16": "Independencia de México",
-    "2026-10-12": "Día de la Raza",
-    "2026-11-02": "Día de Muertos",
-    "2026-11-16": "Revolución Mexicana",
-    "2026-12-12": "Día de la Virgen de Guadalupe",
-    "2026-12-24": "Nochebuena",
-    "2026-12-25": "Navidad",
-    "2026-12-31": "Fin de Año",
+    "2026-01-01": ("Año Nuevo", "bajo", "Muchos cierran. Si abres, poco tráfico."),
+    "2026-02-14": ("San Valentín", "alto", "Parejas buscan café/brunch. Decora, prepara postres especiales."),
+    "2026-02-02": ("Día de la Constitución", "medio", "Puente — familias salen a brunchear."),
+    "2026-03-16": ("Natalicio de Benito Juárez", "medio", "Puente — espera familias."),
+    "2026-05-01": ("Día del Trabajo", "bajo", "Muchos cierran. Revisa si vale abrir."),
+    "2026-05-10": ("Día de las Madres", "muy alto", "DÍA MÁS FUERTE DEL AÑO para cafés. Reservaciones, menú especial, personal extra."),
+    "2026-05-15": ("Día del Maestro", "medio", "Grupos de maestros celebrando. Espera mesas grandes."),
+    "2026-06-21": ("Día del Padre", "alto", "Familias salen a brunchear. Segundo día más fuerte después de Madres."),
+    "2026-07-01": ("Inicio vacaciones verano", "medio", "Tráfico cambia: menos oficinistas, más familias."),
+    "2026-09-16": ("Independencia de México", "medio", "Fin de semana patrio. Puente = familias."),
+    "2026-10-31": ("Halloween", "medio", "Familias con niños, decoración temática ayuda."),
+    "2026-11-02": ("Día de Muertos", "medio", "Pan de muerto, café de olla. Productos temáticos."),
+    "2026-12-12": ("Día de la Virgen", "bajo", "Muchos no trabajan. Tráfico reducido."),
+    "2026-12-24": ("Nochebuena", "bajo", "Cierre temprano o cerrado."),
+    "2026-12-25": ("Navidad", "bajo", "Cerrado o mínimo."),
+    "2026-12-31": ("Fin de Año", "bajo", "Cierre temprano."),
 }
 
-# Bridge days (puentes) — add as they're announced
+# Graduation season (Monterrey) — big for cafés/brunch
+GRADUATION_MONTHS = {5, 6, 7, 12}  # May-Jul and Dec
+
+# Puentes confirmed
 PUENTES = {
     # "2026-03-17": "Puente Benito Juárez",
+}
+
+# ── Café-specific seasonal patterns ──────────────────────────────────────
+CAFE_SEASONAL = {
+    "hot_drinks": {"months": [11, 12, 1, 2], "tip": "Temporada de bebidas calientes. Promueve chocolate, café de olla, chai."},
+    "cold_drinks": {"months": [4, 5, 6, 7, 8, 9], "tip": "Temporada de frappes y smoothies. Asegura hielo y frutas."},
+    "brunch_season": {"months": [3, 4, 5, 10, 11], "tip": "Temporada alta de brunch. Asegura huevos, aguacate, pan."},
 }
 
 # ── Weather ──────────────────────────────────────────────────────────────
@@ -169,39 +181,52 @@ def summarize_day_weather(forecasts, fecha):
 
 # ── Events ───────────────────────────────────────────────────────────────
 def get_events_for_date(fecha_str):
-    """Get events for a specific date."""
+    """Get events for a specific date — café-relevant."""
     events = []
+    dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    dow = dt.weekday()
+    month = dt.month
+    day = dt.day
 
-    # Holidays
+    # Holidays (with café-specific impact and tips)
     if fecha_str in HOLIDAYS_MX:
-        events.append({"type": "holiday", "name": HOLIDAYS_MX[fecha_str], "impact": "high"})
+        name, impact, tip = HOLIDAYS_MX[fecha_str]
+        events.append({"type": "holiday", "name": name, "impact": impact, "tip": tip})
 
     # Puentes
     if fecha_str in PUENTES:
-        events.append({"type": "puente", "name": PUENTES[fecha_str], "impact": "high"})
+        events.append({"type": "puente", "name": PUENTES[fecha_str], "impact": "alto", "tip": "Puente = familias brunching."})
 
-    # Day before holiday (people go out)
-    tomorrow = (datetime.strptime(fecha_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    # Day before holiday
+    tomorrow = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
     if tomorrow in HOLIDAYS_MX:
-        events.append({"type": "vispera", "name": f"Víspera de {HOLIDAYS_MX[tomorrow]}", "impact": "medium"})
+        h_name = HOLIDAYS_MX[tomorrow][0]
+        events.append({"type": "vispera", "name": f"Víspera de {h_name}", "impact": "medio", "tip": "Mañana es festivo — la gente sale hoy."})
 
-    # Weekend detection
-    dt = datetime.strptime(fecha_str, "%Y-%m-%d")
-    dow = dt.weekday()
-    if dow == 4:  # Friday
-        events.append({"type": "weekend", "name": "Viernes", "impact": "medium"})
+    # Weekend (brunch days are king for cafés)
+    if dow == 4:
+        events.append({"type": "weekend", "name": "Viernes", "impact": "medio", "tip": "Después de las 5pm sube el tráfico."})
     elif dow == 5:
-        events.append({"type": "weekend", "name": "Sábado", "impact": "high"})
+        events.append({"type": "weekend", "name": "Sábado", "impact": "alto", "tip": "Día fuerte de brunch. Asegura staff y mise en place."})
     elif dow == 6:
-        events.append({"type": "weekend", "name": "Domingo", "impact": "high"})
+        events.append({"type": "weekend", "name": "Domingo", "impact": "alto", "tip": "Brunch familiar. Mesas grandes, más postres."})
 
-    # Quincena (15th and last day of month)
-    day = dt.day
-    if day == 15 or day == 16:
-        events.append({"type": "quincena", "name": "Quincena", "impact": "medium"})
+    # Quincena
+    if day in (15, 16):
+        events.append({"type": "quincena", "name": "Quincena", "impact": "medio", "tip": "La gente gasta más. Tickets más altos."})
     last_day = (dt.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
     if day == last_day.day or day == 1:
-        events.append({"type": "quincena", "name": "Fin de quincena", "impact": "medium"})
+        events.append({"type": "quincena", "name": "Fin/inicio de quincena", "impact": "medio", "tip": "Más tráfico de oficinistas."})
+
+    # Graduation season
+    if month in GRADUATION_MONTHS and dow in (4, 5, 6):
+        events.append({"type": "graduacion", "name": "Temporada de graduaciones", "impact": "medio", "tip": "Grupos grandes celebrando. Prepara mesas para 6+."})
+
+    # Seasonal café tips
+    for key, info in CAFE_SEASONAL.items():
+        if month in info["months"]:
+            events.append({"type": "temporada", "name": key.replace("_", " ").title(), "impact": "info", "tip": info["tip"]})
+            break  # Only one seasonal tip per day
 
     return events
 
@@ -297,12 +322,17 @@ def build_message(today_str, weather_today, weather_tomorrow, events_today, even
             msg += f" · 🌧 {weather_today['rain_mm']}mm ({weather_today['rain_hours']}h de lluvia)"
         msg += f"\n💧 Humedad: {weather_today['humidity_avg']}%\n"
 
-    # Today's events
+    # Today's events with tips
     if events_today:
         msg += "\n📅 EVENTOS HOY:\n"
         for e in events_today:
-            icon = "🎉" if e["type"] == "holiday" else "🌉" if e["type"] == "puente" else "💰" if e["type"] == "quincena" else "🎊" if e["type"] == "vispera" else "📆"
-            msg += f"  {icon} {e['name']}\n"
+            icon = "🎉" if e["type"] == "holiday" else "🌉" if e["type"] == "puente" else "💰" if e["type"] == "quincena" else "🎓" if e["type"] == "graduacion" else "☕" if e["type"] == "temporada" else "🎊" if e["type"] == "vispera" else "📆"
+            msg += f"  {icon} {e['name']}"
+            if e.get("impact") and e["impact"] not in ("info",):
+                msg += f" (impacto {e['impact']})"
+            msg += "\n"
+            if e.get("tip"):
+                msg += f"     → {e['tip']}\n"
 
     # Today's prediction
     if dow_stats_today:
@@ -320,9 +350,17 @@ def build_message(today_str, weather_today, weather_tomorrow, events_today, even
             msg += f"  Estimado con lluvia: ~${estimated:,}\n"
 
     if weather_today and weather_today["is_rainy"]:
-        msg += "\n💡 ACCIÓN: Prepara menos ingredientes perecederos. Activa promo de bebidas calientes.\n"
-    elif weather_today and weather_today["is_hot"]:
-        msg += "\n💡 ACCIÓN: Refuerza bebidas frías, smoothies y frappes. Asegura hielo suficiente.\n"
+        msg += "\n💡 ACCIÓN CAFÉ:\n"
+        msg += "  • Menos perecederos (ensaladas, fruta)\n"
+        msg += "  • Promueve: café caliente, chocolate, chai, sopas\n"
+        msg += "  • Menos tráfico = buen día para limpieza profunda\n"
+    elif weather_today and weather_today["is_hot"] and weather_today["temp_max"] > 35:
+        msg += "\n💡 ACCIÓN CAFÉ:\n"
+        msg += "  • Refuerza: frappes, smoothies, aguas frescas\n"
+        msg += "  • Asegura hielo suficiente y frutas\n"
+        msg += "  • Clientes buscan AC — ventaja sobre terrazas\n"
+    elif weather_today and weather_today["temp_max"] > 30:
+        msg += "\n💡 Día caluroso — las bebidas frías se van a mover.\n"
 
     # Tomorrow preview
     msg += f"\n{'─' * 30}\n"
