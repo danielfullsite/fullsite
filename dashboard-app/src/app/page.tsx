@@ -2,13 +2,49 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, aggregateMeseros } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
+
+const CATEGORY_NAMES: Record<string, string> = {
+  'CHILAQUILES & ENCHILADAS': 'Chilaquiles',
+  'EGGS & KETO': 'Huevos & Keto',
+  'COFFEE HOT/ICE': 'Café',
+  'TOAST & BAGELS': 'Pan & Toast',
+  'PANINIS': 'Paninis',
+  'BOWLS': 'Bowls',
+  'EVERYDAY SPECIALS': 'Especiales',
+  'FRESH DRINKS': 'Bebidas frescas',
+  'SIGNATURE': 'Signature',
+  'JUGOS': 'Jugos',
+  'CROISSANTS BREAKFAST': 'Croissants',
+  'SMOOTHIES': 'Smoothies',
+  'PANCAKES & WAFFLES': 'Pancakes',
+  'FRAPPES': 'Frappes',
+  'BAKERY': 'Panadería',
+  'HEALTHY SNACKS & MARKET': 'Market',
+  'DESSERTS': 'Postres',
+  'SODAS': 'Sodas',
+  'TEA & TISANAS': 'Té',
+  'EXTRAS': 'Extras',
+  'CEVICHE': 'Ceviche',
+  'BEBIDAS OH': 'Bebidas OH',
+  'PIZZAS & PASTAS': 'Pizzas & Pastas',
+  'SEMILLAS Y DULCES AMALAY': 'Dulces',
+  'MUNCHIES': 'Snacks',
+  'LA NONNA Gorditas Keto': 'La Nonna',
+  'VARIOS': 'Varios',
+  'HEALTHY SNACKS': 'Snacks Healthy',
+  'ICE CREAM': 'Helados',
+}
+
+function cleanCategoryName(name: string): string {
+  return CATEGORY_NAMES[name] || name.charAt(0) + name.slice(1).toLowerCase()
+}
 
 function safeArray<T>(val: unknown): T[] {
   if (!val) return []
@@ -81,6 +117,28 @@ export default function DashboardPage() {
     )
   }
 
+  // Same DOW average (last 4 weeks) for "dia" comparison
+  const sameDOWAvg = (() => {
+    if (!latestDay) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
+    const latestDate = new Date(latestDay.fecha + 'T12:00:00')
+    const dow = latestDate.getDay()
+    const sameDOW = recentData.filter(d => {
+      const dt = new Date(d.fecha + 'T12:00:00')
+      return dt.getDay() === dow && d.fecha !== latestDay.fecha
+    }).slice(0, 4)
+    if (sameDOW.length === 0) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
+    const avg = (key: keyof WansoftDaily) => sameDOW.reduce((s, d) => s + (Number(d[key]) || 0), 0) / sameDOW.length
+    return {
+      ventas: avg('ventas_dia'),
+      tickets: avg('tickets_count'),
+      personas: avg('personas_restaurant'),
+      tp: avg('ticket_promedio_restaurant'),
+    }
+  })()
+
+  const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+  const todayDOWName = latestDay ? dayNames[new Date(latestDay.fecha + 'T12:00:00').getDay()] : ''
+
   // Period-aware calculations
   const periodData = (() => {
     if (period === 'dia') {
@@ -91,11 +149,7 @@ export default function DashboardPage() {
       const propinas = latestDay?.propinas_total || 0
       const descuentos = latestDay?.descuentos || 0
       const brutas = latestDay?.ventas_brutas || 0
-      const prevVentas = prevDay?.ventas_dia || 0
-      const prevTickets = prevDay?.tickets_count || 0
-      const prevPersonas = prevDay?.personas_restaurant || 0
-      const prevTp = prevDay?.ticket_promedio_restaurant || 0
-      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs ayer' }
+      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas: sameDOWAvg.ventas, prevTickets: sameDOWAvg.tickets, prevPersonas: sameDOWAvg.personas, prevTp: sameDOWAvg.tp, label: `vs prom. ${todayDOWName}` }
     }
     if (period === 'semana') {
       const last7 = recentData.slice(0, 7)
@@ -143,6 +197,43 @@ export default function DashboardPage() {
   const personasChange = periodData.prevPersonas > 0 ? percentChange(periodData.personas, periodData.prevPersonas) : 0
   const ticketPromChange = periodData.prevTp > 0 ? percentChange(periodData.tp, periodData.prevTp) : 0
 
+  const topMeseros = latestDay
+    ? aggregateMeseros([latestDay]).slice(0, 5)
+    : []
+  const topMeseroMax = topMeseros[0]?.total || 1
+
+  // Month progress
+  const monthProgress = (() => {
+    if (!latestDay) return null
+    const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === latestDay.fecha.slice(0, 7))
+    const monthVentas = thisMonthData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
+    const latestDate = new Date(latestDay.fecha + 'T12:00:00')
+    const daysInMonth = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate()
+    const dayOfMonth = latestDate.getDate()
+    const daysLeft = daysInMonth - dayOfMonth
+    const dailyAvg = dayOfMonth > 0 ? monthVentas / dayOfMonth : 0
+    const projected = monthVentas + (dailyAvg * daysLeft)
+    const monthName = latestDate.toLocaleDateString('es-MX', { month: 'long' })
+    return { monthVentas, projected, daysLeft, dayOfMonth, daysInMonth, monthName, dailyAvg }
+  })()
+
+  // Quick insight line
+  const quickInsight = (() => {
+    if (!latestDay || topMeseros.length === 0) return null
+    const ventas = latestDay.ventas_dia || 0
+    const topMesero = topMeseros[0]
+    const pct = ventas > 0 ? Math.round((topMesero.total / ventas) * 100) : 0
+    const vsAvg = sameDOWAvg.ventas > 0 ? ((ventas / sameDOWAvg.ventas - 1) * 100).toFixed(0) : null
+    const parts: string[] = []
+    if (vsAvg && Math.abs(Number(vsAvg)) > 5) {
+      parts.push(`${Number(vsAvg) > 0 ? '+' : ''}${vsAvg}% vs promedio de ${todayDOWName}`)
+    }
+    if (pct > 20) {
+      parts.push(`${topMesero.nombre.split(' ')[0]} cargó el ${pct}% de las ventas`)
+    }
+    return parts.length > 0 ? parts.join('. ') + '.' : null
+  })()
+
   // Same day last week comparison
   const sameDayLastWeek = (() => {
     if (!latestDay || recentData.length < 8) return null
@@ -159,14 +250,10 @@ export default function DashboardPage() {
     ? latestDay.ventas_dia - sameDayLastWeek.ventas_dia
     : null
 
-  const topMeseros = latestDay
-    ? aggregateMeseros([latestDay]).slice(0, 5)
-    : []
-  const topMeseroMax = topMeseros[0]?.total || 1
-
-  const gruposData = safeArray<GrupoEntry>(latestDay?.ventas_por_grupo).filter(g => g.total > 0).length > 0
+  const gruposRaw = safeArray<GrupoEntry>(latestDay?.ventas_por_grupo).filter(g => g.total > 0).length > 0
     ? safeArray<GrupoEntry>(latestDay?.ventas_por_grupo)
     : findRecentDataForField<GrupoEntry>(recentData, 'ventas_por_grupo')
+  const gruposData = gruposRaw.map(g => ({ ...g, nombre: cleanCategoryName(g.nombre) }))
 
   const paymentMethods = (() => {
     const latestPayments = safeArray<PagoMetodoEntry>(latestDay?.pago_metodos)
@@ -206,6 +293,47 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Quick insight */}
+      {quickInsight && (
+        <div className="mb-4 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl">
+          <p className="text-sm text-violet-800">
+            <span className="font-semibold">Hoy:</span> {quickInsight}
+          </p>
+        </div>
+      )}
+
+      {/* Month progress */}
+      {monthProgress && monthProgress.monthVentas > 0 && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Target size={16} className="text-emerald-600" />
+              <span className="text-sm font-semibold text-slate-900">
+                {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {new Date(latestDay!.fecha).getFullYear()}
+              </span>
+            </div>
+            <span className="text-xs text-slate-400">
+              Día {monthProgress.dayOfMonth} de {monthProgress.daysInMonth} · {monthProgress.daysLeft} días restantes
+            </span>
+          </div>
+          <div className="flex items-end gap-4 mb-2">
+            <div>
+              <span className="text-2xl font-bold text-slate-900">{formatCurrency(monthProgress.monthVentas)}</span>
+            </div>
+            <div className="text-xs text-slate-400 pb-1">
+              Proyección: <span className="font-semibold text-slate-600">{formatCurrency(monthProgress.projected)}</span>
+              {' · '}Prom. diario: <span className="font-semibold text-slate-600">{formatCurrency(monthProgress.dailyAvg)}</span>
+            </div>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="h-2.5 rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* KPI Summary Cards — 4 across like Toast */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

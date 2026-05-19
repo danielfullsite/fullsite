@@ -69,6 +69,11 @@ export async function getWaiterCategories(days: number = 7) {
 }
 
 // Aggregate mesero data across multiple days
+const EXCLUDE_STAFF = [
+  'mesero evento', 'aplicaciones', 'oscar ricardo', 'rodrigo chávez', 'rodrigo chavez',
+  'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique',
+]
+
 export function aggregateMeseros(
   dailyData: WansoftDaily[]
 ): { nombre: string; total: number; dias: number; promedio: number }[] {
@@ -78,7 +83,8 @@ export function aggregateMeseros(
     const meseros = parseJsonbField<{ nombre?: string; total?: number }>(day.meseros)
     if (meseros.length === 0) continue
     for (const m of meseros) {
-      if (!m.nombre || m.nombre === 'MESERO EVENTO') continue
+      if (!m.nombre) continue
+      if (EXCLUDE_STAFF.some(ex => m.nombre!.toLowerCase().includes(ex))) continue
       if (!map[m.nombre]) {
         map[m.nombre] = { total: 0, dias: new Set() }
       }
