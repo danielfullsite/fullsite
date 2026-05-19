@@ -260,12 +260,17 @@ def analyze_waste_estimate(food_cost_data, suppliers_data, daily_data):
             if isinstance(supplier, str):
                 continue
             monto = supplier.get("total") or supplier.get("monto") or 0
+            if isinstance(monto, (list, dict)):
+                continue
             if isinstance(monto, str):
                 try:
                     monto = float(monto.replace(",", "").replace("$", ""))
                 except:
                     monto = 0
-            total_purchases += monto
+            try:
+                total_purchases += float(monto)
+            except (TypeError, ValueError):
+                continue
 
     # Get theoretical cost from food_cost
     theoretical_cost = 0
