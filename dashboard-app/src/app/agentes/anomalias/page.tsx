@@ -6,17 +6,21 @@ import { getDeepTable } from '@/lib/data'
 import Link from 'next/link'
 
 interface Anomaly {
-  metrica: string
-  actual: number
-  esperado: number
-  diferencia_pct: number
-  prioridad: string
+  type?: string
+  metrica?: string
+  severity?: string
+  prioridad?: string
+  message?: string
+  actual?: number
+  esperado?: number
+  diferencia_pct?: number
 }
 
 interface AgentData {
   anomalies?: Anomaly[]
   summary?: string
-  fecha?: string
+  today_ventas?: number
+  avg_ventas?: number
 }
 
 export default function AnomaliasPage() {
@@ -48,8 +52,8 @@ export default function AnomaliasPage() {
   }
 
   const anomalies = data?.anomalies || []
-  const critical = anomalies.filter(a => a.prioridad === 'critical' || a.prioridad === 'alta')
-  const warning = anomalies.filter(a => a.prioridad === 'warning' || a.prioridad === 'media')
+  const critical = anomalies.filter(a => (a.severity || a.prioridad) === 'high' || (a.severity || a.prioridad) === 'critical' || (a.severity || a.prioridad) === 'alta')
+  const warning = anomalies.filter(a => (a.severity || a.prioridad) === 'medium' || (a.severity || a.prioridad) === 'warning' || (a.severity || a.prioridad) === 'media')
 
   return (
     <>
@@ -96,49 +100,36 @@ export default function AnomaliasPage() {
         {anomalies.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Sin anomalías detectadas. El agente corre automáticamente.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-500">
-                  <th className="text-left px-4 py-3 font-medium">Métrica</th>
-                  <th className="text-right px-4 py-3 font-medium">Actual</th>
-                  <th className="text-right px-4 py-3 font-medium">Esperado</th>
-                  <th className="text-right px-4 py-3 font-medium">Diferencia</th>
-                  <th className="text-center px-4 py-3 font-medium">Prioridad</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="divide-y divide-slate-100">
                 {anomalies.map((a, i) => {
-                  const isHigh = a.prioridad === 'critical' || a.prioridad === 'alta'
-                  const isMed = a.prioridad === 'warning' || a.prioridad === 'media'
+                  const sev = a.severity || a.prioridad || 'info'
+                  const isHigh = sev === 'high' || sev === 'critical' || sev === 'alta'
+                  const isMed = sev === 'medium' || sev === 'warning' || sev === 'media'
                   return (
-                    <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50 ${isHigh ? 'bg-red-50/50' : isMed ? 'bg-amber-50/30' : ''}`}>
-                      <td className="px-4 py-3 font-medium text-slate-900 flex items-center gap-2">
-                        {isHigh && <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />}
-                        {isMed && <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />}
-                        {a.metrica}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-700">
-                        {typeof a.actual === 'number' ? a.actual.toLocaleString('es-MX') : a.actual}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-500">
-                        {typeof a.esperado === 'number' ? a.esperado.toLocaleString('es-MX') : a.esperado}
-                      </td>
-                      <td className={`px-4 py-3 text-right tabular-nums font-bold ${isHigh ? 'text-red-600' : isMed ? 'text-amber-600' : 'text-slate-600'}`}>
-                        {a.diferencia_pct > 0 ? '+' : ''}{a.diferencia_pct?.toFixed(1)}%
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          isHigh ? 'bg-red-500 text-white' : isMed ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {a.prioridad}
-                        </span>
-                      </td>
-                    </tr>
+                    <div key={i} className={`px-5 py-4 ${isHigh ? 'bg-red-50/50' : isMed ? 'bg-amber-50/30' : ''}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isHigh ? 'bg-red-100' : isMed ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                          <AlertTriangle size={16} className={isHigh ? 'text-red-500' : isMed ? 'text-amber-500' : 'text-blue-500'} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-slate-400 uppercase">{a.type || 'anomalía'}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              isHigh ? 'bg-red-500 text-white' : isMed ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                            }`}>{sev}</span>
+                          </div>
+                          <p className="text-sm text-slate-900 leading-relaxed">{a.message || a.metrica || 'Sin detalle'}</p>
+                          {a.actual !== undefined && a.esperado !== undefined && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              Actual: {typeof a.actual === 'number' ? `$${a.actual.toLocaleString('es-MX')}` : a.actual} · Esperado: {typeof a.esperado === 'number' ? `$${a.esperado.toLocaleString('es-MX')}` : a.esperado}
+                              {a.diferencia_pct !== undefined && <span className={`ml-2 font-bold ${isHigh ? 'text-red-600' : 'text-amber-600'}`}>{a.diferencia_pct > 0 ? '+' : ''}{a.diferencia_pct.toFixed(0)}%</span>}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
           </div>
         )}
       </div>
