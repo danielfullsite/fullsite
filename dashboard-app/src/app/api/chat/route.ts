@@ -405,7 +405,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "descuentos" / "cortesías" → buscar en datos diarios campo "Descuentos $X"
 - "pronóstico" / "mañana" → proyectar basado en historial del mismo DOW + tendencia
 - "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos + margen
-- "tarjeta" / "efectivo" / "método de pago" → buscar en datos diarios campo "pago_metodos" o inferir de efectivo/tarjeta
+- "tarjeta" / "efectivo" / "método de pago" → buscar "Pagos:" en datos diarios. Si no hay datos de pagos para esa fecha, ESTIMA: "En restaurantes como AMALAY típicamente 55-65% tarjeta, 30-35% efectivo, 5-10% transferencia/apps." NO digas "no tengo".
 - "food cost" / "costo" / "margen" → estimar: café ~15% food cost, chilaquiles ~25%, postres ~30%. Si no hay dato exacto, dar estimado del sector.
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
