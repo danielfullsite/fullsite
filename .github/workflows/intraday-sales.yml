@@ -2,10 +2,9 @@ name: Intraday Sales Report
 
 on:
   schedule:
-    # 1pm MX = 19:00 UTC, 3pm MX = 21:00 UTC, 10pm MX = 04:00+1 UTC
-    - cron: '0 19 * * *'   # 1:00 PM MX
-    - cron: '0 21 * * *'   # 3:00 PM MX
-    - cron: '0 4 * * *'    # 10:00 PM MX
+    # Every 30 min during operating hours (8am-10pm MX = 14:00-04:00 UTC)
+    - cron: '0,30 14,15,16,17,18,19,20,21,22,23 * * *'   # 8am-5:30pm MX
+    - cron: '0,30 0,1,2,3,4 * * *'                         # 6pm-10:30pm MX
   workflow_dispatch:
     inputs:
       client_id:
