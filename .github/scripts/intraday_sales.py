@@ -416,6 +416,13 @@ def main():
                 if mesero_data:
                     update_data["meseros"] = json.dumps(mesero_data)
 
+            # Platillos vendidos (top 30 for chat to answer "qué platillo se vendió más")
+            if saucers:
+                platillo_data = [{"nombre": s["name"], "cantidad": s["qty"], "total": s["total"]}
+                                 for s in sorted(saucers, key=lambda x: -x["total"])[:30]]
+                if platillo_data:
+                    update_data["platillos_top"] = json.dumps(platillo_data)
+
             # Pago metodos - fetch from Wansoft
             try:
                 pay_html = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",

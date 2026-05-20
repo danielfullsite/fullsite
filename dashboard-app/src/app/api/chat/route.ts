@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     const recentDays = dailyRes.ok ? await dailyRes.json() : []
@@ -330,10 +330,38 @@ export async function POST(request: NextRequest) {
         const topG = grupos.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
           .map((g: { nombre: string; total: number }) => `${g.nombre}:$${g.total}`).join(', ')
 
-        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)} | Meseros: ${topM} | Grupos: ${topG}`
+        const platillos = Array.isArray(d.platillos_top) ? d.platillos_top : (typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : [])
+        const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
+
+        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
       })
 
       dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
+
+      // Fetch hourly data for "hora pico" questions
+      if (q.includes('hora') || q.includes('pico') || q.includes('horario')) {
+        try {
+          const hourlyRes = await fetch(
+            `${sbUrl}/rest/v1/wansoft_hourly?select=fecha,data&order=fecha.desc&limit=3`,
+            { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+          )
+          if (hourlyRes.ok) {
+            const hourlyRows = await hourlyRes.json()
+            if (hourlyRows.length > 0) {
+              const hourlyLines = hourlyRows.map((r: Record<string, unknown>) => {
+                const hData = typeof r.data === 'string' ? JSON.parse(r.data as string) : r.data
+                if (Array.isArray(hData)) {
+                  return `${r.fecha}: ${hData.map((h: Record<string, unknown>) => `${h.hora}=$${h.total || h.ventas || 0}`).join(', ')}`
+                }
+                return ''
+              }).filter(Boolean)
+              if (hourlyLines.length > 0) {
+                dailyContext += `\n\nVENTAS POR HORA:\n${hourlyLines.join('\n')}`
+              }
+            }
+          }
+        } catch { /* hourly data optional */ }
+      }
     }
 
     // 4. System prompt — Unified sharp copilot (same as Telegram)
@@ -375,8 +403,11 @@ CÓMO BUSCAR:
    → Chilaquiles NO aparecen aquí — búscalos en "Grupos:" de los datos diarios.
 3. RANKINGS: H&H, Pan, Postres, Bebidas/persona POR MESERO
    → Para "quién vende más X": usar rankings directamente
-4. IMPORTANTE: "Grupos:" en datos diarios = ventas por categoría del menú COMPLETA (incluye chilaquiles, coffee, eggs, etc).
-   "DESGLOSE POR DÍA" = solo H&H/Pan/Postres/2da Bebida (categorías de upselling).
+4. PLATILLOS: "Platillos:" en datos diarios = top platillos INDIVIDUALES con cantidad y monto.
+   Para "qué platillo se vendió más": busca en Platillos. Para "cuántos cafés": busca café en Platillos.
+5. GRUPOS: "Grupos:" = categorías del menú (CHILAQUILES & ENCHILADAS, COFFEE, etc).
+6. DESGLOSE POR DÍA = solo H&H/Pan/Postres/2da Bebida (upselling).
+7. VENTAS POR HORA: si preguntan "hora pico" o "a qué hora vendemos más", busca en VENTAS POR HORA.
 
 EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique
 
@@ -429,6 +460,23 @@ ${dailyContext}`
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
+
+    // Hermes feedback: log if response contains "no tengo" for improvement
+    if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {
+      try {
+        await fetch(`${sbUrl}/rest/v1/agent_runs`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            agent_id: 'chat-feedback',
+            trigger_type: 'auto',
+            status: 'no_data',
+            output_summary: `Q: ${message.slice(0, 200)} | A: ${text.slice(0, 200)}`,
+            tentacle: 'hermes',
+          }),
+        })
+      } catch { /* non-blocking */ }
+    }
 
     return Response.json({ response: text })
   } catch (error) {
