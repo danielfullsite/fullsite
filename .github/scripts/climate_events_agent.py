@@ -63,9 +63,50 @@ HOLIDAYS_MX = {
 # Graduation season (Monterrey) — big for cafés/brunch
 GRADUATION_MONTHS = {5, 6, 7, 12}  # May-Jul and Dec
 
+# Semana Santa (variable cada año)
+SEMANA_SANTA = {
+    "2026-03-29": ("Domingo de Ramos", "medio", "Inicio de Semana Santa. Tráfico baja gradualmente."),
+    "2026-04-02": ("Jueves Santo", "bajo", "Gente viaja. Espera -30% tráfico."),
+    "2026-04-03": ("Viernes Santo", "muy bajo", "Día más muerto del año. Muchos cierran."),
+    "2026-04-04": ("Sábado de Gloria", "bajo", "Gente sigue de vacaciones."),
+    "2026-04-05": ("Domingo de Pascua", "bajo", "Último día de vacaciones, tráfico se recupera al siguiente."),
+}
+
 # Puentes confirmed
 PUENTES = {
-    # "2026-03-17": "Puente Benito Juárez",
+    "2026-03-17": ("Puente Benito Juárez", "medio", "Lunes puente — familias salen."),
+    "2026-11-17": ("Puente Revolución", "medio", "Lunes puente."),
+}
+
+# External factors calendar — things that affect traffic outside of holidays
+# These are patterns/events specific to Monterrey/San Pedro
+EXTERNAL_FACTORS = {
+    # Monterrey-specific events
+    "maraton_mty": {"months": [3, 11], "days_of_week": [6], "impact": "Maratón/carrera en Monterrey. Calles cerradas, menos tráfico a cafés."},
+    "feria_libro": {"months": [10], "impact": "Feria del Libro MTY. Más tráfico cultural en la zona."},
+    "buen_fin": {"months": [11], "days": [14, 15, 16, 17], "impact": "Buen Fin. Gente en centros comerciales, no en cafés independientes. Pero oportunidad de promo."},
+    # School calendar
+    "vacaciones_verano": {"months": [7, 8], "impact": "Vacaciones de verano. Menos oficinistas, más familias. Horario pico se mueve."},
+    "regreso_clases": {"months": [8], "days": list(range(20, 32)), "impact": "Regreso a clases. Tráfico de oficinistas se normaliza."},
+    "vacaciones_diciembre": {"months": [12], "days": list(range(18, 32)), "impact": "Vacaciones decembrinas. Menos tráfico entre semana, más fin de semana."},
+    # Economic patterns
+    "quincena_alta": {"days": [15, 16, 30, 31, 1], "impact": "Quincena — tickets más altos, más tráfico."},
+    "inicio_mes_bajo": {"days": [2, 3, 4, 5], "impact": "Post-quincena — tráfico puede bajar 10-15%."},
+    # Weather patterns Monterrey
+    "temporada_calor": {"months": [5, 6, 7, 8, 9], "impact": "Calor extremo MTY (35-42°C). Gente busca AC y bebidas frías. Terraza vacía."},
+    "temporada_lluvias": {"months": [8, 9, 10], "impact": "Temporada de lluvias/huracanes. Tráfico baja en días de lluvia fuerte."},
+    "nortes": {"months": [11, 12, 1, 2], "impact": "Frentes fríos (nortes). Bebidas calientes suben. Tráfico normal si no llueve."},
+}
+
+# Competition tracking — known nearby restaurants/cafés
+# Add as you learn about them
+COMPETITION_NOTES = {
+    # "2026-04-01": "Café XYZ abrió en Plaza Valle — monitorear impacto",
+}
+
+# Construction/road closures — add as they happen
+ROAD_CLOSURES = {
+    # "2026-04-15": "Cierre de Av. Vasconcelos por obra — redireciona tráfico",
 }
 
 # ── Café-specific seasonal patterns ──────────────────────────────────────
@@ -227,6 +268,31 @@ def get_events_for_date(fecha_str):
         if month in info["months"]:
             events.append({"type": "temporada", "name": key.replace("_", " ").title(), "impact": "info", "tip": info["tip"]})
             break  # Only one seasonal tip per day
+
+    # Semana Santa
+    if fecha_str in SEMANA_SANTA:
+        name, impact, tip = SEMANA_SANTA[fecha_str]
+        events.append({"type": "semana_santa", "name": name, "impact": impact, "tip": tip})
+
+    # External factors
+    for key, info in EXTERNAL_FACTORS.items():
+        match = True
+        if "months" in info and month not in info["months"]:
+            match = False
+        if "days" in info and day not in info["days"]:
+            match = False
+        if "days_of_week" in info and dow not in info["days_of_week"]:
+            match = False
+        if match and ("months" in info or "days" in info):
+            events.append({"type": "externo", "name": key.replace("_", " ").title(), "impact": "info", "tip": info["impact"]})
+
+    # Competition notes
+    if fecha_str in COMPETITION_NOTES:
+        events.append({"type": "competencia", "name": "Competencia", "impact": "warning", "tip": COMPETITION_NOTES[fecha_str]})
+
+    # Road closures
+    if fecha_str in ROAD_CLOSURES:
+        events.append({"type": "vialidad", "name": "Cierre vial", "impact": "warning", "tip": ROAD_CLOSURES[fecha_str]})
 
     return events
 
