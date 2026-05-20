@@ -1284,14 +1284,7 @@ function POSContent() {
               </h2>
               <span className="text-emerald-400 font-bold text-xl">{formatMXN(total)}</span>
             </div>
-            {/* Silla selector */}
-            <div className="flex gap-1">
-              {Array.from({ length: personas }, (_, i) => i + 1).map(s => (
-                <button key={s} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium text-slate-300 min-h-[32px]">
-                  Silla {s}
-                </button>
-              ))}
-            </div>
+            {/* Silla selector removed — not functional yet */}
           </div>
 
           {/* Order items list */}

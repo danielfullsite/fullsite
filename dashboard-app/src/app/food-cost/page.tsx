@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { PieChart, Search, ArrowUpDown, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import { getLatestDeep } from '@/lib/data'
+import { getRecipes, getIngredients, MENU_CATEGORIES, type RecipeRow, type Ingredient } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 
 interface CostItem {
@@ -26,10 +27,52 @@ export default function FoodCostPage() {
   useEffect(() => {
     async function load() {
       try {
+        // Try wansoft_food_cost first
         const row = await getLatestDeep('wansoft_food_cost')
-        if (row?.data && Array.isArray(row.data)) {
+        if (row?.data && Array.isArray(row.data) && row.data.length > 0) {
           setItems(row.data)
           setFecha(row.fecha as string || '')
+        } else {
+          // Fallback: calculate from pos_recipes + pos_ingredients
+          const [recipes, ingredients] = await Promise.all([getRecipes(), getIngredients()])
+          const ingMap = new Map(ingredients.map((i: Ingredient) => [i.id, i]))
+
+          // Group recipes by platillo
+          const platilloMap = new Map<string, { name: string; cost: number; ingredients: number }>()
+          for (const r of recipes) {
+            const existing = platilloMap.get(r.menu_item_id) || { name: r.menu_item_name, cost: 0, ingredients: 0 }
+            const ing = ingMap.get(r.ingredient_id)
+            if (ing) {
+              existing.cost += (ing.cost_per_unit || 0) * r.quantity
+              existing.ingredients++
+            }
+            platilloMap.set(r.menu_item_id, existing)
+          }
+
+          // Match with menu prices
+          const menuPrices = new Map<string, number>()
+          for (const cat of MENU_CATEGORIES) {
+            for (const item of cat.items) {
+              menuPrices.set(item.name.toLowerCase(), item.price)
+            }
+          }
+
+          const costItems: CostItem[] = []
+          for (const [, p] of platilloMap) {
+            const price = menuPrices.get(p.name.toLowerCase()) || 0
+            const margen = price > 0 ? Math.round((1 - p.cost / price) * 100) : 0
+            if (p.cost > 0 || price > 0) {
+              costItems.push({
+                platillo: p.name,
+                qty: p.ingredients,
+                precio: price,
+                costo: Math.round(p.cost * 100) / 100,
+                margen_pct: margen,
+              })
+            }
+          }
+          setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
+          setFecha('pos_recipes')
         }
       } catch (err) {
         console.error('Error:', err)

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Package, AlertTriangle, TrendingDown, Search, ArrowUpDown } from 'lucide-react'
 import { getLatestDeep } from '@/lib/data'
+import { getIngredients, type Ingredient } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 
 interface InventoryItem {
@@ -40,9 +41,22 @@ export default function InventarioPage() {
           getLatestDeep('wansoft_inventory'),
           getLatestDeep('wansoft_shrinkage'),
         ])
-        if (invRow?.data && Array.isArray(invRow.data)) {
+        if (invRow?.data && Array.isArray(invRow.data) && invRow.data.length > 0) {
           setInventory(invRow.data)
           setFecha(invRow.fecha as string || '')
+        } else {
+          // Fallback: show pos_ingredients as inventory listing
+          const ingredients = await getIngredients()
+          if (ingredients.length > 0) {
+            setInventory(ingredients.map((i: Ingredient) => ({
+              producto: i.name,
+              existencia: 0,
+              unidad: i.unit,
+              costo_unitario: i.cost_per_unit || 0,
+              costo_total: 0,
+            })))
+            setFecha('pos_ingredients')
+          }
         }
         if (shrinkRow?.data && Array.isArray(shrinkRow.data)) setShrinkage(shrinkRow.data)
       } catch (err) {
