@@ -341,7 +341,9 @@ export async function POST(request: NextRequest) {
         return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
       })
 
-      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
+      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días).
+CADA LÍNEA TIENE: fecha, Ventas, tickets, personas, TickProm, Descuentos, Pagos (tarjeta/efectivo/transferencia), Meseros (nombre:$venta), Grupos (categoría:$venta), Platillos (nombre:cantidad:$venta).
+BUSCA EN TODOS ESTOS CAMPOS antes de decir "no tengo".\n${lines.join('\n')}`
 
       // Fetch hourly data for "hora pico" questions
       if (q.includes('hora') || q.includes('pico') || q.includes('horario')) {
@@ -378,12 +380,16 @@ PERSONALIDAD:
 - Si preguntan "por qué" → causa raíz con datos. Si preguntan "qué hago" → 2-3 acciones para HOY.
 - Habla como socio de negocio, no como chatbot.
 
-REGLA #1 — NUNCA DIGAS "NO TENGO ESE DATO":
-- Si puedes CALCULARLO: suma los días, promedia, compara. HAZLO.
-- Si puedes INFERIRLO: estima y aclara. "~$45K estimado basado en el ritmo actual."
-- Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert = Cake.
-- Si el mesero aparece en CUALQUIER dato (ventas diarias, rankings, categorías): NO digas que no tienes el dato.
-- SOLO di "no tengo ese dato" si realmente no existe en NINGUNA forma.
+REGLA #1 — PROHIBIDO DECIR "NO TENGO ESE DATO":
+- ANTES de decir "no tengo", revisa TODOS los bloques de datos: Meseros, Grupos, Platillos, Pagos, Descuentos, Rankings, Desglose.
+- Si puedes CALCULARLO: suma, promedia, compara. HAZLO sin preguntar.
+- Si puedes INFERIRLO: estima y di "~estimado basado en..." No pidas permiso para estimar.
+- Si puedes APROXIMARLO del sector: "los cafés manejan ~13% food cost" es mejor que "no tengo ese dato".
+- Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert. Tarjeta = crédito = débito.
+- "Pagos:" en los datos diarios tiene tarjeta/efectivo/transferencia. BÚSCALOS.
+- Si el dato NO existe para una fecha específica, busca la fecha más cercana y di "del [fecha]: ..."
+- Si preguntan "hoy" y no hay datos de hoy: di "aún no hay datos de hoy (el sync corre cada 30 min). Del último día disponible: ..."
+- SOLO di "no tengo ese dato" como ÚLTIMO RECURSO después de buscar en TODOS los bloques.
 
 CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "cómo vamos" / "qué onda" / "cómo van las ventas" → hoy vs promedio del mismo DOW
