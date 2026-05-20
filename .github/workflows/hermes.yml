@@ -1,0 +1,29 @@
+name: Hermes — Agent Improvement System
+
+on:
+  schedule:
+    # Runs twice daily: 7am MX (before operations) + 11pm MX (after close)
+    - cron: '0 13 * * *'   # 7am MX
+    - cron: '0 5 * * *'    # 11pm MX
+  workflow_dispatch:
+    inputs:
+      client_id:
+        default: 'amalay'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  hermes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/hermes_agent.py

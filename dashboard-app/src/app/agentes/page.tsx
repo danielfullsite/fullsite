@@ -27,6 +27,7 @@ const AGENTS = [
   { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'Gasto y concentración', href: '/agentes/proveedores-agente' },
   { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-600', bg: 'bg-red-50', desc: 'Compras vs consumo', href: '/agentes/desperdicio' },
   { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-50', desc: 'Pronóstico × historial', href: '/agentes/clima' },
+  { id: 'hermes', name: 'Hermes', icon: Bot, color: 'text-indigo-500', bg: 'bg-indigo-50', desc: 'Mejora continua de agentes', href: '/agentes/hermes' },
 ]
 
 const priorityColors: Record<string, string> = {
