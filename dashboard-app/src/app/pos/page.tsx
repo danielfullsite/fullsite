@@ -1556,17 +1556,17 @@ function POSContent() {
 
               {/* Menu items grid — BIG touch cards for tablet */}
               <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {activeCategory.items.filter(item => item.price > 0).map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-xl px-3 py-2.5 text-left transition-all flex flex-col justify-between"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl px-4 py-5 text-left transition-all flex flex-col justify-between min-h-[90px]"
                     >
-                      <span className="font-semibold text-[13px] leading-snug text-white">
+                      <span className="font-bold text-base leading-snug text-white">
                         {item.name}
                       </span>
-                      <span className="text-emerald-400 font-bold text-sm mt-1">
+                      <span className="text-emerald-400 font-bold text-lg mt-2">
                         ${Math.round(item.price)}
                       </span>
                     </button>
