@@ -1561,12 +1561,12 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-xl px-3 py-3 text-left transition-all min-h-[70px] flex items-center justify-between gap-2"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-xl px-3 py-2.5 text-left transition-all flex flex-col justify-between"
                     >
-                      <span className="font-semibold text-sm leading-tight text-white">
+                      <span className="font-semibold text-[13px] leading-snug text-white">
                         {item.name}
                       </span>
-                      <span className="text-emerald-400 font-bold text-sm whitespace-nowrap">
+                      <span className="text-emerald-400 font-bold text-sm mt-1">
                         ${Math.round(item.price)}
                       </span>
                     </button>
