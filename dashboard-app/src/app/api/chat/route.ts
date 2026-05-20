@@ -334,7 +334,11 @@ export async function POST(request: NextRequest) {
         const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
 
         const descuentos = Number(d.descuentos) || 0
-        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
+
+        const pagos = Array.isArray(d.pago_metodos) ? d.pago_metodos : (typeof d.pago_metodos === 'string' ? JSON.parse(d.pago_metodos) : [])
+        const pagoStr = pagos.map((p: { nombre: string; total: number }) => `${p.nombre}:$${Math.round(p.total)}`).join(', ')
+
+        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
       })
 
       dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
@@ -392,9 +396,14 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "me conviene quitar X" → ventas del item + impacto de quitarlo
 - "qué hago ahorita" → staff brief de 5 min con acciones concretas + $ proyectado
 - "cuánto vende Fany" → buscar si existe en datos, explicar su rol si no es mesera
-- "descuentos" / "cortesías" → buscar en datos diarios campo "descuentos"
+- "descuentos" / "cortesías" → buscar en datos diarios campo "Descuentos $X"
 - "pronóstico" / "mañana" → proyectar basado en historial del mismo DOW + tendencia
 - "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos + margen
+- "tarjeta" / "efectivo" / "método de pago" → buscar en datos diarios campo "pago_metodos" o inferir de efectivo/tarjeta
+- "food cost" / "costo" / "margen" → estimar: café ~15% food cost, chilaquiles ~25%, postres ~30%. Si no hay dato exacto, dar estimado del sector.
+- "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
+- "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
+- "hoy" sin datos de hoy → decir "el restaurante aún no abre o no hay datos de hoy, te doy el último día disponible"
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
 
 FECHA DE HOY: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Úsala para calcular "ayer", "la semana pasada", "mañana", etc.
