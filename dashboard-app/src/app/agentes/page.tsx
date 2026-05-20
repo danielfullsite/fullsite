@@ -21,12 +21,12 @@ const AGENTS = [
   { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-50', desc: 'Matriz BCG del menú', href: '/agentes/menu' },
   { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-50', desc: 'Optimización de personal', href: '/agentes/staffing' },
   { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-slate-500', bg: 'bg-slate-100', desc: 'Detección de patrones sospechosos', href: '/agentes/antifraude' },
-  { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Cancelaciones y calidad' },
-  { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-50', desc: 'Velocidad de atención' },
-  { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Patrones de servicio' },
-  { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'Gasto y concentración' },
-  { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-600', bg: 'bg-red-50', desc: 'Compras vs consumo' },
-  { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-50', desc: 'Pronóstico × historial' },
+  { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Cancelaciones y calidad', href: '/agentes/cocina' },
+  { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-50', desc: 'Velocidad de atención', href: '/agentes/tiempo-mesa' },
+  { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Patrones de servicio', href: '/agentes/propinas-agente' },
+  { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'Gasto y concentración', href: '/agentes/proveedores-agente' },
+  { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-600', bg: 'bg-red-50', desc: 'Compras vs consumo', href: '/agentes/desperdicio' },
+  { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-50', desc: 'Pronóstico × historial', href: '/agentes/clima' },
 ]
 
 const priorityColors: Record<string, string> = {
