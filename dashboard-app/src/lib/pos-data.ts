@@ -724,7 +724,6 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function saveOrder(order: Order): Promise<boolean> {
   const orderData: Record<string, unknown> = {
-    id: order.id,
     client_id: 'amalay',
     mesa: order.mesa,
     mesero: order.mesero,
@@ -743,14 +742,13 @@ export async function saveOrder(order: Order): Promise<boolean> {
   }
 
   try {
-    // Use upsert so reopened/updated orders don't duplicate
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
+        Prefer: 'return=minimal',
       },
       body: JSON.stringify(orderData),
     })
