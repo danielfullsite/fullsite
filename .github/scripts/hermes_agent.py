@@ -264,6 +264,110 @@ def audit_chat_patterns():
     return issues
 
 
+# ── AUTO-HEAL: Fix what we can automatically ──────────────────────────────
+
+def auto_heal(all_issues):
+    """Attempt to fix issues automatically. Returns list of actions taken."""
+    actions = []
+
+    for issue in all_issues:
+        # Auto-fix: re-trigger stale agents
+        if issue["type"] == "stale" and issue["severity"] in ("high", "medium"):
+            agent = issue["agent"]
+            workflow_map = {
+                "anomaly": "agents-hourly.yml",
+                "predictor": "agents-hourly.yml",
+                "upselling": "agents-hourly.yml",
+                "kitchen": "agents-daily.yml",
+                "table-time": "agents-daily.yml",
+                "staffing": "agents-weekly.yml",
+                "menu-engineering": "agents-weekly.yml",
+                "antifraud": "agents-weekly.yml",
+                "tips": "agents-weekly.yml",
+                "suppliers": "agents-weekly.yml",
+                "waste": "agents-weekly.yml",
+                "climate": "climate-events.yml",
+                "intraday_sales": "intraday-sales.yml",
+                "deep_scraper": "wansoft-deep.yml",
+                "ticket_detail": "ticket-detail.yml",
+            }
+            wf = workflow_map.get(agent)
+            if wf:
+                try:
+                    github_token = os.environ.get("GITHUB_TOKEN", "")
+                    if github_token:
+                        r = requests.post(
+                            f"https://api.github.com/repos/ramonfaurdaniel-png/fullsite/actions/workflows/{wf}/dispatches",
+                            headers={"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"},
+                            json={"ref": "main"},
+                            timeout=10,
+                        )
+                        if r.ok:
+                            actions.append(f"Re-triggered {wf} for stale agent '{agent}'")
+                        else:
+                            actions.append(f"Failed to trigger {wf}: {r.status_code}")
+                except Exception as e:
+                    actions.append(f"Error triggering {wf}: {e}")
+
+        # Auto-fix: update priority of agents with wrong priority
+        if issue["type"] == "empty_data" and issue["severity"] == "low":
+            try:
+                # Downgrade empty agents to 'info' priority
+                requests.patch(
+                    f"{SUPABASE_URL}/rest/v1/agent_results?agent_id=eq.{issue['agent']}&priority=neq.info",
+                    headers=sb_write,
+                    json={"priority": "info"},
+                    timeout=10,
+                )
+                actions.append(f"Downgraded empty agent '{issue['agent']}' priority to info")
+            except:
+                pass
+
+    return actions
+
+
+# ── AUDIT 5: Track improvement over time ──────────────────────────────────
+
+def track_improvement_trend():
+    """Compare today's issues vs last run to see if things are getting better."""
+    history = sb_get("agent_results", {
+        "select": "fecha,data",
+        "agent_id": "eq.hermes",
+        "order": "fecha.desc",
+        "limit": "7",
+    })
+
+    if len(history) < 2:
+        return None
+
+    trend = []
+    for h in history:
+        d = h.get("data")
+        if isinstance(d, str):
+            d = json.loads(d)
+        if d:
+            trend.append({
+                "fecha": h["fecha"],
+                "total": d.get("total_issues", 0),
+                "critical": d.get("critical_count", 0),
+                "high": d.get("high_count", 0),
+            })
+
+    if len(trend) >= 2:
+        prev = trend[1]["total"]
+        curr = trend[0]["total"]
+        direction = "mejorando" if curr < prev else "empeorando" if curr > prev else "estable"
+        return {
+            "direction": direction,
+            "current": curr,
+            "previous": prev,
+            "change": curr - prev,
+            "history": trend[:7],
+        }
+
+    return None
+
+
 # ── AUDIT 4: Improvement Tracking ─────────────────────────────────────────
 
 def generate_improvements(all_issues):
@@ -341,12 +445,30 @@ def main():
     all_issues = health_issues + data_issues + chat_issues
     improvements = generate_improvements(all_issues)
 
+    # Auto-heal what we can
+    print("━━━ AUTO-HEAL ━━━")
+    heal_actions = auto_heal(all_issues)
+    for action in heal_actions:
+        print(f"  ✓ {action}")
+    if not heal_actions:
+        print("  No auto-fixes needed")
+
+    # Track improvement trend
+    print("\n━━━ TREND ━━━")
+    trend = track_improvement_trend()
+    if trend:
+        print(f"  Direction: {trend['direction']} ({trend['previous']} → {trend['current']}, {trend['change']:+d})")
+    else:
+        print("  Not enough history yet")
+
     # Save to agent_results
     structured_data = {
         "health_issues": health_issues,
         "data_issues": data_issues,
         "chat_issues": chat_issues,
         "improvements": improvements,
+        "auto_heal_actions": heal_actions,
+        "trend": trend,
         "total_issues": len(all_issues),
         "critical_count": len([i for i in all_issues if i["severity"] == "critical"]),
         "high_count": len([i for i in all_issues if i["severity"] == "high"]),
