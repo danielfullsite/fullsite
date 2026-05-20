@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 
@@ -14,12 +15,12 @@ interface AgentResult {
 }
 
 const AGENTS = [
-  { id: 'anomaly', name: 'Anomalías', icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50', desc: 'Detecta métricas fuera de patrón' },
-  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-50', desc: 'Proyecta cómo cierra el día' },
-  { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Oportunidades de venta adicional' },
-  { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-50', desc: 'Matriz BCG del menú' },
-  { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-50', desc: 'Optimización de personal' },
-  { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-slate-500', bg: 'bg-slate-100', desc: 'Detección de patrones sospechosos' },
+  { id: 'anomaly', name: 'Anomalías', icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50', desc: 'Detecta métricas fuera de patrón', href: '/agentes/anomalias' },
+  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-50', desc: 'Proyecta cómo cierra el día', href: '/agentes/prediccion' },
+  { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50', desc: 'Oportunidades de venta adicional', href: '/agentes/upselling' },
+  { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-50', desc: 'Matriz BCG del menú', href: '/agentes/menu' },
+  { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-50', desc: 'Optimización de personal', href: '/agentes/staffing' },
+  { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-slate-500', bg: 'bg-slate-100', desc: 'Detección de patrones sospechosos', href: '/agentes/antifraude' },
   { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-50', desc: 'Cancelaciones y calidad' },
   { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-50', desc: 'Velocidad de atención' },
   { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Patrones de servicio' },
@@ -104,13 +105,13 @@ export default function AgentesPage() {
           const hasData = !!result
           const timeSince = result?.updated_at ? getTimeSince(result.updated_at) : null
 
-          return (
-            <div key={agent.id}
-              className={`bg-white rounded-xl border shadow-sm p-5 transition-all hover:shadow-md ${
-                result?.priority === 'critical' ? 'border-red-300 bg-red-50/30' :
-                result?.priority === 'warning' ? 'border-amber-200' : 'border-slate-200'
-              }`}
-            >
+          const agentHref = (agent as { href?: string }).href
+          const cardClass = `bg-white rounded-xl border shadow-sm p-5 transition-all hover:shadow-md block ${
+            result?.priority === 'critical' ? 'border-red-300 bg-red-50/30' :
+            result?.priority === 'warning' ? 'border-amber-200' : 'border-slate-200'
+          } ${agentHref ? 'cursor-pointer' : ''}`
+
+          const card = (<>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl ${agent.bg} flex items-center justify-center`}>
@@ -141,7 +142,12 @@ export default function AgentesPage() {
                   <p className="text-xs text-slate-400">Sin datos. Se actualiza automáticamente.</p>
                 </div>
               )}
-            </div>
+          </>)
+
+          return agentHref ? (
+            <Link key={agent.id} href={agentHref} className={cardClass}>{card}</Link>
+          ) : (
+            <div key={agent.id} className={cardClass}>{card}</div>
           )
         })}
       </div>
