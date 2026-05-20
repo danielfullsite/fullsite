@@ -1818,136 +1818,137 @@ function POSContent() {
         </div>
       )}
 
-      {/* AI Copilot Chat */}
-      <POSChat />
+      {/* Smart Alerts (replaces chat) */}
+      <POSAlerts role={staffRole} />
     </div>
   )
 }
 
 // ─── AI Copilot Chat (floating) ─────────────────────────────────────────────
 
-function POSChat() {
-  const [open, setOpen] = useState(false)
-  const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
-  const [loading, setLoading] = useState(false)
+function POSAlerts({ role }: { role: string }) {
+  const [alerts, setAlerts] = useState<{ id: string; type: 'warning' | 'info' | 'success'; message: string; dismissible: boolean }[]>([])
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
-  const send = async () => {
-    if (!input.trim() || loading) return
-    const userMsg = input.trim()
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
-    setLoading(true)
+  // Fetch smart alerts every 60 seconds
+  useEffect(() => {
+    async function fetchAlerts() {
+      const newAlerts: typeof alerts = []
+      try {
+        const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+        const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history: messages.slice(-6) }),
-      })
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Sin respuesta' }])
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar' }])
+        // Check low inventory (gerente/admin only)
+        if (role === 'admin' || role === 'gerente') {
+          try {
+            const invRes = await fetch(
+              `${sbUrl}/rest/v1/pos_inventory?stock=lt.5&stock=gt.0&client_id=eq.amalay&limit=5`,
+              { headers }
+            )
+            if (invRes.ok) {
+              const lowStock = await invRes.json()
+              for (const item of lowStock) {
+                newAlerts.push({
+                  id: `inv-${item.ingredient_id}`,
+                  type: 'warning',
+                  message: `⚠️ ${item.ingredient_id} — quedan ${item.stock} unidades`,
+                  dismissible: true,
+                })
+              }
+            }
+          } catch { /* ignore */ }
+
+          // Check agent anomalies
+          try {
+            const agentRes = await fetch(
+              `${sbUrl}/rest/v1/agent_results?agent_id=eq.anomaly&order=updated_at.desc&limit=1`,
+              { headers }
+            )
+            if (agentRes.ok) {
+              const [anomaly] = await agentRes.json()
+              if (anomaly?.priority === 'critical') {
+                newAlerts.push({
+                  id: 'anomaly-critical',
+                  type: 'warning',
+                  message: `🚨 ${anomaly.summary}`,
+                  dismissible: true,
+                })
+              }
+            }
+          } catch { /* ignore */ }
+        }
+
+        // Check ready orders (all roles)
+        try {
+          const readyRes = await fetch(
+            `${sbUrl}/rest/v1/pos_orders?status=eq.lista&client_id=eq.amalay&limit=5`,
+            { headers }
+          )
+          if (readyRes.ok) {
+            const readyOrders = await readyRes.json()
+            if (readyOrders.length > 0) {
+              newAlerts.push({
+                id: 'ready-orders',
+                type: 'success',
+                message: `✅ ${readyOrders.length} orden${readyOrders.length > 1 ? 'es' : ''} lista${readyOrders.length > 1 ? 's' : ''} para entregar`,
+                dismissible: false,
+              })
+            }
+          }
+        } catch { /* ignore */ }
+
+        // Check delivery orders (all roles)
+        try {
+          const delRes = await fetch(
+            `${sbUrl}/rest/v1/delivery_orders?status=eq.nueva&client_id=eq.amalay&limit=3`,
+            { headers }
+          )
+          if (delRes.ok) {
+            const deliveryOrders = await delRes.json()
+            for (const d of deliveryOrders) {
+              const platform: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi', didi: '🔶 Didi' }
+              newAlerts.push({
+                id: `del-${d.id}`,
+                type: 'info',
+                message: `${platform[d.platform] || '📦'} Pedido ${d.customer_name} — $${Math.round(d.total)}`,
+                dismissible: true,
+              })
+            }
+          }
+        } catch { /* ignore */ }
+
+      } catch { /* ignore all errors */ }
+
+      setAlerts(newAlerts)
     }
-    setLoading(false)
+
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 60000)
+    return () => clearInterval(interval)
+  }, [role])
+
+  const visibleAlerts = alerts.filter(a => !dismissed.has(a.id))
+  if (visibleAlerts.length === 0) return null
+
+  const colors = {
+    warning: 'bg-amber-900/80 border-amber-600/50 text-amber-200',
+    info: 'bg-blue-900/80 border-blue-600/50 text-blue-200',
+    success: 'bg-emerald-900/80 border-emerald-600/50 text-emerald-200',
   }
 
   return (
-    <>
-      {/* Floating button */}
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105"
-        >
-          <MessageCircle size={24} />
-        </button>
-      )}
-
-      {/* Chat panel */}
-      {open && (
-        <div className="fixed bottom-0 right-0 z-50 w-full sm:w-[400px] h-[500px] sm:h-[600px] sm:bottom-6 sm:right-6 bg-slate-800 border border-slate-700 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
-                <MessageCircle size={16} className="text-white" />
-              </div>
-              <div>
-                <p className="text-white font-semibold text-sm">fullsite IA</p>
-                <p className="text-emerald-400 text-[11px]">Copiloto operativo</p>
-              </div>
-            </div>
-            <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-lg bg-slate-600 hover:bg-slate-500 flex items-center justify-center text-slate-300">
-              <X size={16} />
+    <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 w-[90%] max-w-lg">
+      {visibleAlerts.map(alert => (
+        <div key={alert.id} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border backdrop-blur-sm shadow-lg text-sm font-medium ${colors[alert.type]}`}>
+          <span>{alert.message}</span>
+          {alert.dismissible && (
+            <button onClick={() => setDismissed(prev => new Set(prev).add(alert.id))} className="ml-3 opacity-60 hover:opacity-100">
+              <X size={14} />
             </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {messages.length === 0 && (
-              <div className="text-center py-8">
-                <MessageCircle size={32} className="mx-auto mb-3 text-slate-600" />
-                <p className="text-slate-400 text-sm">Pregunta lo que quieras</p>
-                <div className="mt-4 space-y-2">
-                  {[
-                    '¿Quién está vendiendo más hoy?',
-                    '¿Cuál es el ticket promedio esta semana?',
-                    '¿Qué mesero tiene más cancelaciones?',
-                  ].map(q => (
-                    <button
-                      key={q}
-                      onClick={() => { setInput(q); }}
-                      className="block w-full text-left px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-300 text-xs transition-colors"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
-                  msg.role === 'user'
-                    ? 'bg-emerald-600 text-white rounded-br-sm'
-                    : 'bg-slate-700 text-slate-200 rounded-bl-sm'
-                }`}>
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-700 text-slate-400 px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
-                  <Loader2 size={16} className="animate-spin" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Input */}
-          <div className="px-3 py-3 border-t border-slate-700 flex-shrink-0">
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && send()}
-                placeholder="Pregunta algo..."
-                className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
-              />
-              <button
-                onClick={send}
-                disabled={!input.trim() || loading}
-                className="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white flex items-center justify-center flex-shrink-0"
-              >
-                <SendIcon size={16} />
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
-    </>
+      ))}
+    </div>
   )
 }
