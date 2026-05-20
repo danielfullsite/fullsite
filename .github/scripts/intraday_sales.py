@@ -446,11 +446,17 @@ def main():
                     update_data["propinas_total"] = kpis[0]["propinas_total"]
             except: pass
 
-            # Ticket promedio
-            ventas_dia = update_data.get("ventas_dia") or consolidated.get("TotalSales", 0)
+            # Ticket promedio — use ventas sin Market / personas
+            ventas_total = consolidated.get("TotalSales", 0) or 0
+            market_v = 0
+            if users:
+                _mkt = [e.lower() for e in (CLIENT.get("staff_market") or [])]
+                market_v = sum(float(str(u.get("total", "0")).replace(",","").replace("$",""))
+                              for u in users if any(ex in u.get("mesero", "").lower() for ex in _mkt))
+            ventas_rest = ventas_total - market_v
             personas = update_data.get("personas_restaurant", 0)
             if personas and personas > 0:
-                update_data["ticket_promedio_restaurant"] = round(ventas_dia / personas, 2)
+                update_data["ticket_promedio_restaurant"] = round(ventas_rest / personas, 2)
 
             requests.patch(
                 f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}",
