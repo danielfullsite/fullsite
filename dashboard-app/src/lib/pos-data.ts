@@ -982,7 +982,7 @@ export interface InventoryMovement {
 
 export async function getIngredients(): Promise<Ingredient[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&order=name.asc&limit=500`,
+    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&order=name.asc&limit=1000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -993,7 +993,7 @@ export async function getIngredients(): Promise<Ingredient[]> {
 
 export async function getRecipes(): Promise<RecipeRow[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&order=menu_item_name.asc&limit=1000`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&order=menu_item_name.asc&limit=2000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []

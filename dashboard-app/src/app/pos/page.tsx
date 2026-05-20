@@ -1522,7 +1522,7 @@ function POSContent() {
                       <button
                         key={item.id}
                         onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 rounded-xl px-4 py-4 text-left transition-colors flex items-center justify-between min-h-[60px]"
+                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 rounded-lg px-3 py-3 text-left transition-colors flex items-center justify-between min-h-[48px]"
                       >
                         <div>
                           <span className="font-semibold text-base text-white">{item.name}</span>
@@ -1543,7 +1543,7 @@ function POSContent() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-5 py-3.5 rounded-xl text-base font-bold whitespace-nowrap transition-all min-h-[52px] ${
+                    className={`px-3 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all min-h-[40px] ${
                       selectedCategory === cat.id
                         ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500'
@@ -1556,18 +1556,18 @@ function POSContent() {
 
               {/* Menu items grid — BIG touch cards for tablet */}
               <div className="flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                   {activeCategory.items.filter(item => item.price > 0).map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl p-5 text-left transition-all min-h-[110px] flex flex-col justify-between"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-xl px-3 py-3 text-left transition-all min-h-[70px] flex items-center justify-between gap-2"
                     >
-                      <span className="font-bold text-base leading-tight text-white">
+                      <span className="font-semibold text-sm leading-tight text-white">
                         {item.name}
                       </span>
-                      <span className="text-emerald-400 font-bold text-xl mt-2">
-                        {formatMXN(item.price)}
+                      <span className="text-emerald-400 font-bold text-sm whitespace-nowrap">
+                        ${Math.round(item.price)}
                       </span>
                     </button>
                   ))}
