@@ -264,6 +264,83 @@ def audit_chat_patterns():
     return issues
 
 
+# ── AUDIT 3B: Chat Failure History ────────────────────────────────────────
+
+def audit_chat_history():
+    """Analyze all chat failures logged by the feedback loop."""
+    issues = []
+
+    # Get all chat-feedback logs
+    feedback = sb_get("agent_runs", {
+        "select": "output_summary,created_at",
+        "agent_id": "eq.chat-feedback",
+        "order": "created_at.desc",
+        "limit": "50",
+    })
+
+    if not feedback:
+        return issues
+
+    # Analyze patterns
+    failure_patterns = defaultdict(int)
+    sample_questions = defaultdict(list)
+
+    for f in feedback:
+        summary = f.get("output_summary", "")
+        # Extract question
+        if "Q: " in summary:
+            question = summary.split("Q: ")[1].split(" | A:")[0].lower() if " | A:" in summary else summary.split("Q: ")[1][:100].lower()
+
+            # Categorize the failure
+            if any(w in question for w in ["platillo", "capuchino", "chilaquil", "latte", "panini", "toast"]):
+                failure_patterns["platillo_individual"] += 1
+                sample_questions["platillo_individual"].append(question[:80])
+            elif any(w in question for w in ["hora", "pico", "horario"]):
+                failure_patterns["ventas_por_hora"] += 1
+                sample_questions["ventas_por_hora"].append(question[:80])
+            elif any(w in question for w in ["descuento", "cortesia", "cancelacion"]):
+                failure_patterns["descuentos"] += 1
+                sample_questions["descuentos"].append(question[:80])
+            elif any(w in question for w in ["cliente", "repite", "frecuente", "recurrente"]):
+                failure_patterns["clientes"] += 1
+                sample_questions["clientes"].append(question[:80])
+            elif any(w in question for w in ["pronostico", "prediccion", "mañana", "proyeccion"]):
+                failure_patterns["prediccion"] += 1
+                sample_questions["prediccion"].append(question[:80])
+            else:
+                failure_patterns["otro"] += 1
+                sample_questions["otro"].append(question[:80])
+
+    for pattern, count in sorted(failure_patterns.items(), key=lambda x: -x[1]):
+        if count >= 1:
+            fix_map = {
+                "platillo_individual": "Agregar SalesBySaucer al sync + cross con mesero en ticket_detail",
+                "ventas_por_hora": "Verificar wansoft_hourly tiene datos, agregar al contexto del chat",
+                "descuentos": "Los descuentos están en wansoft_daily — actualizar prompt para buscarlos",
+                "clientes": "Necesita sistema de loyalty/identificación de clientes (futuro)",
+                "prediccion": "Actualizar prompt — el chat SÍ puede proyectar basado en historial",
+                "otro": "Revisar preguntas manualmente",
+            }
+            issues.append({
+                "agent": "chat",
+                "type": f"recurring_failure_{pattern}",
+                "severity": "high" if count >= 3 else "medium",
+                "message": f"Chat falla {count}x en preguntas de '{pattern}': {', '.join(sample_questions[pattern][:3])}",
+                "fix": fix_map.get(pattern, "Investigar manualmente"),
+            })
+
+    if feedback:
+        issues.append({
+            "agent": "chat",
+            "type": "total_failures",
+            "severity": "info",
+            "message": f"Total: {len(feedback)} respuestas con 'no tengo dato' registradas",
+            "fix": "Reducir a 0 cerrando los gaps de datos",
+        })
+
+    return issues
+
+
 # ── AUTO-HEAL: Fix what we can automatically ──────────────────────────────
 
 def auto_heal(all_issues):
@@ -442,7 +519,11 @@ def main():
     chat_issues = audit_chat_patterns()
     print(f"  {len(chat_issues)} issues found\n")
 
-    all_issues = health_issues + data_issues + chat_issues
+    print("━━━ CHAT HISTORY ━━━")
+    chat_history_issues = audit_chat_history()
+    print(f"  {len(chat_history_issues)} patterns found\n")
+
+    all_issues = health_issues + data_issues + chat_issues + chat_history_issues
     improvements = generate_improvements(all_issues)
 
     # Auto-heal what we can

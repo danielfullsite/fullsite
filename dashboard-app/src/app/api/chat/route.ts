@@ -333,7 +333,8 @@ export async function POST(request: NextRequest) {
         const platillos = Array.isArray(d.platillos_top) ? d.platillos_top : (typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : [])
         const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
 
-        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
+        const descuentos = Number(d.descuentos) || 0
+        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
       })
 
       dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días):\n${lines.join('\n')}`
@@ -391,7 +392,12 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "me conviene quitar X" → ventas del item + impacto de quitarlo
 - "qué hago ahorita" → staff brief de 5 min con acciones concretas + $ proyectado
 - "cuánto vende Fany" → buscar si existe en datos, explicar su rol si no es mesera
+- "descuentos" / "cortesías" → buscar en datos diarios campo "descuentos"
+- "pronóstico" / "mañana" → proyectar basado en historial del mismo DOW + tendencia
+- "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos + margen
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
+
+FECHA DE HOY: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Úsala para calcular "ayer", "la semana pasada", "mañana", etc.
 
 CÓMO BUSCAR:
 1. DATOS DIARIOS: "fecha: Ventas $X | Meseros: nombre:$total | Grupos: categoría:$total"
