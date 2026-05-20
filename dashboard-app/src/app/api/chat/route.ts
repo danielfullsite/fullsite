@@ -367,11 +367,16 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 
 CÓMO BUSCAR:
 1. DATOS DIARIOS: "fecha: Ventas $X | Meseros: nombre:$total | Grupos: categoría:$total"
-   → Sumar ventas de un mesero en la semana = buscar su nombre en CADA día y sumar
-2. DESGLOSE POR DÍA: H&H, Pan, Postres, 2da Bebida por día
-   → Para historial día por día: listar CADA día con su cantidad
+   → MESEROS: cada día lista TODOS los meseros con su venta. Busca el nombre y SUMA.
+   → GRUPOS: cada día lista TODAS las categorías (CHILAQUILES & ENCHILADAS, COFFEE, etc). Busca ahí.
+   → Para "mejor mesero de ayer": busca la fecha de ayer y mira qué mesero tiene más $.
+2. DESGLOSE POR DÍA: H&H, Pan, Postres, 2da Bebida por día (del waiter_categories)
+   → Estas son SOLO las categorías de upselling, NO todas las categorías del menú.
+   → Chilaquiles NO aparecen aquí — búscalos en "Grupos:" de los datos diarios.
 3. RANKINGS: H&H, Pan, Postres, Bebidas/persona POR MESERO
    → Para "quién vende más X": usar rankings directamente
+4. IMPORTANTE: "Grupos:" en datos diarios = ventas por categoría del menú COMPLETA (incluye chilaquiles, coffee, eggs, etc).
+   "DESGLOSE POR DÍA" = solo H&H/Pan/Postres/2da Bebida (categorías de upselling).
 
 EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique
 
