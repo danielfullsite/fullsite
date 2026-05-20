@@ -723,7 +723,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function saveOrder(order: Order): Promise<boolean> {
-  const orderData = {
+  const orderData: Record<string, unknown> = {
+    id: order.id,
     client_id: 'amalay',
     mesa: order.mesa,
     mesero: order.mesero,
@@ -733,23 +734,29 @@ export async function saveOrder(order: Order): Promise<boolean> {
     iva: order.iva,
     total: order.total,
     descuento: order.descuento,
+    propina: order.propina ?? 0,
     metodo_pago: order.metodoPago ?? null,
     notas: order.notas ?? null,
     items: JSON.stringify(order.items),
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
+    updated_at: new Date().toISOString(),
   }
 
   try {
+    // Use upsert so reopened/updated orders don't duplicate
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify(orderData),
     })
+    if (!res.ok) {
+      console.warn(`[saveOrder] Failed: ${res.status} ${res.statusText}`)
+    }
     return res.ok
   } catch {
     // Offline — save to localStorage queue
