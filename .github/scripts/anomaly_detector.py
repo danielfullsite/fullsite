@@ -84,20 +84,36 @@ def analyze_anomalies(today_data, historical):
 
     anomalies = []
 
-    # --- Ventas del día ---
+    # --- Ventas del día (ajustado por hora) ---
     today_ventas = float(today_data.get("ventas_dia") or 0)
     hist_ventas = [float(d.get("ventas_dia") or 0) for d in historical if d.get("ventas_dia")]
     if hist_ventas and today_ventas > 0:
-        avg_ventas = sum(hist_ventas) / len(hist_ventas)
-        if avg_ventas > 0:
-            pct_diff = (today_ventas - avg_ventas) / avg_ventas
+        avg_ventas_full_day = sum(hist_ventas) / len(hist_ventas)
+        # Adjust for time of day: estimate what % of the day is done
+        # Restaurant hours ~8am to 10pm (14 hours)
+        now_mx = datetime.now(MX_TZ)
+        hour = now_mx.hour + now_mx.minute / 60
+        open_hour, close_hour = 8, 22
+        if hour < open_hour:
+            day_pct = 0
+        elif hour >= close_hour:
+            day_pct = 1.0
+        else:
+            day_pct = (hour - open_hour) / (close_hour - open_hour)
+
+        # Expected ventas at this hour = full day avg * day_pct
+        expected_at_this_hour = avg_ventas_full_day * day_pct if day_pct > 0.1 else avg_ventas_full_day
+        label_hora = f"a las {int(hour)}:{int((hour%1)*60):02d}"
+
+        if expected_at_this_hour > 0 and day_pct > 0.1:
+            pct_diff = (today_ventas - expected_at_this_hour) / expected_at_this_hour
             if abs(pct_diff) >= VENTAS_THRESHOLD:
                 direction = "arriba" if pct_diff > 0 else "abajo"
                 emoji = "📈" if pct_diff > 0 else "📉"
                 anomalies.append({
                     "type": "ventas",
                     "severity": "high",
-                    "message": f"{emoji} Ventas ${today_ventas:,.0f} están {abs(pct_diff)*100:.0f}% {direction} del promedio (${avg_ventas:,.0f})",
+                    "message": f"{emoji} Ventas ${today_ventas:,.0f} {label_hora} están {abs(pct_diff)*100:.0f}% {direction} de lo esperado (${expected_at_this_hour:,.0f} para esta hora)",
                 })
 
     # --- Ticket promedio ---
@@ -139,15 +155,17 @@ def analyze_anomalies(today_data, historical):
         if not name or today_total <= 0 or not is_mesero(name, CLIENT):
             continue
         if name in mesero_hist and len(mesero_hist[name]) >= 2:
-            avg = sum(mesero_hist[name]) / len(mesero_hist[name])
-            if avg > 0:
-                pct_diff = (today_total - avg) / avg
+            avg_full_day = sum(mesero_hist[name]) / len(mesero_hist[name])
+            # Adjust by hour — compare partial day vs expected at this hour
+            avg_at_this_hour = avg_full_day * day_pct if day_pct > 0.1 else avg_full_day
+            if avg_at_this_hour > 0:
+                pct_diff = (today_total - avg_at_this_hour) / avg_at_this_hour
                 if pct_diff <= -MESERO_THRESHOLD:
                     short_name = name.split()[0]
                     anomalies.append({
                         "type": "mesero",
                         "severity": "medium",
-                        "message": f"👤 {short_name} lleva ${today_total:,.0f} — {abs(pct_diff)*100:.0f}% abajo de su promedio (${avg:,.0f})",
+                        "message": f"👤 {short_name} lleva ${today_total:,.0f} — {abs(pct_diff)*100:.0f}% abajo de lo esperado para esta hora (${avg_at_this_hour:,.0f})",
                     })
 
     # --- Categorías (postres, H&H, pan) ---
