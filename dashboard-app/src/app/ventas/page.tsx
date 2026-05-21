@@ -10,10 +10,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
-import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone } from 'lucide-react'
+import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldAlert, XCircle, HeartHandshake } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getDateRange, aggregatePayments, aggregateGrupos } from '@/lib/data'
+import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData } from '@/lib/data'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -58,6 +58,10 @@ export default function VentasPage() {
   const [preset, setPreset] = useState<Preset>('mes')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [cancelaciones, setCancelaciones] = useState<{nombre: string; total: number}[]>([])
+  const [anulaciones, setAnulaciones] = useState<{nombre: string; total: number}[]>([])
+  const [cortesias, setCortesias] = useState<{nombre: string; total: number}[]>([])
+  const [descuentosDetalle, setDescuentosDetalle] = useState<{nombre: string; total: number}[]>([])
 
   const dates = useMemo(() => {
     if (preset === 'custom' && customFrom && customTo) {
@@ -84,6 +88,18 @@ export default function VentasPage() {
         prevTo.toISOString().slice(0, 10)
       )
       setPrevData(prevResult)
+
+      // Anti-fraud data
+      const [cancelRes, voidsRes, courtesyRes, discountsRes] = await Promise.all([
+        getWansoftData('cancel_sales'),
+        getWansoftData('voids'),
+        getWansoftData('courtesies'),
+        getWansoftData('discounts_detail'),
+      ])
+      setCancelaciones(cancelRes?.data as {nombre: string; total: number}[] || [])
+      setAnulaciones(voidsRes?.data as {nombre: string; total: number}[] || [])
+      setCortesias(courtesyRes?.data as {nombre: string; total: number}[] || [])
+      setDescuentosDetalle(discountsRes?.data as {nombre: string; total: number}[] || [])
     } catch (err) {
       console.error('Error loading ventas data:', err)
     } finally {
@@ -394,6 +410,157 @@ export default function VentasPage() {
               </div>
             </div>
           </div>
+
+          {/* Control y Anti-Fraude */}
+          {(cancelaciones.length > 0 || anulaciones.length > 0 || cortesias.length > 0) && (
+            <>
+              <div className="mt-2 mb-4 flex items-center gap-2">
+                <ShieldAlert size={20} className="text-red-500" />
+                <h2 className="text-lg font-bold text-red-700">Control y Anti-Fraude</h2>
+              </div>
+
+              {/* Anti-fraud KPI cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                <div className="bg-red-50 rounded-xl border border-red-200 p-5 text-center">
+                  <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <XCircle size={18} className="text-red-500" />
+                  </div>
+                  <p className="text-xs font-medium text-red-600 uppercase tracking-wider mb-1">Cancelaciones</p>
+                  <p className="text-2xl font-bold text-red-700">{cancelaciones.length}</p>
+                  <p className="text-xs text-red-400 mt-1">
+                    {formatCurrency(cancelaciones.reduce((s, c) => s + (c.total || 0), 0))} total
+                  </p>
+                </div>
+                <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
+                  <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <ShieldAlert size={18} className="text-amber-500" />
+                  </div>
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wider mb-1">Anulaciones</p>
+                  <p className="text-2xl font-bold text-amber-700">{anulaciones.length}</p>
+                  <p className="text-xs text-amber-400 mt-1">
+                    {formatCurrency(anulaciones.reduce((s, a) => s + (a.total || 0), 0))} total
+                  </p>
+                </div>
+                <div className="bg-orange-50 rounded-xl border border-orange-200 p-5 text-center">
+                  <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <HeartHandshake size={18} className="text-orange-500" />
+                  </div>
+                  <p className="text-xs font-medium text-orange-600 uppercase tracking-wider mb-1">Cortesias</p>
+                  <p className="text-2xl font-bold text-orange-700">{cortesias.length}</p>
+                  <p className="text-xs text-orange-400 mt-1">
+                    {formatCurrency(cortesias.reduce((s, c) => s + (c.total || 0), 0))} total
+                  </p>
+                </div>
+              </div>
+
+              {/* Anti-fraud detail tables */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Cancelaciones table */}
+                {cancelaciones.length > 0 && (
+                  <div className="bg-white rounded-xl border border-red-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-red-700 mb-1">Cancelaciones</h3>
+                    <p className="text-xs text-red-400 mb-4">{cancelaciones.length} items cancelados</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-red-100">
+                            <th className="text-left py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Producto</th>
+                            <th className="text-right py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cancelaciones.map((item, i) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-red-50/50 transition-colors">
+                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-right font-medium text-red-600 tabular-nums">{formatCurrency(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Anulaciones table */}
+                {anulaciones.length > 0 && (
+                  <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-amber-700 mb-1">Anulaciones</h3>
+                    <p className="text-xs text-amber-400 mb-4">{anulaciones.length} items anulados</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-amber-100">
+                            <th className="text-left py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Producto</th>
+                            <th className="text-right py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {anulaciones.map((item, i) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-amber-50/50 transition-colors">
+                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-right font-medium text-amber-600 tabular-nums">{formatCurrency(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cortesias table */}
+                {cortesias.length > 0 && (
+                  <div className="bg-white rounded-xl border border-orange-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-orange-700 mb-1">Cortesias</h3>
+                    <p className="text-xs text-orange-400 mb-4">{cortesias.length} cortesias otorgadas</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-orange-100">
+                            <th className="text-left py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Producto</th>
+                            <th className="text-right py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cortesias.map((item, i) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-orange-50/50 transition-colors">
+                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-right font-medium text-orange-600 tabular-nums">{formatCurrency(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Descuentos detalle table */}
+                {descuentosDetalle.length > 0 && (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-1">Detalle de Descuentos</h3>
+                    <p className="text-xs text-slate-400 mb-4">{descuentosDetalle.length} descuentos aplicados</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100">
+                            <th className="text-left py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Concepto</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {descuentosDetalle.map((item, i) => (
+                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-right font-medium text-slate-600 tabular-nums">{formatCurrency(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </>

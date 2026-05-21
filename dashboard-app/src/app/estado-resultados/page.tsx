@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { DollarSign, TrendingDown, TrendingUp, Calculator } from 'lucide-react'
+import { DollarSign, TrendingDown, TrendingUp, Calculator, FileText } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getMonthlyData } from '@/lib/data'
+import { getMonthlyData, getLatestDeep } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -19,16 +19,62 @@ interface MonthlyPL {
   margenPct: number
 }
 
+interface FoodCostItem {
+  platillo: string
+  qty: number
+  precio: number
+  costo: number
+  margen_pct: number
+}
+
+interface PnlData {
+  year: number
+  months: Record<string, number[]>
+}
+
 export default function EstadoResultadosPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
+  const [foodCostPct, setFoodCostPct] = useState<number | null>(null)
+  const [foodCostFecha, setFoodCostFecha] = useState<string | null>(null)
+  const [foodCostItems, setFoodCostItems] = useState<FoodCostItem[]>([])
+  const [pnlData, setPnlData] = useState<PnlData | null>(null)
+  const [pnlPeriodo, setPnlPeriodo] = useState<string | null>(null)
 
   useEffect(() => {
-    getMonthlyData().then(d => {
-      setData(d)
+    // Fetch all data in parallel
+    Promise.all([
+      getMonthlyData(),
+      getLatestDeep('wansoft_food_cost'),
+      getLatestDeep('wansoft_pnl'),
+    ]).then(([monthly, foodCost, pnl]) => {
+      setData(monthly)
+
+      // Process food cost data
+      if (foodCost && Array.isArray(foodCost.data)) {
+        const items = foodCost.data as FoodCostItem[]
+        setFoodCostItems(items)
+        setFoodCostFecha(foodCost.fecha)
+        const totalCosto = items.reduce((s, i) => s + (i.costo || 0), 0)
+        const totalPrecio = items.reduce((s, i) => s + (i.precio || 0), 0)
+        if (totalPrecio > 0) {
+          setFoodCostPct(totalCosto / totalPrecio)
+        }
+      }
+
+      // Process P&L data
+      if (pnl && pnl.data) {
+        const d = pnl.data as PnlData
+        setPnlData(d)
+        setPnlPeriodo((pnl as { periodo?: string }).periodo || pnl.fecha)
+      }
+
       setLoading(false)
     })
   }, [])
+
+  const effectiveFoodCostPct = foodCostPct ?? 0.35
+  const isRealFoodCost = foodCostPct !== null
 
   const monthlyPL = useMemo(() => {
     const map: Record<string, { brutas: number; descuentos: number; netas: number }> = {}
@@ -43,7 +89,7 @@ export default function EstadoResultadosPage() {
 
     return Object.entries(map)
       .map(([mes, vals]): MonthlyPL => {
-        const costoEstimado = vals.netas * 0.35
+        const costoEstimado = vals.netas * effectiveFoodCostPct
         const margenBruto = vals.netas - costoEstimado
         const margenPct = vals.netas > 0 ? (margenBruto / vals.netas) * 100 : 0
         return {
@@ -58,13 +104,16 @@ export default function EstadoResultadosPage() {
         }
       })
       .sort((a, b) => b.mes.localeCompare(a.mes))
-  }, [data])
+  }, [data, effectiveFoodCostPct])
 
   const totalBrutas = data.reduce((s, d) => s + (d.ventas_brutas || 0), 0)
   const totalDescuentos = data.reduce((s, d) => s + (d.descuentos || 0), 0)
   const totalNetas = data.reduce((s, d) => s + (d.ventas_dia || 0), 0)
-  const totalCostoEstimado = totalNetas * 0.35
+  const totalCostoEstimado = totalNetas * effectiveFoodCostPct
   const totalMargenBruto = totalNetas - totalCostoEstimado
+  const foodCostLabel = isRealFoodCost
+    ? `Food cost real ${(effectiveFoodCostPct * 100).toFixed(1)}%`
+    : 'Food cost estimado al 35%'
 
   return (
     <>
@@ -106,24 +155,37 @@ export default function EstadoResultadosPage() {
               accentClass="kpi-accent-green"
             />
             <KPICard
-              label="Margen bruto estimado"
+              label={isRealFoodCost ? 'Margen bruto real' : 'Margen bruto estimado'}
               value={formatCurrency(totalMargenBruto)}
-              subtitle="Food cost estimado al 35%"
+              subtitle={foodCostLabel}
               icon={Calculator}
               accentClass="kpi-accent-purple"
             />
           </div>
 
           {/* Info banner */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <p className="text-sm text-blue-700 font-medium">
-              Costos estimados
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              El costo de alimentos se estima al 35% de ventas netas. Para datos reales de food cost y labor cost,
-              conecta los modulos de inventario y nomina de Wansoft.
-            </p>
-          </div>
+          {isRealFoodCost ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-emerald-700 font-medium">
+                Food cost real de Wansoft
+              </p>
+              <p className="text-xs text-emerald-600 mt-1">
+                El costo de alimentos se calcula con datos reales de Wansoft ({(effectiveFoodCostPct * 100).toFixed(1)}% promedio).
+                {foodCostFecha && ` Ultima actualizacion: ${foodCostFecha}.`}
+                {' '}Para labor cost, conecta el modulo de nomina.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-blue-700 font-medium">
+                Costos estimados
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                El costo de alimentos se estima al 35% de ventas netas. Para datos reales de food cost y labor cost,
+                conecta los modulos de inventario y nomina de Wansoft.
+              </p>
+            </div>
+          )}
 
           {/* Revenue section */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
@@ -150,12 +212,17 @@ export default function EstadoResultadosPage() {
           {/* Costs section */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
             <h3 className="text-sm font-semibold text-slate-900 mb-1">
-              Costos (estimado)
+              Costos {isRealFoodCost ? '(real)' : '(estimado)'}
             </h3>
-            <p className="text-xs text-slate-400 mb-5">Basado en porcentajes de industria</p>
+            <p className="text-xs text-slate-400 mb-5">
+              {isRealFoodCost ? 'Basado en datos reales de Wansoft' : 'Basado en porcentajes de industria'}
+            </p>
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-sm text-slate-700">Food cost (35%)</span>
+                <span className="text-sm text-slate-700">
+                  Food cost ({(effectiveFoodCostPct * 100).toFixed(1)}%)
+                  {isRealFoodCost && <span className="ml-1 text-xs text-emerald-600 font-medium">REAL</span>}
+                </span>
                 <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(totalCostoEstimado)}</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
@@ -163,11 +230,109 @@ export default function EstadoResultadosPage() {
                 <span className="text-sm text-slate-400">Conectar nomina</span>
               </div>
               <div className="flex items-center justify-between py-2 bg-emerald-50 rounded-lg px-3">
-                <span className="text-sm font-semibold text-emerald-700">Margen bruto estimado</span>
+                <span className="text-sm font-semibold text-emerald-700">
+                  Margen bruto {isRealFoodCost ? 'real' : 'estimado'}
+                </span>
                 <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatCurrency(totalMargenBruto)}</span>
               </div>
             </div>
           </div>
+
+          {/* Food cost detail table — only when real data exists */}
+          {isRealFoodCost && foodCostItems.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                Detalle de Food Cost
+              </h3>
+              <p className="text-xs text-slate-400 mb-5">
+                Top platillos por costo — datos reales de Wansoft
+                {foodCostFecha && ` (${foodCostFecha})`}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Platillo</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Qty</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Costo</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Margen %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {foodCostItems
+                      .sort((a, b) => (b.costo || 0) - (a.costo || 0))
+                      .slice(0, 20)
+                      .map((item, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 border-b border-slate-100">
+                          <td className="py-3 px-3 text-slate-700 font-medium">{item.platillo}</td>
+                          <td className="py-3 px-3 text-right text-slate-700 tabular-nums">{item.qty}</td>
+                          <td className="py-3 px-3 text-right text-slate-700 tabular-nums">{formatCurrency(item.precio)}</td>
+                          <td className="py-3 px-3 text-right text-slate-900 font-semibold tabular-nums">{formatCurrency(item.costo)}</td>
+                          <td className={`py-3 px-3 text-right tabular-nums font-medium ${
+                            (item.margen_pct || 0) >= 60 ? 'text-emerald-600' :
+                            (item.margen_pct || 0) >= 40 ? 'text-amber-600' : 'text-red-600'
+                          }`}>
+                            {(item.margen_pct || 0).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* P&L de Wansoft section */}
+          {pnlData && pnlData.months && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="w-4 h-4 text-slate-500" />
+                <h3 className="text-sm font-semibold text-slate-900">
+                  P&L de Wansoft
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 mb-5">
+                Estado de resultados oficial
+                {pnlPeriodo && ` — ${pnlPeriodo}`}
+                {pnlData.year && ` (${pnlData.year})`}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Concepto</th>
+                      {Object.keys(pnlData.months).length > 0 &&
+                        (pnlData.months[Object.keys(pnlData.months)[0]] || []).map((_, idx) => (
+                          <th key={idx} className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][idx] || `M${idx + 1}`}
+                          </th>
+                        ))
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(pnlData.months).map(([label, values]) => {
+                      const isTotal = label.toLowerCase().includes('total') || label.toLowerCase().includes('utilidad') || label.toLowerCase().includes('margen')
+                      return (
+                        <tr key={label} className={`border-b border-slate-100 ${isTotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50/50'}`}>
+                          <td className={`py-2 px-3 ${isTotal ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>{label}</td>
+                          {(values || []).map((val, idx) => (
+                            <td key={idx} className={`py-2 px-3 text-right tabular-nums ${
+                              isTotal ? 'text-slate-900 font-semibold' :
+                              val < 0 ? 'text-red-600' : 'text-slate-700'
+                            }`}>
+                              {typeof val === 'number' ? formatCurrency(val) : val}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Monthly P&L table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
@@ -187,7 +352,9 @@ export default function EstadoResultadosPage() {
                       <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">V. Brutas</th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descuentos</th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">V. Netas</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Costo est.</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        {isRealFoodCost ? 'Costo real' : 'Costo est.'}
+                      </th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Margen</th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">%</th>
                     </tr>

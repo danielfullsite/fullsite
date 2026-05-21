@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregatePayments } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getLatestDeep } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -13,10 +13,17 @@ const PROPINA_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '
 export default function PropinasPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
+  const [realTips, setRealTips] = useState<{ mesero: string; ventas: number; tickets: number; propinas: number; propina_promedio: number }[] | null>(null)
 
   useEffect(() => {
-    getRecentDays(30).then(d => {
+    Promise.all([
+      getRecentDays(30),
+      getLatestDeep('wansoft_tips'),
+    ]).then(([d, tips]) => {
       setData(d)
+      if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
+        setRealTips(tips.data as typeof realTips)
+      }
       setLoading(false)
     })
   }, [])
@@ -27,8 +34,23 @@ export default function PropinasPage() {
   const propinaPromedio = diasConPropinas > 0 ? totalPropinas / diasConPropinas : 0
   const pctSobreVentas = totalVentas > 0 ? (totalPropinas / totalVentas) * 100 : 0
 
-  // Propinas por mesero (estimate from mesero ventas proportion)
+  // Propinas por mesero — real data from wansoft_tips, or estimated fallback
+  const isRealTipsData = realTips !== null
   const propinasPorMesero = useMemo(() => {
+    // Use real data if available
+    if (realTips) {
+      return realTips
+        .filter(m => m.mesero && m.mesero !== 'MESERO EVENTO')
+        .map(m => ({
+          nombre: m.mesero,
+          propinas: m.propinas || 0,
+          ventas: m.ventas || 0,
+          dias: m.tickets || 0,
+        }))
+        .sort((a, b) => b.propinas - a.propinas)
+    }
+
+    // Fallback: estimate from mesero ventas proportion
     const meseroMap: Record<string, { ventas: number; dias: number }> = {}
     let totalMeseroVentas = 0
 
@@ -51,7 +73,7 @@ export default function PropinasPage() {
         dias: info.dias,
       }))
       .sort((a, b) => b.propinas - a.propinas)
-  }, [data, totalPropinas])
+  }, [data, totalPropinas, realTips])
 
   const maxPropina = propinasPorMesero[0]?.propinas || 1
 
@@ -121,8 +143,18 @@ export default function PropinasPage() {
               <h3 className="text-sm font-semibold text-slate-900 mb-1">
                 Propinas por mesero
               </h3>
-              <p className="text-xs text-slate-400 mb-5">
-                Estimado proporcional a ventas
+              <p className="text-xs mb-5">
+                {isRealTipsData ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Datos reales de Wansoft
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Estimado proporcional
+                  </span>
+                )}
               </p>
               {propinasPorMesero.length > 0 ? (
                 <div className="space-y-4">

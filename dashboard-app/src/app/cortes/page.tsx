@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays } from '@/lib/data'
+import { getRecentDays, getWansoftData } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -24,14 +24,36 @@ function getHeatColor(value: number) {
 
 export default function CortesPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
+  const [cashClosing, setCashClosing] = useState<{ nombre: string; total: number }[]>([])
+  const [withdrawals, setWithdrawals] = useState<{ nombre: string; total: number }[]>([])
+  const [deposits, setDeposits] = useState<{ nombre: string; total: number }[]>([])
+  const [cashClosingFecha, setCashClosingFecha] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<30 | 60 | 90>(30)
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await getRecentDays(90)
+        const [data, cashClosingRes, withdrawalsRes, depositsRes] = await Promise.all([
+          getRecentDays(90),
+          getWansoftData('cash_closing'),
+          getWansoftData('cash_withdrawals'),
+          getWansoftData('bank_deposits'),
+        ])
         setRecentData(data)
+        if (cashClosingRes) {
+          setCashClosingFecha(cashClosingRes.fecha)
+          const items = Array.isArray(cashClosingRes.data) ? cashClosingRes.data as { nombre: string; total: number }[] : []
+          setCashClosing(items)
+        }
+        if (withdrawalsRes) {
+          const items = Array.isArray(withdrawalsRes.data) ? withdrawalsRes.data as { nombre: string; total: number }[] : []
+          setWithdrawals(items)
+        }
+        if (depositsRes) {
+          const items = Array.isArray(depositsRes.data) ? depositsRes.data as { nombre: string; total: number }[] : []
+          setDeposits(items)
+        }
       } catch (err) {
         console.error('Error loading cortes data:', err)
       } finally {
@@ -329,6 +351,152 @@ export default function CortesPage() {
           </table>
         </div>
       </div>
+
+      {/* Detalle de Corte de Caja */}
+      {cashClosing.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow mt-6">
+          <div className="p-6 border-b border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-violet-50 rounded-full flex items-center justify-center">
+                <Vault size={20} className="text-violet-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Detalle de Corte de Caja</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Último corte: {cashClosingFecha ? new Date(cashClosingFecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full table-striped">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
+                  <th className="text-left text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Concepto</th>
+                  <th className="text-right text-xs font-semibold text-slate-500 py-3.5 px-4 uppercase tracking-wider">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cashClosing.map((item, i) => (
+                  <tr key={i} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
+                    <td className="py-3 px-4 text-sm font-medium text-slate-900">{item.nombre}</td>
+                    <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-slate-900">
+                      {formatCurrency(item.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-50/80 border-t-2 border-slate-200">
+                  <td className="py-3.5 px-4 text-sm font-bold text-slate-900">TOTAL</td>
+                  <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                    {formatCurrency(cashClosing.reduce((s, item) => s + (item.total || 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Retiros y Depósitos */}
+      {(withdrawals.length > 0 || deposits.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+          {/* Retiros */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
+                  <ArrowDownCircle size={20} className="text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Retiros de Caja</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{withdrawals.length} movimiento{withdrawals.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+            </div>
+            {withdrawals.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full table-striped">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/80">
+                      <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Concepto</th>
+                      <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {withdrawals.map((item, i) => (
+                      <tr key={i} className="border-b border-slate-100 hover:bg-red-50/30 transition-colors">
+                        <td className="py-3 px-4 text-sm text-slate-900">{item.nombre}</td>
+                        <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-red-600">
+                          {formatCurrency(item.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50/80 border-t-2 border-slate-200">
+                      <td className="py-3 px-4 text-sm font-bold text-slate-900">TOTAL</td>
+                      <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-red-600">
+                        {formatCurrency(withdrawals.reduce((s, item) => s + (item.total || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-sm text-slate-400">Sin retiros registrados</div>
+            )}
+          </div>
+
+          {/* Depósitos */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                  <Building2 size={20} className="text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Depositos Bancarios</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{deposits.length} movimiento{deposits.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+            </div>
+            {deposits.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full table-striped">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/80">
+                      <th className="text-left text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Concepto</th>
+                      <th className="text-right text-xs font-semibold text-slate-500 py-3 px-4 uppercase tracking-wider">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deposits.map((item, i) => (
+                      <tr key={i} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
+                        <td className="py-3 px-4 text-sm text-slate-900">{item.nombre}</td>
+                        <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                          {formatCurrency(item.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50/80 border-t-2 border-slate-200">
+                      <td className="py-3 px-4 text-sm font-bold text-slate-900">TOTAL</td>
+                      <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                        {formatCurrency(deposits.reduce((s, item) => s + (item.total || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-sm text-slate-400">Sin depositos registrados</div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }
