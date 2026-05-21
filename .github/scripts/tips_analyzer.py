@@ -375,8 +375,7 @@ def main():
 
     total_propinas = sum(d.get("propinas_total", 0) or 0 for d in daily_data)
     if total_propinas == 0:
-        print("[tips] Total propinas = $0 — skipping")
-        return
+        print("[tips] Total propinas = $0 — saving minimal report")
 
     # 2. Analyze
     mesero_ranking = analyze_mesero_tips(tips_data, daily_data)

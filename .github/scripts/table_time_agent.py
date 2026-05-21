@@ -241,7 +241,8 @@ def build_message(analysis, today_kpis):
             msg += f"Valor en mesas abiertas: ${total_abiertas:,.0f}\n"
 
     if not insights:
-        return None  # Nothing interesting to report
+        msg += "\nSin anomalias — rotacion normal."
+        return msg
 
     msg += "\n"
     for i in insights:
@@ -280,15 +281,23 @@ def main():
 
     print(f"[table_time] Starting for {CLIENT['id']} on {today_str}")
 
-    # 1. Fetch today's KPIs
+    # 1. Fetch today's KPIs (try kpis first, fallback to wansoft_daily)
     today_kpis = get_today_kpis()
-    if not today_kpis:
-        print("[table_time] No KPI data — skipping")
-        return
+    if not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
+        # Fallback to latest wansoft_daily
+        daily = sb_get("wansoft_daily", {"select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
+        if daily:
+            today_kpis = daily[0]
+            print(f"[table_time] Using wansoft_daily fallback: {today_kpis.get('fecha')}")
+        else:
+            print("[table_time] No KPI data — skipping")
+            log_run("skipped", 0, "no KPI data")
+            return
 
     ventas = today_kpis.get("ventas_dia", 0) or 0
     if ventas == 0:
         print("[table_time] Ventas = $0 — skipping")
+        log_run("skipped", 0, "ventas=0")
         return
 
     # 2. Try POS orders first
