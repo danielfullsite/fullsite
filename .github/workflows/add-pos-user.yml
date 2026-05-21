@@ -1,0 +1,40 @@
+name: Add POS User
+
+on:
+  workflow_dispatch:
+    inputs:
+      staff_name:
+        description: 'Staff name'
+        required: true
+        default: 'Eduardo'
+      staff_pin:
+        description: 'PIN (4 digits)'
+        required: true
+        default: '4567'
+      staff_role:
+        description: 'Role (admin/gerente/mesero/cajero/consultor)'
+        required: true
+        default: 'consultor'
+      client_id:
+        description: 'Client ID'
+        required: false
+        default: 'amalay'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  STAFF_NAME: ${{ github.event.inputs.staff_name }}
+  STAFF_PIN: ${{ github.event.inputs.staff_pin }}
+  STAFF_ROLE: ${{ github.event.inputs.staff_role }}
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+
+jobs:
+  add-user:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python .github/scripts/add_pos_user.py
