@@ -88,6 +88,24 @@ async def run():
 
         print("[✓] Login OK\n")
 
+        # XHR interceptor — captures JSON responses from Wansoft AJAX calls
+        captured_responses = []
+
+        async def capture_response(response):
+            url = response.url
+            if "wansoft.net" not in url:
+                return
+            ct = response.headers.get("content-type", "")
+            if "json" in ct or "javascript" in ct:
+                try:
+                    body = await response.json()
+                    if body and (isinstance(body, list) or (isinstance(body, dict) and len(body) > 0)):
+                        captured_responses.append({"url": url, "data": body, "status": response.status})
+                except Exception:
+                    pass
+
+        page.on("response", capture_response)
+
         # Helper: navigate to page, wait, extract table data
         async def scrape_page(name, url, wait_selector=None, wait_time=5):
             print(f"  [{name}] → {url}")
@@ -247,16 +265,15 @@ async def run():
         # Saucers — get ALL platillos with name, group, price
         print("  [Saucers] Navigating to Menu/Saucer...")
         try:
+            captured_responses.clear()
             await page.goto(f"{WANSOFT_URL}/Menu/Saucer", wait_until="load", timeout=30000)
             await asyncio.sleep(5)
 
-            # Close modals
+            # Close modals + select subsidiary
             await page.evaluate("""() => {
                 document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
                 document.querySelectorAll('.ui-dialog').forEach(el => el.remove());
             }""")
-
-            # Select subsidiary
             await page.evaluate(f"""() => {{
                 const selects = document.querySelectorAll('select');
                 for (const sel of selects) {{
@@ -268,11 +285,10 @@ async def run():
                     }}
                 }}
             }}""")
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
             # Try to show ALL items (expand pagination)
             await page.evaluate("""() => {
-                // Look for "show all" or page size selector
                 const pageSel = document.querySelector('select[name*="length"], select[class*="page-size"]');
                 if (pageSel) {
                     for (const opt of pageSel.options) {
@@ -283,7 +299,6 @@ async def run():
                         }
                     }
                 }
-                // Click search/filter
                 const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
                 for (const b of btns) {
                     const txt = (b.textContent || b.value || '').toLowerCase();
@@ -294,8 +309,35 @@ async def run():
             }""")
             await asyncio.sleep(5)
 
-            # Extract all saucer data
-            saucers_catalog = await page.evaluate("""() => {
+            # Check XHR captures first (most reliable)
+            saucers_from_xhr = []
+            for cap in captured_responses:
+                data = cap["data"]
+                if isinstance(data, list) and len(data) > 5:
+                    # Likely the saucer list
+                    print(f"    [XHR] Captured {len(data)} items from {cap['url'][-60:]}")
+                    saucers_from_xhr = data
+                    break
+                elif isinstance(data, dict):
+                    # jqGrid format: {"rows": [...], "total": N}
+                    for key in ("rows", "data", "items", "Data", "Rows"):
+                        if key in data and isinstance(data[key], list) and len(data[key]) > 5:
+                            print(f"    [XHR] Captured {len(data[key])} items from {cap['url'][-60:]} (key={key})")
+                            saucers_from_xhr = data[key]
+                            break
+                    if saucers_from_xhr:
+                        break
+
+            if saucers_from_xhr:
+                saucers_catalog = saucers_from_xhr
+                print(f"    Got {len(saucers_catalog)} saucers via XHR")
+            else:
+                print(f"    No XHR data. Captured {len(captured_responses)} responses. Falling back to DOM...")
+                for cap in captured_responses:
+                    print(f"      {cap['url'][-80:]} → type={type(cap['data']).__name__}, len={len(cap['data']) if isinstance(cap['data'], (list, dict)) else '?'}")
+
+                # Fallback: extract from DOM
+                saucers_catalog = await page.evaluate("""() => {
                 const items = [];
 
                 // Try .rowReport (Wansoft standard)
@@ -382,10 +424,9 @@ async def run():
         # Complements/Modifiers
         print("  [Complements] Navigating to Menu/Complementary...")
         try:
+            captured_responses.clear()
             await page.goto(f"{WANSOFT_URL}/Menu/Complementary", wait_until="load", timeout=30000)
             await asyncio.sleep(5)
-
-            # Close modals + select subsidiary
             await page.evaluate("""() => {
                 document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
             }""")
@@ -402,37 +443,28 @@ async def run():
             }}""")
             await asyncio.sleep(3)
 
-            complements_catalog = await page.evaluate("""() => {
-                const items = [];
-                // rowReport
-                const rows = document.querySelectorAll('.rowReport');
-                if (rows.length > 0) {
-                    for (const row of rows) {
-                        const cols = Array.from(row.querySelectorAll('div')).map(d => d.textContent.trim());
-                        if (cols.length >= 1 && cols[0]) {
-                            items.push({
-                                name: cols[0],
-                                price: cols.length > 1 ? parseFloat((cols[1] || '0').replace(/[$,]/g, '')) || 0 : 0,
-                                group: cols.length > 2 ? cols[2] : '',
-                            });
-                        }
+            # Check XHR
+            complements_catalog = []
+            for cap in captured_responses:
+                data = cap["data"]
+                items = data if isinstance(data, list) else data.get("rows", data.get("data", data.get("Data", [])))
+                if isinstance(items, list) and len(items) > 0:
+                    complements_catalog = items
+                    print(f"    [XHR] Captured {len(items)} complements from {cap['url'][-60:]}")
+                    break
+
+            if not complements_catalog:
+                print(f"    No XHR. Captured {len(captured_responses)} responses. Trying DOM...")
+                complements_catalog = await page.evaluate("""() => {
+                    const items = [];
+                    const allRows = document.querySelectorAll('.rowReport, table tbody tr, .ui-jqgrid-bdiv tr');
+                    for (const tr of allRows) {
+                        const cols = Array.from(tr.querySelectorAll('td, div')).map(el => el.textContent.trim());
+                        if (cols.length >= 1 && cols[0] && !cols[0].includes('No records'))
+                            items.push({ name: cols[0], price: cols.length > 1 ? parseFloat((cols[1]||'0').replace(/[$,]/g,''))||0 : 0 });
                     }
                     return items;
-                }
-                // Tables + jqGrid
-                const allRows = document.querySelectorAll('table tbody tr, .ui-jqgrid-bdiv tr, [id*="grid"] tr');
-                for (const tr of allRows) {
-                    const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
-                    if (cols.length >= 1 && cols[0] && !cols[0].includes('No records')) {
-                        items.push({
-                            name: cols[0],
-                            price: cols.length > 1 ? parseFloat((cols[1] || '0').replace(/[$,]/g, '')) || 0 : 0,
-                            group: cols.length > 2 ? cols[2] : '',
-                        });
-                    }
-                }
-                return items;
-            }""")
+                }""")
 
             if complements_catalog:
                 print(f"    Modificadores: {len(complements_catalog)}")
@@ -447,23 +479,34 @@ async def run():
         # Groups
         print("  [Groups] Navigating to Menu/Group...")
         try:
+            captured_responses.clear()
             await page.goto(f"{WANSOFT_URL}/Menu/Group", wait_until="load", timeout=30000)
             await asyncio.sleep(5)
             await page.evaluate("""() => {
                 document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
             }""")
 
-            groups_catalog = await page.evaluate("""() => {
-                const items = [];
-                const allRows = document.querySelectorAll('.rowReport, table tbody tr, .ui-jqgrid-bdiv tr, [id*="grid"] tr');
-                for (const tr of allRows) {
-                    const cols = tr.querySelectorAll ? Array.from(tr.querySelectorAll('td, div')).map(el => el.textContent.trim()) : [];
-                    if (cols.length >= 1 && cols[0] && !cols[0].includes('No records')) {
-                        items.push({ name: cols[0], id: cols.length > 1 ? cols[1] : '' });
+            groups_catalog = []
+            for cap in captured_responses:
+                data = cap["data"]
+                items = data if isinstance(data, list) else data.get("rows", data.get("data", data.get("Data", [])))
+                if isinstance(items, list) and len(items) > 0:
+                    groups_catalog = items
+                    print(f"    [XHR] Captured {len(items)} groups from {cap['url'][-60:]}")
+                    break
+
+            if not groups_catalog:
+                print(f"    No XHR. Captured {len(captured_responses)} responses. Trying DOM...")
+                groups_catalog = await page.evaluate("""() => {
+                    const items = [];
+                    const allRows = document.querySelectorAll('.rowReport, table tbody tr, .ui-jqgrid-bdiv tr');
+                    for (const tr of allRows) {
+                        const cols = Array.from(tr.querySelectorAll('td, div')).map(el => el.textContent.trim());
+                        if (cols.length >= 1 && cols[0] && !cols[0].includes('No records'))
+                            items.push({ name: cols[0], id: cols.length > 1 ? cols[1] : '' });
                     }
-                }
-                return items;
-            }""")
+                    return items;
+                }""")
 
             if groups_catalog:
                 print(f"    Grupos: {len(groups_catalog)}")
