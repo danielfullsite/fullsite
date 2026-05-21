@@ -241,16 +241,253 @@ async def run():
         if reorder_data.get("count", 0) > 0 and reorder_data["type"] not in ("error", "empty"):
             results["reorden"] = reorder_data.get("count", 0)
 
-        # ── MENU ─────────────────────────────────────────────────
-        print("\n━━━ MENU (Browser) ━━━")
+        # ── MENU (Full catalog extraction) ──────────────────────
+        print("\n━━━ MENU CATALOG (Browser) ━━━")
 
-        saucers_data = await scrape_page("Saucers", "Menu/Saucer")
-        if saucers_data.get("count", 0) > 0 and saucers_data["type"] != "error":
-            results["platillos"] = saucers_data.get("count", 0)
+        # Saucers — get ALL platillos with name, group, price
+        print("  [Saucers] Navigating to Menu/Saucer...")
+        try:
+            await page.goto(f"{WANSOFT_URL}/Menu/Saucer", wait_until="load", timeout=30000)
+            await asyncio.sleep(5)
 
-        complements_data = await scrape_page("Complements", "Menu/Complementary")
-        if complements_data.get("count", 0) > 0 and complements_data["type"] != "error":
-            results["modificadores"] = complements_data.get("count", 0)
+            # Close modals
+            await page.evaluate("""() => {
+                document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
+                document.querySelectorAll('.ui-dialog').forEach(el => el.remove());
+            }""")
+
+            # Select subsidiary
+            await page.evaluate(f"""() => {{
+                const selects = document.querySelectorAll('select');
+                for (const sel of selects) {{
+                    for (const opt of sel.options) {{
+                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                            opt.selected = true;
+                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                }}
+            }}""")
+            await asyncio.sleep(2)
+
+            # Try to show ALL items (expand pagination)
+            await page.evaluate("""() => {
+                // Look for "show all" or page size selector
+                const pageSel = document.querySelector('select[name*="length"], select[class*="page-size"]');
+                if (pageSel) {
+                    for (const opt of pageSel.options) {
+                        if (opt.value === '-1' || opt.text.includes('Todos') || opt.text.includes('All') || parseInt(opt.value) >= 500) {
+                            opt.selected = true;
+                            pageSel.dispatchEvent(new Event('change', {bubbles: true}));
+                            break;
+                        }
+                    }
+                }
+                // Click search/filter
+                const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                for (const b of btns) {
+                    const txt = (b.textContent || b.value || '').toLowerCase();
+                    if (txt.includes('buscar') || txt.includes('search') || txt.includes('filtrar') || txt.includes('consultar')) {
+                        b.click(); break;
+                    }
+                }
+            }""")
+            await asyncio.sleep(5)
+
+            # Extract all saucer data
+            saucers_catalog = await page.evaluate("""() => {
+                const items = [];
+
+                // Try .rowReport (Wansoft standard)
+                const rows = document.querySelectorAll('.rowReport');
+                if (rows.length > 0) {
+                    for (const row of rows) {
+                        const cols = Array.from(row.querySelectorAll('div')).map(d => d.textContent.trim());
+                        if (cols.length >= 2 && cols[0]) {
+                            items.push({
+                                name: cols[0],
+                                group: cols.length > 1 ? cols[1] : '',
+                                price: cols.length > 2 ? parseFloat((cols[2] || '0').replace(/[$,]/g, '')) || 0 : 0,
+                                active: cols.length > 3 ? cols[3] : '',
+                            });
+                        }
+                    }
+                    return items;
+                }
+
+                // Try tables
+                const tables = document.querySelectorAll('table');
+                for (const table of tables) {
+                    const trs = table.querySelectorAll('tbody tr, tr');
+                    if (trs.length > 2) {
+                        // Get header to identify columns
+                        const headerRow = table.querySelector('thead tr, tr:first-child');
+                        const headers = headerRow ? Array.from(headerRow.querySelectorAll('th, td')).map(h => h.textContent.trim().toLowerCase()) : [];
+
+                        const nameIdx = headers.findIndex(h => h.includes('nombre') || h.includes('platillo') || h.includes('saucer') || h.includes('name'));
+                        const groupIdx = headers.findIndex(h => h.includes('grupo') || h.includes('group') || h.includes('categoria'));
+                        const priceIdx = headers.findIndex(h => h.includes('precio') || h.includes('price') || h.includes('costo'));
+
+                        for (const tr of trs) {
+                            const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                            if (cols.length >= 2 && cols[0]) {
+                                items.push({
+                                    name: cols[nameIdx >= 0 ? nameIdx : 0],
+                                    group: cols[groupIdx >= 0 ? groupIdx : 1] || '',
+                                    price: parseFloat((cols[priceIdx >= 0 ? priceIdx : 2] || '0').replace(/[$,]/g, '')) || 0,
+                                    active: '',
+                                });
+                            }
+                        }
+                        return items;
+                    }
+                }
+
+                // Try jqGrid (Wansoft uses jqGrid in some views)
+                const gridRows = document.querySelectorAll('#gridSaucer tr, .ui-jqgrid-bdiv tr, [id*="grid"] tr');
+                for (const tr of gridRows) {
+                    const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                    if (cols.length >= 2 && cols[0] && !cols[0].includes('No records')) {
+                        items.push({
+                            name: cols[0],
+                            group: cols.length > 1 ? cols[1] : '',
+                            price: cols.length > 2 ? parseFloat((cols[2] || '0').replace(/[$,]/g, '')) || 0 : 0,
+                            active: cols.length > 3 ? cols[3] : '',
+                        });
+                    }
+                }
+                if (items.length > 0) return items;
+
+                // Last resort: capture page structure for debugging
+                const bodyText = document.querySelector('.content-wrapper, main, #content, body')?.textContent?.substring(0, 3000) || '';
+                return [{_debug: true, text: bodyText}];
+            }""")
+
+            if saucers_catalog and len(saucers_catalog) > 0:
+                debug = any(isinstance(s, dict) and s.get("_debug") for s in saucers_catalog)
+                if debug:
+                    print(f"    [debug] Page text: {str(saucers_catalog[0].get('text', ''))[:200]}")
+                    results["platillos"] = 0
+                else:
+                    with_price = sum(1 for s in saucers_catalog if s.get("price", 0) > 0)
+                    print(f"    Platillos: {len(saucers_catalog)} ({with_price} con precio)")
+                    results["platillos"] = len(saucers_catalog)
+                    results["platillos_con_precio"] = with_price
+            else:
+                print("    No saucers found")
+        except Exception as e:
+            print(f"    ERROR saucers: {e}")
+            saucers_catalog = []
+
+        # Complements/Modifiers
+        print("  [Complements] Navigating to Menu/Complementary...")
+        try:
+            await page.goto(f"{WANSOFT_URL}/Menu/Complementary", wait_until="load", timeout=30000)
+            await asyncio.sleep(5)
+
+            # Close modals + select subsidiary
+            await page.evaluate("""() => {
+                document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
+            }""")
+            await page.evaluate(f"""() => {{
+                const selects = document.querySelectorAll('select');
+                for (const sel of selects) {{
+                    for (const opt of sel.options) {{
+                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                            opt.selected = true;
+                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                }}
+            }}""")
+            await asyncio.sleep(3)
+
+            complements_catalog = await page.evaluate("""() => {
+                const items = [];
+                // rowReport
+                const rows = document.querySelectorAll('.rowReport');
+                if (rows.length > 0) {
+                    for (const row of rows) {
+                        const cols = Array.from(row.querySelectorAll('div')).map(d => d.textContent.trim());
+                        if (cols.length >= 1 && cols[0]) {
+                            items.push({
+                                name: cols[0],
+                                price: cols.length > 1 ? parseFloat((cols[1] || '0').replace(/[$,]/g, '')) || 0 : 0,
+                                group: cols.length > 2 ? cols[2] : '',
+                            });
+                        }
+                    }
+                    return items;
+                }
+                // Tables + jqGrid
+                const allRows = document.querySelectorAll('table tbody tr, .ui-jqgrid-bdiv tr, [id*="grid"] tr');
+                for (const tr of allRows) {
+                    const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                    if (cols.length >= 1 && cols[0] && !cols[0].includes('No records')) {
+                        items.push({
+                            name: cols[0],
+                            price: cols.length > 1 ? parseFloat((cols[1] || '0').replace(/[$,]/g, '')) || 0 : 0,
+                            group: cols.length > 2 ? cols[2] : '',
+                        });
+                    }
+                }
+                return items;
+            }""")
+
+            if complements_catalog:
+                print(f"    Modificadores: {len(complements_catalog)}")
+                results["modificadores"] = len(complements_catalog)
+            else:
+                print("    No complements found")
+                complements_catalog = []
+        except Exception as e:
+            print(f"    ERROR complements: {e}")
+            complements_catalog = []
+
+        # Groups
+        print("  [Groups] Navigating to Menu/Group...")
+        try:
+            await page.goto(f"{WANSOFT_URL}/Menu/Group", wait_until="load", timeout=30000)
+            await asyncio.sleep(5)
+            await page.evaluate("""() => {
+                document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
+            }""")
+
+            groups_catalog = await page.evaluate("""() => {
+                const items = [];
+                const allRows = document.querySelectorAll('.rowReport, table tbody tr, .ui-jqgrid-bdiv tr, [id*="grid"] tr');
+                for (const tr of allRows) {
+                    const cols = tr.querySelectorAll ? Array.from(tr.querySelectorAll('td, div')).map(el => el.textContent.trim()) : [];
+                    if (cols.length >= 1 && cols[0] && !cols[0].includes('No records')) {
+                        items.push({ name: cols[0], id: cols.length > 1 ? cols[1] : '' });
+                    }
+                }
+                return items;
+            }""")
+
+            if groups_catalog:
+                print(f"    Grupos: {len(groups_catalog)}")
+                results["grupos"] = len(groups_catalog)
+            else:
+                print("    No groups found")
+                groups_catalog = []
+        except Exception as e:
+            print(f"    ERROR groups: {e}")
+            groups_catalog = []
+
+        # Save full menu catalog to Supabase
+        print("\n  [Save] Saving menu catalog to Supabase...")
+        menu_data = {
+            "client_id": CLIENT["id"],
+            "fecha": today_str,
+            "groups": json.dumps(groups_catalog),
+            "saucers": json.dumps([s for s in saucers_catalog if not s.get("_debug")]),
+            "saucers_with_cost": json.dumps([]),
+            "complements": json.dumps(complements_catalog),
+            "promotions": json.dumps([]),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        sb_upsert("wansoft_menu_config", menu_data)
 
         # ── STAFF ────────────────────────────────────────────────
         print("\n━━━ STAFF (Browser) ━━━")
