@@ -1511,19 +1511,25 @@ function POSContent() {
                 }
                 return (
                   <div className="space-y-2">
-                    {results.map(({ item, category, catId }) => (
-                      <button
-                        key={item.id}
-                        onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                        className="w-full bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 rounded-lg px-3 py-3 text-left transition-colors flex items-center justify-between min-h-[48px]"
-                      >
-                        <div>
-                          <span className="font-semibold text-base text-white">{item.name}</span>
-                          <span className="text-slate-500 text-xs ml-2">{category}</span>
-                        </div>
-                        <span className="text-emerald-400 font-bold text-lg">{formatMXN(item.price)}</span>
-                      </button>
-                    ))}
+                    {results.map(({ item, category, catId }) => {
+                      const catColor = MENU_CATEGORIES.find(c => c.id === catId)?.color || 'bg-emerald-600'
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
+                          className="w-full bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/30 border border-slate-700 rounded-lg text-left transition-colors flex items-center min-h-[48px] overflow-hidden"
+                        >
+                          <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
+                          <div className="flex items-center justify-between flex-1 px-3 py-3">
+                            <div>
+                              <span className="font-semibold text-base text-white">{item.name}</span>
+                              <span className="text-slate-500 text-xs ml-2">{category}</span>
+                            </div>
+                            <span className="text-emerald-400 font-bold text-lg">{formatMXN(item.price)}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 )
               })()}
@@ -1554,14 +1560,17 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl px-4 py-5 text-left transition-all flex flex-col justify-between min-h-[90px]"
+                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden"
                     >
-                      <span className="font-bold text-base leading-snug text-white">
-                        {item.name}
-                      </span>
-                      <span className="text-emerald-400 font-bold text-lg mt-2">
-                        ${Math.round(item.price)}
-                      </span>
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${activeCategory.color || 'bg-emerald-600'}`} />
+                      <div className="flex flex-col justify-between px-4 py-5 flex-1">
+                        <span className="font-bold text-base leading-snug text-white">
+                          {item.name}
+                        </span>
+                        <span className="text-emerald-400 font-bold text-lg mt-2">
+                          ${Math.round(item.price)}
+                        </span>
+                      </div>
                     </button>
                   ))}
                 </div>

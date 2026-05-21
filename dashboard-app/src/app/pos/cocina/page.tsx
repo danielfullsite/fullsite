@@ -245,6 +245,46 @@ export default function CocinaPage() {
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
 
+  // Production area classification for summary bar
+  const AREA_KEYWORDS: Record<string, string[]> = {
+    'Caliente': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque'],
+    'Fría': ['bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
+    'Bebidas': ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
+    'Panadería': ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
+  }
+
+  const AREA_COLORS: Record<string, string> = {
+    'Caliente': 'bg-red-500',
+    'Fría': 'bg-cyan-500',
+    'Bebidas': 'bg-amber-500',
+    'Panadería': 'bg-orange-400',
+  }
+
+  const areaCounts = (() => {
+    const counts: Record<string, number> = { 'Caliente': 0, 'Fría': 0, 'Bebidas': 0, 'Panadería': 0 }
+    const pendingOrders = orders.filter(o => o.status === 'enviada' || o.status === 'preparando')
+    for (const order of pendingOrders) {
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      for (const item of items) {
+        if (item.cancelled) continue
+        const name = (item.nombre || item.name || '').toLowerCase()
+        const qty = item.cantidad || item.quantity || 1
+        let matched = false
+        for (const [area, keywords] of Object.entries(AREA_KEYWORDS)) {
+          if (keywords.some(kw => name.includes(kw))) {
+            counts[area] += qty
+            matched = true
+            break
+          }
+        }
+        if (!matched) counts['Caliente'] += qty // default to hot kitchen
+      }
+    }
+    return counts
+  })()
+
+  const totalPendingItems = Object.values(areaCounts).reduce((a, b) => a + b, 0)
+
   const sortedOrders = [...orders].sort((a, b) => {
     const priority: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
     return (priority[a.status] || 3) - (priority[b.status] || 3)
@@ -282,6 +322,23 @@ export default function CocinaPage() {
           </div>
         </div>
       </header>
+
+      {/* Production area summary bar */}
+      {totalPendingItems > 0 && (
+        <div className="flex items-center gap-4 px-6 py-2.5 bg-slate-800/60 border-b border-slate-700/50 flex-shrink-0">
+          {Object.entries(areaCounts).map(([area, count]) => (
+            <div key={area} className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${AREA_COLORS[area]}`} />
+              <span className="text-sm text-slate-300">
+                {area}: <span className={`font-bold ${count > 0 ? 'text-white' : 'text-slate-500'}`}>{count}</span>
+              </span>
+            </div>
+          ))}
+          <div className="ml-auto text-xs text-slate-500">
+            {totalPendingItems} items pendientes
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
