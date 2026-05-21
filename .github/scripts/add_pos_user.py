@@ -19,10 +19,13 @@ headers = {
     "Prefer": "resolution=merge-duplicates,return=representation",
 }
 
+import uuid
+staff_id = os.environ.get("STAFF_ID", str(uuid.uuid4())[:8])
+
 r = requests.post(
     f"{SUPABASE_URL}/rest/v1/pos_staff",
     headers=headers,
-    json={"name": name, "pin": pin, "role": role, "active": True, "client_id": client_id},
+    json={"id": staff_id, "name": name, "pin": pin, "role": role, "active": True, "client_id": client_id},
     timeout=15,
 )
 
