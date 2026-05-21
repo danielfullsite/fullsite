@@ -143,6 +143,8 @@ export interface MenuItem {
   id: string
   name: string
   price: number
+  promo?: boolean
+  barcode?: string
 }
 
 export interface MenuCategory {
@@ -347,7 +349,15 @@ export interface Mesa {
 
 export const MENU_CATEGORIES: MenuCategory[] = [
   {
-    id: 'chilaquiles', name: 'Chilaquiles', color: 'bg-red-600', items: [
+    id: 'promos', name: 'Especiales', color: 'bg-red-600', items: [
+      { id: 'promo1', name: 'Combo Amalay', price: 360, promo: true },
+      { id: 'promo2', name: 'Half & Half Combo', price: 287, promo: true },
+      { id: 'promo3', name: 'Egg and Pancake Combo', price: 277, promo: true },
+      { id: 'promo4', name: 'French Toast', price: 220, promo: true },
+    ]
+  },
+  {
+    id: 'chilaquiles', name: 'Chilaquiles', color: 'bg-rose-700', items: [
       { id: 'c1a', name: 'Chilaquiles Verdes', price: 292 },
       { id: 'c1b', name: 'Chilaquiles Rojos', price: 292 },
       { id: 'c2', name: 'Chilaquiles Light', price: 304 },

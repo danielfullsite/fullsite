@@ -200,6 +200,36 @@ def get_monthly_ticket_avg():
         return []
 
 
+def get_tp_weekday_weekend():
+    """Get ticket promedio split by weekday vs weekend from last 30 days."""
+    try:
+        now_mx = datetime.now(MX_TZ)
+        thirty_ago = (now_mx - timedelta(days=30)).strftime("%Y-%m-%d")
+        rows = sb_get("wansoft_daily", {
+            "select": "fecha,ventas_dia,tickets_count",
+            "fecha": f"gte.{thirty_ago}",
+            "ventas_dia": "gt.0",
+            "order": "fecha.asc",
+        })
+        weekday = {"ventas": 0, "tickets": 0, "dias": 0}
+        weekend = {"ventas": 0, "tickets": 0, "dias": 0}
+        for row in rows:
+            from datetime import date as dt_date
+            y, m, d = row["fecha"].split("-")
+            dow = dt_date(int(y), int(m), int(d)).weekday()  # 0=Mon, 6=Sun
+            bucket = weekend if dow >= 5 else weekday
+            bucket["ventas"] += row.get("ventas_dia") or 0
+            bucket["tickets"] += row.get("tickets_count") or 0
+            bucket["dias"] += 1
+        wd_tp = int(weekday["ventas"] / weekday["tickets"]) if weekday["tickets"] else 0
+        we_tp = int(weekend["ventas"] / weekend["tickets"]) if weekend["tickets"] else 0
+        return {"weekday_tp": wd_tp, "weekend_tp": we_tp,
+                "weekday_dias": weekday["dias"], "weekend_dias": weekend["dias"]}
+    except Exception as e:
+        print(f"Error getting TP weekday/weekend: {e}")
+        return None
+
+
 # ── Build message ───────────────────────────────────────────────────────────
 def build_message(consolidated, users, groups, saucers, order_types, monthly_avg):
     now_mx = datetime.now(MX_TZ)
@@ -245,6 +275,18 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
     for m in monthly_avg[-6:]:
         msg += f"\n• {m['month']}: ${m['avg']:,.0f} (${m['ventas']:,.0f} en {m['days']} días)"
+
+    # TP weekday vs weekend
+    tp_split = get_tp_weekday_weekend()
+    if tp_split and tp_split["weekday_tp"] > 0:
+        msg += f"\n\n📊 TP ENTRE SEMANA vs FIN DE SEMANA (30d)"
+        msg += f"\n• Lun-Vie: ${tp_split['weekday_tp']:,} ({tp_split['weekday_dias']}d)"
+        msg += f"\n• Sáb-Dom: ${tp_split['weekend_tp']:,} ({tp_split['weekend_dias']}d)"
+        diff = tp_split['weekend_tp'] - tp_split['weekday_tp']
+        if diff > 0:
+            msg += f"\n• Fin de semana +${diff:,} por ticket"
+        elif diff < 0:
+            msg += f"\n• Entre semana +${abs(diff):,} por ticket"
 
     msg += f"""
 

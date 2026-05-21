@@ -1,8 +1,9 @@
-name: Agents — Daily (Kitchen + Table Time)
+name: Agents — Daily (Kitchen + Table Time + Config Validator)
 
 on:
   schedule:
     # 3pm MX = 21:00 UTC, 4pm = 22:00, 7pm = 01:00+1
+    - cron: '0 13 * * *'   # 7am MX — Config Validator
     - cron: '0 22 * * *'   # 4pm MX — Kitchen Quality
     - cron: '0 1 * * *'    # 7pm MX — Table Time
   workflow_dispatch:
@@ -35,3 +36,12 @@ jobs:
         with: { python-version: '3.11' }
       - run: pip install requests
       - run: python .github/scripts/table_time_agent.py
+
+  config-validator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install requests
+      - run: python .github/scripts/config_validator.py

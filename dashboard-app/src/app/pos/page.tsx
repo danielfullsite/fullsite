@@ -1588,9 +1588,18 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border border-slate-700 hover:border-emerald-600/40 rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden"
+                      className={`bg-slate-800 hover:bg-slate-700 active:bg-emerald-900/40 active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative ${
+                        (item as MenuItem & { promo?: boolean }).promo
+                          ? 'border-red-500/60 ring-1 ring-red-500/30'
+                          : 'border-slate-700 hover:border-emerald-600/40'
+                      }`}
                     >
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${activeCategory.color || 'bg-emerald-600'}`} />
+                      {(item as MenuItem & { promo?: boolean }).promo && (
+                        <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                          Promo
+                        </span>
+                      )}
                       <div className="flex flex-col justify-between px-4 py-5 flex-1">
                         <span className="font-bold text-base leading-snug text-white">
                           {item.name}
