@@ -48,13 +48,67 @@ def wansoft_session():
     return s
 
 
-def wansoft_post(session, path, params):
-    """POST to Wansoft endpoint, return parsed response."""
+def safe_float(val):
+    try:
+        return float(str(val).replace("$", "").replace(",", "").replace("%", "").strip())
+    except (ValueError, TypeError):
+        return 0
+
+
+def parse_any_table(html):
+    """Parse any table/row structure from HTML."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    # Try .rowReport first (Wansoft standard)
+    rows = soup.select(".rowReport")
+    if rows:
+        results = []
+        for row in rows:
+            cols = [c.text.strip() for c in row.select("div")]
+            if cols and any(c for c in cols):
+                results.append(cols)
+        return results
+    # Try standard table
+    tables = soup.select("table")
+    for table in tables:
+        trs = table.select("tr")
+        if len(trs) > 1:
+            results = []
+            for tr in trs:
+                cols = [td.text.strip() for td in tr.select("td")]
+                if cols and any(c for c in cols):
+                    results.append(cols)
+            return results
+    # Try div patterns
+    all_divs = soup.select("div[class*='row'], div[class*='item'], div[class*='record']")
+    if all_divs:
+        results = []
+        for div in all_divs:
+            text = div.get_text(separator="|").strip()
+            if text:
+                results.append(text.split("|"))
+        return results
+    return []
+
+
+def wansoft_fetch(session, path, params):
+    """POST to Wansoft, return (type, data)."""
     r = session.post(f"{WANSOFT_URL}/{path}", data=params, timeout=30)
-    content_type = r.headers.get("Content-Type", "")
-    if "json" in content_type:
-        return r.json()
-    return r.text
+    # Try JSON first
+    try:
+        data = r.json()
+        if data:
+            return "json", data
+    except (ValueError, Exception):
+        pass
+    # Try HTML parsing
+    rows = parse_any_table(r.text)
+    if rows:
+        return "html", rows
+    # Debug: show preview
+    preview = r.text[:300].strip()
+    print(f"    Empty response preview: {preview[:150]}")
+    return "empty", []
 
 
 def sb_upsert(table, data):
@@ -98,123 +152,44 @@ def main():
     params = {"subsidiaryId": SUBSIDIARY_ID}
     results = {}
 
-    # ── 1. Groups (categorías del menú) ─────────────────────────────────
-    print("\n[1] Fetching menu groups...")
-    try:
-        groups_raw = wansoft_post(session, "Menu/GetGroupList", params)
-        groups = []
-        if isinstance(groups_raw, list):
-            groups = groups_raw
-        elif isinstance(groups_raw, str):
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(groups_raw, "html.parser")
-            for row in soup.select(".rowReport, tr"):
-                cols = [c.text.strip() for c in row.select("div, td")]
-                if len(cols) >= 2:
-                    groups.append({"name": cols[0], "id": cols[1] if len(cols) > 1 else ""})
-        print(f"  Groups: {len(groups)}")
-        results["groups"] = groups
-    except Exception as e:
-        print(f"  ERROR: {e}")
-        results["groups"] = []
+    endpoints = [
+        ("groups", "Menu/GetGroupList", params),
+        ("saucers", "Menu/GetSaucerList", params),
+        ("saucers_with_cost", "Reports/GetSaucersWithCost", params),
+        ("complements", "Menu/GetComplementaryList", params),
+        ("promotions", "Menu/GetPromotionList", params),
+    ]
 
-    # ── 2. Saucers (platillos con precios) ──────────────────────────────
-    print("\n[2] Fetching saucers (platillos)...")
-    try:
-        saucers_raw = wansoft_post(session, "Menu/GetSaucerList", params)
-        saucers = []
-        if isinstance(saucers_raw, list):
-            saucers = saucers_raw
-        elif isinstance(saucers_raw, str):
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(saucers_raw, "html.parser")
-            for row in soup.select(".rowReport, tr"):
-                cols = [c.text.strip() for c in row.select("div, td")]
-                if len(cols) >= 3:
-                    try:
-                        price = float(cols[2].replace("$", "").replace(",", "")) if cols[2] else 0
-                    except (ValueError, IndexError):
-                        price = 0
-                    saucers.append({"name": cols[0], "group": cols[1] if len(cols) > 1 else "", "price": price})
-        print(f"  Saucers: {len(saucers)}")
-        results["saucers"] = saucers
+    for i, (key, path, ep_params) in enumerate(endpoints, 1):
+        print(f"\n[{i}] Fetching {key} → {path}...")
+        try:
+            dtype, raw = wansoft_fetch(session, path, ep_params)
+            print(f"  Type: {dtype}, Raw items: {len(raw) if isinstance(raw, list) else 'dict'}")
 
-        # Count items with price vs without
-        with_price = sum(1 for s in saucers if isinstance(s, dict) and (s.get("price") or s.get("Price") or 0) > 0)
-        print(f"  With price: {with_price}, Without price: {len(saucers) - with_price}")
-    except Exception as e:
-        print(f"  ERROR: {e}")
-        results["saucers"] = []
+            items = []
+            if dtype == "json" and isinstance(raw, list):
+                items = raw
+            elif dtype == "html" and isinstance(raw, list):
+                # Transform HTML rows into dicts
+                for cols in raw:
+                    if len(cols) >= 2:
+                        item = {"name": cols[0]}
+                        if len(cols) >= 3:
+                            item["price"] = safe_float(cols[2])
+                        if len(cols) >= 4:
+                            item["cost"] = safe_float(cols[3])
+                        if len(cols) >= 5:
+                            item["margin_pct"] = safe_float(cols[4])
+                        # Second col is usually group or category
+                        item["group"] = cols[1]
+                        items.append(item)
 
-    # ── 3. Saucers with cost (food cost data) ──────────────────────────
-    print("\n[3] Fetching saucers with cost...")
-    try:
-        cost_raw = wansoft_post(session, "Reports/GetSaucersWithCost", params)
-        costs = []
-        if isinstance(cost_raw, list):
-            costs = cost_raw
-        elif isinstance(cost_raw, str):
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(cost_raw, "html.parser")
-            for row in soup.select(".rowReport, tr"):
-                cols = [c.text.strip() for c in row.select("div, td")]
-                if len(cols) >= 4:
-                    try:
-                        price = float(cols[1].replace("$", "").replace(",", "")) if cols[1] else 0
-                        cost = float(cols[2].replace("$", "").replace(",", "")) if cols[2] else 0
-                        margin = float(cols[3].replace("%", "").replace(",", "")) if cols[3] else 0
-                    except ValueError:
-                        price, cost, margin = 0, 0, 0
-                    costs.append({"name": cols[0], "price": price, "cost": cost, "margin_pct": margin})
-        print(f"  Saucers with cost: {len(costs)}")
-        results["saucers_with_cost"] = costs
-    except Exception as e:
-        print(f"  ERROR: {e}")
-        results["saucers_with_cost"] = []
-
-    # ── 4. Complements (modificadores) ──────────────────────────────────
-    print("\n[4] Fetching complements (modificadores)...")
-    try:
-        comp_raw = wansoft_post(session, "Menu/GetComplementaryList", params)
-        complements = []
-        if isinstance(comp_raw, list):
-            complements = comp_raw
-        elif isinstance(comp_raw, str):
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(comp_raw, "html.parser")
-            for row in soup.select(".rowReport, tr"):
-                cols = [c.text.strip() for c in row.select("div, td")]
-                if len(cols) >= 2:
-                    try:
-                        price = float(cols[1].replace("$", "").replace(",", "")) if cols[1] else 0
-                    except ValueError:
-                        price = 0
-                    complements.append({"name": cols[0], "price": price})
-        print(f"  Complements: {len(complements)}")
-        results["complements"] = complements
-    except Exception as e:
-        print(f"  ERROR: {e}")
-        results["complements"] = []
-
-    # ── 5. Promotions ───────────────────────────────────────────────────
-    print("\n[5] Fetching promotions...")
-    try:
-        promo_raw = wansoft_post(session, "Menu/GetPromotionList", params)
-        promos = []
-        if isinstance(promo_raw, list):
-            promos = promo_raw
-        elif isinstance(promo_raw, str):
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(promo_raw, "html.parser")
-            for row in soup.select(".rowReport, tr"):
-                cols = [c.text.strip() for c in row.select("div, td")]
-                if len(cols) >= 2:
-                    promos.append({"name": cols[0], "details": cols[1] if len(cols) > 1 else ""})
-        print(f"  Promotions: {len(promos)}")
-        results["promotions"] = promos
-    except Exception as e:
-        print(f"  ERROR: {e}")
-        results["promotions"] = []
+            results[key] = items
+            with_price = sum(1 for s in items if isinstance(s, dict) and safe_float(s.get("price", s.get("Price", 0))) > 0)
+            print(f"  Parsed: {len(items)} items ({with_price} with price)")
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            results[key] = []
 
     # ── Save to Supabase ────────────────────────────────────────────────
     print("\n[6] Saving to Supabase...")
