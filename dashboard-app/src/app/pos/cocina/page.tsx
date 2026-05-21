@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X } from 'lucide-react'
 import {
@@ -59,7 +59,7 @@ export default function CocinaPage() {
     'Tiempo de espera excesivo',
   ]
 
-  const prevOrderCountRef = { current: 0 }
+  const prevOrderCountRef = useRef(0)
 
   const playNotificationSound = () => {
     try {
@@ -230,12 +230,17 @@ export default function CocinaPage() {
     else if (currentStatus === 'preparando') newStatus = 'lista'
     else if (currentStatus === 'lista') newStatus = 'entregada'
     if (newStatus) {
-      await updateOrderStatus(id, newStatus)
-      logAudit({
-        order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
-        details: { from: currentStatus, to: newStatus, mesero },
-      })
-      fetchOrders()
+      try {
+        await updateOrderStatus(id, newStatus)
+        logAudit({
+          order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
+          details: { from: currentStatus, to: newStatus, mesero },
+        })
+        fetchOrders()
+      } catch (err) {
+        console.error('Error advancing status:', err)
+        alert('Error al cambiar estado. Intenta de nuevo.')
+      }
     }
   }
 

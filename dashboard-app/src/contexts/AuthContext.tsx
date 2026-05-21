@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const parsed = JSON.parse(stored)
             if (parsed.user) {
               setUser(parsed.user)
-              setRole(ROLE_MAP[parsed.user.email || ''] || 'gerente')
+              setRole(ROLE_MAP[parsed.user.email || ''] || 'staff')
               await loadClientData(parsed.user.id)
               setLoading(false)
               return
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
-          setRole(ROLE_MAP[currentUser.email || ''] || 'gerente')
+          setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
           await loadClientData(currentUser.id)
         }
       } catch (err) {
@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
-          setRole(ROLE_MAP[currentUser.email || ''] || 'gerente')
+          setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
           await loadClientData(currentUser.id)
         } else {
           setClientId(null)

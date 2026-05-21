@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback } from 'react'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Fallback PIN for when DB is not available
-const FALLBACK_PIN = '2835'
+// Fallback PIN for when DB is not available (override via env)
+const FALLBACK_PIN = process.env.NEXT_PUBLIC_POS_FALLBACK_PIN || '2835'
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes

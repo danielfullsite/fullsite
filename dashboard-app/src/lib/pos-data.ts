@@ -726,11 +726,15 @@ export const MENU_CATEGORIES: MenuCategory[] = [
 
 export const MESEROS = [
   'Omar Aguilera',
-  'Hector Rodriguez',
-  'Brayan Berlanga',
-  'Daniela Rico',
-  'Julio Hernandez',
-  'Oscar Rios',
+  'Hector Enrique Rodriguez Lopez',
+  'Brayan Berlanga Solis',
+  'Daniela Edith Rico Segura',
+  'Julio Cesar Hernández Hernández',
+  'Oscar Rios Alvarado',
+  'Mauricio Rodriguez Rodriguez',
+  'Alexis Alejandro Ocampo Vera',
+  'Christopher Antonio Sanchez',
+  'Mario Garcia Ramirez',
 ]
 
 export const IVA_RATE = 0.16

@@ -32,9 +32,17 @@ async function getAuthUser() {
 
 // Simple rate limiting — max 20 requests per minute per user
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+let lastCleanup = Date.now()
 
 function checkRateLimit(userId: string): boolean {
   const now = Date.now()
+  // Cleanup expired entries every 5 minutes
+  if (now - lastCleanup > 300000) {
+    for (const [key, entry] of rateLimitMap) {
+      if (now > entry.resetTime) rateLimitMap.delete(key)
+    }
+    lastCleanup = now
+  }
   const entry = rateLimitMap.get(userId)
   if (!entry || now > entry.resetTime) {
     rateLimitMap.set(userId, { count: 1, resetTime: now + 60000 })
