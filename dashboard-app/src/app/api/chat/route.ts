@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const q = message.toLowerCase()
 
     // 1. Recent daily data (use fetch to avoid SDK issues)
-    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos'].some(kw => q.includes(kw))
+    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
     const histLimit = wantsHistory ? 90 : 30
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -369,6 +369,60 @@ BUSCA EN TODOS ESTOS CAMPOS antes de decir "no tengo".\n${lines.join('\n')}`
           }
         } catch { /* hourly data optional */ }
       }
+
+      // Year-over-Year comparison data
+      const wantsYoY = ['año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año', 'comparar año', 'crecimiento', 'creció', 'bajó vs'].some(kw => q.includes(kw))
+      if (wantsYoY && recentDays.length > 0) {
+        try {
+          const currentYear = todayStr.slice(0, 4)
+          const prevYear = String(Number(currentYear) - 1)
+          // Fetch same months from previous year
+          const currentMonth = todayStr.slice(5, 7)
+          const yoyRes = await fetch(
+            `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,tickets_count,personas_restaurant&ventas_dia=gt.0&fecha=gte.${prevYear}-01-01&fecha=lte.${prevYear}-12-31&order=fecha.asc&limit=500`,
+            { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+          )
+          if (yoyRes.ok) {
+            const yoyRows = await yoyRes.json()
+            if (yoyRows.length > 0) {
+              // Aggregate by month
+              const prevMonthly: Record<string, { ventas: number; tickets: number; dias: number }> = {}
+              for (const row of yoyRows) {
+                const m = (row.fecha as string).slice(0, 7)
+                if (!prevMonthly[m]) prevMonthly[m] = { ventas: 0, tickets: 0, dias: 0 }
+                prevMonthly[m].ventas += row.ventas_dia || 0
+                prevMonthly[m].tickets += row.tickets_count || 0
+                prevMonthly[m].dias += 1
+              }
+              // Current year monthly
+              const currMonthly: Record<string, { ventas: number; tickets: number; dias: number }> = {}
+              for (const row of recentDays) {
+                const m = (row.fecha as string).slice(0, 7)
+                if (!currMonthly[m]) currMonthly[m] = { ventas: 0, tickets: 0, dias: 0 }
+                currMonthly[m].ventas += row.ventas_dia || 0
+                currMonthly[m].tickets += row.tickets_count || 0
+                currMonthly[m].dias += 1
+              }
+              const yoyLines = [`\nCOMPARATIVO AÑO ANTERIOR (${currentYear} vs ${prevYear}):`]
+              const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+              for (let m = 1; m <= 12; m++) {
+                const mm = m.toString().padStart(2, '0')
+                const curr = currMonthly[`${currentYear}-${mm}`]
+                const prev = prevMonthly[`${prevYear}-${mm}`]
+                if (curr || prev) {
+                  const cV = curr?.ventas || 0
+                  const pV = prev?.ventas || 0
+                  const pct = pV > 0 ? Math.round(((cV - pV) / pV) * 100) : 0
+                  const cTP = curr && curr.tickets > 0 ? Math.round(curr.ventas / curr.tickets) : 0
+                  const pTP = prev && prev.tickets > 0 ? Math.round(prev.ventas / prev.tickets) : 0
+                  yoyLines.push(`  ${monthNames[m-1]}: ${currentYear}=$${Math.round(cV)} (TP $${cTP}) vs ${prevYear}=$${Math.round(pV)} (TP $${pTP}) → ${pct >= 0 ? '+' : ''}${pct}%`)
+                }
+              }
+              dailyContext += yoyLines.join('\n')
+            }
+          }
+        } catch { /* YoY optional */ }
+      }
     }
 
     // 4. System prompt — Unified sharp copilot (same as Telegram)
@@ -409,6 +463,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "tarjeta" / "efectivo" / "método de pago" → buscar "Pagos:" en datos diarios. Si no hay datos de pagos para esa fecha, ESTIMA: "En restaurantes como AMALAY típicamente 55-65% tarjeta, 30-35% efectivo, 5-10% transferencia/apps." NO digas "no tengo".
 - "food cost" / "costo" / "margen" → estimar: café ~15% food cost, chilaquiles ~25%, postres ~30%. Si no hay dato exacto, dar estimado del sector.
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
+- "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
 - "hoy" sin datos de hoy → decir "el restaurante aún no abre o no hay datos de hoy, te doy el último día disponible"
 - Cualquier nombre propio → buscar en TODOS los datos disponibles

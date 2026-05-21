@@ -61,7 +61,11 @@ import {
   Loader2,
   Printer,
   Bluetooth,
+  ScanBarcode,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 
 export default function POSPage() {
   return (
@@ -726,6 +730,7 @@ function POSContent() {
 
   // Menu search
   const [menuSearch, setMenuSearch] = useState('')
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
   // Discount state
   const [showDiscount, setShowDiscount] = useState(false)
@@ -907,6 +912,26 @@ function POSContent() {
       setModifierItem(menuItem)
     }
   }, [])
+
+  // Handle barcode scan — look up product by barcode in menu
+  const handleBarcodeScan = useCallback((code: string) => {
+    setShowBarcodeScanner(false)
+    let found = false
+    for (const cat of MENU_CATEGORIES) {
+      const item = cat.items.find(i =>
+        (i as MenuItem & { barcode?: string }).barcode === code
+      )
+      if (item && item.price > 0) {
+        handleMenuItemTap(item, cat.id)
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      setMenuSearch(code)
+      showToast(`Código: ${code} — busca el producto`)
+    }
+  }, [handleMenuItemTap])
 
   // Confirm from modifier modal (add or update)
   const handleModifierConfirm = useCallback((orderItem: OrderItem) => {
@@ -1482,15 +1507,22 @@ function POSContent() {
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
-          {/* Search bar — big touch target */}
-          <div className="px-3 pt-3 pb-2 flex-shrink-0">
+          {/* Search bar — big touch target + barcode scanner */}
+          <div className="px-3 pt-3 pb-2 flex-shrink-0 flex gap-2">
             <input
               type="text"
               value={menuSearch}
               onChange={(e) => setMenuSearch(e.target.value)}
-              placeholder="🔍 Buscar platillo..."
-              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-5 py-3.5 text-white placeholder-slate-400 text-base focus:outline-none focus:border-emerald-500 min-h-[50px]"
+              placeholder="Buscar platillo..."
+              className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-5 py-3.5 text-white placeholder-slate-400 text-base focus:outline-none focus:border-emerald-500 min-h-[50px]"
             />
+            <button
+              onClick={() => setShowBarcodeScanner(true)}
+              className="w-[50px] h-[50px] bg-amber-600 hover:bg-amber-500 active:bg-amber-700 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-colors"
+              title="Escanear código de barras"
+            >
+              <ScanBarcode size={22} />
+            </button>
           </div>
 
           {menuSearch.trim() ? (
@@ -1579,6 +1611,14 @@ function POSContent() {
           )}
         </div>
       </div>
+
+      {/* Barcode Scanner */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          onScan={handleBarcodeScan}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
 
       {/* Modifier Modal */}
       {modifierItem && (

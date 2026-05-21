@@ -99,6 +99,33 @@ export default function TendenciasPage() {
     })
   }, [allData])
 
+  // Weekday vs Weekend TP breakdown
+  const tpWeekdayWeekend = useMemo(() => {
+    const weekday = { ventas: 0, tickets: 0, personas: 0, dias: 0 }
+    const weekend = { ventas: 0, tickets: 0, personas: 0, dias: 0 }
+    for (const d of allData) {
+      const date = new Date(d.fecha + 'T12:00:00')
+      const dow = date.getDay()
+      const bucket = (dow === 0 || dow === 6) ? weekend : weekday
+      bucket.ventas += d.ventas_dia || 0
+      bucket.tickets += d.tickets_count || 0
+      bucket.personas += d.personas_restaurant || 0
+      bucket.dias += 1
+    }
+    return {
+      weekday: {
+        ...weekday,
+        ticketPromedio: weekday.tickets > 0 ? Math.round(weekday.ventas / weekday.tickets) : 0,
+        ventasDiarias: weekday.dias > 0 ? Math.round(weekday.ventas / weekday.dias) : 0,
+      },
+      weekend: {
+        ...weekend,
+        ticketPromedio: weekend.tickets > 0 ? Math.round(weekend.ventas / weekend.tickets) : 0,
+        ventasDiarias: weekend.dias > 0 ? Math.round(weekend.ventas / weekend.dias) : 0,
+      },
+    }
+  }, [allData])
+
   // YTD
   const ytdData = useMemo(() => {
     const currentYear = new Date().getFullYear().toString()
@@ -567,6 +594,65 @@ export default function TendenciasPage() {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* Weekday vs Weekend TP */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          Ticket promedio: Entre semana vs Fin de semana
+        </h3>
+        <p className="text-xs text-slate-400 mb-5">Eduardo: &quot;No mezclar weekday con weekend — son clientes diferentes&quot;</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Lunes a Viernes</p>
+            <p className="text-3xl font-bold text-slate-900">{formatCurrency(tpWeekdayWeekend.weekday.ticketPromedio)}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+              <div>
+                <span className="font-medium text-slate-700">{formatCurrency(tpWeekdayWeekend.weekday.ventasDiarias)}</span>
+                <span className="block">venta/día prom.</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">{formatNumber(tpWeekdayWeekend.weekday.dias)}</span>
+                <span className="block">días con datos</span>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-5">
+            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-2">Sábado y Domingo</p>
+            <p className="text-3xl font-bold text-slate-900">{formatCurrency(tpWeekdayWeekend.weekend.ticketPromedio)}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+              <div>
+                <span className="font-medium text-slate-700">{formatCurrency(tpWeekdayWeekend.weekend.ventasDiarias)}</span>
+                <span className="block">venta/día prom.</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">{formatNumber(tpWeekdayWeekend.weekend.dias)}</span>
+                <span className="block">días con datos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        {tpWeekdayWeekend.weekend.ticketPromedio > 0 && tpWeekdayWeekend.weekday.ticketPromedio > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold ${
+              tpWeekdayWeekend.weekend.ticketPromedio > tpWeekdayWeekend.weekday.ticketPromedio
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-blue-50 text-blue-700'
+            }`}>
+              {tpWeekdayWeekend.weekend.ticketPromedio > tpWeekdayWeekend.weekday.ticketPromedio ? (
+                <>
+                  <ArrowUpRight size={14} />
+                  Fin de semana +{formatPercent(percentChange(tpWeekdayWeekend.weekend.ticketPromedio, tpWeekdayWeekend.weekday.ticketPromedio))} vs entre semana
+                </>
+              ) : (
+                <>
+                  <ArrowUpRight size={14} />
+                  Entre semana +{formatPercent(percentChange(tpWeekdayWeekend.weekday.ticketPromedio, tpWeekdayWeekend.weekend.ticketPromedio))} vs fin de semana
+                </>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* YTD Summary */}
