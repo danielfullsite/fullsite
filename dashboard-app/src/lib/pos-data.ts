@@ -840,8 +840,13 @@ export interface KitchenOrderFromDB {
 }
 
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
+  // Only fetch today's orders (not ancient ones stuck in "enviada")
+  const today = new Date()
+  today.setHours(today.getHours() - 12) // Last 12 hours
+  const cutoff = today.toISOString()
+
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&order=created_at.desc`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.amalay&created_at=gte.${cutoff}&order=created_at.desc`,
     {
       headers: {
         apikey: SUPABASE_KEY,
@@ -851,7 +856,16 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     }
   )
   if (!res.ok) return []
-  return res.json()
+  const orders: KitchenOrderFromDB[] = await res.json()
+
+  // Deduplicate by mesa+mesero+items (same order sent twice)
+  const seen = new Set<string>()
+  return orders.filter(o => {
+    const key = `${o.mesa}-${o.mesero}-${o.items}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 // ─── BLINDAJE: Audit Trail (nothing deleteable) ────────────────────────────

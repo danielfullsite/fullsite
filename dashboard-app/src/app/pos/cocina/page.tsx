@@ -93,6 +93,23 @@ export default function CocinaPage() {
   const fetchOrders = async () => {
     const data = await getKitchenOrders()
 
+    // Auto-archive orders older than 4 hours (stuck in enviada/preparando)
+    const now = Date.now()
+    const fourHoursMs = 4 * 60 * 60 * 1000
+    for (const order of data) {
+      const age = now - new Date(order.created_at).getTime()
+      if (age > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
+        try {
+          await updateOrderStatus(order.id, 'entregada')
+        } catch { /* non-blocking */ }
+      }
+    }
+    // Re-filter after auto-archive
+    const fresh = data.filter(o => {
+      const age = now - new Date(o.created_at).getTime()
+      return age <= fourHoursMs || o.status === 'lista'
+    })
+
     // Also fetch delivery orders (nueva/preparando)
     try {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -106,7 +123,7 @@ export default function CocinaPage() {
         for (const d of deliveryOrders) {
           const platformBadge: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi', didi: '🔶 Didi' }
           const items = typeof d.items === 'string' ? JSON.parse(d.items) : d.items || []
-          data.push({
+          fresh.push({
             id: d.id,
             mesa: 0,
             mesero: platformBadge[d.platform] || d.platform,
@@ -122,12 +139,12 @@ export default function CocinaPage() {
     } catch { /* delivery table might not exist yet */ }
 
     // Play sound if new 'enviada' orders appeared
-    const newEnviadas = data.filter(o => o.status === 'enviada').length
+    const newEnviadas = fresh.filter(o => o.status === 'enviada').length
     if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
       playNotificationSound()
     }
     prevOrderCountRef.current = newEnviadas
-    setOrders(data)
+    setOrders(fresh)
     setLoading(false)
   }
 

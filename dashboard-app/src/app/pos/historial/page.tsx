@@ -39,7 +39,18 @@ export default function HistorialPage() {
       `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     )
-    if (res.ok) setOrders(await res.json())
+    if (res.ok) {
+      const raw: OrderFromDB[] = await res.json()
+      // Deduplicate by mesa+mesero+items+created_at (same order sent twice)
+      const seen = new Set<string>()
+      const deduped = raw.filter(o => {
+        const key = `${o.mesa}-${o.mesero}-${o.items}-${o.created_at.slice(0, 16)}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      setOrders(deduped)
+    }
     setLoading(false)
   }
 
