@@ -229,45 +229,60 @@ def main():
             return [{"nombre": c[0], "total": safe_float(c[-1])} for c in r["data"] if len(c) >= 2]
         return []
 
+    # Helper: save any endpoint data to wansoft_data table
+    def save_data(key, data):
+        if data:
+            sb_upsert("wansoft_data", {
+                "client_id": CLIENT["id"], "fecha": today_str, "data_key": key,
+                "data": json.dumps(data), "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+
     areas = scrape_endpoint(session, "SalesByArea", "Reports/SalesByArea", base_params,
                             None, transform_generic)
     if areas:
+        save_data("sales_area", areas)
         results["areas"] = len(areas)
 
     # 3. Sales by terminal
     terminals = scrape_endpoint(session, "SalesByTerminal", "Reports/SalesByTerminal", base_params,
                                 None, transform_generic)
     if terminals:
+        save_data("sales_terminal", terminals)
         results["terminales"] = len(terminals)
 
     # 4. Discounts detail
     discounts = scrape_endpoint(session, "DiscountsDetail", "Reports/DiscountsDetail", base_params,
                                 None, transform_generic)
     if discounts:
+        save_data("discounts_detail", discounts)
         results["descuentos_detalle"] = len(discounts)
 
     # 5. Cancellations detail
     cancels = scrape_endpoint(session, "CancelSalesDetail", "Reports/CancelSalesDetail", base_params,
                               None, transform_generic)
     if cancels:
+        save_data("cancel_sales", cancels)
         results["cancelaciones"] = len(cancels)
 
     # 6. Voids detail
     voids = scrape_endpoint(session, "SaleNullificationDetail", "Reports/SaleNullificationDetail", base_params,
                             None, transform_generic)
     if voids:
+        save_data("voids", voids)
         results["anulaciones"] = len(voids)
 
     # 7. Courtesies
     courtesies = scrape_endpoint(session, "CourtesiesDetail", "Reports/CourtesiesDetail", base_params,
                                  None, transform_generic)
     if courtesies:
+        save_data("courtesies", courtesies)
         results["cortesias"] = len(courtesies)
 
     # 8. Sales by modifiers (extras)
     modifiers = scrape_endpoint(session, "SalesByModifiers", "Reports/SalesByModifiers", base_params,
                                 None, transform_generic)
     if modifiers:
+        save_data("modifiers_sold", modifiers)
         results["modificadores"] = len(modifiers)
 
     # ══════════════════════════════════════════════════════════════
@@ -331,12 +346,14 @@ def main():
     cost_group = scrape_endpoint(session, "GetCostByGroup", "Reports/GetCostByGroup",
                                  {**month_params}, None, transform_generic)
     if cost_group:
+        save_data("cost_by_group", cost_group)
         results["costo_grupo"] = len(cost_group)
 
     # Saucers with cost (master list)
     saucers_cost = scrape_endpoint(session, "GetSaucersWithCost", "Reports/GetSaucersWithCost",
                                    {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if saucers_cost:
+        save_data("saucers_with_cost", saucers_cost)
         results["platillos_con_costo"] = len(saucers_cost)
 
     # ══════════════════════════════════════════════════════════════
@@ -365,12 +382,14 @@ def main():
     inv_statement = scrape_endpoint(session, "GetInventoryStatement", "Inventory/GetInventoryStatementBySubsidiary",
                                     {"subsidiaryId": SUBSIDIARY_ID, **month_params}, None, transform_generic)
     if inv_statement:
+        save_data("inventory_movements", inv_statement)
         results["mov_inventario"] = len(inv_statement)
 
     # Reorder point
     reorder = scrape_endpoint(session, "ReorderPoint", "Inventory/GetReorderPointReport",
                               {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if reorder:
+        save_data("reorder_points", reorder)
         results["reorden"] = len(reorder)
 
     # Physical vs system
@@ -399,11 +418,13 @@ def main():
     in_recipes = scrape_endpoint(session, "ProductsInRecipes", "Inventory/GetProductsThatAreInRecipes",
                                  {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if in_recipes:
+        save_data("products_in_recipes", in_recipes)
         results["prod_en_recetas"] = len(in_recipes)
 
     not_in_recipes = scrape_endpoint(session, "ProductsNotInRecipes", "Inventory/GetProductsThatAreNotInRecipes",
                                      {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if not_in_recipes:
+        save_data("products_not_in_recipes", not_in_recipes)
         results["prod_sin_receta"] = len(not_in_recipes)
 
     # ══════════════════════════════════════════════════════════════
@@ -422,18 +443,21 @@ def main():
     shop_product = scrape_endpoint(session, "ShopByProduct", "Reports/ShopByProduct",
                                    range_params, None, transform_generic)
     if shop_product:
+        save_data("purchases_by_product", shop_product)
         results["compras_producto"] = len(shop_product)
 
     # Purchase orders issued
     po_issued = scrape_endpoint(session, "PO_Issued", "Purchasing/GetPurchaseOrderIssued",
                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if po_issued:
+        save_data("purchase_orders", po_issued)
         results["ordenes_compra"] = len(po_issued)
 
     # Supplier list
     supplier_list = scrape_endpoint(session, "SupplierList", "Purchasing/GetSupplierList",
                                     {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if supplier_list:
+        save_data("supplier_list", supplier_list)
         results["lista_proveedores"] = len(supplier_list)
 
     # ══════════════════════════════════════════════════════════════
@@ -461,18 +485,21 @@ def main():
     hours_worked = scrape_endpoint(session, "HoursWorked", "Staff/GetUserHoursWorkedReport",
                                    base_params, None, transform_labor)
     if hours_worked:
+        save_data("hours_worked", hours_worked)
         results["horas_trabajadas"] = len(hours_worked)
 
     # POS users list
     pos_users = scrape_endpoint(session, "PosUsers", "Staff/GetPosUsersList",
                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if pos_users:
+        save_data("pos_users", pos_users)
         results["usuarios_pos"] = len(pos_users)
 
     # Shift list
     shifts = scrape_endpoint(session, "Shifts", "Staff/GetShiftList",
                              {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if shifts:
+        save_data("shifts", shifts)
         results["turnos"] = len(shifts)
 
     # ══════════════════════════════════════════════════════════════
@@ -499,24 +526,28 @@ def main():
     cash_closing = scrape_endpoint(session, "ClosingCash", "Reports/ClosingCash",
                                    base_params, None, transform_generic)
     if cash_closing:
+        save_data("cash_closing", cash_closing)
         results["corte_caja"] = len(cash_closing)
 
     # Cash flow
     cash_flow = scrape_endpoint(session, "CashFlow", "Finance/GetCashFlowList",
                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if cash_flow:
+        save_data("cash_flow", cash_flow)
         results["flujo_caja"] = len(cash_flow)
 
     # Cash withdrawals
     withdrawals = scrape_endpoint(session, "CashWithdrawals", "Reports/GetCashWithdrawalReport",
                                   base_params, None, transform_generic)
     if withdrawals:
+        save_data("cash_withdrawals", withdrawals)
         results["retiros"] = len(withdrawals)
 
     # Bank deposits
     deposits = scrape_endpoint(session, "BankDeposits", "Finance/GetBankDepositList",
                                {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if deposits:
+        save_data("bank_deposits", deposits)
         results["depositos"] = len(deposits)
 
     # ══════════════════════════════════════════════════════════════
@@ -527,11 +558,13 @@ def main():
     orders_status = scrape_endpoint(session, "EcomOrders", "ECommerce/GetGeneralOrderStatusList",
                                     {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if orders_status:
+        save_data("ecommerce_orders", orders_status)
         results["ecommerce_orders"] = len(orders_status)
 
     ecom_menu = scrape_endpoint(session, "EcomMenu", "ECommerce/GetECommerceMenuStatusList",
                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if ecom_menu:
+        save_data("ecommerce_menu", ecom_menu)
         results["ecommerce_menu"] = len(ecom_menu)
 
     # ══════════════════════════════════════════════════════════════
@@ -542,6 +575,7 @@ def main():
     invoices = scrape_endpoint(session, "Invoices", "Billing/GetDocumentList",
                                {**month_params, "subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
     if invoices:
+        save_data("invoices", invoices)
         results["facturas"] = len(invoices)
 
     # ══════════════════════════════════════════════════════════════

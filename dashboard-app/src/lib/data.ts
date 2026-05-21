@@ -156,6 +156,19 @@ export async function getLatestDeep(table: string): Promise<{ fecha: string; dat
   return { ...data[0], fecha: (data[0].fecha as string) || '', data: parseJsonb(data[0].data) }
 }
 
+// Get data from wansoft_data generic table
+export async function getWansoftData(dataKey: string, clientId: string = 'amalay') {
+  const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
+  if (data.length === 0) return null
+  return { fecha: data[0].fecha as string, data: parseJsonb(data[0].data) }
+}
+
+// Get multiple days of wansoft_data
+export async function getWansoftDataRange(dataKey: string, days: number = 30, clientId: string = 'amalay') {
+  const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
+  return data.map(row => ({ fecha: row.fecha as string, data: parseJsonb(row.data) }))
+}
+
 // Aggregate platillos from ventas_por_grupo
 export function aggregateGrupos(
   dailyData: WansoftDaily[]
