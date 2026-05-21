@@ -1536,9 +1536,9 @@ function POSContent() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all min-h-[40px] ${
+                    className={`px-3 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all min-h-[44px] ${
                       selectedCategory === cat.id
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                        ? `${(cat as { color?: string }).color || 'bg-emerald-600'} text-white shadow-lg`
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500'
                     }`}
                   >

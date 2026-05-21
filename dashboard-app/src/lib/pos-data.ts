@@ -148,6 +148,7 @@ export interface MenuItem {
 export interface MenuCategory {
   id: string
   name: string
+  color?: string  // Tailwind color for group tab
   items: MenuItem[]
 }
 
@@ -346,7 +347,7 @@ export interface Mesa {
 
 export const MENU_CATEGORIES: MenuCategory[] = [
   {
-    id: 'chilaquiles', name: 'Chilaquiles & Enchiladas', items: [
+    id: 'chilaquiles', name: 'Chilaquiles', color: 'bg-red-600', items: [
       { id: 'c1a', name: 'Chilaquiles Verdes', price: 292 },
       { id: 'c1b', name: 'Chilaquiles Rojos', price: 292 },
       { id: 'c2', name: 'Chilaquiles Light', price: 304 },
@@ -354,7 +355,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'eggs', name: 'Eggs & Keto', items: [
+    id: 'eggs', name: 'Huevos', color: 'bg-yellow-500', items: [
       { id: 'e1', name: 'Machacado con Huevo', price: 274 },
       { id: 'e2', name: 'Half & Half Combo', price: 287 },
       { id: 'e3', name: 'Garden Omelet', price: 264 },
@@ -364,7 +365,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'coffee', name: 'Coffee', items: [
+    id: 'coffee', name: 'Café', color: 'bg-amber-700', items: [
       { id: 'cf1', name: 'Cafe Americano', price: 48 },
       { id: 'cf2', name: 'Capuchino Caliente', price: 89 },
       { id: 'cf3', name: 'Cafe Latte Caliente', price: 94 },
@@ -375,7 +376,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'toast', name: 'Toast & Bagels', items: [
+    id: 'toast', name: 'Pan & Toast', color: 'bg-orange-500', items: [
       { id: 't1', name: 'Avocado Toast', price: 252 },
       { id: 't2', name: 'Amalay Salmon Special Toast', price: 402 },
       { id: 't3', name: 'El Mexicano Toast', price: 183 },
@@ -383,19 +384,19 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'especiales', name: 'Everyday Specials', items: [
+    id: 'especiales', name: 'Especiales', color: 'bg-teal-600', items: [
       { id: 'es1', name: 'Combo Amalay', price: 360 },
       { id: 'es2', name: 'French Toast', price: 220 },
     ]
   },
   {
-    id: 'signature', name: 'Signature', items: [
+    id: 'signature', name: 'Signature', color: 'bg-purple-600', items: [
       { id: 'sg1', name: 'Mimosa Clasica', price: 160 },
       { id: 'sg2', name: 'Chamoyada de Mango', price: 120 },
     ]
   },
   {
-    id: 'croissants', name: 'Croissants', items: [
+    id: 'croissants', name: 'Croissants', color: 'bg-yellow-600', items: [
       { id: 'cr1', name: 'Croque Madame Amalay', price: 308 },
       { id: 'cr2', name: 'Croissant Nutella', price: 99 },
       { id: 'cr3', name: 'Turkey & Swiss Croissant', price: 285 },
@@ -403,7 +404,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'jugos', name: 'Jugos', items: [
+    id: 'jugos', name: 'Jugos', color: 'bg-green-500', items: [
       { id: 'j1', name: 'Jugo de Naranja Natural', price: 78 },
       { id: 'j2', name: 'Jugo Verde de la Casa', price: 98 },
       { id: 'j3', name: 'Jugo Be Inmune', price: 115 },
@@ -412,61 +413,61 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'fresh', name: 'Fresh Drinks', items: [
+    id: 'fresh', name: 'Frescos', color: 'bg-cyan-500', items: [
       { id: 'f1', name: 'Limonada Natural', price: 63 },
       { id: 'f2', name: 'Limonada de Frutos Rojos', price: 62 },
     ]
   },
   {
-    id: 'smoothies', name: 'Smoothies', items: [
+    id: 'smoothies', name: 'Smoothies', color: 'bg-pink-500', items: [
       { id: 'sm1', name: 'Smoothie Mango-Matcha', price: 221 },
       { id: 'sm2', name: 'Smoothie Pink Flamingo', price: 152 },
       { id: 'sm3', name: 'Smoothie Tropical Coconut', price: 139 },
     ]
   },
   {
-    id: 'frappes', name: 'Frappes', items: [
+    id: 'frappes', name: 'Frappes', color: 'bg-indigo-500', items: [
       { id: 'fr1', name: 'Frappe Matcha', price: 124 },
       { id: 'fr2', name: 'Frappe Mango-Maracuya', price: 120 },
     ]
   },
   {
-    id: 'pancakes', name: 'Pancakes & Waffles', items: [
+    id: 'pancakes', name: 'Pancakes', color: 'bg-yellow-400', items: [
       { id: 'pw1', name: 'Classic Pancakes', price: 215 },
     ]
   },
   {
-    id: 'paninis', name: 'Paninis', items: [
+    id: 'paninis', name: 'Paninis', color: 'bg-lime-600', items: [
       { id: 'pn1', name: 'Chicken Panini', price: 296 },
     ]
   },
   {
-    id: 'pizzas', name: 'Pizzas & Pastas', items: [
+    id: 'pizzas', name: 'Pizzas', color: 'bg-rose-600', items: [
       { id: 'pz1', name: 'Pasta Mamarosa', price: 287 },
       { id: 'pz2', name: 'Pizza Pepperoni', price: 245 },
       { id: 'pz3', name: 'Pizza Margarita', price: 220 },
     ]
   },
   {
-    id: 'bowls', name: 'Bowls', items: [
+    id: 'bowls', name: 'Bowls', color: 'bg-emerald-600', items: [
       { id: 'bw1', name: 'Acai Love Bowl', price: 232 },
       { id: 'bw2', name: 'Fruit Bowl', price: 150 },
     ]
   },
   {
-    id: 'postres', name: 'Postres', items: [
+    id: 'postres', name: 'Postres', color: 'bg-fuchsia-500', items: [
       { id: 'ds1', name: 'Cheesecake', price: 130 },
       { id: 'ds2', name: 'Carrot Cake', price: 135 },
     ]
   },
   {
-    id: 'bakery', name: 'Bakery', items: [
+    id: 'bakery', name: 'Panadería', color: 'bg-amber-500', items: [
       { id: 'bk1', name: 'Concha de Mantequilla', price: 37 },
       { id: 'bk2', name: 'Healthy Crunchy Mix', price: 170 },
     ]
   },
   {
-    id: 'sodas', name: 'Sodas & Agua', items: [
+    id: 'sodas', name: 'Sodas', color: 'bg-blue-500', items: [
       { id: 'sd1', name: 'Coca Cola Regular 355ml', price: 34 },
       { id: 'sd2', name: 'Coca Cola Sin Azucar 355ml', price: 60 },
       { id: 'sd3', name: 'Coca Cola Light 355ml', price: 60 },
@@ -476,13 +477,13 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'tea', name: 'Tea & Tisanas', items: [
+    id: 'tea', name: 'Té', color: 'bg-green-700', items: [
       { id: 'te1', name: 'Te Chai', price: 75 },
       { id: 'te2', name: 'Te Verde', price: 65 },
     ]
   },
   {
-    id: 'alcohol', name: 'Bebidas OH', items: [
+    id: 'alcohol', name: 'Bebidas OH', color: 'bg-violet-700', items: [
       { id: 'al1', name: 'Cerveza Artesanal', price: 95 },
       { id: 'al2', name: 'Vino Copa Tinto', price: 150 },
     ]
