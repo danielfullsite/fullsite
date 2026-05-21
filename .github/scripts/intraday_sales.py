@@ -467,17 +467,40 @@ def main():
 
             # Pago metodos - fetch from Wansoft
             try:
-                pay_html = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",
-                    data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15).text
+                pay_resp = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",
+                    data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15)
+                pay_html = pay_resp.text
                 pay_soup = BeautifulSoup(pay_html, "html.parser")
                 pago_data = []
                 for row in pay_soup.select(".rowReport"):
                     cols = [c.text.strip() for c in row.select("div")]
-                    if len(cols) >= 4:
-                        pago_data.append({"nombre": cols[0], "total": float(cols[3].replace(",","").replace("$",""))})
+                    if len(cols) >= 2:
+                        name = cols[0]
+                        # Try last column for total (Wansoft varies between 2-4 cols)
+                        total = 0
+                        for c in reversed(cols[1:]):
+                            try:
+                                total = float(c.replace(",","").replace("$","").replace("%",""))
+                                if total > 0: break
+                            except ValueError:
+                                continue
+                        if name and total > 0:
+                            pago_data.append({"nombre": name, "total": total})
                 if pago_data:
                     update_data["pago_metodos"] = json.dumps(pago_data)
-            except: pass
+                    # Also extract efectivo/tarjeta for backwards compat
+                    for p in pago_data:
+                        nm = p["nombre"].lower()
+                        if "efectivo" in nm:
+                            update_data["efectivo"] = p["total"]
+                        elif "tarjeta" in nm or "crédito" in nm or "débito" in nm:
+                            update_data.setdefault("tarjeta", 0)
+                            update_data["tarjeta"] = update_data.get("tarjeta", 0) + p["total"]
+                    print(f"[intraday] Payment methods: {len(pago_data)} → {[p['nombre'] + ':$' + str(int(p['total'])) for p in pago_data]}")
+                else:
+                    print(f"[intraday] No payment rows found. HTML preview: {pay_html[:200]}")
+            except Exception as e:
+                print(f"[intraday] Payment methods error: {e}")
 
             # Propinas - fetch from Wansoft kpis in Supabase
             try:
