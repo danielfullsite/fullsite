@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -74,12 +74,68 @@ function findRecentDataForField<T>(
 
 type Period = 'dia' | 'semana' | 'mes'
 
+// ── Widget Configuration System ─────────────────────────────────────────
+const WIDGET_DEFS = [
+  { id: 'insight', label: 'Insight del día', defaultOn: true },
+  { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
+  { id: 'kpis', label: 'KPIs principales', defaultOn: true },
+  { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
+  { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
+  { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
+  { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
+  { id: 'categories', label: 'Distribución por categoría', defaultOn: true },
+  { id: 'payment_methods', label: 'Métodos de pago', defaultOn: false },
+  { id: 'quick_actions', label: 'Acciones rápidas', defaultOn: true },
+] as const
+
+type WidgetId = typeof WIDGET_DEFS[number]['id']
+type WidgetConfig = Record<WidgetId, boolean>
+
+function getDefaultWidgets(): WidgetConfig {
+  return Object.fromEntries(WIDGET_DEFS.map(w => [w.id, w.defaultOn])) as WidgetConfig
+}
+
+function loadWidgetConfig(): WidgetConfig {
+  if (typeof window === 'undefined') return getDefaultWidgets()
+  try {
+    const saved = localStorage.getItem('dashboard_widgets')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Merge with defaults (new widgets get default value)
+      const defaults = getDefaultWidgets()
+      return { ...defaults, ...parsed }
+    }
+  } catch { /* */ }
+  return getDefaultWidgets()
+}
+
+function saveWidgetConfig(config: WidgetConfig) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('dashboard_widgets', JSON.stringify(config))
+  }
+}
+
 export default function DashboardPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
   const [latestDay, setLatestDay] = useState<WansoftDaily | null>(null)
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('dia')
+  const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
+  const [showSettings, setShowSettings] = useState(false)
+
+  // Load widget config from localStorage
+  useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
+
+  const toggleWidget = useCallback((id: WidgetId) => {
+    setWidgets(prev => {
+      const next = { ...prev, [id]: !prev[id] }
+      saveWidgetConfig(next)
+      return next
+    })
+  }, [])
+
+  const show = (id: WidgetId) => widgets[id]
 
   useEffect(() => {
     async function load() {
@@ -267,7 +323,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Page header with period selector */}
+      {/* Page header with period selector + settings */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
@@ -279,23 +335,62 @@ export default function DashboardPage() {
             </span>
           )}
         </div>
-        <div className="flex bg-slate-900 rounded-xl p-1 gap-1">
-          {(['dia', 'semana', 'mes'] as Period[]).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+              showSettings ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+            title="Personalizar dashboard"
+          >
+            <Settings size={18} />
+          </button>
+          <div className="flex bg-slate-900 rounded-xl p-1 gap-1">
+            {(['dia', 'semana', 'mes'] as Period[]).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* Settings panel — toggle widgets */}
+      {showSettings && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-in slide-in-from-top-2">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900">Personalizar dashboard</h3>
+            <button onClick={() => setShowSettings(false)} className="text-xs text-slate-400 hover:text-slate-600">
+              Cerrar
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {WIDGET_DEFS.map(w => (
+              <button
+                key={w.id}
+                onClick={() => toggleWidget(w.id)}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
+                  widgets[w.id]
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-slate-50 border border-slate-200 text-slate-400'
+                }`}
+              >
+                {widgets[w.id] ? <Eye size={14} /> : <EyeOff size={14} />}
+                <span className="font-medium truncate">{w.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Quick insight */}
-      {quickInsight && (
+      {show('insight') && quickInsight && (
         <div className="mb-4 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl">
           <p className="text-sm text-violet-800">
             <span className="font-semibold">Hoy:</span> {quickInsight}
@@ -304,7 +399,7 @@ export default function DashboardPage() {
       )}
 
       {/* Month progress */}
-      {monthProgress && monthProgress.monthVentas > 0 && (
+      {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
         <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -336,7 +431,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Summary Cards — 4 across like Toast */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {show('kpis') && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           label={period === 'dia' ? 'Ventas del dia' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
           value={formatCurrency(periodData.ventas)}
@@ -369,10 +464,10 @@ export default function DashboardPage() {
           icon={Receipt}
           accentClass="kpi-accent-purple"
         />
-      </div>
+      </div>}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      {show('extra_kpis') && <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
           <p className="text-xs text-slate-500 font-medium mb-1">Propinas</p>
           <p className="text-xl font-bold text-emerald-600">{formatCurrency(periodData.propinas)}</p>
@@ -385,10 +480,10 @@ export default function DashboardPage() {
           <p className="text-xs text-slate-500 font-medium mb-1">Ventas brutas</p>
           <p className="text-xl font-bold text-slate-900">{formatCurrency(periodData.brutas)}</p>
         </div>
-      </div>
+      </div>}
 
       {/* Week comparison banner — like Wansoft */}
-      {vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
+      {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
         <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
@@ -413,7 +508,7 @@ export default function DashboardPage() {
       )}
 
       {/* Main chart — full width */}
-      <div className="mb-6">
+      {show('revenue_chart') && <div className="mb-6">
         <RevenueChart
           data={recentData.map((d) => ({
             fecha: d.fecha,
@@ -421,12 +516,12 @@ export default function DashboardPage() {
           }))}
           title="Ventas últimos 30 días"
         />
-      </div>
+      </div>}
 
       {/* Two columns: Top meseros + Categories */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        {show('top_meseros') && <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
               <Award size={14} className="text-emerald-600" />
@@ -481,17 +576,17 @@ export default function DashboardPage() {
               })}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Categories — horizontal bars */}
-        <RevenueDistributionChart
+        {show('categories') && <RevenueDistributionChart
           data={gruposData}
           title="Distribución por categoría"
-        />
-      </div>
+        />}
+      </div>}
 
       {/* Payment methods */}
-      <div className="mb-6">
+      {show('payment_methods') && <div className="mb-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
@@ -549,10 +644,10 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Quick actions row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
           { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -577,7 +672,7 @@ export default function DashboardPage() {
             </Link>
           )
         })}
-      </div>
+      </div>}
     </>
   )
 }
