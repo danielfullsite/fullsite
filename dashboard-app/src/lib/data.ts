@@ -12,7 +12,7 @@ async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
     },
   })
   if (!res.ok) {
-    console.error(`Supabase fetch error: ${res.status} ${res.statusText}`)
+    if (res.status !== 400) console.error(`Supabase fetch error: ${res.status} ${table}`)
     return []
   }
   return res.json()
@@ -151,9 +151,14 @@ export async function getDeepTable(table: string, limit: number = 30) {
 }
 
 export async function getLatestDeep(table: string): Promise<{ fecha: string; data: unknown; [key: string]: unknown } | null> {
-  const data = await sbFetch(table, `select=*&order=fecha.desc&limit=1`) as Record<string, unknown>[]
-  if (data.length === 0) return null
-  return { ...data[0], fecha: (data[0].fecha as string) || '', data: parseJsonb(data[0].data) }
+  // Try fecha first, fall back to updated_at, then periodo
+  for (const orderCol of ['fecha', 'updated_at', 'periodo']) {
+    const data = await sbFetch(table, `select=*&order=${orderCol}.desc&limit=1`) as Record<string, unknown>[]
+    if (data.length > 0) {
+      return { ...data[0], fecha: (data[0].fecha as string) || (data[0].periodo as string) || '', data: parseJsonb(data[0].data) }
+    }
+  }
+  return null
 }
 
 // Get data from wansoft_data generic table
