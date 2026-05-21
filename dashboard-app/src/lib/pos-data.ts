@@ -362,6 +362,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
       { id: 'c1b', name: 'Chilaquiles Rojos', price: 292 },
       { id: 'c2', name: 'Chilaquiles Light', price: 304 },
       { id: 'c3', name: 'Enchiladas Suizas', price: 261 },
+      { id: 'c4', name: 'Taquitos Amalay', price: 279 },
     ]
   },
   {
@@ -372,6 +373,9 @@ export const MENU_CATEGORIES: MenuCategory[] = [
       { id: 'e4', name: 'Combo Fit', price: 264 },
       { id: 'e5', name: 'Egg and Pancake Combo', price: 277 },
       { id: 'e6', name: 'Miss Benedict', price: 310 },
+      { id: 'e7', name: 'Miss Benedict Keto-Panela Wallander', price: 389 },
+      { id: 'e8', name: 'Mr. Benedict', price: 351 },
+      { id: 'e9', name: 'Benedict Omelet', price: 283 },
     ]
   },
   {
@@ -383,6 +387,8 @@ export const MENU_CATEGORIES: MenuCategory[] = [
       { id: 'cf5', name: 'Matcha Latte Frio', price: 127 },
       { id: 'cf6', name: 'Chai Latte Frio', price: 122 },
       { id: 'cf7', name: 'Mocca Latte Caliente', price: 100 },
+      { id: 'cf8', name: 'Chai Latte Caliente', price: 122 },
+      { id: 'cf9', name: 'Mocca Latte Frio', price: 108 },
     ]
   },
   {
@@ -405,6 +411,7 @@ export const MENU_CATEGORIES: MenuCategory[] = [
       { id: 'cr2', name: 'Croissant Nutella', price: 99 },
       { id: 'cr3', name: 'Turkey & Swiss Croissant', price: 285 },
       { id: 'cr4', name: 'Croissant Almendra', price: 99 },
+      { id: 'cr5', name: "Mumma's Breakfast Croissant", price: 268 },
     ]
   },
   {
@@ -420,6 +427,9 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     id: 'fresh', name: 'Frescos', color: 'bg-cyan-500', items: [
       { id: 'f1', name: 'Limonada Natural', price: 63 },
       { id: 'f2', name: 'Limonada de Frutos Rojos', price: 62 },
+      { id: 'f3', name: 'Limonada de Pepino', price: 62 },
+      { id: 'f4', name: 'Jamaica Natural', price: 49 },
+      { id: 'f5', name: 'Horchata Natural', price: 49 },
     ]
   },
   {
@@ -427,29 +437,38 @@ export const MENU_CATEGORIES: MenuCategory[] = [
       { id: 'sm1', name: 'Smoothie Mango-Matcha', price: 221 },
       { id: 'sm2', name: 'Smoothie Pink Flamingo', price: 152 },
       { id: 'sm3', name: 'Smoothie Tropical Coconut', price: 139 },
+      { id: 'sm4', name: 'Smoothie Morning Blast', price: 207 },
+      { id: 'sm5', name: 'Smoothie Choco-Peanut Butter', price: 175 },
     ]
   },
   {
     id: 'frappes', name: 'Frappes', color: 'bg-indigo-500', items: [
       { id: 'fr1', name: 'Frappe Matcha', price: 124 },
       { id: 'fr2', name: 'Frappe Mango-Maracuya', price: 120 },
+      { id: 'fr3', name: 'Frapuccino', price: 135 },
+      { id: 'fr4', name: 'Frappe Oreo', price: 132 },
     ]
   },
   {
     id: 'pancakes', name: 'Pancakes', color: 'bg-yellow-400', items: [
       { id: 'pw1', name: 'Classic Pancakes', price: 215 },
+      { id: 'pw2', name: 'Paradise Buttermilk Blueberry Pancakes', price: 265 },
+      { id: 'pw3', name: 'Red Velvet Pancakes', price: 250 },
     ]
   },
   {
     id: 'paninis', name: 'Paninis', color: 'bg-lime-600', items: [
       { id: 'pn1', name: 'Chicken Panini', price: 296 },
+      { id: 'pn2', name: 'Caprese Panini', price: 275 },
     ]
   },
   {
-    id: 'pizzas', name: 'Pizzas', color: 'bg-rose-600', items: [
+    id: 'pizzas', name: 'Pizzas & Pastas', color: 'bg-rose-600', items: [
       { id: 'pz1', name: 'Pasta Mamarosa', price: 287 },
       { id: 'pz2', name: 'Pizza Pepperoni', price: 245 },
       { id: 'pz3', name: 'Pizza Margarita', price: 220 },
+      { id: 'pz4', name: 'Pasta Bolognese', price: 232 },
+      { id: 'pz5', name: 'Ribeye Smash Burger', price: 252 },
     ]
   },
   {
@@ -460,8 +479,17 @@ export const MENU_CATEGORIES: MenuCategory[] = [
   },
   {
     id: 'postres', name: 'Postres', color: 'bg-fuchsia-500', items: [
-      { id: 'ds1', name: 'Cheesecake', price: 130 },
+      { id: 'ds1', name: 'New York Cheesecake', price: 130 },
       { id: 'ds2', name: 'Carrot Cake', price: 135 },
+      { id: 'ds3', name: 'Dark Chocolate Brownie', price: 130 },
+      { id: 'ds4', name: 'Tiramisú', price: 145 },
+      { id: 'ds5', name: 'Pastel de Chocolate', price: 130 },
+    ]
+  },
+  {
+    id: 'ceviche', name: 'Ceviche', color: 'bg-sky-600', items: [
+      { id: 'cv1', name: 'Ceviche de Salmon', price: 395 },
+      { id: 'cv2', name: 'Ceviche Clasico', price: 320 },
     ]
   },
   {
