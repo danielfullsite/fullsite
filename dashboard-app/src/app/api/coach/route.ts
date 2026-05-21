@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       }
 
       const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
-        'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
+        'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio']
 
       const meseroList = Object.keys(aggKPIs).filter(name =>
         !excludeNames.some(ex => name.toLowerCase().includes(ex))

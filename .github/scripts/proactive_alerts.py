@@ -162,7 +162,7 @@ def main():
         d = wc[0]["data"]
         if isinstance(d, str):
             d = json.loads(d)
-        exclude = ["oscar ricardo", "rodrigo", "aplicaciones", "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio", "hector enrique"]
+        exclude = ["oscar ricardo", "rodrigo", "aplicaciones", "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
         lines = []
         for name, val in d.items():
             if name.startswith("__") or not isinstance(val, dict):

@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const excludeNames = ['oscar ricardo', 'rodrigo chávez', 'rodrigo chavez', 'aplicaciones',
-          'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique']
+          'mesero evento', 'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio']
 
         const rankings: string[] = []
 

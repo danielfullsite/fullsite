@@ -78,7 +78,9 @@ def main():
             if isinstance(meseros, str):
                 meseros = json.loads(meseros)
             for m in meseros:
-                name = m.get("nombre", "?")
+                name = (m.get("nombre") or "").strip()
+                if not name:
+                    continue
                 mesero_totals[name] = mesero_totals.get(name, 0) + (m.get("total") or 0)
 
         top_meseros = sorted(mesero_totals.items(), key=lambda x: -x[1])[:7]
@@ -113,7 +115,7 @@ def main():
         "TOP MESEROS:",
     ]
 
-    exclude = ["oscar ricardo", "rodrigo", "aplicaciones", "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio", "hector enrique"]
+    exclude = ["oscar ricardo", "rodrigo", "aplicaciones", "mesero evento", "fany elizabeth", "ericka tamara", "frida vianney", "jorge antonio"]
     for i, (name, total) in enumerate(tw['top_meseros']):
         if any(ex in name.lower() for ex in exclude):
             continue
