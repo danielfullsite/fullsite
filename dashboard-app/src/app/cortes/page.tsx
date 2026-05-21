@@ -6,7 +6,24 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays, getWansoftData } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
-import type { WansoftDaily } from '@/lib/types'
+import type { WansoftDaily, PagoMetodoEntry } from '@/lib/types'
+
+function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; transferencia: number } {
+  // If efectivo/tarjeta fields have data, use them
+  if ((d.efectivo || 0) > 0 || (d.tarjeta || 0) > 0) {
+    return { efectivo: d.efectivo || 0, tarjeta: d.tarjeta || 0, transferencia: 0 }
+  }
+  // Otherwise extract from pago_metodos JSONB
+  const metodos = Array.isArray(d.pago_metodos) ? d.pago_metodos : []
+  let efectivo = 0, tarjeta = 0, transferencia = 0
+  for (const m of metodos) {
+    const name = (m.nombre || '').toLowerCase()
+    if (name.includes('efectivo')) efectivo += m.total || 0
+    else if (name.includes('tarjeta') || name.includes('crédito') || name.includes('débito')) tarjeta += m.total || 0
+    else if (name.includes('transferencia')) transferencia += m.total || 0
+  }
+  return { efectivo, tarjeta, transferencia }
+}
 
 const HEATMAP_COLORS = [
   { min: 0, max: 0, bg: 'bg-slate-100', text: 'text-slate-400', hex: '#e2e8f0' },
@@ -69,8 +86,8 @@ export default function CortesPage() {
   const totalVentas = periodData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
   const totalTickets = periodData.reduce((s, d) => s + (d.tickets_count || 0), 0)
   const totalPersonas = periodData.reduce((s, d) => s + (d.personas_restaurant || 0), 0)
-  const totalEfectivo = periodData.reduce((s, d) => s + (d.efectivo || 0), 0)
-  const totalTarjeta = periodData.reduce((s, d) => s + (d.tarjeta || 0), 0)
+  const totalEfectivo = periodData.reduce((s, d) => s + extractPayment(d).efectivo, 0)
+  const totalTarjeta = periodData.reduce((s, d) => s + extractPayment(d).tarjeta, 0)
   const avgTicket = totalTickets > 0 ? Math.round(totalVentas / totalTickets) : 0
 
   // Previous period for comparison
@@ -316,10 +333,10 @@ export default function CortesPage() {
                       {formatCurrency(d.ticket_promedio_restaurant)}
                     </td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
-                      {formatCurrency(d.efectivo)}
+                      {formatCurrency(extractPayment(d).efectivo)}
                     </td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums text-slate-500">
-                      {formatCurrency(d.tarjeta)}
+                      {formatCurrency(extractPayment(d).tarjeta)}
                     </td>
                   </tr>
                 )
