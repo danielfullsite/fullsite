@@ -42,9 +42,19 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
   } as WansoftDaily
 }
 
+function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const seen = new Set<string>()
+  return rows.filter(d => {
+    const f = d.fecha as string
+    if (seen.has(f)) return false
+    seen.add(f)
+    return true
+  })
+}
+
 export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
-  const filtered = data.filter(d => (d.ventas_dia as number) > 0)
+  const filtered = dedupeByFecha(data).filter(d => (d.ventas_dia as number) > 0)
   return filtered.reverse().map(parseRow)
 }
 
@@ -61,7 +71,7 @@ export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
 
 export async function getMonthlyData(): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', 'select=*&ventas_dia=gt.0&order=fecha.asc&limit=1000') as Record<string, unknown>[]
-  return data.map(parseRow)
+  return dedupeByFecha(data).map(parseRow)
 }
 
 export async function getWaiterCategories(days: number = 7) {
@@ -109,7 +119,7 @@ export async function getDateRange(from: string, to: string): Promise<WansoftDai
     'wansoft_daily',
     `select=*&fecha=gte.${from}&fecha=lte.${to}&order=fecha.asc`
   ) as Record<string, unknown>[]
-  return data.filter(d => (d.ventas_dia as number) > 0).map(parseRow)
+  return dedupeByFecha(data).filter(d => (d.ventas_dia as number) > 0).map(parseRow)
 }
 
 // Aggregate payment methods across days
