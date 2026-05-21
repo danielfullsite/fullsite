@@ -11,7 +11,7 @@ import sys
 import json
 import time
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from client_config import get_client, get_tz, get_wansoft_creds
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -149,47 +149,120 @@ def main():
     print(f"{'='*60}")
 
     session = wansoft_session()
-    params = {"subsidiaryId": SUBSIDIARY_ID}
+
+    # Use PROVEN report endpoints (not admin Menu/* which need browser)
+    # Wide date range to capture ALL dishes ever sold
+    thirty_ago = (now_mx - timedelta(days=30)).strftime("%Y-%m-%d")
+    ninety_ago = (now_mx - timedelta(days=90)).strftime("%Y-%m-%d")
+    base = {"subsidiaryId": SUBSIDIARY_ID, "startDate": thirty_ago, "endDate": today_str}
+    wide = {"subsidiaryId": SUBSIDIARY_ID, "startDate": ninety_ago, "endDate": today_str}
+
     results = {}
 
-    endpoints = [
-        ("groups", "Menu/GetGroupList", params),
-        ("saucers", "Menu/GetSaucerList", params),
-        ("saucers_with_cost", "Reports/GetSaucersWithCost", params),
-        ("complements", "Menu/GetComplementaryList", params),
-        ("promotions", "Menu/GetPromotionList", params),
-    ]
+    # 1. SalesBySaucer (90 days) — ALL platillos with qty + total
+    print("\n[1] SalesBySaucer (90 days)...")
+    try:
+        dtype, raw = wansoft_fetch(session, "Reports/SalesBySaucer", wide)
+        saucers = []
+        if dtype == "html":
+            for cols in raw:
+                if len(cols) >= 4:
+                    saucers.append({
+                        "name": cols[0],
+                        "qty": safe_float(cols[1]),
+                        "price": safe_float(cols[2]),
+                        "total": safe_float(cols[3]),
+                    })
+        elif dtype == "json" and isinstance(raw, list):
+            saucers = raw
+        print(f"  Platillos: {len(saucers)}")
+        results["saucers"] = saucers
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        results["saucers"] = []
 
-    for i, (key, path, ep_params) in enumerate(endpoints, 1):
-        print(f"\n[{i}] Fetching {key} → {path}...")
-        try:
-            dtype, raw = wansoft_fetch(session, path, ep_params)
-            print(f"  Type: {dtype}, Raw items: {len(raw) if isinstance(raw, list) else 'dict'}")
+    # 2. SalesByGroup (90 days) — ALL groups
+    print("\n[2] SalesByGroup (90 days)...")
+    try:
+        dtype, raw = wansoft_fetch(session, "Reports/SalesByGroup", wide)
+        groups = []
+        if dtype == "html":
+            for cols in raw:
+                if len(cols) >= 2:
+                    groups.append({"name": cols[0], "total": safe_float(cols[-1])})
+        elif dtype == "json" and isinstance(raw, list):
+            groups = raw
+        print(f"  Grupos: {len(groups)}")
+        results["groups"] = groups
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        results["groups"] = []
 
-            items = []
-            if dtype == "json" and isinstance(raw, list):
-                items = raw
-            elif dtype == "html" and isinstance(raw, list):
-                # Transform HTML rows into dicts
-                for cols in raw:
-                    if len(cols) >= 2:
-                        item = {"name": cols[0]}
-                        if len(cols) >= 3:
-                            item["price"] = safe_float(cols[2])
-                        if len(cols) >= 4:
-                            item["cost"] = safe_float(cols[3])
-                        if len(cols) >= 5:
-                            item["margin_pct"] = safe_float(cols[4])
-                        # Second col is usually group or category
-                        item["group"] = cols[1]
-                        items.append(item)
+    # 3. GetSaucersWithCost — platillos + food cost + margin
+    print("\n[3] GetSaucersWithCost...")
+    try:
+        dtype, raw = wansoft_fetch(session, "Reports/GetSaucersWithCost",
+                                    {"subsidiaryId": SUBSIDIARY_ID})
+        costs = []
+        if dtype == "html":
+            for cols in raw:
+                if len(cols) >= 3:
+                    costs.append({
+                        "name": cols[0],
+                        "price": safe_float(cols[1]) if len(cols) > 1 else 0,
+                        "cost": safe_float(cols[2]) if len(cols) > 2 else 0,
+                        "margin_pct": safe_float(cols[3]) if len(cols) > 3 else 0,
+                    })
+        elif dtype == "json" and isinstance(raw, list):
+            costs = raw
+        print(f"  Con costo: {len(costs)}")
+        results["saucers_with_cost"] = costs
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        results["saucers_with_cost"] = []
 
-            results[key] = items
-            with_price = sum(1 for s in items if isinstance(s, dict) and safe_float(s.get("price", s.get("Price", 0))) > 0)
-            print(f"  Parsed: {len(items)} items ({with_price} with price)")
-        except Exception as e:
-            print(f"  ERROR: {e}")
-            results[key] = []
+    # 4. GetCostBySaucer (month) — dish-level cost
+    print("\n[4] GetCostBySaucer (30 days)...")
+    try:
+        dtype, raw = wansoft_fetch(session, "Reports/GetCostBySaucer", base)
+        cost_detail = []
+        if dtype == "html":
+            for cols in raw:
+                if len(cols) >= 3:
+                    cost_detail.append({
+                        "name": cols[0],
+                        "cost": safe_float(cols[1]) if len(cols) > 1 else 0,
+                        "price": safe_float(cols[2]) if len(cols) > 2 else 0,
+                        "margin_pct": safe_float(cols[3]) if len(cols) > 3 else 0,
+                    })
+        elif dtype == "json" and isinstance(raw, list):
+            cost_detail = raw
+        print(f"  Food cost detail: {len(cost_detail)}")
+        if cost_detail:
+            results["saucers_with_cost"] = cost_detail  # Override with richer data
+    except Exception as e:
+        print(f"  ERROR: {e}")
+
+    # 5. SalesByModifiers — extras/add-ons
+    print("\n[5] SalesByModifiers (30 days)...")
+    try:
+        dtype, raw = wansoft_fetch(session, "Reports/SalesByModifiers", base)
+        modifiers = []
+        if dtype == "html":
+            for cols in raw:
+                if len(cols) >= 2:
+                    modifiers.append({
+                        "name": cols[0],
+                        "qty": safe_float(cols[1]) if len(cols) > 1 else 0,
+                        "total": safe_float(cols[-1]),
+                    })
+        elif dtype == "json" and isinstance(raw, list):
+            modifiers = raw
+        print(f"  Modificadores: {len(modifiers)}")
+        results["complements"] = modifiers
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        results["complements"] = []
 
     # ── Save to Supabase ────────────────────────────────────────────────
     print("\n[6] Saving to Supabase...")
@@ -200,30 +273,35 @@ def main():
         "saucers": json.dumps(results.get("saucers", [])),
         "saucers_with_cost": json.dumps(results.get("saucers_with_cost", [])),
         "complements": json.dumps(results.get("complements", [])),
-        "promotions": json.dumps(results.get("promotions", [])),
+        "promotions": json.dumps([]),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
 
     elapsed = int((time.time() - start) * 1000)
 
     # ── Summary ─────────────────────────────────────────────────────────
-    summary_parts = []
-    for key in ["groups", "saucers", "saucers_with_cost", "complements", "promotions"]:
-        data = results.get(key, [])
-        summary_parts.append(f"{key}: {len(data)}")
+    n_saucers = len(results.get("saucers", []))
+    n_groups = len(results.get("groups", []))
+    n_costs = len(results.get("saucers_with_cost", []))
+    n_mods = len(results.get("complements", []))
 
-    summary = ", ".join(summary_parts)
+    summary = f"platillos:{n_saucers}, grupos:{n_groups}, food_cost:{n_costs}, modificadores:{n_mods}"
     print(f"\n{'='*60}")
     print(f"DONE — {summary}")
     print(f"Time: {elapsed}ms")
 
     # Telegram
     msg = f"📋 MENU SYNC — {today_str}\n\n"
-    msg += f"Grupos: {len(results.get('groups', []))}\n"
-    msg += f"Platillos: {len(results.get('saucers', []))}\n"
-    msg += f"Con costo: {len(results.get('saucers_with_cost', []))}\n"
-    msg += f"Modificadores: {len(results.get('complements', []))}\n"
-    msg += f"Promociones: {len(results.get('promotions', []))}\n"
+    msg += f"Platillos vendidos (90d): {n_saucers}\n"
+    msg += f"Grupos: {n_groups}\n"
+    msg += f"Food cost: {n_costs}\n"
+    msg += f"Modificadores: {n_mods}\n"
+    if results.get("saucers"):
+        top5 = sorted(results["saucers"], key=lambda x: x.get("total", 0) if isinstance(x, dict) else 0, reverse=True)[:5]
+        msg += "\nTop 5 platillos:\n"
+        for s in top5:
+            if isinstance(s, dict):
+                msg += f"  {s.get('name', '?')}: {int(s.get('qty', 0))} pzas, ${int(s.get('total', 0)):,}\n"
     msg += f"\n⏱ {elapsed/1000:.1f}s"
     send_telegram(msg)
 
