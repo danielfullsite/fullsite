@@ -394,12 +394,6 @@ export const MENU_CATEGORIES: MenuCategory[] = [
     ]
   },
   {
-    id: 'especiales', name: 'Especiales', color: 'bg-teal-600', items: [
-      { id: 'es1', name: 'Combo Amalay', price: 360 },
-      { id: 'es2', name: 'French Toast', price: 220 },
-    ]
-  },
-  {
     id: 'signature', name: 'Signature', color: 'bg-purple-600', items: [
       { id: 'sg1', name: 'Mimosa Clasica', price: 160 },
       { id: 'sg2', name: 'Chamoyada de Mango', price: 120 },
