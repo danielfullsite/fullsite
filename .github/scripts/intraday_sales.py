@@ -371,7 +371,7 @@ def main():
                               "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
                 requests.post(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly",
                     headers=sb_headers,
-                    json={"fecha": today_str, "client_id": "amalay", "data": json.dumps(hours_data),
+                    json={"fecha": today_str, "client_id": CLIENT["id"], "data": json.dumps(hours_data),
                           "updated_at": datetime.now(timezone.utc).isoformat()},
                     timeout=10)
                 print(f"[intraday] Saved {len(hours_data)} hourly entries to Supabase")
@@ -398,8 +398,8 @@ def main():
 
             # Ventas por grupo
             if groups:
-                grupo_data = [{"nombre": g["grupo"], "total": float(str(g["subtotal"]).replace(",","")) if g.get("subtotal") else 0}
-                              for g in groups if g.get("grupo")]
+                grupo_data = [{"nombre": g["name"], "total": g.get("total", 0)}
+                              for g in groups if g.get("name")]
                 update_data["ventas_por_grupo"] = json.dumps(grupo_data)
 
             # Meseros
@@ -407,7 +407,7 @@ def main():
                 _excl = [e.lower() for e in (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])]
                 mesero_data = []
                 for u in users:
-                    name = u.get("mesero", "")
+                    name = u.get("name", "")
                     if any(ex in name.lower() for ex in _excl):
                         continue
                     total = float(str(u.get("total", "0")).replace(",","").replace("$",""))

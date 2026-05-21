@@ -30,7 +30,6 @@ import {
   isBluetoothConnected,
   connectBluetoothPrinter,
   disconnectBluetoothPrinter,
-  getBluetoothPrinterName,
 } from '@/lib/printer'
 import {
   ChefHat,
@@ -53,12 +52,9 @@ import {
   Package,
   ShoppingCart,
   Wine,
-  MessageCircle,
   Receipt,
   QrCode,
   Menu,
-  Send as SendIcon,
-  Loader2,
   Printer,
   Bluetooth,
   ScanBarcode,
@@ -1181,7 +1177,7 @@ function POSContent() {
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowNav(!showNav)} className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 flex items-center justify-center transition-colors">
+            <button onClick={() => setShowNav(!showNav)} className="w-12 h-12 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 flex items-center justify-center transition-colors">
               {showNav ? <X size={20} /> : <Menu size={20} />}
             </button>
             <span className="text-white font-black text-lg tracking-tight">
@@ -1338,7 +1334,7 @@ function POSContent() {
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
                           disabled={isCancelled}
-                          className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                          className="w-11 h-11 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                         >
                           <Minus size={14} />
                         </button>
@@ -1348,7 +1344,7 @@ function POSContent() {
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
                           disabled={isCancelled}
-                          className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                          className="w-11 h-11 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                         >
                           <Plus size={14} />
                         </button>
@@ -1387,7 +1383,7 @@ function POSContent() {
                           {/* Edit */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                            className="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition-colors"
                           >
                             <Pencil size={14} />
                           </button>
@@ -1395,7 +1391,7 @@ function POSContent() {
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
-                            className="w-9 h-9 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center transition-colors"
                             title="Cancelar item (requiere gerente)"
                           >
                             <Ban size={14} />

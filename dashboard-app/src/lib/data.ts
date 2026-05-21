@@ -60,7 +60,7 @@ export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
 }
 
 export async function getMonthlyData(): Promise<WansoftDaily[]> {
-  const data = await sbFetch('wansoft_daily', 'select=*&order=fecha.asc&limit=1000') as Record<string, unknown>[]
+  const data = await sbFetch('wansoft_daily', 'select=*&ventas_dia=gt.0&order=fecha.asc&limit=1000') as Record<string, unknown>[]
   return data.map(parseRow)
 }
 
@@ -71,7 +71,7 @@ export async function getWaiterCategories(days: number = 7) {
 // Aggregate mesero data across multiple days
 const EXCLUDE_STAFF = [
   'mesero evento', 'aplicaciones', 'oscar ricardo', 'rodrigo chávez', 'rodrigo chavez',
-  'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio', 'hector enrique',
+  'fany elizabeth', 'ericka tamara', 'frida vianney', 'jorge antonio',
 ]
 
 export function aggregateMeseros(

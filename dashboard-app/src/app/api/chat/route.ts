@@ -130,7 +130,8 @@ export async function POST(request: NextRequest) {
         for (const [name, num] of Object.entries(monthMap)) {
           if (q.includes(name)) {
             const year = todayStr.slice(0, 4)
-            dateFilter = { start: `${year}-${num}-01`, end: `${year}-${num}-31` }
+            const lastDay = new Date(Number(year), Number(num), 0).getDate()
+            dateFilter = { start: `${year}-${num}-01`, end: `${year}-${num}-${String(lastDay).padStart(2, '0')}` }
             break
           }
         }
