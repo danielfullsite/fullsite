@@ -246,22 +246,24 @@ export default function CocinaPage() {
   }
 
   // Production area classification for summary bar
+  const BEBIDA_KEYWORDS = ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana']
+
+  const isBebida = (name: string) => BEBIDA_KEYWORDS.some(kw => name.toLowerCase().includes(kw))
+
   const AREA_KEYWORDS: Record<string, string[]> = {
     'Caliente': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque'],
     'Fría': ['bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
-    'Bebidas': ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
     'Panadería': ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
   }
 
   const AREA_COLORS: Record<string, string> = {
     'Caliente': 'bg-red-500',
     'Fría': 'bg-cyan-500',
-    'Bebidas': 'bg-amber-500',
     'Panadería': 'bg-orange-400',
   }
 
   const areaCounts = (() => {
-    const counts: Record<string, number> = { 'Caliente': 0, 'Fría': 0, 'Bebidas': 0, 'Panadería': 0 }
+    const counts: Record<string, number> = { 'Caliente': 0, 'Fría': 0, 'Panadería': 0 }
     const pendingOrders = orders.filter(o => o.status === 'enviada' || o.status === 'preparando')
     for (const order of pendingOrders) {
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
@@ -269,6 +271,8 @@ export default function CocinaPage() {
         if (item.cancelled) continue
         const name = (item.nombre || item.name || '').toLowerCase()
         const qty = item.cantidad || item.quantity || 1
+        // Skip bebidas — they go to Barra
+        if (isBebida(name)) continue
         let matched = false
         for (const [area, keywords] of Object.entries(AREA_KEYWORDS)) {
           if (keywords.some(kw => name.includes(kw))) {
@@ -360,7 +364,11 @@ export default function CocinaPage() {
               const elapsed = getElapsedMinutes(order.created_at)
               const isUrgent = elapsed > 15 && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              const activeItems = items.filter(i => !i.cancelled)
+              // Filter out bebidas — those go to Barra, not Cocina
+              const activeItems = items.filter(i => !i.cancelled && !isBebida(i.nombre || i.name || ''))
+
+              // Skip orders with only beverages — nothing for cocina
+              if (activeItems.length === 0) return null
 
               return (
                 <div key={order.id} className={`rounded-2xl border-2 p-5 flex flex-col ${config.bg} ${config.border}`}>
