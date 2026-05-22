@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell'
 export const metadata: Metadata = {
   title: 'Fullsite Dashboard',
   description: 'Restaurant Operations Dashboard - Fullsite',
+  icons: { icon: '/favicon.ico' },
 }
 
 export default function RootLayout({
