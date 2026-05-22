@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
+import PosthogInit from '@/components/PosthogInit'
 
 export const metadata: Metadata = {
   title: 'Fullsite Dashboard',
@@ -29,6 +30,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="h-full bg-surface">
+        <PosthogInit />
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
