@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
 };
 
-export default nextConfig;
-// force redeploy Fri May 15 13:35:11 CST 2026
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  org: "fullsite",
+  project: "apple",
+});
