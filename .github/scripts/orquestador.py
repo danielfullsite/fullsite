@@ -37,10 +37,9 @@ MENU = (
 # Workflow a disparar por tentáculo + intent keyword
 # Orden: primero intent específico, luego fallback por tentáculo
 WORKFLOW_MAP: dict[str, str] = {
-    # reportes
+    # reportes — solo el documento formal
     "reportes":         "daily-briefing.yml",
     "briefing":         "daily-briefing.yml",
-    "ventas":           "daily-briefing.yml",
     "weekly":           "weekly-amalay.yml",
     "semanal":          "weekly-amalay.yml",
     "reporte semanal":  "weekly-amalay.yml",
@@ -50,9 +49,13 @@ WORKFLOW_MAP: dict[str, str] = {
     "confirmaciones":   "reservas-pendientes.yml",
     "wansoft":          "wansoft-staleness.yml",
     "sync":             "wansoft-staleness.yml",
-    # kb — Wansoft query (24/7)
+    # kb — Wansoft query (24/7) — default para preguntas
     "kb":               "wansoft-query.yml",
     "consulta":         "wansoft-query.yml",
+    "ventas":           "wansoft-query.yml",
+    "vendimos":         "wansoft-query.yml",
+    "vendió":           "wansoft-query.yml",
+    "vendio":           "wansoft-query.yml",
     "meseros":          "wansoft-query.yml",
     "mesero":           "wansoft-query.yml",
     "platillos":        "wansoft-query.yml",
@@ -66,6 +69,11 @@ WORKFLOW_MAP: dict[str, str] = {
     "cuanto":           "wansoft-query.yml",
     "quién":            "wansoft-query.yml",
     "quien":            "wansoft-query.yml",
+    "cómo vamos":       "wansoft-query.yml",
+    "como vamos":       "wansoft-query.yml",
+    "hoy":              "wansoft-query.yml",
+    "ayer":             "wansoft-query.yml",
+    "semana":           "wansoft-query.yml",
     # skeleton
     "reseñas":          None,
 }

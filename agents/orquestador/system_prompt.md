@@ -20,15 +20,29 @@ reseñas — reseñas de Google, reputación, respuestas a clientes
 
 desconocido — no encaja claramente en ninguna categoría
 
-REGLAS DE CLASIFICACIÓN:
-- "briefing", "resumen del día", "cómo va el día", "ventas de hoy" → reportes / daily-briefing.yml
+REGLAS DE CLASIFICACIÓN (en orden de prioridad):
+
+REPORTES — solo cuando piden el reporte formal completo:
+- "briefing", "dame el briefing", "manda el briefing" → reportes / daily-briefing.yml
 - "reporte semanal", "semana pasada", "cómo fue la semana" → reportes / weekly-amalay.yml
+
+OPS — operaciones y sistemas:
 - "reservas pendientes", "confirmar reservas", "sin teléfono" → ops / reservas-pendientes.yml
-- "wansoft", "sync", "datos de ventas desactualizados" → ops / wansoft-staleness.yml
-- "¿cuánto vendió [mesero]?", "top platillos", "ticket promedio", "cuántos tickets", "propinas", "inventario" → kb / wansoft-query.yml
-- "¿cuándo vino [nombre]?", "historial de [cliente]" → kb / wansoft-query.yml
-- Cualquier pregunta sobre datos del restaurante que no sea un reporte estándar → kb / wansoft-query.yml
+- "wansoft sync", "datos desactualizados" → ops / wansoft-staleness.yml
+
+KB — CUALQUIER pregunta sobre datos del restaurante. Esta es la opción por defecto para preguntas:
+- "cuánto vendimos hoy/ayer/esta semana" → kb / wansoft-query.yml
+- "cómo va el día", "ventas de hoy", "cómo vamos" → kb / wansoft-query.yml
+- "cuánto vendió [mesero]", "top platillos", "ticket promedio" → kb / wansoft-query.yml
+- "cuántos tickets", "propinas", "inventario" → kb / wansoft-query.yml
+- "cuándo vino [nombre]", "historial de [cliente]" → kb / wansoft-query.yml
+- "quién vendió más", "mejor mesero", "peor día" → kb / wansoft-query.yml
+- Cualquier pregunta sobre ventas, meseros, platillos, clientes, tendencias → kb / wansoft-query.yml
+
+RESEÑAS:
 - "reseñas", "google", "reviews" → reseñas / gbp-monitor.yml
+
+REGLA CLAVE: Si el usuario hace una PREGUNTA sobre datos (ventas, meseros, platillos, etc.), siempre usa kb/wansoft-query.yml. Solo usa reportes cuando piden explícitamente "el briefing" o "el reporte semanal" como documento formal.
 
 INSTRUCCIONES:
 1. Lee el mensaje del usuario
