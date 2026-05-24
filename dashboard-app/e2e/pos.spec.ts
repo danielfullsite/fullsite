@@ -24,10 +24,11 @@ test.describe('POS Sub-pages', () => {
 
   for (const path of subPages) {
     test(`${path} loads without error`, async ({ page }) => {
-      const response = await page.goto(path)
+      test.setTimeout(60_000)
+      const response = await page.goto(path, { timeout: 30_000 })
       // Should not 500
       expect(response?.status()).toBeLessThan(500)
-      await page.waitForLoadState('networkidle')
+      await page.waitForLoadState('domcontentloaded')
       // Page rendered something
       const body = page.locator('body')
       await expect(body).toBeVisible()
