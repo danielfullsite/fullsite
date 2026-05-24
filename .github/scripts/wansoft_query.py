@@ -214,12 +214,76 @@ def fetch_all_wansoft_data(session, start, end):
     if rows and len(rows[0]) >= 3:
         data["cortesias_detalle"] = rows[:20]
 
-    # 15. Tips (propinas) — from Supabase since Wansoft uses jqGrid (JS-only)
+    # 15. Tips + payment methods fallback from Supabase (Wansoft jqGrid/empty endpoints)
     try:
+        # Propinas from KPIs (real-time, today only)
         kpis = sb_get("wansoft_kpis", {"select": "propinas_total,propinas_meseros", "limit": "1"})
         if kpis and kpis[0].get("propinas_meseros"):
             data["propinas_meseros"] = kpis[0]["propinas_meseros"]
             data["propinas_total"] = kpis[0].get("propinas_total", 0)
+    except Exception:
+        pass
+
+    # Propinas from wansoft_daily (historical, for date ranges)
+    try:
+        if not data.get("propinas_meseros"):
+            prop_params = {"select": "fecha,propinas_total,propinas_meseros", "order": "fecha.desc", "limit": "7"}
+            if start == end:
+                prop_params["fecha"] = f"eq.{start}"
+            else:
+                prop_params["and"] = f"(fecha.gte.{start},fecha.lte.{end})"
+            prop_rows = sb_get("wansoft_daily", prop_params)
+            if prop_rows:
+                total_propinas = sum(float(r.get("propinas_total", 0) or 0) for r in prop_rows)
+                data["propinas_total"] = total_propinas
+                # Aggregate propinas_meseros across days
+                from collections import defaultdict as _dd2
+                pm_agg = _dd2(float)
+                for r in prop_rows:
+                    pm = r.get("propinas_meseros")
+                    if isinstance(pm, str):
+                        try: pm = json.loads(pm)
+                        except: pm = []
+                    for m in (pm or []):
+                        pm_agg[m.get("nombre", "")] += float(m.get("total", 0))
+                if pm_agg:
+                    data["propinas_meseros"] = [{"nombre": k, "total": round(v)} for k, v in sorted(pm_agg.items(), key=lambda x: -x[1])]
+    except Exception:
+        pass
+
+    # Payment methods fallback from wansoft_daily (if Wansoft endpoint returned empty)
+    try:
+        if not data.get("metodos_pago"):
+            pm_params = {"select": "fecha,pago_metodos,efectivo,tarjeta", "order": "fecha.desc", "limit": "7"}
+            if start == end:
+                pm_params["fecha"] = f"eq.{start}"
+            else:
+                pm_params["and"] = f"(fecha.gte.{start},fecha.lte.{end})"
+            pm_rows = sb_get("wansoft_daily", pm_params)
+            if pm_rows:
+                from collections import defaultdict as _dd3
+                pm_agg = _dd3(float)
+                total_efectivo = 0
+                total_tarjeta = 0
+                for r in pm_rows:
+                    total_efectivo += float(r.get("efectivo", 0) or 0)
+                    total_tarjeta += float(r.get("tarjeta", 0) or 0)
+                    pms = r.get("pago_metodos")
+                    if isinstance(pms, str):
+                        try: pms = json.loads(pms)
+                        except: pms = []
+                    for p in (pms or []):
+                        pm_agg[p.get("nombre", "")] += float(p.get("total", 0))
+                if pm_agg:
+                    grand_total = sum(pm_agg.values()) or 1
+                    data["metodos_pago"] = [{"metodo": k, "total": round(v), "pct": f"{v/grand_total*100:.1f}%"}
+                                             for k, v in sorted(pm_agg.items(), key=lambda x: -x[1])]
+                elif total_efectivo or total_tarjeta:
+                    grand_total = total_efectivo + total_tarjeta or 1
+                    data["metodos_pago"] = [
+                        {"metodo": "Efectivo", "total": round(total_efectivo), "pct": f"{total_efectivo/grand_total*100:.1f}%"},
+                        {"metodo": "Tarjeta", "total": round(total_tarjeta), "pct": f"{total_tarjeta/grand_total*100:.1f}%"},
+                    ]
     except Exception:
         pass
 
@@ -379,7 +443,7 @@ CÓMO INTERPRETAR:
 - "qué hago ahorita" → staff brief 5 min + $ proyectado
 - Cualquier nombre → buscar en TODOS los datos
 
-FORMATO: $ sin decimales. Texto plano. EXCLUIR: {_exclude_str}
+FORMATO: Moneda SIEMPRE en pesos mexicanos (MXN). Usa $ sin decimales. NUNCA digas "dólares" ni "USD" — todo es pesos. Texto plano para Telegram, sin markdown ni asteriscos ni ##. EXCLUIR de rankings: {_exclude_str}
 """
 
 
