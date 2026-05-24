@@ -92,11 +92,9 @@ describe('parseDateFilter', () => {
     expect(parseDateFilter('cuanto vendimos de chilaquiles', TODAY)).toBeNull()
   })
 
-  it('BUG: "mesero" triggers "mes" keyword (known false positive)', () => {
-    // "mesero" contains "mes" so it matches month-to-date.
-    // Documenting current behavior — fix would require word-boundary matching.
+  it('"mesero" does NOT trigger "mes" keyword (word boundary)', () => {
     const result = parseDateFilter('quien es el mejor mesero', TODAY)
-    expect(result).toEqual({ start: '2026-05-01', end: '2026-05-10' })
+    expect(result).toBeNull()
   })
 
   it('parses "hoy"', () => {
@@ -408,9 +406,8 @@ describe('needsExtendedHistory', () => {
     expect(needsExtendedHistory('cuanto vendimos de chilaquiles')).toBe(false)
   })
 
-  it('BUG: "mesero" triggers "mes" keyword (false positive)', () => {
-    // "mesero" contains substring "mes", triggering extended history unnecessarily.
-    expect(needsExtendedHistory('quien es el mejor mesero')).toBe(true)
+  it('"mesero" does NOT trigger "mes" keyword (word boundary)', () => {
+    expect(needsExtendedHistory('quien es el mejor mesero')).toBe(false)
   })
 
   it('is case-insensitive', () => {

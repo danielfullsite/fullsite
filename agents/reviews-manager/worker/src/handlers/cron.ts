@@ -16,7 +16,7 @@ import {
   parseStarRating,
   type GBPReview,
 } from "../lib/google-gbp";
-import { generateReplyDraft } from "../lib/claude-api";
+import { generateReplyDraft } from "../lib/groq-api";
 import {
   getOAuthToken,
   updateOAuthToken,
@@ -123,26 +123,26 @@ async function processReview(
   accessToken: string,
   review: GoogleReview
 ): Promise<void> {
-  // Step 1: Generate draft with Claude
-  const claude = await generateReplyDraft(env.ANTHROPIC_API_KEY, {
+  // Step 1: Generate draft with Groq
+  const groq = await generateReplyDraft(env.GROQ_API_KEY, {
     reviewerName: review.reviewer_name,
     starRating: review.star_rating,
     comment: review.comment,
   });
 
   // Strip [URGENT_REVIEW] tag for the actual reply text
-  const cleanDraft = claude.draft.replace(/^\[URGENT_REVIEW\]\s*/m, "").trim();
+  const cleanDraft = groq.draft.replace(/^\[URGENT_REVIEW\]\s*/m, "").trim();
 
-  await updateReviewDraft(sb, review.id!, cleanDraft, claude.model);
+  await updateReviewDraft(sb, review.id!, cleanDraft, groq.model);
   await logAction(sb, {
     review_id: review.id!,
     action: "ai_draft_generated",
-    actor: "claude",
+    actor: "groq",
     details: {
-      model: claude.model,
-      tokens_in: claude.inputTokens,
-      tokens_out: claude.outputTokens,
-      had_urgent_tag: claude.draft.includes("[URGENT_REVIEW]"),
+      model: groq.model,
+      tokens_in: groq.inputTokens,
+      tokens_out: groq.outputTokens,
+      had_urgent_tag: groq.draft.includes("[URGENT_REVIEW]"),
     },
   });
 

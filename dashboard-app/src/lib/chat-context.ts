@@ -56,7 +56,7 @@ export function parseDateFilter(q: string, todayStr: string): DateFilter | null 
     d.setUTCDate(d.getUTCDate() - 7)
     return { start: d.toISOString().split('T')[0], end: todayStr }
   }
-  if (lower.includes('mes')) {
+  if (/\bmes\b/.test(lower)) {
     return { start: todayStr.slice(0, 8) + '01', end: todayStr }
   }
 
@@ -280,7 +280,10 @@ export function buildWaiterContext(waiterRows: WaiterCategoryRow[]): string {
  */
 export function needsExtendedHistory(q: string): boolean {
   const lower = q.toLowerCase()
-  return ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes',
+  const exactWords = ['mes']
+  const substrings = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana',
     'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos',
-    'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => lower.includes(kw))
+    'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año']
+  return substrings.some(kw => lower.includes(kw)) ||
+    exactWords.some(kw => new RegExp(`\\b${kw}\\b`).test(lower))
 }

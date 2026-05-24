@@ -9,7 +9,7 @@ enabled = true
 # Secrets (setear con: wrangler secret put NOMBRE)
 # SUPABASE_URL           — https://qjiomlvudfmzuvqvhwpk.supabase.co
 # SUPABASE_SERVICE_KEY   — service_role key
-# ANTHROPIC_API_KEY      — API key de Claude
+# GROQ_API_KEY           — API key de Groq
 # GOOGLE_CLIENT_ID       — OAuth 2.0 client ID (GCP Console)
 # GOOGLE_CLIENT_SECRET   — OAuth 2.0 client secret
 # TELEGRAM_BOT_TOKEN     — Token del bot de Telegram
