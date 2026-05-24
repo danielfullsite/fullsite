@@ -1,93 +1,203 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, Search, Save, X, Package } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Pencil, Search, Save, X, ChevronDown, GripVertical } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const CLIENT_ID = 'amalay'
 
-interface MenuItem {
+interface Category {
   id: string
   name: string
-  price: number
-  category: string
+  color: string
+  sort_order: number
   active: boolean
 }
 
-// Current menu from pos-data.ts categories
-import { MENU_CATEGORIES } from '@/lib/pos-data'
+interface MenuItem {
+  id: string
+  category_id: string
+  name: string
+  price: number
+  barcode: string | null
+  sort_order: number
+  active: boolean
+}
+
+async function api(path: string, opts?: RequestInit) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...opts?.headers,
+    },
+  })
+  return res.ok ? res.json() : []
+}
 
 export default function AdminMenuPage() {
+  const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
-  const [editing, setEditing] = useState<MenuItem | null>(null)
-  const [adding, setAdding] = useState(false)
-  const [newItem, setNewItem] = useState({ name: '', price: '', category: MENU_CATEGORIES[0].id })
   const [toast, setToast] = useState<string | null>(null)
+
+  // Item modal
+  const [editItem, setEditItem] = useState<MenuItem | null>(null)
+  const [isNewItem, setIsNewItem] = useState(false)
+
+  // Category modal
+  const [editCat, setEditCat] = useState<Category | null>(null)
+  const [isNewCat, setIsNewCat] = useState(false)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
-  useEffect(() => {
-    // Load from MENU_CATEGORIES (static for now)
-    const all: MenuItem[] = []
-    for (const cat of MENU_CATEGORIES) {
-      for (const item of cat.items) {
-        all.push({ id: item.id, name: item.name, price: item.price, category: cat.name, active: true })
-      }
-    }
-    setItems(all)
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [cats, menuItems] = await Promise.all([
+      api(`pos_menu_categories?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+      api(`pos_menu_items?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+    ])
+    setCategories(cats)
+    setItems(menuItems)
+    setLoading(false)
   }, [])
 
-  const categories = [...new Set(items.map(i => i.category))]
+  useEffect(() => { load() }, [load])
+
+  // ── Item CRUD ──────────────────────────────────────────────
+
+  const handleSaveItem = async () => {
+    if (!editItem || !editItem.name) return
+    const body = {
+      client_id: CLIENT_ID,
+      category_id: editItem.category_id,
+      name: editItem.name,
+      price: editItem.price,
+      barcode: editItem.barcode || null,
+      sort_order: editItem.sort_order,
+      active: editItem.active,
+    }
+    if (isNewItem) {
+      const id = editItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now().toString(36)
+      await api('pos_menu_items', { method: 'POST', body: JSON.stringify({ id, ...body }) })
+      showToast(`${editItem.name} agregado`)
+    } else {
+      await api(`pos_menu_items?id=eq.${editItem.id}`, { method: 'PATCH', body: JSON.stringify(body) })
+      showToast(`${editItem.name} actualizado`)
+    }
+    setEditItem(null)
+    load()
+  }
+
+  const handleToggleItem = async (item: MenuItem) => {
+    await api(`pos_menu_items?id=eq.${item.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: !item.active }),
+    })
+    load()
+  }
+
+  // ── Category CRUD ──────────────────────────────────────────
+
+  const handleSaveCat = async () => {
+    if (!editCat || !editCat.name) return
+    const body = {
+      client_id: CLIENT_ID,
+      name: editCat.name,
+      color: editCat.color,
+      sort_order: editCat.sort_order,
+      active: editCat.active,
+    }
+    if (isNewCat) {
+      const id = editCat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)
+      await api('pos_menu_categories', { method: 'POST', body: JSON.stringify({ id, ...body }) })
+      showToast(`Categoria "${editCat.name}" creada`)
+    } else {
+      await api(`pos_menu_categories?id=eq.${editCat.id}`, { method: 'PATCH', body: JSON.stringify(body) })
+      showToast(`Categoria "${editCat.name}" actualizada`)
+    }
+    setEditCat(null)
+    load()
+  }
+
+  const handleToggleCat = async (cat: Category) => {
+    await api(`pos_menu_categories?id=eq.${cat.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: !cat.active }),
+    })
+    load()
+  }
+
+  // ── Filter ─────────────────────────────────────────────────
 
   const filtered = items.filter(i => {
-    if (filterCat !== 'all' && i.category !== filterCat) return false
+    if (filterCat !== 'all' && i.category_id !== filterCat) return false
     if (search && !i.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
-  const handleSaveEdit = () => {
-    if (!editing) return
-    setItems(prev => prev.map(i => i.id === editing.id ? editing : i))
-    showToast(`${editing.name} actualizado`)
-    setEditing(null)
-  }
+  const getCatName = (catId: string) => categories.find(c => c.id === catId)?.name || catId
+  const activeItems = items.filter(i => i.active).length
+  const activeCats = categories.filter(c => c.active).length
 
-  const handleAdd = () => {
-    if (!newItem.name || !newItem.price) return
-    const cat = MENU_CATEGORIES.find(c => c.id === newItem.category)
-    const item: MenuItem = {
-      id: `new_${Date.now()}`,
-      name: newItem.name,
-      price: Number(newItem.price),
-      category: cat?.name || newItem.category,
-      active: true,
-    }
-    setItems(prev => [...prev, item])
-    showToast(`${item.name} agregado`)
-    setNewItem({ name: '', price: '', category: MENU_CATEGORIES[0].id })
-    setAdding(false)
-  }
+  // ── Color options ──────────────────────────────────────────
+  const COLORS = [
+    'bg-red-600','bg-rose-700','bg-yellow-500','bg-amber-700','bg-orange-500',
+    'bg-yellow-600','bg-yellow-400','bg-lime-600','bg-green-500','bg-green-700',
+    'bg-emerald-600','bg-cyan-500','bg-sky-600','bg-blue-500','bg-indigo-500',
+    'bg-purple-600','bg-violet-700','bg-fuchsia-500','bg-pink-500','bg-slate-500',
+    'bg-amber-500','bg-rose-600',
+  ]
 
-  const handleToggle = (id: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, active: !i.active } : i))
-  }
+  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando menu...</div>
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Administrar Menu</h2>
-          <p className="text-sm text-slate-500">{items.length} platillos · {categories.length} categorias</p>
+          <p className="text-sm text-slate-500">{activeItems} platillos activos · {activeCats} categorias</p>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
-        >
-          <Plus size={16} />
-          Agregar platillo
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setEditCat({ id: '', name: '', color: 'bg-slate-500', sort_order: categories.length, active: true }); setIsNewCat(true) }}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold flex items-center gap-2"
+          >
+            <Plus size={16} /> Categoria
+          </button>
+          <button
+            onClick={() => { setEditItem({ id: '', category_id: categories[0]?.id || '', name: '', price: 0, barcode: null, sort_order: 0, active: true }); setIsNewItem(true) }}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
+          >
+            <Plus size={16} /> Platillo
+          </button>
+        </div>
+      </div>
+
+      {/* Categories bar */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setEditCat({ ...cat })}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              cat.active
+                ? 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
+                : 'bg-slate-50 border-slate-100 text-slate-400 line-through'
+            }`}
+          >
+            <div className={`w-3 h-3 rounded ${cat.color}`}></div>
+            {cat.name}
+            <span className="text-slate-400 font-normal">({items.filter(i => i.category_id === cat.id && i.active).length})</span>
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -108,32 +218,9 @@ export default function AdminMenuPage() {
           className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
         >
           <option value="all">Todas las categorias</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-
-      {/* Add modal */}
-      {adding && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
-          <h3 className="font-semibold text-emerald-800 mb-3">Nuevo platillo</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })}
-              placeholder="Nombre del platillo" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-            <input type="number" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })}
-              placeholder="Precio" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-            <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}
-              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
-              {MENU_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button onClick={handleAdd} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1">
-              <Save size={14} /> Guardar
-            </button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -151,50 +238,136 @@ export default function AdminMenuPage() {
             {filtered.map(item => (
               <tr key={item.id} className={`border-b border-slate-100 hover:bg-slate-50 ${!item.active ? 'opacity-40' : ''}`}>
                 <td className="px-5 py-3">
-                  {editing?.id === item.id ? (
-                    <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })}
-                      className="border border-emerald-300 rounded px-2 py-1 text-sm w-full" />
-                  ) : (
-                    <span className="text-sm font-medium text-slate-900">{item.name}</span>
-                  )}
+                  <span className="text-sm font-medium text-slate-900">{item.name}</span>
+                  {item.barcode && <span className="ml-2 text-xs text-slate-400">{item.barcode}</span>}
                 </td>
-                <td className="px-5 py-3 text-sm text-slate-500">{item.category}</td>
+                <td className="px-5 py-3">
+                  <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded ${categories.find(c => c.id === item.category_id)?.color || 'bg-slate-400'}`}></div>
+                    {getCatName(item.category_id)}
+                  </span>
+                </td>
                 <td className="px-5 py-3 text-right">
-                  {editing?.id === item.id ? (
-                    <input type="number" value={editing.price} onChange={e => setEditing({ ...editing, price: Number(e.target.value) })}
-                      className="border border-emerald-300 rounded px-2 py-1 text-sm w-20 text-right" />
-                  ) : (
-                    <span className="text-sm font-semibold text-slate-900">${item.price.toFixed(2)}</span>
-                  )}
+                  <span className="text-sm font-semibold text-slate-900">
+                    {item.price > 0 ? `$${item.price}` : <span className="text-slate-400 font-normal">Variable</span>}
+                  </span>
                 </td>
                 <td className="px-5 py-3 text-center">
-                  <button onClick={() => handleToggle(item.id)}
+                  <button onClick={() => handleToggleItem(item)}
                     className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                     {item.active ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>
                 <td className="px-5 py-3 text-right">
-                  {editing?.id === item.id ? (
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={handleSaveEdit} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center">
-                        <Save size={14} />
-                      </button>
-                      <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setEditing(item)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
-                      <Pencil size={14} />
-                    </button>
-                  )}
+                  <button onClick={() => { setEditItem({ ...item }); setIsNewItem(false) }}
+                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center ml-auto">
+                    <Pencil size={14} />
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && (
+          <p className="text-center py-8 text-slate-400 text-sm">Sin resultados</p>
+        )}
       </div>
 
+      {/* ── Item Modal ──────────────────────────────────────── */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditItem(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{isNewItem ? 'Nuevo platillo' : 'Editar platillo'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Nombre</label>
+                <input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm mt-1 focus:outline-none focus:border-emerald-500" autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Precio (MXN)</label>
+                  <input type="number" value={editItem.price} onChange={e => setEditItem({ ...editItem, price: Number(e.target.value) })}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Categoria</label>
+                  <select value={editItem.category_id} onChange={e => setEditItem({ ...editItem, category_id: e.target.value })}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm mt-1">
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Codigo de barras (opcional)</label>
+                <input value={editItem.barcode || ''} onChange={e => setEditItem({ ...editItem, barcode: e.target.value || null })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm mt-1 focus:outline-none focus:border-emerald-500"
+                  placeholder="Escanear o escribir codigo" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={handleSaveItem}
+                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                <Save size={14} /> Guardar
+              </button>
+              <button onClick={() => setEditItem(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Category Modal ──────────────────────────────────── */}
+      {editCat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditCat(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{isNewCat ? 'Nueva categoria' : 'Editar categoria'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Nombre</label>
+                <input value={editCat.name} onChange={e => setEditCat({ ...editCat, name: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm mt-1 focus:outline-none focus:border-emerald-500" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">Color</label>
+                <div className="flex gap-2 flex-wrap">
+                  {COLORS.map(c => (
+                    <button key={c} onClick={() => setEditCat({ ...editCat, color: c })}
+                      className={`w-8 h-8 rounded-lg ${c} ${editCat.color === c ? 'ring-2 ring-offset-2 ring-emerald-500' : ''}`} />
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-slate-600">Estado</span>
+                <button onClick={() => setEditCat({ ...editCat, active: !editCat.active })}
+                  className={`text-xs font-semibold px-3 py-1 rounded-full ${editCat.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {editCat.active ? 'Activa' : 'Inactiva'}
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={handleSaveCat}
+                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                <Save size={14} /> Guardar
+              </button>
+              {!isNewCat && (
+                <button onClick={() => { handleToggleCat(editCat); setEditCat(null) }}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${editCat.active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>
+                  {editCat.active ? 'Desactivar' : 'Activar'}
+                </button>
+              )}
+              <button onClick={() => setEditCat(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
