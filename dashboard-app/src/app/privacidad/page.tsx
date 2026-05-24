@@ -24,7 +24,7 @@ export default function PrivacidadPage() {
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">1. Identidad y domicilio del responsable</h2>
           <p className="text-sm text-text-soft leading-relaxed">
-            Fullsite, operado por Daniel Ramonfaur Garcia (&quot;el Responsable&quot;), con domicilio en
+            Fullsite (&quot;el Responsable&quot;), con domicilio en
             Monterrey, Nuevo Leon, Mexico, es responsable de recabar, almacenar, usar y proteger sus
             datos personales conforme a la LFPDPPP, su Reglamento y los Lineamientos del Aviso de
             Privacidad publicados en el Diario Oficial de la Federacion.

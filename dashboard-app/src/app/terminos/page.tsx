@@ -20,7 +20,7 @@ export default function TerminosPage() {
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">1. Definiciones</h2>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside">
-            <li><strong>&quot;Fullsite&quot;</strong> o <strong>&quot;el Servicio&quot;</strong>: la plataforma de punto de venta con inteligencia artificial operada por Daniel Ramonfaur Garcia</li>
+            <li><strong>&quot;Fullsite&quot;</strong> o <strong>&quot;el Servicio&quot;</strong>: la plataforma de punto de venta con inteligencia artificial operada por Fullsite</li>
             <li><strong>&quot;Cliente&quot;</strong> o <strong>&quot;Usuario&quot;</strong>: persona fisica o moral que contrata y utiliza el Servicio</li>
             <li><strong>&quot;Datos del Cliente&quot;</strong>: toda la informacion que el Cliente ingresa, genera o almacena en la plataforma</li>
             <li><strong>&quot;Contenido IA&quot;</strong>: cualquier texto, analisis, recomendacion o insight generado por los modelos de inteligencia artificial del Servicio</li>
