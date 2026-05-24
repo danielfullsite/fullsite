@@ -29,7 +29,7 @@ export default function RevenueDistributionChart({ data, title }: Props) {
       <div className="flex items-center gap-6">
         {/* Donut Chart */}
         <div className="w-[160px] h-[160px] flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <PieChart>
               <Pie
                 data={top8}
