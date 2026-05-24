@@ -19,3 +19,5 @@ fullsite-web
 dashboard-app/.next/
 dashboard-app/test-results/
 dashboard-app/playwright-report/
+.agents/
+skills-lock.json
