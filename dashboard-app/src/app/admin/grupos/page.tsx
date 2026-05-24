@@ -1,23 +1,35 @@
 'use client'
 
-import { MENU_CATEGORIES } from '@/lib/pos-data'
+import { useState, useEffect } from 'react'
+import { getMenuCategoriesFromDB } from '@/lib/pos-data'
 import { Layers, ArrowRight, Package } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import Link from 'next/link'
 
 export default function AdminGruposPage() {
-  const groups = MENU_CATEGORIES.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    color: cat.color || 'bg-slate-500',
-    itemCount: cat.items.length,
-    priceRange: {
-      min: Math.min(...cat.items.map(i => i.price)),
-      max: Math.max(...cat.items.map(i => i.price)),
-    },
-  }))
+  const [groups, setGroups] = useState<{ id: string; name: string; color: string; itemCount: number; priceRange: { min: number; max: number } }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    (async () => {
+      const cats = await getMenuCategoriesFromDB()
+      setGroups(cats.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        color: cat.color || 'bg-slate-500',
+        itemCount: cat.items.length,
+        priceRange: {
+          min: cat.items.length > 0 ? Math.min(...cat.items.map(i => i.price)) : 0,
+          max: cat.items.length > 0 ? Math.max(...cat.items.map(i => i.price)) : 0,
+        },
+      })))
+      setLoading(false)
+    })()
+  }, [])
 
   const totalItems = groups.reduce((s, g) => s + g.itemCount, 0)
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando grupos...</div>
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -37,41 +49,30 @@ export default function AdminGruposPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {groups.map(g => (
-          <div
-            key={g.id}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow"
+        {groups.map(group => (
+          <Link
+            key={group.id}
+            href={`/admin/menu?cat=${group.id}`}
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-emerald-300 hover:shadow-md transition-all group"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-xl ${g.color} flex items-center justify-center`}>
-                <Layers size={18} className="text-white" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl ${group.color} flex items-center justify-center`}>
+                  <Layers size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-sm">{group.name}</h3>
+                  <p className="text-xs text-slate-400">{group.itemCount} platillos</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-slate-900 text-sm">{g.name}</h3>
-                <p className="text-xs text-slate-400">{g.id}</p>
-              </div>
+              <ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors mt-1" />
             </div>
-
-            <div className="flex items-center justify-between mt-4">
-              <div>
-                <p className="text-2xl font-bold text-slate-900">{g.itemCount}</p>
-                <p className="text-xs text-slate-400">platillos</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-700">
-                  ${g.priceRange.min} — ${g.priceRange.max}
-                </p>
-                <p className="text-xs text-slate-400">rango de precios</p>
-              </div>
-            </div>
-
-            <Link
-              href="/admin/menu"
-              className="mt-4 w-full flex items-center justify-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium py-2 rounded-lg hover:bg-emerald-50 transition-colors"
-            >
-              Ver platillos <ArrowRight size={14} />
-            </Link>
-          </div>
+            {group.priceRange.max > 0 && (
+              <p className="text-xs text-slate-500">
+                ${group.priceRange.min} – ${group.priceRange.max} MXN
+              </p>
+            )}
+          </Link>
         ))}
       </div>
     </div>

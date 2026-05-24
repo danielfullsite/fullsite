@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, use } from 'react'
-import { MENU_CATEGORIES, formatMXN } from '@/lib/pos-data'
+import { MENU_CATEGORIES, getMenuCategoriesFromDB, formatMXN } from '@/lib/pos-data'
 
 interface CartItem {
   id: string
@@ -13,12 +13,15 @@ interface CartItem {
 export default function MenuPage({ params }: { params: Promise<{ mesa: string }> }) {
   const { mesa } = use(params)
   const mesaNum = parseInt(mesa) || 1
+  const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCat, setSelectedCat] = useState(MENU_CATEGORIES[0].id)
   const [sent, setSent] = useState(false)
   const [nombre, setNombre] = useState('')
 
-  const activeCat = MENU_CATEGORIES.find(c => c.id === selectedCat) || MENU_CATEGORIES[0]
+  useState(() => { getMenuCategoriesFromDB().then(cats => { if (cats.length) setMenuCategories(cats) }) })
+
+  const activeCat = menuCategories.find(c => c.id === selectedCat) || menuCategories[0]
 
   const addItem = (id: string, name: string, price: number) => {
     setCart(prev => {
@@ -101,7 +104,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
 
       {/* Categories */}
       <div className="flex gap-1 px-3 py-2 overflow-x-auto border-b border-slate-100 bg-slate-50 sticky top-[52px] z-10">
-        {MENU_CATEGORIES.map(cat => (
+        {menuCategories.map(cat => (
           <button
             key={cat.id}
             onClick={() => setSelectedCat(cat.id)}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { PieChart, Search, ArrowUpDown, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import { getLatestDeep } from '@/lib/data'
-import { getRecipes, getIngredients, MENU_CATEGORIES, type RecipeRow, type Ingredient } from '@/lib/pos-data'
+import { getRecipes, getIngredients, getMenuCategoriesFromDB, type RecipeRow, type Ingredient } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 
 interface CostItem {
@@ -34,7 +34,7 @@ export default function FoodCostPage() {
           setFecha(row.fecha as string || '')
         } else {
           // Fallback: calculate from pos_recipes + pos_ingredients
-          const [recipes, ingredients] = await Promise.all([getRecipes(), getIngredients()])
+          const [recipes, ingredients, menuCats] = await Promise.all([getRecipes(), getIngredients(), getMenuCategoriesFromDB()])
           const ingMap = new Map(ingredients.map((i: Ingredient) => [i.id, i]))
 
           // Group recipes by platillo
@@ -49,9 +49,9 @@ export default function FoodCostPage() {
             platilloMap.set(r.menu_item_id, existing)
           }
 
-          // Match with menu prices
+          // Match with menu prices from DB
           const menuPrices = new Map<string, number>()
-          for (const cat of MENU_CATEGORIES) {
+          for (const cat of menuCats) {
             for (const item of cat.items) {
               menuPrices.set(item.name.toLowerCase(), item.price)
             }
