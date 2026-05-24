@@ -100,13 +100,18 @@ def scrape(target_date: str) -> Path:
     log(f"Mode: {'headed (debug)' if debug else 'headless'}")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
+        browser = pw.chromium.launch(
+            headless=headless,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
         context = browser.new_context(
             accept_downloads=True,
             user_agent=(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
+                "Chrome/131.0.0.0 Safari/537.36"
             ),
             viewport={"width": 1280, "height": 800},
             locale="es-MX",
@@ -114,9 +119,14 @@ def scrape(target_date: str) -> Path:
         )
         page = context.new_page()
 
+        # Hide webdriver flag from headless detection scripts
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        """)
+
         # ── Step 1: Login ────────────────────────────────────────────────
         log("Navegando a login...")
-        page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=15000)
+        page.goto(LOGIN_URL, wait_until="networkidle", timeout=30000)
 
         try:
             page.wait_for_selector(
@@ -157,22 +167,31 @@ def scrape(target_date: str) -> Path:
         # ── Post-login verification ──────────────────────────────────────
         log("Verificando login...")
         login_ok = False
+
+        # Wait for navigation after submit — Wansoft redirects to a dashboard
+        # or sub-page. The login page URL ends with /Wansoft.Web/ (with or
+        # without trailing slash and possible query string).
         try:
-            # Option A: URL redirects away from login page
-            page.wait_for_url(
-                lambda url: "/Wansoft.Web/" in url and not url.rstrip("/").endswith("/Wansoft.Web"),
-                timeout=15000,
-            )
-            login_ok = True
+            page.wait_for_load_state("networkidle", timeout=15000)
         except PwTimeout:
             pass
+
+        # Option A: URL changed away from the bare login page
+        current = page.url
+        # Strip query string for path comparison
+        path_part = current.split("?")[0].rstrip("/")
+        if path_part.endswith("/Wansoft.Web"):
+            # Still on login page — could be a redirect race
+            pass
+        elif "/Wansoft.Web/" in current:
+            login_ok = True
 
         if not login_ok:
             # Option B: authenticated element appears (user name in sidebar)
             try:
                 page.wait_for_selector(
                     "text=D.RAMONFAUR, .user-name, .username, [class*='user']",
-                    timeout=5000,
+                    timeout=10000,
                 )
                 login_ok = True
             except PwTimeout:
