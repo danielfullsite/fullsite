@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
+import { PageTransition } from '@/components/motion'
 import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -73,7 +74,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <main className="min-h-screen overflow-auto pt-14 lg:pt-0">
         <div className="p-4 sm:p-6 lg:p-8">
-          {children}
+          <PageTransition key={pathname}>
+            {children}
+          </PageTransition>
         </div>
       </main>
       <ChatWidget />
