@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -80,10 +80,12 @@ const WIDGET_DEFS = [
   { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
+  { id: 'agent_status', label: 'Status de agentes', defaultOn: true },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
   { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
   { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
   { id: 'categories', label: 'Distribución por categoría', defaultOn: true },
+  { id: 'hora_pico', label: 'Hora pico y tendencia', defaultOn: true },
   { id: 'payment_methods', label: 'Métodos de pago', defaultOn: false },
   { id: 'quick_actions', label: 'Acciones rápidas', defaultOn: true },
 ] as const
@@ -482,6 +484,44 @@ export default function DashboardPage() {
         </div>
       </div>}
 
+      {/* Agent Status Widget */}
+      {show('agent_status') && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Bot size={14} className="text-violet-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900">Agentes IA</h3>
+            <span className="ml-auto text-xs text-emerald-600 font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              14 activos
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { name: 'Briefing', time: '7:00 AM', status: 'ok' },
+              { name: 'Anomalias', time: '2/4/6 PM', status: 'ok' },
+              { name: 'Anti-fraude', time: 'Viernes', status: 'ok' },
+              { name: 'KB 24/7', time: 'On-demand', status: 'live' },
+              { name: 'Menu Eng.', time: 'Lunes', status: 'ok' },
+              { name: 'Staffing', time: 'Lunes', status: 'ok' },
+              { name: 'Upselling', time: '2/4/6 PM', status: 'ok' },
+              { name: 'Propinas', time: 'Viernes', status: 'ok' },
+            ].map(agent => (
+              <div key={agent.name} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  agent.status === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-400'
+                }`} />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-700 truncate">{agent.name}</p>
+                  <p className="text-[10px] text-slate-400">{agent.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Week comparison banner — like Wansoft */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
         <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
@@ -645,6 +685,67 @@ export default function DashboardPage() {
           )}
         </div>
       </div>}
+
+      {/* Hora pico + daily trend */}
+      {show('hora_pico') && latestDay && (
+        <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Hora pico */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <Clock size={14} className="text-amber-600" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Hora pico</h3>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-slate-900">
+                {(() => {
+                  const peak = recentData.slice(-7).reduce((best, d) => {
+                    const m = d.meseros as unknown as Array<{ nombre: string; total: number }>
+                    const total = Array.isArray(m) ? m.reduce((s, x) => s + (x.total || 0), 0) : 0
+                    return total > best.total ? { total, fecha: d.fecha } : best
+                  }, { total: 0, fecha: '' })
+                  return peak.fecha ? new Date(peak.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long' }) : '-'
+                })()}
+              </span>
+              <span className="text-sm text-slate-400">mejor dia (7d)</span>
+            </div>
+            <div className="mt-3 flex items-center gap-4 text-sm">
+              <div>
+                <span className="text-slate-400">Mesas/dia:</span>
+                <span className="ml-1 font-semibold text-slate-700">{latestDay.mesas_atendidas || 0}</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Para llevar:</span>
+                <span className="ml-1 font-semibold text-slate-700">{latestDay.ordenes_llevar || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Efficiency metrics */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-cyan-50 flex items-center justify-center">
+                <Activity size={14} className="text-cyan-600" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Eficiencia del dia</h3>
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: 'Venta por persona', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.personas_restaurant || 1, 1)) },
+                { label: 'Venta por mesa', value: formatCurrency((latestDay.ventas_dia || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
+                { label: 'Propina promedio', value: formatCurrency((latestDay.propinas_total || 0) / Math.max(latestDay.mesas_atendidas || 1, 1)) },
+                { label: 'Descuento %', value: `${((latestDay.descuentos || 0) / Math.max(latestDay.ventas_brutas || 1, 1) * 100).toFixed(1)}%` },
+              ].map(m => (
+                <div key={m.label} className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">{m.label}</span>
+                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{m.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick actions row */}
       {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

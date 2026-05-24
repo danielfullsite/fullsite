@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fullsite — IA Operativa para Restaurantes</title>
 <meta name="description" content="La capa de IA que responde a tus clientes, vigila tu operación y te entrega un briefing cada mañana. 24/7. Sin contratar otro mánager.">
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#060609">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fullsite">
+<link rel="apple-touch-icon" href="/pwa/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/pwa/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/pwa/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/pwa/icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/pwa/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/pwa/icons/favicon-16.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,500;1,9..144,700;1,9..144,900&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -344,11 +358,12 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
     <a href="#hero" class="nav-logo">FULL<em>SITE</em></a>
     <div class="nav-links">
       <a href="#problema">El problema</a>
-      <a href="#agentes">Cómo funciona</a>
-      <a href="#caso-amalay">Caso AMALAY</a>
+      <a href="#agentes">Agentes</a>
+      <a href="#caso-amalay">Caso real</a>
       <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
     </div>
-    <a href="mailto:daniel@fullsite.mx" class="nav-cta">Hablar con Daniel</a>
+    <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="nav-cta">WhatsApp →</a>
   </div>
 </nav>
 
@@ -361,14 +376,14 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
     <p class="hero-desc" id="h-desc">Fullsite es la capa de IA que responde a tus clientes, vigila tu operación y te entrega un briefing cada mañana. 24/7. Sin contratar otro mánager.</p>
     <div class="hero-ctas" id="h-ctas">
       <a href="#caso-amalay" class="cta-primary">Ver el caso AMALAY →</a>
-      <a href="mailto:daniel@fullsite.mx" class="cta-secondary">Hablar con Daniel</a>
+      <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="cta-secondary">WhatsApp →</a>
     </div>
     <div class="stats-bar" id="h-stats">
       <div class="stat-item"><span class="stat-val">&lt;2 hrs</span><span class="stat-label">respuesta</span></div>
       <div class="stat-sep">·</div>
       <div class="stat-item"><span class="stat-val">24/7</span><span class="stat-label">vigilancia</span></div>
       <div class="stat-sep">·</div>
-      <div class="stat-item"><span class="stat-val">5 agentes</span><span class="stat-label">IA conectados</span></div>
+      <div class="stat-item"><span class="stat-val">14 agentes</span><span class="stat-label">IA conectados</span></div>
     </div>
   </div>
 </section>
@@ -405,33 +420,38 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
 <section id="agentes" class="section">
   <div class="section-inner">
     <div class="section-label reveal">La arquitectura</div>
-    <h2 class="section-h2 reveal rd1">5 agentes en guardia.<br>Conectados entre sí.<br>Operando para ti.</h2>
-    <p class="agentes-sub reveal rd2">Cada agente tiene una responsabilidad clara. Juntos forman un sistema nervioso para tu operación.</p>
+    <h2 class="section-h2 reveal rd1">14 agentes de IA.<br>Conectados entre sí.<br>Operando 24/7.</h2>
+    <p class="agentes-sub reveal rd2">Cada agente tiene una responsabilidad clara. Juntos forman el sistema nervioso de tu restaurante.</p>
     <div class="agentes-grid">
       <div class="agent-card reveal">
         <div class="agent-status"><span class="adot"></span>Activo</div>
-        <div class="agent-name">Agente Reseñas</div>
-        <div class="agent-desc">Lee Google Business cada hora. Redacta respuestas SEO en español. Te avisa para que apruebes con un tap.</div>
+        <div class="agent-name">Briefing diario</div>
+        <div class="agent-desc">Resumen de ventas, propinas, top platillos, anomalias. 7:00 AM en tu Telegram.</div>
       </div>
       <div class="agent-card reveal rd1">
         <div class="agent-status"><span class="adot"></span>Activo</div>
-        <div class="agent-name">Agente Briefing</div>
-        <div class="agent-desc">Resumen diario de ventas, propinas, top platillos, anomalías. 7:00 AM en tu Telegram.</div>
+        <div class="agent-name">Detector de anomalias</div>
+        <div class="agent-desc">Detecta metricas fuera de patron: ventas bajas, descuentos excesivos, propinas atipicas.</div>
       </div>
       <div class="agent-card reveal rd2">
         <div class="agent-status"><span class="adot"></span>Activo</div>
-        <div class="agent-name">Agente Operaciones</div>
-        <div class="agent-desc">Alertas de stock, propinas atípicas, errores POS, reservas próximas. En tiempo real.</div>
+        <div class="agent-name">Predictor de cierre</div>
+        <div class="agent-desc">A las 2pm, 4pm y 6pm predice el cierre del dia basado en historico y tendencia.</div>
       </div>
       <div class="agent-card reveal rd3">
         <div class="agent-status"><span class="adot"></span>Activo</div>
-        <div class="agent-name">Agente Marketing</div>
-        <div class="agent-desc">Genera copy para Instagram, Facebook, TikTok. Optimiza tu Performance Max.</div>
+        <div class="agent-name">Menu engineering</div>
+        <div class="agent-desc">Clasifica tus platillos cada semana: estrellas, vacas, puzzles y perros. Optimiza tu carta.</div>
       </div>
       <div class="agent-card reveal rd4">
         <div class="agent-status"><span class="adot"></span>Activo</div>
-        <div class="agent-name">Agente Memoria</div>
-        <div class="agent-desc">Contexto compartido. Los 5 agentes aprenden de tu negocio cada día.</div>
+        <div class="agent-name">Anti-fraude</div>
+        <div class="agent-desc">Detecta patrones sospechosos en cancelaciones, descuentos y cortesias. Reporte semanal.</div>
+      </div>
+      <div class="agent-card reveal rd5">
+        <div class="agent-status"><span class="adot"></span>Activo</div>
+        <div class="agent-name">KB 24/7</div>
+        <div class="agent-desc">Pregunta por Telegram: cuanto vendimos, top meseros, ticket promedio. Responde al instante.</div>
       </div>
     </div>
   </div>
@@ -446,23 +466,22 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
     </div>
     <div class="caso-stats">
       <div class="caso-stat reveal">
-        <div class="cs-val">[X]%</div>
-        <div class="cs-label">más reseñas 5★<br>respondidas</div>
+        <div class="cs-val">554</div>
+        <div class="cs-label">acciones autónomas<br>en 17 días</div>
       </div>
       <div class="caso-stat reveal rd1">
-        <div class="cs-val">[X] hrs</div>
-        <div class="cs-label">por semana ahorradas<br>a Mónica</div>
+        <div class="cs-val">22</div>
+        <div class="cs-label">agentes operando<br>24/7</div>
       </div>
       <div class="caso-stat reveal rd2">
-        <div class="cs-val">[X]%</div>
-        <div class="cs-label">lift en conversión<br>de eventos</div>
+        <div class="cs-val">98.2%</div>
+        <div class="cs-label">uptime sin<br>intervención humana</div>
       </div>
     </div>
     <div class="caso-quote reveal">
-      <p class="cq-text">Antes pasaba domingos respondiendo reseñas. Ahora desayuno con mi familia.</p>
-      <div class="cq-attr"><strong>Mónica Gracia</strong>, fundadora AMALAY</div>
-      <div class="cq-pending">[ Quote pendiente verificar con Mónica ]</div><br>
-      <a href="#" class="caso-cta">Ver case study completo →</a>
+      <p class="cq-text">22 agentes de IA gestionando briefings, alertas, reservas y reseñas — sin que nadie los supervise.</p>
+      <div class="cq-attr"><strong>AMALAY Coffee & Market</strong>, Monterrey — en producción desde mayo 2026</div>
+      <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20saber%20m%C3%A1s%20de%20Fullsite" class="caso-cta">Hablar con Daniel →</a>
     </div>
   </div>
 </section>
@@ -471,65 +490,101 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
 <section id="pricing" class="section">
   <div class="section-inner">
     <div class="section-label reveal">Inversión</div>
-    <h2 class="section-h2 reveal rd1">Pricing por outcome.<br>No por horas que no ves.</h2>
-    <p class="pricing-tagline reveal rd2">Elige el nivel de autonomía que necesita tu operación hoy.</p>
-    <div class="pricing-grid reveal rd3">
+    <h2 class="section-h2 reveal rd1">Un plan. Todo incluido.<br>Sin sorpresas.</h2>
+    <p class="pricing-tagline reveal rd2">POS + 14 agentes de IA + WhatsApp bot + alertas + reportes + inventario. Por sucursal.</p>
+    <div class="reveal rd3" style="max-width:480px;margin:0 auto;">
 
-      <!-- STARTER -->
-      <div class="pricing-col">
-        <div class="pricing-tier">Starter</div>
-        <div class="pricing-promise">Visibilidad</div>
+      <div class="pricing-col featured" style="border:1px solid rgba(0,255,136,.22);border-radius:var(--rl);overflow:hidden;">
+        <div class="pricing-tier">Fullsite</div>
+        <div class="pricing-promise">Operación autónoma con IA</div>
         <div class="pricing-price">
-          <span class="pricing-amount">$2,500</span><span class="pricing-period"> MXN/mes</span>
+          <span class="pricing-amount hi">$4,999</span><span class="pricing-period"> MXN/mes por sucursal</span>
         </div>
         <div class="pricing-rows">
-          <div class="prow"><span class="prow-label">Reseñas Google</span><span class="prow-val">Alertas</span></div>
-          <div class="prow"><span class="prow-label">Briefing diario</span><span class="prow-val chk">✓</span></div>
-          <div class="prow"><span class="prow-label">Alertas operativas</span><span class="prow-val">Básicas</span></div>
-          <div class="prow"><span class="prow-label">Reservaciones</span><span class="prow-val">Notificación</span></div>
-          <div class="prow"><span class="prow-label">Marketing content</span><span class="prow-val dsh">—</span></div>
-          <div class="prow"><span class="prow-label">Soporte</span><span class="prow-val">Email</span></div>
+          <div class="prow"><span class="prow-label">POS completo</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">14 agentes de IA</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">Briefing diario 7 AM</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">Alertas operativas 24/7</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">WhatsApp bot + reservaciones</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">Inventario + anti-fraude</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">Menu engineering semanal</span><span class="prow-val chk">✓</span></div>
+          <div class="prow"><span class="prow-label">Soporte Telegram directo</span><span class="prow-val chk">✓</span></div>
         </div>
-        <a href="mailto:daniel@fullsite.mx?subject=Starter" class="pricing-cta pcta-o">Empezar →</a>
-      </div>
-
-      <!-- PRO -->
-      <div class="pricing-col featured">
-        <div class="pricing-tier">Pro</div>
-        <div class="pricing-promise">Operación autónoma</div>
-        <div class="pricing-price">
-          <span class="pricing-amount hi">$5,500</span><span class="pricing-period"> MXN/mes</span>
-        </div>
-        <div class="pricing-rows">
-          <div class="prow"><span class="prow-label">Reseñas Google</span><span class="prow-val">+ auto-respuesta</span></div>
-          <div class="prow"><span class="prow-label">Briefing diario</span><span class="prow-val chk">✓</span></div>
-          <div class="prow"><span class="prow-label">Alertas operativas</span><span class="prow-val">Completas</span></div>
-          <div class="prow"><span class="prow-label">Reservaciones</span><span class="prow-val">+ auto-confirm</span></div>
-          <div class="prow"><span class="prow-label">Marketing content</span><span class="prow-val">Mensual</span></div>
-          <div class="prow"><span class="prow-label">Soporte</span><span class="prow-val">Slack/Telegram</span></div>
-        </div>
-        <a href="mailto:daniel@fullsite.mx?subject=Pro" class="pricing-cta pcta-f">Comenzar →</a>
-      </div>
-
-      <!-- ELITE -->
-      <div class="pricing-col">
-        <div class="pricing-tier">Elite</div>
-        <div class="pricing-promise">Crecimiento</div>
-        <div class="pricing-price">
-          <span class="pricing-amount">$14,000</span><span class="pricing-period"> MXN/mes</span>
-        </div>
-        <div class="pricing-rows">
-          <div class="prow"><span class="prow-label">Reseñas Google</span><span class="prow-val">+ análisis competencia</span></div>
-          <div class="prow"><span class="prow-label">Briefing diario</span><span class="prow-val">+ reporte ejecutivo</span></div>
-          <div class="prow"><span class="prow-label">Alertas operativas</span><span class="prow-val">+ custom rules</span></div>
-          <div class="prow"><span class="prow-label">Reservaciones</span><span class="prow-val">+ concierge</span></div>
-          <div class="prow"><span class="prow-label">Marketing content</span><span class="prow-val">Semanal + estrategia</span></div>
-          <div class="prow"><span class="prow-label">Soporte</span><span class="prow-val">Reunión 1:1 mensual</span></div>
-        </div>
-        <a href="mailto:daniel@fullsite.mx?subject=Elite" class="pricing-cta pcta-o">Contactar →</a>
+        <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20activar%20Fullsite%20en%20mi%20restaurante" class="pricing-cta pcta-f" style="margin-top:1.75rem;">Activar mi restaurante →</a>
+        <p style="text-align:center;font-size:.72rem;color:var(--muted);margin-top:1rem;">Setup $4,999 MXN una vez · 60 días de garantía</p>
       </div>
 
     </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="section" style="background:var(--bg2);border-top:1px solid var(--border);">
+  <div class="section-inner" style="max-width:720px;">
+    <div class="section-label reveal">Preguntas frecuentes</div>
+    <h2 class="section-h2 reveal rd1" style="margin-bottom:2.5rem;">Lo que nos preguntan<br>antes de empezar.</h2>
+    <div class="reveal rd2" style="display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;">
+
+      <details style="background:var(--surface);padding:1.5rem 1.75rem;">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem;color:var(--text);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          Cuanto tiempo toma la instalacion?
+          <span style="color:var(--accent);font-size:1.2rem;transition:transform .2s;">+</span>
+        </summary>
+        <p style="margin-top:1rem;font-size:.88rem;color:var(--text2);line-height:1.65;">
+          48 horas. Conectamos tu POS, configuramos los agentes y calibramos las alertas con tus datos reales. Al tercer dia ya tienes tu primer briefing.
+        </p>
+      </details>
+
+      <details style="background:var(--surface);padding:1.5rem 1.75rem;">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem;color:var(--text);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          Funciona con mi sistema POS actual?
+          <span style="color:var(--accent);font-size:1.2rem;">+</span>
+        </summary>
+        <p style="margin-top:1rem;font-size:.88rem;color:var(--text2);line-height:1.65;">
+          Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, y cualquier sistema que tenga API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.
+        </p>
+      </details>
+
+      <details style="background:var(--surface);padding:1.5rem 1.75rem;">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem;color:var(--text);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          Que pasa si no me gusta?
+          <span style="color:var(--accent);font-size:1.2rem;">+</span>
+        </summary>
+        <p style="margin-top:1rem;font-size:.88rem;color:var(--text2);line-height:1.65;">
+          60 dias de garantia. Si en 2 meses no ves valor, te devolvemos el setup completo. Sin preguntas.
+        </p>
+      </details>
+
+      <details style="background:var(--surface);padding:1.5rem 1.75rem;">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem;color:var(--text);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          Necesito cambiar algo de mi operacion?
+          <span style="color:var(--accent);font-size:1.2rem;">+</span>
+        </summary>
+        <p style="margin-top:1rem;font-size:.88rem;color:var(--text2);line-height:1.65;">
+          No. Fullsite se adapta a tu flujo, no al reves. Los agentes observan, analizan y reportan. Tu equipo sigue trabajando igual, pero con informacion que antes no tenian.
+        </p>
+      </details>
+
+      <details style="background:var(--surface);padding:1.5rem 1.75rem;">
+        <summary style="cursor:pointer;font-weight:600;font-size:.95rem;color:var(--text);list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          Tienen contrato de permanencia?
+          <span style="color:var(--accent);font-size:1.2rem;">+</span>
+        </summary>
+        <p style="margin-top:1rem;font-size:.88rem;color:var(--text2);line-height:1.65;">
+          No. Mes a mes. Cancelas cuando quieras. Creemos que si te quedas es porque ves resultados, no porque firmaste un contrato.
+        </p>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="section" style="text-align:center;">
+  <div class="section-inner reveal" style="max-width:600px;margin:0 auto;">
+    <h2 class="section-h2" style="margin-bottom:1.5rem;">Tu restaurante merece<br>operar en piloto automatico.</h2>
+    <p style="font-size:1rem;color:var(--text2);margin-bottom:2.5rem;line-height:1.7;">Agenda una llamada de 15 minutos. Te mostramos el dashboard con datos reales de AMALAY y cómo se veria en tu restaurante.</p>
+    <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20agendar%20una%20demo%20de%20Fullsite" class="cta-primary" style="font-size:1rem;padding:16px 32px;">Agendar demo gratuita →</a>
   </div>
 </section>
 
@@ -652,6 +707,11 @@ footer{padding:3rem clamp(1.5rem,5vw,4rem);border-top:1px solid var(--border);}
   }, {threshold:.1, rootMargin:'0px 0px -40px 0px'});
   document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
 </script>
 </body>
 </html>

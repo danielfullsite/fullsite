@@ -1614,3 +1614,137 @@ export async function updateFacturaStatus(
   )
   return res.ok
 }
+
+// ─── CFDI — Facturación electrónica SAT ─────────────────────────────────────
+//
+// CREATE TABLE pos_cfdi_requests (
+//   id TEXT PRIMARY KEY,
+//   client_id TEXT DEFAULT 'amalay',
+//   order_id TEXT,                    -- optional: link to POS order
+//   rfc TEXT NOT NULL,
+//   razon_social TEXT NOT NULL,
+//   regimen_fiscal TEXT NOT NULL,     -- clave SAT e.g. '601', '612', '616'
+//   uso_cfdi TEXT NOT NULL,           -- e.g. 'G03', 'D10', 'S01'
+//   codigo_postal TEXT NOT NULL,
+//   email TEXT NOT NULL,
+//   subtotal NUMERIC DEFAULT 0,
+//   iva NUMERIC DEFAULT 0,
+//   total NUMERIC DEFAULT 0,
+//   status TEXT DEFAULT 'pendiente',  -- pendiente, procesando, emitida, cancelada, error
+//   folio_fiscal TEXT,               -- UUID SAT once emitted
+//   pdf_url TEXT,
+//   xml_url TEXT,
+//   error_msg TEXT,
+//   requested_by TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW(),
+//   updated_at TIMESTAMPTZ DEFAULT NOW()
+// );
+// CREATE INDEX idx_cfdi_rfc ON pos_cfdi_requests(rfc);
+// CREATE INDEX idx_cfdi_status ON pos_cfdi_requests(status);
+// CREATE INDEX idx_cfdi_created ON pos_cfdi_requests(created_at DESC);
+
+export interface CFDIRequest {
+  id: string
+  client_id: string
+  order_id?: string
+  rfc: string
+  razon_social: string
+  regimen_fiscal: string
+  uso_cfdi: string
+  codigo_postal: string
+  email: string
+  subtotal: number
+  iva: number
+  total: number
+  status: 'pendiente' | 'procesando' | 'emitida' | 'cancelada' | 'error'
+  folio_fiscal?: string
+  pdf_url?: string
+  xml_url?: string
+  error_msg?: string
+  requested_by?: string
+  created_at: string
+  updated_at: string
+}
+
+export const REGIMENES_FISCALES = [
+  { clave: '601', nombre: 'General de Ley Personas Morales' },
+  { clave: '603', nombre: 'Personas Morales con Fines no Lucrativos' },
+  { clave: '605', nombre: 'Sueldos y Salarios' },
+  { clave: '606', nombre: 'Arrendamiento' },
+  { clave: '608', nombre: 'Demás ingresos' },
+  { clave: '610', nombre: 'Residentes en el Extranjero' },
+  { clave: '612', nombre: 'Personas Físicas con Actividades Empresariales y Profesionales' },
+  { clave: '614', nombre: 'Ingresos por intereses' },
+  { clave: '616', nombre: 'Sin obligaciones fiscales' },
+  { clave: '620', nombre: 'Sociedades Cooperativas de Producción' },
+  { clave: '621', nombre: 'Incorporación Fiscal' },
+  { clave: '622', nombre: 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras' },
+  { clave: '625', nombre: 'Régimen de las Actividades Empresariales (Plataformas)' },
+  { clave: '626', nombre: 'Régimen Simplificado de Confianza' },
+]
+
+export const USOS_CFDI = [
+  { clave: 'G01', nombre: 'Adquisición de mercancías' },
+  { clave: 'G03', nombre: 'Gastos en general' },
+  { clave: 'D10', nombre: 'Pagos por servicios educativos' },
+  { clave: 'I01', nombre: 'Construcciones' },
+  { clave: 'P01', nombre: 'Por definir' },
+  { clave: 'S01', nombre: 'Sin efectos fiscales' },
+]
+
+export async function createCFDIRequest(req: {
+  order_id?: string
+  rfc: string
+  razon_social: string
+  regimen_fiscal: string
+  uso_cfdi: string
+  codigo_postal: string
+  email: string
+  subtotal: number
+  iva: number
+  total: number
+  requested_by?: string
+}): Promise<{ ok: boolean; id?: string }> {
+  const id = `CFDI-${generateId()}`
+  const body = {
+    id,
+    client_id: 'amalay',
+    ...req,
+    status: 'pendiente',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_cfdi_requests`,
+    {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    }
+  )
+  return { ok: res.ok, id: res.ok ? id : undefined }
+}
+
+export async function getCFDIRequests(limit = 50): Promise<CFDIRequest[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.amalay&order=created_at.desc&limit=${limit}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function updateCFDIStatus(
+  id: string, status: string, extra?: Record<string, unknown>
+): Promise<boolean> {
+  const body: Record<string, unknown> = { status, updated_at: new Date().toISOString(), ...extra }
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_cfdi_requests?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    }
+  )
+  return res.ok
+}

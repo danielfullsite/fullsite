@@ -60,6 +60,7 @@ import {
   Printer,
   Bluetooth,
   ScanBarcode,
+  Stamp,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -811,8 +812,8 @@ function POSContent() {
       cajero: ['mesas', 'cocina', 'barra', 'corte'],
       cocina: ['cocina'],
       barra: ['barra'],
-      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial'],
-      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial'],
+      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
     }
     return (perms[staffRole] || perms.admin).includes(section)
   }
@@ -1278,6 +1279,7 @@ function POSContent() {
                 { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
                 { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
                 { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
+                { href: '/pos/facturacion', icon: Stamp, label: 'Facturacion', section: 'facturacion' },
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
               ].filter(item => canSee(item.section)).map(item => (
                 <Link
