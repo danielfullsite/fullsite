@@ -61,6 +61,7 @@ import {
   Bluetooth,
   ScanBarcode,
   Stamp,
+  Monitor,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -812,8 +813,8 @@ function POSContent() {
       cajero: ['mesas', 'cocina', 'barra', 'corte'],
       cocina: ['cocina'],
       barra: ['barra'],
-      gerente: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
-      admin: ['mesas', 'cocina', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+      gerente: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+      admin: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
     }
     return (perms[staffRole] || perms.admin).includes(section)
   }
@@ -1271,6 +1272,7 @@ function POSContent() {
               {[
                 { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
                 { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
+                { href: '/pos/kds', icon: Monitor, label: 'KDS Tablet', section: 'kds' },
                 { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
                 { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
                 { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
