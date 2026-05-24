@@ -11,7 +11,7 @@ export default function TerminosPage() {
             </span>
           </a>
           <h1 className="text-2xl font-bold text-text mb-2">Terminos y Condiciones de Servicio</h1>
-          <p className="text-xs text-text-muted">Ultima actualizacion: 18 de mayo de 2026</p>
+          <p className="text-xs text-text-muted">Ultima actualizacion: 24 de mayo de 2026</p>
         </div>
       </div>
 
@@ -223,13 +223,19 @@ export default function TerminosPage() {
         </section>
 
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
-          <h2 className="text-sm font-semibold text-text mb-3">16. Ley aplicable y jurisdiccion</h2>
+          <h2 className="text-sm font-semibold text-text mb-3">16. Ley aplicable, jurisdiccion y resolucion de controversias</h2>
           <p className="text-sm text-text-soft leading-relaxed">
             Estos Terminos se rigen por las leyes de los Estados Unidos Mexicanos. Para la
             interpretacion y cumplimiento de estos Terminos, las partes se someten expresamente a la
             jurisdiccion de los tribunales competentes de la ciudad de Monterrey, Nuevo Leon, Mexico,
             renunciando a cualquier otro fuero que pudiera corresponderles por razon de su domicilio
             presente o futuro.
+          </p>
+          <p className="text-sm text-text-soft leading-relaxed mt-3">
+            <strong>Mediacion previa obligatoria:</strong> Antes de iniciar cualquier procedimiento judicial,
+            las partes se comprometen a intentar resolver la controversia mediante mediacion privada
+            en Monterrey, Nuevo Leon, durante un periodo minimo de 30 dias naturales. Los costos de
+            mediacion seran compartidos equitativamente entre las partes.
           </p>
         </section>
 

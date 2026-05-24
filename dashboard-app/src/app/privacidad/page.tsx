@@ -15,7 +15,7 @@ export default function PrivacidadPage() {
             En cumplimiento con la Ley Federal de Proteccion de Datos Personales en Posesion de los
             Particulares (LFPDPPP) y su Reglamento.
           </p>
-          <p className="text-xs text-text-muted mt-2">Ultima actualizacion: 18 de mayo de 2026</p>
+          <p className="text-xs text-text-muted mt-2">Ultima actualizacion: 24 de mayo de 2026</p>
         </div>
       </div>
 
