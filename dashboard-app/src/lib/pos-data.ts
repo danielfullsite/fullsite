@@ -242,6 +242,73 @@ export function getModifiersForCategory(categoryId: string): {
   return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_FOOD }
 }
 
+// ── DB-backed menu loading (fallback to static MENU_CATEGORIES) ─────────────
+
+const _SUPABASE_URL = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL || '' : ''
+const _SUPABASE_KEY = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' : ''
+const _SB_HEADERS = { apikey: _SUPABASE_KEY, Authorization: `Bearer ${_SUPABASE_KEY}` }
+
+export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
+  try {
+    const [catRes, itemsRes] = await Promise.all([
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.amalay&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+    ])
+    if (!catRes.ok || !itemsRes.ok) return MENU_CATEGORIES
+
+    const cats = await catRes.json()
+    const items = await itemsRes.json()
+    if (!cats.length || !items.length) return MENU_CATEGORIES
+
+    const itemsByCat = new Map<string, MenuItem[]>()
+    for (const item of items) {
+      const arr = itemsByCat.get(item.category_id) || []
+      arr.push({ id: item.id, name: item.name, price: Number(item.price), promo: item.promo, barcode: item.barcode })
+      itemsByCat.set(item.category_id, arr)
+    }
+
+    return cats.map((cat: { id: string; name: string; color: string }) => ({
+      id: cat.id,
+      name: cat.name,
+      color: cat.color,
+      items: itemsByCat.get(cat.id) || [],
+    }))
+  } catch {
+    return MENU_CATEGORIES
+  }
+}
+
+export async function getModifiersForCategoryFromDB(categoryId: string): Promise<{
+  quitarOptions: string[]
+  agregarOptions: ModificadorAgregar[]
+}> {
+  try {
+    const assignRes = await fetch(
+      `${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.amalay&category_id=eq.${categoryId}&select=modifier_group_id`,
+      { headers: _SB_HEADERS, cache: 'no-store' }
+    )
+    if (!assignRes.ok) return getModifiersForCategory(categoryId)
+
+    const assignments: { modifier_group_id: string }[] = await assignRes.json()
+    if (!assignments.length) return { quitarOptions: [], agregarOptions: [] }
+
+    const groupIds = assignments.map(a => a.modifier_group_id)
+    const modRes = await fetch(
+      `${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.amalay&active=eq.true&group_id=in.(${groupIds.join(',')})&order=sort_order.asc`,
+      { headers: _SB_HEADERS, cache: 'no-store' }
+    )
+    if (!modRes.ok) return getModifiersForCategory(categoryId)
+
+    const mods: { group_id: string; name: string; price: number }[] = await modRes.json()
+    return {
+      quitarOptions: mods.filter(m => m.group_id === 'quitar').map(m => m.name),
+      agregarOptions: mods.filter(m => m.group_id !== 'quitar').map(m => ({ name: m.name, price: Number(m.price) })),
+    }
+  } catch {
+    return getModifiersForCategory(categoryId)
+  }
+}
+
 // Map POS menu item names → recipe names in database
 // This connects every platillo to its recipe for dynamic modifiers + inventory deduction
 export const RECIPE_ALIASES: Record<string, string[]> = {

@@ -17,6 +17,8 @@ import {
   getRecipes,
   getIngredients,
   getModifiersForCategory,
+  getMenuCategoriesFromDB,
+  getModifiersForCategoryFromDB,
   type RecipeRow,
   type Ingredient,
   type ModificadorAgregar,
@@ -575,6 +577,7 @@ function POSContent() {
   const searchParams = useSearchParams()
   const initialMesa = Number(searchParams.get('mesa')) || 1
 
+  const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
   const [selectedCategory, setSelectedCategory] = useState<string>(
     MENU_CATEGORIES[0].id
   )
@@ -610,9 +613,10 @@ function POSContent() {
 
   useEffect(() => {
     (async () => {
-      const [r, i] = await Promise.all([getRecipes(), getIngredients()])
+      const [r, i, dbMenu] = await Promise.all([getRecipes(), getIngredients(), getMenuCategoriesFromDB()])
       setAllRecipes(r)
       setAllIngredients(i)
+      if (dbMenu.length > 0) setMenuCategories(dbMenu)
     })()
   }, [])
 
@@ -880,7 +884,7 @@ function POSContent() {
   }, [])
 
   const activeCategory =
-    MENU_CATEGORIES.find((c) => c.id === selectedCategory) || MENU_CATEGORIES[0]
+    menuCategories.find((c) => c.id === selectedCategory) || menuCategories[0]
 
   // Open modifier modal for a new item
   const handleMenuItemTap = useCallback((item: MenuItem, catId?: string) => {
@@ -890,7 +894,7 @@ function POSContent() {
     if (catId) {
       setModifierCategoryId(catId)
     } else {
-      const cat = MENU_CATEGORIES.find(c => c.items.some(i => i.id === item.id))
+      const cat = menuCategories.find(c => c.items.some(i => i.id === item.id))
       setModifierCategoryId(cat?.id ?? '')
     }
   }, [])
@@ -899,7 +903,7 @@ function POSContent() {
   const handleEditOrderItem = useCallback((orderItem: OrderItem) => {
     // Find the menu item to get the base info
     let menuItem: MenuItem | null = null
-    for (const cat of MENU_CATEGORIES) {
+    for (const cat of menuCategories) {
       const found = cat.items.find(i => i.id === orderItem.menuItemId)
       if (found) { menuItem = found; break }
     }
@@ -913,7 +917,7 @@ function POSContent() {
   const handleBarcodeScan = useCallback((code: string) => {
     setShowBarcodeScanner(false)
     let found = false
-    for (const cat of MENU_CATEGORIES) {
+    for (const cat of menuCategories) {
       const item = cat.items.find(i =>
         (i as MenuItem & { barcode?: string }).barcode === code
       )
@@ -1527,7 +1531,7 @@ function POSContent() {
               {(() => {
                 const term = menuSearch.toLowerCase()
                 const results: { item: MenuItem; category: string; catId: string }[] = []
-                for (const cat of MENU_CATEGORIES) {
+                for (const cat of menuCategories) {
                   for (const item of cat.items) {
                     if (item.price > 0 && item.name.toLowerCase().includes(term)) {
                       results.push({ item, category: cat.name, catId: cat.id })
@@ -1540,7 +1544,7 @@ function POSContent() {
                 return (
                   <div className="space-y-2">
                     {results.map(({ item, category, catId }) => {
-                      const catColor = MENU_CATEGORIES.find(c => c.id === catId)?.color || 'bg-emerald-600'
+                      const catColor = menuCategories.find(c => c.id === catId)?.color || 'bg-emerald-600'
                       return (
                         <button
                           key={item.id}
@@ -1566,7 +1570,7 @@ function POSContent() {
             <>
               {/* Category tabs — big touch targets */}
               <div className="flex gap-2 px-3 py-2.5 overflow-x-auto border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
-                {MENU_CATEGORIES.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
+                {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
