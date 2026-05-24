@@ -140,44 +140,51 @@ TRIGGERS (GitHub Actions cron / Telegram webhook)
         │
         ▼
   ┌─────────────────────────────────────────┐
-  │          ORQUESTADOR (skeleton)         │  ← Telegram inbound → clasifica → despacha
+  │          ORQUESTADOR (active)           │  ← Telegram inbound → Groq clasifica → despacha
   └─────────────────────────────────────────┘
         │
-  ┌─────┴────────────────────────────────┐
-  │         TENTÁCULOS                   │
-  ├──────────────┬──────────────┬────────┤
-  │   reportes   │     ops      │   kb   │  reseñas (skeleton)
-  │  daily brief │  reservas    │ lookup │
-  │  weekly rep  │  wansoft     │        │
-  └──────┬───────┴──────┬───────┘        │
-         │              │                │
-         ▼              ▼                ▼
-    Supabase REST    Supabase REST   Supabase REST
+  ┌─────┴──────────────────────────────────────┐
+  │              TENTÁCULOS                    │
+  ├──────────────┬──────────────┬──────────────┤
+  │   reportes   │     ops      │     kb       │  reseñas (skeleton)
+  │  daily brief │  reservas    │ wansoft-query │
+  │  weekly rep  │  wansoft     │  (24/7)      │
+  └──────┬───────┴──────┬───────┴──────┬───────┘
+         │              │              │
+         ▼              ▼              ▼
+    Supabase REST    Supabase REST   Wansoft Web
     + Groq API       + Groq API      + Groq API
-         │              │
-         ▼              ▼
-      Telegram        Telegram       agent_runs log
+         │              │              │
+         ▼              ▼              ▼
+      Telegram        Telegram       Telegram
+                                   + agent_runs log
 ```
 
 ### Tentáculos — status
 
 | Tentáculo | Status | Workflows | Blocker |
 |---|---|---|---|
-| `ops` | **active** | reservas-pendientes (10am), wansoft-staleness (8am) | — |
+| `orquestador` | **active** | orquestador.yml (webhook via Cloudflare Worker) | — |
 | `reportes` | **active** | daily-briefing (7am), weekly-amalay (lunes 9am) | — |
-| `kb` | skeleton | kb-query.yml (pendiente) | orquestador activo |
+| `ops` | **active** | reservas-pendientes (10am), wansoft-staleness (8am) | — |
+| `kb` | **active** | wansoft-query.yml (24/7 on-demand via orquestador) | — |
 | `reseñas` | skeleton | gbp-monitor.yml (pendiente) | Google Cloud OAuth |
-| `orquestador` | skeleton | orquestador.yml (workflow_dispatch) | Endpoint público HTTPS |
 
 ### Workflows activos
 
-| Workflow | Archivo | Cron | Tentáculo | Descripción |
+| Workflow | Archivo | Trigger | Tentáculo | Descripción |
 |---|---|---|---|---|
+| Orquestador | `orquestador.yml` | webhook (Telegram → CF Worker) | orquestador | Clasifica intent con Groq, despacha al tentáculo correcto |
 | Daily Briefing | `daily-briefing.yml` | `0 13 * * *` (7am MX) | reportes | Briefing matutino completo |
+| Weekly Report | `weekly-amalay.yml` | `0 15 * * 1` (lunes 9am MX) | reportes | Reporte ejecutivo semanal |
 | Reservas Pendientes | `reservas-pendientes.yml` | `0 16 * * *` (10am MX) | ops | Alerta reservas sin confirmar/sin tel |
 | Wansoft Staleness | `wansoft-staleness.yml` | `0 14 * * *` (8am MX) | ops | Alert si sync > 24h (silent si OK) |
-| Weekly Report | `weekly-amalay.yml` | `0 15 * * 1` (lunes 9am MX) | reportes | Reporte ejecutivo semanal |
-| Orquestador | `orquestador.yml` | `workflow_dispatch` | orquestador | Skeleton — router de Telegram inbound |
+| Wansoft Query | `wansoft-query.yml` | on-demand (via orquestador) | kb | Responde preguntas ad-hoc sobre ventas, meseros, platillos 24/7 |
+| Agents Daily | `agents-daily.yml` | cron (7am, 4pm, 7pm MX) | ops | Config Validator + Kitchen Quality + Table Time |
+| Agents Hourly | `agents-hourly.yml` | cron (2pm, 4pm, 6pm MX) | ops | Anomaly Detector + Close Predictor + Upselling |
+| Agents Weekly | `agents-weekly.yml` | cron (Lun-Vie) | ops | Staffing + Menu Engineering + Suppliers + Waste + Anti-Fraud + Tips |
+| Intraday Sales | `intraday-sales.yml` | cron | reportes | Reporte de ventas intraday |
+| Wansoft Scraper | `wansoft-daily-mesero.yml` | cron (3pm avance, 8:30/11pm cierre) | ops | Scraper Playwright → parser → Telegram |
 
 ### Secrets requeridos en GitHub (Settings → Secrets → Actions)
 
@@ -189,53 +196,37 @@ TRIGGERS (GitHub Actions cron / Telegram webhook)
 | `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram |
 | `TELEGRAM_CHAT_ID_DANIEL` | Chat ID del destinatario |
 
-### Script principal
+### Scripts principales
 
-`.github/scripts/daily_briefing.py` — self-contained, sin dependencias externas salvo `requests`.
+| Script | Descripción |
+|---|---|
+| `daily_briefing.py` | Briefing matutino: reservas + calendar + wansoft → Groq → Telegram |
+| `orquestador.py` | Router central: Telegram msg → Groq clasifica → dispatch workflow |
+| `wansoft_query.py` | KB 24/7: pregunta natural → date detection → Wansoft scrape → Groq → Telegram |
+| `client_config.py` | Config multi-tenant: fetcha client settings de Supabase (chat IDs, staff, TZ) |
+| `anomaly_detector.py` | Detecta metricas fuera de patron historico |
+| `close_predictor.py` | Predice cierre del dia a las 2pm/4pm/6pm |
+| `upselling_agent.py` | Detecta oportunidades de upselling por mesero |
+| `kitchen_quality_agent.py` | Monitorea cancelaciones vs baseline |
+| `table_time_agent.py` | Analiza rotacion de mesas |
+| `staffing_optimizer.py` | Sugiere horarios optimos (lunes) |
+| `menu_engineering.py` | Clasifica platillos: estrellas, vacas, perros (lunes) |
+| `antifraud_agent.py` | Detecta patrones de fraude en cancelaciones/descuentos (viernes) |
+| `tips_analyzer.py` | Analisis de propinas por mesero (viernes) |
 
-Flujo interno:
-1. Fetch Supabase REST API: `amalay_reservaciones` (hoy + 7 días), `calendar_sync_log` (hoy), `wansoft_kpis`
-2. Formatea bloque de datos estructurado
-3. Llama Groq con system prompt del briefing + datos → texto del briefing
-4. Envía a Telegram (split automático si >4000 chars)
-5. Inserta log en tabla `agent_runs` (non-blocking si falla)
+Todos siguen el patron: `client_config.get_client()` → fetch data → Groq/Claude → Telegram → log `agent_runs`.
 
-### Tablas requeridas en Supabase (correr en SQL Editor)
+### Tablas de agentes en Supabase (ya creadas)
 
-```sql
--- Tabla de log de ejecuciones (requerida por todos los agentes)
-CREATE TABLE IF NOT EXISTS agent_runs (
-  id BIGSERIAL PRIMARY KEY,
-  agent_id TEXT NOT NULL,
-  trigger_type TEXT NOT NULL,
-  status TEXT NOT NULL,
-  duration_ms INT,
-  output_summary TEXT,
-  error_message TEXT,
-  tokens_in INT,
-  tokens_out INT,
-  tentacle TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Tabla de mensajería inter-agente (para orquestador)
-CREATE TABLE IF NOT EXISTS agent_messages (
-  id BIGSERIAL PRIMARY KEY,
-  from_agent TEXT NOT NULL,
-  to_agent TEXT NOT NULL,
-  payload JSONB,
-  read BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+- `agent_runs` — log de ejecuciones de todos los agentes (agent_id, status, duration_ms, tokens, tentacle)
+- `agent_messages` — mensajería inter-agente (from_agent, to_agent, payload, read)
 
 ### Auth pendiente — qué se desbloquea con cada step
 
 | Auth step | Cómo hacerlo | Se desbloquea |
 |---|---|---|
-| Crear tabla `agent_runs` en Supabase SQL Editor | Correr SQL de arriba | Logging completo de todos los agentes |
-| Crear tabla `agent_messages` en Supabase SQL Editor | Correr SQL de arriba | Mensajería inter-agente |
-| Cloudflare Worker (gratis) con webhook de Telegram | Ver `agents/orquestador/triggers.yml` paso a paso | **Orquestador activo** — todos los tentáculos responden a Telegram inbound |
+| ~~Crear tablas `agent_runs` / `agent_messages`~~ | ~~SQL Editor~~ | ✅ Completado 2026-05-23 |
+| ~~Cloudflare Worker webhook de Telegram~~ | ~~`telegram-orquestador-warroom`~~ | ✅ Completado — orquestador activo |
 | Google Cloud OAuth (GBP API) | Ver `agents/reseñas/tools.md` — 5 pasos | Tentáculo `reseñas` — monitor de Google Maps |
 | Meta Business + WhatsApp Business API | Meta Business Manager | WhatsApp inbound/outbound desde agentes |
 
@@ -285,12 +276,14 @@ El orquestador recibe mensajes de Telegram en tiempo real vía:
 **Routing del orquestador** (`agents/orquestador/system_prompt.md`):
 | Mensaje | Tentáculo | Workflow disparado |
 |---|---|---|
-| `/start`, saludos | — | Menú de comandos |
-| "briefing", "ventas de hoy" | reportes | `daily-briefing.yml` |
+| `/start`, saludos | — | Menu de comandos |
+| "dame el briefing" | reportes | `daily-briefing.yml` |
 | "reporte semanal" | reportes | `weekly-amalay.yml` |
 | "reservas pendientes" | ops | `reservas-pendientes.yml` |
-| "wansoft", "sync" | ops | `wansoft-staleness.yml` |
-| "historial de [cliente]" | kb | skeleton |
+| "wansoft sync" | ops | `wansoft-staleness.yml` |
+| "cuanto vendimos hoy", "como vamos", "ticket promedio" | kb | `wansoft-query.yml` |
+| "quien vendio mas", "top meseros", "propinas" | kb | `wansoft-query.yml` |
+| Cualquier pregunta sobre datos del restaurante | kb | `wansoft-query.yml` |
 | "reseñas", "google" | reseñas | skeleton |
 
 **Re-deploy del Worker** (si cambias el código TypeScript):
