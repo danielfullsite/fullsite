@@ -17,6 +17,7 @@ WANSOFT_URL  = "https://www.wansoft.net/Wansoft.Web"
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 MESSAGE      = os.environ.get("INPUT_MESSAGE", "").strip()
@@ -630,20 +631,17 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}",
+    r = requests.post("https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
         json={
-            "model": "llama-3.3-70b-versatile",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": 4000,
-            "temperature": 0.3,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": context},
-            ],
+            "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": context}],
         }, timeout=30)
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    return r.json()["content"][0]["text"].strip()
 
 
 # ── Log ─────────────────────────────────────────────────────────────────────
