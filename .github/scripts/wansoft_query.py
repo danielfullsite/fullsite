@@ -16,7 +16,7 @@ WANSOFT_URL  = "https://www.wansoft.net/Wansoft.Web"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 MESSAGE      = os.environ.get("INPUT_MESSAGE", "").strip()
@@ -84,24 +84,27 @@ def detect_date_range(question):
     month_start = now_mx.strftime("%Y-%m-01")
 
     try:
-        r = requests.post("https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}",
                      "Content-Type": "application/json"},
             json={
-                "model": "claude-haiku-4-5-20251001",
+                "model": "llama-3.3-70b-versatile",
                 "max_tokens": 50,
-                "system": f"""Hoy es {today_str} ({dow}). Ayer fue {yesterday_str}. Extrae el rango de fechas.
+                "temperature": 0.0,
+                "messages": [
+                    {"role": "system", "content": f"""Hoy es {today_str} ({dow}). Ayer fue {yesterday_str}. Extrae el rango de fechas.
 Responde SOLO JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
 - "hoy" → {{"start":"{today_str}","end":"{today_str}"}}
 - "ayer" → {{"start":"{yesterday_str}","end":"{yesterday_str}"}}
 - "esta semana" → {{"start":"{week_start}","end":"{today_str}"}}
 - "este mes" → {{"start":"{month_start}","end":"{today_str}"}}
 - Sin fecha → {{"start":"{today_str}","end":"{today_str}"}}
-Solo JSON.""",
-                "messages": [{"role": "user", "content": question}],
+Solo JSON."""},
+                    {"role": "user", "content": question},
+                ],
             }, timeout=15)
         r.raise_for_status()
-        raw = r.json()["content"][0]["text"].strip()
+        raw = r.json()["choices"][0]["message"]["content"].strip()
         # Extract JSON from response (may have extra text)
         import re
         json_match = re.search(r'\{[^}]+\}', raw)
@@ -627,17 +630,20 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    r = requests.post("https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+    r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}",
                  "Content-Type": "application/json"},
         json={
-            "model": "claude-haiku-4-5-20251001",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 4000,
-            "system": SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": context}],
+            "temperature": 0.3,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": context},
+            ],
         }, timeout=30)
     r.raise_for_status()
-    return r.json()["content"][0]["text"].strip()
+    return r.json()["choices"][0]["message"]["content"].strip()
 
 
 # ── Log ─────────────────────────────────────────────────────────────────────

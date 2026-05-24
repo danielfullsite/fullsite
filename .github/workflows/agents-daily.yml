@@ -22,8 +22,8 @@ jobs:
   kitchen:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
       - run: python .github/scripts/kitchen_quality_agent.py
@@ -31,8 +31,8 @@ jobs:
   table-time:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
       - run: python .github/scripts/table_time_agent.py
@@ -40,8 +40,8 @@ jobs:
   config-validator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
       - run: python .github/scripts/config_validator.py
