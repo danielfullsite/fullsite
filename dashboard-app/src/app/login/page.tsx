@@ -28,7 +28,14 @@ export default function LoginPage() {
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        setError(data.error_description || data.msg || 'Credenciales incorrectas')
+        const rawMsg = data.error_description || data.msg || ''
+        const errorMap: Record<string, string> = {
+          'Invalid login credentials': 'Credenciales incorrectas',
+          'Email not confirmed': 'Correo no confirmado. Revisa tu bandeja.',
+          'User not found': 'Usuario no encontrado',
+          'Too many requests': 'Demasiados intentos. Espera un momento.',
+        }
+        setError(errorMap[rawMsg] || rawMsg || 'Credenciales incorrectas')
         setLoading(false)
         return
       }
