@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Trash2, Save, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Size {
   id?: number
@@ -31,6 +31,7 @@ async function sbFetch(path: string, opts?: RequestInit) {
 }
 
 export default function AdminTamañosPage() {
+  const CLIENT_ID = useClientId()
   const [sizes, setSizes] = useState<Size[]>([])
   const [editing, setEditing] = useState<Size | null>(null)
   const [adding, setAdding] = useState(false)

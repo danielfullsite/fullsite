@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Save, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface PaymentMethod {
   id?: string
@@ -31,6 +31,7 @@ async function api(path: string, opts?: RequestInit) {
 }
 
 export default function FormasPagoPage() {
+  const CLIENT_ID = useClientId()
   const [items, setItems] = useState<PaymentMethod[]>([])
   const [modal, setModal] = useState<PaymentMethod | null>(null)
   const [isNew, setIsNew] = useState(false)

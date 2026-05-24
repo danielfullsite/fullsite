@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Trash2, Save, X } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 const DAYS = ['Lun','Mar','Mie','Jue','Vie','Sab','Dom']
 const TYPES = ['discount','2x1','combo']
@@ -27,7 +27,7 @@ interface Promo {
   client_id: string
 }
 
-const empty: Promo = { name:'', type:'discount', discount_pct:null, discount_amount:null, valid_from:'', valid_until:'', hours_start:'', hours_end:'', days_of_week:[], min_purchase:0, active:true, client_id:CLIENT_ID }
+const empty: Promo = { name:'', type:'discount', discount_pct:null, discount_amount:null, valid_from:'', valid_until:'', hours_start:'', hours_end:'', days_of_week:[], min_purchase:0, active:true, client_id:'amalay' }
 
 async function api(path: string, opts?: RequestInit) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -40,6 +40,7 @@ async function api(path: string, opts?: RequestInit) {
 }
 
 export default function PromocionesPage() {
+  const CLIENT_ID = useClientId()
   const [promos, setPromos] = useState<Promo[]>([])
   const [editing, setEditing] = useState<Promo | null>(null)
   const [loading, setLoading] = useState(true)

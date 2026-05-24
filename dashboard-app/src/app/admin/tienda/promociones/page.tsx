@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Save, X, Tag, Trash2 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Promo {
   id?: string; name: string; type: 'percent' | 'fixed' | '2x1' | 'combo'
@@ -27,6 +27,7 @@ const TYPE_LABELS: Record<string, string> = { percent: '% Descuento', fixed: '$ 
 const TYPE_COLORS: Record<string, string> = { percent: 'bg-blue-100 text-blue-700', fixed: 'bg-emerald-100 text-emerald-700', '2x1': 'bg-purple-100 text-purple-700', combo: 'bg-amber-100 text-amber-700' }
 
 export default function PromosTiendaPage() {
+  const CLIENT_ID = useClientId()
   const [promos, setPromos] = useState<Promo[]>([])
   const [items, setItems] = useState<{ id: string; name: string }[]>([])
   const [adding, setAdding] = useState(false)

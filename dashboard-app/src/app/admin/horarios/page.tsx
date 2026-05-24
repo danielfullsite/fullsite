@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Trash2, Save, X, Clock } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 const DAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
 interface Schedule {
@@ -37,6 +37,7 @@ async function sbFetch(path: string, opts?: RequestInit) {
 const empty: Schedule = { name: '', start_time: '07:00', end_time: '12:00', days_of_week: [0, 1, 2, 3, 4, 5, 6] }
 
 export default function AdminHorariosPage() {
+  const CLIENT_ID = useClientId()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [editing, setEditing] = useState<Schedule | null>(null)
   const [adding, setAdding] = useState(false)

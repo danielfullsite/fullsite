@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Pencil, Search, Save, X, ChevronDown, GripVertical } from 'lucide-react'
+import { useClientId } from '@/hooks/useClientId'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Category {
   id: string
@@ -40,6 +40,7 @@ async function api(path: string, opts?: RequestInit) {
 }
 
 export default function AdminMenuPage() {
+  const CLIENT_ID = useClientId()
   const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)

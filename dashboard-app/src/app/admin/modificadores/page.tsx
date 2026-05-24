@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { useClientId } from '@/hooks/useClientId'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 type Tab = 'mods' | 'assign' | 'order-type'
 type OrderType = 'dine-in' | 'takeout' | 'delivery'
@@ -46,6 +46,7 @@ const DEFAULT_ORDER_TYPES: Record<string, OrderType[]> = {
 const ORDER_TYPE_LABELS: Record<OrderType, string> = { 'dine-in': 'Restaurante', takeout: 'Para llevar', delivery: 'Domicilio' }
 
 export default function ModificadoresPage() {
+  const CLIENT_ID = useClientId()
   const [tab, setTab] = useState<Tab>('mods')
   const [groups, setGroups] = useState<ModGroup[]>([])
   const [mods, setMods] = useState<Modifier[]>([])

@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { DollarSign, Check, Save } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Item { id: string; name: string; department: string; price: number; cost: number }
 
@@ -28,6 +28,7 @@ const TIERS = ['$0-49', '$50-99', '$100-199', '$200-499', '$500+']
 const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-slate-100 text-slate-700', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-700', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
 
 export default function PreciosPage() {
+  const CLIENT_ID = useClientId()
   const [items, setItems] = useState<Item[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [newPrice, setNewPrice] = useState('')

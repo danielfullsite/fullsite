@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Save, X, Layers } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Group { department: string; group_name: string; count: number }
 
@@ -17,8 +17,8 @@ async function sbFetch(path: string) {
   return r.ok ? r.json() : []
 }
 
-async function sbPatch(filter: string, body: Record<string, string>) {
-  return fetch(`${SUPABASE_URL}/rest/v1/pos_retail_items?${filter}&client_id=eq.${CLIENT_ID}`, {
+async function sbPatch(filter: string, body: Record<string, string>, clientId: string = 'amalay') {
+  return fetch(`${SUPABASE_URL}/rest/v1/pos_retail_items?${filter}&client_id=eq.${clientId}`, {
     method: 'PATCH',
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify(body),
@@ -26,6 +26,7 @@ async function sbPatch(filter: string, body: Record<string, string>) {
 }
 
 export default function GruposTiendaPage() {
+  const CLIENT_ID = useClientId()
   const [groups, setGroups] = useState<Group[]>([])
   const [editing, setEditing] = useState<{ orig: Group; department: string; group_name: string } | null>(null)
   const [adding, setAdding] = useState(false)

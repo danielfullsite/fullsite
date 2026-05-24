@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Save, X, Search, ScanBarcode } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface RetailItem {
   id?: string; name: string; barcode: string; department: string; group_name: string
@@ -26,6 +26,7 @@ function margin(p: number, c: number) { return p > 0 ? ((p - c) / p) * 100 : 0 }
 function marginColor(m: number) { return m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-600' : 'text-red-600' }
 
 export default function ArticulosPage() {
+  const CLIENT_ID = useClientId()
   const [items, setItems] = useState<RetailItem[]>([])
   const [search, setSearch] = useState('')
   const [filterDept, setFilterDept] = useState('all')

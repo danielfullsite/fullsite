@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Trash2, Save, X, Search, RefreshCw } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface GiftCard {
   id?: string
@@ -20,7 +20,7 @@ interface GiftCard {
   client_id: string
 }
 
-const empty: GiftCard = { code:'', initial_balance:0, current_balance:0, customer_name:'', customer_phone:'', status:'active', expires_at:'', client_id:CLIENT_ID }
+const empty: GiftCard = { code:'', initial_balance:0, current_balance:0, customer_name:'', customer_phone:'', status:'active', expires_at:'', client_id:'amalay' }
 
 const genCode = () => Math.random().toString(36).substring(2,6).toUpperCase() + Math.floor(1000+Math.random()*9000)
 
@@ -35,6 +35,7 @@ async function api(path: string, opts?: RequestInit) {
 }
 
 export default function TarjetasRegaloPage() {
+  const CLIENT_ID = useClientId()
   const [cards, setCards] = useState<GiftCard[]>([])
   const [editing, setEditing] = useState<GiftCard | null>(null)
   const [search, setSearch] = useState('')

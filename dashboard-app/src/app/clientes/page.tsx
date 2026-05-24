@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Search, Pencil, Save, Phone, Mail, Calendar, DollarSign, User, X } from 'lucide-react'
+import { useClientId } from '@/hooks/useClientId'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface Customer {
   id?: string
@@ -34,6 +34,7 @@ async function api(path: string, opts?: RequestInit) {
 const emptyCustomer: Customer = { name: '', phone: '', email: '', notes: '', visits: 0, total_spent: 0, last_visit: null }
 
 export default function ClientesPage() {
+  const CLIENT_ID = useClientId()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

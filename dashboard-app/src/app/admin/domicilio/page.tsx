@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useClientId } from '@/hooks/useClientId'
 import { Plus, Pencil, Save, X, MapPin, Clock, DollarSign } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
 
 interface DeliveryZone {
   id?: string
@@ -30,6 +30,7 @@ async function api(path: string, opts?: RequestInit) {
 }
 
 export default function DomicilioPage() {
+  const CLIENT_ID = useClientId()
   const [zones, setZones] = useState<DeliveryZone[]>([])
   const [modal, setModal] = useState<DeliveryZone | null>(null)
   const [isNew, setIsNew] = useState(false)
