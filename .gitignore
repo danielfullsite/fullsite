@@ -15,3 +15,7 @@ agents/wansoft/downloads/
 __pycache__/
 fullsite-web
 .vercel
+.next/
+dashboard-app/.next/
+dashboard-app/test-results/
+dashboard-app/playwright-report/

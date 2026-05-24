@@ -14,8 +14,12 @@ import {
   ClipboardList,
   Package,
   FileBarChart,
+  Bell,
+  BellOff,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useState, useEffect } from 'react'
+import { isPushSupported, getPushPermission, subscribeToPush, unsubscribeFromPush, getExistingSubscription } from '@/lib/push-notifications'
 
 const mainNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,6 +47,25 @@ function getTodayFormatted(): string {
 export default function TopNav() {
   const pathname = usePathname()
   const { user, clientConfig, signOut } = useAuth()
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushSupported, setPushSupported] = useState(false)
+
+  useEffect(() => {
+    if (isPushSupported()) {
+      setPushSupported(true)
+      getExistingSubscription().then(sub => setPushEnabled(!!sub))
+    }
+  }, [])
+
+  const togglePush = async () => {
+    if (pushEnabled) {
+      await unsubscribeFromPush()
+      setPushEnabled(false)
+    } else {
+      const sub = await subscribeToPush()
+      setPushEnabled(!!sub)
+    }
+  }
 
   const renderNavItem = (item: { href: string; label: string; icon: typeof LayoutDashboard }) => {
     const isActive =
@@ -99,6 +122,21 @@ export default function TopNav() {
             <Calendar size={12} />
             <span className="font-medium">{getTodayFormatted()}</span>
           </div>
+
+          {/* Push notification toggle */}
+          {pushSupported && (
+            <button
+              onClick={togglePush}
+              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md transition-colors ${
+                pushEnabled
+                  ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+              }`}
+              title={pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
+            >
+              {pushEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+            </button>
+          )}
 
           {user && (
             <>

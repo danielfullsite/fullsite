@@ -27,6 +27,8 @@ import {
   PieChart,
   Truck,
   Bot,
+  Stamp,
+  Bell,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -56,6 +58,7 @@ const navSections = [
       { href: '/ingresos', label: 'Ingresos', icon: Banknote },
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
       { href: '/nomina', label: 'Nomina', icon: UserCheck },
+      { href: '/pos/facturacion', label: 'Facturacion CFDI', icon: Stamp },
     ],
   },
   {
