@@ -160,7 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, loadClientData])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try { await supabase.auth.signOut() } catch { /* */ }
+    // Clear manually-stored tokens from login page
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    try {
+      const hostname = new URL(supabaseUrl).hostname.split('.')[0]
+      localStorage.removeItem(`sb-${hostname}-auth-token`)
+    } catch { /* */ }
     setUser(null)
     setClientId(null)
     setClientConfig(null)
