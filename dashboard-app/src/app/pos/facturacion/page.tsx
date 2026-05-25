@@ -143,7 +143,7 @@ export default function FacturacionPage() {
                   onChange={e => setRfc(e.target.value.toUpperCase())}
                   placeholder="XAXX010101000"
                   maxLength={13}
-                  className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg tracking-wider"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg tracking-wider"
                 />
                 {rfc.length > 0 && !validateRFC(rfc) && (
                   <p className="text-red-400 text-xs mt-1">Formato: 3-4 letras + 6 digitos + 3 caracteres</p>
@@ -158,7 +158,7 @@ export default function FacturacionPage() {
                   value={razonSocial}
                   onChange={e => setRazonSocial(e.target.value)}
                   placeholder="Empresa S.A. de C.V."
-                  className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -169,7 +169,7 @@ export default function FacturacionPage() {
                   <select
                     value={regimenFiscal}
                     onChange={e => setRegimenFiscal(e.target.value)}
-                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   >
                     {REGIMENES_FISCALES.map(r => (
                       <option key={r.clave} value={r.clave}>{r.clave} - {r.nombre}</option>
@@ -181,7 +181,7 @@ export default function FacturacionPage() {
                   <select
                     value={usoCfdi}
                     onChange={e => setUsoCfdi(e.target.value)}
-                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   >
                     {USOS_CFDI.map(u => (
                       <option key={u.clave} value={u.clave}>{u.clave} - {u.nombre}</option>
@@ -200,7 +200,7 @@ export default function FacturacionPage() {
                     onChange={e => setCodigoPostal(e.target.value.replace(/\D/g, '').slice(0, 5))}
                     placeholder="64000"
                     maxLength={5}
-                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
@@ -210,7 +210,7 @@ export default function FacturacionPage() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="factura@empresa.com"
-                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -227,7 +227,7 @@ export default function FacturacionPage() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg pl-8 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-8 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg"
                   />
                 </div>
                 {montoTotal && parseFloat(montoTotal) > 0 && (
@@ -263,7 +263,7 @@ export default function FacturacionPage() {
                 value={searchRFC}
                 onChange={e => setSearchRFC(e.target.value)}
                 placeholder="Buscar por RFC o razon social..."
-                className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
               />
             </div>
 
@@ -346,7 +346,7 @@ export default function FacturacionPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-xl text-sm font-medium z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-xl text-sm font-medium z-50">
           {toast}
         </div>
       )}
