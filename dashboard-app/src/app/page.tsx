@@ -494,7 +494,7 @@ export default function DashboardPage() {
             <h3 className="text-sm font-semibold text-slate-900">Agentes IA</h3>
             <span className="ml-auto text-xs text-emerald-600 font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              14 activos
+              26 activos
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -507,6 +507,10 @@ export default function DashboardPage() {
               { name: 'Staffing', time: 'Lunes', status: 'ok' },
               { name: 'Upselling', time: '2/4/6 PM', status: 'ok' },
               { name: 'Propinas', time: 'Viernes', status: 'ok' },
+              { name: 'Velocidad', time: '4:00 PM', status: 'ok' },
+              { name: 'Auto-orden', time: '9:00 AM', status: 'ok' },
+              { name: 'Merma', time: 'Semanal', status: 'ok' },
+              { name: 'Orquestador', time: '24/7', status: 'live' },
             ].map(agent => (
               <div key={agent.name} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
