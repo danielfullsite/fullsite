@@ -71,7 +71,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden">
         <Sidebar />
       </div>
-      <main className="min-h-screen overflow-auto pt-14 lg:pt-0">
+      <main className="min-h-screen overflow-auto lg:pt-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <PageTransition key={pathname}>
             {children}
