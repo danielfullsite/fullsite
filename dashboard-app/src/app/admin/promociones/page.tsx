@@ -141,7 +141,7 @@ export default function PromocionesPage() {
               </div>
               <div className="flex gap-1">
                 <button onClick={()=>setEditing({...p})} className="p-2 hover:bg-[var(--surface-2)] rounded-lg text-[var(--text-3)] hover:text-[var(--text-1)] text-xs">Editar</button>
-                <button onClick={()=>remove(p.id!)} className="p-2 hover:bg-red-50 rounded-lg text-[var(--text-3)] hover:text-red-500"><Trash2 size={14}/></button>
+                <button onClick={()=>remove(p.id!)} className="p-2 hover:bg-red-500/10 rounded-lg text-[var(--text-3)] hover:text-red-500"><Trash2 size={14}/></button>
               </div>
             </div>
           ))}

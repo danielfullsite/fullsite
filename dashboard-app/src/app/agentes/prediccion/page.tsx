@@ -78,13 +78,13 @@ export default function PrediccionPage() {
       </div>
 
       {/* Big projection number */}
-      <div className="bg-[var(--surface)] rounded-xl border border-blue-200 shadow-sm p-6 mb-6 text-center">
+      <div className="bg-[var(--surface)] rounded-xl border border-blue-500/20 shadow-sm p-6 mb-6 text-center">
         <p className="text-xs text-blue-500 font-medium mb-2 uppercase tracking-wider">Proyeccion al cierre</p>
-        <p className="text-4xl font-bold text-blue-600 mb-1">{formatCurrency(data?.proyeccion_cierre)}</p>
+        <p className="text-4xl font-bold text-blue-400 mb-1">{formatCurrency(data?.proyeccion_cierre)}</p>
         {data?.avance_pct != null && (
           <div className="mt-3">
             <div className="w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-2.5">
-              <div className="h-2.5 rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(data.avance_pct, 100)}%` }} />
+              <div className="h-2.5 rounded-full bg-blue-500/100 transition-all" style={{ width: `${Math.min(data.avance_pct, 100)}%` }} />
             </div>
             <p className="text-xs text-[var(--text-2)] mt-1">{data.avance_pct.toFixed(0)}% avance</p>
           </div>
@@ -99,11 +99,11 @@ export default function PrediccionPage() {
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Proyeccion cierre</p>
-          <p className="text-2xl font-bold text-blue-600">{formatCurrency(data?.proyeccion_cierre)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.proyeccion_cierre)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Gap restante</p>
-          <p className="text-2xl font-bold text-amber-600">{formatCurrency(data?.gap)}</p>
+          <p className="text-2xl font-bold text-amber-400">{formatCurrency(data?.gap)}</p>
         </div>
       </div>
 

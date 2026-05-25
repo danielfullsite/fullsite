@@ -18,7 +18,7 @@ interface Assignment { id: number; category_id: string; modifier_group_id: strin
 
 const GROUP_COLORS: Record<string, string> = {
   quitar: 'bg-red-100 text-red-700',
-  food: 'bg-amber-100 text-amber-700',
+  food: 'bg-amber-100 text-amber-400',
   coffee: 'bg-yellow-100 text-yellow-700',
   drinks: 'bg-cyan-100 text-cyan-700',
 }
@@ -146,13 +146,13 @@ export default function ModificadoresPage() {
       {tab === 'mods' && (
         <>
           <div className="flex justify-end mb-4">
-            <button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            <button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
               <Plus size={16} /> Agregar
             </button>
           </div>
 
           {adding && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-4">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-4">
               <h3 className="font-semibold text-emerald-800 mb-3 text-sm">Nuevo modificador</h3>
               <div className="grid grid-cols-3 gap-3">
                 <input value={newMod.name} onChange={e => setNewMod({ ...newMod, name: e.target.value })}
@@ -186,7 +186,7 @@ export default function ModificadoresPage() {
                       <span className="text-sm text-[var(--text-1)]">{m.name}</span>
                       <div className="flex items-center gap-3">
                         {m.price > 0 && <span className="text-sm font-semibold text-emerald-600">+${m.price}</span>}
-                        <button onClick={() => handleDelete(m)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-[var(--text-3)] hover:text-red-500 flex items-center justify-center">
+                        <button onClick={() => handleDelete(m)} className="w-7 h-7 rounded-lg hover:bg-red-500/10 text-[var(--text-3)] hover:text-red-500 flex items-center justify-center">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -225,7 +225,7 @@ export default function ModificadoresPage() {
                     return (
                       <td key={g.id} className="text-center px-4 py-3">
                         <button onClick={() => toggleAssign(cat.id, g.id)}
-                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)] text-transparent hover:border-[var(--line)]'}`}>
+                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500/100 border-emerald-500 text-white' : 'border-[var(--line)] text-transparent hover:border-[var(--line)]'}`}>
                           {on && <span className="text-xs font-bold">&#10003;</span>}
                         </button>
                       </td>
@@ -261,7 +261,7 @@ export default function ModificadoresPage() {
                     return (
                       <td key={ot} className="text-center px-5 py-4">
                         <button onClick={() => toggleOrderType(g.id, ot)}
-                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500' : 'bg-[var(--line)]'}`}>
+                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500/100' : 'bg-[var(--line)]'}`}>
                           <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-[var(--surface)] shadow transition-transform ${on ? 'left-[18px]' : 'left-0.5'}`} />
                         </button>
                       </td>

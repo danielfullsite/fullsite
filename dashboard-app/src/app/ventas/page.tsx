@@ -246,7 +246,7 @@ export default function VentasPage() {
                         <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                     <XAxis
                       dataKey="fecha"
                       tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -388,21 +388,21 @@ export default function VentasPage() {
             <p className="text-xs text-[var(--text-3)] mb-5">Restaurante vs Para llevar</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
-                <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <div className="w-9 h-9 bg-blue-500/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Store size={18} className="text-blue-500" />
                 </div>
                 <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Personas restaurante</p>
                 <p className="text-2xl font-bold text-[var(--text-1)]">{data.reduce((s, d) => s + (d.personas_restaurant || 0), 0).toLocaleString()}</p>
               </div>
               <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
-                <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <div className="w-9 h-9 bg-emerald-500/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <ShoppingBag size={18} className="text-emerald-500" />
                 </div>
                 <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Ordenes para llevar</p>
                 <p className="text-2xl font-bold text-[var(--text-1)]">{data.reduce((s, d) => s + (d.ordenes_llevar || 0), 0).toLocaleString()}</p>
               </div>
               <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
-                <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <div className="w-9 h-9 bg-purple-500/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Smartphone size={18} className="text-purple-500" />
                 </div>
                 <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Propinas totales</p>
@@ -421,7 +421,7 @@ export default function VentasPage() {
 
               {/* Anti-fraud KPI cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                <div className="bg-red-50 rounded-xl border border-red-200 p-5 text-center">
+                <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-5 text-center">
                   <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <XCircle size={18} className="text-red-500" />
                   </div>
@@ -431,17 +431,17 @@ export default function VentasPage() {
                     {formatCurrency(cancelaciones.reduce((s, c) => s + (c.total || 0), 0))} total
                   </p>
                 </div>
-                <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
+                <div className="bg-amber-500/10 rounded-xl border border-amber-500/20 p-5 text-center">
                   <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <ShieldAlert size={18} className="text-amber-500" />
                   </div>
-                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wider mb-1">Anulaciones</p>
-                  <p className="text-2xl font-bold text-amber-700">{anulaciones.length}</p>
+                  <p className="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1">Anulaciones</p>
+                  <p className="text-2xl font-bold text-amber-400">{anulaciones.length}</p>
                   <p className="text-xs text-amber-400 mt-1">
                     {formatCurrency(anulaciones.reduce((s, a) => s + (a.total || 0), 0))} total
                   </p>
                 </div>
-                <div className="bg-orange-50 rounded-xl border border-orange-200 p-5 text-center">
+                <div className="bg-orange-500/10 rounded-xl border border-orange-500/20 p-5 text-center">
                   <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <HeartHandshake size={18} className="text-orange-500" />
                   </div>
@@ -457,20 +457,20 @@ export default function VentasPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Cancelaciones table */}
                 {cancelaciones.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-red-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
                     <h3 className="text-sm font-semibold text-red-700 mb-1">Cancelaciones</h3>
                     <p className="text-xs text-red-400 mb-4">{cancelaciones.length} items cancelados</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-red-100">
+                          <tr className="border-b border-red-500/20">
                             <th className="text-left py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Producto</th>
                             <th className="text-right py-2 text-xs font-semibold text-red-500 uppercase tracking-wider">Monto</th>
                           </tr>
                         </thead>
                         <tbody>
                           {cancelaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-red-50/50 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/100/10 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-red-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
@@ -483,22 +483,22 @@ export default function VentasPage() {
 
                 {/* Anulaciones table */}
                 {anulaciones.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-amber-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-amber-700 mb-1">Anulaciones</h3>
+                  <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-amber-400 mb-1">Anulaciones</h3>
                     <p className="text-xs text-amber-400 mb-4">{anulaciones.length} items anulados</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-amber-100">
+                          <tr className="border-b border-amber-500/20">
                             <th className="text-left py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Producto</th>
                             <th className="text-right py-2 text-xs font-semibold text-amber-500 uppercase tracking-wider">Monto</th>
                           </tr>
                         </thead>
                         <tbody>
                           {anulaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-amber-50/50 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-amber-500/100/10 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-amber-600 tabular-nums">{formatCurrency(item.total)}</td>
+                              <td className="py-2.5 text-right font-medium text-amber-400 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -509,20 +509,20 @@ export default function VentasPage() {
 
                 {/* Cortesias table */}
                 {cortesias.length > 0 && (
-                  <div className="bg-[var(--surface)] rounded-xl border border-orange-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <div className="bg-[var(--surface)] rounded-xl border border-orange-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
                     <h3 className="text-sm font-semibold text-orange-700 mb-1">Cortesias</h3>
                     <p className="text-xs text-orange-400 mb-4">{cortesias.length} cortesias otorgadas</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-orange-100">
+                          <tr className="border-b border-orange-500/15">
                             <th className="text-left py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Producto</th>
                             <th className="text-right py-2 text-xs font-semibold text-orange-500 uppercase tracking-wider">Monto</th>
                           </tr>
                         </thead>
                         <tbody>
                           {cortesias.map((item, i) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-orange-50/50 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-orange-500/10/50 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-orange-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
@@ -548,7 +548,7 @@ export default function VentasPage() {
                         </thead>
                         <tbody>
                           {descuentosDetalle.map((item, i) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]/50 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]/50 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-[var(--text-2)] tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>

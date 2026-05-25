@@ -50,7 +50,7 @@ type SortKey = 'nombre' | 'total' | 'promedio' | 'dias' | 'pct'
 type SortDir = 'asc' | 'desc'
 
 const MEDAL_COLORS: Record<number, { bg: string; text: string; icon: string }> = {
-  0: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '1' },
+  0: { bg: 'bg-amber-100', text: 'text-amber-400', icon: '1' },
   1: { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', icon: '2' },
   2: { bg: 'bg-orange-100', text: 'text-orange-700', icon: '3' },
 }
@@ -385,7 +385,7 @@ export default function MeserosPage() {
                 </h3>
                 <p className="text-xs text-[var(--text-3)] mt-1">Últimos {period} días</p>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 rounded-lg">
                 <BarChart3 size={14} className="text-blue-500" />
                 <span className="text-xs font-medium text-blue-500">Top 10</span>
               </div>
@@ -401,7 +401,7 @@ export default function MeserosPage() {
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
                   <XAxis
                     type="number"
                     tick={{ fontSize: 11, fill: '#94a3b8' }}
@@ -503,7 +503,7 @@ export default function MeserosPage() {
                     return (
                       <tr
                         key={m.nombre}
-                        className={`border-b border-[var(--line-soft)]/80 hover:bg-blue-50/40 transition-colors duration-150 ${
+                        className={`border-b border-[var(--line-soft)]/80 hover:bg-blue-500/10/40 transition-colors duration-150 ${
                           i % 2 === 1 ? 'bg-[var(--surface-2)]/40' : ''
                         }`}
                       >
@@ -548,7 +548,7 @@ export default function MeserosPage() {
                           {m.dias}
                         </td>
                         <td className="py-3.5 px-5 text-sm text-right tabular-nums">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-500">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500">
                             {m.pct.toFixed(1)}%
                           </span>
                         </td>
@@ -584,7 +584,7 @@ export default function MeserosPage() {
                         Rendimiento relativo en métricas clave (normalizado a 100)
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 rounded-lg">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 rounded-lg">
                       <Target size={14} className="text-purple-600" />
                       <span className="text-xs font-medium text-purple-600">Radar</span>
                     </div>
@@ -592,7 +592,7 @@ export default function MeserosPage() {
                   <div className="h-[280px] sm:h-[380px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
-                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarGrid stroke="var(--line)" />
                         <PolarAngleAxis
                           dataKey="metric"
                           tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }}
@@ -752,7 +752,7 @@ export default function MeserosPage() {
                       onClick={() => setSelectedMesero(w.nombre === selectedMesero ? '' : w.nombre)}
                       className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border ${
                         selectedMesero === w.nombre
-                          ? 'border-blue-500 bg-blue-50 text-blue-500 shadow-sm'
+                          ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-sm'
                           : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-2)] hover:border-blue-500/40 hover:text-[var(--text-1)]'
                       }`}
                     >
@@ -823,7 +823,7 @@ export default function MeserosPage() {
                             <p className="text-2xl font-bold text-[var(--text-1)] tabular-nums mb-1">{kpi.fmt(kpi.val)}</p>
                             <div className="flex items-center gap-1.5">
                               <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                isAbove ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                                isAbove ? 'bg-emerald-500/100/10 text-emerald-400' : 'bg-red-500/10 text-red-500'
                               }`}>
                                 {isAbove ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                                 {pctDiff}%
@@ -856,7 +856,7 @@ export default function MeserosPage() {
                               layout="vertical"
                               margin={{ left: 5, right: 20 }}
                             >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
                               <XAxis
                                 type="number"
                                 tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -912,7 +912,7 @@ export default function MeserosPage() {
                               layout="vertical"
                               margin={{ left: 5, right: 20 }}
                             >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
                               <XAxis
                                 type="number"
                                 tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -956,7 +956,7 @@ export default function MeserosPage() {
               {/* Prompt to select */}
               {!selectedWaiter && (
                 <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-16 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
                     <ChevronRight size={28} className="text-blue-500/40" />
                   </div>
                   <p className="text-[var(--text-2)] text-sm font-medium">Selecciona un mesero arriba para ver su detalle</p>

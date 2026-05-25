@@ -173,7 +173,7 @@ export default function IngresosPage() {
                         <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                     <XAxis
                       dataKey="fecha"
                       tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -221,11 +221,11 @@ export default function IngresosPage() {
               </div>
               <div className="flex items-center gap-6 mt-4 justify-center">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500/100" />
                   <span className="text-xs text-[var(--text-2)]">Efectivo</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <div className="w-3 h-3 rounded-full bg-blue-500/100" />
                   <span className="text-xs text-[var(--text-2)]">Tarjeta</span>
                 </div>
               </div>

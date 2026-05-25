@@ -40,7 +40,7 @@ export default function AdminGruposPage() {
         action={
           <Link
             href="/admin/menu"
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
+            className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
           >
             <Package size={16} />
             Administrar platillos

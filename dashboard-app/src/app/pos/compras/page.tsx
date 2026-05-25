@@ -258,7 +258,7 @@ export default function ComprasPage() {
               <div className="text-center">
                 <ShoppingCart size={48} className="mx-auto mb-3 opacity-50" />
                 <p className="text-xl">Sin ordenes de compra</p>
-                <button onClick={() => setTab('nueva')} className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm">
+                <button onClick={() => setTab('nueva')} className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500/100 rounded-lg text-white text-sm">
                   <Sparkles size={14} className="inline mr-1.5" />Crear con IA
                 </button>
               </div>
@@ -287,17 +287,17 @@ export default function ComprasPage() {
 
                       {/* Action buttons based on status */}
                       {po.status === 'borrador' && (
-                        <button onClick={() => sendOC(po)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm text-white flex items-center gap-1.5">
+                        <button onClick={() => sendOC(po)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500/100 rounded-lg text-sm text-white flex items-center gap-1.5">
                           <Send size={14} />Enviar
                         </button>
                       )}
                       {po.status === 'enviada' && (
-                        <button onClick={() => openReception(po)} className="px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm text-white flex items-center gap-1.5">
+                        <button onClick={() => openReception(po)} className="px-3 py-2 bg-amber-600 hover:bg-amber-500/100 rounded-lg text-sm text-white flex items-center gap-1.5">
                           <PackageCheck size={14} />Recibir
                         </button>
                       )}
                       {po.status === 'recibida' && (
-                        <button onClick={() => setFacturaModal(po)} className="px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm text-white flex items-center gap-1.5">
+                        <button onClick={() => setFacturaModal(po)} className="px-3 py-2 bg-purple-600 hover:bg-purple-500/100 rounded-lg text-sm text-white flex items-center gap-1.5">
                           <Receipt size={14} />Factura
                         </button>
                       )}
@@ -373,12 +373,12 @@ export default function ComprasPage() {
                     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${config.bg} ${config.color}`}>{config.label}</span>
 
                     {f.status === 'capturada' && (
-                      <button onClick={() => advanceFactura(f)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm text-white flex items-center gap-1.5">
+                      <button onClick={() => advanceFactura(f)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500/100 rounded-lg text-sm text-white flex items-center gap-1.5">
                         <Check size={14} />Aprobar
                       </button>
                     )}
                     {f.status === 'aprobada' && (
-                      <button onClick={() => advanceFactura(f)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm text-white flex items-center gap-1.5">
+                      <button onClick={() => advanceFactura(f)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500/100 rounded-lg text-sm text-white flex items-center gap-1.5">
                         <CreditCard size={14} />Pagar
                       </button>
                     )}
@@ -536,7 +536,7 @@ export default function ComprasPage() {
               <button
                 onClick={handleConfirmReception}
                 disabled={!receptionBy.trim() || savingReception}
-                className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold flex items-center justify-center gap-2"
+                className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold flex items-center justify-center gap-2"
               >
                 <PackageCheck size={18} />
                 {savingReception ? 'Guardando...' : 'Confirmar recepcion'}
@@ -572,7 +572,7 @@ export default function ComprasPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setFacturaModal(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">Cancelar</button>
-              <button onClick={handleCreateFactura} className="flex-[2] py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold flex items-center justify-center gap-2">
+              <button onClick={handleCreateFactura} className="flex-[2] py-3 rounded-xl bg-purple-600 hover:bg-purple-500/100 text-white font-semibold flex items-center justify-center gap-2">
                 <Receipt size={18} />Capturar
               </button>
             </div>
@@ -714,7 +714,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
                 <button
                   onClick={() => createOCForSupplier(s.supplier)}
                   disabled={creating}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] rounded-lg text-sm text-white font-semibold flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-[var(--line)] rounded-lg text-sm text-white font-semibold flex items-center gap-1.5"
                 >
                   <Plus size={14} />Crear OC
                 </button>

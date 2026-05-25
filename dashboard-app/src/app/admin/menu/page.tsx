@@ -149,11 +149,11 @@ export default function AdminMenuPage() {
 
   // ── Color options ──────────────────────────────────────────
   const COLORS = [
-    'bg-red-600','bg-rose-700','bg-yellow-500','bg-amber-700','bg-orange-500',
-    'bg-yellow-600','bg-yellow-400','bg-lime-600','bg-green-500','bg-green-700',
-    'bg-emerald-600','bg-cyan-500','bg-sky-600','bg-blue-500','bg-indigo-500',
-    'bg-purple-600','bg-violet-700','bg-fuchsia-500','bg-pink-500','bg-[var(--surface-2)]0',
-    'bg-amber-500','bg-rose-600',
+    'bg-red-600','bg-rose-700','bg-yellow-500/100','bg-amber-700','bg-orange-500/100',
+    'bg-yellow-600','bg-yellow-400','bg-lime-600','bg-green-500/100','bg-green-700',
+    'bg-emerald-600','bg-cyan-500','bg-sky-600','bg-blue-500/100','bg-indigo-500/100',
+    'bg-purple-600','bg-violet-700','bg-fuchsia-500','bg-pink-500/100','bg-[var(--surface-2)]0',
+    'bg-amber-500/100','bg-rose-600',
   ]
 
   if (loading) return <div className="flex items-center justify-center h-64 text-[var(--text-3)]">Cargando menu...</div>
@@ -175,7 +175,7 @@ export default function AdminMenuPage() {
           </button>
           <button
             onClick={() => { setEditItem({ id: '', category_id: categories[0]?.id || '', name: '', price: 0, barcode: null, sort_order: 0, active: true }); setIsNewItem(true) }}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
+            className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
           >
             <Plus size={16} /> Platillo
           </button>
@@ -308,7 +308,7 @@ export default function AdminMenuPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSaveItem}
-                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                className="flex-1 px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
                 <Save size={14} /> Guardar
               </button>
               <button onClick={() => setEditItem(null)}
@@ -350,12 +350,12 @@ export default function AdminMenuPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSaveCat}
-                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                className="flex-1 px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
                 <Save size={14} /> Guardar
               </button>
               {!isNewCat && (
                 <button onClick={() => { handleToggleCat(editCat); setEditCat(null) }}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${editCat.active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${editCat.active ? 'bg-red-500/100/10 text-red-400 hover:bg-red-100' : 'bg-emerald-500/100/10 text-emerald-400 hover:bg-emerald-100'}`}>
                   {editCat.active ? 'Desactivar' : 'Activar'}
                 </button>
               )}

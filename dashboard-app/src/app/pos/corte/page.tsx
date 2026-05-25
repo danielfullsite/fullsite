@@ -351,7 +351,7 @@ export default function CortePage() {
             {reopenError && <p className="text-red-400 text-sm text-center mt-2">{reopenError}</p>}
             <div className="flex gap-3 mt-4">
               <button onClick={() => setReopenTarget(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">Cancelar</button>
-              <button onClick={handleReopen} className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold flex items-center justify-center gap-2">
+              <button onClick={handleReopen} className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500/100 text-white font-semibold flex items-center justify-center gap-2">
                 <RotateCcw size={18} />Reabrir
               </button>
             </div>

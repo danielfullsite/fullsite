@@ -199,7 +199,7 @@ export default function TurnoPage() {
                     value={closingNotas}
                     onChange={e => setClosingNotas(e.target.value)}
                     placeholder="Observaciones opcionales..."
-                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-slate-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[var(--line-soft)]0"
                   />
                 </div>
                 <div>
@@ -218,7 +218,7 @@ export default function TurnoPage() {
                 <button
                   onClick={handleCloseTurno}
                   disabled={!fondoFinal || !closePin}
-                  className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
+                  className="w-full py-4 bg-red-600 hover:bg-red-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
                 >
                   Cerrar turno
                 </button>
@@ -261,7 +261,7 @@ export default function TurnoPage() {
                 <button
                   onClick={handleOpenTurno}
                   disabled={!openedBy.trim() || !fondoInicial}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
                 >
                   Abrir turno
                 </button>

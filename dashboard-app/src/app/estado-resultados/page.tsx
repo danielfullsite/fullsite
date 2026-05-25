@@ -165,7 +165,7 @@ export default function EstadoResultadosPage() {
 
           {/* Info banner */}
           {isRealFoodCost ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
               <p className="text-sm text-emerald-700 font-medium">
                 Food cost real de Wansoft
               </p>
@@ -176,11 +176,11 @@ export default function EstadoResultadosPage() {
               </p>
             </div>
           ) : (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6">
               <p className="text-sm text-blue-700 font-medium">
                 Costos estimados
               </p>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="text-xs text-blue-400 mt-1">
                 El costo de alimentos se estima al 35% de ventas netas. Para datos reales de food cost y labor cost,
                 conecta los modulos de inventario y nomina de Wansoft.
               </p>
@@ -229,7 +229,7 @@ export default function EstadoResultadosPage() {
                 <span className="text-sm text-[var(--text-3)]">Labor cost</span>
                 <span className="text-sm text-[var(--text-3)]">Conectar nomina</span>
               </div>
-              <div className="flex items-center justify-between py-2 bg-emerald-50 rounded-lg px-3">
+              <div className="flex items-center justify-between py-2 bg-emerald-500/10 rounded-lg px-3">
                 <span className="text-sm font-semibold text-emerald-700">
                   Margen bruto {isRealFoodCost ? 'real' : 'estimado'}
                 </span>
@@ -271,7 +271,7 @@ export default function EstadoResultadosPage() {
                           <td className="py-3 px-3 text-right text-[var(--text-1)] font-semibold tabular-nums">{formatCurrency(item.costo)}</td>
                           <td className={`py-3 px-3 text-right tabular-nums font-medium ${
                             (item.margen_pct || 0) >= 60 ? 'text-emerald-600' :
-                            (item.margen_pct || 0) >= 40 ? 'text-amber-600' : 'text-red-600'
+                            (item.margen_pct || 0) >= 40 ? 'text-amber-400' : 'text-red-600'
                           }`}>
                             {(item.margen_pct || 0).toFixed(1)}%
                           </td>

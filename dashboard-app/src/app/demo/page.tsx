@@ -46,11 +46,11 @@ export default function DemoPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
             fullsite
-            <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+            <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
           </span>
           <button
             onClick={scrollToForm}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
+            className="bg-emerald-500/100 hover:bg-emerald-600 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors"
           >
             Solicitar demo
           </button>
@@ -69,7 +69,7 @@ export default function DemoPage() {
             </p>
             <button
               onClick={scrollToForm}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-base px-8 py-3.5 rounded-lg transition-colors shadow-lg shadow-emerald-500/20"
+              className="bg-emerald-500/100 hover:bg-emerald-600 text-white font-semibold text-base px-8 py-3.5 rounded-lg transition-colors shadow-lg shadow-emerald-500/20"
             >
               Solicitar demo gratis
             </button>
@@ -148,7 +148,7 @@ export default function DemoPage() {
               },
             ].map((s) => (
               <div key={s.step} className="text-center">
-                <div className="w-12 h-12 bg-emerald-500 text-white font-bold text-lg rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-12 h-12 bg-emerald-500/100 text-white font-bold text-lg rounded-full flex items-center justify-center mx-auto mb-4">
                   {s.step}
                 </div>
                 <h3 className="font-bold text-lg mb-2">{s.title}</h3>
@@ -222,7 +222,7 @@ export default function DemoPage() {
                   onClick={scrollToForm}
                   className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${
                     plan.highlighted
-                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      ? 'bg-emerald-500/100 hover:bg-emerald-600 text-white'
                       : 'bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-1)]'
                   }`}
                 >
@@ -245,7 +245,7 @@ export default function DemoPage() {
           </p>
 
           {submitted ? (
-            <div className="text-center bg-emerald-50 border border-emerald-200 rounded-xl p-8">
+            <div className="text-center bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-8">
               <div className="text-4xl mb-3">&#10003;</div>
               <h3 className="font-bold text-lg mb-2">Recibimos tu solicitud</h3>
               <p className="text-[var(--text-2)] text-sm">Te contactaremos pronto. Gracias por tu interes en Fullsite.</p>
@@ -316,7 +316,7 @@ export default function DemoPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
+                className="w-full bg-emerald-500/100 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
               >
                 {submitting ? 'Enviando...' : 'Solicitar demo'}
               </button>
@@ -331,7 +331,7 @@ export default function DemoPage() {
           <div className="flex items-center gap-6">
             <span className="text-[#1a1a1a] font-black text-lg tracking-tight">
               fullsite
-              <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              <span className="inline-block w-1.5 h-1.5 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
             </span>
             <div className="flex gap-4 text-sm text-[var(--text-2)]">
               <a href="/privacidad" className="hover:text-[var(--text-1)] transition-colors">Privacidad</a>

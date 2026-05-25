@@ -126,7 +126,7 @@ export default function PlatillosPage() {
         <div className="h-[350px] sm:h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
               <XAxis
                 type="number"
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
@@ -212,7 +212,7 @@ export default function PlatillosPage() {
                     <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                 <XAxis
                   dataKey="fecha"
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -265,7 +265,7 @@ export default function PlatillosPage() {
                     <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                 <XAxis
                   dataKey="fecha"
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -331,7 +331,7 @@ export default function PlatillosPage() {
                 return (
                   <tr
                     key={g.nombre}
-                    className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors"
+                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors"
                   >
                     <td className="py-3 px-4 text-sm text-[var(--text-3)] tabular-nums font-medium">{i + 1}</td>
                     <td className="py-3 px-4">
@@ -358,7 +358,7 @@ export default function PlatillosPage() {
                       {formatCurrency(g.total)}
                     </td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400">
                         {pct}%
                       </span>
                     </td>

@@ -145,7 +145,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <div className="mb-6">
           <span className="text-white font-black text-2xl tracking-tight">
             fullsite
-            <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-1" />
+            <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-1" />
           </span>
           <p className="text-[var(--text-3)] text-sm mt-1">POS — Ingresa tu PIN</p>
         </div>
@@ -168,7 +168,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <button
           onClick={handleSubmit}
           disabled={pin.length < 4 || checking || isLocked}
-          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold text-lg transition-all min-h-[56px]"
+          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold text-lg transition-all min-h-[56px]"
         >
           {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar'}
         </button>

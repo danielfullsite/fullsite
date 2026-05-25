@@ -25,7 +25,7 @@ function tierLabel(p: number) {
   return '$0-49'
 }
 const TIERS = ['$0-49', '$50-99', '$100-199', '$200-499', '$500+']
-const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-[var(--surface-2)] text-[var(--text-1)]', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-700', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
+const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-[var(--surface-2)] text-[var(--text-1)]', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-400', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
 
 export default function PreciosPage() {
   const CLIENT_ID = useClientId()
@@ -77,7 +77,7 @@ export default function PreciosPage() {
       <PageHeader title="Gestion de Precios" subtitle={`${items.length} productos activos`} eyebrow="Tienda" />
 
       {selected.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 flex items-center gap-4">
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 mb-6 flex items-center gap-4">
           <span className="text-sm font-semibold text-blue-800">{selected.size} seleccionados</span>
           <div className="flex items-center gap-2 flex-1">
             <DollarSign size={16} className="text-blue-500" />
@@ -120,13 +120,13 @@ export default function PreciosPage() {
                 return (
                   <div key={item.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-[var(--surface-2)]">
                     <button onClick={() => toggleSelect(item.id)}
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)]'}`}>
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500/100 border-emerald-500 text-white' : 'border-[var(--line)]'}`}>
                       {selected.has(item.id) && <Check size={12} />}
                     </button>
                     <span className="text-sm font-medium text-[var(--text-1)] flex-1">{item.name}</span>
                     <span className="text-xs text-[var(--text-3)]">{item.department}</span>
                     <span className="text-sm font-semibold text-[var(--text-1)] w-20 text-right">${item.price.toFixed(2)}</span>
-                    <span className={`text-xs font-semibold w-12 text-right ${m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-600' : 'text-red-600'}`}>{m.toFixed(0)}%</span>
+                    <span className={`text-xs font-semibold w-12 text-right ${m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-400' : 'text-red-600'}`}>{m.toFixed(0)}%</span>
                   </div>
                 )
               })}

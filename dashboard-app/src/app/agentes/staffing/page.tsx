@@ -112,7 +112,7 @@ export default function StaffingPage() {
                   const isMax = d.ventas_por_mesero === maxVPM
                   const isMin = d.ventas_por_mesero === minVPM && porDia.length > 1
                   return (
-                    <tr key={i} className={`border-b border-slate-50 hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-50/30' : isMin ? 'bg-emerald-50/30' : ''}`}>
+                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-500/10/30' : isMin ? 'bg-emerald-500/10/30' : ''}`}>
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{d.dia}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(d.ventas_promedio)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{d.meseros}</td>
@@ -139,7 +139,7 @@ export default function StaffingPage() {
           <div className="p-4 space-y-2">
             {recomendaciones.map((rec, i) => (
               <div key={i} className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
                 <p className="text-sm text-[var(--text-1)]">{rec}</p>
               </div>
             ))}

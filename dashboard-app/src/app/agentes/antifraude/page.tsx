@@ -43,7 +43,7 @@ export default function AntiFraudePage() {
   useEffect(() => { load() }, [])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-[var(--line-soft)]0 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   const score = data?.risk_score ?? 0
@@ -51,14 +51,14 @@ export default function AntiFraudePage() {
 
   function scoreColor(s: number): string {
     if (s >= 70) return 'text-red-600'
-    if (s >= 40) return 'text-amber-600'
+    if (s >= 40) return 'text-amber-400'
     return 'text-emerald-600'
   }
 
   function scoreBg(s: number): string {
-    if (s >= 70) return 'border-red-300 bg-red-50/30'
-    if (s >= 40) return 'border-amber-200 bg-amber-50/30'
-    return 'border-emerald-200 bg-emerald-50/30'
+    if (s >= 70) return 'border-red-300 bg-red-500/10/30'
+    if (s >= 40) return 'border-amber-500/20 bg-amber-500/10/30'
+    return 'border-emerald-500/20 bg-emerald-500/10/30'
   }
 
   function scoreLabel(s: number): string {
@@ -69,8 +69,8 @@ export default function AntiFraudePage() {
 
   function nivelBadge(nivel: string) {
     const n = nivel.toLowerCase()
-    if (n === 'alto' || n === 'critical') return 'bg-red-500 text-white'
-    if (n === 'medio' || n === 'warning') return 'bg-amber-100 text-amber-700'
+    if (n === 'alto' || n === 'critical') return 'bg-red-500/100 text-white'
+    if (n === 'medio' || n === 'warning') return 'bg-amber-100 text-amber-400'
     return 'bg-[var(--surface-2)] text-[var(--text-2)]'
   }
 
@@ -98,7 +98,7 @@ export default function AntiFraudePage() {
         <p className={`text-sm font-medium mt-1 ${scoreColor(score)}`}>{scoreLabel(score)}</p>
         <div className="mt-3 w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-3">
           <div
-            className={`h-3 rounded-full transition-all ${score >= 70 ? 'bg-red-500' : score >= 40 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+            className={`h-3 rounded-full transition-all ${score >= 70 ? 'bg-red-500/100' : score >= 40 ? 'bg-amber-400' : 'bg-emerald-500/100'}`}
             style={{ width: `${Math.min(score, 100)}%` }}
           />
         </div>
@@ -110,13 +110,13 @@ export default function AntiFraudePage() {
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Hallazgos totales</p>
           <p className="text-2xl font-bold text-[var(--text-1)]">{findings.length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-red-200 shadow-sm p-5 bg-red-50/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/10/30">
           <p className="text-xs text-red-600 font-medium mb-1">Riesgo alto</p>
           <p className="text-2xl font-bold text-red-600">{findings.filter(f => f.nivel?.toLowerCase() === 'alto' || f.nivel?.toLowerCase() === 'critical').length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-amber-200 shadow-sm p-5 bg-amber-50/30">
-          <p className="text-xs text-amber-600 font-medium mb-1">Riesgo medio</p>
-          <p className="text-2xl font-bold text-amber-600">{findings.filter(f => f.nivel?.toLowerCase() === 'medio' || f.nivel?.toLowerCase() === 'warning').length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/10/30">
+          <p className="text-xs text-amber-400 font-medium mb-1">Riesgo medio</p>
+          <p className="text-2xl font-bold text-amber-400">{findings.filter(f => f.nivel?.toLowerCase() === 'medio' || f.nivel?.toLowerCase() === 'warning').length}</p>
         </div>
       </div>
 
@@ -126,7 +126,7 @@ export default function AntiFraudePage() {
           {findings.map((f, i) => {
             const isHigh = f.nivel?.toLowerCase() === 'alto' || f.nivel?.toLowerCase() === 'critical'
             return (
-              <div key={i} className={`bg-[var(--surface)] rounded-xl border shadow-sm p-5 ${isHigh ? 'border-red-200' : 'border-[var(--line)]'}`}>
+              <div key={i} className={`bg-[var(--surface)] rounded-xl border shadow-sm p-5 ${isHigh ? 'border-red-500/20' : 'border-[var(--line)]'}`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {isHigh ? <AlertTriangle size={16} className="text-red-500" /> : <Shield size={16} className="text-[var(--text-3)]" />}

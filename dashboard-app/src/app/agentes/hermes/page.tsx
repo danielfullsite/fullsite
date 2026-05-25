@@ -38,9 +38,9 @@ export default function HermesPage() {
   const highCount = (data?.high_count || 0) as number
 
   const priorityColors: Record<string, string> = {
-    critical: 'bg-red-500 text-white',
+    critical: 'bg-red-500/100 text-white',
     high: 'bg-red-100 text-red-700',
-    medium: 'bg-amber-100 text-amber-700',
+    medium: 'bg-amber-100 text-amber-400',
     low: 'bg-blue-100 text-blue-700',
     info: 'bg-[var(--surface-2)] text-[var(--text-2)]',
   }
@@ -50,7 +50,7 @@ export default function HermesPage() {
       <div className="mb-6 flex items-center gap-3">
         <Link href="/agentes" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
             <Bot size={20} className="text-indigo-500" />
           </div>
           <div>
@@ -67,13 +67,13 @@ export default function HermesPage() {
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Total issues</p>
           <p className="text-2xl font-bold text-[var(--text-1)]">{totalIssues}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-red-200 shadow-sm p-5 bg-red-50/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/10/30">
           <p className="text-xs text-red-600 font-medium mb-1">Criticos</p>
           <p className="text-2xl font-bold text-red-600">{criticalCount}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-amber-200 shadow-sm p-5 bg-amber-50/30">
-          <p className="text-xs text-amber-600 font-medium mb-1">Altos</p>
-          <p className="text-2xl font-bold text-amber-600">{highCount}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/10/30">
+          <p className="text-xs text-amber-400 font-medium mb-1">Altos</p>
+          <p className="text-2xl font-bold text-amber-400">{highCount}</p>
         </div>
       </div>
 
@@ -169,7 +169,7 @@ export default function HermesPage() {
           )}
 
           {totalIssues === 0 && (
-            <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-8 text-center">
+            <div className="bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-8 text-center">
               <CheckCircle size={32} className="mx-auto mb-3 text-emerald-500" />
               <p className="text-emerald-700 font-medium">Todos los agentes funcionando correctamente</p>
             </div>

@@ -63,10 +63,10 @@ export default function GruposTiendaPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="Grupos y Departamentos" subtitle={`${departments.length} departamentos · ${groups.length} grupos`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nuevo grupo</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nuevo grupo</button>} />
 
       {adding && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
           <h3 className="font-semibold text-emerald-800 mb-3">Nuevo grupo</h3>
           <div className="grid grid-cols-2 gap-3">
             <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} placeholder="Departamento" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" list="depts" />

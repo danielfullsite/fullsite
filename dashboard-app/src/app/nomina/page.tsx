@@ -127,7 +127,7 @@ export default function NominaPage() {
                 <th className="text-right px-4 py-3 font-medium">% del total</th>
               </tr></thead>
               <tbody>{meseros.map((m, i) => (
-                <tr key={m.nombre} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                <tr key={m.nombre} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                   <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-[var(--text-1)]">{m.nombre}</td>
                   <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(m.total)}</td>
@@ -154,7 +154,7 @@ export default function NominaPage() {
                   <th className="text-right px-4 py-3 font-medium">Prom/ticket</th>
                 </tr></thead>
                 <tbody>{tips.sort((a, b) => (b.propinas || 0) - (a.propinas || 0)).map((t, i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{t.mesero}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(t.ventas)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{t.tickets}</td>
@@ -178,7 +178,7 @@ export default function NominaPage() {
                   <div className="flex flex-wrap gap-3">
                     {shifts.map((s, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 text-sm">
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="w-2 h-2 rounded-full bg-blue-500/100" />
                         <span className="font-medium text-[var(--text-1)]">{s.nombre}</span>
                         <span className="text-[var(--text-3)]">{s.total}</span>
                       </span>
@@ -195,7 +195,7 @@ export default function NominaPage() {
                     <th className="text-right px-4 py-3 font-medium">Horas</th>
                   </tr></thead>
                   <tbody>{labor.map((l, i) => (
-                    <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                    <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{l.empleado}</td>
                       <td className="px-4 py-3 text-[var(--text-2)]">{l.entrada || '--:--'}</td>
                       <td className="px-4 py-3 text-[var(--text-2)]">{l.salida || '--:--'}</td>
@@ -220,17 +220,17 @@ export default function NominaPage() {
               </tr></thead>
               <tbody>
                 {hoursWorked.sort((a, b) => b.horas - a.horas).map((h, i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{h.empleado}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{h.entrada || '--:--'}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{h.salida || '--:--'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-600">{h.horas > 0 ? `${h.horas}h` : '--'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-400">{h.horas > 0 ? `${h.horas}h` : '--'}</td>
                   </tr>
                 ))}
                 <tr className="bg-[var(--surface-2)] font-bold">
                   <td className="px-4 py-3" colSpan={4}>Total</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-amber-700">
+                  <td className="px-4 py-3 text-right tabular-nums text-amber-400">
                     {hoursWorked.reduce((s, h) => s + (h.horas || 0), 0).toFixed(1)}h
                   </td>
                 </tr>

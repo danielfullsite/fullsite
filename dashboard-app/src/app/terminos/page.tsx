@@ -7,7 +7,7 @@ export default function TerminosPage() {
           <a href="/login" className="inline-block mb-6">
             <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
               fullsite
-              <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </a>
           <h1 className="text-2xl font-bold text-text mb-2">Terminos y Condiciones de Servicio</h1>
@@ -105,7 +105,7 @@ export default function TerminosPage() {
 
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">8. Disclaimer de inteligencia artificial</h2>
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-3">
             <p className="text-xs text-amber-800 leading-relaxed font-medium">
               CLAUSULA IMPORTANTE — LEER CUIDADOSAMENTE
             </p>

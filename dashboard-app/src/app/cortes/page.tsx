@@ -26,7 +26,7 @@ function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; t
 }
 
 const HEATMAP_COLORS = [
-  { min: 0, max: 0, bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-3)]', hex: '#e2e8f0' },
+  { min: 0, max: 0, bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-3)]', hex: 'var(--line)' },
   { min: 1, max: 20000, bg: 'bg-red-100', text: 'text-red-700', hex: '#fecaca' },
   { min: 20001, max: 40000, bg: 'bg-orange-100', text: 'text-orange-700', hex: '#fed7aa' },
   { min: 40001, max: 60000, bg: 'bg-yellow-100', text: 'text-yellow-700', hex: '#fef08a' },
@@ -234,7 +234,7 @@ export default function CortesPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center">
               <Banknote size={20} className="text-emerald-500" />
             </div>
             <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Total Efectivo</p>
@@ -243,7 +243,7 @@ export default function CortesPage() {
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 bg-[var(--surface-2)] rounded-full h-2">
               <div
-                className="h-2 rounded-full bg-emerald-500 animate-progress"
+                className="h-2 rounded-full bg-emerald-500/100 animate-progress"
                 style={{ width: `${totalVentas > 0 ? (totalEfectivo / totalVentas) * 100 : 0}%` }}
               />
             </div>
@@ -254,7 +254,7 @@ export default function CortesPage() {
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
               <CreditCard size={20} className="text-blue-500" />
             </div>
             <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Total Tarjeta</p>
@@ -263,7 +263,7 @@ export default function CortesPage() {
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 bg-[var(--surface-2)] rounded-full h-2">
               <div
-                className="h-2 rounded-full bg-blue-500 animate-progress"
+                className="h-2 rounded-full bg-blue-500/100 animate-progress"
                 style={{ width: `${totalVentas > 0 ? (totalTarjeta / totalVentas) * 100 : 0}%` }}
               />
             </div>
@@ -302,7 +302,7 @@ export default function CortesPage() {
                 return (
                   <tr
                     key={d.fecha}
-                    className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors"
+                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors"
                   >
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -314,7 +314,7 @@ export default function CortesPage() {
                           })}
                         </span>
                         {prev && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-500/100/10 text-emerald-400' : 'bg-red-500/100/10 text-red-400'}`}>
                             {change >= 0 ? '+' : ''}{change.toFixed(0)}%
                           </span>
                         )}
@@ -345,7 +345,7 @@ export default function CortesPage() {
             <tfoot>
               <tr className="bg-[var(--surface-2)]/80 border-t-2 border-[var(--line)]">
                 <td className="py-3.5 px-4 text-sm font-bold text-[var(--text-1)]">TOTAL</td>
-                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
                   {formatCurrency(totalVentas)}
                 </td>
                 <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
@@ -374,7 +374,7 @@ export default function CortesPage() {
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden hover:shadow-md transition-shadow mt-6">
           <div className="p-6 border-b border-[var(--line)]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-50 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-violet-500/10 rounded-full flex items-center justify-center">
                 <Vault size={20} className="text-violet-500" />
               </div>
               <div>
@@ -395,7 +395,7 @@ export default function CortesPage() {
               </thead>
               <tbody>
                 {cashClosing.map((item, i) => (
-                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                     <td className="py-3 px-4 text-sm font-medium text-[var(--text-1)]">{item.nombre}</td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
                       {formatCurrency(item.total)}
@@ -406,7 +406,7 @@ export default function CortesPage() {
               <tfoot>
                 <tr className="bg-[var(--surface-2)]/80 border-t-2 border-[var(--line)]">
                   <td className="py-3.5 px-4 text-sm font-bold text-[var(--text-1)]">TOTAL</td>
-                  <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                  <td className="py-3.5 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
                     {formatCurrency(cashClosing.reduce((s, item) => s + (item.total || 0), 0))}
                   </td>
                 </tr>
@@ -423,7 +423,7 @@ export default function CortesPage() {
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="p-6 border-b border-[var(--line)]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center">
                   <ArrowDownCircle size={20} className="text-red-500" />
                 </div>
                 <div>
@@ -443,7 +443,7 @@ export default function CortesPage() {
                   </thead>
                   <tbody>
                     {withdrawals.map((item, i) => (
-                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-50/30 transition-colors">
+                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10/30 transition-colors">
                         <td className="py-3 px-4 text-sm text-[var(--text-1)]">{item.nombre}</td>
                         <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-red-600">
                           {formatCurrency(item.total)}
@@ -470,7 +470,7 @@ export default function CortesPage() {
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div className="p-6 border-b border-[var(--line)]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
                   <Building2 size={20} className="text-blue-500" />
                 </div>
                 <div>
@@ -490,9 +490,9 @@ export default function CortesPage() {
                   </thead>
                   <tbody>
                     {deposits.map((item, i) => (
-                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                         <td className="py-3 px-4 text-sm text-[var(--text-1)]">{item.nombre}</td>
-                        <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                        <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
                           {formatCurrency(item.total)}
                         </td>
                       </tr>
@@ -501,7 +501,7 @@ export default function CortesPage() {
                   <tfoot>
                     <tr className="bg-[var(--surface-2)]/80 border-t-2 border-[var(--line)]">
                       <td className="py-3 px-4 text-sm font-bold text-[var(--text-1)]">TOTAL</td>
-                      <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-600">
+                      <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
                         {formatCurrency(deposits.reduce((s, item) => s + (item.total || 0), 0))}
                       </td>
                     </tr>

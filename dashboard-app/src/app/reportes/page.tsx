@@ -17,10 +17,10 @@ const reportOptions: { key: ReportType; label: string; icon: typeof DollarSign; 
 ]
 
 const iconColorMap: Record<string, { active: string; inactive: string; activeBg: string; inactiveBg: string }> = {
-  blue: { active: 'text-blue-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-blue-50', inactiveBg: 'bg-[var(--surface-2)]' },
-  emerald: { active: 'text-emerald-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-emerald-50', inactiveBg: 'bg-[var(--surface-2)]' },
-  amber: { active: 'text-amber-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-amber-50', inactiveBg: 'bg-[var(--surface-2)]' },
-  purple: { active: 'text-purple-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-purple-50', inactiveBg: 'bg-[var(--surface-2)]' },
+  blue: { active: 'text-blue-400', inactive: 'text-[var(--text-3)]', activeBg: 'bg-blue-500/10', inactiveBg: 'bg-[var(--surface-2)]' },
+  emerald: { active: 'text-emerald-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-emerald-500/10', inactiveBg: 'bg-[var(--surface-2)]' },
+  amber: { active: 'text-amber-400', inactive: 'text-[var(--text-3)]', activeBg: 'bg-amber-500/10', inactiveBg: 'bg-[var(--surface-2)]' },
+  purple: { active: 'text-purple-600', inactive: 'text-[var(--text-3)]', activeBg: 'bg-purple-500/10', inactiveBg: 'bg-[var(--surface-2)]' },
 }
 
 export default function ReportesPage() {
@@ -137,7 +137,7 @@ export default function ReportesPage() {
               onClick={() => { setReportType(opt.key); setGenerated(false) }}
               className={`text-left p-5 rounded-xl border transition-all duration-200 ${
                 isActive
-                  ? 'border-blue-200 bg-[var(--surface)] shadow-md ring-1 ring-blue-500/10'
+                  ? 'border-blue-500/20 bg-[var(--surface)] shadow-md ring-1 ring-blue-500/10'
                   : 'border-[var(--line)] bg-[var(--surface)] shadow-sm hover:shadow-md hover:border-[var(--line)]'
               }`}
             >
@@ -179,7 +179,7 @@ export default function ReportesPage() {
           <button
             onClick={generate}
             disabled={loading}
-            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+            className="px-6 py-2.5 bg-blue-500/100 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
           >
             <FileBarChart size={16} />
             {loading ? 'Generando...' : 'Generar reporte'}
@@ -187,7 +187,7 @@ export default function ReportesPage() {
           <button
             onClick={() => window.print()}
             disabled={!generated || data.length === 0}
-            className="px-4 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+            className="px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-700 hover:bg-blue-100 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Download size={16} />
             Generar PDF
@@ -195,7 +195,7 @@ export default function ReportesPage() {
           <button
             onClick={exportExcel}
             disabled={!generated || data.length === 0}
-            className="px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+            className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 hover:bg-emerald-100 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Download size={16} />
             Generar Excel
@@ -264,7 +264,7 @@ export default function ReportesPage() {
                     </thead>
                     <tbody>
                       {reportData.payments.map(p => (
-                        <tr key={p.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                        <tr key={p.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                           <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">{p.nombre}</td>
                           <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(p.total)}</td>
                           <td className="py-2.5 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
@@ -297,14 +297,14 @@ export default function ReportesPage() {
                         const meseroMax = reportData.meseros[0]?.total || 1
                         const barWidth = meseroMax > 0 ? ((m.total / meseroMax) * 100) : 0
                         return (
-                          <tr key={m.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                          <tr key={m.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                             <td className="py-2.5 px-4 text-sm text-[var(--text-3)] font-medium">{i + 1}</td>
                             <td className="py-2.5 px-4">
                               <div className="flex items-center gap-3">
                                 <span className="text-sm font-medium text-[var(--text-1)]">{m.nombre}</span>
                               </div>
                               <div className="mt-1 w-32 bg-[var(--surface-2)] rounded-full h-1">
-                                <div className="h-1 rounded-full bg-blue-500 animate-progress" style={{ width: `${barWidth}%` }} />
+                                <div className="h-1 rounded-full bg-blue-500/100 animate-progress" style={{ width: `${barWidth}%` }} />
                               </div>
                             </td>
                             <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(m.total)}</td>
@@ -336,12 +336,12 @@ export default function ReportesPage() {
                       {reportData.grupos.map((g, i) => {
                         const totalG = reportData.grupos.reduce((s, x) => s + x.total, 0)
                         return (
-                          <tr key={g.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                          <tr key={g.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                             <td className="py-2.5 px-4 text-sm text-[var(--text-3)]">{i + 1}</td>
                             <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">{g.nombre}</td>
                             <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(g.total)}</td>
                             <td className="py-2.5 px-4 text-sm text-right tabular-nums">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400">
                                 {totalG > 0 ? ((g.total / totalG) * 100).toFixed(1) : 0}%
                               </span>
                             </td>
@@ -369,7 +369,7 @@ export default function ReportesPage() {
                     </thead>
                     <tbody>
                       {[...data].reverse().map(d => (
-                        <tr key={d.fecha} className="border-b border-[var(--line-soft)] hover:bg-blue-50/30 transition-colors">
+                        <tr key={d.fecha} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
                           <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">
                             {new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
                               weekday: 'short',
@@ -394,7 +394,7 @@ export default function ReportesPage() {
       {/* Empty state */}
       {!generated && !loading && (
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-12 text-center hover:shadow-md transition-shadow">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <FileBarChart size={32} className="text-blue-500" />
           </div>
           <p className="text-[var(--text-2)] text-sm">

@@ -7,7 +7,7 @@ export default function PrivacidadPage() {
           <a href="/login" className="inline-block mb-6">
             <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
               fullsite
-              <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </a>
           <h1 className="text-2xl font-bold text-text mb-2">Aviso de Privacidad Integral</h1>
@@ -57,7 +57,7 @@ export default function PrivacidadPage() {
             <li>Consultas realizadas al asistente de inteligencia artificial</li>
             <li>Registros de acceso y auditoria (logs)</li>
           </ul>
-          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <p className="text-xs text-amber-800 leading-relaxed">
               <strong>Datos sensibles:</strong> No recabamos datos sensibles conforme al articulo 3, fraccion VI de la LFPDPPP
               (datos de salud, origen etnico, creencias religiosas, orientacion sexual, etc.).

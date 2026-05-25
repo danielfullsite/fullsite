@@ -107,7 +107,7 @@ export default function InventarioPage() {
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2"><AlertTriangle size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Stock bajo</span></div>
-          <p className="text-2xl font-bold text-amber-600">{lowStock.length}</p>
+          <p className="text-2xl font-bold text-amber-400">{lowStock.length}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2"><TrendingDown size={16} className="text-red-500" /><span className="text-xs text-[var(--text-2)] font-medium">Items con merma</span></div>
@@ -141,9 +141,9 @@ export default function InventarioPage() {
                   <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('costo_total')}>Costo total <ArrowUpDown size={12} className="inline" /></th>
                 </tr></thead>
                 <tbody>{filtered.slice(0, 200).map((item, i) => (
-                  <tr key={i} className={`border-b border-slate-50 hover:bg-[var(--surface-2)] ${item.existencia < 5 && item.existencia > 0 ? 'bg-amber-50/50' : ''}`}>
+                  <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.existencia < 5 && item.existencia > 0 ? 'bg-amber-500/100/10' : ''}`}>
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${item.existencia < 5 ? 'text-amber-600 font-bold' : 'text-[var(--text-1)]'}`}>{item.existencia}</td>
+                    <td className={`px-4 py-3 text-right tabular-nums ${item.existencia < 5 ? 'text-amber-400 font-bold' : 'text-[var(--text-1)]'}`}>{item.existencia}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{item.unidad}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(item.costo_unitario)}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-1)]">{formatCurrency(item.costo_total)}</td>
@@ -168,7 +168,7 @@ export default function InventarioPage() {
                   <th className="text-right px-4 py-3 font-medium">Costo dif.</th>
                 </tr></thead>
                 <tbody>{shrinkage.map((item, i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-red-50/50">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/100/10">
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.sistema}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.fisico}</td>

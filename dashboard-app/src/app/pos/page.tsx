@@ -207,8 +207,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   />
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     quitarChecked.has(mod)
-                      ? 'bg-red-500 border-red-500'
-                      : 'border-slate-500'
+                      ? 'bg-red-500/100 border-red-500'
+                      : 'border-[var(--line-soft)]0'
                   }`}>
                     {quitarChecked.has(mod) && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -243,8 +243,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   />
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     agregarChecked.has(mod.name)
-                      ? 'bg-emerald-500 border-emerald-500'
-                      : 'border-slate-500'
+                      ? 'bg-emerald-500/100 border-emerald-500'
+                      : 'border-[var(--line-soft)]0'
                   }`}>
                     {agregarChecked.has(mod.name) && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -306,7 +306,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-[2] py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors min-h-[48px]"
+            className="flex-[2] py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold transition-colors min-h-[48px]"
           >
             {existingOrder ? 'Actualizar' : 'Agregar'} {formatMXN(subtotal)}
           </button>
@@ -386,7 +386,7 @@ function DiscountModal({ subtotal, onApply, onCancel }: DiscountModalProps) {
           <button
             onClick={() => onApply(discountAmount)}
             disabled={discountAmount <= 0}
-            className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]"
+            className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]"
           >
             Aplicar -{formatMXN(discountAmount)}
           </button>
@@ -482,7 +482,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500/100 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
           >
             <Ban size={18} />
             Cancelar item
@@ -563,7 +563,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500/100 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
           >
             <Ban size={18} />
             Anular orden
@@ -1189,7 +1189,7 @@ function POSContent() {
             </button>
             <span className="text-white font-black text-lg tracking-tight">
               fullsite
-              <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
+              <span className="inline-block w-1.5 h-1.5 bg-emerald-500/100 ml-0.5 mb-0.5" />
             </span>
           </div>
           <div className="flex items-center gap-3 text-[var(--text-3)] flex-shrink-0 ml-2">
@@ -1258,7 +1258,7 @@ function POSContent() {
             onClick={() => setMobileView('order')}
             className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors relative ${mobileView === 'order' ? 'bg-blue-600 text-white' : 'text-[var(--text-3)]'}`}
           >
-            Orden {activeItems.length > 0 && <span className="ml-1 bg-emerald-500 text-white text-xs rounded-full px-1.5 py-0.5">{activeItems.length}</span>}
+            Orden {activeItems.length > 0 && <span className="ml-1 bg-emerald-500/100 text-white text-xs rounded-full px-1.5 py-0.5">{activeItems.length}</span>}
           </button>
         </div>
       </header>
@@ -1494,7 +1494,7 @@ function POSContent() {
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500/100 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
             >
               <Send size={22} />
               {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Cocina'}
@@ -1502,14 +1502,14 @@ function POSContent() {
             <button
               onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-6 rounded-2xl text-base transition-all min-h-[72px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500/100 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-6 rounded-2xl text-base transition-all min-h-[72px]"
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500/100 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
             >
               <CreditCard size={22} />
               Cobrar
@@ -1530,7 +1530,7 @@ function POSContent() {
             />
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="w-[50px] h-[50px] bg-amber-600 hover:bg-amber-500 active:bg-amber-700 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-colors"
+              className="w-[50px] h-[50px] bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-colors"
               title="Escanear código de barras"
             >
               <ScanBarcode size={22} />
@@ -1773,7 +1773,7 @@ function POSContent() {
                   setShowPayment(true)
                   showToast('Cobra Cuenta 1 primero')
                 }}
-                className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold min-h-[48px]"
+                className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold min-h-[48px]"
               >
                 Dividir y cobrar
               </button>
@@ -1863,14 +1863,14 @@ function POSContent() {
             <div className="space-y-3">
               <button
                 onClick={() => handlePayment('efectivo')}
-                className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <Banknote size={24} />
                 Efectivo
               </button>
               <button
                 onClick={() => handlePayment('tarjeta')}
-                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <CreditCard size={24} />
                 Tarjeta

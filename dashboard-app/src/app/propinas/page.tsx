@@ -145,13 +145,13 @@ export default function PropinasPage() {
               </h3>
               <p className="text-xs mb-5">
                 {isRealTipsData ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100" />
                     Datos reales de Wansoft
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/100/10 text-amber-400 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500/100" />
                     Estimado proporcional
                   </span>
                 )}

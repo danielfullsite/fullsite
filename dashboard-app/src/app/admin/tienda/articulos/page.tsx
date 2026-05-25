@@ -23,7 +23,7 @@ async function sbFetch(path: string, opts?: RequestInit) {
 }
 
 function margin(p: number, c: number) { return p > 0 ? ((p - c) / p) * 100 : 0 }
-function marginColor(m: number) { return m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-600' : 'text-red-600' }
+function marginColor(m: number) { return m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-400' : 'text-red-600' }
 
 export default function ArticulosPage() {
   const CLIENT_ID = useClientId()
@@ -72,7 +72,7 @@ export default function ArticulosPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader title="Articulos Tienda" subtitle={`${items.length} productos`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Agregar</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Agregar</button>} />
 
       <div className="flex gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
@@ -87,7 +87,7 @@ export default function ArticulosPage() {
       </div>
 
       {(adding || editing) && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
           <h3 className="font-semibold text-emerald-800 mb-3">{adding ? 'Nuevo articulo' : `Editando: ${editing?.name}`}</h3>
           {(() => { const f = adding ? form : editing!; const set = adding ? setForm : (v: RetailItem) => setEditing(v); return (
             <>
@@ -136,7 +136,7 @@ export default function ArticulosPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex gap-1 justify-end">
                     <button onClick={() => setEditing(item)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
-                    <button onClick={() => handleDelete(item)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><X size={14}/></button>
+                    <button onClick={() => handleDelete(item)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><X size={14}/></button>
                   </div>
                 </td>
               </tr>

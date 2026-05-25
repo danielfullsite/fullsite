@@ -153,11 +153,11 @@ export default function EcommercePage() {
           </div>
 
           {ecommerceData.totalEcommerce === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-amber-700 font-medium">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
+              <p className="text-sm text-amber-400 font-medium">
                 Sin datos de eCommerce
               </p>
-              <p className="text-xs text-amber-600 mt-1">
+              <p className="text-xs text-amber-400 mt-1">
                 No se encontraron ventas de Rappi, Ubereats u otras plataformas en los metodos de pago.
                 Si tu restaurante usa delivery, verifica que los pagos se registren correctamente en Wansoft.
               </p>
@@ -214,7 +214,7 @@ export default function EcommercePage() {
                     <div className="h-[200px] sm:h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={ecommerceData.channels}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                           <XAxis
                             dataKey="nombre"
                             tick={{ fontSize: 11, fill: '#94a3b8' }}
@@ -262,7 +262,7 @@ export default function EcommercePage() {
                             <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
                         <XAxis
                           dataKey="mes"
                           tick={{ fontSize: 10, fill: '#94a3b8' }}

@@ -64,8 +64,8 @@ export default function MenuEngineeringPage() {
   }
 
   const quadrants = [
-    { key: 'estrellas', label: 'Estrellas', desc: 'Alta popularidad + alto margen', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200', items: data?.estrellas || [] },
-    { key: 'caballos', label: 'Caballos de Trabajo', desc: 'Alta popularidad + bajo margen', icon: Zap, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', items: data?.caballos || [] },
+    { key: 'estrellas', label: 'Estrellas', desc: 'Alta popularidad + alto margen', icon: Star, color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20', items: data?.estrellas || [] },
+    { key: 'caballos', label: 'Caballos de Trabajo', desc: 'Alta popularidad + bajo margen', icon: Zap, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20', items: data?.caballos || [] },
     { key: 'rompecabezas', label: 'Rompecabezas', desc: 'Baja popularidad + alto margen', icon: Puzzle, color: 'text-violet-500', bg: 'bg-violet-50', border: 'border-violet-200', items: data?.rompecabezas || [] },
     { key: 'perros', label: 'Perros', desc: 'Baja popularidad + bajo margen', icon: Dog, color: 'text-[var(--text-3)]', bg: 'bg-[var(--surface-2)]', border: 'border-[var(--line)]', items: data?.perros || [] },
   ]
@@ -116,7 +116,7 @@ export default function MenuEngineeringPage() {
                       <span className="text-[var(--text-1)] truncate max-w-[180px]">{item.nombre}</span>
                       <div className="flex items-center gap-3">
                         <span className="tabular-nums text-[var(--text-2)] text-xs">{formatCurrency(item.ventas)}</span>
-                        <span className={`tabular-nums text-xs font-bold ${item.margen_pct >= 60 ? 'text-emerald-600' : item.margen_pct >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
+                        <span className={`tabular-nums text-xs font-bold ${item.margen_pct >= 60 ? 'text-emerald-600' : item.margen_pct >= 30 ? 'text-amber-400' : 'text-red-600'}`}>
                           {item.margen_pct?.toFixed(0)}%
                         </span>
                       </div>

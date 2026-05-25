@@ -24,7 +24,7 @@ async function sbFetch(path: string, opts?: RequestInit) {
 }
 
 const TYPE_LABELS: Record<string, string> = { percent: '% Descuento', fixed: '$ Fijo', '2x1': '2x1', combo: 'Combo' }
-const TYPE_COLORS: Record<string, string> = { percent: 'bg-blue-100 text-blue-700', fixed: 'bg-emerald-100 text-emerald-700', '2x1': 'bg-purple-100 text-purple-700', combo: 'bg-amber-100 text-amber-700' }
+const TYPE_COLORS: Record<string, string> = { percent: 'bg-blue-100 text-blue-700', fixed: 'bg-emerald-100 text-emerald-700', '2x1': 'bg-purple-100 text-purple-700', combo: 'bg-amber-100 text-amber-400' }
 
 export default function PromosTiendaPage() {
   const CLIENT_ID = useClientId()
@@ -71,7 +71,7 @@ export default function PromosTiendaPage() {
   }
 
   const renderForm = (f: Promo, set: (v: Promo) => void, isNew: boolean) => (
-    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
       <h3 className="font-semibold text-emerald-800 mb-3">{isNew ? 'Nueva promocion' : `Editando: ${f.name}`}</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <input value={f.name} onChange={e => set({ ...f, name: e.target.value })} placeholder="Nombre" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm col-span-2" />
@@ -89,7 +89,7 @@ export default function PromosTiendaPage() {
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
             {items.map(i => (
               <button key={i.id} onClick={() => toggleAppliesTo(f, set, i.id)}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${f.applies_to.includes(i.id) ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--line)]'}`}>
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${f.applies_to.includes(i.id) ? 'bg-emerald-500/100 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--line)]'}`}>
                 {i.name}
               </button>
             ))}
@@ -109,7 +109,7 @@ export default function PromosTiendaPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Promociones Tienda" subtitle={`${active.length} activas · ${inactive.length} inactivas`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nueva promo</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nueva promo</button>} />
 
       {adding && renderForm(form, setForm, true)}
       {editing && renderForm(editing, (v) => setEditing(v), false)}
@@ -137,7 +137,7 @@ export default function PromosTiendaPage() {
                 <td className="px-4 py-3">
                   <div className="flex gap-1 justify-end">
                     <button onClick={() => setEditing(p)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
-                    <button onClick={() => handleDelete(p)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14}/></button>
+                    <button onClick={() => handleDelete(p)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14}/></button>
                   </div>
                 </td>
               </tr>

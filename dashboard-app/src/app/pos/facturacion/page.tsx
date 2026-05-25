@@ -242,7 +242,7 @@ export default function FacturacionPage() {
               <button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg mt-4"
+                className="w-full bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg mt-4"
               >
                 {saving ? (
                   <><RefreshCw size={20} className="animate-spin" /> Guardando...</>

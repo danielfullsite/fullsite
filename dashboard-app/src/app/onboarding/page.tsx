@@ -177,7 +177,7 @@ export default function OnboardingPage() {
       <header className="bg-[var(--surface)] border-b border-[var(--line)] px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <span className="font-black text-xl tracking-tight text-[var(--text-1)]">
-            fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5" />
+            fullsite<span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5" />
           </span>
           <span className="text-sm text-[var(--text-3)]">Configuracion inicial</span>
         </div>
@@ -190,7 +190,7 @@ export default function OnboardingPage() {
             const Icon = s.icon
             return (
               <div key={s.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${
-                i < step ? 'text-emerald-600' : i === step ? 'bg-emerald-50 text-emerald-700' : 'text-[var(--text-3)]'
+                i < step ? 'text-emerald-600' : i === step ? 'bg-emerald-500/10 text-emerald-700' : 'text-[var(--text-3)]'
               }`}>
                 {i < step ? <Check size={14} /> : <Icon size={14} />}
                 <span className="hidden sm:inline">{s.label}</span>
@@ -287,7 +287,7 @@ export default function OnboardingPage() {
                 <label className="text-xs font-semibold text-[var(--text-2)] uppercase mb-2 block">Categorias</label>
                 <div className="flex gap-2 flex-wrap mb-3">
                   {categories.map(c => (
-                    <span key={c} className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+                    <span key={c} className="flex items-center gap-1 bg-emerald-500/10 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium">
                       {c}
                       <button onClick={() => setCategories(categories.filter(x => x !== c))} className="text-emerald-400 hover:text-red-500 ml-1">&times;</button>
                     </span>

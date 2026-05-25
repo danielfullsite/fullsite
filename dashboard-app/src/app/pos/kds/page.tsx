@@ -19,9 +19,9 @@ function timerColor(mins: number): string {
 }
 
 function timerBg(mins: number): string {
-  if (mins <= 10) return 'bg-emerald-500/10 border-emerald-500/30'
-  if (mins <= 20) return 'bg-amber-500/10 border-amber-500/30'
-  return 'bg-red-500/10 border-red-500/30'
+  if (mins <= 10) return 'bg-emerald-500/100/10 border-emerald-500/30'
+  if (mins <= 20) return 'bg-amber-500/100/10 border-amber-500/30'
+  return 'bg-red-500/100/10 border-red-500/30'
 }
 
 interface ParsedItem {
@@ -196,11 +196,11 @@ export default function KDSPage() {
               {orders.filter(o => o.status === 'enviada').length}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-amber-500" />
+              <span className="w-3 h-3 rounded-full bg-amber-500/100" />
               {orders.filter(o => o.status === 'preparando').length}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="w-3 h-3 rounded-full bg-emerald-500/100" />
               {orders.filter(o => o.status === 'lista').length}
             </span>
           </div>
@@ -236,7 +236,7 @@ export default function KDSPage() {
               const isDone = order.status === 'lista'
 
               const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
-              const headerBg = isNew ? 'bg-[var(--surface)] text-black' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
+              const headerBg = isNew ? 'bg-[var(--surface)] text-black' : isPrep ? 'bg-amber-500/100 text-black' : 'bg-emerald-500/100 text-black'
 
               return (
                 <div
@@ -280,7 +280,7 @@ export default function KDSPage() {
                   {isDone ? (
                     <button
                       onClick={() => bump(order.id, order.mesa, order.mesero)}
-                      className="mx-3 mb-3 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-lg transition-colors min-h-[56px]"
+                      className="mx-3 mb-3 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 active:bg-emerald-700 text-white font-bold text-lg transition-colors min-h-[56px]"
                     >
                       BUMP
                     </button>
@@ -289,8 +289,8 @@ export default function KDSPage() {
                       onClick={() => advance(order.id, order.status, order.mesa, order.mesero)}
                       className={`mx-3 mb-3 py-4 rounded-xl font-bold text-lg transition-colors min-h-[56px] ${
                         isNew
-                          ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black'
-                          : 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black'
+                          ? 'bg-amber-500/100 hover:bg-amber-400 active:bg-amber-600 text-black'
+                          : 'bg-emerald-500/100 hover:bg-emerald-400 active:bg-emerald-600 text-black'
                       }`}
                     >
                       {isNew ? 'PREPARAR' : 'LISTA'}

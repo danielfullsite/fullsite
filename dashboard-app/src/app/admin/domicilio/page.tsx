@@ -71,7 +71,7 @@ export default function DomicilioPage() {
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Zonas de Domicilio" subtitle={`${zones.length} zonas configuradas`}
         action={<button onClick={() => { setModal({ ...empty }); setIsNew(true) }}
-          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+          className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
           <Plus size={16} /> Agregar zona
         </button>} />
 

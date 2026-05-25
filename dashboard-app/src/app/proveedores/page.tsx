@@ -76,7 +76,7 @@ export default function ProveedoresPage() {
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Concentracion</span></div>
-          <p className="text-2xl font-bold text-amber-600">{topPct}%</p>
+          <p className="text-2xl font-bold text-amber-400">{topPct}%</p>
           <p className="text-xs text-[var(--text-3)]">del gasto en 1 proveedor</p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function ProveedoresPage() {
               <tbody>{sorted.map((sup, i) => {
                 const pct = totalSpend > 0 ? (sup.total / totalSpend) * 100 : 0
                 return (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                     <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{sup.proveedor || sup.nombre || 'N/A'}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{sup.num_compras || '--'}</td>
@@ -106,7 +106,7 @@ export default function ProveedoresPage() {
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{pct.toFixed(1)}%</td>
                     <td className="px-4 py-3">
                       <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
-                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(pct, 100)}%` }} />
+                        <div className="h-2 rounded-full bg-blue-500/100" style={{ width: `${Math.min(pct, 100)}%` }} />
                       </div>
                     </td>
                   </tr>

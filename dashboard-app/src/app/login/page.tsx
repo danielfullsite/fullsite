@@ -82,7 +82,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
             <span className="text-[#1a1a1a] font-black text-3xl tracking-tight">
-              fullsite<span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+              fullsite<span className="inline-block w-3 h-3 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </div>
           <h2 className="text-2xl font-bold text-[var(--text-1)] mb-1">Bienvenido</h2>
@@ -122,13 +122,13 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm">{error}</div>
+              <div className="bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg px-4 py-3 text-sm">{error}</div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 text-white font-semibold text-sm rounded-lg px-4 py-3.5 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
+              className="w-full bg-emerald-500/100 text-white font-semibold text-sm rounded-lg px-4 py-3.5 hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
             >
               {loading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Ingresando...</>

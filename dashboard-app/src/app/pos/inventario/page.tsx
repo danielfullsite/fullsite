@@ -244,8 +244,8 @@ export default function InventarioPage() {
                         <div className="h-2 bg-[var(--line)] rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
-                              status === 'critical' ? 'bg-red-500' :
-                              status === 'low' ? 'bg-amber-500' : 'bg-emerald-500'
+                              status === 'critical' ? 'bg-red-500/100' :
+                              status === 'low' ? 'bg-amber-500/100' : 'bg-emerald-500/100'
                             }`}
                             style={{ width: `${pct}%` }}
                           />

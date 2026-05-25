@@ -66,13 +66,13 @@ export default function FormasPagoPage() {
     load()
   }
 
-  const commColor = (pct: number) => pct < 5 ? 'bg-emerald-100 text-emerald-700' : pct <= 20 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+  const commColor = (pct: number) => pct < 5 ? 'bg-emerald-100 text-emerald-700' : pct <= 20 ? 'bg-amber-100 text-amber-400' : 'bg-red-100 text-red-700'
 
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="Formas de Pago" subtitle={`${items.length} metodos configurados`}
         action={<button onClick={() => { setModal({ ...empty }); setIsNew(true) }}
-          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+          className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
           <Plus size={16} /> Agregar
         </button>} />
 

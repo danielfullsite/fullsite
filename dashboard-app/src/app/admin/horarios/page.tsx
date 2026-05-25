@@ -100,7 +100,7 @@ export default function AdminHorariosPage() {
     <div className="flex gap-1">
       {DAYS.map((d, i) => (
         <button key={i} type="button" onClick={() => toggleDay(i, target)}
-          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'}`}>
+          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500/100 text-white' : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'}`}>
           {d}
         </button>
       ))}
@@ -115,14 +115,14 @@ export default function AdminHorariosPage() {
         eyebrow="Admin"
         action={
           <button onClick={() => setAdding(true)}
-            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
             <Plus size={16} /> Agregar horario
           </button>
         }
       />
 
       {adding && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
           <h3 className="font-semibold text-emerald-800 mb-3">Nuevo horario</h3>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
@@ -206,7 +206,7 @@ export default function AdminHorariosPage() {
                     ) : (
                       <div className="flex gap-1 justify-end">
                         <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14} /></button>
-                        <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
+                        <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
                       </div>
                     )}
                   </td>

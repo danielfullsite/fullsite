@@ -353,7 +353,7 @@ export default function DashboardPage() {
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-[var(--surface-2)]'
+                  period === p ? 'bg-emerald-500/100 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-[var(--surface-2)]'
                 }`}
               >
                 {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
@@ -393,7 +393,7 @@ export default function DashboardPage() {
 
       {/* Quick insight */}
       {show('insight') && quickInsight && (
-        <div className="mb-4 px-4 py-2.5 bg-purple-500/100/10 border border-purple-500/30 rounded-xl">
+        <div className="mb-4 px-4 py-2.5 bg-purple-500/100/100/10 border border-purple-500/30 rounded-xl">
           <p className="text-sm text-purple-400">
             <span className="font-semibold">Hoy:</span> {quickInsight}
           </p>
@@ -425,7 +425,7 @@ export default function DashboardPage() {
           </div>
           <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 overflow-hidden">
             <div
-              className="h-2.5 rounded-full bg-emerald-500 transition-all"
+              className="h-2.5 rounded-full bg-emerald-500/100 transition-all"
               style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
             />
           </div>
@@ -493,7 +493,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-sm font-semibold text-[var(--text-1)]">Agentes IA</h3>
             <span className="ml-auto text-xs text-[var(--accent-bright)] font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100 animate-pulse" />
               26 activos
             </span>
           </div>
@@ -514,7 +514,7 @@ export default function DashboardPage() {
             ].map(agent => (
               <div key={agent.name} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  agent.status === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-400'
+                  agent.status === 'live' ? 'bg-emerald-500/100 animate-pulse' : 'bg-emerald-400'
                 }`} />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-[var(--text-1)] truncate">{agent.name}</p>
@@ -528,7 +528,7 @@ export default function DashboardPage() {
 
       {/* Week comparison banner — like Wansoft */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/100/10 border-red-500/30'}`}>
+        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/100/100/10 border-red-500/30'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               {vsLastWeek >= 0
@@ -582,10 +582,10 @@ export default function DashboardPage() {
               {topMeseros.map((m, i) => {
                 const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
                 const colors = [
-                  { bg: 'bg-blue-500/10', text: 'text-blue-400', bar: '#3b82f6' },
-                  { bg: 'bg-emerald-50', text: 'text-[var(--accent-bright)]', bar: '#10b981' },
-                  { bg: 'bg-amber-500/10', text: 'text-amber-400', bar: '#f59e0b' },
-                  { bg: 'bg-red-500/10', text: 'text-red-400', bar: '#ef4444' },
+                  { bg: 'bg-blue-500/100/10', text: 'text-blue-400', bar: '#3b82f6' },
+                  { bg: 'bg-emerald-500/10', text: 'text-[var(--accent-bright)]', bar: '#10b981' },
+                  { bg: 'bg-amber-500/100/10', text: 'text-amber-400', bar: '#f59e0b' },
+                  { bg: 'bg-red-500/100/10', text: 'text-red-400', bar: '#ef4444' },
                   { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', bar: '#94a3b8' },
                 ]
                 const color = colors[i] || colors[4]
@@ -696,7 +696,7 @@ export default function DashboardPage() {
           {/* Hora pico */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/100/10 flex items-center justify-center">
                 <Clock size={14} className="text-amber-400" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--text-1)]">Hora pico</h3>
@@ -754,10 +754,10 @@ export default function DashboardPage() {
       {/* Quick actions row */}
       {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-50' },
-          { href: '/cortes', label: 'Ver cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-          { href: '/reportes', label: 'Generar reporte', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+          { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/100/10' },
+          { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-500/10' },
+          { href: '/cortes', label: 'Ver cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/100/10' },
+          { href: '/reportes', label: 'Generar reporte', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/100/10' },
         ].map(action => {
           const ActionIcon = action.icon
           return (
