@@ -169,7 +169,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+          <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -328,11 +328,11 @@ export default function DashboardPage() {
       {/* Page header with period selector + settings */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del dia' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {latestDay && (
-            <span className="text-sm text-slate-400">
+            <span className="text-sm text-[var(--text-3)]">
               {formatDate(latestDay.fecha)}
             </span>
           )}
@@ -341,7 +341,7 @@ export default function DashboardPage() {
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-              showSettings ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              showSettings ? 'bg-slate-900 text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
             }`}
             title="Personalizar dashboard"
           >
@@ -353,7 +353,7 @@ export default function DashboardPage() {
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-slate-800'
                 }`}
               >
                 {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
@@ -365,10 +365,10 @@ export default function DashboardPage() {
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (
-        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-in slide-in-from-top-2">
+        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 animate-in slide-in-from-top-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-900">Personalizar dashboard</h3>
-            <button onClick={() => setShowSettings(false)} className="text-xs text-slate-400 hover:text-slate-600">
+            <h3 className="text-sm font-bold text-[var(--text-1)]">Personalizar dashboard</h3>
+            <button onClick={() => setShowSettings(false)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-2)]">
               Cerrar
             </button>
           </div>
@@ -380,7 +380,7 @@ export default function DashboardPage() {
                 className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
                   widgets[w.id]
                     ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                    : 'bg-slate-50 border border-slate-200 text-slate-400'
+                    : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)]'
                 }`}
               >
                 {widgets[w.id] ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -402,28 +402,28 @@ export default function DashboardPage() {
 
       {/* Month progress */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm px-5 py-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Target size={16} className="text-emerald-600" />
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-[var(--text-1)]">
                 {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {new Date(latestDay!.fecha).getFullYear()}
               </span>
             </div>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-[var(--text-3)]">
               Día {monthProgress.dayOfMonth} de {monthProgress.daysInMonth} · {monthProgress.daysLeft} días restantes
             </span>
           </div>
           <div className="flex items-end gap-4 mb-2">
             <div>
-              <span className="text-2xl font-bold text-slate-900">{formatCurrency(monthProgress.monthVentas)}</span>
+              <span className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(monthProgress.monthVentas)}</span>
             </div>
-            <div className="text-xs text-slate-400 pb-1">
-              Proyección: <span className="font-semibold text-slate-600">{formatCurrency(monthProgress.projected)}</span>
-              {' · '}Prom. diario: <span className="font-semibold text-slate-600">{formatCurrency(monthProgress.dailyAvg)}</span>
+            <div className="text-xs text-[var(--text-3)] pb-1">
+              Proyección: <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.projected)}</span>
+              {' · '}Prom. diario: <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+          <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 overflow-hidden">
             <div
               className="h-2.5 rounded-full bg-emerald-500 transition-all"
               style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
@@ -470,28 +470,28 @@ export default function DashboardPage() {
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
       {show('extra_kpis') && <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
-          <p className="text-xs text-slate-500 font-medium mb-1">Propinas</p>
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Propinas</p>
           <p className="text-xl font-bold text-emerald-600">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
-          <p className="text-xs text-slate-500 font-medium mb-1">Descuentos</p>
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Descuentos</p>
           <p className="text-xl font-bold text-red-500">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
-          <p className="text-xs text-slate-500 font-medium mb-1">Ventas brutas</p>
-          <p className="text-xl font-bold text-slate-900">{formatCurrency(periodData.brutas)}</p>
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Ventas brutas</p>
+          <p className="text-xl font-bold text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
         </div>
       </div>}
 
       {/* Agent Status Widget */}
       {show('agent_status') && (
-        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
               <Bot size={14} className="text-violet-600" />
             </div>
-            <h3 className="text-sm font-semibold text-slate-900">Agentes IA</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Agentes IA</h3>
             <span className="ml-auto text-xs text-emerald-600 font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               26 activos
@@ -512,13 +512,13 @@ export default function DashboardPage() {
               { name: 'Merma', time: 'Semanal', status: 'ok' },
               { name: 'Orquestador', time: '24/7', status: 'live' },
             ].map(agent => (
-              <div key={agent.name} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+              <div key={agent.name} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                   agent.status === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-400'
                 }`} />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{agent.name}</p>
-                  <p className="text-[10px] text-slate-400">{agent.time}</p>
+                  <p className="text-xs font-medium text-[var(--text-1)] truncate">{agent.name}</p>
+                  <p className="text-[10px] text-[var(--text-3)]">{agent.time}</p>
                 </div>
               </div>
             ))}
@@ -538,14 +538,14 @@ export default function DashboardPage() {
                 <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                   {formatPercent(vsLastWeek)} vs mismo dia semana pasada
                 </p>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-[var(--text-2)]">
                   {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {sameDayLastWeek.fecha}
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-slate-500">Semana pasada</p>
-              <p className="font-semibold text-slate-700">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
+              <p className="text-sm text-[var(--text-2)]">Semana pasada</p>
+              <p className="font-semibold text-[var(--text-1)]">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
             </div>
           </div>
         </div>
@@ -565,18 +565,18 @@ export default function DashboardPage() {
       {/* Two columns: Top meseros + Categories */}
       {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Top meseros — R365 style with progress bars */}
-        {show('top_meseros') && <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        {show('top_meseros') && <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
               <Award size={14} className="text-emerald-600" />
             </div>
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">
               Top meseros del día
             </h3>
           </div>
-          <p className="text-xs text-slate-400 mb-5 ml-9">Ranking por ventas</p>
+          <p className="text-xs text-[var(--text-3)] mb-5 ml-9">Ranking por ventas</p>
           {topMeseros.length === 0 ? (
-            <p className="text-slate-400 text-sm">Sin datos de meseros</p>
+            <p className="text-[var(--text-3)] text-sm">Sin datos de meseros</p>
           ) : (
             <div className="space-y-4">
               {topMeseros.map((m, i) => {
@@ -586,7 +586,7 @@ export default function DashboardPage() {
                   { bg: 'bg-emerald-50', text: 'text-emerald-600', bar: '#10b981' },
                   { bg: 'bg-amber-50', text: 'text-amber-600', bar: '#f59e0b' },
                   { bg: 'bg-red-50', text: 'text-red-500', bar: '#ef4444' },
-                  { bg: 'bg-slate-50', text: 'text-slate-500', bar: '#94a3b8' },
+                  { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', bar: '#94a3b8' },
                 ]
                 const color = colors[i] || colors[4]
                 return (
@@ -598,15 +598,15 @@ export default function DashboardPage() {
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
+                        <p className="text-sm font-medium text-[var(--text-1)] truncate">
                           {m.nombre}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                      <p className="text-sm font-semibold text-[var(--text-1)] tabular-nums">
                         {formatCurrency(m.total)}
                       </p>
                     </div>
-                    <div className="ml-10 w-auto bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="ml-10 w-auto bg-[var(--line-soft)] rounded-full h-1.5 overflow-hidden">
                       <div
                         className="h-1.5 rounded-full animate-progress"
                         style={{
@@ -631,16 +631,16 @@ export default function DashboardPage() {
 
       {/* Payment methods */}
       {show('payment_methods') && <div className="mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
               <CreditCard size={14} className="text-violet-600" />
             </div>
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">
               Métodos de pago
             </h3>
           </div>
-          <p className="text-xs text-slate-400 mb-5 ml-9">
+          <p className="text-xs text-[var(--text-3)] mb-5 ml-9">
             {latestDay ? formatCurrency(latestDay.ventas_dia) : '-'} total
           </p>
           {paymentMethods.length > 0 ? (
@@ -651,25 +651,25 @@ export default function DashboardPage() {
                 const barWidth = paymentMax > 0 ? ((p.total / paymentMax) * 100) : 0
                 const barColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
                 return (
-                  <div key={p.nombre} className="bg-slate-50 rounded-lg p-4">
+                  <div key={p.nombre} className="bg-[var(--surface-2)] rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div
                           className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: barColors[i % barColors.length] }}
                         />
-                        <span className="text-sm font-medium text-slate-700">
+                        <span className="text-sm font-medium text-[var(--text-1)]">
                           {p.nombre}
                         </span>
                       </div>
-                      <span className="text-xs text-slate-400 font-medium">
+                      <span className="text-xs text-[var(--text-3)] font-medium">
                         {pct}%
                       </span>
                     </div>
-                    <p className="text-lg font-bold text-slate-900 tabular-nums mb-2">
+                    <p className="text-lg font-bold text-[var(--text-1)] tabular-nums mb-2">
                       {formatCurrency(p.total)}
                     </p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-[var(--line)] rounded-full h-1.5 overflow-hidden">
                       <div
                         className="h-1.5 rounded-full animate-progress"
                         style={{
@@ -684,7 +684,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex items-center justify-center py-8">
-              <p className="text-slate-400 text-sm">Sin datos de pagos para este día</p>
+              <p className="text-[var(--text-3)] text-sm">Sin datos de pagos para este día</p>
             </div>
           )}
         </div>
@@ -694,15 +694,15 @@ export default function DashboardPage() {
       {show('hora_pico') && latestDay && (
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Hora pico */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
                 <Clock size={14} className="text-amber-600" />
               </div>
-              <h3 className="text-sm font-semibold text-slate-900">Hora pico</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-1)]">Hora pico</h3>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-900">
+              <span className="text-3xl font-bold text-[var(--text-1)]">
                 {(() => {
                   const peak = recentData.slice(-7).reduce((best, d) => {
                     const m = d.meseros as unknown as Array<{ nombre: string; total: number }>
@@ -712,27 +712,27 @@ export default function DashboardPage() {
                   return peak.fecha ? new Date(peak.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long' }) : '-'
                 })()}
               </span>
-              <span className="text-sm text-slate-400">mejor dia (7d)</span>
+              <span className="text-sm text-[var(--text-3)]">mejor dia (7d)</span>
             </div>
             <div className="mt-3 flex items-center gap-4 text-sm">
               <div>
-                <span className="text-slate-400">Mesas/dia:</span>
-                <span className="ml-1 font-semibold text-slate-700">{latestDay.mesas_atendidas || 0}</span>
+                <span className="text-[var(--text-3)]">Mesas/dia:</span>
+                <span className="ml-1 font-semibold text-[var(--text-1)]">{latestDay.mesas_atendidas || 0}</span>
               </div>
               <div>
-                <span className="text-slate-400">Para llevar:</span>
-                <span className="ml-1 font-semibold text-slate-700">{latestDay.ordenes_llevar || 0}</span>
+                <span className="text-[var(--text-3)]">Para llevar:</span>
+                <span className="ml-1 font-semibold text-[var(--text-1)]">{latestDay.ordenes_llevar || 0}</span>
               </div>
             </div>
           </div>
 
           {/* Efficiency metrics */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-cyan-50 flex items-center justify-center">
                 <Activity size={14} className="text-cyan-600" />
               </div>
-              <h3 className="text-sm font-semibold text-slate-900">Eficiencia del dia</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-1)]">Eficiencia del dia</h3>
             </div>
             <div className="space-y-3">
               {[
@@ -742,8 +742,8 @@ export default function DashboardPage() {
                 { label: 'Descuento %', value: `${((latestDay.descuentos || 0) / Math.max(latestDay.ventas_brutas || 1, 1) * 100).toFixed(1)}%` },
               ].map(m => (
                 <div key={m.label} className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500">{m.label}</span>
-                  <span className="text-sm font-semibold text-slate-900 tabular-nums">{m.value}</span>
+                  <span className="text-sm text-[var(--text-2)]">{m.label}</span>
+                  <span className="text-sm font-semibold text-[var(--text-1)] tabular-nums">{m.value}</span>
                 </div>
               ))}
             </div>
@@ -764,15 +764,15 @@ export default function DashboardPage() {
             <Link
               key={action.href}
               href={action.href}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md hover:border-slate-300 transition-all group"
+              className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 hover:shadow-md hover:border-[var(--line)] transition-all group"
             >
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${action.bg}`}>
                 <ActionIcon size={18} className={action.color} />
               </div>
-              <p className="text-sm font-semibold text-slate-900 mb-0.5">{action.label}</p>
+              <p className="text-sm font-semibold text-[var(--text-1)] mb-0.5">{action.label}</p>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-slate-400">{action.desc}</p>
-                <ArrowRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
+                <p className="text-xs text-[var(--text-3)]">{action.desc}</p>
+                <ArrowRight size={14} className="text-slate-300 group-hover:text-[var(--text-2)] transition-colors" />
               </div>
             </Link>
           )

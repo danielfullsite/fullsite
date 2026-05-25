@@ -33,21 +33,21 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
   const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+    <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">{title || 'Ventas'}</h3>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(total)}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{chartData.length} dias</p>
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">{title || 'Ventas'}</h3>
+          <p className="text-2xl font-bold text-[var(--text-1)] mt-1">{formatCurrency(total)}</p>
+          <p className="text-xs text-[var(--text-3)] mt-0.5">{chartData.length} dias</p>
         </div>
         <div className="flex gap-4 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-slate-500">Max: {formatCurrency(maxVal)}</span>
+            <span className="text-[var(--text-2)]">Max: {formatCurrency(maxVal)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-            <span className="text-slate-500">Min: {formatCurrency(minVal)}</span>
+            <span className="text-[var(--text-2)]">Min: {formatCurrency(minVal)}</span>
           </div>
         </div>
       </div>
