@@ -207,16 +207,14 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger — only show when sidebar is closed */}
-      {!mobileOpen && (
-        <button
-          className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
-          style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
-          onClick={() => setMobileOpen(true)}
-        >
-          <Menu size={20} />
-        </button>
-      )}
+      {/* Mobile hamburger / close */}
+      <button
+        className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
+        style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+        onClick={() => setMobileOpen(!mobileOpen)}
+      >
+        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
 
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -234,7 +232,7 @@ export default function Sidebar() {
       {/* Mobile sidebar — slide in */}
       <div
         className={`lg:hidden fixed top-0 left-0 h-full z-40 transition-transform duration-200 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1px)]'
         }`}
       >
         {sidebarContent}
