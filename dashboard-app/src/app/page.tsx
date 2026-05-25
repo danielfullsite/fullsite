@@ -341,19 +341,19 @@ export default function DashboardPage() {
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-              showSettings ? 'bg-slate-900 text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
+              showSettings ? 'bg-[var(--surface)] text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
             }`}
             title="Personalizar dashboard"
           >
             <Settings size={18} />
           </button>
-          <div className="flex bg-slate-900 rounded-xl p-1 gap-1">
+          <div className="flex bg-[var(--surface)] rounded-xl p-1 gap-1">
             {(['dia', 'semana', 'mes'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-slate-800'
+                  period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-[var(--surface-2)]'
                 }`}
               >
                 {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
@@ -379,7 +379,7 @@ export default function DashboardPage() {
                 onClick={() => toggleWidget(w.id)}
                 className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
                   widgets[w.id]
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    ? 'bg-[var(--accent-soft)] border border-[var(--accent-line)] text-[var(--accent-bright)]'
                     : 'bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-3)]'
                 }`}
               >
@@ -393,8 +393,8 @@ export default function DashboardPage() {
 
       {/* Quick insight */}
       {show('insight') && quickInsight && (
-        <div className="mb-4 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl">
-          <p className="text-sm text-violet-800">
+        <div className="mb-4 px-4 py-2.5 bg-purple-500/100/10 border border-purple-500/30 rounded-xl">
+          <p className="text-sm text-purple-400">
             <span className="font-semibold">Hoy:</span> {quickInsight}
           </p>
         </div>
@@ -405,7 +405,7 @@ export default function DashboardPage() {
         <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm px-5 py-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Target size={16} className="text-emerald-600" />
+              <Target size={16} className="text-[var(--accent-bright)]" />
               <span className="text-sm font-semibold text-[var(--text-1)]">
                 {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {new Date(latestDay!.fecha).getFullYear()}
               </span>
@@ -472,11 +472,11 @@ export default function DashboardPage() {
       {show('extra_kpis') && <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Propinas</p>
-          <p className="text-xl font-bold text-emerald-600">{formatCurrency(periodData.propinas)}</p>
+          <p className="text-xl font-bold text-[var(--accent-bright)]">{formatCurrency(periodData.propinas)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Descuentos</p>
-          <p className="text-xl font-bold text-red-500">{formatCurrency(periodData.descuentos)}</p>
+          <p className="text-xl font-bold text-red-400">{formatCurrency(periodData.descuentos)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Ventas brutas</p>
@@ -488,11 +488,11 @@ export default function DashboardPage() {
       {show('agent_status') && (
         <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
               <Bot size={14} className="text-violet-600" />
             </div>
             <h3 className="text-sm font-semibold text-[var(--text-1)]">Agentes IA</h3>
-            <span className="ml-auto text-xs text-emerald-600 font-medium flex items-center gap-1">
+            <span className="ml-auto text-xs text-[var(--accent-bright)] font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               26 activos
             </span>
@@ -528,14 +528,14 @@ export default function DashboardPage() {
 
       {/* Week comparison banner — like Wansoft */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/100/10 border-red-500/30'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               {vsLastWeek >= 0
-                ? <TrendingUp size={20} className="text-emerald-600" />
+                ? <TrendingUp size={20} className="text-[var(--accent-bright)]" />
                 : <TrendingDown size={20} className="text-red-600" />}
               <div>
-                <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-[var(--accent-bright)]' : 'text-red-400'}`}>
                   {formatPercent(vsLastWeek)} vs mismo dia semana pasada
                 </p>
                 <p className="text-sm text-[var(--text-2)]">
@@ -567,8 +567,8 @@ export default function DashboardPage() {
         {/* Top meseros — R365 style with progress bars */}
         {show('top_meseros') && <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <Award size={14} className="text-emerald-600" />
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Award size={14} className="text-[var(--accent-bright)]" />
             </div>
             <h3 className="text-sm font-semibold text-[var(--text-1)]">
               Top meseros del día
@@ -582,10 +582,10 @@ export default function DashboardPage() {
               {topMeseros.map((m, i) => {
                 const barWidth = topMeseroMax > 0 ? ((m.total / topMeseroMax) * 100) : 0
                 const colors = [
-                  { bg: 'bg-blue-50', text: 'text-blue-600', bar: '#3b82f6' },
-                  { bg: 'bg-emerald-50', text: 'text-emerald-600', bar: '#10b981' },
-                  { bg: 'bg-amber-50', text: 'text-amber-600', bar: '#f59e0b' },
-                  { bg: 'bg-red-50', text: 'text-red-500', bar: '#ef4444' },
+                  { bg: 'bg-blue-500/10', text: 'text-blue-400', bar: '#3b82f6' },
+                  { bg: 'bg-emerald-50', text: 'text-[var(--accent-bright)]', bar: '#10b981' },
+                  { bg: 'bg-amber-500/10', text: 'text-amber-400', bar: '#f59e0b' },
+                  { bg: 'bg-red-500/10', text: 'text-red-400', bar: '#ef4444' },
                   { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', bar: '#94a3b8' },
                 ]
                 const color = colors[i] || colors[4]
@@ -633,7 +633,7 @@ export default function DashboardPage() {
       {show('payment_methods') && <div className="mb-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
               <CreditCard size={14} className="text-violet-600" />
             </div>
             <h3 className="text-sm font-semibold text-[var(--text-1)]">
@@ -696,8 +696,8 @@ export default function DashboardPage() {
           {/* Hora pico */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
-                <Clock size={14} className="text-amber-600" />
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Clock size={14} className="text-amber-400" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--text-1)]">Hora pico</h3>
             </div>
@@ -729,8 +729,8 @@ export default function DashboardPage() {
           {/* Efficiency metrics */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-cyan-50 flex items-center justify-center">
-                <Activity size={14} className="text-cyan-600" />
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                <Activity size={14} className="text-cyan-400" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--text-1)]">Eficiencia del dia</h3>
             </div>
@@ -754,10 +754,10 @@ export default function DashboardPage() {
       {/* Quick actions row */}
       {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { href: '/cortes', label: 'Ver cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { href: '/reportes', label: 'Generar reporte', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+          { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-50' },
+          { href: '/cortes', label: 'Ver cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+          { href: '/reportes', label: 'Generar reporte', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/10' },
         ].map(action => {
           const ActionIcon = action.icon
           return (
@@ -772,7 +772,7 @@ export default function DashboardPage() {
               <p className="text-sm font-semibold text-[var(--text-1)] mb-0.5">{action.label}</p>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-[var(--text-3)]">{action.desc}</p>
-                <ArrowRight size={14} className="text-slate-300 group-hover:text-[var(--text-2)] transition-colors" />
+                <ArrowRight size={14} className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors" />
               </div>
             </Link>
           )
