@@ -6,7 +6,7 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, aggregateMeseros } from '@/lib/data'
+import { getRecentDays, getLatestDay, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 
@@ -125,6 +125,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>('dia')
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
+  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -155,6 +156,9 @@ export default function DashboardPage() {
             setPrevDay(recent[recent.length - 2])
           }
         }
+        // Load agent runs
+        const runs = await getLatestAgentRuns()
+        setAgentRuns(runs)
       } catch (err) {
         console.error('Error loading dashboard data:', err)
       } finally {
@@ -484,45 +488,74 @@ export default function DashboardPage() {
         </div>
       </div>}
 
-      {/* Agent Status Widget */}
+      {/* Agent Status Widget — real data from agent_runs */}
       {show('agent_status') && (
         <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <Bot size={14} className="text-violet-600" />
+              <Bot size={14} className="text-purple-400" />
             </div>
             <h3 className="text-sm font-semibold text-[var(--text-1)]">Agentes IA</h3>
             <span className="ml-auto text-xs text-[var(--accent-bright)] font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100 animate-pulse" />
-              26 activos
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {agentRuns.length} activos
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { name: 'Briefing', time: '7:00 AM', status: 'ok' },
-              { name: 'Anomalias', time: '2/4/6 PM', status: 'ok' },
-              { name: 'Anti-fraude', time: 'Viernes', status: 'ok' },
-              { name: 'KB 24/7', time: 'On-demand', status: 'live' },
-              { name: 'Menu Eng.', time: 'Lunes', status: 'ok' },
-              { name: 'Staffing', time: 'Lunes', status: 'ok' },
-              { name: 'Upselling', time: '2/4/6 PM', status: 'ok' },
-              { name: 'Propinas', time: 'Viernes', status: 'ok' },
-              { name: 'Velocidad', time: '4:00 PM', status: 'ok' },
-              { name: 'Auto-orden', time: '9:00 AM', status: 'ok' },
-              { name: 'Merma', time: 'Semanal', status: 'ok' },
-              { name: 'Orquestador', time: '24/7', status: 'live' },
-            ].map(agent => (
-              <div key={agent.name} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  agent.status === 'live' ? 'bg-emerald-500/100 animate-pulse' : 'bg-emerald-400'
-                }`} />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-[var(--text-1)] truncate">{agent.name}</p>
-                  <p className="text-[10px] text-[var(--text-3)]">{agent.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {agentRuns.length === 0 ? (
+            <p className="text-[var(--text-3)] text-sm">Cargando datos de agentes...</p>
+          ) : (
+            <div className="space-y-1.5">
+              {agentRuns.slice(0, 8).map(run => {
+                const agentNames: Record<string, string> = {
+                  'anomaly-detector': 'Anomalias',
+                  'close-predictor': 'Prediccion',
+                  'upselling': 'Upselling',
+                  'menu-engineering': 'Menu Eng.',
+                  'staffing-optimizer': 'Staffing',
+                  'antifraud-agent': 'Anti-fraude',
+                  'kitchen-quality': 'Cocina',
+                  'tips-analyzer': 'Propinas',
+                  'supplier-monitor': 'Proveedores',
+                  'waste-detector': 'Merma',
+                  'daily-briefing': 'Briefing',
+                  'weekly-amalay': 'Semanal',
+                  'reservas-pendientes': 'Reservas',
+                  'wansoft-staleness': 'Sync',
+                  'config-validator': 'Config',
+                  'intraday-sales': 'Intraday',
+                  'speed_of_service': 'Velocidad',
+                  'inventory_auto_order': 'Auto-orden',
+                  'pos_daily_aggregator': 'Agregador',
+                  'proactive-alerts': 'Alertas',
+                  'climate-events': 'Clima',
+                  'hermes': 'Hermes',
+                  'table-time': 'Mesas',
+                  'menu-gap': 'Menu Gap',
+                }
+                const name = agentNames[run.agent_id] || run.agent_id
+                const isError = run.status === 'error'
+                const mins = Math.floor((Date.now() - new Date(run.created_at).getTime()) / 60000)
+                const timeAgo = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
+                return (
+                  <div key={run.agent_id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-[var(--text-1)]">{name}</p>
+                        <span className="text-[10px] text-[var(--text-4)]">{timeAgo}</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-3)] truncate">{run.output_summary}</p>
+                    </div>
+                  </div>
+                )
+              })}
+              {agentRuns.length > 8 && (
+                <a href="/agentes" className="block text-center text-xs text-[var(--accent)] hover:text-[var(--accent-bright)] py-1">
+                  Ver los {agentRuns.length} agentes →
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
 
