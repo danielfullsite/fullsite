@@ -40,7 +40,10 @@ function getPresetDates(preset: Preset): { from: string; to: string } {
     }
     case 'semana': {
       const start = new Date(today)
-      start.setDate(start.getDate() - start.getDay() + 1)
+      const dow = start.getDay()
+      // getDay: 0=Sun, 1=Mon... If Sunday, go back 6 days to Monday
+      const daysBack = dow === 0 ? 6 : dow - 1
+      start.setDate(start.getDate() - daysBack)
       return { from: fmt(start), to: fmt(today) }
     }
     case 'mes': {
