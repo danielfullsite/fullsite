@@ -213,7 +213,7 @@ export interface AgentRun {
 }
 
 export async function getLatestAgentRuns(): Promise<AgentRun[]> {
-  const rows = await sbFetch('agent_runs', 'select=agent_id,status,output_summary,trigger_type,created_at&client_id=eq.amalay&order=created_at.desc&limit=100')
+  const rows = await sbFetch('agent_runs', 'select=agent_id,status,output_summary,trigger_type,created_at&order=created_at.desc&limit=100')
   const map = new Map<string, AgentRun>()
   for (const row of rows as AgentRun[]) {
     if (!map.has(row.agent_id)) {
