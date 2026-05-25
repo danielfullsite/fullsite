@@ -121,9 +121,9 @@ export function aggregateMeseros(
 export async function getDateRange(from: string, to: string): Promise<WansoftDaily[]> {
   const data = await sbFetch(
     'wansoft_daily',
-    `select=*&fecha=gte.${from}&fecha=lte.${to}&order=fecha.asc`
+    `select=*&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
-  return dedupeByFecha(data).filter(d => (d.ventas_dia as number) > 0).map(parseRow)
+  return dedupeByFecha(data).map(parseRow)
 }
 
 // Aggregate payment methods across days
