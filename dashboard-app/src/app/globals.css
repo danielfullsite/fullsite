@@ -127,10 +127,11 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-surface);
-  color: var(--color-text);
+  background: var(--bg);
+  color: var(--text-1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Smooth transitions globally */
@@ -141,8 +142,8 @@ a, button {
 /* ========== SIDEBAR ========== */
 .sidebar {
   width: 240px;
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -160,19 +161,19 @@ a, button {
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--text-2);
   transition: all 0.15s ease;
   position: relative;
 }
 
 .sidebar-nav-item:hover {
-  color: #1e293b;
-  background: #f8fafc;
+  color: var(--text-1);
+  background: var(--surface-2);
 }
 
 .sidebar-nav-item.active {
-  color: #3b82f6;
-  background: #eff6ff;
+  color: var(--accent);
+  background: var(--accent-soft);
   font-weight: 600;
 }
 
@@ -184,7 +185,7 @@ a, button {
   bottom: 4px;
   width: 4px;
   border-radius: 0 4px 4px 0;
-  background: #3b82f6;
+  background: var(--accent);
 }
 
 .sidebar-section-label {
@@ -192,21 +193,21 @@ a, button {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: var(--text-3);
   padding: 16px 12px 6px;
 }
 
 /* ========== CARDS ========== */
 .dash-card {
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
   transition: box-shadow 0.2s ease;
 }
 
 .dash-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-mid);
 }
 
 /* ========== KPI ACCENT BORDERS ========== */
@@ -310,12 +311,12 @@ a, button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--line);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--accent-line);
 }
 
 .scrollbar-hide {
@@ -375,14 +376,14 @@ a, button {
 
 /* premium-card kept for backward compat on sub-pages */
 .premium-card {
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
   transition: box-shadow 0.2s ease;
 }
 .premium-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-mid);
 }
 
 /* Print styles for PDF export */

@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect } from 'react'
 import { isPushSupported, getPushPermission, subscribeToPush, unsubscribeFromPush, getExistingSubscription } from '@/lib/push-notifications'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const mainNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -93,12 +94,12 @@ export default function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60" style={{ backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)' }}>
+    <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-[var(--line)]" style={{ background: 'color-mix(in srgb, var(--bg) 80%, transparent)' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-14 justify-between">
         <div className="flex items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center shrink-0 mr-6 logo-hover">
-            <span className="text-[#1a1a1a] font-black text-xl tracking-tight">
+            <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
               fullsite<span className="logo-dot inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </Link>
@@ -117,11 +118,14 @@ export default function TopNav() {
         {/* Right side: date + user info + logout */}
         <div className="flex items-center gap-3 shrink-0">
           {/* Date indicator with live pulse */}
-          <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-50/80 px-2.5 py-1.5 rounded-md border border-slate-100">
+          <div className="hidden md:flex items-center gap-2 text-xs text-[var(--text-3)] bg-[var(--surface-2)] px-2.5 py-1.5 rounded-md border border-[var(--line-soft)]">
             <div className="pulse-dot" />
             <Calendar size={12} />
             <span className="font-medium">{getTodayFormatted()}</span>
           </div>
+
+          {/* Theme toggle */}
+          <ThemeToggle />
 
           {/* Push notification toggle */}
           {pushSupported && (

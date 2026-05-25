@@ -16,10 +16,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className="h-full">
+    <html lang="es" className="h-full" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}})();` }} />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
         <link rel="manifest" href="/manifest.json" />
@@ -29,7 +30,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Fullsite" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className="h-full bg-surface">
+      <body className="h-full" style={{ background: 'var(--bg)', color: 'var(--text-1)' }}>
         <PosthogInit />
         <AuthProvider>
           <AppShell>{children}</AppShell>
