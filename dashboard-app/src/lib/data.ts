@@ -12,7 +12,7 @@ async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
     },
   })
   if (!res.ok) {
-    if (res.status !== 400) console.error(`Supabase fetch error: ${res.status} ${table}`)
+    console.error(`Supabase fetch error: ${res.status} ${table}`, await res.text().catch(() => ''))
     return []
   }
   return res.json()

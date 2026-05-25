@@ -140,12 +140,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="h-screen flex items-center justify-center bg-[var(--surface)] text-white">
+    <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-6">
           <span className="text-white font-black text-2xl tracking-tight">
             fullsite
-            <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-1" />
+            <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-1" />
           </span>
           <p className="text-[var(--text-3)] text-sm mt-1">POS — Ingresa tu PIN</p>
         </div>
