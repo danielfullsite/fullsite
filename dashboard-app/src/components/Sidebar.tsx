@@ -126,8 +126,8 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-[var(--line)]" style={{ background: 'var(--surface)' }}>
-      {/* Logo — pl-10 on mobile to avoid hamburger X overlap */}
-      <div className="px-5 py-5 pl-14 lg:pl-5 border-b border-[var(--line-soft)]">
+      {/* Logo */}
+      <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]">
         <Link href="/" className="flex items-center logo-hover">
           <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
             fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
@@ -207,14 +207,16 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
-        style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
+      {/* Mobile hamburger — only show when sidebar is closed */}
+      {!mobileOpen && (
+        <button
+          className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
+          style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+          onClick={() => setMobileOpen(true)}
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* Mobile overlay */}
       {mobileOpen && (
