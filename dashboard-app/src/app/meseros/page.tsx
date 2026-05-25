@@ -52,7 +52,7 @@ type SortDir = 'asc' | 'desc'
 const MEDAL_COLORS: Record<number, { bg: string; text: string; icon: string }> = {
   0: { bg: 'bg-amber-100', text: 'text-amber-400', icon: '1' },
   1: { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', icon: '2' },
-  2: { bg: 'bg-orange-100', text: 'text-orange-700', icon: '3' },
+  2: { bg: 'bg-orange-500/15', text: 'text-orange-400', icon: '3' },
 }
 
 interface WaiterKpi {

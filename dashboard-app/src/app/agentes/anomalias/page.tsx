@@ -85,11 +85,11 @@ export default function AnomaliasPage() {
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Total anomalías</p>
           <p className="text-2xl font-bold text-[var(--text-1)]">{anomalies.length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/10/30">
-          <p className="text-xs text-red-600 font-medium mb-1">Alta prioridad</p>
-          <p className="text-2xl font-bold text-red-600">{critical.length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/8">
+          <p className="text-xs text-red-400 font-medium mb-1">Alta prioridad</p>
+          <p className="text-2xl font-bold text-red-400">{critical.length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/10/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/8">
           <p className="text-xs text-amber-400 font-medium mb-1">Media prioridad</p>
           <p className="text-2xl font-bold text-amber-400">{warning.length}</p>
         </div>
@@ -106,23 +106,23 @@ export default function AnomaliasPage() {
                   const isHigh = sev === 'high' || sev === 'critical' || sev === 'alta'
                   const isMed = sev === 'medium' || sev === 'warning' || sev === 'media'
                   return (
-                    <div key={i} className={`px-5 py-4 ${isHigh ? 'bg-red-500/100/10' : isMed ? 'bg-amber-500/10/30' : ''}`}>
+                    <div key={i} className={`px-5 py-4 ${isHigh ? 'bg-red-500/8' : isMed ? 'bg-amber-500/8' : ''}`}>
                       <div className="flex items-start gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isHigh ? 'bg-red-100' : isMed ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isHigh ? 'bg-red-500/15' : isMed ? 'bg-amber-500/15' : 'bg-blue-500/15'}`}>
                           <AlertTriangle size={16} className={isHigh ? 'text-red-500' : isMed ? 'text-amber-500' : 'text-blue-500'} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-bold text-[var(--text-3)] uppercase">{a.type || 'anomalía'}</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              isHigh ? 'bg-red-500/100 text-white' : isMed ? 'bg-amber-100 text-amber-400' : 'bg-[var(--surface-2)] text-[var(--text-2)]'
+                              isHigh ? 'bg-red-500 text-white' : isMed ? 'bg-amber-500/15 text-amber-400' : 'bg-[var(--surface-2)] text-[var(--text-2)]'
                             }`}>{sev}</span>
                           </div>
                           <p className="text-sm text-[var(--text-1)] leading-relaxed">{a.message || a.metrica || 'Sin detalle'}</p>
                           {a.actual !== undefined && a.esperado !== undefined && (
                             <p className="text-xs text-[var(--text-3)] mt-1">
                               Actual: {typeof a.actual === 'number' ? `$${a.actual.toLocaleString('es-MX')}` : a.actual} · Esperado: {typeof a.esperado === 'number' ? `$${a.esperado.toLocaleString('es-MX')}` : a.esperado}
-                              {a.diferencia_pct !== undefined && <span className={`ml-2 font-bold ${isHigh ? 'text-red-600' : 'text-amber-400'}`}>{a.diferencia_pct > 0 ? '+' : ''}{a.diferencia_pct.toFixed(0)}%</span>}
+                              {a.diferencia_pct !== undefined && <span className={`ml-2 font-bold ${isHigh ? 'text-red-400' : 'text-amber-400'}`}>{a.diferencia_pct > 0 ? '+' : ''}{a.diferencia_pct.toFixed(0)}%</span>}
                             </p>
                           )}
                         </div>

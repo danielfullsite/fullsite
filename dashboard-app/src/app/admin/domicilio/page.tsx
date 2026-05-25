@@ -119,7 +119,7 @@ export default function DomicilioPage() {
                   CP: {zone.postal_codes || '---'}
                 </p>
                 <button onClick={() => toggleActive(zone)}
-                  className={`text-xs font-semibold px-2 py-1 rounded-full ${zone.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  className={`text-xs font-semibold px-2 py-1 rounded-full ${zone.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                   {zone.active ? 'Activa' : 'Inactiva'}
                 </button>
               </div>

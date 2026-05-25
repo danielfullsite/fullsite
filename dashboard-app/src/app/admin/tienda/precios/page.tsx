@@ -25,7 +25,7 @@ function tierLabel(p: number) {
   return '$0-49'
 }
 const TIERS = ['$0-49', '$50-99', '$100-199', '$200-499', '$500+']
-const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-[var(--surface-2)] text-[var(--text-1)]', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-400', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
+const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-[var(--surface-2)] text-[var(--text-1)]', '$50-99': 'bg-blue-500/15 text-blue-400', '$100-199': 'bg-amber-500/15 text-amber-400', '$200-499': 'bg-purple-500/15 text-purple-400', '$500+': 'bg-emerald-500/15 text-emerald-400' }
 
 export default function PreciosPage() {
   const CLIENT_ID = useClientId()

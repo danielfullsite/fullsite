@@ -416,17 +416,17 @@ export default function VentasPage() {
             <>
               <div className="mt-2 mb-4 flex items-center gap-2">
                 <ShieldAlert size={20} className="text-red-500" />
-                <h2 className="text-lg font-bold text-red-700">Control y Anti-Fraude</h2>
+                <h2 className="text-lg font-bold text-red-400">Control y Anti-Fraude</h2>
               </div>
 
               {/* Anti-fraud KPI cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-5 text-center">
-                  <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <div className="w-9 h-9 bg-red-500/15 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <XCircle size={18} className="text-red-500" />
                   </div>
                   <p className="text-xs font-medium text-red-600 uppercase tracking-wider mb-1">Cancelaciones</p>
-                  <p className="text-2xl font-bold text-red-700">{cancelaciones.length}</p>
+                  <p className="text-2xl font-bold text-red-400">{cancelaciones.length}</p>
                   <p className="text-xs text-red-400 mt-1">
                     {formatCurrency(cancelaciones.reduce((s, c) => s + (c.total || 0), 0))} total
                   </p>
@@ -442,11 +442,11 @@ export default function VentasPage() {
                   </p>
                 </div>
                 <div className="bg-orange-500/10 rounded-xl border border-orange-500/20 p-5 text-center">
-                  <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <div className="w-9 h-9 bg-orange-500/15 rounded-lg flex items-center justify-center mx-auto mb-3">
                     <HeartHandshake size={18} className="text-orange-500" />
                   </div>
                   <p className="text-xs font-medium text-orange-600 uppercase tracking-wider mb-1">Cortesias</p>
-                  <p className="text-2xl font-bold text-orange-700">{cortesias.length}</p>
+                  <p className="text-2xl font-bold text-orange-400">{cortesias.length}</p>
                   <p className="text-xs text-orange-400 mt-1">
                     {formatCurrency(cortesias.reduce((s, c) => s + (c.total || 0), 0))} total
                   </p>
@@ -458,7 +458,7 @@ export default function VentasPage() {
                 {/* Cancelaciones table */}
                 {cancelaciones.length > 0 && (
                   <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-red-700 mb-1">Cancelaciones</h3>
+                    <h3 className="text-sm font-semibold text-red-400 mb-1">Cancelaciones</h3>
                     <p className="text-xs text-red-400 mb-4">{cancelaciones.length} items cancelados</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
@@ -510,7 +510,7 @@ export default function VentasPage() {
                 {/* Cortesias table */}
                 {cortesias.length > 0 && (
                   <div className="bg-[var(--surface)] rounded-xl border border-orange-500/20 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-orange-700 mb-1">Cortesias</h3>
+                    <h3 className="text-sm font-semibold text-orange-400 mb-1">Cortesias</h3>
                     <p className="text-xs text-orange-400 mb-4">{cortesias.length} cortesias otorgadas</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">

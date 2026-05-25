@@ -116,7 +116,7 @@ export default function MenuEngineeringPage() {
                       <span className="text-[var(--text-1)] truncate max-w-[180px]">{item.nombre}</span>
                       <div className="flex items-center gap-3">
                         <span className="tabular-nums text-[var(--text-2)] text-xs">{formatCurrency(item.ventas)}</span>
-                        <span className={`tabular-nums text-xs font-bold ${item.margen_pct >= 60 ? 'text-emerald-600' : item.margen_pct >= 30 ? 'text-amber-400' : 'text-red-600'}`}>
+                        <span className={`tabular-nums text-xs font-bold ${item.margen_pct >= 60 ? 'text-emerald-600' : item.margen_pct >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
                           {item.margen_pct?.toFixed(0)}%
                         </span>
                       </div>

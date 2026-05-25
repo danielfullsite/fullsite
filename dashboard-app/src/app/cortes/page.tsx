@@ -27,11 +27,11 @@ function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; t
 
 const HEATMAP_COLORS = [
   { min: 0, max: 0, bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-3)]', hex: 'var(--line)' },
-  { min: 1, max: 20000, bg: 'bg-red-100', text: 'text-red-700', hex: '#fecaca' },
-  { min: 20001, max: 40000, bg: 'bg-orange-100', text: 'text-orange-700', hex: '#fed7aa' },
-  { min: 40001, max: 60000, bg: 'bg-yellow-100', text: 'text-yellow-700', hex: '#fef08a' },
+  { min: 1, max: 20000, bg: 'bg-red-500/15', text: 'text-red-400', hex: '#fecaca' },
+  { min: 20001, max: 40000, bg: 'bg-orange-500/15', text: 'text-orange-400', hex: '#fed7aa' },
+  { min: 40001, max: 60000, bg: 'bg-yellow-500/15', text: 'text-yellow-400', hex: '#fef08a' },
   { min: 60001, max: 80000, bg: 'bg-lime-100', text: 'text-lime-700', hex: '#d9f99d' },
-  { min: 80001, max: Infinity, bg: 'bg-emerald-100', text: 'text-emerald-700', hex: '#a7f3d0' },
+  { min: 80001, max: Infinity, bg: 'bg-emerald-500/15', text: 'text-emerald-700', hex: '#a7f3d0' },
 ]
 
 function getHeatColor(value: number) {

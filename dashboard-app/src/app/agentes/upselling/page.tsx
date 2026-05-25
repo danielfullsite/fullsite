@@ -119,7 +119,7 @@ export default function UpsellingPage() {
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(o.actual)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(o.esperado)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`tabular-nums font-bold ${o.gap_pct > 20 ? 'text-red-600' : o.gap_pct > 10 ? 'text-amber-400' : 'text-emerald-600'}`}>
+                      <span className={`tabular-nums font-bold ${o.gap_pct > 20 ? 'text-red-400' : o.gap_pct > 10 ? 'text-amber-400' : 'text-emerald-600'}`}>
                         {o.gap_pct > 0 ? '-' : '+'}{Math.abs(o.gap_pct)?.toFixed(1)}%
                       </span>
                     </td>
@@ -154,11 +154,11 @@ export default function UpsellingPage() {
                 {meseroGaps.map((m, i) => {
                   const isBad = m.gap_pct > 15
                   return (
-                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isBad ? 'bg-red-500/10/30' : ''}`}>
+                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isBad ? 'bg-red-500/8' : ''}`}>
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{m.mesero}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{m.bebidas_persona?.toFixed(2)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{m.promedio_general?.toFixed(2)}</td>
-                      <td className={`px-4 py-3 text-right tabular-nums font-bold ${isBad ? 'text-red-600' : 'text-amber-400'}`}>
+                      <td className={`px-4 py-3 text-right tabular-nums font-bold ${isBad ? 'text-red-400' : 'text-amber-400'}`}>
                         {m.gap_pct > 0 ? '-' : '+'}{Math.abs(m.gap_pct)?.toFixed(1)}%
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--text-2)] max-w-[200px] truncate">{m.oportunidad || '—'}</td>
@@ -196,7 +196,7 @@ export default function UpsellingPage() {
                   <div key={i}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-[var(--text-1)]">{b.mesero}</span>
-                      <span className={`text-xs tabular-nums font-bold ${b.bebidas_persona >= (bebidas.meta || 1) ? 'text-emerald-600' : b.bebidas_persona >= (bebidas.promedio_general || 0) ? 'text-[var(--text-1)]' : 'text-red-600'}`}>
+                      <span className={`text-xs tabular-nums font-bold ${b.bebidas_persona >= (bebidas.meta || 1) ? 'text-emerald-600' : b.bebidas_persona >= (bebidas.promedio_general || 0) ? 'text-[var(--text-1)]' : 'text-red-400'}`}>
                         {b.bebidas_persona?.toFixed(2)}
                       </span>
                     </div>

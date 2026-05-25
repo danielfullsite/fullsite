@@ -38,10 +38,10 @@ export default function HermesPage() {
   const highCount = (data?.high_count || 0) as number
 
   const priorityColors: Record<string, string> = {
-    critical: 'bg-red-500/100 text-white',
-    high: 'bg-red-100 text-red-700',
-    medium: 'bg-amber-100 text-amber-400',
-    low: 'bg-blue-100 text-blue-700',
+    critical: 'bg-red-500 text-white',
+    high: 'bg-red-500/15 text-red-400',
+    medium: 'bg-amber-500/15 text-amber-400',
+    low: 'bg-blue-500/15 text-blue-400',
     info: 'bg-[var(--surface-2)] text-[var(--text-2)]',
   }
 
@@ -67,11 +67,11 @@ export default function HermesPage() {
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Total issues</p>
           <p className="text-2xl font-bold text-[var(--text-1)]">{totalIssues}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/10/30">
-          <p className="text-xs text-red-600 font-medium mb-1">Criticos</p>
-          <p className="text-2xl font-bold text-red-600">{criticalCount}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/8">
+          <p className="text-xs text-red-400 font-medium mb-1">Criticos</p>
+          <p className="text-2xl font-bold text-red-400">{criticalCount}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/10/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/8">
           <p className="text-xs text-amber-400 font-medium mb-1">Altos</p>
           <p className="text-2xl font-bold text-amber-400">{highCount}</p>
         </div>
@@ -171,7 +171,7 @@ export default function HermesPage() {
           {totalIssues === 0 && (
             <div className="bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-8 text-center">
               <CheckCircle size={32} className="mx-auto mb-3 text-emerald-500" />
-              <p className="text-emerald-700 font-medium">Todos los agentes funcionando correctamente</p>
+              <p className="text-emerald-400 font-medium">Todos los agentes funcionando correctamente</p>
             </div>
           )}
         </div>

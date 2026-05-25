@@ -99,7 +99,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
     return (
       <div className="min-h-screen bg-[var(--surface)] flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <div className="w-20 h-20 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-10 h-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
@@ -239,7 +239,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
                       <Minus size={14} />
                     </button>
                     <span className="font-bold text-[var(--text-1)] w-5 text-center">{item.qty}</span>
-                    <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price })} className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price })} className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
                       <Plus size={14} />
                     </button>
                   </div>

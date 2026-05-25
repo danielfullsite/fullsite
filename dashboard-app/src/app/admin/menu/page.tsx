@@ -255,7 +255,7 @@ export default function AdminMenuPage() {
                 </td>
                 <td className="px-5 py-3 text-center">
                   <button onClick={() => handleToggleItem(item)}
-                    className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                    className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                     {item.active ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>
@@ -343,7 +343,7 @@ export default function AdminMenuPage() {
               <div className="flex items-center justify-between pt-2">
                 <span className="text-sm text-[var(--text-2)]">Estado</span>
                 <button onClick={() => setEditCat({ ...editCat, active: !editCat.active })}
-                  className={`text-xs font-semibold px-3 py-1 rounded-full ${editCat.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  className={`text-xs font-semibold px-3 py-1 rounded-full ${editCat.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                   {editCat.active ? 'Activa' : 'Inactiva'}
                 </button>
               </div>
@@ -355,7 +355,7 @@ export default function AdminMenuPage() {
               </button>
               {!isNewCat && (
                 <button onClick={() => { handleToggleCat(editCat); setEditCat(null) }}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${editCat.active ? 'bg-red-500/100/10 text-red-400 hover:bg-red-100' : 'bg-emerald-500/100/10 text-emerald-400 hover:bg-emerald-100'}`}>
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${editCat.active ? 'bg-red-500/100/10 text-red-400 hover:bg-red-500/15' : 'bg-emerald-500/100/10 text-emerald-400 hover:bg-emerald-500/15'}`}>
                   {editCat.active ? 'Desactivar' : 'Activar'}
                 </button>
               )}

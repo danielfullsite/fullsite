@@ -112,11 +112,11 @@ export default function StaffingPage() {
                   const isMax = d.ventas_por_mesero === maxVPM
                   const isMin = d.ventas_por_mesero === minVPM && porDia.length > 1
                   return (
-                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-500/10/30' : isMin ? 'bg-emerald-500/10/30' : ''}`}>
+                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-500/8' : isMin ? 'bg-emerald-500/10/30' : ''}`}>
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{d.dia}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(d.ventas_promedio)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{d.meseros}</td>
-                      <td className={`px-4 py-3 text-right tabular-nums font-bold ${isMax ? 'text-red-600' : isMin ? 'text-emerald-600' : 'text-[var(--text-1)]'}`}>
+                      <td className={`px-4 py-3 text-right tabular-nums font-bold ${isMax ? 'text-red-400' : isMin ? 'text-emerald-600' : 'text-[var(--text-1)]'}`}>
                         {formatCurrency(d.ventas_por_mesero)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{d.personas}</td>
@@ -139,7 +139,7 @@ export default function StaffingPage() {
           <div className="p-4 space-y-2">
             {recomendaciones.map((rec, i) => (
               <div key={i} className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                <span className="w-5 h-5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
                 <p className="text-sm text-[var(--text-1)]">{rec}</p>
               </div>
             ))}
@@ -161,7 +161,7 @@ export default function StaffingPage() {
                 <span className="text-sm font-medium text-[var(--text-1)]">{g.mesero}</span>
                 <div className="flex gap-1.5">
                   {g.dias_faltantes.map((d, j) => (
-                    <span key={j} className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-medium">{d}</span>
+                    <span key={j} className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-[10px] font-medium">{d}</span>
                   ))}
                 </div>
               </div>

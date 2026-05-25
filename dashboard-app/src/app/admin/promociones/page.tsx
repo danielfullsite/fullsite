@@ -124,7 +124,7 @@ export default function PromocionesPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-semibold text-[var(--text-1)]">{p.name}</span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.active && !isExpired(p) ? 'bg-green-100 text-green-700' : 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.active && !isExpired(p) ? 'bg-green-500/15 text-green-400' : 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
                     {p.active && !isExpired(p) ? 'Activa' : 'Inactiva'}
                   </span>
                   <span className="text-[10px] bg-[var(--surface-2)] text-[var(--text-2)] px-2 py-0.5 rounded-full uppercase">{p.type}</span>

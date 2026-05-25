@@ -96,7 +96,7 @@ export default function GruposTiendaPage() {
                     <div className="flex gap-2 flex-1">
                       <input value={editing.department} onChange={e => setEditing({ ...editing, department: e.target.value })} className="border border-emerald-300 rounded px-2 py-1 text-sm flex-1" />
                       <input value={editing.group_name} onChange={e => setEditing({ ...editing, group_name: e.target.value })} className="border border-emerald-300 rounded px-2 py-1 text-sm flex-1" />
-                      <button onClick={handleSaveEdit} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14}/></button>
+                      <button onClick={handleSaveEdit} className="w-8 h-8 rounded-lg bg-emerald-500/15 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14}/></button>
                       <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><X size={14}/></button>
                     </div>
                   ) : (

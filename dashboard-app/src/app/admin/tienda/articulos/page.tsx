@@ -136,7 +136,7 @@ export default function ArticulosPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex gap-1 justify-end">
                     <button onClick={() => setEditing(item)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
-                    <button onClick={() => handleDelete(item)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><X size={14}/></button>
+                    <button onClick={() => handleDelete(item)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/15 text-red-500 flex items-center justify-center"><X size={14}/></button>
                   </div>
                 </td>
               </tr>

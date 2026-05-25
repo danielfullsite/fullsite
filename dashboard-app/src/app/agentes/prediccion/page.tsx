@@ -119,7 +119,7 @@ export default function PrediccionPage() {
                 <span className="text-sm text-[var(--text-1)]">{c.label}</span>
                 <div className="flex items-center gap-3">
                   <span className="text-sm tabular-nums text-[var(--text-2)]">{formatCurrency(c.valor)}</span>
-                  <span className={`flex items-center gap-1 text-sm font-bold tabular-nums ${c.diferencia_pct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <span className={`flex items-center gap-1 text-sm font-bold tabular-nums ${c.diferencia_pct >= 0 ? 'text-emerald-600' : 'text-red-400'}`}>
                     {c.diferencia_pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {c.diferencia_pct > 0 ? '+' : ''}{c.diferencia_pct?.toFixed(1)}%
                   </span>

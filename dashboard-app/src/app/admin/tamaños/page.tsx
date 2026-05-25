@@ -158,13 +158,13 @@ export default function AdminTamañosPage() {
                   <td className="px-5 py-3 text-right">
                     {editing && editing.id === s.id ? (
                       <div className="flex gap-1 justify-end">
-                        <button onClick={handleSave} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14} /></button>
+                        <button onClick={handleSave} className="w-8 h-8 rounded-lg bg-emerald-500/15 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14} /></button>
                         <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><X size={14} /></button>
                       </div>
                     ) : (
                       <div className="flex gap-1 justify-end">
                         <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14} /></button>
-                        <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
+                        <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/15 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
                       </div>
                     )}
                   </td>

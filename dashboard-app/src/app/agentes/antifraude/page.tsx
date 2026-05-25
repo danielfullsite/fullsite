@@ -50,14 +50,14 @@ export default function AntiFraudePage() {
   const findings = data?.findings || []
 
   function scoreColor(s: number): string {
-    if (s >= 70) return 'text-red-600'
+    if (s >= 70) return 'text-red-400'
     if (s >= 40) return 'text-amber-400'
     return 'text-emerald-600'
   }
 
   function scoreBg(s: number): string {
-    if (s >= 70) return 'border-red-300 bg-red-500/10/30'
-    if (s >= 40) return 'border-amber-500/20 bg-amber-500/10/30'
+    if (s >= 70) return 'border-red-300 bg-red-500/8'
+    if (s >= 40) return 'border-amber-500/20 bg-amber-500/8'
     return 'border-emerald-500/20 bg-emerald-500/10/30'
   }
 
@@ -69,8 +69,8 @@ export default function AntiFraudePage() {
 
   function nivelBadge(nivel: string) {
     const n = nivel.toLowerCase()
-    if (n === 'alto' || n === 'critical') return 'bg-red-500/100 text-white'
-    if (n === 'medio' || n === 'warning') return 'bg-amber-100 text-amber-400'
+    if (n === 'alto' || n === 'critical') return 'bg-red-500 text-white'
+    if (n === 'medio' || n === 'warning') return 'bg-amber-500/15 text-amber-400'
     return 'bg-[var(--surface-2)] text-[var(--text-2)]'
   }
 
@@ -110,11 +110,11 @@ export default function AntiFraudePage() {
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Hallazgos totales</p>
           <p className="text-2xl font-bold text-[var(--text-1)]">{findings.length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/10/30">
-          <p className="text-xs text-red-600 font-medium mb-1">Riesgo alto</p>
-          <p className="text-2xl font-bold text-red-600">{findings.filter(f => f.nivel?.toLowerCase() === 'alto' || f.nivel?.toLowerCase() === 'critical').length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-red-500/20 shadow-sm p-5 bg-red-500/8">
+          <p className="text-xs text-red-400 font-medium mb-1">Riesgo alto</p>
+          <p className="text-2xl font-bold text-red-400">{findings.filter(f => f.nivel?.toLowerCase() === 'alto' || f.nivel?.toLowerCase() === 'critical').length}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/10/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-500/20 shadow-sm p-5 bg-amber-500/8">
           <p className="text-xs text-amber-400 font-medium mb-1">Riesgo medio</p>
           <p className="text-2xl font-bold text-amber-400">{findings.filter(f => f.nivel?.toLowerCase() === 'medio' || f.nivel?.toLowerCase() === 'warning').length}</p>
         </div>

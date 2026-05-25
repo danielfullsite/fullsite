@@ -66,7 +66,7 @@ export default function FormasPagoPage() {
     load()
   }
 
-  const commColor = (pct: number) => pct < 5 ? 'bg-emerald-100 text-emerald-700' : pct <= 20 ? 'bg-amber-100 text-amber-400' : 'bg-red-100 text-red-700'
+  const commColor = (pct: number) => pct < 5 ? 'bg-emerald-500/15 text-emerald-400' : pct <= 20 ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -101,7 +101,7 @@ export default function FormasPagoPage() {
                 <td className="px-5 py-3 text-sm text-[var(--text-2)] font-mono">{item.fiscal_code || '---'}</td>
                 <td className="px-5 py-3 text-center">
                   <button onClick={() => toggleActive(item)}
-                    className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                    className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                     {item.active ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>

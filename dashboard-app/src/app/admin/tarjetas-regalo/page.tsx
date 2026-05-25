@@ -80,9 +80,9 @@ export default function TarjetasRegaloPage() {
   })
 
   const statusColor: Record<string, string> = {
-    active: 'bg-green-100 text-green-700',
+    active: 'bg-green-500/15 text-green-400',
     used: 'bg-[var(--surface-2)] text-[var(--text-3)]',
-    expired: 'bg-red-100 text-red-500',
+    expired: 'bg-red-500/15 text-red-500',
   }
 
   const pct = (c: GiftCard) => c.initial_balance > 0 ? (c.current_balance / c.initial_balance) * 100 : 0

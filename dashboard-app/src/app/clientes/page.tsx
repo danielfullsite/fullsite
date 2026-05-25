@@ -243,7 +243,7 @@ export default function ClientesPage() {
               </button>
               {!isNew && (
                 <button onClick={() => { handleDelete(editing); setEditing(null) }}
-                  className="px-4 py-2.5 bg-red-500/10 hover:bg-red-100 text-red-600 rounded-xl text-sm font-semibold">
+                  className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/15 text-red-600 rounded-xl text-sm font-semibold">
                   Eliminar
                 </button>
               )}

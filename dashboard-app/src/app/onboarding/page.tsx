@@ -356,7 +356,7 @@ export default function OnboardingPage() {
           {/* Step 4: Done */}
           {step === 4 && (
             <div className="text-center py-12">
-              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Rocket size={36} className="text-emerald-600" />
               </div>
               <h2 className="text-3xl font-bold text-[var(--text-1)] mb-3">Todo listo</h2>

@@ -17,10 +17,10 @@ interface Category { id: string; name: string; color: string; active: boolean }
 interface Assignment { id: number; category_id: string; modifier_group_id: string }
 
 const GROUP_COLORS: Record<string, string> = {
-  quitar: 'bg-red-100 text-red-700',
-  food: 'bg-amber-100 text-amber-400',
-  coffee: 'bg-yellow-100 text-yellow-700',
-  drinks: 'bg-cyan-100 text-cyan-700',
+  quitar: 'bg-red-500/15 text-red-400',
+  food: 'bg-amber-500/15 text-amber-400',
+  coffee: 'bg-yellow-500/15 text-yellow-400',
+  drinks: 'bg-cyan-500/15 text-cyan-400',
 }
 
 async function api(path: string, opts?: RequestInit) {

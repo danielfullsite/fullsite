@@ -24,7 +24,7 @@ async function sbFetch(path: string, opts?: RequestInit) {
 }
 
 const TYPE_LABELS: Record<string, string> = { percent: '% Descuento', fixed: '$ Fijo', '2x1': '2x1', combo: 'Combo' }
-const TYPE_COLORS: Record<string, string> = { percent: 'bg-blue-100 text-blue-700', fixed: 'bg-emerald-100 text-emerald-700', '2x1': 'bg-purple-100 text-purple-700', combo: 'bg-amber-100 text-amber-400' }
+const TYPE_COLORS: Record<string, string> = { percent: 'bg-blue-500/15 text-blue-400', fixed: 'bg-emerald-500/15 text-emerald-400', '2x1': 'bg-purple-500/15 text-purple-400', combo: 'bg-amber-500/15 text-amber-400' }
 
 export default function PromosTiendaPage() {
   const CLIENT_ID = useClientId()
@@ -132,12 +132,12 @@ export default function PromosTiendaPage() {
                 <td className="px-4 py-3 text-xs text-[var(--text-2)]">{p.start_date || '-'} → {p.end_date || '-'}</td>
                 <td className="px-4 py-3 text-xs text-[var(--text-2)]">{p.applies_to?.length || 0} items</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{p.active ? 'Activa' : 'Inactiva'}</span>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${p.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>{p.active ? 'Activa' : 'Inactiva'}</span>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1 justify-end">
                     <button onClick={() => setEditing(p)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
-                    <button onClick={() => handleDelete(p)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14}/></button>
+                    <button onClick={() => handleDelete(p)} className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/15 text-red-500 flex items-center justify-center"><Trash2 size={14}/></button>
                   </div>
                 </td>
               </tr>
