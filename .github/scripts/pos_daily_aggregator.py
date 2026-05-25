@@ -56,20 +56,44 @@ def sb_get(table, params):
         return []
 
 
-def sb_upsert(table, data):
-    """Upsert (insert or update on conflict)."""
+def sb_upsert_daily(fecha, data):
+    """Check if row exists for fecha, then update or insert."""
     try:
-        r = requests.post(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers={
-                **sb_headers,
-                "Content-Type": "application/json",
-                "Prefer": "resolution=merge-duplicates,return=minimal",
-            },
-            json=data, timeout=15,
-        )
-        return r.ok
-    except:
+        # Check if row exists
+        existing = sb_get("wansoft_daily", {
+            "select": "fecha",
+            "fecha": f"eq.{fecha}",
+            "limit": "1",
+        })
+
+        if existing:
+            # UPDATE existing row
+            r = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/wansoft_daily?fecha=eq.{fecha}",
+                headers={
+                    **sb_headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json=data, timeout=15,
+            )
+            print(f"PATCH {fecha}: {r.status_code}")
+            return r.ok
+        else:
+            # INSERT new row
+            r = requests.post(
+                f"{SUPABASE_URL}/rest/v1/wansoft_daily",
+                headers={
+                    **sb_headers,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json=data, timeout=15,
+            )
+            print(f"POST {fecha}: {r.status_code}")
+            return r.ok
+    except Exception as e:
+        print(f"sb_upsert_daily error: {e}")
         return False
 
 
@@ -87,27 +111,21 @@ def fetch_closed_orders(fecha):
     start = f"{fecha}T00:00:00"
     end = f"{fecha}T23:59:59"
 
+    # Use PostgREST AND filter for date range
     orders = sb_get("pos_orders", {
         "select": "*",
         "client_id": "eq.amalay",
         "status": "eq.cerrada",
-        "closed_at": f"gte.{start}",
-        "closed_at": f"lte.{end}",
-        "order": "closed_at.asc",
+        "or": f"(closed_at.gte.{start},created_at.gte.{start})",
+        "order": "created_at.asc",
         "limit": "500",
     })
 
-    # Also try by created_at for orders that might not have closed_at
-    if not orders:
-        orders = sb_get("pos_orders", {
-            "select": "*",
-            "client_id": "eq.amalay",
-            "status": "eq.cerrada",
-            "created_at": f"gte.{start}",
-            "created_at": f"lte.{end}",
-            "order": "created_at.asc",
-            "limit": "500",
-        })
+    # Filter in Python to ensure correct date (PostgREST OR is loose)
+    orders = [o for o in orders if
+        (o.get("closed_at", "") or "").startswith(fecha) or
+        (o.get("created_at", "") or "").startswith(fecha)
+    ]
 
     return orders
 
@@ -302,7 +320,7 @@ if __name__ == "__main__":
         row = aggregate(orders, cat_map, item_cat_map)
 
         if row:
-            ok = sb_upsert("wansoft_daily", row)
+            ok = sb_upsert_daily(fecha, row)
             if ok:
                 print(f"OK — {row['tickets_count']} ordenes, ${row['ventas_dia']:,.2f} ventas")
 
