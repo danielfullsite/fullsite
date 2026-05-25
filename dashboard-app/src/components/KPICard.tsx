@@ -48,24 +48,24 @@ export default function KPICard({
       <div aria-hidden className="absolute inset-x-0 top-0 h-px pointer-events-none"
         style={{ background: 'var(--bento-bevel)' }} />
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {Icon && (
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: index * 0.06 + 0.1 }}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${style.bg}`}
+            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${style.bg}`}
           >
-            <Icon size={22} strokeWidth={1.8} className={style.icon} />
+            <Icon size={20} strokeWidth={1.8} className={style.icon} />
           </motion.div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.15em] font-mono text-[var(--text-3)] mb-1">{label}</p>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.15em] font-mono text-[var(--text-3)] mb-1">{label}</p>
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
-            className="text-2xl font-bold tracking-tight text-[var(--text-1)] tnum"
+            className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--text-1)] tnum"
           >
             {value}
           </motion.p>
