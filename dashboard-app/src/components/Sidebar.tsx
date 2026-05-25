@@ -191,16 +191,19 @@ export default function Sidebar() {
           </p>
         )}
 
-        {/* Logout */}
-        {user && (
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-500/10"
-          >
-            <LogOut size={14} />
-            <span>Cerrar sesion</span>
-          </button>
-        )}
+        {/* Logout — always visible, nukes all storage */}
+        <button
+          onClick={() => {
+            try { signOut() } catch {}
+            localStorage.clear()
+            sessionStorage.clear()
+            window.location.href = '/login'
+          }}
+          className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-500/10"
+        >
+          <LogOut size={14} />
+          <span>Cerrar sesion</span>
+        </button>
       </div>
     </aside>
   )
