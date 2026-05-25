@@ -33,7 +33,8 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
   const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
-    <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm p-6">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px pointer-events-none" style={{ background: 'var(--bento-bevel)' }} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-1)]">{title || 'Ventas'}</h3>
@@ -61,16 +62,16 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
                 <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
             <XAxis
               dataKey="fecha"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: 'var(--text-3)' }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: 'var(--text-3)' }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
@@ -79,14 +80,14 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
             <Tooltip
               formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
               contentStyle={{
-                backgroundColor: '#0f172a',
-                border: 'none',
+                backgroundColor: 'var(--panel)',
+                border: '1px solid var(--line)',
                 borderRadius: '12px',
                 padding: '10px 14px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                boxShadow: 'var(--shadow-mid)',
               }}
-              itemStyle={{ color: '#10b981', fontSize: '13px', fontWeight: 600 }}
-              labelStyle={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}
+              itemStyle={{ color: 'var(--accent-bright)', fontSize: '13px', fontWeight: 600 }}
+              labelStyle={{ color: 'var(--text-3)', fontSize: '11px', marginBottom: '4px' }}
               cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
             <Area

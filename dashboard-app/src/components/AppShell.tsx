@@ -32,15 +32,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, router, isPublicPage])
 
-  // POS pages: full screen, dark theme, no sidebar — check FIRST
-  const isPosPage = isPosRoute
-  if (isPosPage) {
+  // POS pages: full screen, dark theme, no sidebar
+  if (isPosRoute) {
     if (!showContent && loading) {
       return (
-        <div className="flex items-center justify-center h-screen bg-slate-900">
+        <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
           <div className="text-center">
-            <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-400 text-sm">Cargando POS...</p>
+            <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[var(--text-3)] text-sm">Cargando POS...</p>
           </div>
         </div>
       )
@@ -48,24 +47,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <main className="min-h-screen bg-slate-900">{children}</main>
   }
 
-  // Other public pages (login, privacy, etc.)
+  // Public pages (login, privacy, etc.)
   if (isPublicPage) {
     return <>{children}</>
   }
 
   if (!showContent && loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Cargando...</p>
+          <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--text-3)] text-sm">Cargando...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="grid lg:grid-cols-[240px_1fr] min-h-screen">
+    <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)]">
       <div className="hidden lg:block">
         <Sidebar />
       </div>
@@ -73,7 +72,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar />
       </div>
       <main className="min-h-screen overflow-auto pt-14 lg:pt-0">
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <PageTransition key={pathname}>
             {children}
           </PageTransition>
