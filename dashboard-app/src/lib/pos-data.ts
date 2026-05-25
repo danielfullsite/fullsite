@@ -1035,12 +1035,19 @@ export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntr
   return res.json()
 }
 
-// Manager PINs for approval (in production, these come from the DB)
-export const MANAGER_PINS: Record<string, string> = {
-  '1234': 'Eduardo',
-  '5678': 'Monica',
-  '9012': 'Daniel',
+// Manager PINs for approval — loaded from env to keep secrets out of source code
+// Format: "PIN:Name,PIN:Name,PIN:Name"  e.g. "1234:Eduardo,5678:Monica,9012:Daniel"
+function parseManagerPins(): Record<string, string> {
+  const raw = process.env.NEXT_PUBLIC_MANAGER_PINS || ''
+  if (!raw) return {}
+  const pins: Record<string, string> = {}
+  for (const entry of raw.split(',')) {
+    const [pin, name] = entry.split(':')
+    if (pin && name) pins[pin.trim()] = name.trim()
+  }
+  return pins
 }
+export const MANAGER_PINS: Record<string, string> = parseManagerPins()
 
 // ─── INVENTORY & RECIPES ────────────────────────────────────────────────────
 

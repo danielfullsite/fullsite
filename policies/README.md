@@ -17,6 +17,7 @@ Estas politicas son requisito para la certificacion SOC 2 Type II.
 | 08 | [Uso Aceptable](08-acceptable-use-policy.md) | Reglas para empleados y contratistas |
 | 09 | [Evaluacion de Riesgos](09-risk-assessment-policy.md) | Metodologia, registro de riesgos, tratamiento |
 | 10 | [Logging y Monitoreo](10-logging-monitoring-policy.md) | Que se registra, retencion, alertas, forense |
+| 11 | [PCI-DSS SAQ-A](11-pci-dss-saq-a.md) | Autoevaluacion PCI — evidencia de que no tocamos datos de tarjeta |
 
 ## Estado
 
