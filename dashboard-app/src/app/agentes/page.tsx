@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw } from 'lucide-react'
+import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw, Timer, Package, MessageCircle, BarChart3, Calendar, Zap, FileText, Activity, Bell, Sparkles, Settings } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 
 interface AgentResult {
@@ -28,6 +28,18 @@ const AGENTS = [
   { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-600', bg: 'bg-red-50', desc: 'Compras vs consumo', href: '/agentes/desperdicio' },
   { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-50', desc: 'Pronóstico × historial', href: '/agentes/clima' },
   { id: 'hermes', name: 'Hermes', icon: Bot, color: 'text-indigo-500', bg: 'bg-indigo-50', desc: 'Mejora continua de agentes', href: '/agentes/hermes' },
+  { id: 'speed-of-service', name: 'Velocidad', icon: Timer, color: 'text-cyan-600', bg: 'bg-cyan-50', desc: 'Tiempo de preparación por platillo', href: '/agentes/velocidad' },
+  { id: 'inventory-auto-order', name: 'Auto-Orden', icon: Package, color: 'text-teal-500', bg: 'bg-teal-50', desc: 'OC automática cuando baja stock', href: '/agentes/auto-orden' },
+  { id: 'daily-briefing', name: 'Briefing Diario', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50', desc: 'Resumen 7 AM en Telegram', href: '/agentes/briefing' },
+  { id: 'weekly-summary', name: 'Reporte Semanal', icon: BarChart3, color: 'text-purple-500', bg: 'bg-purple-50', desc: 'Ejecutivo cada lunes', href: '/agentes/semanal' },
+  { id: 'wansoft-query', name: 'KB 24/7', icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-50', desc: 'Preguntas on-demand por Telegram', href: '/agentes/kb' },
+  { id: 'reservas', name: 'Reservaciones', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-50', desc: 'Alertas de reservas pendientes', href: '/agentes/reservas' },
+  { id: 'wansoft-staleness', name: 'Monitor Sync', icon: Activity, color: 'text-red-500', bg: 'bg-red-50', desc: 'Alerta si datos >24h sin sync', href: '/agentes/sync' },
+  { id: 'proactive-alerts', name: 'Alertas Proactivas', icon: Bell, color: 'text-red-600', bg: 'bg-red-50', desc: 'Clima, eventos, dias festivos', href: '/agentes/alertas' },
+  { id: 'intraday-sales', name: 'Ventas Intraday', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-50', desc: 'Avance de ventas en tiempo real', href: '/agentes/intraday' },
+  { id: 'menu-gap', name: 'Análisis de Menú', icon: Sparkles, color: 'text-violet-600', bg: 'bg-violet-50', desc: 'Gaps y oportunidades del menú', href: '/agentes/menu-gap' },
+  { id: 'config-validator', name: 'Config Validator', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-50', desc: 'Verifica configuración del cliente', href: '/agentes/config' },
+  { id: 'orquestador', name: 'Orquestador', icon: Bot, color: 'text-slate-700', bg: 'bg-slate-100', desc: 'Cerebro central — despacha agentes', href: '/agentes/orquestador' },
 ]
 
 const priorityColors: Record<string, string> = {
@@ -74,7 +86,7 @@ export default function AgentesPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">Agentes de IA</h2>
-          <p className="text-sm text-slate-400">12 agentes monitoreando tu operación 24/7</p>
+          <p className="text-sm text-slate-400">26 agentes monitoreando tu operación 24/7</p>
         </div>
         <button onClick={() => { setLoading(true); loadResults() }}
           className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
@@ -86,7 +98,7 @@ export default function AgentesPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
           <p className="text-xs text-slate-500 font-medium mb-1">Agentes activos</p>
-          <p className="text-2xl font-bold text-slate-900">{activeCount} <span className="text-sm font-normal text-slate-400">/ 12</span></p>
+          <p className="text-2xl font-bold text-slate-900">{activeCount} <span className="text-sm font-normal text-slate-400">/ 26</span></p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
           <p className="text-xs text-slate-500 font-medium mb-1">Alertas críticas</p>
