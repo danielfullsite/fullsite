@@ -1,6 +1,46 @@
-import { Shield, Lock, Server, Eye, Database, Brain, HardDrive, Fingerprint, Globe, FileCheck } from 'lucide-react'
+import { Shield, Lock, Server, Eye, Database, Brain, HardDrive, Fingerprint, Globe, FileCheck, CreditCard, Receipt, Award, ArrowRight } from 'lucide-react'
+
+const certifications = [
+  {
+    name: 'CFDI 4.0',
+    status: 'active' as const,
+    description: 'Facturacion electronica SAT via PAC certificado',
+  },
+  {
+    name: 'PCI-DSS',
+    status: 'active' as const,
+    description: 'Cumplimiento via tokenizacion — nunca tocamos datos de tarjeta',
+  },
+  {
+    name: 'LFPDPPP',
+    status: 'active' as const,
+    description: 'Ley Federal de Proteccion de Datos Personales — derechos ARCO completos',
+  },
+  {
+    name: 'SOC 2 Type II',
+    status: 'roadmap' as const,
+    description: 'Auditoria independiente de controles de seguridad — en proceso',
+  },
+  {
+    name: 'ISO 27001',
+    status: 'roadmap' as const,
+    description: 'Gestion de seguridad de la informacion — planeado',
+  },
+]
 
 const sections = [
+  {
+    icon: CreditCard,
+    title: 'PCI-DSS — sin datos de tarjeta',
+    description:
+      'Fullsite nunca almacena, procesa ni transmite numeros de tarjeta. Todos los pagos con tarjeta se procesan a traves de tokenizadores certificados PCI-DSS (Stripe, Clip, MercadoPago). Tu POS solo recibe un token de confirmacion — los datos sensibles nunca pasan por nuestros servidores.',
+  },
+  {
+    icon: Receipt,
+    title: 'CFDI 4.0 — facturacion electronica SAT',
+    description:
+      'Integracion directa con PAC autorizado por el SAT para emision de CFDI 4.0. Gestion segura del Certificado de Sello Digital (CSD) de cada cliente. Timbrado automatico, cancelacion con motivo, y almacenamiento de XMLs por 5 anos conforme a regulacion fiscal.',
+  },
   {
     icon: Lock,
     title: 'Encriptacion en transito y reposo',
@@ -51,54 +91,81 @@ const sections = [
   },
   {
     icon: FileCheck,
-    title: 'Cumplimiento normativo',
+    title: 'Cumplimiento LFPDPPP',
     description:
-      'Cumplimos con la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares (LFPDPPP) y su Reglamento. Implementamos derechos ARCO completos. Nuestros proveedores de infraestructura cuentan con certificaciones SOC 2 y controles de seguridad auditados.',
+      'Cumplimos con la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares y su Reglamento. Implementamos derechos ARCO completos (Acceso, Rectificacion, Cancelacion, Oposicion). Aviso de privacidad disponible en /privacidad.',
   },
 ]
 
 export default function SeguridadPage() {
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-[var(--surface)] border-b border-border">
-        <div className="max-w-4xl mx-auto px-6 py-8">
-          <a href="/login" className="inline-block mb-6">
-            <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
+      <div className="bg-gray-950">
+        <div className="max-w-5xl mx-auto px-6 py-16">
+          <a href="/login" className="inline-block mb-8">
+            <span className="text-white font-black text-2xl tracking-tight">
               fullsite
-              <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
+              <span className="inline-block w-2.5 h-2.5 bg-emerald-400 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </a>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-accent" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-emerald-400" />
             </div>
-            <h1 className="text-2xl font-bold text-text">Seguridad</h1>
+            <h1 className="text-3xl font-bold text-white">Seguridad y Compliance</h1>
           </div>
-          <p className="text-text-soft text-sm max-w-2xl">
+          <p className="text-white/60 text-base max-w-2xl leading-relaxed">
             La seguridad de los datos de nuestros clientes es nuestra maxima prioridad.
-            Estas son las medidas que implementamos para proteger tu informacion.
+            Protegemos tu informacion con los mismos estandares que usan las instituciones financieras.
           </p>
-          <p className="text-xs text-text-muted mt-2">Ultima actualizacion: 18 de mayo de 2026</p>
+
+          {/* Certification badges */}
+          <div className="mt-10 flex flex-wrap gap-3">
+            {certifications.map((cert) => (
+              <div
+                key={cert.name}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border ${
+                  cert.status === 'active'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    : 'bg-white/5 border-white/10 text-white/40'
+                }`}
+              >
+                {cert.status === 'active' ? (
+                  <Award className="w-4 h-4" />
+                ) : (
+                  <ArrowRight className="w-4 h-4" />
+                )}
+                <div>
+                  <span className="text-sm font-semibold">{cert.name}</span>
+                  {cert.status === 'roadmap' && (
+                    <span className="text-[10px] uppercase tracking-wider ml-2 opacity-60">pronto</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Sections */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="grid gap-4">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="grid gap-6 md:grid-cols-2">
           {sections.map((section) => {
             const Icon = section.icon
             return (
               <div
                 key={section.title}
-                className="bg-card rounded-xl border border-border card-shadow p-6 flex gap-4"
+                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
               >
-                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                  <Icon className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-text mb-1">{section.title}</h2>
-                  <p className="text-sm text-text-soft leading-relaxed">{section.description}</p>
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Icon className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 mb-2">{section.title}</h2>
+                    <p className="text-sm text-gray-500 leading-relaxed">{section.description}</p>
+                  </div>
                 </div>
               </div>
             )
@@ -106,12 +173,12 @@ export default function SeguridadPage() {
         </div>
 
         {/* Responsible disclosure */}
-        <div className="mt-8 bg-card rounded-xl border border-border card-shadow p-6">
-          <h2 className="text-sm font-semibold text-text mb-3">Divulgacion responsable</h2>
-          <p className="text-sm text-text-soft leading-relaxed">
+        <div className="mt-12 bg-gray-50 rounded-xl border border-gray-200 p-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Divulgacion responsable</h2>
+          <p className="text-sm text-gray-500 leading-relaxed max-w-2xl">
             Si descubres una vulnerabilidad de seguridad en nuestra plataforma, te pedimos que nos la
             reportes de manera responsable a{' '}
-            <a href="mailto:seguridad@fullsite.mx" className="text-accent hover:underline">
+            <a href="mailto:seguridad@fullsite.mx" className="text-emerald-600 hover:underline font-medium">
               seguridad@fullsite.mx
             </a>
             . Nos comprometemos a investigar y responder dentro de 48 horas habiles. No tomaremos
@@ -120,17 +187,22 @@ export default function SeguridadPage() {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-text-muted">
+        <div className="mt-12 pt-8 border-t border-gray-100 text-center">
+          <p className="text-xs text-gray-400">
+            Ultima actualizacion: 25 de mayo de 2026
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
             Preguntas sobre seguridad?{' '}
-            <a href="mailto:seguridad@fullsite.mx" className="text-accent hover:underline">
+            <a href="mailto:seguridad@fullsite.mx" className="text-emerald-600 hover:underline">
               seguridad@fullsite.mx
             </a>
           </p>
-          <div className="mt-4 flex justify-center gap-4 text-xs text-text-muted">
-            <a href="/privacidad" className="hover:text-accent transition-colors">Privacidad</a>
+          <div className="mt-4 flex justify-center gap-4 text-xs text-gray-400">
+            <a href="/privacidad" className="hover:text-emerald-600 transition-colors">Privacidad</a>
             <span>|</span>
-            <a href="/terminos" className="hover:text-accent transition-colors">Terminos</a>
+            <a href="/terminos" className="hover:text-emerald-600 transition-colors">Terminos</a>
+            <span>|</span>
+            <a href="/login" className="hover:text-emerald-600 transition-colors">Iniciar sesion</a>
           </div>
         </div>
       </div>
