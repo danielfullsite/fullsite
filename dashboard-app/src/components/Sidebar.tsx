@@ -231,8 +231,8 @@ export default function Sidebar() {
 
       {/* Mobile sidebar — slide in */}
       <div
-        className={`lg:hidden fixed top-0 left-0 h-full z-40 transition-transform duration-200 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1px)]'
+        className={`lg:hidden fixed top-0 left-0 h-full z-40 transition-all duration-200 ${
+          mobileOpen ? 'translate-x-0 opacity-100 visible' : '-translate-x-full opacity-0 invisible'
         }`}
       >
         {sidebarContent}
