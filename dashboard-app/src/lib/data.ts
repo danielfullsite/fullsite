@@ -5,17 +5,27 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
-  const res = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-    },
-  })
-  if (!res.ok) {
-    console.error(`Supabase fetch error: ${res.status} ${table}`, await res.text().catch(() => ''))
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    })
+    if (!res.ok) {
+      console.error(`[Fullsite] Supabase error ${res.status} on ${table}:`, await res.text().catch(() => ''))
+      return []
+    }
+    const data = await res.json()
+    if (!Array.isArray(data)) {
+      console.error(`[Fullsite] Supabase returned non-array for ${table}:`, typeof data)
+      return []
+    }
+    return data
+  } catch (err) {
+    console.error(`[Fullsite] Network error fetching ${table}:`, err)
     return []
   }
-  return res.json()
 }
 
 function parseJsonbField<T>(value: unknown): T[] {
@@ -33,13 +43,29 @@ function parseJsonbField<T>(value: unknown): T[] {
 }
 
 function parseRow(row: Record<string, unknown>): WansoftDaily {
+  // Sanitize: guarantee numbers are numbers, never null/undefined
+  const num = (v: unknown) => Number(v) || 0
   return {
-    ...row,
+    fecha: (row.fecha as string) || '',
+    ventas_dia: num(row.ventas_dia),
+    ventas_brutas: num(row.ventas_brutas),
+    descuentos: num(row.descuentos),
+    devoluciones: num(row.devoluciones),
+    tickets_count: num(row.tickets_count),
+    personas_restaurant: num(row.personas_restaurant),
+    ticket_promedio_restaurant: num(row.ticket_promedio_restaurant),
+    efectivo: num(row.efectivo),
+    tarjeta: num(row.tarjeta),
+    mesas_atendidas: num(row.mesas_atendidas),
+    ordenes_llevar: num(row.ordenes_llevar),
+    propinas_total: num(row.propinas_total),
+    chilaquiles_total: num(row.chilaquiles_total),
+    half_half_total: num(row.half_half_total),
     meseros: parseJsonbField(row.meseros),
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
     pago_metodos: parseJsonbField(row.pago_metodos),
-  } as WansoftDaily
+  }
 }
 
 function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>[] {
