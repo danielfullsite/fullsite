@@ -1,24 +1,112 @@
 @import "tailwindcss";
 
+/* ============ Fullsite Design Tokens ============
+ * Light by default (current dashboard).
+ * Dark mode via [data-theme="dark"] on <html>.
+ * Accent: emerald (#10b981). Inspired by HAILO OS bento style.
+ */
+
+:root {
+  /* Light mode (default) */
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f4f4f6;
+  --panel: #ffffff;
+  --line: #e2e8f0;
+  --line-soft: #f1f5f9;
+
+  --text-1: #1e293b;
+  --text-2: #64748b;
+  --text-3: #94a3b8;
+  --text-4: #cbd5e1;
+
+  /* Accent (emerald) */
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --accent-deep: #059669;
+  --accent-soft: rgba(16, 185, 129, 0.07);
+  --accent-line: rgba(16, 185, 129, 0.22);
+
+  /* Bento cards (light) */
+  --bento-card: linear-gradient(165deg, var(--panel) 0%, var(--panel) 60%, var(--accent-soft) 100%);
+  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.5) 50%, transparent 100%);
+
+  --shadow-mid: 0 1px 2px rgba(15,23,42,.04), 0 12px 32px rgba(15,23,42,.06);
+  --shadow-soft: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.04);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #0a0a0c;
+  --surface-2: #0f1014;
+  --panel: #0b0b0e;
+  --line: #1c1d22;
+  --line-soft: #141519;
+
+  --text-1: #f5f5f7;
+  --text-2: #c4c4cc;
+  --text-3: #87878f;
+  --text-4: #555560;
+
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --accent-deep: #059669;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-line: rgba(16, 185, 129, 0.28);
+
+  --bento-card: linear-gradient(165deg, var(--panel) 0%, var(--panel) 60%, rgba(16,185,129,0.08) 100%);
+  --bento-bevel: linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.32) 50%, transparent 100%);
+
+  --shadow-mid: 0 2px 8px rgba(0,0,0,0.45), 0 12px 32px rgba(0,0,0,0.4);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+
+  color-scheme: dark;
+}
+
 @theme inline {
-  --color-accent: #3b82f6;
-  --color-accent-light: #dbeafe;
-  --color-accent-dark: #2563eb;
-  --color-surface: #f8fafc;
-  --color-card: #ffffff;
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-soft);
+  --color-accent-dark: var(--accent-deep);
+  --color-surface: var(--bg);
+  --color-card: var(--panel);
   --color-success: #10b981;
   --color-success-bg: #d1fae5;
   --color-danger: #ef4444;
   --color-danger-bg: #fee2e2;
   --color-warning: #f59e0b;
   --color-warning-bg: #fef3c7;
-  --color-text: #1e293b;
-  --color-text-soft: #64748b;
-  --color-text-muted: #94a3b8;
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
+  --color-text: var(--text-1);
+  --color-text-soft: var(--text-2);
+  --color-text-muted: var(--text-3);
+  --color-border: var(--line);
+  --color-border-light: var(--line-soft);
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
+
+/* Bento utilities */
+.serif { letter-spacing: -0.025em; font-feature-settings: "ss01", "cv11"; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+.lift { transition: transform 200ms ease, box-shadow 200ms ease; }
+.lift:hover { transform: translateY(-1px); }
+
+.accent-halo { box-shadow: 0 0 0 1px var(--accent-line), 0 8px 20px rgba(16,185,129,0.15); }
+
+/* Reveal stagger (entrada suave en cascada) */
+@keyframes bento-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.bento-reveal { animation: bento-reveal 0.5s ease-out backwards; }
+.bento-stagger > * { animation: bento-reveal 0.5s ease-out backwards; }
+.bento-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.bento-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.bento-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.bento-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.bento-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.bento-stagger > *:nth-child(6) { animation-delay: 250ms; }
+
+::selection { background: var(--accent); color: white; }
 
 html {
   scroll-behavior: smooth;
