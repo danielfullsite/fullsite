@@ -149,8 +149,8 @@ export default function PlatillosPage() {
                   return item?.fullName || label
                 }}
                 contentStyle={{
-                  background: '#fff',
-                  border: 'none',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
                   borderRadius: '8px',
                   fontSize: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -230,8 +230,8 @@ export default function PlatillosPage() {
                 <Tooltip
                   formatter={(value) => [formatCurrency(Number(value)), 'Chilaquiles']}
                   contentStyle={{
-                    background: '#fff',
-                    border: 'none',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line)',
                     borderRadius: '8px',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -244,7 +244,7 @@ export default function PlatillosPage() {
                   fill="url(#colorChilaquiles)"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4, stroke: '#ef4444', strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 4, stroke: '#ef4444', strokeWidth: 2, fill: 'var(--text-3)' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -283,8 +283,8 @@ export default function PlatillosPage() {
                 <Tooltip
                   formatter={(value) => [formatCurrency(Number(value)), 'H&H']}
                   contentStyle={{
-                    background: '#fff',
-                    border: 'none',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line)',
                     borderRadius: '8px',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -297,7 +297,7 @@ export default function PlatillosPage() {
                   fill="url(#colorHH)"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: '#fff' }}
+                  activeDot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: 'var(--text-3)' }}
                 />
               </AreaChart>
             </ResponsiveContainer>

@@ -420,8 +420,8 @@ export default function MeserosPage() {
                   <Tooltip
                     formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                     contentStyle={{
-                      background: '#fff',
-                      border: 'none',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--line)',
                       borderRadius: '8px',
                       fontSize: '12px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -622,8 +622,8 @@ export default function MeserosPage() {
                         />
                         <Tooltip
                           contentStyle={{
-                            background: '#fff',
-                            border: 'none',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--line)',
                             borderRadius: '8px',
                             fontSize: '12px',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -875,8 +875,8 @@ export default function MeserosPage() {
                               <Tooltip
                                 formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                                 contentStyle={{
-                                  background: '#fff',
-                                  border: 'none',
+                                  background: 'var(--surface)',
+                                  border: '1px solid var(--line)',
                                   borderRadius: '8px',
                                   fontSize: '12px',
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -931,8 +931,8 @@ export default function MeserosPage() {
                               <Tooltip
                                 formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                                 contentStyle={{
-                                  background: '#fff',
-                                  border: 'none',
+                                  background: 'var(--surface)',
+                                  border: '1px solid var(--line)',
                                   borderRadius: '8px',
                                   fontSize: '12px',
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',

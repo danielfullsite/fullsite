@@ -97,7 +97,7 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
               strokeWidth={2.5}
               fill="url(#gradientVentas)"
               dot={false}
-              activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{ r: 6, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>

@@ -317,8 +317,8 @@ export default function TendenciasPage() {
               <Tooltip
                 formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                 contentStyle={{
-                  background: '#fff',
-                  border: 'none',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
                   borderRadius: '8px',
                   fontSize: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -330,8 +330,8 @@ export default function TendenciasPage() {
                 stroke="#3b82f6"
                 strokeWidth={2.5}
                 fill="url(#colorMonthlyVentas)"
-                dot={{ r: 3, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                dot={{ r: 3, fill: '#3b82f6', stroke: 'var(--text-1)', strokeWidth: 2 }}
+                activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--text-3)' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -373,8 +373,8 @@ export default function TendenciasPage() {
                 <Tooltip
                   formatter={(value, name) => [formatCurrency(Number(value)), name]}
                   contentStyle={{
-                    background: '#fff',
-                    border: 'none',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line)',
                     borderRadius: '8px',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -393,7 +393,7 @@ export default function TendenciasPage() {
                   strokeWidth={2}
                   strokeDasharray="6 3"
                   fill="none"
-                  dot={{ r: 2, fill: '#94a3b8', stroke: '#fff', strokeWidth: 1 }}
+                  dot={{ r: 2, fill: '#94a3b8', stroke: 'var(--text-1)', strokeWidth: 1 }}
                 />
                 <Area
                   type="monotone"
@@ -401,8 +401,8 @@ export default function TendenciasPage() {
                   stroke="#3b82f6"
                   strokeWidth={2.5}
                   fill="url(#colorYoyCurrent)"
-                  dot={{ r: 3, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                  activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                  dot={{ r: 3, fill: '#3b82f6', stroke: 'var(--text-1)', strokeWidth: 2 }}
+                  activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--text-3)' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -492,8 +492,8 @@ export default function TendenciasPage() {
               <Tooltip
                 formatter={(value) => [formatCurrency(Number(value)), 'Ticket Prom.']}
                 contentStyle={{
-                  background: '#fff',
-                  border: 'none',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
                   borderRadius: '8px',
                   fontSize: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -505,8 +505,8 @@ export default function TendenciasPage() {
                 stroke="#10b981"
                 strokeWidth={2.5}
                 fill="url(#colorTicketProm)"
-                dot={{ r: 3, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: '#fff' }}
+                dot={{ r: 3, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
+                activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: 'var(--text-3)' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -540,8 +540,8 @@ export default function TendenciasPage() {
                 <Tooltip
                   formatter={(value) => [formatCurrency(Number(value)), 'Venta prom.']}
                   contentStyle={{
-                    background: '#fff',
-                    border: 'none',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line)',
                     borderRadius: '8px',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -582,8 +582,8 @@ export default function TendenciasPage() {
                 <Tooltip
                   formatter={(value) => [formatCurrency(Number(value)), 'Ticket prom.']}
                   contentStyle={{
-                    background: '#fff',
-                    border: 'none',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line)',
                     borderRadius: '8px',
                     fontSize: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',

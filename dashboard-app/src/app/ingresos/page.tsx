@@ -191,8 +191,8 @@ export default function IngresosPage() {
                     <Tooltip
                       formatter={(value, name) => [formatCurrency(Number(value)), name === 'efectivo' ? 'Efectivo' : 'Tarjeta']}
                       contentStyle={{
-                        background: '#fff',
-                        border: 'none',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--line)',
                         borderRadius: '8px',
                         fontSize: '12px',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -205,7 +205,7 @@ export default function IngresosPage() {
                       strokeWidth={2}
                       fill="url(#colorEfectivo)"
                       dot={false}
-                      activeDot={{ r: 4, stroke: '#10b981', strokeWidth: 2, fill: '#fff' }}
+                      activeDot={{ r: 4, stroke: '#10b981', strokeWidth: 2, fill: 'var(--text-3)' }}
                     />
                     <Area
                       type="monotone"
@@ -214,7 +214,7 @@ export default function IngresosPage() {
                       strokeWidth={2}
                       fill="url(#colorTarjeta)"
                       dot={false}
-                      activeDot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                      activeDot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--text-3)' }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

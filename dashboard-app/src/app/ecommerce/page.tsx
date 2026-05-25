@@ -231,8 +231,8 @@ export default function EcommercePage() {
                           <Tooltip
                             formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
                             contentStyle={{
-                              background: '#fff',
-                              border: 'none',
+                              background: 'var(--surface)',
+                              border: '1px solid var(--line)',
                               borderRadius: '8px',
                               fontSize: '12px',
                               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -279,8 +279,8 @@ export default function EcommercePage() {
                         <Tooltip
                           formatter={(value) => [formatCurrency(Number(value)), 'eCommerce']}
                           contentStyle={{
-                            background: '#fff',
-                            border: 'none',
+                            background: 'var(--surface)',
+                            border: '1px solid var(--line)',
                             borderRadius: '8px',
                             fontSize: '12px',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -293,7 +293,7 @@ export default function EcommercePage() {
                           strokeWidth={2.5}
                           fill="url(#colorEcommerce)"
                           dot={false}
-                          activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }}
+                          activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--text-3)' }}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
