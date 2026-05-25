@@ -33,7 +33,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://*.vercel-scripts.com https://*.sentry.io",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https://*.supabase.co https://*.vercel.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://*.vercel.com https://images.unsplash.com",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://vercel.live https://*.vercel.com",
       "frame-src 'self' https://vercel.live",
       "frame-ancestors 'none'",
