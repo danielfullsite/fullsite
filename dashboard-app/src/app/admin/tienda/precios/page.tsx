@@ -25,7 +25,7 @@ function tierLabel(p: number) {
   return '$0-49'
 }
 const TIERS = ['$0-49', '$50-99', '$100-199', '$200-499', '$500+']
-const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-slate-100 text-slate-700', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-700', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
+const TIER_COLORS: Record<string, string> = { '$0-49': 'bg-[var(--surface-2)] text-[var(--text-1)]', '$50-99': 'bg-blue-100 text-blue-700', '$100-199': 'bg-amber-100 text-amber-700', '$200-499': 'bg-purple-100 text-purple-700', '$500+': 'bg-emerald-100 text-emerald-700' }
 
 export default function PreciosPage() {
   const CLIENT_ID = useClientId()
@@ -95,7 +95,7 @@ export default function PreciosPage() {
           if (count === 0) return null
           return (
             <button key={t} onClick={() => setActiveTier(activeTier === t ? null : t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeTier === t ? 'bg-slate-900 text-white' : TIER_COLORS[t]}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeTier === t ? 'bg-[var(--surface)] text-white' : TIER_COLORS[t]}`}>
               {t} ({count})
             </button>
           )
@@ -104,11 +104,11 @@ export default function PreciosPage() {
 
       <div className="space-y-4">
         {(activeTier ? grouped.filter(g => g.tier === activeTier) : grouped).map(({ tier, items: tierItems }) => (
-          <div key={tier} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+          <div key={tier} className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
+            <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${TIER_COLORS[tier]}`}>{tier}</span>
-                <span className="text-xs text-slate-400">{tierItems.length} productos</span>
+                <span className="text-xs text-[var(--text-3)]">{tierItems.length} productos</span>
               </div>
               <button onClick={() => selectTier(tier)} className="text-xs text-emerald-600 hover:underline font-medium">
                 {tierItems.every(i => selected.has(i.id)) ? 'Deseleccionar' : 'Seleccionar'} todos
@@ -118,14 +118,14 @@ export default function PreciosPage() {
               {tierItems.map(item => {
                 const m = item.price > 0 ? ((item.price - item.cost) / item.price * 100) : 0
                 return (
-                  <div key={item.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-slate-50">
+                  <div key={item.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-[var(--surface-2)]">
                     <button onClick={() => toggleSelect(item.id)}
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'}`}>
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)]'}`}>
                       {selected.has(item.id) && <Check size={12} />}
                     </button>
-                    <span className="text-sm font-medium text-slate-900 flex-1">{item.name}</span>
-                    <span className="text-xs text-slate-400">{item.department}</span>
-                    <span className="text-sm font-semibold text-slate-900 w-20 text-right">${item.price.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-[var(--text-1)] flex-1">{item.name}</span>
+                    <span className="text-xs text-[var(--text-3)]">{item.department}</span>
+                    <span className="text-sm font-semibold text-[var(--text-1)] w-20 text-right">${item.price.toFixed(2)}</span>
                     <span className={`text-xs font-semibold w-12 text-right ${m >= 50 ? 'text-emerald-600' : m >= 30 ? 'text-amber-600' : 'text-red-600'}`}>{m.toFixed(0)}%</span>
                   </div>
                 )
@@ -133,10 +133,10 @@ export default function PreciosPage() {
             </div>
           </div>
         ))}
-        {items.length === 0 && <p className="text-center text-slate-400 py-10 text-sm">No hay productos registrados</p>}
+        {items.length === 0 && <p className="text-center text-[var(--text-3)] py-10 text-sm">No hay productos registrados</p>}
       </div>
 
-      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
+      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
     </div>
   )
 }

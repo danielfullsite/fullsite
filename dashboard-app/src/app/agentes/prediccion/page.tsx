@@ -64,61 +64,61 @@ export default function PrediccionPage() {
     <>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/agentes" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+          <Link href="/agentes" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Prediccion de Cierre</h2>
-            <p className="text-sm text-slate-400">Proyeccion al final del dia {fecha && `· ${fecha}`}{data?.hora_corte && ` · corte ${data.hora_corte}`}</p>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Prediccion de Cierre</h2>
+            <p className="text-sm text-[var(--text-3)]">Proyeccion al final del dia {fecha && `· ${fecha}`}{data?.hora_corte && ` · corte ${data.hora_corte}`}</p>
           </div>
         </div>
-        <button onClick={load} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+        <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
           <RefreshCw size={16} />
         </button>
       </div>
 
       {/* Big projection number */}
-      <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-6 mb-6 text-center">
+      <div className="bg-[var(--surface)] rounded-xl border border-blue-200 shadow-sm p-6 mb-6 text-center">
         <p className="text-xs text-blue-500 font-medium mb-2 uppercase tracking-wider">Proyeccion al cierre</p>
         <p className="text-4xl font-bold text-blue-600 mb-1">{formatCurrency(data?.proyeccion_cierre)}</p>
         {data?.avance_pct != null && (
           <div className="mt-3">
-            <div className="w-full max-w-xs mx-auto bg-slate-100 rounded-full h-2.5">
+            <div className="w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-2.5">
               <div className="h-2.5 rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(data.avance_pct, 100)}%` }} />
             </div>
-            <p className="text-xs text-slate-500 mt-1">{data.avance_pct.toFixed(0)}% avance</p>
+            <p className="text-xs text-[var(--text-2)] mt-1">{data.avance_pct.toFixed(0)}% avance</p>
           </div>
         )}
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs text-slate-500 font-medium mb-1">Ventas actuales</p>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(data?.ventas_actuales)}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Ventas actuales</p>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(data?.ventas_actuales)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs text-slate-500 font-medium mb-1">Proyeccion cierre</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Proyeccion cierre</p>
           <p className="text-2xl font-bold text-blue-600">{formatCurrency(data?.proyeccion_cierre)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs text-slate-500 font-medium mb-1">Gap restante</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Gap restante</p>
           <p className="text-2xl font-bold text-amber-600">{formatCurrency(data?.gap)}</p>
         </div>
       </div>
 
       {/* Comparisons */}
       {comparaciones.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900">Comparativos</h3>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm mb-6">
+          <div className="px-4 py-3 border-b border-[var(--line-soft)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)]">Comparativos</h3>
           </div>
           <div className="divide-y divide-slate-50">
             {comparaciones.map((c, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-slate-700">{c.label}</span>
+                <span className="text-sm text-[var(--text-1)]">{c.label}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm tabular-nums text-slate-600">{formatCurrency(c.valor)}</span>
+                  <span className="text-sm tabular-nums text-[var(--text-2)]">{formatCurrency(c.valor)}</span>
                   <span className={`flex items-center gap-1 text-sm font-bold tabular-nums ${c.diferencia_pct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {c.diferencia_pct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     {c.diferencia_pct > 0 ? '+' : ''}{c.diferencia_pct?.toFixed(1)}%
@@ -132,9 +132,9 @@ export default function PrediccionPage() {
 
       {/* Boost suggestions */}
       {boosts.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
+          <div className="px-4 py-3 border-b border-[var(--line-soft)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
               <Zap size={14} className="text-amber-500" /> Sugerencias para impulsar ventas
             </h3>
           </div>
@@ -142,10 +142,10 @@ export default function PrediccionPage() {
             {boosts.map((b, i) => (
               <div key={i} className="px-4 py-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-slate-900">{b.category}</span>
+                  <span className="text-sm font-medium text-[var(--text-1)]">{b.category}</span>
                   <span className="text-sm font-bold text-emerald-600">+{formatCurrency(b.potencial)}</span>
                 </div>
-                <p className="text-xs text-slate-500">{b.razon}</p>
+                <p className="text-xs text-[var(--text-2)]">{b.razon}</p>
               </div>
             ))}
           </div>
@@ -154,13 +154,13 @@ export default function PrediccionPage() {
 
       {/* Summary */}
       {data?.summary && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mt-6">
-          <p className="text-sm text-slate-700 leading-relaxed">{data.summary}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 mt-6">
+          <p className="text-sm text-[var(--text-1)] leading-relaxed">{data.summary}</p>
         </div>
       )}
 
       {!data && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-slate-400 text-sm">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
           Sin datos de prediccion. El agente corre automaticamente.
         </div>
       )}

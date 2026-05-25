@@ -42,50 +42,50 @@ export default function HermesPage() {
     high: 'bg-red-100 text-red-700',
     medium: 'bg-amber-100 text-amber-700',
     low: 'bg-blue-100 text-blue-700',
-    info: 'bg-slate-100 text-slate-600',
+    info: 'bg-[var(--surface-2)] text-[var(--text-2)]',
   }
 
   return (
     <>
       <div className="mb-6 flex items-center gap-3">
-        <Link href="/agentes" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400"><ArrowLeft size={16} /></Link>
+        <Link href="/agentes" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <div className="flex items-center gap-3 flex-1">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
             <Bot size={20} className="text-indigo-500" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Hermes</h2>
-            <p className="text-sm text-slate-400">{summary} {fecha && `· ${fecha}`}</p>
+            <h2 className="text-xl font-bold text-[var(--text-1)]">Hermes</h2>
+            <p className="text-sm text-[var(--text-3)]">{summary} {fecha && `· ${fecha}`}</p>
           </div>
         </div>
-        <button onClick={load} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400"><RefreshCw size={16} /></button>
+        <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><RefreshCw size={16} /></button>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <p className="text-xs text-slate-500 font-medium mb-1">Total issues</p>
-          <p className="text-2xl font-bold text-slate-900">{totalIssues}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Total issues</p>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{totalIssues}</p>
         </div>
-        <div className="bg-white rounded-xl border border-red-200 shadow-sm p-5 bg-red-50/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-red-200 shadow-sm p-5 bg-red-50/30">
           <p className="text-xs text-red-600 font-medium mb-1">Criticos</p>
           <p className="text-2xl font-bold text-red-600">{criticalCount}</p>
         </div>
-        <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 bg-amber-50/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-amber-200 shadow-sm p-5 bg-amber-50/30">
           <p className="text-xs text-amber-600 font-medium mb-1">Altos</p>
           <p className="text-2xl font-bold text-amber-600">{highCount}</p>
         </div>
       </div>
 
       {!data ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">Hermes no ha corrido todavía. Corre 2x al día (7am + 11pm).</div>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-8 text-center text-[var(--text-3)]">Hermes no ha corrido todavía. Corre 2x al día (7am + 11pm).</div>
       ) : (
         <div className="space-y-4">
           {/* Improvements */}
           {improvements.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <h3 className="text-sm font-bold text-slate-900">Mejoras recomendadas</h3>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
+              <div className="px-5 py-4 border-b border-[var(--line-soft)]">
+                <h3 className="text-sm font-bold text-[var(--text-1)]">Mejoras recomendadas</h3>
               </div>
               <div className="divide-y divide-slate-50">
                 {improvements.map((imp, i) => (
@@ -94,11 +94,11 @@ export default function HermesPage() {
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${priorityColors[imp.priority as string] || priorityColors.info}`}>
                         {imp.priority as string}
                       </span>
-                      <span className="text-sm font-semibold text-slate-900">{imp.title as string}</span>
+                      <span className="text-sm font-semibold text-[var(--text-1)]">{imp.title as string}</span>
                     </div>
                     <div className="space-y-1">
                       {((imp.details || []) as string[]).map((d, j) => (
-                        <p key={j} className="text-xs text-slate-500">• {d}</p>
+                        <p key={j} className="text-xs text-[var(--text-2)]">• {d}</p>
                       ))}
                     </div>
                     {((imp.fixes || []) as string[]).length > 0 && (
@@ -116,15 +116,15 @@ export default function HermesPage() {
 
           {/* Health Issues */}
           {healthIssues.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">Salud de agentes ({healthIssues.length})</h3>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+              <h3 className="text-sm font-bold text-[var(--text-1)] mb-3">Salud de agentes ({healthIssues.length})</h3>
               <div className="space-y-2">
                 {healthIssues.map((issue, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <AlertTriangle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <span className="font-medium text-slate-900">{issue.agent as string}:</span>{' '}
-                      <span className="text-slate-600">{issue.message as string}</span>
+                      <span className="font-medium text-[var(--text-1)]">{issue.agent as string}:</span>{' '}
+                      <span className="text-[var(--text-2)]">{issue.message as string}</span>
                     </div>
                   </div>
                 ))}
@@ -134,15 +134,15 @@ export default function HermesPage() {
 
           {/* Data Issues */}
           {dataIssues.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">Calidad de datos ({dataIssues.length})</h3>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+              <h3 className="text-sm font-bold text-[var(--text-1)] mb-3">Calidad de datos ({dataIssues.length})</h3>
               <div className="space-y-2">
                 {dataIssues.map((issue, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <AlertTriangle size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <span className="font-medium text-slate-900">{issue.agent as string}:</span>{' '}
-                      <span className="text-slate-600">{issue.message as string}</span>
+                      <span className="font-medium text-[var(--text-1)]">{issue.agent as string}:</span>{' '}
+                      <span className="text-[var(--text-2)]">{issue.message as string}</span>
                     </div>
                   </div>
                 ))}
@@ -152,14 +152,14 @@ export default function HermesPage() {
 
           {/* Chat Issues */}
           {chatIssues.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">Gaps del chat ({chatIssues.length})</h3>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+              <h3 className="text-sm font-bold text-[var(--text-1)] mb-3">Gaps del chat ({chatIssues.length})</h3>
               <div className="space-y-2">
                 {chatIssues.map((issue, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <AlertTriangle size={14} className="text-violet-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <span className="text-slate-600">{issue.message as string}</span>
+                      <span className="text-[var(--text-2)]">{issue.message as string}</span>
                       <p className="text-xs text-indigo-600 mt-1">→ {issue.fix as string}</p>
                     </div>
                   </div>

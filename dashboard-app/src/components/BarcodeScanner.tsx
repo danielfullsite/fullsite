@@ -102,7 +102,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         </div>
         <button
           onClick={() => { stopCamera(); onClose() }}
-          className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-white"
+          className="w-10 h-10 rounded-full bg-[var(--surface-2)] hover:bg-[var(--line)] flex items-center justify-center text-white"
         >
           <X size={20} />
         </button>
@@ -112,7 +112,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       {error ? (
         <div className="text-center px-6">
           <p className="text-red-400 text-lg mb-4">{error}</p>
-          <button onClick={onClose} className="px-6 py-3 bg-slate-700 rounded-xl text-white font-bold">
+          <button onClick={onClose} className="px-6 py-3 bg-[var(--line)] rounded-xl text-white font-bold">
             Cerrar
           </button>
         </div>
@@ -140,7 +140,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         </div>
       )}
 
-      <p className="text-slate-400 text-sm mt-4 text-center px-6">
+      <p className="text-[var(--text-3)] text-sm mt-4 text-center px-6">
         Apunta al código de barras del producto Market
       </p>
     </div>

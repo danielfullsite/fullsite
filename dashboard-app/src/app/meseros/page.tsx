@@ -51,7 +51,7 @@ type SortDir = 'asc' | 'desc'
 
 const MEDAL_COLORS: Record<number, { bg: string; text: string; icon: string }> = {
   0: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '1' },
-  1: { bg: 'bg-slate-100', text: 'text-slate-600', icon: '2' },
+  1: { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-2)]', icon: '2' },
   2: { bg: 'bg-orange-100', text: 'text-orange-700', icon: '3' },
 }
 
@@ -274,14 +274,14 @@ export default function MeserosPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+          <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
   }
 
   const SortIcon = ({ field }: { field: SortKey }) => {
-    if (sortKey !== field) return <ChevronDown size={12} className="text-slate-400/40 ml-1" />
+    if (sortKey !== field) return <ChevronDown size={12} className="text-[var(--text-3)]/40 ml-1" />
     return sortDir === 'desc'
       ? <ChevronDown size={12} className="text-blue-500 ml-1" />
       : <ChevronUp size={12} className="text-blue-500 ml-1" />
@@ -297,7 +297,7 @@ export default function MeserosPage() {
 
       {/* Tabs — segmented control style */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
-        <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-0.5">
+        <div className="inline-flex bg-[var(--surface-2)] rounded-lg p-1 gap-0.5">
           {([
             { key: 'ventas' as Tab, label: 'Ventas', icon: BarChart3 },
             { key: 'kpis' as Tab, label: 'KPIs', icon: Target },
@@ -310,8 +310,8 @@ export default function MeserosPage() {
                 onClick={() => setTab(t.key)}
                 className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                   tab === t.key
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm'
+                    : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
                 }`}
               >
                 <Icon size={15} />
@@ -323,15 +323,15 @@ export default function MeserosPage() {
 
         {/* Period selector — segmented control */}
         {tab === 'ventas' && (
-          <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-0.5">
+          <div className="inline-flex bg-[var(--surface-2)] rounded-lg p-1 gap-0.5">
             {([7, 14, 30] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                   period === p
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm'
+                    : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
                 }`}
               >
                 {p}d
@@ -377,13 +377,13 @@ export default function MeserosPage() {
           </div>
 
           {/* Horizontal bar chart — top 10 */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider">
                   Top 10 Meseros por Ventas
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">Últimos {period} días</p>
+                <p className="text-xs text-[var(--text-3)] mt-1">Últimos {period} días</p>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
                 <BarChart3 size={14} className="text-blue-500" />
@@ -439,16 +439,16 @@ export default function MeserosPage() {
           </div>
 
           {/* Ranking table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--line-soft)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                  <h3 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider">
                     Ranking Completo
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">{meseros.length} meseros activos en {period} días</p>
+                  <p className="text-xs text-[var(--text-3)] mt-1">{meseros.length} meseros activos en {period} días</p>
                 </div>
-                <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full font-medium">
+                <span className="text-xs text-[var(--text-3)] bg-[var(--surface-2)] px-3 py-1.5 rounded-full font-medium">
                   Click columna para ordenar
                 </span>
               </div>
@@ -456,40 +456,40 @@ export default function MeserosPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50/80">
-                    <th className="text-left text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider w-12">
+                  <tr className="bg-[var(--surface-2)]/80">
+                    <th className="text-left text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider w-12">
                       #
                     </th>
                     <th
                       onClick={() => handleSort('nombre')}
-                      className="text-left text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
+                      className="text-left text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
                     >
                       <span className="inline-flex items-center">Mesero <SortIcon field="nombre" /></span>
                     </th>
-                    <th className="text-left text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider w-44">
+                    <th className="text-left text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider w-44">
                       Progreso
                     </th>
                     <th
                       onClick={() => handleSort('total')}
-                      className="text-right text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
+                      className="text-right text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
                     >
                       <span className="inline-flex items-center justify-end">Ventas <SortIcon field="total" /></span>
                     </th>
                     <th
                       onClick={() => handleSort('promedio')}
-                      className="text-right text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
+                      className="text-right text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
                     >
                       <span className="inline-flex items-center justify-end">Prom. Diario <SortIcon field="promedio" /></span>
                     </th>
                     <th
                       onClick={() => handleSort('dias')}
-                      className="text-right text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
+                      className="text-right text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
                     >
                       <span className="inline-flex items-center justify-end">Días <SortIcon field="dias" /></span>
                     </th>
                     <th
                       onClick={() => handleSort('pct')}
-                      className="text-right text-[11px] font-semibold text-slate-500 py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
+                      className="text-right text-[11px] font-semibold text-[var(--text-2)] py-3 px-5 uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors"
                     >
                       <span className="inline-flex items-center justify-end">% del Total <SortIcon field="pct" /></span>
                     </th>
@@ -503,8 +503,8 @@ export default function MeserosPage() {
                     return (
                       <tr
                         key={m.nombre}
-                        className={`border-b border-slate-100/80 hover:bg-blue-50/40 transition-colors duration-150 ${
-                          i % 2 === 1 ? 'bg-slate-50/40' : ''
+                        className={`border-b border-[var(--line-soft)]/80 hover:bg-blue-50/40 transition-colors duration-150 ${
+                          i % 2 === 1 ? 'bg-[var(--surface-2)]/40' : ''
                         }`}
                       >
                         <td className="py-3.5 px-5">
@@ -513,7 +513,7 @@ export default function MeserosPage() {
                               <Award size={14} className={medal.text} />
                             </div>
                           ) : (
-                            <span className="text-sm text-slate-400 tabular-nums font-medium pl-1.5">{origIndex + 1}</span>
+                            <span className="text-sm text-[var(--text-3)] tabular-nums font-medium pl-1.5">{origIndex + 1}</span>
                           )}
                         </td>
                         <td className="py-3.5 px-5">
@@ -524,11 +524,11 @@ export default function MeserosPage() {
                             >
                               {m.nombre.charAt(0)}
                             </div>
-                            <span className="text-sm font-medium text-slate-900">{m.nombre}</span>
+                            <span className="text-sm font-medium text-[var(--text-1)]">{m.nombre}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-5">
-                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                          <div className="w-full bg-[var(--surface-2)] rounded-full h-2 overflow-hidden">
                             <div
                               className="h-2 rounded-full animate-progress transition-all duration-500"
                               style={{
@@ -538,13 +538,13 @@ export default function MeserosPage() {
                             />
                           </div>
                         </td>
-                        <td className="py-3.5 px-5 text-sm text-right tabular-nums font-bold text-slate-900">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
                           {formatCurrency(m.total)}
                         </td>
-                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-slate-500">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-[var(--text-2)]">
                           {formatCurrency(m.promedio)}
                         </td>
-                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-slate-500">
+                        <td className="py-3.5 px-5 text-sm text-right tabular-nums text-[var(--text-2)]">
                           {m.dias}
                         </td>
                         <td className="py-3.5 px-5 text-sm text-right tabular-nums">
@@ -566,21 +566,21 @@ export default function MeserosPage() {
       {tab === 'kpis' && (
         <div className="space-y-6">
           {waiterKpis.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-16 shadow-sm text-center">
-              <Target size={40} className="text-slate-400/30 mx-auto mb-4" />
-              <p className="text-slate-400 text-sm">Sin datos de KPIs de meseros disponibles</p>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-16 shadow-sm text-center">
+              <Target size={40} className="text-[var(--text-3)]/30 mx-auto mb-4" />
+              <p className="text-[var(--text-3)] text-sm">Sin datos de KPIs de meseros disponibles</p>
             </div>
           ) : (
             <>
               {/* Radar chart — top 5 comparison */}
               {radarData.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                      <h3 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider">
                         Comparativa Top 5 Meseros
                       </h3>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-[var(--text-3)] mt-1">
                         Rendimiento relativo en métricas clave (normalizado a 100)
                       </p>
                     </div>
@@ -639,10 +639,10 @@ export default function MeserosPage() {
               {/* KPI Cards grid */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                  <h3 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider">
                     Métricas por Mesero
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[var(--text-3)]">
                     {waiterData.length} días analizados &middot; Verde = sobre el promedio
                   </p>
                 </div>
@@ -681,10 +681,10 @@ export default function MeserosPage() {
                     return (
                       <div
                         key={w.nombre}
-                        className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                        className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
                       >
                         {/* Header with accent */}
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+                        <div className="px-5 py-4 border-b border-[var(--line-soft)] flex items-center gap-3">
                           <div
                             className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                             style={{ backgroundColor: COLORS[i % COLORS.length] }}
@@ -692,21 +692,21 @@ export default function MeserosPage() {
                             {w.nombre.charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <h4 className="text-sm font-semibold text-slate-900 truncate">{w.nombre}</h4>
-                            <p className="text-xs text-slate-400">
+                            <h4 className="text-sm font-semibold text-[var(--text-1)] truncate">{w.nombre}</h4>
+                            <p className="text-xs text-[var(--text-3)]">
                               {formatCurrency(w.totalVentas)} &middot; {w.personas} personas &middot; {w.dias} días
                             </p>
                           </div>
                         </div>
                         {/* Metrics */}
-                        <div className="grid grid-cols-2 gap-px bg-slate-100">
+                        <div className="grid grid-cols-2 gap-px bg-[var(--surface-2)]">
                           {metrics.map((m) => {
                             const isAbove = m.actual >= m.avg
                             return (
-                              <div key={m.label} className="bg-white px-4 py-3.5">
-                                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
+                              <div key={m.label} className="bg-[var(--surface)] px-4 py-3.5">
+                                <p className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-1">{m.label}</p>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-lg font-bold text-slate-900 tabular-nums">{m.value}</span>
+                                  <span className="text-lg font-bold text-[var(--text-1)] tabular-nums">{m.value}</span>
                                   {isAbove ? (
                                     <TrendingUp size={14} className="text-emerald-500" />
                                   ) : (
@@ -734,15 +734,15 @@ export default function MeserosPage() {
       {tab === 'detalle' && (
         <div className="space-y-6">
           {waiterKpis.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-16 shadow-sm text-center">
-              <User size={40} className="text-slate-400/30 mx-auto mb-4" />
-              <p className="text-slate-400 text-sm">Sin datos de detalle por mesero disponibles</p>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-16 shadow-sm text-center">
+              <User size={40} className="text-[var(--text-3)]/30 mx-auto mb-4" />
+              <p className="text-[var(--text-3)] text-sm">Sin datos de detalle por mesero disponibles</p>
             </div>
           ) : (
             <>
               {/* Mesero selector */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <label className="text-sm font-semibold text-slate-900 uppercase tracking-wider block mb-3">
+              <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
+                <label className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider block mb-3">
                   Seleccionar Mesero
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -753,7 +753,7 @@ export default function MeserosPage() {
                       className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border ${
                         selectedMesero === w.nombre
                           ? 'border-blue-500 bg-blue-50 text-blue-500 shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-500 hover:border-blue-500/40 hover:text-slate-900'
+                          : 'border-[var(--line)] bg-[var(--surface)] text-[var(--text-2)] hover:border-blue-500/40 hover:text-[var(--text-1)]'
                       }`}
                     >
                       <div
@@ -772,8 +772,8 @@ export default function MeserosPage() {
               {selectedWaiter && (
                 <div className="space-y-6">
                   {/* KPIs vs average */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+                  <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden">
+                    <div className="px-6 py-5 border-b border-[var(--line-soft)] flex items-center gap-3">
                       <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                         style={{ backgroundColor: COLORS[waiterKpis.findIndex(w => w.nombre === selectedMesero) % COLORS.length] }}
@@ -781,13 +781,13 @@ export default function MeserosPage() {
                         {selectedWaiter.nombre.charAt(0)}
                       </div>
                       <div>
-                        <h3 className="text-base font-semibold text-slate-900">{selectedWaiter.nombre}</h3>
-                        <p className="text-xs text-slate-400">
+                        <h3 className="text-base font-semibold text-[var(--text-1)]">{selectedWaiter.nombre}</h3>
+                        <p className="text-xs text-[var(--text-3)]">
                           {formatCurrency(selectedWaiter.totalVentas)} total &middot; {selectedWaiter.personas} personas &middot; {selectedWaiter.mesas} mesas &middot; {selectedWaiter.dias} días
                         </p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-100">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[var(--surface-2)]">
                       {[
                         {
                           label: 'Bebidas/persona',
@@ -818,9 +818,9 @@ export default function MeserosPage() {
                         const isAbove = diff >= 0
                         const pctDiff = kpi.avg > 0 ? Math.abs((diff / kpi.avg) * 100).toFixed(0) : '0'
                         return (
-                          <div key={kpi.label} className="bg-white p-5">
-                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2">{kpi.label}</p>
-                            <p className="text-2xl font-bold text-slate-900 tabular-nums mb-1">{kpi.fmt(kpi.val)}</p>
+                          <div key={kpi.label} className="bg-[var(--surface)] p-5">
+                            <p className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-2">{kpi.label}</p>
+                            <p className="text-2xl font-bold text-[var(--text-1)] tabular-nums mb-1">{kpi.fmt(kpi.val)}</p>
                             <div className="flex items-center gap-1.5">
                               <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
                                 isAbove ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
@@ -828,7 +828,7 @@ export default function MeserosPage() {
                                 {isAbove ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                                 {pctDiff}%
                               </span>
-                              <span className="text-[10px] text-slate-400">vs promedio ({kpi.fmt(kpi.avg)})</span>
+                              <span className="text-[10px] text-[var(--text-3)]">vs promedio ({kpi.fmt(kpi.avg)})</span>
                             </div>
                           </div>
                         )
@@ -840,11 +840,11 @@ export default function MeserosPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Top categories */}
                     {selectedWaiter.grupos.length > 0 && (
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                        <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-1">
+                      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
+                        <h4 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider mb-1">
                           Top Categorías
                         </h4>
-                        <p className="text-xs text-slate-400 mb-4">{selectedWaiter.grupos.length} categorías vendidas</p>
+                        <p className="text-xs text-[var(--text-3)] mb-4">{selectedWaiter.grupos.length} categorías vendidas</p>
                         <div className="h-[250px] sm:h-[350px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
@@ -896,11 +896,11 @@ export default function MeserosPage() {
 
                     {/* Top platillos */}
                     {selectedWaiter.platillos.length > 0 && (
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                        <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-1">
+                      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
+                        <h4 className="text-sm font-semibold text-[var(--text-1)] uppercase tracking-wider mb-1">
                           Top Platillos
                         </h4>
-                        <p className="text-xs text-slate-400 mb-4">{selectedWaiter.platillos.length} platillos vendidos</p>
+                        <p className="text-xs text-[var(--text-3)] mb-4">{selectedWaiter.platillos.length} platillos vendidos</p>
                         <div className="h-[250px] sm:h-[350px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart
@@ -955,12 +955,12 @@ export default function MeserosPage() {
 
               {/* Prompt to select */}
               {!selectedWaiter && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-16 text-center">
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-16 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
                     <ChevronRight size={28} className="text-blue-500/40" />
                   </div>
-                  <p className="text-slate-500 text-sm font-medium">Selecciona un mesero arriba para ver su detalle</p>
-                  <p className="text-slate-400 text-xs mt-1">Categorías, platillos, y comparativa con el promedio</p>
+                  <p className="text-[var(--text-2)] text-sm font-medium">Selecciona un mesero arriba para ver su detalle</p>
+                  <p className="text-[var(--text-3)] text-xs mt-1">Categorías, platillos, y comparativa con el promedio</p>
                 </div>
               )}
             </>

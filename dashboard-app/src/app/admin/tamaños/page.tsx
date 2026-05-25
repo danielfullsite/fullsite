@@ -103,44 +103,44 @@ export default function AdminTamañosPage() {
           <h3 className="font-semibold text-emerald-800 mb-3">Nuevo tamaño</h3>
           <div className="grid grid-cols-2 gap-3">
             <input value={newSize.name} onChange={e => setNewSize({ ...newSize, name: e.target.value })}
-              placeholder="Nombre (ej. Grande)" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              placeholder="Nombre (ej. Grande)" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
             <input type="number" step="0.01" value={newSize.multiplier}
               onChange={e => setNewSize({ ...newSize, multiplier: Number(e.target.value) })}
-              placeholder="Multiplicador (ej. 1.3)" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              placeholder="Multiplicador (ej. 1.3)" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
           </div>
           <div className="flex gap-2 mt-3">
             <button onClick={handleAdd} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1">
               <Save size={14} /> Guardar
             </button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
+            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm">Cancelar</button>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
         {loading ? (
-          <p className="text-center py-12 text-slate-400 text-sm">Cargando...</p>
+          <p className="text-center py-12 text-[var(--text-3)] text-sm">Cargando...</p>
         ) : sizes.length === 0 ? (
-          <p className="text-center py-12 text-slate-400 text-sm">No hay tamaños configurados</p>
+          <p className="text-center py-12 text-[var(--text-3)] text-sm">No hay tamaños configurados</p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Nombre</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Multiplicador</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Ejemplo ($100)</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Acciones</th>
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Nombre</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Multiplicador</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Ejemplo ($100)</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {sizes.map(s => (
-                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr key={s.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                   <td className="px-5 py-3">
                     {editing && editing.id === s.id ? (
                       <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })}
                         className="border border-emerald-300 rounded px-2 py-1 text-sm w-full" />
                     ) : (
-                      <span className="text-sm font-medium text-slate-900">{s.name}</span>
+                      <span className="text-sm font-medium text-[var(--text-1)]">{s.name}</span>
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -149,21 +149,21 @@ export default function AdminTamañosPage() {
                         onChange={e => setEditing({ ...editing, multiplier: Number(e.target.value) })}
                         className="border border-emerald-300 rounded px-2 py-1 text-sm w-24 text-right" />
                     ) : (
-                      <span className="text-sm text-slate-700">{s.multiplier}x</span>
+                      <span className="text-sm text-[var(--text-1)]">{s.multiplier}x</span>
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <span className="text-sm font-semibold text-slate-900">${(100 * s.multiplier).toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-[var(--text-1)]">${(100 * s.multiplier).toFixed(2)}</span>
                   </td>
                   <td className="px-5 py-3 text-right">
                     {editing && editing.id === s.id ? (
                       <div className="flex gap-1 justify-end">
                         <button onClick={handleSave} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14} /></button>
-                        <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><X size={14} /></button>
+                        <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><X size={14} /></button>
                       </div>
                     ) : (
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><Pencil size={14} /></button>
+                        <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14} /></button>
                         <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
                       </div>
                     )}
@@ -176,7 +176,7 @@ export default function AdminTamañosPage() {
       </div>
 
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-slate-800 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-[var(--surface-2)] text-white' : 'bg-red-600 text-white'}`}>
           {toast.msg}
         </div>
       )}

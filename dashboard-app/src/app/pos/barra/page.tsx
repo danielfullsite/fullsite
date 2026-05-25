@@ -89,7 +89,7 @@ export default function BarraPage() {
   }
 
   const statusConfig: Record<string, { bg: string; border: string; badge: string; badgeText: string; label: string; nextLabel: string }> = {
-    enviada: { bg: 'bg-slate-800', border: 'border-white/20', badge: 'bg-white', badgeText: 'text-slate-900', label: 'NUEVA', nextLabel: 'Preparando' },
+    enviada: { bg: 'bg-[var(--surface-2)]', border: 'border-white/20', badge: 'bg-[var(--surface)]', badgeText: 'text-[var(--text-1)]', label: 'NUEVA', nextLabel: 'Preparando' },
     preparando: { bg: 'bg-purple-950/40', border: 'border-purple-500/40', badge: 'bg-purple-500', badgeText: 'text-white', label: 'PREPARANDO', nextLabel: 'Lista' },
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
@@ -102,32 +102,32 @@ export default function BarraPage() {
   if (!mounted) return null
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <Wine size={24} className="text-purple-400" />
             <h1 className="text-xl font-bold">Barra</h1>
           </div>
-          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-white" />
-            <span className="text-sm text-slate-300">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
+            <div className="w-3 h-3 rounded-full bg-[var(--surface)]" />
+            <span className="text-sm text-[var(--text-4)]">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-purple-500" />
-            <span className="text-sm text-slate-300">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span className="text-sm text-slate-300">Listas ({orders.filter(o => o.status === 'lista').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Listas ({orders.filter(o => o.status === 'lista').length})</span>
           </div>
         </div>
       </header>
@@ -138,7 +138,7 @@ export default function BarraPage() {
             <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : sortedOrders.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <div className="text-center">
               <Wine size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-xl">No hay bebidas pendientes</p>
@@ -165,9 +165,9 @@ export default function BarraPage() {
                           {config.label}
                         </span>
                       </div>
-                      <p className="text-slate-400 text-sm">{order.mesero}</p>
+                      <p className="text-[var(--text-3)] text-sm">{order.mesero}</p>
                     </div>
-                    <div className={`flex items-center gap-1 ${isUrgent ? 'text-red-400' : 'text-slate-400'}`}>
+                    <div className={`flex items-center gap-1 ${isUrgent ? 'text-red-400' : 'text-[var(--text-3)]'}`}>
                       {isUrgent ? <Flame size={16} /> : <Clock size={16} />}
                       <span className="text-sm font-mono font-semibold">{elapsed}m</span>
                     </div>
@@ -182,7 +182,7 @@ export default function BarraPage() {
                         <div>
                           <span className="text-white text-sm">{item.nombre || item.name}</span>
                           {item.modificadores && item.modificadores.length > 0 && (
-                            <p className="text-slate-500 text-xs">{item.modificadores.join(' · ')}</p>
+                            <p className="text-[var(--text-2)] text-xs">{item.modificadores.join(' · ')}</p>
                           )}
                         </div>
                       </div>
@@ -194,7 +194,7 @@ export default function BarraPage() {
                     className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                       order.status === 'enviada' ? 'bg-purple-500 hover:bg-purple-400 text-white' :
                       order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
-                      'bg-slate-600 hover:bg-slate-500 text-white'
+                      'bg-slate-600 hover:bg-[var(--surface-2)]0 text-white'
                     }`}
                   >
                     <Check size={18} />

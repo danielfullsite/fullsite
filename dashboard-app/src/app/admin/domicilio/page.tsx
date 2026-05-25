@@ -76,21 +76,21 @@ export default function DomicilioPage() {
         </button>} />
 
       {zones.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-10 text-center text-sm text-[var(--text-3)]">
           No hay zonas de delivery configuradas
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {zones.map(zone => (
-            <div key={zone.id} className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-5 ${!zone.active ? 'opacity-40' : ''}`}>
+            <div key={zone.id} className={`bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm p-5 ${!zone.active ? 'opacity-40' : ''}`}>
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{zone.name}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{cpCount(zone.postal_codes)} codigos postales</p>
+                  <h3 className="font-semibold text-[var(--text-1)]">{zone.name}</h3>
+                  <p className="text-xs text-[var(--text-3)] mt-0.5">{cpCount(zone.postal_codes)} codigos postales</p>
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => { setModal({ ...zone }); setIsNew(false) }}
-                    className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 inline-flex items-center justify-center">
+                    className="w-7 h-7 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] inline-flex items-center justify-center">
                     <Pencil size={13} />
                   </button>
                 </div>
@@ -99,23 +99,23 @@ export default function DomicilioPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <DollarSign size={14} className="text-emerald-500" />
-                  <span className="text-slate-600">Envio:</span>
-                  <span className="font-semibold text-slate-900">${zone.delivery_fee.toFixed(2)}</span>
+                  <span className="text-[var(--text-2)]">Envio:</span>
+                  <span className="font-semibold text-[var(--text-1)]">${zone.delivery_fee.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin size={14} className="text-blue-500" />
-                  <span className="text-slate-600">Minimo:</span>
-                  <span className="font-semibold text-slate-900">${zone.min_order.toFixed(2)}</span>
+                  <span className="text-[var(--text-2)]">Minimo:</span>
+                  <span className="font-semibold text-[var(--text-1)]">${zone.min_order.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Clock size={14} className="text-amber-500" />
-                  <span className="text-slate-600">Tiempo est.:</span>
-                  <span className="font-semibold text-slate-900">{zone.estimated_minutes} min</span>
+                  <span className="text-[var(--text-2)]">Tiempo est.:</span>
+                  <span className="font-semibold text-[var(--text-1)]">{zone.estimated_minutes} min</span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-xs text-slate-400 truncate max-w-[60%]" title={zone.postal_codes}>
+              <div className="mt-3 pt-3 border-t border-[var(--line-soft)] flex items-center justify-between">
+                <p className="text-xs text-[var(--text-3)] truncate max-w-[60%]" title={zone.postal_codes}>
                   CP: {zone.postal_codes || '---'}
                 </p>
                 <button onClick={() => toggleActive(zone)}
@@ -131,34 +131,34 @@ export default function DomicilioPage() {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-slate-900 mb-4">{isNew ? 'Nueva zona' : 'Editar zona'}</h3>
+          <div className="bg-[var(--surface)] rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[var(--text-1)] mb-4">{isNew ? 'Nueva zona' : 'Editar zona'}</h3>
             <div className="space-y-3">
               <input value={modal.name} onChange={e => setModal({ ...modal, name: e.target.value })}
-                placeholder="Nombre de la zona" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                placeholder="Nombre de la zona" className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">Codigos postales (separados por coma)</label>
+                <label className="text-xs text-[var(--text-2)] mb-1 block">Codigos postales (separados por coma)</label>
                 <input value={modal.postal_codes} onChange={e => setModal({ ...modal, postal_codes: e.target.value })}
-                  placeholder="64000, 64010, 64020" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                  placeholder="64000, 64010, 64020" className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Costo envio</label>
+                  <label className="text-xs text-[var(--text-2)] mb-1 block">Costo envio</label>
                   <input type="number" value={modal.delivery_fee}
                     onChange={e => setModal({ ...modal, delivery_fee: Number(e.target.value) })}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Pedido min.</label>
+                  <label className="text-xs text-[var(--text-2)] mb-1 block">Pedido min.</label>
                   <input type="number" value={modal.min_order}
                     onChange={e => setModal({ ...modal, min_order: Number(e.target.value) })}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Minutos est.</label>
+                  <label className="text-xs text-[var(--text-2)] mb-1 block">Minutos est.</label>
                   <input type="number" value={modal.estimated_minutes}
                     onChange={e => setModal({ ...modal, estimated_minutes: Number(e.target.value) })}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
                 </div>
               </div>
             </div>
@@ -168,7 +168,7 @@ export default function DomicilioPage() {
                 <Save size={14} /> Guardar
               </button>
               <button onClick={() => setModal(null)}
-                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl text-sm flex items-center gap-1">
+                className="px-4 py-2.5 bg-[var(--line)] hover:bg-slate-300 text-[var(--text-2)] rounded-xl text-sm flex items-center gap-1">
                 <X size={14} /> Cancelar
               </button>
             </div>
@@ -177,7 +177,7 @@ export default function DomicilioPage() {
       )}
 
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

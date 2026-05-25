@@ -76,29 +76,29 @@ export default function FormasPagoPage() {
           <Plus size={16} /> Agregar
         </button>} />
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Nombre</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Tipo</th>
-              <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Comision</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Codigo Fiscal</th>
-              <th className="text-center px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Estado</th>
-              <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Acciones</th>
+            <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
+              <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Nombre</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Tipo</th>
+              <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Comision</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Codigo Fiscal</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Estado</th>
+              <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {items.map(item => (
-              <tr key={item.id} className={`border-b border-slate-100 hover:bg-slate-50 ${!item.active ? 'opacity-40' : ''}`}>
-                <td className="px-5 py-3 text-sm font-medium text-slate-900">{item.name}</td>
-                <td className="px-5 py-3 text-sm text-slate-500">{TYPE_LABELS[item.type] || item.type}</td>
+              <tr key={item.id} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${!item.active ? 'opacity-40' : ''}`}>
+                <td className="px-5 py-3 text-sm font-medium text-[var(--text-1)]">{item.name}</td>
+                <td className="px-5 py-3 text-sm text-[var(--text-2)]">{TYPE_LABELS[item.type] || item.type}</td>
                 <td className="px-5 py-3 text-right">
                   <span className={`text-xs font-semibold px-2 py-1 rounded-full ${commColor(item.commission_pct)}`}>
                     {item.commission_pct}%
                   </span>
                 </td>
-                <td className="px-5 py-3 text-sm text-slate-500 font-mono">{item.fiscal_code || '---'}</td>
+                <td className="px-5 py-3 text-sm text-[var(--text-2)] font-mono">{item.fiscal_code || '---'}</td>
                 <td className="px-5 py-3 text-center">
                   <button onClick={() => toggleActive(item)}
                     className={`text-xs font-semibold px-2 py-1 rounded-full ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -107,14 +107,14 @@ export default function FormasPagoPage() {
                 </td>
                 <td className="px-5 py-3 text-right">
                   <button onClick={() => { setModal({ ...item }); setIsNew(false) }}
-                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 inline-flex items-center justify-center">
+                    className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] inline-flex items-center justify-center">
                     <Pencil size={14} />
                   </button>
                 </td>
               </tr>
             ))}
             {items.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No hay formas de pago configuradas</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--text-3)]">No hay formas de pago configuradas</td></tr>
             )}
           </tbody>
         </table>
@@ -123,23 +123,23 @@ export default function FormasPagoPage() {
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-slate-900 mb-4">{isNew ? 'Nueva forma de pago' : 'Editar forma de pago'}</h3>
+          <div className="bg-[var(--surface)] rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[var(--text-1)] mb-4">{isNew ? 'Nueva forma de pago' : 'Editar forma de pago'}</h3>
             <div className="space-y-3">
               <input value={modal.name} onChange={e => setModal({ ...modal, name: e.target.value })}
-                placeholder="Nombre" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                placeholder="Nombre" className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
               <select value={modal.type} onChange={e => setModal({ ...modal, type: e.target.value as PaymentMethod['type'] })}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm">
                 {TYPES.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
               </select>
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">Comision (%)</label>
+                <label className="text-xs text-[var(--text-2)] mb-1 block">Comision (%)</label>
                 <input type="number" step="0.1" value={modal.commission_pct}
                   onChange={e => setModal({ ...modal, commission_pct: Number(e.target.value) })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                  className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
               </div>
               <input value={modal.fiscal_code} onChange={e => setModal({ ...modal, fiscal_code: e.target.value })}
-                placeholder="Codigo fiscal (SAT)" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                placeholder="Codigo fiscal (SAT)" className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSave}
@@ -147,7 +147,7 @@ export default function FormasPagoPage() {
                 <Save size={14} /> Guardar
               </button>
               <button onClick={() => setModal(null)}
-                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl text-sm flex items-center gap-1">
+                className="px-4 py-2.5 bg-[var(--line)] hover:bg-slate-300 text-[var(--text-2)] rounded-xl text-sm flex items-center gap-1">
                 <X size={14} /> Cancelar
               </button>
             </div>
@@ -156,7 +156,7 @@ export default function FormasPagoPage() {
       )}
 
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

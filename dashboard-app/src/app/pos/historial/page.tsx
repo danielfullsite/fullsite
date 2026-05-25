@@ -66,7 +66,7 @@ export default function HistorialPage() {
   })
 
   const statusConfig: Record<string, { color: string; label: string }> = {
-    abierta: { color: 'text-slate-400', label: 'Abierta' },
+    abierta: { color: 'text-[var(--text-3)]', label: 'Abierta' },
     enviada: { color: 'text-blue-400', label: 'Enviada' },
     preparando: { color: 'text-amber-400', label: 'Preparando' },
     lista: { color: 'text-emerald-400', label: 'Lista' },
@@ -75,35 +75,35 @@ export default function HistorialPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
-            <FileText size={24} className="text-slate-400" />
+            <FileText size={24} className="text-[var(--text-3)]" />
             <h1 className="text-xl font-bold">Historial de ordenes</h1>
           </div>
-          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
-        <span className="text-slate-400 text-sm">{filtered.length} ordenes</span>
+        <span className="text-[var(--text-3)] text-sm">{filtered.length} ordenes</span>
       </header>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-slate-800/50 border-b border-slate-700">
+      <div className="flex items-center gap-3 px-6 py-3 bg-[var(--surface-2)]/50 border-b border-slate-700">
         <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
+          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm" />
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
           <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar mesero, mesa, orden..."
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500" />
+            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500" />
         </div>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
+          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
           <option value="all">Todos</option>
           <option value="cerrada">Cerradas</option>
           <option value="cancelada">Canceladas</option>
@@ -118,7 +118,7 @@ export default function HistorialPage() {
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <p>Sin ordenes para esta fecha</p>
           </div>
         ) : (
@@ -132,18 +132,18 @@ export default function HistorialPage() {
                 <div key={order.id}>
                   <button
                     onClick={() => setExpanded(isOpen ? null : order.id)}
-                    className="w-full flex items-center gap-4 px-6 py-3 hover:bg-slate-800/50 text-left"
+                    className="w-full flex items-center gap-4 px-6 py-3 hover:bg-[var(--surface-2)]/50 text-left"
                   >
-                    <div className="w-7 h-7 rounded bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded bg-[var(--line)] flex items-center justify-center flex-shrink-0">
                       {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-white font-medium">Mesa {order.mesa}</span>
-                        <span className="text-slate-500 text-xs">{order.mesero}</span>
+                        <span className="text-[var(--text-2)] text-xs">{order.mesero}</span>
                         <span className={`text-xs font-bold ${config.color}`}>{config.label}</span>
                       </div>
-                      <p className="text-slate-500 text-xs">
+                      <p className="text-[var(--text-2)] text-xs">
                         {new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                         {order.metodo_pago && ` · ${order.metodo_pago}`}
                         {order.personas > 0 && ` · ${order.personas} personas`}
@@ -154,21 +154,21 @@ export default function HistorialPage() {
 
                   {isOpen && (
                     <div className="px-6 pb-3">
-                      <div className="bg-slate-800/60 rounded-xl p-4 ml-11">
+                      <div className="bg-[var(--surface-2)]/60 rounded-xl p-4 ml-11">
                         <div className="space-y-1.5 mb-3">
                           {items.map((item: { nombre?: string; name?: string; cantidad?: number; quantity?: number; subtotal?: number; modificadores?: string[] }, i: number) => (
                             <div key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-slate-300">
+                              <span className="text-[var(--text-4)]">
                                 {item.cantidad || item.quantity || 1}x {item.nombre || item.name}
                                 {item.modificadores && item.modificadores.length > 0 && (
-                                  <span className="text-slate-500 text-xs ml-1">({item.modificadores.join(', ')})</span>
+                                  <span className="text-[var(--text-2)] text-xs ml-1">({item.modificadores.join(', ')})</span>
                                 )}
                               </span>
-                              <span className="text-slate-400">{formatMXN(item.subtotal || 0)}</span>
+                              <span className="text-[var(--text-3)]">{formatMXN(item.subtotal || 0)}</span>
                             </div>
                           ))}
                         </div>
-                        <div className="border-t border-slate-700 pt-2 text-xs text-slate-500 flex gap-4">
+                        <div className="border-t border-slate-700 pt-2 text-xs text-[var(--text-2)] flex gap-4">
                           <span>Sub: {formatMXN(order.subtotal)}</span>
                           <span>IVA: {formatMXN(order.iva)}</span>
                           {order.descuento > 0 && <span className="text-red-400">Desc: -{formatMXN(order.descuento)}</span>}

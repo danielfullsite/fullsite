@@ -262,7 +262,7 @@ export default function CocinaPage() {
   }
 
   const statusConfig: Record<string, { bg: string; border: string; badge: string; badgeText: string; label: string; nextLabel: string }> = {
-    enviada: { bg: 'bg-slate-800', border: 'border-white/20', badge: 'bg-white', badgeText: 'text-slate-900', label: 'NUEVA', nextLabel: 'Preparando' },
+    enviada: { bg: 'bg-[var(--surface-2)]', border: 'border-white/20', badge: 'bg-[var(--surface)]', badgeText: 'text-[var(--text-1)]', label: 'NUEVA', nextLabel: 'Preparando' },
     preparando: { bg: 'bg-amber-950/40', border: 'border-amber-500/40', badge: 'bg-amber-500', badgeText: 'text-black', label: 'PREPARANDO', nextLabel: 'Lista' },
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
@@ -319,48 +319,48 @@ export default function CocinaPage() {
   if (!mounted) return null
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <ChefHat size={24} className="text-emerald-400" />
             <h1 className="text-xl font-bold">Cocina</h1>
           </div>
-          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-white" />
-            <span className="text-sm text-slate-300">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
+            <div className="w-3 h-3 rounded-full bg-[var(--surface)]" />
+            <span className="text-sm text-[var(--text-4)]">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-amber-500" />
-            <span className="text-sm text-slate-300">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span className="text-sm text-slate-300">Listas ({orders.filter(o => o.status === 'lista').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Listas ({orders.filter(o => o.status === 'lista').length})</span>
           </div>
         </div>
       </header>
 
       {/* Production area summary bar */}
       {totalPendingItems > 0 && (
-        <div className="flex items-center gap-4 px-6 py-2.5 bg-slate-800/60 border-b border-slate-700/50 flex-shrink-0">
+        <div className="flex items-center gap-4 px-6 py-2.5 bg-[var(--surface-2)]/60 border-b border-slate-700/50 flex-shrink-0">
           {Object.entries(areaCounts).map(([area, count]) => (
             <div key={area} className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${AREA_COLORS[area]}`} />
-              <span className="text-sm text-slate-300">
-                {area}: <span className={`font-bold ${count > 0 ? 'text-white' : 'text-slate-500'}`}>{count}</span>
+              <span className="text-sm text-[var(--text-4)]">
+                {area}: <span className={`font-bold ${count > 0 ? 'text-white' : 'text-[var(--text-2)]'}`}>{count}</span>
               </span>
             </div>
           ))}
-          <div className="ml-auto text-xs text-slate-500">
+          <div className="ml-auto text-xs text-[var(--text-2)]">
             {totalPendingItems} items pendientes
           </div>
         </div>
@@ -372,7 +372,7 @@ export default function CocinaPage() {
             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : sortedOrders.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <div className="text-center">
               <ChefHat size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-xl">No hay órdenes pendientes</p>
@@ -402,9 +402,9 @@ export default function CocinaPage() {
                           {config.label}
                         </span>
                       </div>
-                      <p className="text-slate-400 text-sm">{order.mesero}</p>
+                      <p className="text-[var(--text-3)] text-sm">{order.mesero}</p>
                     </div>
-                    <div className={`flex items-center gap-1 ${isUrgent ? 'text-red-400' : 'text-slate-400'}`}>
+                    <div className={`flex items-center gap-1 ${isUrgent ? 'text-red-400' : 'text-[var(--text-3)]'}`}>
                       {isUrgent ? <Flame size={16} /> : <Clock size={16} />}
                       <span className="text-sm font-mono font-semibold">{elapsed}m</span>
                     </div>
@@ -425,7 +425,7 @@ export default function CocinaPage() {
                             <p className="text-red-500 text-[10px]">Cancelado: {item.cancelReason} — {item.cancelledBy}</p>
                           )}
                           {!item.cancelled && item.modificadores && item.modificadores.length > 0 && (
-                            <p className="text-slate-500 text-xs">{item.modificadores.join(' · ')}</p>
+                            <p className="text-[var(--text-2)] text-xs">{item.modificadores.join(' · ')}</p>
                           )}
                         </div>
                         {!item.cancelled && (
@@ -447,7 +447,7 @@ export default function CocinaPage() {
                       className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                         order.status === 'enviada' ? 'bg-amber-500 hover:bg-amber-400 text-black' :
                         order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
-                        'bg-slate-600 hover:bg-slate-500 text-white'
+                        'bg-slate-600 hover:bg-[var(--surface-2)]0 text-white'
                       }`}
                     >
                       <Check size={18} />
@@ -464,20 +464,20 @@ export default function CocinaPage() {
       {(recipeDetail || loadingDetail) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setRecipeDetail(null)} />
-          <div className="relative bg-slate-800 border border-emerald-700/40 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl mx-4">
+          <div className="relative bg-[var(--surface-2)] border border-emerald-700/40 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl mx-4">
             {loadingDetail ? (
               <div className="p-12 text-center">
                 <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
             ) : recipeDetail ? (
               <>
-                <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-5 py-4 rounded-t-2xl z-10">
+                <div className="sticky top-0 bg-[var(--surface-2)] border-b border-slate-700 px-5 py-4 rounded-t-2xl z-10">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-bold text-white">{recipeDetail.name}</h3>
                       {recipeDetail.category && <p className="text-emerald-400 text-sm">{recipeDetail.category}</p>}
                     </div>
-                    <button onClick={() => setRecipeDetail(null)} className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-300">
+                    <button onClick={() => setRecipeDetail(null)} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center text-[var(--text-4)]">
                       <X size={20} />
                     </button>
                   </div>
@@ -487,26 +487,26 @@ export default function CocinaPage() {
                   {/* Info rápida */}
                   <div className="flex gap-3 flex-wrap">
                     {recipeDetail.prep_time && (
-                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
-                        <p className="text-slate-400 text-[10px] uppercase">Prep</p>
+                      <div className="bg-[var(--line)]/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[var(--text-3)] text-[10px] uppercase">Prep</p>
                         <p className="text-white font-semibold text-sm">{recipeDetail.prep_time}</p>
                       </div>
                     )}
                     {recipeDetail.cook_time && (
-                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
-                        <p className="text-slate-400 text-[10px] uppercase">Coccion</p>
+                      <div className="bg-[var(--line)]/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[var(--text-3)] text-[10px] uppercase">Coccion</p>
                         <p className="text-white font-semibold text-sm">{recipeDetail.cook_time}</p>
                       </div>
                     )}
                     {recipeDetail.serving_temp && (
-                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
-                        <p className="text-slate-400 text-[10px] uppercase">Temp</p>
+                      <div className="bg-[var(--line)]/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[var(--text-3)] text-[10px] uppercase">Temp</p>
                         <p className="text-white font-semibold text-sm">{recipeDetail.serving_temp}°</p>
                       </div>
                     )}
                     {recipeDetail.portion_size && (
-                      <div className="bg-slate-700/60 rounded-lg px-3 py-2 text-center">
-                        <p className="text-slate-400 text-[10px] uppercase">Porcion</p>
+                      <div className="bg-[var(--line)]/60 rounded-lg px-3 py-2 text-center">
+                        <p className="text-[var(--text-3)] text-[10px] uppercase">Porcion</p>
                         <p className="text-white font-semibold text-sm">{recipeDetail.portion_size}</p>
                       </div>
                     )}
@@ -538,8 +538,8 @@ export default function CocinaPage() {
 
                   {/* Equipo */}
                   {recipeDetail.equipment && (
-                    <div className="bg-slate-700/40 rounded-xl px-4 py-3">
-                      <p className="text-slate-400 text-xs font-semibold uppercase mb-1">Equipo</p>
+                    <div className="bg-[var(--line)]/40 rounded-xl px-4 py-3">
+                      <p className="text-[var(--text-3)] text-xs font-semibold uppercase mb-1">Equipo</p>
                       <p className="text-white text-sm">{recipeDetail.equipment}</p>
                     </div>
                   )}
@@ -558,9 +558,9 @@ export default function CocinaPage() {
                 </div>
               </>
             ) : (
-              <div className="p-8 text-center text-slate-500">
+              <div className="p-8 text-center text-[var(--text-2)]">
                 <p>Sin datos de presentacion para este platillo</p>
-                <button onClick={() => setRecipeDetail(null)} className="mt-3 text-sm text-slate-400 underline">Cerrar</button>
+                <button onClick={() => setRecipeDetail(null)} className="mt-3 text-sm text-[var(--text-3)] underline">Cerrar</button>
               </div>
             )}
           </div>
@@ -571,7 +571,7 @@ export default function CocinaPage() {
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setCancelTarget(null)} />
-          <div className="relative bg-slate-800 border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+          <div className="relative bg-[var(--surface-2)] border border-red-700/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center">
                 <ShieldAlert size={20} className="text-red-400" />
@@ -584,7 +584,7 @@ export default function CocinaPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">Motivo</label>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo</label>
                 <div className="grid grid-cols-1 gap-2">
                   {CANCEL_REASONS.map(r => (
                     <button
@@ -593,7 +593,7 @@ export default function CocinaPage() {
                       className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
                         cancelReason === r
                           ? 'bg-red-900/40 border border-red-600 text-white'
-                          : 'bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700'
+                          : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
                       }`}
                     >
                       {r}
@@ -603,7 +603,7 @@ export default function CocinaPage() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2 block">PIN de gerente</label>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
                 <input
                   type="password"
                   inputMode="numeric"
@@ -611,7 +611,7 @@ export default function CocinaPage() {
                   value={cancelPin}
                   onChange={(e) => { setCancelPin(e.target.value.replace(/\D/g, '')); setCancelError('') }}
                   placeholder="****"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
                 />
               </div>
 
@@ -619,7 +619,7 @@ export default function CocinaPage() {
             </div>
 
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setCancelTarget(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold">
+              <button onClick={() => setCancelTarget(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">
                 Volver
               </button>
               <button
@@ -636,7 +636,7 @@ export default function CocinaPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

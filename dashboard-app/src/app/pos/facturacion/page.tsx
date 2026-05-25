@@ -100,10 +100,10 @@ export default function FacturacionPage() {
     : requests
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       {/* Header */}
-      <header className="flex items-center gap-4 px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
-        <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+      <header className="flex items-center gap-4 px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
+        <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex items-center gap-2">
@@ -111,13 +111,13 @@ export default function FacturacionPage() {
           <h1 className="text-xl font-bold">Facturacion CFDI</h1>
         </div>
         <div className="flex-1" />
-        <div className="flex bg-slate-700 rounded-lg p-1 gap-1">
+        <div className="flex bg-[var(--line)] rounded-lg p-1 gap-1">
           {(['nueva', 'historial'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                tab === t ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                tab === t ? 'bg-emerald-600 text-white' : 'text-[var(--text-3)] hover:text-white'
               }`}
             >
               {t === 'nueva' ? 'Nueva solicitud' : `Historial (${requests.length})`}
@@ -129,21 +129,21 @@ export default function FacturacionPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {tab === 'nueva' ? (
           <div className="max-w-2xl mx-auto">
-            <p className="text-slate-400 text-sm mb-6">
+            <p className="text-[var(--text-3)] text-sm mb-6">
               Datos fiscales del cliente para generar CFDI 4.0
             </p>
 
             <div className="space-y-4">
               {/* RFC */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">RFC *</label>
+                <label className="block text-sm font-medium text-[var(--text-4)] mb-1">RFC *</label>
                 <input
                   type="text"
                   value={rfc}
                   onChange={e => setRfc(e.target.value.toUpperCase())}
                   placeholder="XAXX010101000"
                   maxLength={13}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg tracking-wider"
+                  className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg tracking-wider"
                 />
                 {rfc.length > 0 && !validateRFC(rfc) && (
                   <p className="text-red-400 text-xs mt-1">Formato: 3-4 letras + 6 digitos + 3 caracteres</p>
@@ -152,24 +152,24 @@ export default function FacturacionPage() {
 
               {/* Razon social */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Razon social *</label>
+                <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Razon social *</label>
                 <input
                   type="text"
                   value={razonSocial}
                   onChange={e => setRazonSocial(e.target.value)}
                   placeholder="Empresa S.A. de C.V."
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
               {/* Grid: Regimen + Uso CFDI */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Regimen fiscal *</label>
+                  <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Regimen fiscal *</label>
                   <select
                     value={regimenFiscal}
                     onChange={e => setRegimenFiscal(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   >
                     {REGIMENES_FISCALES.map(r => (
                       <option key={r.clave} value={r.clave}>{r.clave} - {r.nombre}</option>
@@ -177,11 +177,11 @@ export default function FacturacionPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Uso CFDI *</label>
+                  <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Uso CFDI *</label>
                   <select
                     value={usoCfdi}
                     onChange={e => setUsoCfdi(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   >
                     {USOS_CFDI.map(u => (
                       <option key={u.clave} value={u.clave}>{u.clave} - {u.nombre}</option>
@@ -193,33 +193,33 @@ export default function FacturacionPage() {
               {/* Grid: CP + Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Codigo postal *</label>
+                  <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Codigo postal *</label>
                   <input
                     type="text"
                     value={codigoPostal}
                     onChange={e => setCodigoPostal(e.target.value.replace(/\D/g, '').slice(0, 5))}
                     placeholder="64000"
                     maxLength={5}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
+                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Email *</label>
                   <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="factura@empresa.com"
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Monto */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Monto total (IVA incluido) *</label>
+                <label className="block text-sm font-medium text-[var(--text-4)] mb-1">Monto total (IVA incluido) *</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-3)] font-bold">$</span>
                   <input
                     type="number"
                     value={montoTotal}
@@ -227,11 +227,11 @@ export default function FacturacionPage() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-8 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg"
+                    className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg pl-8 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none font-mono text-lg"
                   />
                 </div>
                 {montoTotal && parseFloat(montoTotal) > 0 && (
-                  <div className="flex gap-4 mt-2 text-xs text-slate-400">
+                  <div className="flex gap-4 mt-2 text-xs text-[var(--text-3)]">
                     <span>Subtotal: {formatMXN(parseFloat(montoTotal) / (1 + IVA_RATE))}</span>
                     <span>IVA 16%: {formatMXN(parseFloat(montoTotal) - parseFloat(montoTotal) / (1 + IVA_RATE))}</span>
                   </div>
@@ -242,7 +242,7 @@ export default function FacturacionPage() {
               <button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg mt-4"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg mt-4"
               >
                 {saving ? (
                   <><RefreshCw size={20} className="animate-spin" /> Guardando...</>
@@ -257,25 +257,25 @@ export default function FacturacionPage() {
           <div className="max-w-4xl mx-auto">
             {/* Search */}
             <div className="relative mb-4">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-2)]" />
               <input
                 type="text"
                 value={searchRFC}
                 onChange={e => setSearchRFC(e.target.value)}
                 placeholder="Buscar por RFC o razon social..."
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                className="w-full bg-[var(--surface-2)] border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
               />
             </div>
 
             {loading ? (
               <div className="text-center py-12">
                 <RefreshCw size={24} className="animate-spin text-emerald-400 mx-auto mb-2" />
-                <p className="text-slate-400">Cargando...</p>
+                <p className="text-[var(--text-3)]">Cargando...</p>
               </div>
             ) : filteredRequests.length === 0 ? (
               <div className="text-center py-12">
-                <FileText size={48} className="text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400">Sin solicitudes de factura</p>
+                <FileText size={48} className="text-[var(--text-2)] mx-auto mb-3" />
+                <p className="text-[var(--text-3)]">Sin solicitudes de factura</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -283,18 +283,18 @@ export default function FacturacionPage() {
                   const st = STATUS_STYLES[req.status] || STATUS_STYLES.pendiente
                   const StatusIcon = st.icon
                   return (
-                    <div key={req.id} className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                    <div key={req.id} className="bg-[var(--surface-2)] border border-slate-700 rounded-xl p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
-                            <span className="font-mono text-sm text-slate-400">{req.id}</span>
+                            <span className="font-mono text-sm text-[var(--text-3)]">{req.id}</span>
                             <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full ${st.bg} ${st.color}`}>
                               <StatusIcon size={12} />
                               {st.label}
                             </span>
                           </div>
                           <p className="font-semibold text-white truncate">{req.razon_social}</p>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-slate-400">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-[var(--text-3)]">
                             <span className="font-mono">{req.rfc}</span>
                             <span>{req.email}</span>
                             <span>CP {req.codigo_postal}</span>
@@ -302,7 +302,7 @@ export default function FacturacionPage() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-lg font-bold text-white">{formatMXN(req.total)}</p>
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-[var(--text-2)] mt-1">
                             {new Date(req.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         </div>
@@ -346,7 +346,7 @@ export default function FacturacionPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-xl text-sm font-medium z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--surface-2)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-xl text-sm font-medium z-50">
           {toast}
         </div>
       )}

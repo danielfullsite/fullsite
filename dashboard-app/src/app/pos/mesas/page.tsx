@@ -115,16 +115,16 @@ export default function MesasPage() {
 
   return (
     <div className="h-screen flex flex-col text-white">
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
             <h1 className="text-xl font-bold">Mesas</h1>
-            <p className="text-slate-400 text-sm">{activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}</p>
+            <p className="text-[var(--text-3)] text-sm">{activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}</p>
           </div>
-          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
@@ -132,8 +132,8 @@ export default function MesasPage() {
           {Object.entries(counts).map(([status, count]) => (
             <div key={status} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${statusDot[status]}`} />
-              <span className="text-sm text-slate-300">
-                {statusLabel[status]} <span className="text-slate-500">({count})</span>
+              <span className="text-sm text-[var(--text-4)]">
+                {statusLabel[status]} <span className="text-[var(--text-2)]">({count})</span>
               </span>
             </div>
           ))}
@@ -167,9 +167,9 @@ export default function MesasPage() {
                   <div className="mt-3">
                     {mesa.status !== 'disponible' ? (
                       <>
-                        <p className="text-slate-300 text-sm truncate">{mesa.mesero}</p>
+                        <p className="text-[var(--text-4)] text-sm truncate">{mesa.mesero}</p>
                         <div className="flex items-center justify-between mt-1">
-                          <div className="flex items-center gap-1 text-slate-400 text-sm">
+                          <div className="flex items-center gap-1 text-[var(--text-3)] text-sm">
                             <Users size={14} />
                             <span className="font-semibold text-white">{mesa.personas}</span>
                           </div>
@@ -178,13 +178,13 @@ export default function MesasPage() {
                           )}
                         </div>
                         {mesa.personas && mesa.personas > 0 && mesa.total ? (
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-[var(--text-2)] mt-1">
                             TP: <span className="text-emerald-400 font-semibold">{formatMXN(mesa.total / mesa.personas)}</span>/pers
                           </p>
                         ) : null}
                       </>
                     ) : (
-                      <p className="text-slate-500 text-sm">{mesa.capacity} lugares</p>
+                      <p className="text-[var(--text-2)] text-sm">{mesa.capacity} lugares</p>
                     )}
                   </div>
                 </button>
@@ -207,8 +207,8 @@ export default function MesasPage() {
                       </div>
                       <p className="text-white font-medium">{r.nombre}</p>
                       <div className="flex items-center justify-between mt-1">
-                        <span className="text-slate-400 text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
-                        <span className="text-slate-500 text-xs">{r.espacio}</span>
+                        <span className="text-[var(--text-3)] text-sm flex items-center gap-1"><Users size={12} /> {r.guests} personas</span>
+                        <span className="text-[var(--text-2)] text-xs">{r.espacio}</span>
                       </div>
                     </div>
                   ))}

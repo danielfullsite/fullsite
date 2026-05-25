@@ -67,7 +67,7 @@ export default function MenuEngineeringPage() {
     { key: 'estrellas', label: 'Estrellas', desc: 'Alta popularidad + alto margen', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200', items: data?.estrellas || [] },
     { key: 'caballos', label: 'Caballos de Trabajo', desc: 'Alta popularidad + bajo margen', icon: Zap, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', items: data?.caballos || [] },
     { key: 'rompecabezas', label: 'Rompecabezas', desc: 'Baja popularidad + alto margen', icon: Puzzle, color: 'text-violet-500', bg: 'bg-violet-50', border: 'border-violet-200', items: data?.rompecabezas || [] },
-    { key: 'perros', label: 'Perros', desc: 'Baja popularidad + bajo margen', icon: Dog, color: 'text-slate-400', bg: 'bg-slate-50', border: 'border-slate-200', items: data?.perros || [] },
+    { key: 'perros', label: 'Perros', desc: 'Baja popularidad + bajo margen', icon: Dog, color: 'text-[var(--text-3)]', bg: 'bg-[var(--surface-2)]', border: 'border-[var(--line)]', items: data?.perros || [] },
   ]
 
   const revDist = data?.revenue_distribution || []
@@ -78,15 +78,15 @@ export default function MenuEngineeringPage() {
     <>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/agentes" className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+          <Link href="/agentes" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Menu Engineering</h2>
-            <p className="text-sm text-slate-400">Matriz BCG del menu {fecha && `· ${fecha}`}</p>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Menu Engineering</h2>
+            <p className="text-sm text-[var(--text-3)]">Matriz BCG del menu {fecha && `· ${fecha}`}</p>
           </div>
         </div>
-        <button onClick={load} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+        <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
           <RefreshCw size={16} />
         </button>
       </div>
@@ -96,26 +96,26 @@ export default function MenuEngineeringPage() {
         {quadrants.map(q => {
           const Icon = q.icon
           return (
-            <div key={q.key} className={`bg-white rounded-xl border ${q.border} shadow-sm p-5`}>
+            <div key={q.key} className={`bg-[var(--surface)] rounded-xl border ${q.border} shadow-sm p-5`}>
               <div className="flex items-center gap-2 mb-3">
                 <div className={`w-8 h-8 rounded-lg ${q.bg} flex items-center justify-center`}>
                   <Icon size={16} className={q.color} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">{q.label}</h3>
-                  <p className="text-[11px] text-slate-400">{q.desc}</p>
+                  <h3 className="text-sm font-bold text-[var(--text-1)]">{q.label}</h3>
+                  <p className="text-[11px] text-[var(--text-3)]">{q.desc}</p>
                 </div>
-                <span className="ml-auto text-xs font-medium text-slate-400">{q.items.length} items</span>
+                <span className="ml-auto text-xs font-medium text-[var(--text-3)]">{q.items.length} items</span>
               </div>
               {q.items.length === 0 ? (
-                <p className="text-xs text-slate-400">Sin datos</p>
+                <p className="text-xs text-[var(--text-3)]">Sin datos</p>
               ) : (
                 <div className="space-y-1.5">
                   {q.items.slice(0, 8).map((item, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-700 truncate max-w-[180px]">{item.nombre}</span>
+                      <span className="text-[var(--text-1)] truncate max-w-[180px]">{item.nombre}</span>
                       <div className="flex items-center gap-3">
-                        <span className="tabular-nums text-slate-500 text-xs">{formatCurrency(item.ventas)}</span>
+                        <span className="tabular-nums text-[var(--text-2)] text-xs">{formatCurrency(item.ventas)}</span>
                         <span className={`tabular-nums text-xs font-bold ${item.margen_pct >= 60 ? 'text-emerald-600' : item.margen_pct >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
                           {item.margen_pct?.toFixed(0)}%
                         </span>
@@ -123,7 +123,7 @@ export default function MenuEngineeringPage() {
                     </div>
                   ))}
                   {q.items.length > 8 && (
-                    <p className="text-[11px] text-slate-400 pt-1">+{q.items.length - 8} mas</p>
+                    <p className="text-[11px] text-[var(--text-3)] pt-1">+{q.items.length - 8} mas</p>
                   )}
                 </div>
               )}
@@ -134,18 +134,18 @@ export default function MenuEngineeringPage() {
 
       {/* Revenue distribution (text-based bars) */}
       {revDist.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-6">
-          <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 mb-6">
+          <h3 className="text-sm font-bold text-[var(--text-1)] mb-4 flex items-center gap-2">
             <UtensilsCrossed size={14} className="text-violet-500" /> Distribucion de ingresos
           </h3>
           <div className="space-y-2.5">
             {revDist.slice(0, 10).map((seg, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-700">{seg.nombre}</span>
-                  <span className="text-xs tabular-nums text-slate-500">{formatCurrency(seg.total)} ({seg.pct?.toFixed(1)}%)</span>
+                  <span className="text-xs text-[var(--text-1)]">{seg.nombre}</span>
+                  <span className="text-xs tabular-nums text-[var(--text-2)]">{formatCurrency(seg.total)} ({seg.pct?.toFixed(1)}%)</span>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2">
+                <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                   <div className="h-2 rounded-full bg-violet-500 transition-all" style={{ width: `${maxRev > 0 ? (seg.pct / maxRev) * 100 : 0}%` }} />
                 </div>
               </div>
@@ -156,9 +156,9 @@ export default function MenuEngineeringPage() {
 
       {/* Top 5 recommendations */}
       {recommendations.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900">Top {Math.min(recommendations.length, 5)} Recomendaciones</h3>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
+          <div className="px-4 py-3 border-b border-[var(--line-soft)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)]">Top {Math.min(recommendations.length, 5)} Recomendaciones</h3>
           </div>
           <div className="divide-y divide-slate-50">
             {recommendations.slice(0, 5).map((rec, i) => (
@@ -166,11 +166,11 @@ export default function MenuEngineeringPage() {
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                    <span className="text-sm font-medium text-slate-900">{rec.item}</span>
+                    <span className="text-sm font-medium text-[var(--text-1)]">{rec.item}</span>
                   </div>
                   <span className="text-sm font-bold text-emerald-600">+{formatCurrency(rec.impacto_estimado)}</span>
                 </div>
-                <p className="text-xs text-slate-500 ml-7">{rec.accion} — {rec.detalle}</p>
+                <p className="text-xs text-[var(--text-2)] ml-7">{rec.accion} — {rec.detalle}</p>
               </div>
             ))}
           </div>
@@ -179,13 +179,13 @@ export default function MenuEngineeringPage() {
 
       {/* Summary */}
       {data?.summary && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mt-6">
-          <p className="text-sm text-slate-700 leading-relaxed">{data.summary}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 mt-6">
+          <p className="text-sm text-[var(--text-1)] leading-relaxed">{data.summary}</p>
         </div>
       )}
 
       {!data && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center text-slate-400 text-sm">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
           Sin datos de menu engineering. El agente corre automaticamente.
         </div>
       )}

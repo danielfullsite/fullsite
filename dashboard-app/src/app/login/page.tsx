@@ -77,7 +77,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right — white form panel */}
-      <div className="flex-1 bg-white flex flex-col items-center justify-center px-6 py-10 sm:px-8 sm:py-12 lg:px-16">
+      <div className="flex-1 bg-[var(--panel)] flex flex-col items-center justify-center px-6 py-10 sm:px-8 sm:py-12 lg:px-16">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
@@ -85,13 +85,13 @@ export default function LoginPage() {
               fullsite<span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">Bienvenido</h2>
-          <p className="text-slate-400 text-sm mb-10">Inicia sesión para continuar</p>
+          <h2 className="text-2xl font-bold text-[var(--text-1)] mb-1">Bienvenido</h2>
+          <p className="text-[var(--text-3)] text-sm mb-10">Inicia sesión para continuar</p>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-[var(--text-1)] mb-1.5">
                 Correo electrónico
               </label>
               <input
@@ -102,12 +102,12 @@ export default function LoginPage() {
                 placeholder="nombre@empresa.com"
                 required
                 disabled={loading}
-                className="w-full text-sm border border-slate-300 rounded-lg px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full text-sm border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-[var(--text-1)] mb-1.5">
                 Contraseña
               </label>
               <input
@@ -117,7 +117,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full text-sm border border-slate-300 rounded-lg px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full text-sm border border-[var(--line)] rounded-lg px-4 py-3 text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
@@ -139,7 +139,7 @@ export default function LoginPage() {
           </form>
 
           {/* Create account */}
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-[var(--text-2)]">
             ¿No tienes cuenta?{' '}
             <a
               href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20crear%20una%20cuenta%20en%20Fullsite."
@@ -152,13 +152,13 @@ export default function LoginPage() {
           </p>
 
           {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-400 text-center">
-              <a href="/privacidad" className="hover:text-slate-600 transition-colors">Privacidad</a>
+          <div className="mt-8 pt-6 border-t border-[var(--line-soft)]">
+            <p className="text-xs text-[var(--text-3)] text-center">
+              <a href="/privacidad" className="hover:text-[var(--text-2)] transition-colors">Privacidad</a>
               {' · '}
-              <a href="/terminos" className="hover:text-slate-600 transition-colors">Términos</a>
+              <a href="/terminos" className="hover:text-[var(--text-2)] transition-colors">Términos</a>
               {' · '}
-              <a href="/seguridad" className="hover:text-slate-600 transition-colors">Seguridad</a>
+              <a href="/seguridad" className="hover:text-[var(--text-2)] transition-colors">Seguridad</a>
             </p>
           </div>
         </div>

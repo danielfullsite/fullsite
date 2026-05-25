@@ -71,7 +71,7 @@ export default function IngresosPage() {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+            <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -108,11 +108,11 @@ export default function IngresosPage() {
           </div>
 
           {/* Payment methods breakdown */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+            <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
               Desglose por metodo de pago
             </h3>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-[var(--text-3)] mb-5">
               Total: {formatCurrency(paymentTotal)}
             </p>
             {payments.length > 0 ? (
@@ -128,14 +128,14 @@ export default function IngresosPage() {
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }}
                           />
-                          <span className="text-sm font-medium text-slate-700">{p.nombre}</span>
+                          <span className="text-sm font-medium text-[var(--text-1)]">{p.nombre}</span>
                         </div>
-                        <span className="text-sm font-bold text-slate-900 tabular-nums">
+                        <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">
                           {formatCurrency(p.total)}{' '}
-                          <span className="text-slate-400 text-xs font-normal">({pct}%)</span>
+                          <span className="text-[var(--text-3)] text-xs font-normal">({pct}%)</span>
                         </span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2">
+                      <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                         <div
                           className="h-2 rounded-full animate-progress"
                           style={{
@@ -149,17 +149,17 @@ export default function IngresosPage() {
                 })}
               </div>
             ) : (
-              <p className="text-slate-400 text-sm py-8 text-center">Sin datos de metodos de pago</p>
+              <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de metodos de pago</p>
             )}
           </div>
 
           {/* Daily cash flow chart */}
           {dailyChart.length > 1 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Flujo diario de efectivo y tarjeta
               </h3>
-              <p className="text-xs text-slate-400 mb-5">{data.length} dias</p>
+              <p className="text-xs text-[var(--text-3)] mb-5">{data.length} dias</p>
               <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dailyChart}>
@@ -222,11 +222,11 @@ export default function IngresosPage() {
               <div className="flex items-center gap-6 mt-4 justify-center">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-slate-500">Efectivo</span>
+                  <span className="text-xs text-[var(--text-2)]">Efectivo</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-xs text-slate-500">Tarjeta</span>
+                  <span className="text-xs text-[var(--text-2)]">Tarjeta</span>
                 </div>
               </div>
             </div>

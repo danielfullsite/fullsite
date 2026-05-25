@@ -86,10 +86,10 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--surface)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Cargando menu...</p>
+          <p className="text-[var(--text-3)] text-sm">Cargando menu...</p>
         </div>
       </div>
     )
@@ -97,16 +97,16 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
 
   if (sent) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[var(--surface)] flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-10 h-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Pedido enviado</h2>
-          <p className="text-slate-500 mb-1">Tu orden fue enviada a la cocina</p>
-          <p className="text-slate-400 text-sm">Mesa {mesaNum} · {totalItems} items · {formatMXN(totalPrice + iva)}</p>
+          <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Pedido enviado</h2>
+          <p className="text-[var(--text-2)] mb-1">Tu orden fue enviada a la cocina</p>
+          <p className="text-[var(--text-3)] text-sm">Mesa {mesaNum} · {totalItems} items · {formatMXN(totalPrice + iva)}</p>
           <button onClick={() => { setSent(false); setCart([]) }} className="mt-8 px-8 py-3.5 bg-emerald-600 text-white rounded-2xl font-semibold text-lg shadow-lg shadow-emerald-200">
             Pedir mas
           </button>
@@ -116,20 +116,20 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-[var(--surface-2)] flex flex-col">
       {/* Header */}
-      <header className="bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-20">
+      <header className="bg-[var(--surface)] text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-20">
         <div>
           <span className="font-black text-lg tracking-tight">
             fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
           </span>
-          <span className="text-slate-400 text-sm ml-2">Mesa {mesaNum}</span>
+          <span className="text-[var(--text-3)] text-sm ml-2">Mesa {mesaNum}</span>
         </div>
         {totalItems > 0 && (
           <button onClick={() => setShowCart(true)} className="relative bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2">
             <ShoppingCart size={16} />
             {formatMXN(totalPrice)}
-            <span className="absolute -top-2 -right-2 bg-white text-emerald-600 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
+            <span className="absolute -top-2 -right-2 bg-[var(--surface)] text-emerald-600 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
               {totalItems}
             </span>
           </button>
@@ -137,22 +137,22 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       </header>
 
       {/* Name input */}
-      <div className="px-4 py-3 bg-white border-b border-slate-100">
+      <div className="px-4 py-3 bg-[var(--surface)] border-b border-[var(--line-soft)]">
         <input
           value={nombre} onChange={e => setNombre(e.target.value)}
           placeholder="Tu nombre (opcional)"
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+          className="w-full border border-[var(--line)] rounded-xl px-4 py-2.5 text-[var(--text-1)] placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
         />
       </div>
 
       {/* Categories */}
-      <div className="flex gap-1.5 px-3 py-2.5 overflow-x-auto border-b border-slate-100 bg-white sticky top-[56px] z-10">
+      <div className="flex gap-1.5 px-3 py-2.5 overflow-x-auto border-b border-[var(--line-soft)] bg-[var(--surface)] sticky top-[56px] z-10">
         {menuCategories.map(cat => (
           <button key={cat.id} onClick={() => setSelectedCat(cat.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
               selectedCat === cat.id
                 ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200'
-                : 'bg-slate-100 text-slate-600'
+                : 'bg-[var(--surface-2)] text-[var(--text-2)]'
             }`}>
             {cat.name}
           </button>
@@ -163,21 +163,21 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       <div className="flex-1 px-4 py-4">
         {activeCat && (
           <>
-            <h3 className="text-lg font-bold text-slate-900 mb-3">{activeCat.name}</h3>
+            <h3 className="text-lg font-bold text-[var(--text-1)] mb-3">{activeCat.name}</h3>
             <div className="grid grid-cols-2 gap-3">
               {activeCat.items.map(item => {
                 const inCart = cart.find(c => c.id === item.id)
                 return (
                   <div key={item.id}
-                    className={`bg-white border rounded-2xl p-4 transition-all ${
-                      inCart ? 'border-emerald-400 shadow-sm shadow-emerald-100' : 'border-slate-200'
+                    className={`bg-[var(--surface)] border rounded-2xl p-4 transition-all ${
+                      inCart ? 'border-emerald-400 shadow-sm shadow-emerald-100' : 'border-[var(--line)]'
                     }`}>
                     <button onClick={() => addItem(item)} className="w-full text-left">
-                      <p className="font-semibold text-slate-900 text-sm leading-tight">{item.name}</p>
+                      <p className="font-semibold text-[var(--text-1)] text-sm leading-tight">{item.name}</p>
                       <p className="text-emerald-600 font-bold mt-1.5">{formatMXN(item.price)}</p>
                     </button>
                     {inCart && (
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--line-soft)]">
                         <button onClick={() => removeItem(item.id)}
                           className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center">
                           <Minus size={14} />
@@ -191,7 +191,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
                     )}
                     {inCart && (
                       <button onClick={() => { setNotasItem(item.id); setNotasText(inCart.notas) }}
-                        className="mt-2 w-full text-xs text-slate-400 flex items-center gap-1 justify-center hover:text-emerald-600">
+                        className="mt-2 w-full text-xs text-[var(--text-3)] flex items-center gap-1 justify-center hover:text-emerald-600">
                         <MessageSquare size={10} />
                         {inCart.notas ? inCart.notas : 'Agregar nota'}
                       </button>
@@ -206,7 +206,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
 
       {/* Bottom bar */}
       {totalItems > 0 && !showCart && (
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-10">
+        <div className="sticky bottom-0 bg-[var(--surface)] border-t border-[var(--line)] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-10">
           <button onClick={() => setShowCart(true)}
             className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-2xl transition-colors flex items-center justify-center gap-3 shadow-lg shadow-emerald-200">
             <ShoppingCart size={20} />
@@ -218,11 +218,11 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       {/* Cart drawer */}
       {showCart && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={() => setShowCart(false)}>
-          <div className="bg-white rounded-t-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--surface)] rounded-t-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Cart header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">Tu pedido</h3>
-              <button onClick={() => setShowCart(false)} className="text-slate-400"><X size={20} /></button>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--line-soft)]">
+              <h3 className="text-lg font-bold text-[var(--text-1)]">Tu pedido</h3>
+              <button onClick={() => setShowCart(false)} className="text-[var(--text-3)]"><X size={20} /></button>
             </div>
 
             {/* Cart items */}
@@ -230,15 +230,15 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
               {cart.map(item => (
                 <div key={item.id} className="flex items-center gap-3 py-3 border-b border-slate-50">
                   <div className="flex-1">
-                    <p className="font-medium text-slate-900 text-sm">{item.name}</p>
-                    {item.notas && <p className="text-xs text-slate-400 mt-0.5">{item.notas}</p>}
+                    <p className="font-medium text-[var(--text-1)] text-sm">{item.name}</p>
+                    {item.notas && <p className="text-xs text-[var(--text-3)] mt-0.5">{item.notas}</p>}
                     <p className="text-emerald-600 font-semibold text-sm mt-0.5">{formatMXN(item.price * item.qty)}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">
+                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 rounded-full bg-[var(--surface-2)] text-[var(--text-2)] flex items-center justify-center">
                       <Minus size={14} />
                     </button>
-                    <span className="font-bold text-slate-900 w-5 text-center">{item.qty}</span>
+                    <span className="font-bold text-[var(--text-1)] w-5 text-center">{item.qty}</span>
                     <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price })} className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                       <Plus size={14} />
                     </button>
@@ -248,14 +248,14 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
             </div>
 
             {/* Cart totals */}
-            <div className="px-5 py-4 border-t border-slate-100">
-              <div className="flex justify-between text-sm text-slate-500 mb-1">
+            <div className="px-5 py-4 border-t border-[var(--line-soft)]">
+              <div className="flex justify-between text-sm text-[var(--text-2)] mb-1">
                 <span>Subtotal</span><span>{formatMXN(totalPrice)}</span>
               </div>
-              <div className="flex justify-between text-sm text-slate-500 mb-3">
+              <div className="flex justify-between text-sm text-[var(--text-2)] mb-3">
                 <span>IVA (16%)</span><span>{formatMXN(iva)}</span>
               </div>
-              <div className="flex justify-between text-lg font-bold text-slate-900 mb-4">
+              <div className="flex justify-between text-lg font-bold text-[var(--text-1)] mb-4">
                 <span>Total</span><span>{formatMXN(totalPrice + iva)}</span>
               </div>
               <button onClick={handleSend} disabled={sending}
@@ -271,17 +271,17 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       {/* Notas modal */}
       {notasItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setNotasItem(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-slate-900 mb-3">Nota para el platillo</h3>
+          <div className="bg-[var(--surface)] rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[var(--text-1)] mb-3">Nota para el platillo</h3>
             <textarea value={notasText} onChange={e => setNotasText(e.target.value)}
               placeholder="Sin cebolla, extra salsa, etc..."
               rows={3} autoFocus
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-emerald-500" />
+              className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-emerald-500" />
             <div className="flex gap-2 mt-3">
               <button onClick={() => { updateNotas(notasItem, notasText); setNotasItem(null) }}
                 className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold">Guardar</button>
               <button onClick={() => setNotasItem(null)}
-                className="py-2.5 px-4 bg-slate-100 text-slate-600 rounded-xl text-sm">Cancelar</button>
+                className="py-2.5 px-4 bg-[var(--surface-2)] text-[var(--text-2)] rounded-xl text-sm">Cancelar</button>
             </div>
           </div>
         </div>

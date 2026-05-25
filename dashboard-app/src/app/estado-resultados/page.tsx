@@ -127,7 +127,7 @@ export default function EstadoResultadosPage() {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+            <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -188,46 +188,46 @@ export default function EstadoResultadosPage() {
           )}
 
           {/* Revenue section */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+            <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
               Ingresos
             </h3>
-            <p className="text-xs text-slate-400 mb-5">Desglose de ventas</p>
+            <p className="text-xs text-[var(--text-3)] mb-5">Desglose de ventas</p>
             <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-sm text-slate-700">Ventas brutas</span>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(totalBrutas)}</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
+                <span className="text-sm text-[var(--text-1)]">Ventas brutas</span>
+                <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(totalBrutas)}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
                 <span className="text-sm text-red-600">(-) Descuentos</span>
                 <span className="text-sm font-bold text-red-600 tabular-nums">-{formatCurrency(totalDescuentos)}</span>
               </div>
-              <div className="flex items-center justify-between py-2 bg-slate-50 rounded-lg px-3">
-                <span className="text-sm font-semibold text-slate-900">Ventas netas</span>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(totalNetas)}</span>
+              <div className="flex items-center justify-between py-2 bg-[var(--surface-2)] rounded-lg px-3">
+                <span className="text-sm font-semibold text-[var(--text-1)]">Ventas netas</span>
+                <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(totalNetas)}</span>
               </div>
             </div>
           </div>
 
           {/* Costs section */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+            <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
               Costos {isRealFoodCost ? '(real)' : '(estimado)'}
             </h3>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-[var(--text-3)] mb-5">
               {isRealFoodCost ? 'Basado en datos reales de Wansoft' : 'Basado en porcentajes de industria'}
             </p>
             <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-sm text-slate-700">
+              <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
+                <span className="text-sm text-[var(--text-1)]">
                   Food cost ({(effectiveFoodCostPct * 100).toFixed(1)}%)
                   {isRealFoodCost && <span className="ml-1 text-xs text-emerald-600 font-medium">REAL</span>}
                 </span>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(totalCostoEstimado)}</span>
+                <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(totalCostoEstimado)}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-sm text-slate-400">Labor cost</span>
-                <span className="text-sm text-slate-400">Conectar nomina</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
+                <span className="text-sm text-[var(--text-3)]">Labor cost</span>
+                <span className="text-sm text-[var(--text-3)]">Conectar nomina</span>
               </div>
               <div className="flex items-center justify-between py-2 bg-emerald-50 rounded-lg px-3">
                 <span className="text-sm font-semibold text-emerald-700">
@@ -240,23 +240,23 @@ export default function EstadoResultadosPage() {
 
           {/* Food cost detail table — only when real data exists */}
           {isRealFoodCost && foodCostItems.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Detalle de Food Cost
               </h3>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[var(--text-3)] mb-5">
                 Top platillos por costo — datos reales de Wansoft
                 {foodCostFecha && ` (${foodCostFecha})`}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Platillo</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Qty</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Precio</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Costo</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Margen %</th>
+                    <tr className="border-b border-[var(--line)]">
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Platillo</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Qty</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Precio</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Costo</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Margen %</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -264,11 +264,11 @@ export default function EstadoResultadosPage() {
                       .sort((a, b) => (b.costo || 0) - (a.costo || 0))
                       .slice(0, 20)
                       .map((item, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50 border-b border-slate-100">
-                          <td className="py-3 px-3 text-slate-700 font-medium">{item.platillo}</td>
-                          <td className="py-3 px-3 text-right text-slate-700 tabular-nums">{item.qty}</td>
-                          <td className="py-3 px-3 text-right text-slate-700 tabular-nums">{formatCurrency(item.precio)}</td>
-                          <td className="py-3 px-3 text-right text-slate-900 font-semibold tabular-nums">{formatCurrency(item.costo)}</td>
+                        <tr key={i} className="hover:bg-[var(--surface-2)]/50 border-b border-[var(--line-soft)]">
+                          <td className="py-3 px-3 text-[var(--text-1)] font-medium">{item.platillo}</td>
+                          <td className="py-3 px-3 text-right text-[var(--text-1)] tabular-nums">{item.qty}</td>
+                          <td className="py-3 px-3 text-right text-[var(--text-1)] tabular-nums">{formatCurrency(item.precio)}</td>
+                          <td className="py-3 px-3 text-right text-[var(--text-1)] font-semibold tabular-nums">{formatCurrency(item.costo)}</td>
                           <td className={`py-3 px-3 text-right tabular-nums font-medium ${
                             (item.margen_pct || 0) >= 60 ? 'text-emerald-600' :
                             (item.margen_pct || 0) >= 40 ? 'text-amber-600' : 'text-red-600'
@@ -285,14 +285,14 @@ export default function EstadoResultadosPage() {
 
           {/* P&L de Wansoft section */}
           {pnlData && pnlData.months && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
               <div className="flex items-center gap-2 mb-1">
-                <FileText className="w-4 h-4 text-slate-500" />
-                <h3 className="text-sm font-semibold text-slate-900">
+                <FileText className="w-4 h-4 text-[var(--text-2)]" />
+                <h3 className="text-sm font-semibold text-[var(--text-1)]">
                   P&L de Wansoft
                 </h3>
               </div>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[var(--text-3)] mb-5">
                 Estado de resultados oficial
                 {pnlPeriodo && ` — ${pnlPeriodo}`}
                 {pnlData.year && ` (${pnlData.year})`}
@@ -300,11 +300,11 @@ export default function EstadoResultadosPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Concepto</th>
+                    <tr className="border-b border-[var(--line)]">
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Concepto</th>
                       {Object.keys(pnlData.months).length > 0 &&
                         (pnlData.months[Object.keys(pnlData.months)[0]] || []).map((_, idx) => (
-                          <th key={idx} className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th key={idx} className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">
                             {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][idx] || `M${idx + 1}`}
                           </th>
                         ))
@@ -315,12 +315,12 @@ export default function EstadoResultadosPage() {
                     {Object.entries(pnlData.months).map(([label, values]) => {
                       const isTotal = label.toLowerCase().includes('total') || label.toLowerCase().includes('utilidad') || label.toLowerCase().includes('margen')
                       return (
-                        <tr key={label} className={`border-b border-slate-100 ${isTotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50/50'}`}>
-                          <td className={`py-2 px-3 ${isTotal ? 'text-slate-900 font-semibold' : 'text-slate-700'}`}>{label}</td>
+                        <tr key={label} className={`border-b border-[var(--line-soft)] ${isTotal ? 'bg-[var(--surface-2)] font-semibold' : 'hover:bg-[var(--surface-2)]/50'}`}>
+                          <td className={`py-2 px-3 ${isTotal ? 'text-[var(--text-1)] font-semibold' : 'text-[var(--text-1)]'}`}>{label}</td>
                           {(values || []).map((val, idx) => (
                             <td key={idx} className={`py-2 px-3 text-right tabular-nums ${
-                              isTotal ? 'text-slate-900 font-semibold' :
-                              val < 0 ? 'text-red-600' : 'text-slate-700'
+                              isTotal ? 'text-[var(--text-1)] font-semibold' :
+                              val < 0 ? 'text-red-600' : 'text-[var(--text-1)]'
                             }`}>
                               {typeof val === 'number' ? formatCurrency(val) : val}
                             </td>
@@ -335,11 +335,11 @@ export default function EstadoResultadosPage() {
           )}
 
           {/* Monthly P&L table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+            <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
               P&L mensual
             </h3>
-            <p className="text-xs text-slate-400 mb-5">
+            <p className="text-xs text-[var(--text-3)] mb-5">
               Estado de resultados por mes
             </p>
 
@@ -347,35 +347,35 @@ export default function EstadoResultadosPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Mes</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">V. Brutas</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descuentos</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">V. Netas</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr className="border-b border-[var(--line)]">
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Mes</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">V. Brutas</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Descuentos</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">V. Netas</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">
                         {isRealFoodCost ? 'Costo real' : 'Costo est.'}
                       </th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Margen</th>
-                      <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">%</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Margen</th>
+                      <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">%</th>
                     </tr>
                   </thead>
                   <tbody>
                     {monthlyPL.map(row => (
-                      <tr key={row.mes} className="hover:bg-slate-50/50 border-b border-slate-100">
-                        <td className="py-3 px-3 text-slate-700 font-medium capitalize">{row.mesLabel}</td>
-                        <td className="py-3 px-3 text-right text-slate-700 tabular-nums">{formatCurrency(row.ventasBrutas)}</td>
+                      <tr key={row.mes} className="hover:bg-[var(--surface-2)]/50 border-b border-[var(--line-soft)]">
+                        <td className="py-3 px-3 text-[var(--text-1)] font-medium capitalize">{row.mesLabel}</td>
+                        <td className="py-3 px-3 text-right text-[var(--text-1)] tabular-nums">{formatCurrency(row.ventasBrutas)}</td>
                         <td className="py-3 px-3 text-right text-red-500 tabular-nums">-{formatCurrency(row.descuentos)}</td>
-                        <td className="py-3 px-3 text-right text-slate-900 font-semibold tabular-nums">{formatCurrency(row.ventasNetas)}</td>
-                        <td className="py-3 px-3 text-right text-slate-500 tabular-nums">{formatCurrency(row.costoEstimado)}</td>
+                        <td className="py-3 px-3 text-right text-[var(--text-1)] font-semibold tabular-nums">{formatCurrency(row.ventasNetas)}</td>
+                        <td className="py-3 px-3 text-right text-[var(--text-2)] tabular-nums">{formatCurrency(row.costoEstimado)}</td>
                         <td className="py-3 px-3 text-right text-emerald-600 font-semibold tabular-nums">{formatCurrency(row.margenBruto)}</td>
-                        <td className="py-3 px-3 text-right text-slate-500 tabular-nums">{row.margenPct.toFixed(1)}%</td>
+                        <td className="py-3 px-3 text-right text-[var(--text-2)] tabular-nums">{row.margenPct.toFixed(1)}%</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <p className="text-slate-400 text-sm py-8 text-center">Sin datos mensuales</p>
+              <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos mensuales</p>
             )}
           </div>
         </>

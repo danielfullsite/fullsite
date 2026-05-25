@@ -111,24 +111,24 @@ export default function ChatPage() {
 
   return (
     <div
-      className="flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+      className="flex flex-col bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden"
       style={{ height: 'calc(100dvh - 80px)' }}
     >
       {/* Header */}
-      <div className="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+      <div className="px-4 sm:px-6 py-4 border-b border-[var(--line)] bg-[var(--surface)] shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
             <Sparkles size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-slate-900">Asistente IA</h1>
-            <p className="text-xs text-slate-500 truncate">
+            <h1 className="text-lg font-semibold text-[var(--text-1)]">Asistente IA</h1>
+            <p className="text-xs text-[var(--text-2)] truncate">
               Preg&uacute;ntame sobre ventas, meseros, platillos y m&aacute;s
             </p>
           </div>
-          <div className="ml-auto hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full px-3 py-1 shrink-0">
+          <div className="ml-auto hidden sm:flex items-center gap-1.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3 py-1 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-[11px] text-slate-500 font-medium">Powered by Claude</span>
+            <span className="text-[11px] text-[var(--text-2)] font-medium">Powered by Claude</span>
           </div>
         </div>
       </div>
@@ -141,10 +141,10 @@ export default function ChatPage() {
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center mb-6 shadow-inner">
               <Sparkles size={32} className="text-blue-600" />
             </div>
-            <h2 className="text-2xl font-semibold text-slate-900 mb-2">
+            <h2 className="text-2xl font-semibold text-[var(--text-1)] mb-2">
               &iquest;En qu&eacute; puedo ayudarte?
             </h2>
-            <p className="text-sm text-slate-500 mb-8">
+            <p className="text-sm text-[var(--text-2)] mb-8">
               Tengo acceso a los datos del restaurante en tiempo real
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
@@ -152,15 +152,15 @@ export default function ChatPage() {
                 <button
                   key={card.title}
                   onClick={() => sendMessage(card.title)}
-                  className="group text-left bg-white border border-slate-200 rounded-xl px-4 py-3.5 hover:shadow-md hover:border-blue-200 hover:bg-blue-50/30 transition-all duration-200 cursor-pointer"
+                  className="group text-left bg-[var(--surface)] border border-[var(--line)] rounded-xl px-4 py-3.5 hover:shadow-md hover:border-blue-200 hover:bg-blue-50/30 transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-xl shrink-0 mt-0.5">{card.icon}</span>
                     <div>
-                      <p className="text-sm font-medium text-slate-900 group-hover:text-blue-700 transition-colors">
+                      <p className="text-sm font-medium text-[var(--text-1)] group-hover:text-blue-700 transition-colors">
                         {card.title}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      <p className="text-xs text-[var(--text-2)] mt-0.5 leading-relaxed">
                         {card.description}
                       </p>
                     </div>
@@ -200,13 +200,13 @@ export default function ChatPage() {
                     className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-blue-500 text-white rounded-br-md'
-                        : 'bg-white text-slate-900 border border-slate-100 shadow-sm rounded-bl-md'
+                        : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line-soft)] shadow-sm rounded-bl-md'
                     }`}
                   >
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   </div>
                   {msg.timestamp && (
-                    <span className={`text-xs text-slate-400 mt-1 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                    <span className={`text-xs text-[var(--text-3)] mt-1 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
                       {formatTime(msg.timestamp)}
                     </span>
                   )}
@@ -220,7 +220,7 @@ export default function ChatPage() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
                   <Sparkles size={14} className="text-white" />
                 </div>
-                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="bg-[var(--surface)] border border-[var(--line-soft)] shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex gap-1.5 items-center h-5">
                     <span className="w-2 h-2 bg-slate-400 rounded-full animate-typing-dot" />
                     <span
@@ -241,7 +241,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input bar */}
-      <div className="px-4 sm:px-6 py-4 border-t border-slate-200 bg-white shrink-0">
+      <div className="px-4 sm:px-6 py-4 border-t border-[var(--line)] bg-[var(--surface)] shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -256,7 +256,7 @@ export default function ChatPage() {
             onKeyDown={handleKeyDown}
             placeholder="Preg\u00FAntame lo que quieras..."
             rows={1}
-            className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none transition-all text-slate-900 placeholder:text-slate-400"
+            className="flex-1 text-sm bg-[var(--surface-2)] border border-[var(--line)] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
             disabled={isLoading}
           />
           <button
@@ -267,7 +267,7 @@ export default function ChatPage() {
             <ArrowUp size={18} />
           </button>
         </form>
-        <p className="text-[11px] text-slate-400 text-center mt-2.5">
+        <p className="text-[11px] text-[var(--text-3)] text-center mt-2.5">
           Powered by Claude &middot; Las respuestas se basan en datos reales del restaurante
         </p>
       </div>

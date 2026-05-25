@@ -40,9 +40,9 @@ export default function DemoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-[var(--surface)] text-[var(--text-1)]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-100">
+      <nav className="sticky top-0 z-50 bg-[var(--surface)]/90 backdrop-blur border-b border-[var(--line-soft)]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
             fullsite
@@ -64,7 +64,7 @@ export default function DemoPage() {
             <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight mb-6">
               Inteligencia artificial para tu restaurante
             </h1>
-            <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+            <p className="text-lg text-[var(--text-2)] mb-8 leading-relaxed">
               Ventas, meseros, platillos, tendencias — preguntale lo que quieras a tu asistente IA
             </p>
             <button
@@ -74,19 +74,19 @@ export default function DemoPage() {
               Solicitar demo gratis
             </button>
           </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-12 flex items-center justify-center min-h-[320px]">
-            <p className="text-slate-400 text-sm font-medium">Dashboard preview</p>
+          <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl p-12 flex items-center justify-center min-h-[320px]">
+            <p className="text-[var(--text-3)] text-sm font-medium">Dashboard preview</p>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section className="bg-slate-50 py-20">
+      <section className="bg-[var(--surface-2)] py-20">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-2xl lg:text-3xl font-bold text-center mb-4">
             Todo lo que necesitas en un solo lugar
           </h2>
-          <p className="text-slate-500 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-[var(--text-2)] text-center mb-12 max-w-2xl mx-auto">
             Conectamos tu POS y te damos inteligencia accionable en tiempo real
           </p>
           <div className="grid md:grid-cols-3 gap-8">
@@ -109,11 +109,11 @@ export default function DemoPage() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="bg-white rounded-xl border border-slate-200 p-8 hover:shadow-md transition-shadow"
+                className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-8 hover:shadow-md transition-shadow"
               >
                 <div className="text-3xl mb-4">{f.icon}</div>
                 <h3 className="font-bold text-lg mb-2">{f.title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+                <p className="text-[var(--text-2)] text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -126,7 +126,7 @@ export default function DemoPage() {
           <h2 className="text-2xl lg:text-3xl font-bold text-center mb-4">
             Como funciona
           </h2>
-          <p className="text-slate-500 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-[var(--text-2)] text-center mb-12 max-w-2xl mx-auto">
             Tres pasos para transformar la operacion de tu restaurante
           </p>
           <div className="grid md:grid-cols-3 gap-8">
@@ -152,7 +152,7 @@ export default function DemoPage() {
                   {s.step}
                 </div>
                 <h3 className="font-bold text-lg mb-2">{s.title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{s.desc}</p>
+                <p className="text-[var(--text-2)] text-sm leading-relaxed">{s.desc}</p>
               </div>
             ))}
           </div>
@@ -160,10 +160,10 @@ export default function DemoPage() {
       </section>
 
       {/* Pricing */}
-      <section className="bg-slate-50 py-20">
+      <section className="bg-[var(--surface-2)] py-20">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-2xl lg:text-3xl font-bold text-center mb-4">Planes</h2>
-          <p className="text-slate-500 text-center mb-12">Precios en MXN + IVA</p>
+          <p className="text-[var(--text-2)] text-center mb-12">Precios en MXN + IVA</p>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
@@ -199,18 +199,18 @@ export default function DemoPage() {
                 key={plan.name}
                 className={`rounded-xl border p-8 flex flex-col ${
                   plan.highlighted
-                    ? 'border-emerald-500 bg-white shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500'
-                    : 'border-slate-200 bg-white'
+                    ? 'border-emerald-500 bg-[var(--surface)] shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500'
+                    : 'border-[var(--line)] bg-[var(--surface)]'
                 }`}
               >
                 <h3 className="font-bold text-lg mb-1">{plan.name}</h3>
                 <div className="mb-6">
                   <span className="text-3xl font-extrabold">{plan.price}</span>
-                  <span className="text-slate-500 text-sm">/mes</span>
+                  <span className="text-[var(--text-2)] text-sm">/mes</span>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
+                    <li key={f} className="flex items-start gap-2 text-sm text-[var(--text-2)]">
                       <svg className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -223,7 +223,7 @@ export default function DemoPage() {
                   className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${
                     plan.highlighted
                       ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-1)]'
                   }`}
                 >
                   Solicitar demo
@@ -240,7 +240,7 @@ export default function DemoPage() {
           <h2 className="text-2xl lg:text-3xl font-bold text-center mb-4">
             Solicita tu demo gratuita
           </h2>
-          <p className="text-slate-500 text-center mb-10">
+          <p className="text-[var(--text-2)] text-center mb-10">
             Dejanos tus datos y te contactamos en menos de 24 horas
           </p>
 
@@ -248,61 +248,61 @@ export default function DemoPage() {
             <div className="text-center bg-emerald-50 border border-emerald-200 rounded-xl p-8">
               <div className="text-4xl mb-3">&#10003;</div>
               <h3 className="font-bold text-lg mb-2">Recibimos tu solicitud</h3>
-              <p className="text-slate-600 text-sm">Te contactaremos pronto. Gracias por tu interes en Fullsite.</p>
+              <p className="text-[var(--text-2)] text-sm">Te contactaremos pronto. Gracias por tu interes en Fullsite.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nombre</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Nombre</label>
                 <input
                   type="text"
                   required
                   value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Tu nombre completo"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Restaurante</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Restaurante</label>
                 <input
                   type="text"
                   required
                   value={form.restaurante}
                   onChange={(e) => setForm({ ...form, restaurante: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Nombre de tu restaurante"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Email</label>
                 <input
                   type="email"
                   required
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="correo@restaurante.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Telefono</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Telefono</label>
                 <input
                   type="tel"
                   required
                   value={form.telefono}
                   onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="81 1234 5678"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">POS que usas</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">POS que usas</label>
                 <select
                   required
                   value={form.pos}
                   onChange={(e) => setForm({ ...form, pos: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                  className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-[var(--surface)]"
                 >
                   <option value="">Selecciona tu POS</option>
                   {posOptions.map((p) => (
@@ -326,20 +326,20 @@ export default function DemoPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 py-10">
+      <footer className="border-t border-[var(--line)] py-10">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <span className="text-[#1a1a1a] font-black text-lg tracking-tight">
               fullsite
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
             </span>
-            <div className="flex gap-4 text-sm text-slate-500">
-              <a href="/privacidad" className="hover:text-slate-700 transition-colors">Privacidad</a>
-              <a href="/terminos" className="hover:text-slate-700 transition-colors">Terminos</a>
-              <a href="/seguridad" className="hover:text-slate-700 transition-colors">Seguridad</a>
+            <div className="flex gap-4 text-sm text-[var(--text-2)]">
+              <a href="/privacidad" className="hover:text-[var(--text-1)] transition-colors">Privacidad</a>
+              <a href="/terminos" className="hover:text-[var(--text-1)] transition-colors">Terminos</a>
+              <a href="/seguridad" className="hover:text-[var(--text-1)] transition-colors">Seguridad</a>
             </div>
           </div>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-[var(--text-3)]">
             &copy; 2026 Fullsite. Monterrey, NL, Mexico.
           </p>
         </div>

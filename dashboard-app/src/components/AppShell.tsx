@@ -44,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )
     }
-    return <main className="min-h-screen bg-slate-900">{children}</main>
+    return <main className="min-h-screen bg-[var(--surface)]">{children}</main>
   }
 
   // Public pages (login, privacy, etc.)

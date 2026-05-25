@@ -76,11 +76,11 @@ export default function ArticulosPage() {
 
       <div className="flex gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o codigo..."
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
+            className="w-full pl-10 pr-4 py-2.5 border border-[var(--line)] rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
         </div>
-        <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="border border-[var(--line)] rounded-xl px-3 py-2.5 text-sm">
           <option value="all">Todos los departamentos</option>
           {departments.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
@@ -92,50 +92,50 @@ export default function ArticulosPage() {
           {(() => { const f = adding ? form : editing!; const set = adding ? setForm : (v: RetailItem) => setEditing(v); return (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <input value={f.name} onChange={e => set({ ...f, name: e.target.value })} placeholder="Nombre" className="border border-slate-200 rounded-lg px-3 py-2 text-sm col-span-2" />
+                <input value={f.name} onChange={e => set({ ...f, name: e.target.value })} placeholder="Nombre" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm col-span-2" />
                 <div className="relative">
-                  <ScanBarcode size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input value={f.barcode} onChange={e => set({ ...f, barcode: e.target.value })} placeholder="Codigo de barras" className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                  <ScanBarcode size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
+                  <input value={f.barcode} onChange={e => set({ ...f, barcode: e.target.value })} placeholder="Codigo de barras" className="w-full pl-10 pr-3 py-2 border border-[var(--line)] rounded-lg text-sm" />
                 </div>
-                <input value={f.department} onChange={e => set({ ...f, department: e.target.value })} placeholder="Departamento" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input value={f.group_name} onChange={e => set({ ...f, group_name: e.target.value })} placeholder="Grupo" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input type="number" value={f.price||''} onChange={e => set({ ...f, price: +e.target.value })} placeholder="Precio" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input type="number" value={f.cost||''} onChange={e => set({ ...f, cost: +e.target.value })} placeholder="Costo" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input type="number" value={f.stock||''} onChange={e => set({ ...f, stock: +e.target.value })} placeholder="Stock" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input type="number" value={f.min_stock||''} onChange={e => set({ ...f, min_stock: +e.target.value })} placeholder="Stock min" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                <input value={f.unit} onChange={e => set({ ...f, unit: e.target.value })} placeholder="Unidad" className="border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                <input value={f.department} onChange={e => set({ ...f, department: e.target.value })} placeholder="Departamento" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input value={f.group_name} onChange={e => set({ ...f, group_name: e.target.value })} placeholder="Grupo" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input type="number" value={f.price||''} onChange={e => set({ ...f, price: +e.target.value })} placeholder="Precio" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input type="number" value={f.cost||''} onChange={e => set({ ...f, cost: +e.target.value })} placeholder="Costo" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input type="number" value={f.stock||''} onChange={e => set({ ...f, stock: +e.target.value })} placeholder="Stock" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input type="number" value={f.min_stock||''} onChange={e => set({ ...f, min_stock: +e.target.value })} placeholder="Stock min" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
+                <input value={f.unit} onChange={e => set({ ...f, unit: e.target.value })} placeholder="Unidad" className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" />
               </div>
               <div className="flex gap-2 mt-3">
                 <button onClick={() => handleSave(f, adding)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1"><Save size={14}/> Guardar</button>
-                <button onClick={() => { setAdding(false); setEditing(null); setForm({...empty}) }} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
+                <button onClick={() => { setAdding(false); setEditing(null); setForm({...empty}) }} className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm">Cancelar</button>
               </div>
             </>
           ); })()}
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
+            <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
               {['Producto','Codigo','Depto','Precio','Costo','Margen','Stock',''].map(h =>
-                <th key={h} className={`px-4 py-3 text-xs font-semibold text-slate-500 uppercase ${h==='Precio'||h==='Costo'||h==='Margen'||h==='Stock'?'text-right':'text-left'}`}>{h}</th>
+                <th key={h} className={`px-4 py-3 text-xs font-semibold text-[var(--text-2)] uppercase ${h==='Precio'||h==='Costo'||h==='Margen'||h==='Stock'?'text-right':'text-left'}`}>{h}</th>
               )}
             </tr>
           </thead>
           <tbody>
             {filtered.map(item => { const m = margin(item.price, item.cost); return (
-              <tr key={item.id} className={`border-b border-slate-100 hover:bg-slate-50 ${!item.active?'opacity-40':''}`}>
-                <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.name}</td>
-                <td className="px-4 py-3 text-sm text-slate-500 font-mono">{item.barcode}</td>
-                <td className="px-4 py-3 text-sm text-slate-500">{item.department}</td>
+              <tr key={item.id} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${!item.active?'opacity-40':''}`}>
+                <td className="px-4 py-3 text-sm font-medium text-[var(--text-1)]">{item.name}</td>
+                <td className="px-4 py-3 text-sm text-[var(--text-2)] font-mono">{item.barcode}</td>
+                <td className="px-4 py-3 text-sm text-[var(--text-2)]">{item.department}</td>
                 <td className="px-4 py-3 text-sm text-right font-semibold">${item.price.toFixed(2)}</td>
-                <td className="px-4 py-3 text-sm text-right text-slate-500">${item.cost.toFixed(2)}</td>
+                <td className="px-4 py-3 text-sm text-right text-[var(--text-2)]">${item.cost.toFixed(2)}</td>
                 <td className={`px-4 py-3 text-sm text-right font-semibold ${marginColor(m)}`}>{m.toFixed(0)}%</td>
-                <td className={`px-4 py-3 text-sm text-right ${item.stock<=item.min_stock?'text-red-600 font-semibold':'text-slate-700'}`}>{item.stock} {item.unit}</td>
+                <td className={`px-4 py-3 text-sm text-right ${item.stock<=item.min_stock?'text-red-600 font-semibold':'text-[var(--text-1)]'}`}>{item.stock} {item.unit}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex gap-1 justify-end">
-                    <button onClick={() => setEditing(item)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><Pencil size={14}/></button>
+                    <button onClick={() => setEditing(item)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
                     <button onClick={() => handleDelete(item)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><X size={14}/></button>
                   </div>
                 </td>
@@ -143,10 +143,10 @@ export default function ArticulosPage() {
             )})}
           </tbody>
         </table>
-        {filtered.length === 0 && <p className="text-center text-slate-400 py-10 text-sm">No se encontraron articulos</p>}
+        {filtered.length === 0 && <p className="text-center text-[var(--text-3)] py-10 text-sm">No se encontraron articulos</p>}
       </div>
 
-      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
+      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
     </div>
   )
 }

@@ -86,50 +86,50 @@ export default function PromocionesPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Promociones" subtitle="Gestionar descuentos y ofertas" action={
-        <button onClick={() => setEditing({...empty})} className="flex items-center gap-1.5 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"><Plus size={16}/>Nueva</button>
+        <button onClick={() => setEditing({...empty})} className="flex items-center gap-1.5 bg-[var(--surface)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--surface-2)]"><Plus size={16}/>Nueva</button>
       }/>
 
       {editing && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 space-y-4">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-5 mb-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <input placeholder="Nombre" value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm"/>
-            <select value={editing.type} onChange={e=>setEditing({...editing,type:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm">
+            <input placeholder="Nombre" value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
+            <select value={editing.type} onChange={e=>setEditing({...editing,type:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm">
               {TYPES.map(t=><option key={t} value={t}>{t}</option>)}
             </select>
-            <input type="number" placeholder="% descuento" value={editing.discount_pct??''} onChange={e=>setEditing({...editing,discount_pct:e.target.value?Number(e.target.value):null})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm"/>
-            <input type="number" placeholder="$ descuento" value={editing.discount_amount??''} onChange={e=>setEditing({...editing,discount_amount:e.target.value?Number(e.target.value):null})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm"/>
-            <input type="date" value={editing.valid_from} onChange={e=>setEditing({...editing,valid_from:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm" title="Desde"/>
-            <input type="date" value={editing.valid_until} onChange={e=>setEditing({...editing,valid_until:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm" title="Hasta"/>
-            <input type="time" value={editing.hours_start} onChange={e=>setEditing({...editing,hours_start:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm" title="Hora inicio"/>
-            <input type="time" value={editing.hours_end} onChange={e=>setEditing({...editing,hours_end:e.target.value})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm" title="Hora fin"/>
-            <input type="number" placeholder="Compra minima" value={editing.min_purchase||''} onChange={e=>setEditing({...editing,min_purchase:Number(e.target.value)})} className="border border-slate-200 rounded-lg px-3 py-2 text-sm"/>
+            <input type="number" placeholder="% descuento" value={editing.discount_pct??''} onChange={e=>setEditing({...editing,discount_pct:e.target.value?Number(e.target.value):null})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
+            <input type="number" placeholder="$ descuento" value={editing.discount_amount??''} onChange={e=>setEditing({...editing,discount_amount:e.target.value?Number(e.target.value):null})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
+            <input type="date" value={editing.valid_from} onChange={e=>setEditing({...editing,valid_from:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" title="Desde"/>
+            <input type="date" value={editing.valid_until} onChange={e=>setEditing({...editing,valid_until:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" title="Hasta"/>
+            <input type="time" value={editing.hours_start} onChange={e=>setEditing({...editing,hours_start:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" title="Hora inicio"/>
+            <input type="time" value={editing.hours_end} onChange={e=>setEditing({...editing,hours_end:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" title="Hora fin"/>
+            <input type="number" placeholder="Compra minima" value={editing.min_purchase||''} onChange={e=>setEditing({...editing,min_purchase:Number(e.target.value)})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={e=>setEditing({...editing,active:e.target.checked})}/>Activa</label>
           </div>
           <div className="flex gap-2">
             {DAYS.map((d,i)=>(
-              <button key={i} onClick={()=>toggleDay(i)} className={`px-3 py-1 rounded-full text-xs font-medium ${editing.days_of_week.includes(i)?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`}>{d}</button>
+              <button key={i} onClick={()=>toggleDay(i)} className={`px-3 py-1 rounded-full text-xs font-medium ${editing.days_of_week.includes(i)?'bg-[var(--surface)] text-white':'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>{d}</button>
             ))}
           </div>
           <div className="flex gap-2 justify-end">
-            <button onClick={()=>setEditing(null)} className="flex items-center gap-1 px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-lg"><X size={14}/>Cancelar</button>
-            <button onClick={save} className="flex items-center gap-1 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800"><Save size={14}/>Guardar</button>
+            <button onClick={()=>setEditing(null)} className="flex items-center gap-1 px-4 py-2 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)] rounded-lg"><X size={14}/>Cancelar</button>
+            <button onClick={save} className="flex items-center gap-1 bg-[var(--surface)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--surface-2)]"><Save size={14}/>Guardar</button>
           </div>
         </div>
       )}
 
-      {loading ? <p className="text-slate-400 text-sm">Cargando...</p> : promos.length === 0 ? <p className="text-slate-400 text-sm">Sin promociones</p> : (
+      {loading ? <p className="text-[var(--text-3)] text-sm">Cargando...</p> : promos.length === 0 ? <p className="text-[var(--text-3)] text-sm">Sin promociones</p> : (
         <div className="grid gap-4">
           {promos.map(p=>(
-            <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-start justify-between">
+            <div key={p.id} className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-slate-900">{p.name}</span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.active && !isExpired(p) ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                  <span className="font-semibold text-[var(--text-1)]">{p.name}</span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.active && !isExpired(p) ? 'bg-green-100 text-green-700' : 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
                     {p.active && !isExpired(p) ? 'Activa' : 'Inactiva'}
                   </span>
-                  <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase">{p.type}</span>
+                  <span className="text-[10px] bg-[var(--surface-2)] text-[var(--text-2)] px-2 py-0.5 rounded-full uppercase">{p.type}</span>
                 </div>
-                <div className="text-xs text-slate-400 space-x-3">
+                <div className="text-xs text-[var(--text-3)] space-x-3">
                   {p.discount_pct && <span>{p.discount_pct}% desc</span>}
                   {p.discount_amount && <span>${p.discount_amount} desc</span>}
                   {p.valid_from && <span>Desde {p.valid_from}</span>}
@@ -140,8 +140,8 @@ export default function PromocionesPage() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <button onClick={()=>setEditing({...p})} className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-slate-700 text-xs">Editar</button>
-                <button onClick={()=>remove(p.id!)} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
+                <button onClick={()=>setEditing({...p})} className="p-2 hover:bg-[var(--surface-2)] rounded-lg text-[var(--text-3)] hover:text-[var(--text-1)] text-xs">Editar</button>
+                <button onClick={()=>remove(p.id!)} className="p-2 hover:bg-red-50 rounded-lg text-[var(--text-3)] hover:text-red-500"><Trash2 size={14}/></button>
               </div>
             </div>
           ))}

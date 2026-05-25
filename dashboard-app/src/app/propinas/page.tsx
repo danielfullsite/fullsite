@@ -101,7 +101,7 @@ export default function PropinasPage() {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+            <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -139,8 +139,8 @@ export default function PropinasPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Propinas por mesero */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Propinas por mesero
               </h3>
               <p className="text-xs mb-5">
@@ -168,13 +168,13 @@ export default function PropinasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: PROPINA_COLORS[i % PROPINA_COLORS.length] }}
                             />
-                            <span className="text-sm font-medium text-slate-700 truncate max-w-[180px]">{m.nombre}</span>
+                            <span className="text-sm font-medium text-[var(--text-1)] truncate max-w-[180px]">{m.nombre}</span>
                           </div>
-                          <span className="text-sm font-bold text-slate-900 tabular-nums">
+                          <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">
                             {formatCurrency(m.propinas)}
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                           <div
                             className="h-2 rounded-full animate-progress"
                             style={{
@@ -188,16 +188,16 @@ export default function PropinasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de propinas por mesero</p>
+                <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de propinas por mesero</p>
               )}
             </div>
 
             {/* Propinas por metodo de pago */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Pagos con tarjeta
               </h3>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[var(--text-3)] mb-5">
                 Ventas por tipo de tarjeta (propinas se cobran aqui)
               </p>
               {tarjetaPayments.length > 0 ? (
@@ -213,14 +213,14 @@ export default function PropinasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: PROPINA_COLORS[i % PROPINA_COLORS.length] }}
                             />
-                            <span className="text-sm font-medium text-slate-700">{p.nombre}</span>
+                            <span className="text-sm font-medium text-[var(--text-1)]">{p.nombre}</span>
                           </div>
-                          <span className="text-sm font-bold text-slate-900 tabular-nums">
+                          <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">
                             {formatCurrency(p.total)}{' '}
-                            <span className="text-slate-400 text-xs font-normal">({pct}%)</span>
+                            <span className="text-[var(--text-3)] text-xs font-normal">({pct}%)</span>
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                           <div
                             className="h-2 rounded-full animate-progress"
                             style={{
@@ -234,7 +234,7 @@ export default function PropinasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de pagos con tarjeta</p>
+                <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de pagos con tarjeta</p>
               )}
             </div>
           </div>

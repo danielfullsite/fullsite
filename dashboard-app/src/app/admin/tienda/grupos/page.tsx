@@ -69,43 +69,43 @@ export default function GruposTiendaPage() {
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
           <h3 className="font-semibold text-emerald-800 mb-3">Nuevo grupo</h3>
           <div className="grid grid-cols-2 gap-3">
-            <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} placeholder="Departamento" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" list="depts" />
+            <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} placeholder="Departamento" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" list="depts" />
             <datalist id="depts">{departments.map(d => <option key={d} value={d} />)}</datalist>
-            <input value={form.group_name} onChange={e => setForm({ ...form, group_name: e.target.value })} placeholder="Nombre del grupo" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            <input value={form.group_name} onChange={e => setForm({ ...form, group_name: e.target.value })} placeholder="Nombre del grupo" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
           </div>
-          <p className="text-xs text-slate-400 mt-2">Los grupos se crean al asignar articulos a ellos desde Articulos.</p>
+          <p className="text-xs text-[var(--text-3)] mt-2">Los grupos se crean al asignar articulos a ellos desde Articulos.</p>
           <div className="flex gap-2 mt-3">
             <button onClick={() => { showToast('Grupo registrado'); setAdding(false); setForm({ department: '', group_name: '' }) }} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1"><Save size={14}/> Guardar</button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
+            <button onClick={() => setAdding(false)} className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm">Cancelar</button>
           </div>
         </div>
       )}
 
       <div className="space-y-4">
         {departments.map(dept => (
-          <div key={dept} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
-              <Layers size={16} className="text-slate-400" />
-              <h3 className="font-semibold text-slate-900 text-sm">{dept}</h3>
-              <span className="text-xs text-slate-400 ml-auto">{groups.filter(g => g.department === dept).length} grupos</span>
+          <div key={dept} className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
+            <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-3 flex items-center gap-2">
+              <Layers size={16} className="text-[var(--text-3)]" />
+              <h3 className="font-semibold text-[var(--text-1)] text-sm">{dept}</h3>
+              <span className="text-xs text-[var(--text-3)] ml-auto">{groups.filter(g => g.department === dept).length} grupos</span>
             </div>
             <div className="divide-y divide-slate-100">
               {groups.filter(g => g.department === dept).map(g => (
-                <div key={`${g.department}-${g.group_name}`} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div key={`${g.department}-${g.group_name}`} className="px-5 py-3 flex items-center justify-between hover:bg-[var(--surface-2)]">
                   {editing?.orig === g ? (
                     <div className="flex gap-2 flex-1">
                       <input value={editing.department} onChange={e => setEditing({ ...editing, department: e.target.value })} className="border border-emerald-300 rounded px-2 py-1 text-sm flex-1" />
                       <input value={editing.group_name} onChange={e => setEditing({ ...editing, group_name: e.target.value })} className="border border-emerald-300 rounded px-2 py-1 text-sm flex-1" />
                       <button onClick={handleSaveEdit} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14}/></button>
-                      <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><X size={14}/></button>
+                      <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><X size={14}/></button>
                     </div>
                   ) : (
                     <>
                       <div>
-                        <span className="text-sm font-medium text-slate-900">{g.group_name}</span>
-                        <span className="text-xs text-slate-400 ml-2">{g.count} articulos</span>
+                        <span className="text-sm font-medium text-[var(--text-1)]">{g.group_name}</span>
+                        <span className="text-xs text-[var(--text-3)] ml-2">{g.count} articulos</span>
                       </div>
-                      <button onClick={() => setEditing({ orig: g, department: g.department, group_name: g.group_name })} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><Pencil size={14}/></button>
+                      <button onClick={() => setEditing({ orig: g, department: g.department, group_name: g.group_name })} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14}/></button>
                     </>
                   )}
                 </div>
@@ -113,10 +113,10 @@ export default function GruposTiendaPage() {
             </div>
           </div>
         ))}
-        {groups.length === 0 && <p className="text-center text-slate-400 py-10 text-sm">No hay grupos todavia. Agrega articulos primero.</p>}
+        {groups.length === 0 && <p className="text-center text-[var(--text-3)] py-10 text-sm">No hay grupos todavia. Agrega articulos primero.</p>}
       </div>
 
-      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
+      {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
     </div>
   )
 }

@@ -12,8 +12,8 @@ export default function CoachPage() {
             <Sparkles size={20} className="text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Coach</h2>
-            <p className="text-sm text-slate-400">Tu socio operativo que nunca deja de pensar en tu negocio</p>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Coach</h2>
+            <p className="text-sm text-[var(--text-3)]">Tu socio operativo que nunca deja de pensar en tu negocio</p>
           </div>
         </div>
       </div>

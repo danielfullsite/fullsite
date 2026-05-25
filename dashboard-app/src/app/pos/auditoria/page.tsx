@@ -13,9 +13,9 @@ const ACTION_CONFIG: Record<string, { icon: typeof ShieldCheck; color: string; l
   item_added: { icon: Plus, color: 'text-emerald-400', label: 'Item agregado' },
   item_modified: { icon: Pencil, color: 'text-amber-400', label: 'Item modificado' },
   item_cancelled: { icon: Ban, color: 'text-red-400', label: 'Item cancelado' },
-  quantity_changed: { icon: Pencil, color: 'text-slate-400', label: 'Cantidad cambiada' },
+  quantity_changed: { icon: Pencil, color: 'text-[var(--text-3)]', label: 'Cantidad cambiada' },
   discount_applied: { icon: Percent, color: 'text-amber-400', label: 'Descuento aplicado' },
-  discount_removed: { icon: Percent, color: 'text-slate-400', label: 'Descuento removido' },
+  discount_removed: { icon: Percent, color: 'text-[var(--text-3)]', label: 'Descuento removido' },
   status_changed: { icon: ChefHat, color: 'text-blue-400', label: 'Estado cambiado' },
   payment_processed: { icon: CreditCard, color: 'text-emerald-400', label: 'Pago procesado' },
 }
@@ -70,44 +70,44 @@ export default function AuditoriaPage() {
   )
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <ShieldCheck size={24} className="text-emerald-400" />
             <h1 className="text-xl font-bold">Auditoria</h1>
           </div>
-          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-sm text-slate-400">
+          <div className="text-sm text-[var(--text-3)]">
             {entries.length} eventos · {alertEntries.length} cancelaciones
           </div>
         </div>
       </header>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-slate-800/50 border-b border-slate-700">
+      <div className="flex items-center gap-3 px-6 py-3 bg-[var(--surface-2)]/50 border-b border-slate-700">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por mesero, orden, motivo..."
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
+            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
           />
         </div>
         <select
           value={filterAction}
           onChange={(e) => setFilterAction(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
+          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
         >
           <option value="all">Todas las acciones</option>
           <option value="item_cancelled">Cancelaciones de item</option>
@@ -127,7 +127,7 @@ export default function AuditoriaPage() {
             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <div className="text-center">
               <ShieldCheck size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-xl">Sin eventos registrados</p>
@@ -136,7 +136,7 @@ export default function AuditoriaPage() {
         ) : (
           <div className="divide-y divide-slate-800">
             {filtered.map(entry => {
-              const config = ACTION_CONFIG[entry.action] || { icon: FileText, color: 'text-slate-400', label: entry.action }
+              const config = ACTION_CONFIG[entry.action] || { icon: FileText, color: 'text-[var(--text-3)]', label: entry.action }
               const Icon = config.icon
               const details = parseDetails(entry.details)
               const isAlert = entry.action === 'item_cancelled' || entry.action === 'order_cancelled'
@@ -144,12 +144,12 @@ export default function AuditoriaPage() {
               return (
                 <div
                   key={entry.id}
-                  className={`px-6 py-4 hover:bg-slate-800/50 transition-colors ${isAlert ? 'bg-red-950/20 border-l-2 border-red-500' : ''}`}
+                  className={`px-6 py-4 hover:bg-[var(--surface-2)]/50 transition-colors ${isAlert ? 'bg-red-950/20 border-l-2 border-red-500' : ''}`}
                 >
                   <div className="flex items-start gap-4">
                     {/* Icon */}
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      isAlert ? 'bg-red-900/40' : 'bg-slate-800'
+                      isAlert ? 'bg-red-900/40' : 'bg-[var(--surface-2)]'
                     }`}>
                       <Icon size={16} className={config.color} />
                     </div>
@@ -159,16 +159,16 @@ export default function AuditoriaPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`font-semibold text-sm ${config.color}`}>{config.label}</span>
                         {entry.mesa && (
-                          <span className="text-slate-500 text-xs">Mesa {entry.mesa}</span>
+                          <span className="text-[var(--text-2)] text-xs">Mesa {entry.mesa}</span>
                         )}
                         {entry.order_id && (
-                          <span className="text-slate-600 text-xs font-mono">{entry.order_id.slice(0, 8)}</span>
+                          <span className="text-[var(--text-2)] text-xs font-mono">{entry.order_id.slice(0, 8)}</span>
                         )}
                       </div>
 
                       {/* Details */}
                       {details && (
-                        <div className="text-slate-400 text-sm space-y-0.5">
+                        <div className="text-[var(--text-3)] text-sm space-y-0.5">
                           {'item' in details && details.item ? <p>Item: <span className="text-white">{String(details.item)}</span></p> : null}
                           {'method' in details && details.method ? <p>Metodo: <span className="text-white">{String(details.method)}</span></p> : null}
                           {'total' in details && details.total != null ? <p>Total: <span className="text-white">${Number(details.total).toFixed(2)}</span></p> : null}
@@ -191,12 +191,12 @@ export default function AuditoriaPage() {
                     {/* Right side: actor + time + approver */}
                     <div className="text-right flex-shrink-0">
                       <div className="flex items-center gap-1.5 justify-end mb-1">
-                        <User size={12} className="text-slate-500" />
+                        <User size={12} className="text-[var(--text-2)]" />
                         <span className="text-sm text-white">{entry.actor}</span>
                       </div>
                       <div className="flex items-center gap-1.5 justify-end">
-                        <Clock size={12} className="text-slate-600" />
-                        <span className="text-xs text-slate-500">{formatTime(entry.created_at)}</span>
+                        <Clock size={12} className="text-[var(--text-2)]" />
+                        <span className="text-xs text-[var(--text-2)]">{formatTime(entry.created_at)}</span>
                       </div>
                       {entry.approved_by && (
                         <p className="text-amber-400 text-xs mt-1">

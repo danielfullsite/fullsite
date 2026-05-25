@@ -92,11 +92,11 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-[400px] h-[100dvh] sm:h-auto sm:max-h-[580px] bg-white sm:rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden animate-widget-in">
+    <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-[400px] h-[100dvh] sm:h-auto sm:max-h-[580px] bg-[var(--surface)] sm:rounded-2xl shadow-2xl border border-[var(--line)]/80 flex flex-col overflow-hidden animate-widget-in">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-gradient-to-r from-blue-500 to-indigo-600">
+      <div className="px-5 py-4 border-b border-[var(--line)]/80 flex items-center justify-between bg-gradient-to-r from-blue-500 to-indigo-600">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-[var(--surface)]/20 backdrop-blur-sm flex items-center justify-center">
             <Sparkles size={18} className="text-white" />
           </div>
           <div>
@@ -109,14 +109,14 @@ export default function ChatWidget() {
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+          className="text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[var(--surface)]/10"
         >
           <X size={18} />
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[380px] bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[380px] bg-[var(--surface-2)]/50">
         {messages.map((msg, i) => (
           <div
             key={i}
@@ -136,13 +136,13 @@ export default function ChatWidget() {
                 className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-blue-500 text-white rounded-br-md'
-                    : 'bg-white text-slate-900 border border-slate-200/80 shadow-sm rounded-bl-md'
+                    : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/80 shadow-sm rounded-bl-md'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               </div>
               {msg.timestamp && (
-                <span className="text-[10px] text-slate-400 mt-0.5 px-1">
+                <span className="text-[10px] text-[var(--text-3)] mt-0.5 px-1">
                   {formatTime(msg.timestamp)}
                 </span>
               )}
@@ -157,7 +157,7 @@ export default function ChatWidget() {
               <button
                 key={q}
                 onClick={() => sendMessage(q)}
-                className="text-xs text-blue-600 bg-white border border-blue-200/80 rounded-full px-3 py-1.5 hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm"
+                className="text-xs text-blue-600 bg-[var(--surface)] border border-blue-200/80 rounded-full px-3 py-1.5 hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm"
               >
                 {q}
               </button>
@@ -171,7 +171,7 @@ export default function ChatWidget() {
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
               <Sparkles size={12} className="text-white" />
             </div>
-            <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
+            <div className="bg-[var(--surface)] border border-[var(--line)]/80 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex gap-1.5 items-center h-4">
                 <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-typing-dot" />
                 <span
@@ -190,7 +190,7 @@ export default function ChatWidget() {
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-slate-200/80 bg-white">
+      <div className="px-4 py-3 border-t border-[var(--line)]/80 bg-[var(--surface)]">
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -208,7 +208,7 @@ export default function ChatWidget() {
               }
             }}
             placeholder="Escribe tu pregunta..."
-            className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-slate-900 placeholder:text-slate-400"
+            className="flex-1 text-sm bg-[var(--surface-2)] border border-[var(--line)] rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
             disabled={isLoading}
           />
           <button

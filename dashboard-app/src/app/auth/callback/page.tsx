@@ -67,7 +67,7 @@ export default function AuthCallbackPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--surface)] px-4">
         <div className="text-center max-w-sm">
           <p className="text-red-600 font-medium mb-4">{error}</p>
           <a
@@ -82,10 +82,10 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--surface)]">
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-slate-500 text-sm font-medium">Autenticando...</p>
+        <p className="text-[var(--text-2)] text-sm font-medium">Autenticando...</p>
       </div>
     </div>
   )

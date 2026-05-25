@@ -70,7 +70,7 @@ export default function ClienteDisplay() {
           <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-1 mb-1" />
         </span>
         {order && (
-          <p className="text-slate-400 text-lg mt-2">Mesa {order.mesa}</p>
+          <p className="text-[var(--text-3)] text-lg mt-2">Mesa {order.mesa}</p>
         )}
       </header>
 
@@ -79,8 +79,8 @@ export default function ClienteDisplay() {
         {!order || items.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-slate-600 text-2xl font-light">Bienvenido</p>
-              <p className="text-slate-700 text-sm mt-2">Tu orden aparecera aqui</p>
+              <p className="text-[var(--text-2)] text-2xl font-light">Bienvenido</p>
+              <p className="text-[var(--text-1)] text-sm mt-2">Tu orden aparecera aqui</p>
             </div>
           </div>
         ) : (
@@ -93,7 +93,7 @@ export default function ClienteDisplay() {
                     <span className="text-white text-lg">{item.nombre || item.name}</span>
                   </div>
                   {item.modificadores && item.modificadores.length > 0 && (
-                    <p className="text-slate-500 text-sm ml-10">{item.modificadores.join(' · ')}</p>
+                    <p className="text-[var(--text-2)] text-sm ml-10">{item.modificadores.join(' · ')}</p>
                   )}
                 </div>
                 <span className="text-white font-semibold text-lg">
@@ -115,11 +115,11 @@ export default function ClienteDisplay() {
                 <span>-{formatMXN(order.descuento)}</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-400 mb-2">
+            <div className="flex justify-between text-[var(--text-3)] mb-2">
               <span>Subtotal</span>
               <span>{formatMXN(order.subtotal)}</span>
             </div>
-            <div className="flex justify-between text-slate-400 mb-4">
+            <div className="flex justify-between text-[var(--text-3)] mb-4">
               <span>IVA (16%)</span>
               <span>{formatMXN(order.iva)}</span>
             </div>
@@ -133,7 +133,7 @@ export default function ClienteDisplay() {
 
       {/* Footer */}
       <div className="text-center py-4 border-t border-slate-900">
-        <p className="text-slate-700 text-xs">Gracias por tu visita</p>
+        <p className="text-[var(--text-1)] text-xs">Gracias por tu visita</p>
       </div>
     </div>
   )

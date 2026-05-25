@@ -83,7 +83,7 @@ export default function TopNav() {
           ${
             isActive
               ? 'bg-blue-50 text-blue-600 nav-active-dot'
-              : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              : 'text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)]'
           }
         `}
       >
@@ -109,7 +109,7 @@ export default function TopNav() {
             {mainNavItems.map(renderNavItem)}
 
             {/* Separator */}
-            <div className="w-px h-5 bg-slate-200 mx-1.5 shrink-0" />
+            <div className="w-px h-5 bg-[var(--line)] mx-1.5 shrink-0" />
 
             {secondaryNavItems.map(renderNavItem)}
           </nav>
@@ -134,7 +134,7 @@ export default function TopNav() {
               className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md transition-colors ${
                 pushEnabled
                   ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                  : 'text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--surface-2)]'
               }`}
               title={pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
             >
@@ -146,7 +146,7 @@ export default function TopNav() {
             <>
               {/* Client name badge */}
               {clientConfig && (
-                <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-md bg-slate-50 text-xs font-medium text-slate-500 border border-slate-200/80">
+                <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--surface-2)] text-xs font-medium text-[var(--text-2)] border border-[var(--line)]/80">
                   {clientConfig.name || clientConfig.id}
                 </span>
               )}
@@ -154,7 +154,7 @@ export default function TopNav() {
               {/* Logout button */}
               <button
                 onClick={signOut}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-md hover:bg-red-50"
+                className="flex items-center gap-1.5 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors px-2 py-1.5 rounded-md hover:bg-red-50"
                 title="Cerrar sesión"
               >
                 <LogOut size={14} />

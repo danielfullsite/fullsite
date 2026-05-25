@@ -109,19 +109,19 @@ export default function CoachPanel() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
             <Sparkles size={14} className="text-white" />
           </div>
-          <h3 className="text-sm font-semibold text-slate-900">Coach</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Coach</h3>
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="animate-pulse">
-              <div className="h-3 bg-slate-100 rounded w-1/3 mb-2" />
-              <div className="h-3 bg-slate-100 rounded w-full mb-1" />
-              <div className="h-3 bg-slate-100 rounded w-2/3" />
+              <div className="h-3 bg-[var(--surface-2)] rounded w-1/3 mb-2" />
+              <div className="h-3 bg-[var(--surface-2)] rounded w-full mb-1" />
+              <div className="h-3 bg-[var(--surface-2)] rounded w-2/3" />
             </div>
           ))}
         </div>
@@ -131,14 +131,14 @@ export default function CoachPanel() {
 
   if (error || !data || data.insights.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
             <Sparkles size={14} className="text-white" />
           </div>
-          <h3 className="text-sm font-semibold text-slate-900">Coach</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Coach</h3>
         </div>
-        <p className="text-sm text-slate-400">Sin datos suficientes para generar insights.</p>
+        <p className="text-sm text-[var(--text-3)]">Sin datos suficientes para generar insights.</p>
       </div>
     )
   }
@@ -151,23 +151,23 @@ export default function CoachPanel() {
     : null
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-6 pt-5 pb-4 border-b border-slate-100">
+      <div className="px-6 pt-5 pb-4 border-b border-[var(--line-soft)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
               <Sparkles size={15} className="text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Coach</h3>
-              <p className="text-[11px] text-slate-400">Insights basados en tus datos</p>
+              <h3 className="text-sm font-bold text-[var(--text-1)]">Coach</h3>
+              <p className="text-[11px] text-[var(--text-3)]">Insights basados en tus datos</p>
             </div>
           </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 disabled:opacity-50"
+            className="p-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors text-[var(--text-3)] hover:text-[var(--text-2)] disabled:opacity-50"
             title="Actualizar insights"
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
@@ -178,8 +178,8 @@ export default function CoachPanel() {
         {data.today && (
           <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-50">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">Hoy</span>
-              <span className="text-xs font-bold text-slate-900">
+              <span className="text-xs text-[var(--text-3)]">Hoy</span>
+              <span className="text-xs font-bold text-[var(--text-1)]">
                 ${data.today.ventas.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
               </span>
               {ventasVsAvg && (
@@ -188,10 +188,10 @@ export default function CoachPanel() {
                 </span>
               )}
             </div>
-            <div className="w-px h-3 bg-slate-200" />
+            <div className="w-px h-3 bg-[var(--line)]" />
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">Semana</span>
-              <span className="text-xs font-bold text-slate-900">
+              <span className="text-xs text-[var(--text-3)]">Semana</span>
+              <span className="text-xs font-bold text-[var(--text-1)]">
                 ${data.today.weekVentas.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
               </span>
               {weekChange && (
@@ -200,10 +200,10 @@ export default function CoachPanel() {
                 </span>
               )}
             </div>
-            <div className="w-px h-3 bg-slate-200" />
+            <div className="w-px h-3 bg-[var(--line)]" />
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">TP</span>
-              <span className="text-xs font-bold text-slate-900">${data.today.tp}</span>
+              <span className="text-xs text-[var(--text-3)]">TP</span>
+              <span className="text-xs font-bold text-[var(--text-1)]">${data.today.tp}</span>
             </div>
           </div>
         )}
@@ -212,7 +212,7 @@ export default function CoachPanel() {
       {/* Insights */}
       <div className="divide-y divide-slate-50">
         {data.insights.map((insight, i) => (
-          <div key={i} className="px-6 py-4 hover:bg-slate-50/50 transition-colors">
+          <div key={i} className="px-6 py-4 hover:bg-[var(--surface-2)]/50 transition-colors">
             <div className="flex items-start gap-3">
               <InsightIcon type={insight.type} priority={insight.priority} />
               <div className="flex-1 min-w-0">
@@ -220,8 +220,8 @@ export default function CoachPanel() {
                   <TypeLabel type={insight.type} />
                   <MetricBadge metric={insight.metric} priority={insight.priority} />
                 </div>
-                <p className="text-sm font-semibold text-slate-900 mb-1">{insight.title}</p>
-                <p className="text-xs text-slate-500 leading-relaxed">{insight.body}</p>
+                <p className="text-sm font-semibold text-[var(--text-1)] mb-1">{insight.title}</p>
+                <p className="text-xs text-[var(--text-2)] leading-relaxed">{insight.body}</p>
               </div>
             </div>
           </div>
@@ -229,8 +229,8 @@ export default function CoachPanel() {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100">
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+      <div className="px-6 py-3 bg-[var(--surface-2)]/50 border-t border-[var(--line-soft)]">
+        <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-3)]">
           <Calendar size={10} />
           <span>Actualizado con datos hasta {data.today?.fecha || 'hoy'}</span>
         </div>

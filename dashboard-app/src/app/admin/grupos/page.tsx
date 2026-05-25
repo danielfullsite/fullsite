@@ -16,7 +16,7 @@ export default function AdminGruposPage() {
       setGroups(cats.map(cat => ({
         id: cat.id,
         name: cat.name,
-        color: cat.color || 'bg-slate-500',
+        color: cat.color || 'bg-[var(--surface-2)]0',
         itemCount: cat.items.length,
         priceRange: {
           min: cat.items.length > 0 ? Math.min(...cat.items.map(i => i.price)) : 0,
@@ -29,7 +29,7 @@ export default function AdminGruposPage() {
 
   const totalItems = groups.reduce((s, g) => s + g.itemCount, 0)
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando grupos...</div>
+  if (loading) return <div className="flex items-center justify-center h-64 text-[var(--text-3)]">Cargando grupos...</div>
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -53,7 +53,7 @@ export default function AdminGruposPage() {
           <Link
             key={group.id}
             href={`/admin/menu?cat=${group.id}`}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-emerald-300 hover:shadow-md transition-all group"
+            className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm p-5 hover:border-emerald-300 hover:shadow-md transition-all group"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -61,14 +61,14 @@ export default function AdminGruposPage() {
                   <Layers size={18} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900 text-sm">{group.name}</h3>
-                  <p className="text-xs text-slate-400">{group.itemCount} platillos</p>
+                  <h3 className="font-semibold text-[var(--text-1)] text-sm">{group.name}</h3>
+                  <p className="text-xs text-[var(--text-3)]">{group.itemCount} platillos</p>
                 </div>
               </div>
-              <ArrowRight size={16} className="text-slate-300 group-hover:text-emerald-500 transition-colors mt-1" />
+              <ArrowRight size={16} className="text-[var(--text-4)] group-hover:text-emerald-500 transition-colors mt-1" />
             </div>
             {group.priceRange.max > 0 && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--text-2)]">
                 ${group.priceRange.min} – ${group.priceRange.max} MXN
               </p>
             )}

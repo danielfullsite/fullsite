@@ -82,43 +82,43 @@ export default function NominaPage() {
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">Nomina y Rendimiento</h2>
-        <p className="text-sm text-slate-400">Asistencia, ventas por empleado y propinas {fecha && `· ${fecha}`}</p>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Nomina y Rendimiento</h2>
+        <p className="text-sm text-[var(--text-3)]">Asistencia, ventas por empleado y propinas {fecha && `· ${fecha}`}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><Users size={16} className="text-blue-500" /><span className="text-xs text-slate-500 font-medium">Empleados activos</span></div>
-          <p className="text-2xl font-bold text-slate-900">{meseros.length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><Users size={16} className="text-blue-500" /><span className="text-xs text-[var(--text-2)] font-medium">Empleados activos</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{meseros.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-emerald-500" /><span className="text-xs text-slate-500 font-medium">Ventas semana</span></div>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalVentas)}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-emerald-500" /><span className="text-xs text-[var(--text-2)] font-medium">Ventas semana</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(totalVentas)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><TrendingUp size={16} className="text-violet-500" /><span className="text-xs text-slate-500 font-medium">Propinas hoy</span></div>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalTips)}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><TrendingUp size={16} className="text-violet-500" /><span className="text-xs text-[var(--text-2)] font-medium">Propinas hoy</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(totalTips)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-500" /><span className="text-xs text-slate-500 font-medium">Registros asistencia</span></div>
-          <p className="text-2xl font-bold text-slate-900">{labor.length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><Clock size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Registros asistencia</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{labor.length}</p>
         </div>
       </div>
 
       <div className="flex gap-2 mb-4">
-        <button onClick={() => setTab('rendimiento')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'rendimiento' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>Rendimiento</button>
-        <button onClick={() => setTab('propinas')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'propinas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Propinas ({tips.length})</button>
-        <button onClick={() => setTab('asistencia')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'asistencia' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Asistencia ({labor.length})</button>
+        <button onClick={() => setTab('rendimiento')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'rendimiento' ? 'bg-[var(--surface)] text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Rendimiento</button>
+        <button onClick={() => setTab('propinas')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'propinas' ? 'bg-emerald-600 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Propinas ({tips.length})</button>
+        <button onClick={() => setTab('asistencia')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'asistencia' ? 'bg-blue-600 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Asistencia ({labor.length})</button>
         {hoursWorked.length > 0 && (
-          <button onClick={() => setTab('horas')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'horas' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Horas ({hoursWorked.length})</button>
+          <button onClick={() => setTab('horas')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'horas' ? 'bg-amber-600 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Horas ({hoursWorked.length})</button>
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
         {tab === 'rendimiento' && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-100 text-slate-500">
+              <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                 <th className="text-left px-4 py-3 font-medium">#</th>
                 <th className="text-left px-4 py-3 font-medium">Mesero</th>
                 <th className="text-right px-4 py-3 font-medium">Ventas 7d</th>
@@ -127,13 +127,13 @@ export default function NominaPage() {
                 <th className="text-right px-4 py-3 font-medium">% del total</th>
               </tr></thead>
               <tbody>{meseros.map((m, i) => (
-                <tr key={m.nombre} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{m.nombre}</td>
+                <tr key={m.nombre} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                  <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">{m.nombre}</td>
                   <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(m.total)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{m.dias}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{formatCurrency(m.promedio)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">{totalVentas > 0 ? Math.round(m.total / totalVentas * 100) : 0}%</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{m.dias}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(m.promedio)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{totalVentas > 0 ? Math.round(m.total / totalVentas * 100) : 0}%</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -142,11 +142,11 @@ export default function NominaPage() {
 
         {tab === 'propinas' && (
           tips.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">Sin datos de propinas. Se actualizan diario.</div>
+            <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de propinas. Se actualizan diario.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-slate-100 text-slate-500">
+                <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                   <th className="text-left px-4 py-3 font-medium">Mesero</th>
                   <th className="text-right px-4 py-3 font-medium">Ventas</th>
                   <th className="text-right px-4 py-3 font-medium">Tickets</th>
@@ -154,12 +154,12 @@ export default function NominaPage() {
                   <th className="text-right px-4 py-3 font-medium">Prom/ticket</th>
                 </tr></thead>
                 <tbody>{tips.sort((a, b) => (b.propinas || 0) - (a.propinas || 0)).map((t, i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{t.mesero}</td>
+                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{t.mesero}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(t.ventas)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{t.tickets}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{t.tickets}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-600">{formatCurrency(t.propinas)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-500">{formatCurrency(t.propina_promedio)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(t.propina_promedio)}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -169,18 +169,18 @@ export default function NominaPage() {
 
         {tab === 'asistencia' && (
           labor.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">Sin datos de asistencia. Se actualizan diario.</div>
+            <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de asistencia. Se actualizan diario.</div>
           ) : (
             <div>
               {shifts.length > 0 && (
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Turnos del dia</p>
+                <div className="px-4 py-3 border-b border-[var(--line-soft)] bg-[var(--surface-2)]">
+                  <p className="text-xs font-medium text-[var(--text-2)] mb-2">Turnos del dia</p>
                   <div className="flex flex-wrap gap-3">
                     {shifts.map((s, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 text-sm">
                         <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        <span className="font-medium text-slate-700">{s.nombre}</span>
-                        <span className="text-slate-400">{s.total}</span>
+                        <span className="font-medium text-[var(--text-1)]">{s.nombre}</span>
+                        <span className="text-[var(--text-3)]">{s.total}</span>
                       </span>
                     ))}
                   </div>
@@ -188,17 +188,17 @@ export default function NominaPage() {
               )}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100 text-slate-500">
+                  <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                     <th className="text-left px-4 py-3 font-medium">Empleado</th>
                     <th className="text-left px-4 py-3 font-medium">Entrada</th>
                     <th className="text-left px-4 py-3 font-medium">Salida</th>
                     <th className="text-right px-4 py-3 font-medium">Horas</th>
                   </tr></thead>
                   <tbody>{labor.map((l, i) => (
-                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{l.empleado}</td>
-                      <td className="px-4 py-3 text-slate-600">{l.entrada || '--:--'}</td>
-                      <td className="px-4 py-3 text-slate-600">{l.salida || '--:--'}</td>
+                    <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                      <td className="px-4 py-3 font-medium text-[var(--text-1)]">{l.empleado}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{l.entrada || '--:--'}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">{l.salida || '--:--'}</td>
                       <td className="px-4 py-3 text-right tabular-nums font-medium">{l.horas > 0 ? `${l.horas}h` : '--'}</td>
                     </tr>
                   ))}</tbody>
@@ -211,7 +211,7 @@ export default function NominaPage() {
         {tab === 'horas' && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-100 text-slate-500">
+              <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                 <th className="text-left px-4 py-3 font-medium">#</th>
                 <th className="text-left px-4 py-3 font-medium">Empleado</th>
                 <th className="text-left px-4 py-3 font-medium">Entrada</th>
@@ -220,15 +220,15 @@ export default function NominaPage() {
               </tr></thead>
               <tbody>
                 {hoursWorked.sort((a, b) => b.horas - a.horas).map((h, i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{h.empleado}</td>
-                    <td className="px-4 py-3 text-slate-600">{h.entrada || '--:--'}</td>
-                    <td className="px-4 py-3 text-slate-600">{h.salida || '--:--'}</td>
+                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                    <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{h.empleado}</td>
+                    <td className="px-4 py-3 text-[var(--text-2)]">{h.entrada || '--:--'}</td>
+                    <td className="px-4 py-3 text-[var(--text-2)]">{h.salida || '--:--'}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-600">{h.horas > 0 ? `${h.horas}h` : '--'}</td>
                   </tr>
                 ))}
-                <tr className="bg-slate-50 font-bold">
+                <tr className="bg-[var(--surface-2)] font-bold">
                   <td className="px-4 py-3" colSpan={4}>Total</td>
                   <td className="px-4 py-3 text-right tabular-nums text-amber-700">
                     {hoursWorked.reduce((s, h) => s + (h.horas || 0), 0).toFixed(1)}h

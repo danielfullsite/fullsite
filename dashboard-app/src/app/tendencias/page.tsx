@@ -179,7 +179,7 @@ export default function TendenciasPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+          <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
         </div>
       </div>
     )
@@ -262,19 +262,19 @@ export default function TendenciasPage() {
               change: ticketMoM,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{card.label}</p>
+            <div key={card.label} className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 hover:shadow-md transition-shadow">
+              <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider mb-3">{card.label}</p>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-xs text-slate-400 mb-0.5">Este mes</p>
-                  <p className="text-xl font-bold text-slate-900">{card.current}</p>
+                  <p className="text-xs text-[var(--text-3)] mb-0.5">Este mes</p>
+                  <p className="text-xl font-bold text-[var(--text-1)]">{card.current}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-400 mb-0.5">Mes anterior</p>
-                  <p className="text-lg font-semibold text-slate-400">{card.prev}</p>
+                  <p className="text-xs text-[var(--text-3)] mb-0.5">Mes anterior</p>
+                  <p className="text-lg font-semibold text-[var(--text-3)]">{card.prev}</p>
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-100">
+              <div className="mt-3 pt-3 border-t border-[var(--line-soft)]">
                 <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${card.change >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                   {card.change >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                   {formatPercent(card.change)}
@@ -286,11 +286,11 @@ export default function TendenciasPage() {
       )}
 
       {/* Monthly revenue trend */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-slate-900 mb-1">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
           Ventas mensuales
         </h3>
-        <p className="text-xs text-slate-400 mb-5">{monthlyAgg.length} meses de datos</p>
+        <p className="text-xs text-[var(--text-3)] mb-5">{monthlyAgg.length} meses de datos</p>
         <div className="h-[250px] sm:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -340,11 +340,11 @@ export default function TendenciasPage() {
 
       {/* Year-over-Year comparison */}
       {yoyData.chartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
             Comparativo año anterior
           </h3>
-          <p className="text-xs text-slate-400 mb-5">
+          <p className="text-xs text-[var(--text-3)] mb-5">
             {yoyData.currentYear} vs {yoyData.prevYear} -- ventas mensuales
           </p>
           <div className="h-[250px] sm:h-[300px]">
@@ -410,8 +410,8 @@ export default function TendenciasPage() {
 
           {/* Comparison table */}
           {yoyData.tableData.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+            <div className="mt-6 pt-5 border-t border-[var(--line-soft)]">
+              <p className="text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider mb-3">
                 Detalle mensual {yoyData.currentYear} vs {yoyData.prevYear}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -420,20 +420,20 @@ export default function TendenciasPage() {
                   return (
                     <div
                       key={row.monthNum}
-                      className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--line-soft)]"
                     >
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-slate-900">
+                        <span className="text-sm font-medium text-[var(--text-1)]">
                           {row.monthLabel} {yoyData.currentYear.slice(2)}
                         </span>
-                        <span className="text-xs text-slate-400 ml-1.5">
+                        <span className="text-xs text-[var(--text-3)] ml-1.5">
                           {formatCurrency(row.current)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">
                         {row.prev > 0 ? (
                           <>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-[var(--text-3)]">
                               vs {formatCurrency(row.prev)}
                             </span>
                             <span
@@ -448,7 +448,7 @@ export default function TendenciasPage() {
                             </span>
                           </>
                         ) : (
-                          <span className="text-xs text-slate-400">Sin datos {yoyData.prevYear}</span>
+                          <span className="text-xs text-[var(--text-3)]">Sin datos {yoyData.prevYear}</span>
                         )}
                       </div>
                     </div>
@@ -461,11 +461,11 @@ export default function TendenciasPage() {
       )}
 
       {/* Monthly ticket promedio */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-slate-900 mb-1">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
           Ticket promedio mensual (restaurante)
         </h3>
-        <p className="text-xs text-slate-400 mb-5">Evolución del ticket promedio</p>
+        <p className="text-xs text-[var(--text-3)] mb-5">Evolución del ticket promedio</p>
         <div className="h-[200px] sm:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyAgg}>
@@ -515,11 +515,11 @@ export default function TendenciasPage() {
 
       {/* Day of week */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
             Venta promedio por día
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
+          <p className="text-xs text-[var(--text-3)] mb-5">Promedio histórico</p>
           <div className="h-[220px] sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -557,11 +557,11 @@ export default function TendenciasPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
             Ticket promedio por día (restaurante)
           </h3>
-          <p className="text-xs text-slate-400 mb-5">Promedio histórico</p>
+          <p className="text-xs text-[var(--text-3)] mb-5">Promedio histórico</p>
           <div className="h-[220px] sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dowAgg}>
@@ -597,43 +597,43 @@ export default function TendenciasPage() {
       </div>
 
       {/* Weekday vs Weekend TP */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-slate-900 mb-1">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
           Ticket promedio: Entre semana vs Fin de semana
         </h3>
-        <p className="text-xs text-slate-400 mb-5">Eduardo: &quot;No mezclar weekday con weekend — son clientes diferentes&quot;</p>
+        <p className="text-xs text-[var(--text-3)] mb-5">Eduardo: &quot;No mezclar weekday con weekend — son clientes diferentes&quot;</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5">
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Lunes a Viernes</p>
-            <p className="text-3xl font-bold text-slate-900">{formatCurrency(tpWeekdayWeekend.weekday.ticketPromedio)}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+            <p className="text-3xl font-bold text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekday.ticketPromedio)}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--text-2)]">
               <div>
-                <span className="font-medium text-slate-700">{formatCurrency(tpWeekdayWeekend.weekday.ventasDiarias)}</span>
+                <span className="font-medium text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekday.ventasDiarias)}</span>
                 <span className="block">venta/día prom.</span>
               </div>
               <div>
-                <span className="font-medium text-slate-700">{formatNumber(tpWeekdayWeekend.weekday.dias)}</span>
+                <span className="font-medium text-[var(--text-1)]">{formatNumber(tpWeekdayWeekend.weekday.dias)}</span>
                 <span className="block">días con datos</span>
               </div>
             </div>
           </div>
           <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-5">
             <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-2">Sábado y Domingo</p>
-            <p className="text-3xl font-bold text-slate-900">{formatCurrency(tpWeekdayWeekend.weekend.ticketPromedio)}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+            <p className="text-3xl font-bold text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekend.ticketPromedio)}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--text-2)]">
               <div>
-                <span className="font-medium text-slate-700">{formatCurrency(tpWeekdayWeekend.weekend.ventasDiarias)}</span>
+                <span className="font-medium text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekend.ventasDiarias)}</span>
                 <span className="block">venta/día prom.</span>
               </div>
               <div>
-                <span className="font-medium text-slate-700">{formatNumber(tpWeekdayWeekend.weekend.dias)}</span>
+                <span className="font-medium text-[var(--text-1)]">{formatNumber(tpWeekdayWeekend.weekend.dias)}</span>
                 <span className="block">días con datos</span>
               </div>
             </div>
           </div>
         </div>
         {tpWeekdayWeekend.weekend.ticketPromedio > 0 && tpWeekdayWeekend.weekday.ticketPromedio > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+          <div className="mt-4 pt-4 border-t border-[var(--line-soft)] text-center">
             <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold ${
               tpWeekdayWeekend.weekend.ticketPromedio > tpWeekdayWeekend.weekday.ticketPromedio
                 ? 'bg-amber-50 text-amber-700'
@@ -656,29 +656,29 @@ export default function TendenciasPage() {
       </div>
 
       {/* YTD Summary */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-        <div className="p-6 border-b border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-900">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div className="p-6 border-b border-[var(--line)]">
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">
             Resumen Year-To-Date ({new Date().getFullYear()})
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">{ytdData.dias} días con datos</p>
+          <p className="text-xs text-[var(--text-3)] mt-0.5">{ytdData.dias} días con datos</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ventas totales</p>
-            <p className="text-2xl font-bold text-slate-900">{formatCurrency(ytdData.totalVentas)}</p>
+            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Ventas totales</p>
+            <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(ytdData.totalVentas)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Tickets</p>
-            <p className="text-2xl font-bold text-slate-900">{formatNumber(ytdData.totalTickets)}</p>
+            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Tickets</p>
+            <p className="text-2xl font-bold text-[var(--text-1)]">{formatNumber(ytdData.totalTickets)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Personas</p>
-            <p className="text-2xl font-bold text-slate-900">{formatNumber(ytdData.totalPersonas)}</p>
+            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Personas</p>
+            <p className="text-2xl font-bold text-[var(--text-1)]">{formatNumber(ytdData.totalPersonas)}</p>
           </div>
           <div className="p-5 text-center">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ticket promedio</p>
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Ticket promedio</p>
+            <p className="text-2xl font-bold text-[var(--text-1)]">
               {ytdData.totalTickets > 0 ? formatCurrency(Math.round(ytdData.totalVentas / ytdData.totalTickets)) : '-'}
             </p>
           </div>

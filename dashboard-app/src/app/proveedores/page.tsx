@@ -57,37 +57,37 @@ export default function ProveedoresPage() {
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">Proveedores</h2>
-        <p className="text-sm text-slate-400">Gasto por proveedor ultimos 30 dias {fecha && `· ${fecha}`}</p>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Proveedores</h2>
+        <p className="text-sm text-[var(--text-3)]">Gasto por proveedor ultimos 30 dias {fecha && `· ${fecha}`}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><Truck size={16} className="text-blue-500" /><span className="text-xs text-slate-500 font-medium">Proveedores</span></div>
-          <p className="text-2xl font-bold text-slate-900">{suppliers.length}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><Truck size={16} className="text-blue-500" /><span className="text-xs text-[var(--text-2)] font-medium">Proveedores</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{suppliers.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-500" /><span className="text-xs text-slate-500 font-medium">Gasto total</span></div>
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalSpend)}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-500" /><span className="text-xs text-[var(--text-2)] font-medium">Gasto total</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(totalSpend)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><ShoppingCart size={16} className="text-emerald-500" /><span className="text-xs text-slate-500 font-medium">Top proveedor</span></div>
-          <p className="text-lg font-bold text-slate-900 truncate">{topSupplier?.proveedor || topSupplier?.nombre || '--'}</p>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><ShoppingCart size={16} className="text-emerald-500" /><span className="text-xs text-[var(--text-2)] font-medium">Top proveedor</span></div>
+          <p className="text-lg font-bold text-[var(--text-1)] truncate">{topSupplier?.proveedor || topSupplier?.nombre || '--'}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-amber-500" /><span className="text-xs text-slate-500 font-medium">Concentracion</span></div>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Concentracion</span></div>
           <p className="text-2xl font-bold text-amber-600">{topPct}%</p>
-          <p className="text-xs text-slate-400">del gasto en 1 proveedor</p>
+          <p className="text-xs text-[var(--text-3)]">del gasto en 1 proveedor</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
         {sorted.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-sm">Sin datos de proveedores. El scraper corre diario.</div>
+          <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de proveedores. El scraper corre diario.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-100 text-slate-500">
+              <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                 <th className="text-left px-4 py-3 font-medium">#</th>
                 <th className="text-left px-4 py-3 font-medium">Proveedor</th>
                 <th className="text-right px-4 py-3 font-medium">Compras</th>
@@ -98,14 +98,14 @@ export default function ProveedoresPage() {
               <tbody>{sorted.map((sup, i) => {
                 const pct = totalSpend > 0 ? (sup.total / totalSpend) * 100 : 0
                 return (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{sup.proveedor || sup.nombre || 'N/A'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{sup.num_compras || '--'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-900">{formatCurrency(sup.total)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-500">{pct.toFixed(1)}%</td>
+                  <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]">
+                    <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{sup.proveedor || sup.nombre || 'N/A'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{sup.num_compras || '--'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-1)]">{formatCurrency(sup.total)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{pct.toFixed(1)}%</td>
                     <td className="px-4 py-3">
-                      <div className="w-full bg-slate-100 rounded-full h-2">
+                      <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                         <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(pct, 100)}%` }} />
                       </div>
                     </td>

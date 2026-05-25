@@ -131,18 +131,18 @@ export default function CortePage() {
   }, [orders, auditLog])
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <Receipt size={24} className="text-blue-400" />
             <h1 className="text-xl font-bold">Corte de Caja</h1>
           </div>
-          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
@@ -150,7 +150,7 @@ export default function CortePage() {
           type="date"
           value={selectedDate}
           onChange={e => setSelectedDate(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
         />
       </header>
 
@@ -196,18 +196,18 @@ export default function CortePage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Desglose financiero */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <DollarSign size={18} className="text-emerald-400" />
                 Desglose financiero
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Subtotal</span>
+                  <span className="text-[var(--text-3)]">Subtotal</span>
                   <span className="text-white font-medium">{formatMXN(stats.totalSubtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">IVA (16%)</span>
+                  <span className="text-[var(--text-3)]">IVA (16%)</span>
                   <span className="text-white font-medium">{formatMXN(stats.totalIva)}</span>
                 </div>
                 {stats.totalDescuentos > 0 && (
@@ -224,7 +224,7 @@ export default function CortePage() {
             </div>
 
             {/* Metodos de pago */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <CreditCard size={18} className="text-blue-400" />
                 Metodos de pago
@@ -235,31 +235,31 @@ export default function CortePage() {
                     <div className="flex items-center gap-2">
                       {method === 'efectivo' ? <Banknote size={16} className="text-emerald-400" /> :
                        method === 'tarjeta' ? <CreditCard size={16} className="text-blue-400" /> :
-                       <DollarSign size={16} className="text-slate-400" />}
-                      <span className="text-slate-300 capitalize">{method}</span>
+                       <DollarSign size={16} className="text-[var(--text-3)]" />}
+                      <span className="text-[var(--text-4)] capitalize">{method}</span>
                     </div>
                     <span className="text-white font-medium">{formatMXN(total)}</span>
                   </div>
                 ))}
                 {Object.keys(stats.byPayment).length === 0 && (
-                  <p className="text-slate-500 text-sm">Sin pagos registrados</p>
+                  <p className="text-[var(--text-2)] text-sm">Sin pagos registrados</p>
                 )}
               </div>
             </div>
 
             {/* Ventas por mesero */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <ChefHat size={18} className="text-amber-400" />
                 Ventas por mesero
               </h3>
               {stats.byMesero.length === 0 ? (
-                <p className="text-slate-500 text-sm">Sin datos de meseros</p>
+                <p className="text-[var(--text-2)] text-sm">Sin datos de meseros</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-slate-400 border-b border-slate-700">
+                      <tr className="text-[var(--text-3)] border-b border-slate-700">
                         <th className="text-left px-3 py-2">#</th>
                         <th className="text-left px-3 py-2">Mesero</th>
                         <th className="text-right px-3 py-2">Ventas</th>
@@ -271,11 +271,11 @@ export default function CortePage() {
                     <tbody>
                       {stats.byMesero.map(([mesero, data], i) => (
                         <tr key={mesero} className="border-b border-slate-700/50">
-                          <td className="px-3 py-2.5 text-slate-500">{i + 1}</td>
+                          <td className="px-3 py-2.5 text-[var(--text-2)]">{i + 1}</td>
                           <td className="px-3 py-2.5 text-white font-medium">{mesero}</td>
                           <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold">{formatMXN(data.ventas)}</td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">{data.ordenes}</td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">{data.personas}</td>
+                          <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.ordenes}</td>
+                          <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.personas}</td>
                           <td className="px-3 py-2.5 text-right text-white">{formatMXN(data.personas > 0 ? data.ventas / data.personas : 0)}</td>
                         </tr>
                       ))}
@@ -287,18 +287,18 @@ export default function CortePage() {
           </div>
 
           {/* Ordenes cerradas — con opción de reabrir */}
-          <div className="mt-6 bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+          <div className="mt-6 bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
             <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-              <Receipt size={18} className="text-slate-400" />
+              <Receipt size={18} className="text-[var(--text-3)]" />
               Ordenes cerradas ({orders.filter(o => o.status === 'cerrada').length})
             </h3>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {orders.filter(o => o.status === 'cerrada').map(order => (
-                <div key={order.id} className="flex items-center justify-between px-3 py-2.5 bg-slate-700/40 rounded-lg">
+                <div key={order.id} className="flex items-center justify-between px-3 py-2.5 bg-[var(--line)]/40 rounded-lg">
                   <div>
                     <span className="text-white text-sm font-medium">Mesa {order.mesa}</span>
-                    <span className="text-slate-400 text-xs ml-2">{order.mesero}</span>
-                    <span className="text-slate-500 text-xs ml-2">{order.metodo_pago}</span>
+                    <span className="text-[var(--text-3)] text-xs ml-2">{order.mesero}</span>
+                    <span className="text-[var(--text-2)] text-xs ml-2">{order.metodo_pago}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-white font-semibold text-sm">{formatMXN(order.total)}</span>
@@ -316,7 +316,7 @@ export default function CortePage() {
           </div>
 
           {/* Status */}
-          <div className="mt-6 flex gap-4 text-sm text-slate-500">
+          <div className="mt-6 flex gap-4 text-sm text-[var(--text-2)]">
             <span>Abiertas: {stats.ordenesAbiertas}</span>
             <span>Cerradas: {stats.ordenesCerradas}</span>
             <span>Canceladas: {stats.ordenesCanceladas}</span>
@@ -328,7 +328,7 @@ export default function CortePage() {
       {reopenTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setReopenTarget(null)} />
-          <div className="relative bg-slate-800 border border-amber-700/40 rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
+          <div className="relative bg-[var(--surface-2)] border border-amber-700/40 rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
             <div className="flex items-center gap-3 mb-4">
               <ShieldAlert size={24} className="text-amber-400" />
               <div>
@@ -337,7 +337,7 @@ export default function CortePage() {
               </div>
             </div>
             <div>
-              <label className="text-sm text-slate-400 block mb-2">PIN de gerente</label>
+              <label className="text-sm text-[var(--text-3)] block mb-2">PIN de gerente</label>
               <input
                 type="password"
                 inputMode="numeric"
@@ -345,12 +345,12 @@ export default function CortePage() {
                 value={reopenPin}
                 onChange={e => { setReopenPin(e.target.value.replace(/\D/g, '')); setReopenError('') }}
                 placeholder="****"
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-amber-500"
+                className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-amber-500"
               />
             </div>
             {reopenError && <p className="text-red-400 text-sm text-center mt-2">{reopenError}</p>}
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setReopenTarget(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold">Cancelar</button>
+              <button onClick={() => setReopenTarget(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">Cancelar</button>
               <button onClick={handleReopen} className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold flex items-center justify-center gap-2">
                 <RotateCcw size={18} />Reabrir
               </button>
@@ -361,7 +361,7 @@ export default function CortePage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

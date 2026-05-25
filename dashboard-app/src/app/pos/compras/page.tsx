@@ -18,7 +18,7 @@ import {
 // ─── OC Status Config ───────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  borrador: { color: 'text-slate-400', bg: 'bg-slate-700', label: 'Borrador' },
+  borrador: { color: 'text-[var(--text-3)]', bg: 'bg-[var(--line)]', label: 'Borrador' },
   enviada: { color: 'text-blue-400', bg: 'bg-blue-900/40', label: 'Enviada' },
   recibida: { color: 'text-amber-400', bg: 'bg-amber-900/40', label: 'Recibida' },
   facturada: { color: 'text-purple-400', bg: 'bg-purple-900/40', label: 'Facturada' },
@@ -210,22 +210,22 @@ export default function ComprasPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <ShoppingCart size={24} className="text-purple-400" />
             <h1 className="text-xl font-bold">Compras</h1>
           </div>
-          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-3)]">
           <span>{orders.length} OC</span>
           <span>·</span>
           <span>{facturas.length} facturas</span>
@@ -234,13 +234,13 @@ export default function ComprasPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 px-6 py-2 border-b border-slate-700">
-        <button onClick={() => setTab('ordenes')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'ordenes' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+        <button onClick={() => setTab('ordenes')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'ordenes' ? 'bg-purple-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-slate-600'}`}>
           <Truck size={14} className="inline mr-1.5 -mt-0.5" />Ordenes de Compra
         </button>
-        <button onClick={() => setTab('facturas')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'facturas' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+        <button onClick={() => setTab('facturas')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'facturas' ? 'bg-purple-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-slate-600'}`}>
           <Receipt size={14} className="inline mr-1.5 -mt-0.5" />Facturas
         </button>
-        <button onClick={() => setTab('nueva')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'nueva' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+        <button onClick={() => setTab('nueva')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'nueva' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-slate-600'}`}>
           <Sparkles size={14} className="inline mr-1.5 -mt-0.5" />Nueva OC (IA)
         </button>
       </div>
@@ -254,7 +254,7 @@ export default function ComprasPage() {
         ) : tab === 'ordenes' ? (
           /* ─── OC List ─── */
           orders.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="flex items-center justify-center h-full text-[var(--text-2)]">
               <div className="text-center">
                 <ShoppingCart size={48} className="mx-auto mb-3 opacity-50" />
                 <p className="text-xl">Sin ordenes de compra</p>
@@ -270,17 +270,17 @@ export default function ComprasPage() {
                 const isOpen = expanded === po.id
                 return (
                   <div key={po.id}>
-                    <div className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/50 transition-colors">
-                      <button onClick={() => toggleExpand(po.id)} className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center">
+                    <div className="flex items-center gap-4 px-6 py-4 hover:bg-[var(--surface-2)]/50 transition-colors">
+                      <button onClick={() => toggleExpand(po.id)} className="w-8 h-8 rounded-lg bg-[var(--line)] flex items-center justify-center">
                         {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-white">{po.supplier}</span>
-                          <span className="text-slate-600 text-xs font-mono">{po.id.slice(0, 8)}</span>
+                          <span className="text-[var(--text-2)] text-xs font-mono">{po.id.slice(0, 8)}</span>
                           {po.ai_suggested && <Sparkles size={12} className="text-amber-400" />}
                         </div>
-                        <p className="text-slate-400 text-sm">Por: {po.created_by} · {new Date(po.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</p>
+                        <p className="text-[var(--text-3)] text-sm">Por: {po.created_by} · {new Date(po.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</p>
                       </div>
                       <p className="font-semibold text-white">{formatMXN(po.total)}</p>
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${config.bg} ${config.color}`}>{config.label}</span>
@@ -306,10 +306,10 @@ export default function ComprasPage() {
                     {/* Expanded items */}
                     {isOpen && (
                       <div className="px-6 pb-4">
-                        <div className="bg-slate-800/60 rounded-xl overflow-hidden ml-12">
+                        <div className="bg-[var(--surface-2)]/60 rounded-xl overflow-hidden ml-12">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-slate-400 border-b border-slate-700">
+                              <tr className="text-[var(--text-3)] border-b border-slate-700">
                                 <th className="text-left px-4 py-2.5 font-medium">Ingrediente</th>
                                 <th className="text-right px-4 py-2.5 font-medium">Pedido</th>
                                 <th className="text-right px-4 py-2.5 font-medium">Recibido</th>
@@ -322,10 +322,10 @@ export default function ComprasPage() {
                               {expandedItems.map(item => (
                                 <tr key={item.id} className="border-b border-slate-700/50 last:border-0">
                                   <td className="px-4 py-2.5 text-white">{item.ingredient_name}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-300">{item.quantity_ordered}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-300">{item.quantity_received ?? '—'}</td>
-                                  <td className="px-4 py-2.5 text-slate-400">{item.unit}</td>
-                                  <td className="px-4 py-2.5 text-right text-slate-400">{formatMXN(item.unit_cost)}</td>
+                                  <td className="px-4 py-2.5 text-right text-[var(--text-4)]">{item.quantity_ordered}</td>
+                                  <td className="px-4 py-2.5 text-right text-[var(--text-4)]">{item.quantity_received ?? '—'}</td>
+                                  <td className="px-4 py-2.5 text-[var(--text-3)]">{item.unit}</td>
+                                  <td className="px-4 py-2.5 text-right text-[var(--text-3)]">{formatMXN(item.unit_cost)}</td>
                                   <td className="px-4 py-2.5 text-right text-white font-medium">{formatMXN(item.total_cost)}</td>
                                 </tr>
                               ))}
@@ -342,7 +342,7 @@ export default function ComprasPage() {
         ) : tab === 'facturas' ? (
           /* ─── Facturas List ─── */
           facturas.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="flex items-center justify-center h-full text-[var(--text-2)]">
               <div className="text-center">
                 <Receipt size={48} className="mx-auto mb-3 opacity-50" />
                 <p className="text-xl">Sin facturas</p>
@@ -354,16 +354,16 @@ export default function ComprasPage() {
               {facturas.map(f => {
                 const config = FACTURA_STATUS[f.status] || FACTURA_STATUS.capturada
                 return (
-                  <div key={f.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/50">
+                  <div key={f.id} className="flex items-center gap-4 px-6 py-4 hover:bg-[var(--surface-2)]/50">
                     <div className="w-9 h-9 rounded-lg bg-purple-900/30 flex items-center justify-center flex-shrink-0">
                       <Receipt size={16} className="text-purple-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-white">{f.supplier}</span>
-                        {f.folio && <span className="text-slate-500 text-xs">Folio: {f.folio}</span>}
+                        {f.folio && <span className="text-[var(--text-2)] text-xs">Folio: {f.folio}</span>}
                       </div>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-[var(--text-3)] text-sm">
                         Capturada por: {f.captured_by}
                         {f.approved_by && ` · Aprobada: ${f.approved_by}`}
                         {f.purchase_order_id && ` · OC: ${f.purchase_order_id.slice(0, 6)}`}
@@ -397,9 +397,9 @@ export default function ComprasPage() {
       {receptionPO && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setReceptionPO(null)} />
-          <div className="relative bg-slate-800 border border-amber-700/40 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl mx-4">
+          <div className="relative bg-[var(--surface-2)] border border-amber-700/40 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl mx-4">
             {/* Header */}
-            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 rounded-t-2xl z-10">
+            <div className="sticky top-0 bg-[var(--surface-2)] border-b border-slate-700 px-6 py-4 rounded-t-2xl z-10">
               <div className="flex items-center gap-3">
                 <PackageCheck size={24} className="text-amber-400" />
                 <div>
@@ -407,14 +407,14 @@ export default function ComprasPage() {
                   <p className="text-amber-400 text-sm">{receptionPO.supplier} · OC {receptionPO.id.slice(0, 8)}</p>
                 </div>
               </div>
-              <p className="text-slate-400 text-sm mt-2">Verifica cada producto contra lo que llego fisicamente. Si algo no coincide, ajusta la cantidad y escribe el motivo.</p>
+              <p className="text-[var(--text-3)] text-sm mt-2">Verifica cada producto contra lo que llego fisicamente. Si algo no coincide, ajusta la cantidad y escribe el motivo.</p>
             </div>
 
             {/* Items table */}
             <div className="px-6 py-4">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-slate-400 border-b border-slate-700">
+                  <tr className="text-[var(--text-3)] border-b border-slate-700">
                     <th className="text-left px-3 py-2.5 font-medium">Ingrediente</th>
                     <th className="text-right px-3 py-2.5 font-medium">Pedido</th>
                     <th className="text-right px-3 py-2.5 font-medium">Recibido</th>
@@ -431,21 +431,21 @@ export default function ComprasPage() {
                     return (
                       <tr key={item.id} className={`border-b border-slate-700/50 ${!matches ? 'bg-amber-950/20' : ''}`}>
                         <td className="px-3 py-3 text-white font-medium">{item.ingredient_name}</td>
-                        <td className="px-3 py-3 text-right text-slate-300">{item.quantity_ordered}</td>
+                        <td className="px-3 py-3 text-right text-[var(--text-4)]">{item.quantity_ordered}</td>
                         <td className="px-3 py-3 text-right">
                           <input
                             type="number"
                             step="0.01"
                             value={item.qty_received}
                             onChange={e => updateReceivedQty(item.id, Number(e.target.value))}
-                            className={`w-24 bg-slate-700 border rounded px-2 py-1.5 text-right text-sm focus:outline-none ${
+                            className={`w-24 bg-[var(--line)] border rounded px-2 py-1.5 text-right text-sm focus:outline-none ${
                               matches ? 'border-slate-600 text-white focus:border-emerald-500' :
                               isShort ? 'border-red-600 text-red-400 focus:border-red-500' :
                               'border-amber-600 text-amber-400 focus:border-amber-500'
                             }`}
                           />
                         </td>
-                        <td className="px-3 py-3 text-slate-400">{item.unit}</td>
+                        <td className="px-3 py-3 text-[var(--text-3)]">{item.unit}</td>
                         <td className="px-3 py-3 text-center">
                           {matches ? (
                             <span className="text-emerald-400 text-xs font-bold">OK</span>
@@ -460,7 +460,7 @@ export default function ComprasPage() {
                             <select
                               value={item.discrepancy}
                               onChange={e => updateDiscrepancy(item.id, e.target.value)}
-                              className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                              className="w-full bg-[var(--line)] border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
                             >
                               <option value="">Selecciona motivo</option>
                               <option value="Producto agotado con proveedor">Agotado con proveedor</option>
@@ -483,13 +483,13 @@ export default function ComprasPage() {
                 const discrepancies = receptionItems.filter(i => i.qty_received !== i.quantity_ordered)
                 const receivedTotal = receptionItems.reduce((sum, i) => sum + (i.qty_received * i.unit_cost), 0)
                 return (
-                  <div className="mt-4 p-4 bg-slate-700/50 rounded-xl">
+                  <div className="mt-4 p-4 bg-[var(--line)]/50 rounded-xl">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-400">Total OC original</span>
-                      <span className="text-slate-300">{formatMXN(receptionPO.total)}</span>
+                      <span className="text-[var(--text-3)]">Total OC original</span>
+                      <span className="text-[var(--text-4)]">{formatMXN(receptionPO.total)}</span>
                     </div>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-400">Total recibido (+ IVA)</span>
+                      <span className="text-[var(--text-3)]">Total recibido (+ IVA)</span>
                       <span className={`font-semibold ${receivedTotal * 1.16 < receptionPO.total ? 'text-amber-400' : 'text-white'}`}>
                         {formatMXN(receivedTotal * 1.16)}
                       </span>
@@ -506,37 +506,37 @@ export default function ComprasPage() {
 
               {/* Who received */}
               <div className="mt-4">
-                <label className="text-sm text-slate-400 block mb-1">Recibido por</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">Recibido por</label>
                 <input
                   type="text"
                   value={receptionBy}
                   onChange={e => setReceptionBy(e.target.value)}
                   placeholder="Nombre del almacenista..."
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div className="mt-3">
-                <label className="text-sm text-slate-400 block mb-1">Notas de recepcion</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">Notas de recepcion</label>
                 <input
                   type="text"
                   value={receptionNotes}
                   onChange={e => setReceptionNotes(e.target.value)}
                   placeholder="Notas opcionales..."
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 px-6 py-4 flex gap-3 rounded-b-2xl">
-              <button onClick={() => setReceptionPO(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold">
+            <div className="sticky bottom-0 bg-[var(--surface-2)] border-t border-slate-700 px-6 py-4 flex gap-3 rounded-b-2xl">
+              <button onClick={() => setReceptionPO(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmReception}
                 disabled={!receptionBy.trim() || savingReception}
-                className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold flex items-center justify-center gap-2"
+                className="flex-[2] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold flex items-center justify-center gap-2"
               >
                 <PackageCheck size={18} />
                 {savingReception ? 'Guardando...' : 'Confirmar recepcion'}
@@ -550,28 +550,28 @@ export default function ComprasPage() {
       {facturaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setFacturaModal(null)} />
-          <div className="relative bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+          <div className="relative bg-[var(--surface-2)] border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
             <div className="flex items-center gap-3 mb-4">
               <Receipt size={24} className="text-purple-400" />
               <div>
                 <h3 className="text-lg font-bold text-white">Capturar factura</h3>
-                <p className="text-slate-400 text-sm">{facturaModal.supplier} · {formatMXN(facturaModal.total)}</p>
+                <p className="text-[var(--text-3)] text-sm">{facturaModal.supplier} · {formatMXN(facturaModal.total)}</p>
               </div>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Folio de factura</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">Folio de factura</label>
                 <input type="text" value={facturaFolio} onChange={e => setFacturaFolio(e.target.value)} placeholder="Ej. FAC-2024-001"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500" />
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500" />
               </div>
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Notas</label>
+                <label className="text-sm text-[var(--text-3)] block mb-1">Notas</label>
                 <input type="text" value={facturaNotes} onChange={e => setFacturaNotes(e.target.value)} placeholder="Notas opcionales..."
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500" />
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500" />
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setFacturaModal(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold">Cancelar</button>
+              <button onClick={() => setFacturaModal(null)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] font-semibold">Cancelar</button>
               <button onClick={handleCreateFactura} className="flex-[2] py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold flex items-center justify-center gap-2">
                 <Receipt size={18} />Capturar
               </button>
@@ -582,7 +582,7 @@ export default function ComprasPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}
@@ -669,7 +669,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Analizando inventario...</p>
+          <p className="text-[var(--text-3)] text-sm">Analizando inventario...</p>
         </div>
       </div>
     )
@@ -677,7 +677,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
 
   if (suggestions.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500">
+      <div className="flex items-center justify-center h-full text-[var(--text-2)]">
         <div className="text-center">
           <Check size={48} className="mx-auto mb-3 text-emerald-500 opacity-70" />
           <p className="text-xl text-emerald-400">Inventario OK</p>
@@ -692,7 +692,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
       <div className="flex items-center gap-3 mb-2">
         <Sparkles size={20} className="text-amber-400" />
         <h2 className="text-lg font-bold">Sugerencias de compra</h2>
-        <span className="text-slate-400 text-sm">Basado en punto de reorden — ajusta cantidades antes de enviar</span>
+        <span className="text-[var(--text-3)] text-sm">Basado en punto de reorden — ajusta cantidades antes de enviar</span>
       </div>
 
       {suggestions.map(s => {
@@ -703,18 +703,18 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
         }, 0)
 
         return (
-          <div key={s.supplier} className="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
+          <div key={s.supplier} className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
               <div>
                 <h3 className="font-bold text-white text-lg">{s.supplier}</h3>
-                <p className="text-slate-400 text-sm">{s.items.length} ingredientes bajo stock</p>
+                <p className="text-[var(--text-3)] text-sm">{s.items.length} ingredientes bajo stock</p>
               </div>
               <div className="flex items-center gap-3">
                 <p className="font-semibold text-white">{formatMXN(totalCost)}</p>
                 <button
                   onClick={() => createOCForSupplier(s.supplier)}
                   disabled={creating}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 rounded-lg text-sm text-white font-semibold flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] rounded-lg text-sm text-white font-semibold flex items-center gap-1.5"
                 >
                   <Plus size={14} />Crear OC
                 </button>
@@ -723,7 +723,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
 
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-slate-400 border-b border-slate-700">
+                <tr className="text-[var(--text-3)] border-b border-slate-700">
                   <th className="text-left px-5 py-2.5 font-medium">Ingrediente</th>
                   <th className="text-right px-3 py-2.5 font-medium">Stock actual</th>
                   <th className="text-right px-3 py-2.5 font-medium">Reorden</th>
@@ -739,16 +739,16 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
                     <tr key={item.ingredient_id} className="border-b border-slate-700/50 last:border-0">
                       <td className="px-5 py-2.5 text-white">{item.name}</td>
                       <td className="px-3 py-2.5 text-right text-red-400 font-medium">{item.current_stock.toFixed(2)}</td>
-                      <td className="px-3 py-2.5 text-right text-slate-400">{item.reorder_point}</td>
+                      <td className="px-3 py-2.5 text-right text-[var(--text-3)]">{item.reorder_point}</td>
                       <td className="px-3 py-2.5 text-right">
                         <input
                           type="number"
                           value={qty}
                           onChange={e => updateQty(s.supplier, item.ingredient_id, Number(e.target.value))}
-                          className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-right text-sm focus:outline-none focus:border-emerald-500"
+                          className="w-20 bg-[var(--line)] border border-slate-600 rounded px-2 py-1 text-white text-right text-sm focus:outline-none focus:border-emerald-500"
                         />
                       </td>
-                      <td className="px-3 py-2.5 text-slate-400">{item.unit}</td>
+                      <td className="px-3 py-2.5 text-[var(--text-3)]">{item.unit}</td>
                       <td className="px-5 py-2.5 text-right text-white">{formatMXN(qty * item.unit_cost)}</td>
                     </tr>
                   )

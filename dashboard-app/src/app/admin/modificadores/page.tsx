@@ -125,22 +125,22 @@ export default function ModificadoresPage() {
     { id: 'order-type', label: 'Por Tipo de Orden' },
   ]
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400">Cargando modificadores...</div>
+  if (loading) return <div className="flex items-center justify-center h-64 text-[var(--text-3)]">Cargando modificadores...</div>
 
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Modificadores" subtitle={`${mods.length} modificadores · ${groups.length} grupos`} eyebrow="Admin" />
 
-      <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-[var(--surface-2)] rounded-xl p-1 w-fit">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-2)] hover:text-[var(--text-1)]'}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {toast && <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm shadow-lg">{toast}</div>}
+      {toast && <div className="fixed top-4 right-4 z-50 bg-[var(--surface)] text-white px-4 py-2.5 rounded-xl text-sm shadow-lg">{toast}</div>}
 
       {/* Tab 1: Modifier list */}
       {tab === 'mods' && (
@@ -156,17 +156,17 @@ export default function ModificadoresPage() {
               <h3 className="font-semibold text-emerald-800 mb-3 text-sm">Nuevo modificador</h3>
               <div className="grid grid-cols-3 gap-3">
                 <input value={newMod.name} onChange={e => setNewMod({ ...newMod, name: e.target.value })}
-                  placeholder="Nombre" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" autoFocus />
+                  placeholder="Nombre" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" autoFocus />
                 <input type="number" value={newMod.price} onChange={e => setNewMod({ ...newMod, price: e.target.value })}
-                  placeholder="Precio extra ($0 si quitar)" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                  placeholder="Precio extra ($0 si quitar)" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
                 <select value={newMod.group_id} onChange={e => setNewMod({ ...newMod, group_id: e.target.value })}
-                  className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                  className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm">
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
               <div className="flex gap-2 mt-3">
                 <button onClick={handleAdd} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1"><Save size={14} /> Guardar</button>
-                <button onClick={() => setAdding(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
+                <button onClick={() => setAdding(false)} className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm">Cancelar</button>
               </div>
             </div>
           )}
@@ -177,16 +177,16 @@ export default function ModificadoresPage() {
             return (
               <div key={group.id} className="mb-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${GROUP_COLORS[group.id] || 'bg-slate-100 text-slate-700'}`}>{group.name}</span>
-                  <span className="text-xs text-slate-400">{groupMods.length}</span>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${GROUP_COLORS[group.id] || 'bg-[var(--surface-2)] text-[var(--text-1)]'}`}>{group.name}</span>
+                  <span className="text-xs text-[var(--text-3)]">{groupMods.length}</span>
                 </div>
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+                <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm divide-y divide-slate-100">
                   {groupMods.map(m => (
                     <div key={m.id} className="flex items-center justify-between px-5 py-3">
-                      <span className="text-sm text-slate-900">{m.name}</span>
+                      <span className="text-sm text-[var(--text-1)]">{m.name}</span>
                       <div className="flex items-center gap-3">
                         {m.price > 0 && <span className="text-sm font-semibold text-emerald-600">+${m.price}</span>}
-                        <button onClick={() => handleDelete(m)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 flex items-center justify-center">
+                        <button onClick={() => handleDelete(m)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-[var(--text-3)] hover:text-red-500 flex items-center justify-center">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -201,20 +201,20 @@ export default function ModificadoresPage() {
 
       {/* Tab 2: Assignment matrix */}
       {tab === 'assign' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase sticky left-0 bg-slate-50">Categoria</th>
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[var(--text-2)] uppercase sticky left-0 bg-[var(--surface-2)]">Categoria</th>
                 {groups.map(g => (
-                  <th key={g.id} className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{g.name}</th>
+                  <th key={g.id} className="text-center px-4 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">{g.name}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {categories.map(cat => (
-                <tr key={cat.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm font-medium text-slate-900 sticky left-0 bg-white">
+                <tr key={cat.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
+                  <td className="px-4 py-3 text-sm font-medium text-[var(--text-1)] sticky left-0 bg-[var(--surface)]">
                     <span className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded ${cat.color}`}></div>
                       {cat.name}
@@ -225,7 +225,7 @@ export default function ModificadoresPage() {
                     return (
                       <td key={g.id} className="text-center px-4 py-3">
                         <button onClick={() => toggleAssign(cat.id, g.id)}
-                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-transparent hover:border-slate-300'}`}>
+                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)] text-transparent hover:border-[var(--line)]'}`}>
                           {on && <span className="text-xs font-bold">&#10003;</span>}
                         </button>
                       </td>
@@ -240,29 +240,29 @@ export default function ModificadoresPage() {
 
       {/* Tab 3: Order type config */}
       {tab === 'order-type' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Grupo</th>
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Grupo</th>
                 {(['dine-in', 'takeout', 'delivery'] as OrderType[]).map(ot => (
-                  <th key={ot} className="text-center px-5 py-3 text-xs font-semibold text-slate-500 uppercase">{ORDER_TYPE_LABELS[ot]}</th>
+                  <th key={ot} className="text-center px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">{ORDER_TYPE_LABELS[ot]}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {groups.map(g => (
-                <tr key={g.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr key={g.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                   <td className="px-5 py-4">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${GROUP_COLORS[g.id] || 'bg-slate-100 text-slate-700'}`}>{g.name}</span>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${GROUP_COLORS[g.id] || 'bg-[var(--surface-2)] text-[var(--text-1)]'}`}>{g.name}</span>
                   </td>
                   {(['dine-in', 'takeout', 'delivery'] as OrderType[]).map(ot => {
                     const on = (orderTypes[g.id] || []).includes(ot)
                     return (
                       <td key={ot} className="text-center px-5 py-4">
                         <button onClick={() => toggleOrderType(g.id, ot)}
-                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500' : 'bg-[var(--line)]'}`}>
+                          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-[var(--surface)] shadow transition-transform ${on ? 'left-[18px]' : 'left-0.5'}`} />
                         </button>
                       </td>
                     )
@@ -271,8 +271,8 @@ export default function ModificadoresPage() {
               ))}
             </tbody>
           </table>
-          <div className="px-5 py-3 bg-slate-50 border-t border-slate-200">
-            <p className="text-xs text-slate-400">Desactiva un grupo para excluir esos modificadores de un tipo de orden.</p>
+          <div className="px-5 py-3 bg-[var(--surface-2)] border-t border-[var(--line)]">
+            <p className="text-xs text-[var(--text-3)]">Desactiva un grupo para excluir esos modificadores de un tipo de orden.</p>
           </div>
         </div>
       )}

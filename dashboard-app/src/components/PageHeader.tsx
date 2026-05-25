@@ -14,11 +14,11 @@ export default function PageHeader({ title, subtitle, eyebrow, action }: PageHea
             {eyebrow}
           </p>
         )}
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">
+        <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-slate-400 text-sm mt-1">{subtitle}</p>
+          <p className="text-[var(--text-3)] text-sm mt-1">{subtitle}</p>
         )}
       </div>
       {action && <div>{action}</div>}

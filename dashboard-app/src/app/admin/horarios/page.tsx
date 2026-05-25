@@ -100,7 +100,7 @@ export default function AdminHorariosPage() {
     <div className="flex gap-1">
       {DAYS.map((d, i) => (
         <button key={i} type="button" onClick={() => toggleDay(i, target)}
-          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'}`}>
           {d}
         </button>
       ))}
@@ -126,48 +126,48 @@ export default function AdminHorariosPage() {
           <h3 className="font-semibold text-emerald-800 mb-3">Nuevo horario</h3>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-              placeholder="Nombre (ej. Desayuno)" className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              placeholder="Nombre (ej. Desayuno)" className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
             <input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })}
-              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
             <input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })}
-              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              className="border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm" />
           </div>
           <DayPills days={form.days_of_week} target="form" />
           <div className="flex gap-2 mt-3">
             <button onClick={handleAdd} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1">
               <Save size={14} /> Guardar
             </button>
-            <button onClick={() => { setAdding(false); setForm({ ...empty }) }} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg text-sm">Cancelar</button>
+            <button onClick={() => { setAdding(false); setForm({ ...empty }) }} className="px-4 py-2 bg-[var(--line)] text-[var(--text-2)] rounded-lg text-sm">Cancelar</button>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm overflow-hidden">
         {loading ? (
-          <p className="text-center py-12 text-slate-400 text-sm">Cargando...</p>
+          <p className="text-center py-12 text-[var(--text-3)] text-sm">Cargando...</p>
         ) : schedules.length === 0 ? (
-          <p className="text-center py-12 text-slate-400 text-sm">No hay horarios configurados</p>
+          <p className="text-center py-12 text-[var(--text-3)] text-sm">No hay horarios configurados</p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Horario</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Rango</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Dias</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Acciones</th>
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--line)]">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Horario</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Rango</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Dias</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-2)] uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {schedules.map(s => (
-                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr key={s.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
                   <td className="px-5 py-3">
                     {editing && editing.id === s.id ? (
                       <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })}
                         className="border border-emerald-300 rounded px-2 py-1 text-sm w-full" />
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Clock size={14} className="text-slate-400" />
-                        <span className="text-sm font-medium text-slate-900">{s.name}</span>
+                        <Clock size={14} className="text-[var(--text-3)]" />
+                        <span className="text-sm font-medium text-[var(--text-1)]">{s.name}</span>
                       </div>
                     )}
                   </td>
@@ -176,12 +176,12 @@ export default function AdminHorariosPage() {
                       <div className="flex gap-1 items-center">
                         <input type="time" value={editing.start_time} onChange={e => setEditing({ ...editing, start_time: e.target.value })}
                           className="border border-emerald-300 rounded px-2 py-1 text-sm w-28" />
-                        <span className="text-slate-400">-</span>
+                        <span className="text-[var(--text-3)]">-</span>
                         <input type="time" value={editing.end_time} onChange={e => setEditing({ ...editing, end_time: e.target.value })}
                           className="border border-emerald-300 rounded px-2 py-1 text-sm w-28" />
                       </div>
                     ) : (
-                      <span className="text-sm text-slate-700">{s.start_time} — {s.end_time}</span>
+                      <span className="text-sm text-[var(--text-1)]">{s.start_time} — {s.end_time}</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -190,7 +190,7 @@ export default function AdminHorariosPage() {
                     ) : (
                       <div className="flex gap-1">
                         {DAYS.map((d, i) => (
-                          <span key={i} className={`w-7 h-6 rounded text-[10px] font-semibold flex items-center justify-center ${s.days_of_week?.includes(i) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-50 text-slate-300'}`}>
+                          <span key={i} className={`w-7 h-6 rounded text-[10px] font-semibold flex items-center justify-center ${s.days_of_week?.includes(i) ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--surface-2)] text-[var(--text-4)]'}`}>
                             {d}
                           </span>
                         ))}
@@ -201,11 +201,11 @@ export default function AdminHorariosPage() {
                     {editing && editing.id === s.id ? (
                       <div className="flex gap-1 justify-end">
                         <button onClick={handleSave} className="w-8 h-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 flex items-center justify-center"><Save size={14} /></button>
-                        <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><X size={14} /></button>
+                        <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><X size={14} /></button>
                       </div>
                     ) : (
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"><Pencil size={14} /></button>
+                        <button onClick={() => setEditing(s)} className="w-8 h-8 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] flex items-center justify-center"><Pencil size={14} /></button>
                         <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
                       </div>
                     )}
@@ -218,7 +218,7 @@ export default function AdminHorariosPage() {
       </div>
 
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-slate-800 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl text-sm font-medium ${toast.type === 'ok' ? 'bg-[var(--surface-2)] text-white' : 'bg-red-600 text-white'}`}>
           {toast.msg}
         </div>
       )}

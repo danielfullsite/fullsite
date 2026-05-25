@@ -139,9 +139,9 @@ export default function TurnoPage() {
   }, [])
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
-      <header className="flex items-center gap-4 px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
-        <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
+      <header className="flex items-center gap-4 px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
+        <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex items-center gap-2">
@@ -163,47 +163,47 @@ export default function TurnoPage() {
                 <DoorOpen size={28} className="text-emerald-400" />
                 <div>
                   <h2 className="text-lg font-bold text-emerald-400">Turno activo</h2>
-                  <p className="text-slate-400 text-sm">
+                  <p className="text-[var(--text-3)] text-sm">
                     Abierto por {activeTurno.opened_by} a las {new Date(activeTurno.opened_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center justify-between bg-slate-800/50 rounded-xl px-4 py-3">
-                <span className="text-slate-400">Fondo inicial</span>
+              <div className="flex items-center justify-between bg-[var(--surface-2)]/50 rounded-xl px-4 py-3">
+                <span className="text-[var(--text-3)]">Fondo inicial</span>
                 <span className="text-white font-bold text-xl">{formatMXN(activeTurno.fondo_inicial)}</span>
               </div>
             </div>
 
             {/* Cerrar turno */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-6">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-2xl p-6">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <DoorClosed size={20} className="text-red-400" />
                 Cerrar turno
               </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-slate-400 block mb-1">Efectivo contado en caja</label>
+                  <label className="text-sm text-[var(--text-3)] block mb-1">Efectivo contado en caja</label>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={fondoFinal}
                     onChange={e => setFondoFinal(e.target.value)}
                     placeholder="$0.00"
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-lg text-center focus:outline-none focus:border-red-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-lg text-center focus:outline-none focus:border-red-500"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400 block mb-1">Notas del cierre</label>
+                  <label className="text-sm text-[var(--text-3)] block mb-1">Notas del cierre</label>
                   <input
                     type="text"
                     value={closingNotas}
                     onChange={e => setClosingNotas(e.target.value)}
                     placeholder="Observaciones opcionales..."
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-slate-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400 block mb-1">PIN de gerente</label>
+                  <label className="text-sm text-[var(--text-3)] block mb-1">PIN de gerente</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -211,14 +211,14 @@ export default function TurnoPage() {
                     value={closePin}
                     onChange={e => { setClosePin(e.target.value.replace(/\D/g, '')); setCloseError('') }}
                     placeholder="****"
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500"
                   />
                 </div>
                 {closeError && <p className="text-red-400 text-sm text-center">{closeError}</p>}
                 <button
                   onClick={handleCloseTurno}
                   disabled={!fondoFinal || !closePin}
-                  className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl text-lg transition-colors"
+                  className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
                 >
                   Cerrar turno
                 </button>
@@ -228,40 +228,40 @@ export default function TurnoPage() {
         ) : (
           /* No turno — abrir uno */
           <div className="max-w-md mx-auto">
-            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-6">
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6">
                 <DoorOpen size={28} className="text-blue-400" />
                 <div>
                   <h2 className="text-lg font-bold">Abrir turno</h2>
-                  <p className="text-slate-400 text-sm">Cuenta el efectivo en caja antes de empezar</p>
+                  <p className="text-[var(--text-3)] text-sm">Cuenta el efectivo en caja antes de empezar</p>
                 </div>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-slate-400 block mb-1">Quien abre</label>
+                  <label className="text-sm text-[var(--text-3)] block mb-1">Quien abre</label>
                   <input
                     type="text"
                     value={openedBy}
                     onChange={e => setOpenedBy(e.target.value)}
                     placeholder="Tu nombre"
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400 block mb-1">Fondo de caja (efectivo contado)</label>
+                  <label className="text-sm text-[var(--text-3)] block mb-1">Fondo de caja (efectivo contado)</label>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={fondoInicial}
                     onChange={e => setFondoInicial(e.target.value)}
                     placeholder="$0.00"
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white text-lg text-center focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-lg text-center focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <button
                   onClick={handleOpenTurno}
                   disabled={!openedBy.trim() || !fondoInicial}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl text-lg transition-colors"
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold rounded-xl text-lg transition-colors"
                 >
                   Abrir turno
                 </button>
@@ -272,7 +272,7 @@ export default function TurnoPage() {
       </div>
 
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-700 border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
         </div>
       )}

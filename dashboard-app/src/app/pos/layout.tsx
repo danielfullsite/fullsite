@@ -140,14 +140,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+    <div className="h-screen flex items-center justify-center bg-[var(--surface)] text-white">
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-6">
           <span className="text-white font-black text-2xl tracking-tight">
             fullsite
             <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-1" />
           </span>
-          <p className="text-slate-400 text-sm mt-1">POS — Ingresa tu PIN</p>
+          <p className="text-[var(--text-3)] text-sm mt-1">POS — Ingresa tu PIN</p>
         </div>
 
         <input
@@ -160,7 +160,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           placeholder="PIN"
           autoFocus
           disabled={isLocked}
-          className={`w-full bg-slate-800 border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 ${
+          className={`w-full bg-[var(--surface-2)] border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 ${
             error ? 'border-red-500' : isLocked ? 'border-red-800 opacity-50' : 'border-slate-700 focus:border-emerald-500'
           }`}
         />
@@ -168,7 +168,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         <button
           onClick={handleSubmit}
           disabled={pin.length < 4 || checking || isLocked}
-          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[56px]"
+          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold text-lg transition-all min-h-[56px]"
         >
           {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar'}
         </button>

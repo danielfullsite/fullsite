@@ -174,14 +174,14 @@ export default function VentasPage() {
               type="date"
               value={customFrom}
               onChange={e => setCustomFrom(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              className="px-3 py-2 rounded-lg text-sm border border-[var(--line)] bg-[var(--surface)] text-[var(--text-1)] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
-            <span className="text-slate-400 text-sm">a</span>
+            <span className="text-[var(--text-3)] text-sm">a</span>
             <input
               type="date"
               value={customTo}
               onChange={e => setCustomTo(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              className="px-3 py-2 rounded-lg text-sm border border-[var(--line)] bg-[var(--surface)] text-[var(--text-1)] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
           </div>
         )}
@@ -191,7 +191,7 @@ export default function VentasPage() {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+            <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -232,11 +232,11 @@ export default function VentasPage() {
 
           {/* Daily sales area chart */}
           {dailyChart.length > 1 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Ventas por día
               </h3>
-              <p className="text-xs text-slate-400 mb-5">{data.length} días</p>
+              <p className="text-xs text-[var(--text-3)] mb-5">{data.length} días</p>
               <div className="h-[250px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dailyChart}>
@@ -288,11 +288,11 @@ export default function VentasPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Payment methods */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Métodos de pago
               </h3>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[var(--text-3)] mb-5">
                 Total: {formatCurrency(paymentTotal)}
               </p>
               {payments.length > 0 ? (
@@ -308,14 +308,14 @@ export default function VentasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }}
                             />
-                            <span className="text-sm font-medium text-slate-700">{p.nombre}</span>
+                            <span className="text-sm font-medium text-[var(--text-1)]">{p.nombre}</span>
                           </div>
-                          <span className="text-sm font-bold text-slate-900 tabular-nums">
+                          <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">
                             {formatCurrency(p.total)}{' '}
-                            <span className="text-slate-400 text-xs font-normal">({pct}%)</span>
+                            <span className="text-[var(--text-3)] text-xs font-normal">({pct}%)</span>
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                           <div
                             className="h-2 rounded-full animate-progress"
                             style={{
@@ -329,16 +329,16 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de métodos de pago</p>
+                <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de métodos de pago</p>
               )}
             </div>
 
             {/* Revenue distribution by category */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="text-sm font-semibold text-slate-900 mb-1">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                 Distribución por categoría
               </h3>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[var(--text-3)] mb-5">
                 Top 10 categorías
               </p>
               {topGrupos.length > 0 ? (
@@ -355,13 +355,13 @@ export default function VentasPage() {
                               className="w-2.5 h-2.5 rounded-full shrink-0"
                               style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
                             />
-                            <span className="text-xs font-medium text-slate-700 truncate">{g.nombre}</span>
+                            <span className="text-xs font-medium text-[var(--text-1)] truncate">{g.nombre}</span>
                           </div>
-                          <span className="text-xs tabular-nums text-slate-500 ml-2 shrink-0">
+                          <span className="text-xs tabular-nums text-[var(--text-2)] ml-2 shrink-0">
                             {formatCurrency(g.total)} ({pct}%)
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5">
                           <div
                             className="h-1.5 rounded-full animate-progress"
                             style={{
@@ -375,38 +375,38 @@ export default function VentasPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-slate-400 text-sm py-8 text-center">Sin datos de categorías</p>
+                <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de categorías</p>
               )}
             </div>
           </div>
 
           {/* Sales by order type */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+            <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
               Desglose por tipo de orden
             </h3>
-            <p className="text-xs text-slate-400 mb-5">Restaurante vs Para llevar</p>
+            <p className="text-xs text-[var(--text-3)] mb-5">Restaurante vs Para llevar</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+              <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
                 <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Store size={18} className="text-blue-500" />
                 </div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Personas restaurante</p>
-                <p className="text-2xl font-bold text-slate-900">{data.reduce((s, d) => s + (d.personas_restaurant || 0), 0).toLocaleString()}</p>
+                <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Personas restaurante</p>
+                <p className="text-2xl font-bold text-[var(--text-1)]">{data.reduce((s, d) => s + (d.personas_restaurant || 0), 0).toLocaleString()}</p>
               </div>
-              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+              <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
                 <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <ShoppingBag size={18} className="text-emerald-500" />
                 </div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Ordenes para llevar</p>
-                <p className="text-2xl font-bold text-slate-900">{data.reduce((s, d) => s + (d.ordenes_llevar || 0), 0).toLocaleString()}</p>
+                <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Ordenes para llevar</p>
+                <p className="text-2xl font-bold text-[var(--text-1)]">{data.reduce((s, d) => s + (d.ordenes_llevar || 0), 0).toLocaleString()}</p>
               </div>
-              <div className="bg-slate-50 rounded-xl p-5 text-center border border-slate-100">
+              <div className="bg-[var(--surface-2)] rounded-xl p-5 text-center border border-[var(--line-soft)]">
                 <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Smartphone size={18} className="text-purple-500" />
                 </div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Propinas totales</p>
-                <p className="text-2xl font-bold text-slate-900">{formatCurrency(data.reduce((s, d) => s + (d.propinas_total || 0), 0))}</p>
+                <p className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-1">Propinas totales</p>
+                <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(data.reduce((s, d) => s + (d.propinas_total || 0), 0))}</p>
               </div>
             </div>
           </div>
@@ -457,7 +457,7 @@ export default function VentasPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Cancelaciones table */}
                 {cancelaciones.length > 0 && (
-                  <div className="bg-white rounded-xl border border-red-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <div className="bg-[var(--surface)] rounded-xl border border-red-200 shadow-sm p-6 hover:shadow-md transition-shadow">
                     <h3 className="text-sm font-semibold text-red-700 mb-1">Cancelaciones</h3>
                     <p className="text-xs text-red-400 mb-4">{cancelaciones.length} items cancelados</p>
                     <div className="overflow-x-auto">
@@ -471,7 +471,7 @@ export default function VentasPage() {
                         <tbody>
                           {cancelaciones.map((item, i) => (
                             <tr key={i} className="border-b border-slate-50 hover:bg-red-50/50 transition-colors">
-                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-red-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
@@ -483,7 +483,7 @@ export default function VentasPage() {
 
                 {/* Anulaciones table */}
                 {anulaciones.length > 0 && (
-                  <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <div className="bg-[var(--surface)] rounded-xl border border-amber-200 shadow-sm p-6 hover:shadow-md transition-shadow">
                     <h3 className="text-sm font-semibold text-amber-700 mb-1">Anulaciones</h3>
                     <p className="text-xs text-amber-400 mb-4">{anulaciones.length} items anulados</p>
                     <div className="overflow-x-auto">
@@ -497,7 +497,7 @@ export default function VentasPage() {
                         <tbody>
                           {anulaciones.map((item, i) => (
                             <tr key={i} className="border-b border-slate-50 hover:bg-amber-50/50 transition-colors">
-                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-amber-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
@@ -509,7 +509,7 @@ export default function VentasPage() {
 
                 {/* Cortesias table */}
                 {cortesias.length > 0 && (
-                  <div className="bg-white rounded-xl border border-orange-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <div className="bg-[var(--surface)] rounded-xl border border-orange-200 shadow-sm p-6 hover:shadow-md transition-shadow">
                     <h3 className="text-sm font-semibold text-orange-700 mb-1">Cortesias</h3>
                     <p className="text-xs text-orange-400 mb-4">{cortesias.length} cortesias otorgadas</p>
                     <div className="overflow-x-auto">
@@ -523,7 +523,7 @@ export default function VentasPage() {
                         <tbody>
                           {cortesias.map((item, i) => (
                             <tr key={i} className="border-b border-slate-50 hover:bg-orange-50/50 transition-colors">
-                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
+                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-orange-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
@@ -535,22 +535,22 @@ export default function VentasPage() {
 
                 {/* Descuentos detalle table */}
                 {descuentosDetalle.length > 0 && (
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-slate-700 mb-1">Detalle de Descuentos</h3>
-                    <p className="text-xs text-slate-400 mb-4">{descuentosDetalle.length} descuentos aplicados</p>
+                  <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Detalle de Descuentos</h3>
+                    <p className="text-xs text-[var(--text-3)] mb-4">{descuentosDetalle.length} descuentos aplicados</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="text-left py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Concepto</th>
-                            <th className="text-right py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Monto</th>
+                          <tr className="border-b border-[var(--line-soft)]">
+                            <th className="text-left py-2 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Concepto</th>
+                            <th className="text-right py-2 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Monto</th>
                           </tr>
                         </thead>
                         <tbody>
                           {descuentosDetalle.map((item, i) => (
-                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                              <td className="py-2.5 text-slate-700">{item.nombre}</td>
-                              <td className="py-2.5 text-right font-medium text-slate-600 tabular-nums">{formatCurrency(item.total)}</td>
+                            <tr key={i} className="border-b border-slate-50 hover:bg-[var(--surface-2)]/50 transition-colors">
+                              <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
+                              <td className="py-2.5 text-right font-medium text-[var(--text-2)] tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
                         </tbody>

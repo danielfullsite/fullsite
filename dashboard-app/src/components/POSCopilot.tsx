@@ -266,9 +266,9 @@ export default function POSCopilot({ orderItems, mesa, personas, mesero, onAddIt
             <Icon size={16} className={`${colors.icon} flex-shrink-0`} />
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-semibold">{s.title}
-                {s.actionPrice && <span className="text-slate-400 font-normal"> · ${s.actionPrice}</span>}
+                {s.actionPrice && <span className="text-[var(--text-3)] font-normal"> · ${s.actionPrice}</span>}
               </p>
-              <p className="text-slate-400 text-[10px] leading-tight">{s.description}</p>
+              <p className="text-[var(--text-3)] text-[10px] leading-tight">{s.description}</p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {s.action && onAddItem && (
@@ -284,7 +284,7 @@ export default function POSCopilot({ orderItems, mesa, personas, mesero, onAddIt
               )}
               <button
                 onClick={() => setDismissed(prev => new Set(prev).add(s.title))}
-                className="text-slate-600 hover:text-slate-400 text-xs px-1"
+                className="text-[var(--text-2)] hover:text-[var(--text-3)] text-xs px-1"
               >
                 ×
               </button>

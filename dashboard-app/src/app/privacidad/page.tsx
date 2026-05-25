@@ -2,7 +2,7 @@ export default function PrivacidadPage() {
   return (
     <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white border-b border-border">
+      <div className="bg-[var(--surface)] border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <a href="/login" className="inline-block mb-6">
             <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">

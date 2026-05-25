@@ -116,7 +116,7 @@ export default function EcommercePage() {
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-500 text-sm font-medium">Cargando datos...</p>
+            <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
       ) : (
@@ -166,11 +166,11 @@ export default function EcommercePage() {
             <>
               {/* Channel breakdown */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+                  <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                     Ventas por canal
                   </h3>
-                  <p className="text-xs text-slate-400 mb-5">
+                  <p className="text-xs text-[var(--text-3)] mb-5">
                     Desglose por plataforma
                   </p>
                   <div className="space-y-4">
@@ -185,14 +185,14 @@ export default function EcommercePage() {
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                              <span className="text-sm font-medium text-slate-700">{ch.nombre}</span>
+                              <span className="text-sm font-medium text-[var(--text-1)]">{ch.nombre}</span>
                             </div>
-                            <span className="text-sm font-bold text-slate-900 tabular-nums">
+                            <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">
                               {formatCurrency(ch.total)}{' '}
-                              <span className="text-slate-400 text-xs font-normal">({pct}%)</span>
+                              <span className="text-[var(--text-3)] text-xs font-normal">({pct}%)</span>
                             </span>
                           </div>
-                          <div className="w-full bg-slate-100 rounded-full h-2">
+                          <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                             <div
                               className="h-2 rounded-full animate-progress"
                               style={{ width: `${barWidth}%`, backgroundColor: color }}
@@ -206,11 +206,11 @@ export default function EcommercePage() {
 
                 {/* Bar chart by channel */}
                 {ecommerceData.channels.length > 0 && (
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                       Comparativo por canal
                     </h3>
-                    <p className="text-xs text-slate-400 mb-5">Total acumulado</p>
+                    <p className="text-xs text-[var(--text-3)] mb-5">Total acumulado</p>
                     <div className="h-[200px] sm:h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={ecommerceData.channels}>
@@ -248,11 +248,11 @@ export default function EcommercePage() {
 
               {/* Monthly trend */}
               {ecommerceData.monthly.length > 1 && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+                  <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
                     Tendencia mensual eCommerce
                   </h3>
-                  <p className="text-xs text-slate-400 mb-5">Ventas por mes</p>
+                  <p className="text-xs text-[var(--text-3)] mb-5">Ventas por mes</p>
                   <div className="h-[250px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={ecommerceData.monthly}>

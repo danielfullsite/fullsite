@@ -77,7 +77,7 @@ export default function InventarioPage() {
   const statusConfig = {
     critical: { bg: 'bg-red-900/30', border: 'border-red-700/50', text: 'text-red-400', label: 'AGOTADO' },
     low: { bg: 'bg-amber-900/30', border: 'border-amber-700/50', text: 'text-amber-400', label: 'BAJO' },
-    ok: { bg: 'bg-slate-800/60', border: 'border-slate-700/50', text: 'text-emerald-400', label: 'OK' },
+    ok: { bg: 'bg-[var(--surface-2)]/60', border: 'border-slate-700/50', text: 'text-emerald-400', label: 'OK' },
   }
 
   const catLabels: Record<string, string> = {
@@ -89,24 +89,24 @@ export default function InventarioPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col text-white bg-slate-900">
+    <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-colors">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div className="flex items-center gap-2">
             <Package size={24} className="text-blue-400" />
             <h1 className="text-xl font-bold">Inventario</h1>
           </div>
-          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>
         <Link
           href="/pos/recetas"
-          className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-1.5"
+          className="px-3 py-2 bg-[var(--line)] hover:bg-slate-600 rounded-lg text-sm text-[var(--text-4)] transition-colors flex items-center gap-1.5"
         >
           <BookOpen size={14} />
           Recetas
@@ -114,7 +114,7 @@ export default function InventarioPage() {
       </header>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-3 px-6 py-3 bg-slate-800/30 border-b border-slate-700">
+      <div className="grid grid-cols-4 gap-3 px-6 py-3 bg-[var(--surface-2)]/30 border-b border-slate-700">
         <div className="bg-red-900/20 border border-red-700/30 rounded-xl px-4 py-3">
           <p className="text-red-400 text-2xl font-bold">{stats.critical}</p>
           <p className="text-red-400/70 text-xs">Agotados</p>
@@ -140,7 +140,7 @@ export default function InventarioPage() {
         <button
           onClick={() => setTab('stock')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'stock' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            tab === 'stock' ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-slate-600'
           }`}
         >
           Stock actual
@@ -148,7 +148,7 @@ export default function InventarioPage() {
         <button
           onClick={() => setTab('movements')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'movements' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            tab === 'movements' ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-slate-600'
           }`}
         >
           Movimientos
@@ -158,21 +158,21 @@ export default function InventarioPage() {
       {tab === 'stock' ? (
         <>
           {/* Filters */}
-          <div className="flex items-center gap-3 px-6 py-3 bg-slate-800/30 border-b border-slate-700">
+          <div className="flex items-center gap-3 px-6 py-3 bg-[var(--surface-2)]/30 border-b border-slate-700">
             <div className="relative flex-1 max-w-md">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar ingrediente..."
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-[var(--line)] border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
+              className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
             >
               <option value="all">Todas las categorias</option>
               {categories.map(c => (
@@ -182,7 +182,7 @@ export default function InventarioPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
+              className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm min-h-[42px]"
             >
               <option value="all">Todos los estados</option>
               <option value="critical">Agotados</option>
@@ -195,7 +195,7 @@ export default function InventarioPage() {
                 const idx = order.indexOf(prev)
                 return order[(idx + 1) % order.length]
               })}
-              className="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 transition-colors flex items-center gap-1.5"
+              className="px-3 py-2.5 bg-[var(--line)] hover:bg-slate-600 rounded-lg text-sm text-[var(--text-4)] transition-colors flex items-center gap-1.5"
             >
               <ArrowUpDown size={14} />
               {sortKey === 'status' ? 'Estado' : sortKey === 'name' ? 'Nombre' : sortKey === 'stock' ? 'Stock' : 'Categoria'}
@@ -209,7 +209,7 @@ export default function InventarioPage() {
                 <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-slate-500">
+              <div className="flex items-center justify-center h-full text-[var(--text-2)]">
                 <div className="text-center">
                   <Package size={48} className="mx-auto mb-3 opacity-50" />
                   <p className="text-xl">Sin inventario</p>
@@ -236,12 +236,12 @@ export default function InventarioPage() {
                       {/* Name + category */}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-white text-sm">{item.ingredient_name}</p>
-                        <p className="text-slate-500 text-xs">{catLabels[item.ingredient_category ?? ''] ?? item.ingredient_category}</p>
+                        <p className="text-[var(--text-2)] text-xs">{catLabels[item.ingredient_category ?? ''] ?? item.ingredient_category}</p>
                       </div>
 
                       {/* Stock bar */}
                       <div className="w-32 flex-shrink-0">
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-2 bg-[var(--line)] rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
                               status === 'critical' ? 'bg-red-500' :
@@ -257,7 +257,7 @@ export default function InventarioPage() {
                         <p className={`font-semibold text-sm ${config.text}`}>
                           {item.stock.toFixed(item.ingredient_unit === 'pz' || item.ingredient_unit === 'pza.' ? 0 : 2)} {item.ingredient_unit}
                         </p>
-                        <p className="text-slate-600 text-xs">
+                        <p className="text-[var(--text-2)] text-xs">
                           reorden: {item.reorder_point} {item.ingredient_unit}
                         </p>
                       </div>
@@ -265,7 +265,7 @@ export default function InventarioPage() {
                       {/* Value */}
                       {showCosts && (
                         <div className="w-24 text-right flex-shrink-0">
-                          <p className="text-slate-400 text-sm">{formatMXN(item.stock * (item.ingredient_cost ?? 0))}</p>
+                          <p className="text-[var(--text-3)] text-sm">{formatMXN(item.stock * (item.ingredient_cost ?? 0))}</p>
                         </div>
                       )}
 
@@ -284,7 +284,7 @@ export default function InventarioPage() {
         /* Movements tab */
         <div className="flex-1 overflow-y-auto">
           {movements.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500">
+            <div className="flex items-center justify-center h-full text-[var(--text-2)]">
               <p>Sin movimientos registrados</p>
             </div>
           ) : (
@@ -300,14 +300,14 @@ export default function InventarioPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium">{mov.ingredient_id}</p>
-                      <p className="text-slate-400 text-xs">{mov.notes || mov.movement_type}</p>
+                      <p className="text-[var(--text-3)] text-xs">{mov.notes || mov.movement_type}</p>
                     </div>
                     <p className={`font-semibold text-sm ${isDeduction ? 'text-red-400' : 'text-emerald-400'}`}>
                       {mov.quantity > 0 ? '+' : ''}{mov.quantity}
                     </p>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-slate-400 text-xs">{mov.actor}</p>
-                      <p className="text-slate-600 text-xs">
+                      <p className="text-[var(--text-3)] text-xs">{mov.actor}</p>
+                      <p className="text-[var(--text-2)] text-xs">
                         {new Date(mov.created_at).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
