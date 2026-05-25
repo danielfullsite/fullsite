@@ -8,6 +8,7 @@ import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getRecentDays, getLatestDay, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
+import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -79,6 +80,7 @@ const WIDGET_DEFS = [
   { id: 'insight', label: 'Insight del día', defaultOn: true },
   { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
+  { id: 'prediction', label: 'Prediccion de cierre', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
   { id: 'agent_status', label: 'Status de agentes', defaultOn: true },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
@@ -471,6 +473,39 @@ export default function DashboardPage() {
           accentClass="kpi-accent-purple"
         />
       </div>}
+
+      {/* Prediction Widget */}
+      {show('prediction') && period === 'dia' && (() => {
+        const today = latestDay?.fecha || ''
+        const todayDate = today ? new Date(today + 'T12:00:00') : new Date()
+        const todayDow = todayDate.getDay()
+        const yesterdayDate = new Date(todayDate); yesterdayDate.setDate(todayDate.getDate() - 1)
+        const yesterdayStr = yesterdayDate.toISOString().slice(0, 10)
+        const lastWeekDate = new Date(todayDate); lastWeekDate.setDate(todayDate.getDate() - 7)
+        const lastWeekStr = lastWeekDate.toISOString().slice(0, 10)
+
+        const yesterdayData = recentData.find(d => d.fecha === yesterdayStr)
+        const lastWeekData = recentData.find(d => d.fecha === lastWeekStr)
+
+        // DOW average from last 4 weeks
+        const sameDowDays = recentData.filter(d => {
+          const dt = new Date(d.fecha + 'T12:00:00')
+          return dt.getDay() === todayDow && d.fecha !== today && (d.ventas_dia || 0) > 0
+        })
+        const dowAvg = sameDowDays.length > 0
+          ? sameDowDays.reduce((sum, d) => sum + (d.ventas_dia || 0), 0) / sameDowDays.length
+          : 0
+
+        return (
+          <PredictionWidget
+            currentVentas={latestDay?.ventas_dia || 0}
+            currentTickets={latestDay?.tickets_count || 0}
+            yesterdayVentas={yesterdayData?.ventas_dia || 0}
+            lastWeekVentas={lastWeekData?.ventas_dia || 0}
+            dowAvgVentas={dowAvg}
+          />
+        )
+      })()}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
       {show('extra_kpis') && <div className="grid grid-cols-3 gap-4 mb-6">
