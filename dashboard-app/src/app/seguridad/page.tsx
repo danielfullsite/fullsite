@@ -1,46 +1,6 @@
-import { Shield, Lock, Server, Eye, Database, Brain, HardDrive, Fingerprint, Globe, FileCheck, CreditCard, Receipt, Award, ArrowRight } from 'lucide-react'
-
-const certifications = [
-  {
-    name: 'CFDI 4.0',
-    status: 'active' as const,
-    description: 'Facturacion electronica SAT via PAC certificado',
-  },
-  {
-    name: 'PCI-DSS',
-    status: 'active' as const,
-    description: 'Cumplimiento via tokenizacion — nunca tocamos datos de tarjeta',
-  },
-  {
-    name: 'LFPDPPP',
-    status: 'active' as const,
-    description: 'Ley Federal de Proteccion de Datos Personales — derechos ARCO completos',
-  },
-  {
-    name: 'SOC 2 Type II',
-    status: 'roadmap' as const,
-    description: 'Auditoria independiente de controles de seguridad — en proceso',
-  },
-  {
-    name: 'ISO 27001',
-    status: 'roadmap' as const,
-    description: 'Gestion de seguridad de la informacion — planeado',
-  },
-]
+import { Shield, Lock, Server, Eye, Database, Brain, HardDrive, Fingerprint, Globe, FileCheck } from 'lucide-react'
 
 const sections = [
-  {
-    icon: CreditCard,
-    title: 'PCI-DSS — sin datos de tarjeta',
-    description:
-      'Fullsite nunca almacena, procesa ni transmite numeros de tarjeta. Todos los pagos con tarjeta se procesan a traves de tokenizadores certificados PCI-DSS (Stripe, Clip, MercadoPago). Tu POS solo recibe un token de confirmacion — los datos sensibles nunca pasan por nuestros servidores.',
-  },
-  {
-    icon: Receipt,
-    title: 'CFDI 4.0 — facturacion electronica SAT',
-    description:
-      'Integracion directa con PAC autorizado por el SAT para emision de CFDI 4.0. Gestion segura del Certificado de Sello Digital (CSD) de cada cliente. Timbrado automatico, cancelacion con motivo, y almacenamiento de XMLs por 5 anos conforme a regulacion fiscal.',
-  },
   {
     icon: Lock,
     title: 'Encriptacion en transito y reposo',
@@ -91,9 +51,9 @@ const sections = [
   },
   {
     icon: FileCheck,
-    title: 'Cumplimiento LFPDPPP',
+    title: 'Cumplimiento normativo',
     description:
-      'Cumplimos con la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares y su Reglamento. Implementamos derechos ARCO completos (Acceso, Rectificacion, Cancelacion, Oposicion). Aviso de privacidad disponible en /privacidad.',
+      'Cumplimos con la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares (LFPDPPP) y su Reglamento. Implementamos derechos ARCO completos (Acceso, Rectificacion, Cancelacion, Oposicion). Aviso de privacidad disponible en /privacidad.',
   },
 ]
 
@@ -113,38 +73,12 @@ export default function SeguridadPage() {
             <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <Shield className="w-6 h-6 text-emerald-400" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Seguridad y Compliance</h1>
+            <h1 className="text-3xl font-bold text-white">Seguridad</h1>
           </div>
           <p className="text-white/60 text-base max-w-2xl leading-relaxed">
             La seguridad de los datos de nuestros clientes es nuestra maxima prioridad.
             Protegemos tu informacion con los mismos estandares que usan las instituciones financieras.
           </p>
-
-          {/* Certification badges */}
-          <div className="mt-10 flex flex-wrap gap-3">
-            {certifications.map((cert) => (
-              <div
-                key={cert.name}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border ${
-                  cert.status === 'active'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-white/5 border-white/10 text-white/40'
-                }`}
-              >
-                {cert.status === 'active' ? (
-                  <Award className="w-4 h-4" />
-                ) : (
-                  <ArrowRight className="w-4 h-4" />
-                )}
-                <div>
-                  <span className="text-sm font-semibold">{cert.name}</span>
-                  {cert.status === 'roadmap' && (
-                    <span className="text-[10px] uppercase tracking-wider ml-2 opacity-60">pronto</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
