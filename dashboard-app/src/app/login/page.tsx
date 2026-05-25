@@ -94,7 +94,7 @@ export default function LoginPage() {
                 placeholder="nombre@empresa.com"
                 required
                 disabled={loading}
-                className="w-full text-sm border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full text-sm bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 autofill:bg-white autofill:shadow-[inset_0_0_0px_1000px_rgb(255,255,255)] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full text-sm border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full text-sm bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 autofill:bg-white autofill:shadow-[inset_0_0_0px_1000px_rgb(255,255,255)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
