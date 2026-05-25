@@ -1,32 +1,29 @@
 """
 Persistencia a Supabase para reportes de Wansoft.
 NO bloquea el envio de Telegram si falla.
+
+REGLA: nunca escribir ventas_dia=null. Si el parser no tiene el dato,
+no tocar el campo. El avance (3pm) siempre tiene ventas, el cierre
+actualiza el mismo row.
 """
 import os
 import sys
+import json
+import requests
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-
-try:
-    from supabase import create_client, Client
-except ImportError:
-    print("[supabase_client] supabase SDK no instalado, persistencia deshabilitada", file=sys.stderr)
-    create_client = None
+from typing import Any, Dict
 
 
-def get_supabase() -> Optional["Client"]:
-    """Retorna cliente Supabase o None si no esta configurado."""
-    if create_client is None:
-        return None
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_KEY")
 
-    if not url or not key:
-        print("[supabase_client] SUPABASE_URL o SUPABASE_SERVICE_KEY no configurado", file=sys.stderr)
-        return None
-
-    return create_client(url, key)
+def _sb_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
 
 
 def upsert_daily_report(
@@ -37,36 +34,100 @@ def upsert_daily_report(
     client_slug: str = "amalay",
 ) -> bool:
     """
-    UPSERT del reporte diario a wansoft_daily.
-    Retorna True si exitoso, False si hubo error.
-    NO levanta excepcion.
+    Upsert del reporte diario a wansoft_daily.
+    Avance y cierre actualizan el MISMO row (no crean duplicados).
+    NUNCA escribe ventas_dia=null.
     """
-    try:
-        supabase = get_supabase()
-        if supabase is None:
-            return False
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("[supabase_client] SUPABASE_URL o KEY no configurado", file=sys.stderr)
+        return False
 
-        row = {
-            "client_slug": client_slug,
+    try:
+        # Build row — only include fields that have actual values
+        row: Dict[str, Any] = {
             "fecha": fecha,
             "report_type": report_type,
             "updated_at": datetime.now(timezone.utc).isoformat(),
-            # De agg_meseros
-            "ventas_dia": agg_meseros.get("total_dia"),
-            "personas_restaurant": agg_meseros.get("personas_dia"),
-            "ticket_promedio_restaurant": agg_meseros.get("ticket_promedio"),
-            "meseros": agg_meseros.get("meseros_top", []),
-            # De agg_platillos
-            "chilaquiles_total": agg_platillos.get("chilaquiles_total"),
-            "half_half_total": agg_platillos.get("half_half_total"),
-            "platillos_top": agg_platillos.get("platillos_top", []),
         }
 
-        supabase.table("wansoft_daily").upsert(
-            row, on_conflict="client_slug,fecha,report_type"
-        ).execute()
-        print(f"[supabase_client] UPSERT OK: {fecha} {report_type}", file=sys.stderr)
-        return True
+        # From agg_meseros — only set if value exists and is not None
+        ventas = agg_meseros.get("total_dia")
+        if ventas is not None and ventas > 0:
+            row["ventas_dia"] = ventas
+
+        personas = agg_meseros.get("personas_dia")
+        if personas is not None:
+            row["personas_restaurant"] = personas
+
+        tp = agg_meseros.get("ticket_promedio")
+        if tp is not None:
+            row["ticket_promedio_restaurant"] = tp
+
+        tickets = agg_meseros.get("tickets_dia")
+        if tickets is not None:
+            row["tickets_count"] = tickets
+
+        meseros = agg_meseros.get("meseros_top")
+        if meseros:
+            row["meseros"] = json.dumps(meseros) if not isinstance(meseros, str) else meseros
+
+        # From agg_platillos
+        chil = agg_platillos.get("chilaquiles_total")
+        if chil is not None:
+            row["chilaquiles_total"] = chil
+
+        hh = agg_platillos.get("half_half_total")
+        if hh is not None:
+            row["half_half_total"] = hh
+
+        platillos = agg_platillos.get("platillos_top")
+        if platillos:
+            row["platillos_top"] = json.dumps(platillos) if not isinstance(platillos, str) else platillos
+
+        ventas_grupo = agg_platillos.get("ventas_por_grupo")
+        if ventas_grupo:
+            row["ventas_por_grupo"] = json.dumps(ventas_grupo) if not isinstance(ventas_grupo, str) else ventas_grupo
+
+        pago = agg_platillos.get("pago_metodos")
+        if pago:
+            row["pago_metodos"] = json.dumps(pago) if not isinstance(pago, str) else pago
+
+        ventas_brutas = agg_platillos.get("ventas_brutas") or agg_meseros.get("ventas_brutas")
+        if ventas_brutas is not None:
+            row["ventas_brutas"] = ventas_brutas
+
+        descuentos = agg_platillos.get("descuentos") or agg_meseros.get("descuentos")
+        if descuentos is not None:
+            row["descuentos"] = descuentos
+
+        # Check if row for this date already exists
+        check = requests.get(
+            f"{SUPABASE_URL}/rest/v1/wansoft_daily?fecha=eq.{fecha}&ventas_dia=gt.0&limit=1",
+            headers=_sb_headers(), timeout=10,
+        )
+
+        if check.ok and check.json():
+            # UPDATE existing row (PATCH)
+            resp = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/wansoft_daily?fecha=eq.{fecha}&ventas_dia=gt.0",
+                headers={**_sb_headers(), "Prefer": "return=minimal"},
+                json=row, timeout=10,
+            )
+            print(f"[supabase_client] PATCH {fecha} {report_type}: {resp.status_code}", file=sys.stderr)
+        else:
+            # INSERT new row — but only if we have ventas_dia
+            if "ventas_dia" not in row:
+                print(f"[supabase_client] SKIP {fecha} {report_type}: no ventas_dia, won't create empty row", file=sys.stderr)
+                return False
+            resp = requests.post(
+                f"{SUPABASE_URL}/rest/v1/wansoft_daily",
+                headers={**_sb_headers(), "Prefer": "return=minimal"},
+                json=row, timeout=10,
+            )
+            print(f"[supabase_client] POST {fecha} {report_type}: {resp.status_code}", file=sys.stderr)
+
+        return resp.ok
+
     except Exception as e:
-        print(f"[supabase_client] UPSERT FAIL: {e}", file=sys.stderr)
+        print(f"[supabase_client] FAIL: {e}", file=sys.stderr)
         return False
