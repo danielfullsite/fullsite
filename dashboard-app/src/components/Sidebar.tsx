@@ -33,6 +33,7 @@ import {
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessPage } from '@/contexts/AuthContext'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const navSections = [
   {
@@ -124,11 +125,11 @@ export default function Sidebar() {
   const { user, role, clientConfig, signOut } = useAuth()
 
   const sidebarContent = (
-    <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-slate-200 bg-white">
+    <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-[var(--line)]" style={{ background: 'var(--surface)' }}>
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-slate-100">
+      <div className="px-5 py-5 border-b border-[var(--line-soft)]">
         <Link href="/" className="flex items-center logo-hover">
-          <span className="text-[#1a1a1a] font-black text-xl tracking-tight">
+          <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
             fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
           </span>
         </Link>
@@ -167,22 +168,25 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-4 py-4 border-t border-slate-100">
-        {/* Date */}
-        <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
-          <Calendar size={12} />
-          <span className="font-medium">{getTodayFormatted()}</span>
+      <div className="px-4 py-4 border-t border-[var(--line-soft)]">
+        {/* Date + Theme toggle */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-3)]">
+            <Calendar size={12} />
+            <span className="font-medium">{getTodayFormatted()}</span>
+          </div>
+          <ThemeToggle />
         </div>
 
         {/* Connection status */}
         <div className="flex items-center gap-2 mb-2">
           <div className="pulse-dot" />
-          <span className="text-xs text-slate-500 font-medium">Conectado</span>
+          <span className="text-xs text-[var(--text-3)] font-medium">Conectado</span>
         </div>
 
         {/* Client name */}
         {clientConfig && (
-          <p className="text-[11px] text-slate-400 mb-3 truncate">
+          <p className="text-[11px] text-[var(--text-4)] mb-3 truncate">
             {clientConfig.name || clientConfig.id}
           </p>
         )}
@@ -191,7 +195,7 @@ export default function Sidebar() {
         {user && (
           <button
             onClick={signOut}
-            className="flex items-center gap-2 text-xs text-slate-400 hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-50"
+            className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-500/10"
           >
             <LogOut size={14} />
             <span>Cerrar sesion</span>
@@ -205,7 +209,8 @@ export default function Sidebar() {
     <>
       {/* Mobile hamburger */}
       <button
-        className="fixed top-4 left-4 z-50 lg:hidden bg-white text-slate-700 p-2 rounded-lg shadow-md border border-slate-200"
+        className="fixed top-4 left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
+        style={{ background: 'var(--surface)', color: 'var(--text-1)' }}
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
