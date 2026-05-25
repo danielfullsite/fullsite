@@ -199,7 +199,7 @@ export default function CortesPage() {
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xs text-[var(--text-3)]">Menor</span>
           {HEATMAP_COLORS.slice(1).map((c, i) => (
-            <div key={i} className={`w-5 h-5 rounded-md ${c.bg} border border-white shadow-sm`} />
+            <div key={i} className={`w-5 h-5 rounded-md ${c.bg} border border-white/10`} />
           ))}
           <span className="text-xs text-[var(--text-3)]">Mayor</span>
         </div>
@@ -216,11 +216,14 @@ export default function CortesPage() {
                 return (
                   <div
                     key={day.fecha}
-                    className={`w-9 h-9 rounded-md flex items-center justify-center cursor-default ${color.bg} border border-white/50 shadow-sm transition-transform hover:scale-110`}
+                    className={`w-16 h-14 rounded-lg flex flex-col items-center justify-center cursor-default ${color.bg} border border-white/10 transition-transform hover:scale-105`}
                     title={`${dateStr}: ${formatCurrency(day.ventas)}`}
                   >
-                    <span className={`text-[9px] font-bold ${color.text}`}>
+                    <span className={`text-[9px] font-medium ${color.text} opacity-70`}>
                       {new Date(day.fecha + 'T12:00:00').getDate()}
+                    </span>
+                    <span className={`text-[10px] font-bold ${color.text}`}>
+                      {day.ventas > 0 ? `$${Math.round(day.ventas / 1000)}k` : '-'}
                     </span>
                   </div>
                 )

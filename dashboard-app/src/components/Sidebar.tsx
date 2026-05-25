@@ -126,8 +126,8 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-[var(--line)]" style={{ background: 'var(--surface)' }}>
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-[var(--line-soft)]">
+      {/* Logo — safe-pt for standalone PWA mode */}
+      <div className="px-5 py-5 border-b border-[var(--line-soft)] safe-pt">
         <Link href="/" className="flex items-center logo-hover">
           <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
             fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
