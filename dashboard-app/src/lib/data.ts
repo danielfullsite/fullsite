@@ -53,14 +53,16 @@ function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>
       map.set(f, row)
     }
   }
-  // Preserve original order
+  // Return best row per fecha, ordered by first appearance
   const seen = new Set<string>()
-  return rows.filter(d => {
-    const f = d.fecha as string
-    if (seen.has(f)) return false
+  const result: Record<string, unknown>[] = []
+  for (const row of rows) {
+    const f = row.fecha as string
+    if (seen.has(f)) continue
     seen.add(f)
-    return map.get(f) === d
-  })
+    result.push(map.get(f)!)
+  }
+  return result
 }
 
 export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> {
@@ -70,18 +72,17 @@ export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> 
 }
 
 export async function getLatestDay(): Promise<WansoftDaily | null> {
-  const data = await sbFetch('wansoft_daily', 'select=*&order=fecha.desc&limit=5') as Record<string, unknown>[]
-  const row = data.find(d => (d.ventas_dia as number) > 0)
-  return row ? parseRow(row) : null
+  // ALWAYS filter ventas_dia>0 to skip null/cierre rows
+  const data = await sbFetch('wansoft_daily', 'select=*&ventas_dia=gt.0&order=fecha.desc&limit=5') as Record<string, unknown>[]
+  const deduped = dedupeByFecha(data)
+  return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
 export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
-  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&ventas_dia=gt.0&limit=1`) as Record<string, unknown>[]
-  if (data.length > 0) return parseRow(data[0])
-  // Fallback: try without filter (some days might have 0 sales)
-  const fallback = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&limit=2`) as Record<string, unknown>[]
-  const best = fallback.find(d => (d.ventas_dia as number) > 0) || fallback[0]
-  return best ? parseRow(best) : null
+  // Fetch all rows for date, dedup keeps highest ventas
+  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
+  const deduped = dedupeByFecha(data)
+  return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
 export async function getMonthlyData(): Promise<WansoftDaily[]> {
