@@ -53,8 +53,8 @@ function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>
 }
 
 export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> {
-  const data = await sbFetch('wansoft_daily', `select=*&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
-  const filtered = dedupeByFecha(data).filter(d => (d.ventas_dia as number) > 0)
+  const data = await sbFetch('wansoft_daily', `select=*&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
+  const filtered = dedupeByFecha(data).slice(0, days)
   return filtered.reverse().map(parseRow)
 }
 
@@ -65,8 +65,12 @@ export async function getLatestDay(): Promise<WansoftDaily | null> {
 }
 
 export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
-  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&limit=1`) as Record<string, unknown>[]
-  return data.length > 0 ? parseRow(data[0]) : null
+  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&ventas_dia=gt.0&limit=1`) as Record<string, unknown>[]
+  if (data.length > 0) return parseRow(data[0])
+  // Fallback: try without filter (some days might have 0 sales)
+  const fallback = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&limit=2`) as Record<string, unknown>[]
+  const best = fallback.find(d => (d.ventas_dia as number) > 0) || fallback[0]
+  return best ? parseRow(best) : null
 }
 
 export async function getMonthlyData(): Promise<WansoftDaily[]> {
