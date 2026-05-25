@@ -198,9 +198,14 @@ body {
 
 /* Recharts — force dark backgrounds */
 .recharts-tooltip-wrapper { z-index: 50 !important; }
-.recharts-default-tooltip { background: var(--panel) !important; border: 1px solid var(--line) !important; border-radius: 10px !important; }
-.recharts-tooltip-label { color: var(--text-2) !important; }
-.recharts-tooltip-item { color: var(--text-1) !important; }
+.recharts-default-tooltip { background: #0b0b0e !important; background-color: #0b0b0e !important; border: 1px solid #1c1d22 !important; border-radius: 10px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important; }
+.recharts-tooltip-label { color: #c4c4cc !important; }
+.recharts-tooltip-item { color: #f5f5f7 !important; }
+.recharts-tooltip-item-name { color: #87878f !important; }
+.recharts-tooltip-item-separator { color: #87878f !important; }
+[data-theme="light"] .recharts-default-tooltip { background: #ffffff !important; background-color: #ffffff !important; border: 1px solid #e6e6ea !important; box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
+[data-theme="light"] .recharts-tooltip-label { color: #36363f !important; }
+[data-theme="light"] .recharts-tooltip-item { color: #08080a !important; }
 .recharts-cartesian-grid line { stroke: var(--line) !important; }
 .recharts-text { fill: var(--text-3) !important; }
 
