@@ -160,15 +160,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           placeholder="PIN"
           autoFocus
           disabled={isLocked}
-          className={`w-full bg-[var(--surface-2)] border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 ${
-            error ? 'border-red-500' : isLocked ? 'border-red-800 opacity-50' : 'border-slate-700 focus:border-emerald-500'
+          className={`w-full bg-slate-800 border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 placeholder-slate-500 ${
+            error ? 'border-red-500' : isLocked ? 'border-red-800 opacity-50' : 'border-slate-600 focus:border-emerald-500'
           }`}
         />
 
         <button
           onClick={handleSubmit}
           disabled={pin.length < 4 || checking || isLocked}
-          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold text-lg transition-all min-h-[56px]"
+          className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[56px]"
         >
           {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar'}
         </button>
