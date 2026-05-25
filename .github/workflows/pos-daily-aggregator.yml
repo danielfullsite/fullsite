@@ -1,0 +1,37 @@
+name: POS Daily Aggregator
+
+on:
+  schedule:
+    # Avance 3pm MX = 21:00 UTC
+    - cron: '0 21 * * *'
+    # Cierre 11pm MX = 05:00 UTC (+1 day)
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Override date (YYYY-MM-DD)'
+        required: false
+
+defaults:
+  run:
+    working-directory: .github/scripts
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+  TARGET_DATE: ${{ github.event.inputs.target_date || '' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pytz
+      - run: python pos_daily_aggregator.py
