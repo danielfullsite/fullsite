@@ -159,6 +159,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase, loadClientData])
 
+  // Auto-logout: clear tokens when browser/tab closes
+  // sessionStorage survives reloads but dies on tab close
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    let storageKey = ''
+    try { storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token` } catch {}
+    if (!storageKey) return
+
+    // On mount: check if this is a fresh tab (no sessionStorage marker)
+    if (!sessionStorage.getItem('fullsite_session')) {
+      // Fresh tab — clear any stale auth tokens from previous sessions
+      localStorage.removeItem(storageKey)
+    }
+    // Mark this tab as active
+    sessionStorage.setItem('fullsite_session', '1')
+  }, [])
+
   const signOut = async () => {
     try { await supabase.auth.signOut() } catch { /* */ }
     // Clear manually-stored tokens from login page
