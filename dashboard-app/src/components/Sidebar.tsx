@@ -125,7 +125,7 @@ export default function Sidebar() {
   const { user, role, clientConfig, signOut } = useAuth()
 
   const sidebarContent = (
-    <aside className="flex flex-col h-screen sticky top-0 w-full border-r border-[var(--line)]" style={{ background: 'var(--surface)' }}>
+    <aside className="flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
       {/* Logo */}
       <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]">
         <Link href="/" className="flex items-center logo-hover">
