@@ -20,8 +20,15 @@ import type { WansoftDaily } from '@/lib/types'
 type Preset = 'hoy' | 'ayer' | 'semana' | 'mes' | 'custom'
 
 function getPresetDates(preset: Preset): { from: string; to: string } {
-  const today = new Date()
-  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  // Use Mexico City timezone for "today" calculation
+  const nowMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+  const today = nowMX
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
 
   switch (preset) {
     case 'hoy':
