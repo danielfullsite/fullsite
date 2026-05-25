@@ -74,15 +74,18 @@ export default function LoginPage() {
 
         <div className="flex-1 flex flex-col lg:flex-row">
           {/* Left — big logo on desktop */}
-          <div className="hidden lg:flex lg:w-[55%] items-center justify-center">
-            <span className="text-white font-black text-7xl tracking-tight drop-shadow-2xl">
-              fullsite
-              <span className="inline-block w-5 h-5 bg-emerald-400 ml-1 mb-1 rounded-none" />
-            </span>
+          <div className="hidden lg:flex lg:flex-1 items-center justify-center">
+            <div className="text-center">
+              <span className="text-white font-black text-7xl tracking-tight drop-shadow-2xl">
+                fullsite
+                <span className="inline-block w-5 h-5 bg-emerald-400 ml-1 mb-1 rounded-none" />
+              </span>
+              <p className="text-white/40 text-xs font-medium tracking-[0.2em] uppercase mt-4">POS con IA para restaurantes</p>
+            </div>
           </div>
 
           {/* Right — form */}
-          <div className="flex-1 flex items-end lg:items-center justify-center px-6 pb-8 lg:pb-0 lg:px-16">
+          <div className="flex-1 lg:flex-none lg:w-[480px] flex items-end lg:items-center justify-center px-6 pb-8 lg:pb-0 lg:px-16">
             <div className="w-full max-w-sm">
               {/* Glass card */}
               <div className="rounded-2xl border border-white/10 p-6 backdrop-blur-xl" style={{ background: 'rgba(0,0,0,0.6)' }}>
