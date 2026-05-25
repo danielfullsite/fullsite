@@ -43,12 +43,23 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
 }
 
 function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  // Keep the row with highest ventas_dia per fecha
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of rows) {
+    const f = row.fecha as string
+    const ventas = (row.ventas_dia as number) || 0
+    const existing = map.get(f)
+    if (!existing || ventas > ((existing.ventas_dia as number) || 0)) {
+      map.set(f, row)
+    }
+  }
+  // Preserve original order
   const seen = new Set<string>()
   return rows.filter(d => {
     const f = d.fecha as string
     if (seen.has(f)) return false
     seen.add(f)
-    return true
+    return map.get(f) === d
   })
 }
 
