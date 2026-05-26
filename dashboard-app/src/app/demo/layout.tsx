@@ -110,9 +110,6 @@ const NAV: NavSection[] = [
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // Login page — no sidebar
-  if (pathname === '/demo') return <>{children}</>
-
   // POS page — full screen
   if (pathname === '/demo/pos') return <>{children}</>
 
