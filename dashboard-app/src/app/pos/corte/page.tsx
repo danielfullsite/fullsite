@@ -38,8 +38,10 @@ export default function CortePage() {
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(() => {
+    // Use Mexico timezone to get correct local date
     const now = new Date()
-    return now.toISOString().split('T')[0]
+    const mxDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+    return mxDate.toISOString().split('T')[0]
   })
 
   const fetchData = async () => {

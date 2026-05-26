@@ -10,6 +10,7 @@ import {
   MANAGER_PINS, RECIPE_ALIASES, formatMXN,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
+import { isBebida, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -151,7 +152,7 @@ export default function CocinaPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, 2000)
+    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
     return () => clearInterval(interval)
   }, [])
 
@@ -271,9 +272,7 @@ export default function CocinaPage() {
   }
 
   // Production area classification for summary bar
-  const BEBIDA_KEYWORDS = ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana']
-
-  const isBebida = (name: string) => BEBIDA_KEYWORDS.some(kw => name.toLowerCase().includes(kw))
+  // isBebida imported from shared constants at top of file
 
   const AREA_KEYWORDS: Record<string, string[]> = {
     'Caliente': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque'],

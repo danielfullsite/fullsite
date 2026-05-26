@@ -3,14 +3,15 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, QrCode } from 'lucide-react'
+import { MESAS_COUNT } from '@/lib/pos-constants'
 
 export default function QRPage() {
   const [baseUrl] = useState(() => {
     if (typeof window !== 'undefined') return window.location.origin
-    return 'https://dashboard-app-eight-zeta.vercel.app'
+    return process.env.NEXT_PUBLIC_APP_URL || 'https://app.fullsite.mx'
   })
 
-  const tables = Array.from({ length: 16 }, (_, i) => i + 1)
+  const tables = Array.from({ length: MESAS_COUNT }, (_, i) => i + 1)
 
   return (
     <div className="h-screen flex flex-col text-white bg-[var(--surface)]">

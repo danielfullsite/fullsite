@@ -1860,8 +1860,10 @@ function POSContent() {
                   ? activeItems.filter(i => splitAssignments[i.id] === 2)
                   : activeItems
               const paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-              const payIva = paySubtotal * IVA_RATE
-              const payTotal = paySubtotal + payIva
+              const payDiscount = splitPayingCuenta === 0 ? discount : 0
+              const paySubAfterDisc = Math.max(0, paySubtotal - payDiscount)
+              const payIva = paySubAfterDisc * IVA_RATE
+              const payTotal = paySubAfterDisc + payIva
               const cuentaLabel = splitPayingCuenta > 0 ? ` — Cuenta ${splitPayingCuenta}` : ''
 
               return (<>
@@ -1928,24 +1930,31 @@ function POSContent() {
 
             <div className="space-y-3">
               <button
-                onClick={() => handlePayment('efectivo')}
+                onClick={() => handlePayment('Efectivo')}
                 className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <Banknote size={24} />
                 Efectivo
               </button>
               <button
-                onClick={() => handlePayment('tarjeta')}
+                onClick={() => handlePayment('Tarjeta de credito')}
                 className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <CreditCard size={24} />
                 Tarjeta
               </button>
               <button
-                onClick={() => handlePayment('mixto')}
-                className="w-full flex items-center justify-center gap-3 bg-[var(--line)] hover:bg-[var(--line)] text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                onClick={() => handlePayment('Transferencia electronica')}
+                className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
-                Mixto
+                <Send size={22} />
+                Transferencia
+              </button>
+              <button
+                onClick={() => handlePayment('Mixto')}
+                className="w-full flex items-center justify-center gap-3 bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)] font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
+              >
+                Mixto (efectivo + tarjeta)
               </button>
             </div>
               </>)

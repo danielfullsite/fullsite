@@ -4,23 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
-
-// Categories that go to barra (beverages)
-const BARRA_CATEGORIES = [
-  'coffee', 'jugos', 'fresh', 'smoothies', 'frappes', 'sodas', 'tea', 'alcohol', 'signature',
-]
-
-// Item names that are beverages (fallback matching)
-const BEBIDA_KEYWORDS = [
-  'cafe', 'capuchino', 'latte', 'mocca', 'chai', 'matcha',
-  'jugo', 'limonada', 'smoothie', 'frappe',
-  'coca', 'agua', 'te ', 'cerveza', 'vino', 'mimosa', 'chamoyada',
-]
-
-function isBeverage(itemName: string): boolean {
-  const name = itemName.toLowerCase()
-  return BEBIDA_KEYWORDS.some(kw => name.includes(kw))
-}
+import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -69,7 +53,7 @@ export default function BarraPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, 2000)
+    const interval = setInterval(fetchOrders, POLL_INTERVAL_KITCHEN)
     return () => clearInterval(interval)
   }, [])
 
