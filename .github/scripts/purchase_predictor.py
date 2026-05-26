@@ -46,9 +46,18 @@ def sb_post(table, data):
     r.raise_for_status()
 
 def sb_upsert(table, data):
-    r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}",
-        headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
-        json=data, timeout=15)
+    """Upsert: try POST with merge, fall back to PATCH if conflict."""
+    headers_upsert = {**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+    r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=headers_upsert, json=data, timeout=15)
+    if r.status_code == 409:
+        # Conflict — update existing row instead
+        agent_id = data.get("agent_id", "")
+        fecha = data.get("fecha", "")
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/{table}?agent_id=eq.{agent_id}&fecha=eq.{fecha}",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={k: v for k, v in data.items() if k not in ("agent_id", "fecha")},
+            timeout=15)
     r.raise_for_status()
 
 def send_telegram(text):
