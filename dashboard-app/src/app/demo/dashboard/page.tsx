@@ -31,17 +31,13 @@ export default function DemoDashboard() {
     <div className="min-h-screen bg-[#0a0a0c] text-white">
       {/* Top bar */}
       <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-black tracking-tight">
-              fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
-            </h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · {DEMO_RESTAURANT.location}</p>
-          </div>
+        <div>
+          <h1 className="text-lg font-bold">{DEMO_RESTAURANT.name}</h1>
+          <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.location} · {DEMO_RESTAURANT.type}</p>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/demo/pos" className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded-lg hover:bg-emerald-600">
-            <Utensils size={16} /> Ver POS <ArrowRight size={14} />
+            <Utensils size={16} /> Abrir POS <ArrowRight size={14} />
           </Link>
           <div className="flex items-center gap-1 text-xs text-zinc-500">
             <Zap size={12} className="text-emerald-400" /> En vivo
