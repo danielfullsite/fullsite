@@ -36,11 +36,25 @@ sb_headers = {
 _cats = CLIENT.get("menu_categories") or {}
 HH_KEYWORDS = _cats.get("hh", ["HALF", "H&H"])
 PAN_KEYWORDS = _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])
-POSTRES_KEYWORDS = _cats.get("postres", ["BROWNIE", "CHEESECAKE", "FLAN", "PASTEL", "CAKE", "CHURRO", "TIRAMISU", "CREPAS", "CREPE"])
-POSTRES_EXCLUDE = ["PANCAKE", "EGG AND PANCAKE", "PARADISE BUTTERMILK"]
-PANADERIA_KEYWORDS = _cats.get("panaderia", ["CONCHA", "CRUNCHY MIX", "MUFFIN", "CUERNO", "DONA", "ROL DE CANELA"])
+POSTRES_KEYWORDS = _cats.get("postres", [
+    "BROWNIE", "CHEESECAKE", "FLAN", "PASTEL", "CAKE", "CHURRO", "TIRAMISU",
+    "CREPAS", "CREPE", "GELATO", "HELADO", "NIEVE", "POSTRE", "MOUSSE",
+    "TARTA", "PIE", "FONDUE", "COULANT",
+])
+POSTRES_EXCLUDE = ["PANCAKE", "EGG AND PANCAKE", "PARADISE BUTTERMILK", "CLASSIC PANCAKE"]
+PANADERIA_KEYWORDS = _cats.get("panaderia", [
+    "CONCHA", "CRUNCHY MIX", "MUFFIN", "CUERNO", "DONA", "ROL DE CANELA",
+    "GALLETA", "COOKIE", "POLVORON", "OREJA", "MANTECADA", "PAN DE",
+    "CROISSANT MANTEQUILLA", "BRIOCHE",
+])
 CHILAQUILES_KEYWORDS = _cats.get("chilaquiles", ["CHILAQUIL"])
-BEBIDA_GROUPS = CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES", "FRAPPES", "SIGNATURE", "TEA & TISANAS", "SODAS", "BEBIDAS OH"]
+BEBIDA_GROUPS = CLIENT.get("bebida_groups") or [
+    "COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES", "FRAPPES",
+    "SIGNATURE", "TEA & TISANAS", "SODAS", "BEBIDAS OH",
+]
+# Groups to use for group-level matching (fallback if saucer keywords miss)
+POSTRES_GROUPS = ["DESSERTS", "ICE CREAM"]
+PANADERIA_GROUPS = ["BAKERY"]
 
 
 def sb_get(table, params):
@@ -265,11 +279,27 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     ticket_avg = ventas_restaurante / tickets_restaurante if tickets_restaurante else 0
     personas_por_orden = round(personas / tickets_restaurante, 2) if tickets_restaurante and personas else 0
 
-    # Category totals from saucers
+    # Category totals from saucers (keyword match + group-level enrichment)
     hh_items = filter_category(saucers, HH_KEYWORDS)
     chilaquiles_items = filter_category(saucers, CHILAQUILES_KEYWORDS)
     panaderia_items = filter_category(saucers, PANADERIA_KEYWORDS)
     postre_items = filter_category_ex(saucers, POSTRES_KEYWORDS, POSTRES_EXCLUDE)
+
+    # Enrich from group totals if keyword matching missed items
+    # This catches items that don't have obvious keywords (e.g., "TRES LECHES")
+    for g in groups:
+        gname = g["name"].upper()
+        if gname in [pg.upper() for pg in POSTRES_GROUPS]:
+            group_total = g.get("qty") or g.get("total", 0)
+            saucer_total = sum_qty(postre_items)
+            if group_total > saucer_total and group_total > 0 and saucer_total == 0:
+                # Group has items our keywords missed — add group total
+                postre_items.append({"name": f"({gname})", "qty": group_total, "total": g.get("total", 0)})
+        if gname in [pg.upper() for pg in PANADERIA_GROUPS]:
+            group_total = g.get("qty") or g.get("total", 0)
+            saucer_total = sum_qty(panaderia_items)
+            if group_total > saucer_total and group_total > 0 and saucer_total == 0:
+                panaderia_items.append({"name": f"({gname})", "qty": group_total, "total": g.get("total", 0)})
 
     # Bebidas total and per-person
     bebida_total_qty = 0
@@ -374,6 +404,12 @@ def main():
     # Use MX timezone for date (GitHub Actions runs in UTC)
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
+
+    # Guard: skip if outside operating hours (before 9am or after 9pm MX)
+    mx_hour = now_mx.hour
+    if mx_hour < 9 or mx_hour >= 21:
+        print(f"[intraday] Outside operating hours ({mx_hour}:00 MX) — skipping")
+        return
 
     try:
         print("[intraday] Logging into Wansoft...")
