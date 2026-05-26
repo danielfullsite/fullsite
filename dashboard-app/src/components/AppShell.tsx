@@ -18,9 +18,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
-  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/demo', '/reservar']
+  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar']
   const isPosRoute = pathname.startsWith('/pos')
-  const isPublicPage = publicPages.includes(pathname) || isPosRoute
+  const isDemoRoute = pathname.startsWith('/demo')
+  const isPublicPage = publicPages.includes(pathname) || isPosRoute || isDemoRoute
 
   useEffect(() => {
     if (!loading) {
