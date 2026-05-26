@@ -147,7 +147,7 @@ export default function TopNav() {
               {/* Client name badge */}
               {clientConfig && (
                 <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-md bg-[var(--surface-2)] text-xs font-medium text-[var(--text-2)] border border-[var(--line)]/80">
-                  {clientConfig.name || clientConfig.id}
+                  {clientConfig.display_name || clientConfig.id}
                 </span>
               )}
 

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
-import { getClientConfig, getClientIdFromEmail } from '@/lib/client-config'
+import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientConfig } from '@/lib/client-config'
 
 // Dashboard roles — controls page visibility
 // dueño: sees EVERYTHING (financials, gastos, nómina, P&L, all agents)
@@ -41,7 +41,7 @@ interface AuthContextType {
   user: User | null
   role: DashboardRole
   clientId: string | null
-  clientConfig: { id: string; name?: string } | null
+  clientConfig: ClientConfig | null
   locations: ClientLocation[]
   locationId: string | null
   setLocationId: (id: string | null) => void
@@ -68,7 +68,7 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [clientId, setClientId] = useState<string | null>(null)
-  const [clientConfig, setClientConfig] = useState<{ id: string; name?: string } | null>(null)
+  const [clientConfig, setClientConfig] = useState<ClientConfig | null>(null)
   const [locations, setLocations] = useState<ClientLocation[]>([])
   const [locationId, setLocationId] = useState<string | null>(null)
   const [role, setRole] = useState<DashboardRole>('staff')
@@ -100,9 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cid = metaClientId || dbClientId || emailClientId
     setClientId(cid)
 
-    // Load client config from registry
-    const config = getClientConfig(cid)
-    setClientConfig({ id: cid, name: config.name })
+    // Load full client config from Supabase (with fallback to hardcoded)
+    const config = await fetchClientConfig(cid)
+    setClientConfig(config)
 
     // Fetch locations for this client
     try {

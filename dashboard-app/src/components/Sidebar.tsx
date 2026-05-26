@@ -210,7 +210,7 @@ export default function Sidebar() {
         {/* Client name */}
         {clientConfig && (
           <p className="text-[11px] text-[var(--text-4)] mb-3 truncate">
-            {clientConfig.name || clientConfig.id}
+            {clientConfig.display_name || clientConfig.id}
           </p>
         )}
 
