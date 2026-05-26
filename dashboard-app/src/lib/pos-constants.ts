@@ -26,6 +26,71 @@ export function isBebida(name: string): boolean {
   return BEBIDA_KEYWORDS.some(kw => lower.includes(kw))
 }
 
+// ─── STATION ROUTING ────────────────────────────────────────────────────────
+
+export type StationName = 'cocina' | 'barra' | 'caja'
+
+// Category IDs (from MENU_CATEGORIES) routed to each station
+export const STATION_CATEGORIES: Record<StationName, string[]> = {
+  cocina: [
+    'promos', 'chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis',
+    'pizzas', 'bowls', 'ceviche',
+  ],
+  barra: [
+    'coffee', 'signature', 'jugos', 'fresh', 'smoothies', 'frappes',
+    'sodas', 'tea', 'alcohol',
+  ],
+  caja: [
+    'toast', 'bakery', 'postres', 'mkt-cafe',
+  ],
+}
+
+// Build reverse lookup: category id -> station
+export const CATEGORY_TO_STATION: Record<string, StationName> = (() => {
+  const map: Record<string, StationName> = {}
+  for (const [station, cats] of Object.entries(STATION_CATEGORIES)) {
+    for (const cat of cats) {
+      map[cat] = station as StationName
+    }
+  }
+  return map
+})()
+
+// Fallback: determine station from item name using BEBIDA_KEYWORDS
+export function getStationForItem(categoryId: string, itemName: string): StationName {
+  // Try category-based routing first
+  if (CATEGORY_TO_STATION[categoryId]) {
+    return CATEGORY_TO_STATION[categoryId]
+  }
+  // Fallback: use beverage detection
+  if (isBebida(itemName)) return 'barra'
+  return 'cocina'
+}
+
+export const STATION_LABELS: Record<StationName, string> = {
+  cocina: 'COCINA',
+  barra: 'BARRA',
+  caja: 'MARKET',
+}
+
+// Keywords for caja/market items (used when we only have the item name, no category)
+const CAJA_KEYWORDS = [
+  'toast', 'bagel', 'concha', 'bakery', 'crunchy', 'galleta', 'brownie',
+  'cheesecake', 'carrot cake', 'tiramisu', 'tiramisú', 'pastel de choc',
+  'cafe grano', 'cafe molido', 'vaso cafe refill', 'semilla', 'dulce',
+]
+
+/**
+ * Classify an item by station using only its name (for kitchen display where
+ * we don't have category IDs).
+ */
+export function getStationByName(name: string): StationName {
+  if (isBebida(name)) return 'barra'
+  const lower = name.toLowerCase()
+  if (CAJA_KEYWORDS.some(kw => lower.includes(kw))) return 'caja'
+  return 'cocina'
+}
+
 // Payment methods available
 export const PAYMENT_METHODS = [
   { id: 'efectivo', label: 'Efectivo', icon: 'Banknote', color: 'bg-emerald-600 hover:bg-emerald-500' },

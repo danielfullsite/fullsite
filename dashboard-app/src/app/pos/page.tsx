@@ -25,9 +25,9 @@ import {
 } from '@/lib/pos-data'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
+  printByStation,
   printTicketCSS,
   printTicketBluetooth,
-  printKitchenTicketCSS,
   isBluetoothAvailable,
   isBluetoothConnected,
   connectBluetoothPrinter,
@@ -1146,8 +1146,8 @@ function POSContent() {
       } else {
         showToast('Orden enviada a cocina')
       }
-      // Print kitchen ticket
-      printKitchenTicketCSS(order)
+      // Print per-station tickets (splits order by cocina/barra/caja)
+      printByStation(order)
 
       setSentToKitchen(true)
       setTimeout(() => setSentToKitchen(false), 2000)

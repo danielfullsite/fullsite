@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
-import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
+import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -22,6 +22,7 @@ export default function BarraPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [stationFilter, setStationFilter] = useState<'todo' | StationName>('barra')
 
   const prevCountRef = { current: 0 }
 
@@ -39,14 +40,11 @@ export default function BarraPage() {
 
   const fetchOrders = async () => {
     const allOrders = await getKitchenOrders()
-    const barraOrders = allOrders.filter(order => {
-      const items: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-      return items.some(item => isBeverage(item.nombre || item.name || ''))
-    })
-    const newEnviadas = barraOrders.filter(o => o.status === 'enviada').length
+    // Store all orders — filtering happens at render time based on stationFilter
+    const newEnviadas = allOrders.filter(o => o.status === 'enviada').length
     if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
     prevCountRef.current = newEnviadas
-    setOrders(barraOrders)
+    setOrders(allOrders)
     setLoading(false)
   }
 
@@ -78,7 +76,17 @@ export default function BarraPage() {
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500/100', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
 
-  const sortedOrders = [...orders].sort((a, b) => {
+  // Filter orders to those that have items matching the station filter
+  const filteredOrders = orders.filter(order => {
+    const items: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+    return items.some(item => {
+      const name = item.nombre || item.name || ''
+      if (stationFilter === 'todo') return true
+      return getStationByName(name) === stationFilter
+    })
+  })
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
     const priority: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
     return (priority[a.status] || 3) - (priority[b.status] || 3)
   })
@@ -116,6 +124,28 @@ export default function BarraPage() {
         </div>
       </header>
 
+      {/* Station filter tabs */}
+      <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">
+        {([
+          { key: 'todo', label: 'Todo', color: 'bg-white text-black' },
+          { key: 'cocina', label: 'Cocina', color: 'bg-amber-500 text-black' },
+          { key: 'barra', label: 'Barra', color: 'bg-purple-500 text-white' },
+          { key: 'caja', label: 'Market', color: 'bg-cyan-500 text-black' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setStationFilter(tab.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              stationFilter === tab.key
+                ? tab.color
+                : 'bg-[var(--line)]/60 text-[var(--text-3)] hover:bg-[var(--line)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -136,8 +166,12 @@ export default function BarraPage() {
               const elapsed = getElapsedMinutes(order.created_at)
               const isUrgent = elapsed > 10 && order.status !== 'lista'
               const allItems: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              // Only show beverage items
-              const beverageItems = allItems.filter(item => isBeverage(item.nombre || item.name || ''))
+              // Filter items based on station filter
+              const beverageItems = allItems.filter(item => {
+                const name = item.nombre || item.name || ''
+                if (stationFilter === 'todo') return true
+                return getStationByName(name) === stationFilter
+              })
 
               return (
                 <div key={order.id} className={`rounded-2xl border-2 p-5 flex flex-col ${config.bg} ${config.border}`}>

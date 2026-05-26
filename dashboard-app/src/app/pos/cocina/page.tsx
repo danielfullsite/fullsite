@@ -10,7 +10,7 @@ import {
   MANAGER_PINS, RECIPE_ALIASES, formatMXN,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
-import { isBebida, POLL_INTERVAL_KITCHEN } from '@/lib/pos-constants'
+import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -42,6 +42,9 @@ export default function CocinaPage() {
     setRecipeDetail(detail)
     setLoadingDetail(false)
   }
+
+  // Station filter
+  const [stationFilter, setStationFilter] = useState<'todo' | StationName>('cocina')
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -351,6 +354,28 @@ export default function CocinaPage() {
         </div>
       </header>
 
+      {/* Station filter tabs */}
+      <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">
+        {([
+          { key: 'todo', label: 'Todo', color: 'bg-white text-black' },
+          { key: 'cocina', label: 'Cocina', color: 'bg-amber-500 text-black' },
+          { key: 'barra', label: 'Barra', color: 'bg-purple-500 text-white' },
+          { key: 'caja', label: 'Market', color: 'bg-cyan-500 text-black' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setStationFilter(tab.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              stationFilter === tab.key
+                ? tab.color
+                : 'bg-[var(--line)]/60 text-[var(--text-3)] hover:bg-[var(--line)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Production area summary bar */}
       {totalPendingItems > 0 && (
         <div className="flex items-center gap-4 px-6 py-2.5 bg-[var(--surface-2)]/60 border-b border-slate-700/50 flex-shrink-0">
@@ -388,10 +413,15 @@ export default function CocinaPage() {
               const elapsed = getElapsedMinutes(order.created_at)
               const isUrgent = elapsed > 15 && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              // Filter out bebidas — those go to Barra, not Cocina
-              const activeItems = items.filter(i => !i.cancelled && !isBebida(i.nombre || i.name || ''))
+              // Filter items based on station filter
+              const activeItems = items.filter(i => {
+                if (i.cancelled) return false
+                const name = i.nombre || i.name || ''
+                if (stationFilter === 'todo') return true
+                return getStationByName(name) === stationFilter
+              })
 
-              // Skip orders with only beverages — nothing for cocina
+              // Skip orders with no items matching the filter
               if (activeItems.length === 0) return null
 
               return (
