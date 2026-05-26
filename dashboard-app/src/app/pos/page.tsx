@@ -26,6 +26,7 @@ import {
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
+  printPreTicket,
   printTicketCSS,
   printTicketBluetooth,
   isBluetoothAvailable,
@@ -1157,6 +1158,27 @@ function POSContent() {
     setSaving(false)
   }
 
+  // Pre-ticket (precuenta — antes de cobrar)
+  const handlePreTicket = async () => {
+    if (activeItems.length === 0) return
+    const order: Order = {
+      id: orderId,
+      mesa,
+      mesero,
+      personas,
+      status: 'enviada',
+      items: activeItems,
+      subtotal,
+      iva,
+      total,
+      descuento: discount,
+      notas: orderNotes || undefined,
+      createdAt: new Date(),
+    }
+    await printPreTicket(order)
+    showToast('Pre-cuenta impresa')
+  }
+
   const handleCloseOrder = () => {
     if (orderItems.length === 0) return
     setShowMixto(false)
@@ -1579,6 +1601,14 @@ function POSContent() {
             >
               <Send size={22} />
               {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Cocina'}
+            </button>
+            <button
+              onClick={handlePreTicket}
+              disabled={activeItems.length === 0 || saving}
+              className="flex-[0.6] flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-base transition-all min-h-[72px]"
+            >
+              <Receipt size={18} />
+              Cuenta
             </button>
             <button
               onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}

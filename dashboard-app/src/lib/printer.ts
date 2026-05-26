@@ -81,9 +81,7 @@ export function printTicketCSS(order: Order) {
   win.document.close()
 }
 
-// ─── WEBBLUETOOTH ESC/POS (Android Chrome) ──────────────────────────────────
-
-// ESC/POS command constants
+// ESC/POS command constants (used by all Bluetooth functions)
 const ESC = 0x1B
 const GS = 0x1D
 const LF = 0x0A
@@ -92,6 +90,169 @@ function textToBytes(text: string): number[] {
   const encoder = new TextEncoder()
   return Array.from(encoder.encode(text))
 }
+
+// ─── PRE-TICKET (precuenta — antes de cobrar) ──────────────────────────────
+
+export function printPreTicketCSS(order: Order) {
+  const win = window.open('', '_blank', 'width=300,height=600')
+  if (!win) return
+
+  const items = order.items || []
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+  const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+  const itemRows = items.map(i => `
+    <tr>
+      <td style="text-align:left">${i.cantidad}x ${i.nombre}${i.modificadores ? '<br><small style="color:#666">' + i.modificadores + '</small>' : ''}</td>
+      <td style="text-align:right;white-space:nowrap">${formatMXN(i.subtotal)}</td>
+    </tr>
+  `).join('')
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { margin: 0; size: 58mm auto; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 58mm; padding: 4mm; color: #000; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .line { border-top: 1px dashed #000; margin: 4px 0; }
+  .big { font-size: 16px; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 0; vertical-align: top; font-size: 11px; }
+</style>
+</head><body>
+  <div class="center bold" style="font-size:14px;margin-bottom:2px">*** PRE-CUENTA ***</div>
+  <div class="center bold" style="font-size:13px;margin-bottom:4px">AMALAY</div>
+  <div class="center" style="font-size:9px">Coffee & Market</div>
+  <div class="line"></div>
+
+  <div style="display:flex;justify-content:space-between;font-size:10px">
+    <span>Mesa: ${order.mesa}</span>
+    <span>${order.mesero}</span>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:10px">
+    <span>${dateStr}</span>
+    <span>${timeStr}</span>
+  </div>
+  <div class="line"></div>
+
+  <table>${itemRows}</table>
+  <div class="line"></div>
+
+  <table>
+    <tr><td>Subtotal</td><td style="text-align:right">${formatMXN(order.subtotal)}</td></tr>
+    ${order.descuento > 0 ? `<tr><td>Descuento</td><td style="text-align:right;color:red">-${formatMXN(order.descuento)}</td></tr>` : ''}
+    <tr><td>IVA (16%)</td><td style="text-align:right">${formatMXN(order.iva)}</td></tr>
+    <tr class="bold"><td style="font-size:14px">TOTAL</td><td style="text-align:right;font-size:14px">${formatMXN(order.total)}</td></tr>
+  </table>
+  <div class="line"></div>
+
+  <div class="center" style="margin-top:4px;font-size:10px;font-weight:bold">* ESTE NO ES UN COMPROBANTE FISCAL *</div>
+  <div class="center" style="font-size:9px;margin-top:2px">Propina no incluida</div>
+
+  <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
+</body></html>`
+
+  win.document.write(html)
+  win.document.close()
+}
+
+export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
+  if (!btCharacteristic) throw new Error('Impresora no conectada')
+
+  const cmds: number[] = []
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+  const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+  // Init
+  cmds.push(ESC, 0x40)
+
+  // Center + PRE-CUENTA header
+  cmds.push(ESC, 0x61, 0x01)
+  cmds.push(ESC, 0x45, 0x01)
+  cmds.push(GS, 0x21, 0x01)
+  cmds.push(...textToBytes('*** PRE-CUENTA ***\n'))
+  cmds.push(GS, 0x21, 0x11)
+  cmds.push(...textToBytes('AMALAY\n'))
+  cmds.push(GS, 0x21, 0x00)
+  cmds.push(ESC, 0x45, 0x00)
+  cmds.push(...textToBytes('Coffee & Market\n'))
+  cmds.push(...textToBytes('--------------------------------\n'))
+
+  // Left align
+  cmds.push(ESC, 0x61, 0x00)
+  cmds.push(...textToBytes(`Mesa: ${order.mesa}  ${order.mesero}\n`))
+  cmds.push(...textToBytes(`${dateStr}  ${timeStr}\n`))
+  cmds.push(...textToBytes('--------------------------------\n'))
+
+  // Items
+  for (const item of order.items) {
+    const name = `${item.cantidad}x ${item.nombre}`
+    const price = formatMXN(item.subtotal)
+    const spaces = Math.max(1, 32 - name.length - price.length)
+    cmds.push(...textToBytes(name + ' '.repeat(spaces) + price + '\n'))
+    if (item.modificadores) {
+      cmds.push(...textToBytes(`  ${item.modificadores}\n`))
+    }
+  }
+  cmds.push(...textToBytes('--------------------------------\n'))
+
+  // Totals
+  const pad = (label: string, val: string) => {
+    const spaces = Math.max(1, 32 - label.length - val.length)
+    return label + ' '.repeat(spaces) + val + '\n'
+  }
+  cmds.push(...textToBytes(pad('Subtotal', formatMXN(order.subtotal))))
+  if (order.descuento > 0) {
+    cmds.push(...textToBytes(pad('Descuento', '-' + formatMXN(order.descuento))))
+  }
+  cmds.push(...textToBytes(pad('IVA (16%)', formatMXN(order.iva))))
+  cmds.push(ESC, 0x45, 0x01)
+  cmds.push(GS, 0x21, 0x01)
+  cmds.push(...textToBytes(pad('TOTAL', formatMXN(order.total))))
+  cmds.push(GS, 0x21, 0x00)
+  cmds.push(ESC, 0x45, 0x00)
+  cmds.push(...textToBytes('--------------------------------\n'))
+
+  // Footer
+  cmds.push(ESC, 0x61, 0x01)
+  cmds.push(...textToBytes('* NO ES COMPROBANTE FISCAL *\n'))
+  cmds.push(...textToBytes('Propina no incluida\n'))
+
+  // Feed + cut
+  cmds.push(LF, LF, LF, LF)
+  cmds.push(GS, 0x56, 0x00)
+
+  const data = new Uint8Array(cmds)
+  const CHUNK_SIZE = 128
+  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+    const chunk = data.slice(i, i + CHUNK_SIZE)
+    if (btCharacteristic.properties.writeWithoutResponse) {
+      await btCharacteristic.writeValueWithoutResponse(chunk)
+    } else {
+      await btCharacteristic.writeValueWithResponse(chunk)
+    }
+    await new Promise(r => setTimeout(r, 50))
+  }
+  return true
+}
+
+export async function printPreTicket(order: Order) {
+  if (isBluetoothConnected() && btCharacteristic) {
+    try {
+      await printPreTicketBluetooth(order)
+      return
+    } catch (e) {
+      console.warn('[printer] Bluetooth pre-ticket failed, CSS fallback:', e)
+    }
+  }
+  printPreTicketCSS(order)
+}
+
+// ─── WEBBLUETOOTH ESC/POS (Android Chrome) ──────────────────────────────────
 
 function buildESCPOS(order: Order): Uint8Array {
   const cmds: number[] = []
