@@ -123,8 +123,36 @@ if not wansoft_rows:
     ])
 wansoft = wansoft_rows[0] if wansoft_rows else {}
 
+# Fetch real tips data from wansoft_tips (wansoft_daily often has NULL propinas)
+tips_data = []
+try:
+    tips_rows = sb_get("wansoft_tips", [
+        ("fecha", f"eq.{yesterday_str}"),
+        ("select", "data"),
+        ("limit", "1"),
+    ])
+    if tips_rows:
+        raw_tips = tips_rows[0].get("data", "[]")
+        if isinstance(raw_tips, str):
+            raw_tips = json.loads(raw_tips)
+        if isinstance(raw_tips, str):  # double-encoded
+            raw_tips = json.loads(raw_tips)
+        tips_data = [t for t in (raw_tips or []) if t.get("mesero") and t.get("propinas", 0) > 0]
+except Exception as e:
+    print(f"[briefing] WARN: tips fetch failed: {e}")
+
+# Fetch last 7 days for trend context
+last7_rows = sb_get("wansoft_daily", [
+    ("fecha", f"gte.{(today - timedelta(days=8)).isoformat()}"),
+    ("fecha", f"lte.{yesterday_str}"),
+    ("ventas_dia", "gt.0"),
+    ("select", "fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant"),
+    ("order", "fecha.desc"),
+    ("limit", "7"),
+])
+
 print(f"[briefing] reservas_hoy={len(reservas_hoy)}, proximas={len(reservas_proximas)}, "
-      f"cal={len(calendario)}, wansoft={'ok' if wansoft else 'empty'}")
+      f"cal={len(calendario)}, wansoft={'ok' if wansoft else 'empty'}, tips={len(tips_data)}, trend_days={len(last7_rows)}")
 
 # ── Format data block ────────────────────────────────────────────────────────
 
@@ -185,16 +213,37 @@ if wansoft:
     if isinstance(meseros_raw, str):
         meseros_raw = json.loads(meseros_raw)
     top_meseros = sorted(meseros_raw, key=lambda m: m.get("total", 0), reverse=True)[:5]
-    meseros_str = ", ".join(f"{m.get('nombre','?')}: ${m.get('total',0):,.0f}" for m in top_meseros)
+    meseros_lines = "\n".join(f"  {m.get('nombre','?')}: ${m.get('total',0):,.0f}" for m in top_meseros)
+
+    # Real tips from wansoft_tips (more reliable than wansoft_daily.propinas_total)
+    propinas_total_real = sum(t.get("propinas", 0) for t in tips_data)
+    if propinas_total_real > 0:
+        propinas = propinas_total_real
+    tips_lines = ""
+    if tips_data:
+        tips_sorted = sorted(tips_data, key=lambda t: t.get("propinas", 0), reverse=True)[:5]
+        tips_lines = "\n" + "\n".join(f"  {t.get('mesero','?')}: ${t.get('propinas',0):,.0f}" for t in tips_sorted)
+
+    # 7-day trend for context
+    trend_str = ""
+    if last7_rows and len(last7_rows) >= 2:
+        avg_7d = sum(r.get("ventas_dia", 0) or 0 for r in last7_rows) / len(last7_rows)
+        vs_avg = ((ventas - avg_7d) / avg_7d * 100) if avg_7d > 0 else 0
+        avg_tp_7d = sum(r.get("ticket_promedio_restaurant", 0) or 0 for r in last7_rows) / len(last7_rows)
+        trend_str = (
+            f"\n  Promedio 7d: ${avg_7d:,.0f}/día | TP 7d: ${avg_tp_7d:,.0f}\n"
+            f"  Ayer vs promedio: {vs_avg:+.1f}%"
+        )
 
     wansoft_fmt = (
         f"  Fecha: {fecha}\n"
         f"  Ventas netas: ${ventas:,.0f}\n"
         f"  Tickets: {tickets or 'N/D'} | Personas: {personas or 'N/D'}\n"
         f"  Ticket promedio: ${tp:,.0f}\n"
-        f"  Propinas: ${propinas:,.0f}\n"
-        f"  Descuentos: ${descuentos:,.0f}\n"
-        f"  Top meseros: {meseros_str or 'N/D'}"
+        f"  Propinas: ${propinas:,.0f}{tips_lines}\n"
+        f"  Descuentos: ${descuentos:,.0f}"
+        f"{trend_str}\n\n"
+        f"  TOP MESEROS:\n{meseros_lines or '  N/D'}"
     )
 
 data_block = f"""=== DATOS {CLIENT['display_name']} {today_str} ===
@@ -237,7 +286,11 @@ ESTRUCTURA EXACTA (usa estos headers tal cual):
 (Top 5 meseros por ventas)
 
 ## Top 3 acciones
-(exactamente 3 bullets, específicos y accionables basados en los datos de ayer; ejemplos: mesero con bajo ticket promedio, reservaciones sin confirmar, tendencia de ventas)
+(exactamente 3 bullets con DATOS ESPECÍFICOS. Nunca genéricos. Ejemplos:
+* "Omar vendió $19K pero $0 propinas — revisar servicio"
+* "Ticket promedio $280 vs $310 promedio 7d — activar upselling en bebidas"
+* "Reserva Berenice 25px sábado — confirmar menú y meseros asignados"
+Cada acción DEBE incluir un número o nombre concreto de los datos.)
 
 REGLAS:
 - Español
@@ -246,7 +299,8 @@ REGLAS:
 - Máximo 10 líneas por sección
 - Texto plano, sin markdown complejo
 - Los datos de ventas son de AYER — son frescos, NO son stale
-- Las acciones deben ser operativas y basadas en datos reales"""
+- NUNCA uses frases genéricas como "mejorar la experiencia" o "aumentar las ventas"
+- Cada acción DEBE referenciar un dato específico (mesero, monto, porcentaje, reserva)"""
 
 print("[briefing] Calling Groq...")
 groq_resp = requests.post(

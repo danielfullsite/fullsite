@@ -68,15 +68,26 @@ def audit_agent_health():
     expected_agents = ["anomaly", "predictor", "upselling", "menu-engineering", "staffing",
                        "antifraud", "kitchen", "table-time", "tips", "suppliers", "waste", "climate"]
 
+    # Also check agent_runs to see if agents ran but just didn't have data to save
+    recent_runs = sb_get("agent_runs", {
+        "select": "agent_id,status",
+        "created_at": f"gte.{(now - timedelta(days=7)).isoformat()}",
+        "status": "neq.error",
+        "limit": "200",
+    })
+    agents_that_ran = set(r.get("agent_id", "") for r in recent_runs)
+
     for agent in expected_agents:
         if agent not in agents_seen:
-            issues.append({
-                "agent": agent,
-                "type": "missing",
-                "severity": "high",
-                "message": f"Agente '{agent}' nunca ha guardado resultados",
-                "fix": "Verificar que el workflow corre y guarda a agent_results",
-            })
+            # Only flag as issue if it also hasn't run recently in agent_runs
+            if agent not in agents_that_ran:
+                issues.append({
+                    "agent": agent,
+                    "type": "missing",
+                    "severity": "high",
+                    "message": f"Agente '{agent}' no ha corrido ni guardado resultados en 7 días",
+                    "fix": "Verificar que el workflow corre y guarda a agent_results",
+                })
         else:
             last = agents_seen[agent]
             updated = datetime.fromisoformat(last["updated_at"].replace("Z", "+00:00"))
@@ -101,12 +112,14 @@ def audit_agent_health():
                     "fix": "Verificar fuente de datos (Supabase tables, Wansoft scraper)",
                 })
 
-    # Check agent_runs for failures
+    # Check agent_runs for failures (last 7 days only)
+    week_ago = (now - timedelta(days=7)).isoformat()
     runs = sb_get("agent_runs", {
         "select": "agent_id,status,error_message,created_at",
         "status": "eq.error",
+        "created_at": f"gte.{week_ago}",
         "order": "created_at.desc",
-        "limit": "20",
+        "limit": "50",
     })
 
     error_counts = defaultdict(int)
@@ -119,7 +132,7 @@ def audit_agent_health():
                 "agent": agent,
                 "type": "recurring_error",
                 "severity": "high",
-                "message": f"Agente '{agent}' ha fallado {count} veces recientemente",
+                "message": f"Agente '{agent}' ha fallado {count} veces en los últimos 7 días",
                 "fix": "Revisar logs del workflow en GitHub Actions",
             })
 
