@@ -58,12 +58,12 @@ const navSections = [
     items: [
       { href: '/ingresos', label: 'Ingresos', icon: Banknote },
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
-      { href: '/nomina', label: 'Nomina', icon: UserCheck },
-      { href: '/pos/facturacion', label: 'Facturacion CFDI', icon: Stamp },
+      { href: '/nomina', label: 'Nómina', icon: UserCheck },
+      { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
     ],
   },
   {
-    label: 'Operaciónes',
+    label: 'Operaciones',
     items: [
       { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
@@ -95,7 +95,7 @@ const navSections = [
   {
     label: 'POS Tienda',
     items: [
-      { href: '/admin/tienda/artículos', label: 'Artículos', icon: Package },
+      { href: '/admin/tienda/articulos', label: 'Artículos', icon: Package },
       { href: '/admin/tienda/grupos', label: 'Grupos', icon: Settings },
       { href: '/admin/tienda/precios', label: 'Tipos de Precio', icon: DollarSign },
       { href: '/admin/tienda/promociones', label: 'Promociones', icon: Sparkles },
@@ -202,7 +202,7 @@ export default function Sidebar() {
           className="flex items-center gap-2 text-xs text-[var(--text-3)] hover:text-red-500 transition-colors w-full px-2 py-1.5 rounded-md hover:bg-red-500/10"
         >
           <LogOut size={14} />
-          <span>Cerrar sesion</span>
+          <span>Cerrar sesión</span>
         </button>
       </div>
     </aside>
