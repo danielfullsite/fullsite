@@ -71,8 +71,9 @@ export default function MenuEngineeringPage() {
   ]
 
   const revDist = data?.revenue_distribution || []
-  const recommendations = data?.recommendations || []
+  const recommendations = data?.recommendations?.filter(r => r.item) || []
   const maxRev = revDist.length > 0 ? Math.max(...revDist.map(r => r.pct)) : 0
+  const totalItems = quadrants.reduce((sum, q) => sum + q.items.length, 0)
 
   return (
     <>
@@ -83,7 +84,7 @@ export default function MenuEngineeringPage() {
           </Link>
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Menu Engineering</h2>
-            <p className="text-sm text-[var(--text-3)]">Matriz BCG del menu {fecha && `· ${fecha}`}</p>
+            <p className="text-sm text-[var(--text-3)]">Matriz BCG del menú {fecha && `· ${fecha}`}</p>
           </div>
         </div>
         <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
@@ -91,8 +92,18 @@ export default function MenuEngineeringPage() {
         </button>
       </div>
 
+      {totalItems === 0 && (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+            <UtensilsCrossed size={24} className="text-violet-500" />
+          </div>
+          <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Pendiente de análisis</h3>
+          <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">El agente de Menu Engineering clasifica tus platillos en estrellas, caballos, rompecabezas y perros. Se ejecuta automáticamente cada lunes.</p>
+        </div>
+      )}
+
       {/* BCG Matrix - 4 quadrants */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      {totalItems > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {quadrants.map(q => {
           const Icon = q.icon
           return (
@@ -130,7 +141,7 @@ export default function MenuEngineeringPage() {
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {/* Revenue distribution (text-based bars) */}
       {revDist.length > 0 && (
@@ -184,11 +195,6 @@ export default function MenuEngineeringPage() {
         </div>
       )}
 
-      {!data && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
-          Sin datos de menu engineering. El agente corre automaticamente.
-        </div>
-      )}
     </>
   )
 }
