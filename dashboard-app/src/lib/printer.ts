@@ -567,9 +567,17 @@ export async function printByStation(order: Order) {
   const stations: StationName[] = ['cocina', 'barra', 'caja']
   let printed = false
 
+  console.log('[printer] printByStation called. BT connected:', isBluetoothConnected(), 'characteristic:', !!btCharacteristic)
+  console.log('[printer] Split:', { cocina: split.cocina.length, barra: split.barra.length, caja: split.caja.length })
+
   for (const station of stations) {
     const items = split[station]
-    if (items.length === 0) continue
+    if (items.length === 0) {
+      console.log(`[printer] ${station}: 0 items, skipping`)
+      continue
+    }
+
+    console.log(`[printer] ${station}: ${items.length} items, printing...`)
 
     // Delay between tickets (not before the first)
     if (printed) {
@@ -578,14 +586,23 @@ export async function printByStation(order: Order) {
 
     if (isBluetoothConnected() && btCharacteristic) {
       try {
+        console.log(`[printer] Attempting Bluetooth print for ${station}...`)
         await printStationTicketBluetooth(order, station, items)
+        console.log(`[printer] Bluetooth print SUCCESS for ${station}`)
         printed = true
         continue
       } catch (e) {
-        console.warn(`[printer] Bluetooth station print (${station}) failed, CSS fallback:`, e)
+        console.warn(`[printer] Bluetooth station print (${station}) FAILED, CSS fallback:`, e)
       }
+    } else {
+      console.log(`[printer] No BT connection, using CSS for ${station}`)
     }
     printStationTicketCSS(order, station, items)
     printed = true
+  }
+
+  if (!printed) {
+    console.warn('[printer] No items to print in any station, falling back to full kitchen ticket')
+    printKitchenTicketCSS(order)
   }
 }
