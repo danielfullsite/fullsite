@@ -1,8 +1,8 @@
 name: Reservas Pendientes AMALAY
 
 on:
-  schedule:
-    - cron: '0 16 * * *'   # 10am MX (UTC-6)
+  # schedule:
+  #   - cron: '0 16 * * *'   # 10am MX (UTC-6) — DISABLED: Daniel doesn't want these alerts
   workflow_dispatch:
     inputs:
       client_id:
