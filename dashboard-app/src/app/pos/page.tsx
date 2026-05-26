@@ -1350,17 +1350,17 @@ function POSContent() {
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
                           disabled={isCancelled}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                         >
                           <Minus size={14} />
                         </button>
-                        <span className="w-8 text-center font-semibold text-lg text-[var(--text-1)]">
+                        <span className="w-8 text-center font-semibold text-lg">
                           {item.cantidad}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
                           disabled={isCancelled}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                         >
                           <Plus size={14} />
                         </button>
@@ -1399,7 +1399,7 @@ function POSContent() {
                           {/* Edit */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 text-[var(--text-4)] flex items-center justify-center transition-colors"
                           >
                             <Pencil size={14} />
                           </button>
@@ -1407,7 +1407,7 @@ function POSContent() {
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center transition-colors"
                             title="Cancelar item (requiere gerente)"
                           >
                             <Ban size={14} />
@@ -1604,23 +1604,23 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className={`bg-[var(--surface)] hover:bg-[var(--surface-2)] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative shadow-sm ${
+                      className={`bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-emerald-900/40 active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative ${
                         (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-emerald-500/40 ring-1 ring-emerald-500/20'
-                          : 'border-[var(--line)] hover:border-emerald-500/30'
+                          ? 'border-red-500/60 ring-1 ring-red-500/30'
+                          : 'border-slate-700 hover:border-emerald-600/40'
                       }`}
                     >
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${activeCategory.color || 'bg-emerald-600'}`} />
                       {(item as MenuItem & { promo?: boolean }).promo && (
-                        <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                        <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                           Promo
                         </span>
                       )}
                       <div className="flex flex-col justify-between px-4 py-5 flex-1">
-                        <span className="font-bold text-base leading-snug text-[var(--text-1)]">
+                        <span className="font-bold text-base leading-snug text-white">
                           {item.name}
                         </span>
-                        <span className="text-emerald-500 font-bold text-lg mt-2">
+                        <span className="text-emerald-400 font-bold text-lg mt-2">
                           ${Math.round(item.price)}
                         </span>
                       </div>
