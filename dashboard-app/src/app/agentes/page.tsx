@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw, Timer, Package, MessageCircle, BarChart3, Calendar, Zap, FileText, Activity, Bell, Sparkles, Settings } from 'lucide-react'
+import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw, Timer, Package, MessageCircle, BarChart3, Calendar, Zap, FileText, Activity, Bell, Sparkles, Settings, Star } from 'lucide-react'
 import { getDeepTable } from '@/lib/data'
 
 interface AgentResult {
@@ -40,6 +40,7 @@ const AGENTS = [
   { id: 'menu-gap', name: 'Análisis de Menú', icon: Sparkles, color: 'text-violet-600', bg: 'bg-violet-500/10', desc: 'Gaps y oportunidades del menú' },
   { id: 'config-validator', name: 'Config Validator', icon: Settings, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Verifica configuración del cliente' },
   { id: 'orquestador', name: 'Orquestador', icon: Bot, color: 'text-[var(--text-1)]', bg: 'bg-[var(--surface-2)]', desc: 'Cerebro central — despacha agentes' },
+  { id: 'reviews', name: 'Reseñas Google', icon: Star, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Auto-responder con IA', href: '/agentes/resenas' },
 ]
 
 const priorityColors: Record<string, string> = {

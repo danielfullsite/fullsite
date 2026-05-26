@@ -91,28 +91,26 @@ function dedupeByFecha(rows: Record<string, unknown>[]): Record<string, unknown>
   return result
 }
 
-export async function getRecentDays(days: number = 30): Promise<WansoftDaily[]> {
-  const data = await sbFetch('wansoft_daily', `select=*&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
+export async function getRecentDays(days: number = 30, clientSlug: string = 'amalay'): Promise<WansoftDaily[]> {
+  const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const filtered = dedupeByFecha(data).slice(0, days)
   return filtered.reverse().map(parseRow)
 }
 
-export async function getLatestDay(): Promise<WansoftDaily | null> {
-  // ALWAYS filter ventas_dia>0 to skip null/cierre rows
-  const data = await sbFetch('wansoft_daily', 'select=*&ventas_dia=gt.0&order=fecha.desc&limit=5') as Record<string, unknown>[]
+export async function getLatestDay(clientSlug: string = 'amalay'): Promise<WansoftDaily | null> {
+  const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
-export async function getDayData(fecha: string): Promise<WansoftDaily | null> {
-  // Fetch all rows for date, dedup keeps highest ventas
-  const data = await sbFetch('wansoft_daily', `select=*&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
+export async function getDayData(fecha: string, clientSlug: string = 'amalay'): Promise<WansoftDaily | null> {
+  const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
-export async function getMonthlyData(): Promise<WansoftDaily[]> {
-  const data = await sbFetch('wansoft_daily', 'select=*&ventas_dia=gt.0&order=fecha.asc&limit=1000') as Record<string, unknown>[]
+export async function getMonthlyData(clientSlug: string = 'amalay'): Promise<WansoftDaily[]> {
+  const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   return dedupeByFecha(data).map(parseRow)
 }
 
@@ -156,10 +154,10 @@ export function aggregateMeseros(
 }
 
 // Get data for a date range
-export async function getDateRange(from: string, to: string): Promise<WansoftDaily[]> {
+export async function getDateRange(from: string, to: string, clientSlug: string = 'amalay'): Promise<WansoftDaily[]> {
   const data = await sbFetch(
     'wansoft_daily',
-    `select=*&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
+    `select=*&client_slug=eq.${clientSlug}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
   return dedupeByFecha(data).map(parseRow)
 }
@@ -244,6 +242,12 @@ export function aggregateGrupos(
   return Object.entries(map)
     .map(([nombre, total]) => ({ nombre, total }))
     .sort((a, b) => b.total - a.total)
+}
+
+// ── Google Reviews ──────────────────────────────────────────────────
+
+export async function getGoogleReviews(clientSlug: string = 'amalay') {
+  return sbFetch('google_reviews', `select=*&client_slug=eq.${clientSlug}&order=create_time.desc&limit=100`)
 }
 
 export interface AgentRun {
