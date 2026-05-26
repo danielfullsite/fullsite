@@ -95,7 +95,7 @@ export default function CortePage() {
     const totalIva = closed.reduce((s, o) => s + o.iva, 0)
     const totalDescuentos = closed.reduce((s, o) => s + o.descuento, 0)
     const totalPersonas = closed.reduce((s, o) => s + o.personas, 0)
-    const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
+    const ticketPromedio = closed.length > 0 ? totalVentas / closed.length : 0
 
     // Payment methods
     const byPayment: Record<string, number> = {}

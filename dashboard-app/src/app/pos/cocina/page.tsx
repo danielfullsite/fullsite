@@ -138,9 +138,9 @@ export default function CocinaPage() {
       }
     } catch { /* delivery table might not exist yet */ }
 
-    // Play sound if new 'enviada' orders appeared
+    // Play sound if new 'enviada' orders appeared (skip first load)
     const newEnviadas = fresh.filter(o => o.status === 'enviada').length
-    if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
+    if (prevOrderCountRef.current >= 0 && newEnviadas > prevOrderCountRef.current) {
       playNotificationSound()
     }
     prevOrderCountRef.current = newEnviadas
@@ -168,6 +168,7 @@ export default function CocinaPage() {
     if (!order) return
 
     const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+    if (!items[cancelTarget.itemIndex]) { setCancelError('Item no encontrado'); return }
     items[cancelTarget.itemIndex] = {
       ...items[cancelTarget.itemIndex],
       cancelled: true,
@@ -205,22 +206,24 @@ export default function CocinaPage() {
       }
     }
 
-    // Revert deductions
-    for (const row of recipeRows) {
-      const qty = row.quantity * (items[cancelTarget.itemIndex].cantidad || items[cancelTarget.itemIndex].quantity || 1)
-      const inv = invMap.get(row.ingredient_id)
-      if (inv) {
-        await updateInventoryStock(row.ingredient_id, inv.stock + qty)
-        await logInventoryMovement({
-          ingredient_id: row.ingredient_id,
-          movement_type: 'adjustment',
-          quantity: qty,
-          order_id: cancelTarget.orderId,
-          actor: manager,
-          notes: `Cancelacion: ${cancelTarget.itemName} — ${cancelReason}`,
-        })
+    // Revert deductions (wrapped in try-catch so cancel still works if inventory fails)
+    try {
+      for (const row of recipeRows) {
+        const qty = row.quantity * (items[cancelTarget.itemIndex].cantidad || items[cancelTarget.itemIndex].quantity || 1)
+        const inv = invMap.get(row.ingredient_id)
+        if (inv) {
+          await updateInventoryStock(row.ingredient_id, inv.stock + qty)
+          await logInventoryMovement({
+            ingredient_id: row.ingredient_id,
+            movement_type: 'adjustment',
+            quantity: qty,
+            order_id: cancelTarget.orderId,
+            actor: manager,
+            notes: `Cancelacion: ${cancelTarget.itemName} — ${cancelReason}`,
+          })
+        }
       }
-    }
+    } catch { /* inventory reversal failed but cancellation still proceeds */ }
 
     // 4. Audit log
     logAudit({

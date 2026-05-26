@@ -1226,6 +1226,7 @@ export async function deductIngredientsForOrder(
   orderId: string,
   actor: string,
 ): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[] }> {
+  try {
   // 1. Get all recipes
   const recipes = await getRecipes()
   const inventory = await getInventory()
@@ -1280,24 +1281,25 @@ export async function deductIngredientsForOrder(
       const inv = invMap.get(row.ingredient_id)
       if (!inv) continue
 
+      const actualDeduction = Math.min(deductAmount, inv.stock) // never deduct more than available
       const newStock = Math.max(0, inv.stock - deductAmount)
 
       // Update stock
       await updateInventoryStock(row.ingredient_id, newStock)
 
-      // Log movement
+      // Log movement (log actual amount deducted, not requested)
       await logInventoryMovement({
         ingredient_id: row.ingredient_id,
         movement_type: 'deduction',
-        quantity: -deductAmount,
+        quantity: -actualDeduction,
         order_id: orderId,
         actor,
-        notes: `${item.cantidad}x ${item.nombre}`,
+        notes: `${item.cantidad}x ${item.nombre}${actualDeduction < deductAmount ? ' (stock insuficiente)' : ''}`,
       })
 
       deductions.push({
         ingredient: inv.ingredient_name ?? row.ingredient_id,
-        amount: deductAmount,
+        amount: actualDeduction,
         unit: row.unit || inv.ingredient_unit || '',
         newStock,
       })
@@ -1313,6 +1315,10 @@ export async function deductIngredientsForOrder(
   }
 
   return { success: true, deductions, alerts }
+  } catch (err) {
+    console.warn('[deductIngredientsForOrder] Failed:', err)
+    return { success: false, deductions: [], alerts: ['Error al descontar inventario'] }
+  }
 }
 
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {

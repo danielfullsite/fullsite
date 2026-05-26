@@ -789,12 +789,14 @@ function POSContent() {
   const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null)
   useEffect(() => {
+    let cancelled = false
     const loadMesaOrder = async () => {
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
+        if (cancelled) return // mesa changed while fetching
         if (res.ok) {
           const rows = await res.json()
           if (rows.length > 0 && rows[0].id !== loadedOrderId) {
@@ -811,6 +813,7 @@ function POSContent() {
       } catch { /* */ }
     }
     if (orderItems.length === 0) loadMesaOrder()
+    return () => { cancelled = true }
   }, [mesa])
 
   // Order-level notes
