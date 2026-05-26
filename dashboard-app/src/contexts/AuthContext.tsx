@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
+import { getClientConfig, getClientIdFromEmail } from '@/lib/client-config'
 
 // Dashboard roles — controls page visibility
 // dueño: sees EVERYTHING (financials, gastos, nómina, P&L, all agents)
@@ -76,37 +77,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // createBrowserClient from @supabase/ssr is a singleton by default
   const supabase = useMemo(() => createClient(), [])
 
-  const loadClientData = useCallback(async (userId: string) => {
+  const loadClientData = useCallback(async (userId: string, userEmail?: string, userMeta?: Record<string, unknown>) => {
+    // Priority 1: user_metadata.client_id (set at signup, instant)
+    const metaClientId = userMeta?.client_id as string | undefined
+
+    // Priority 2: client_users table (DB lookup)
+    let dbClientId: string | null = null
     try {
-      // Look up client_id from client_users table
-      const { data: clientUser, error } = await supabase
+      const { data: clientUser } = await supabase
         .from('client_users')
         .select('client_id')
         .eq('user_id', userId)
         .limit(1)
         .single()
+      dbClientId = (clientUser as { client_id: string } | null)?.client_id || null
+    } catch { /* table might not exist for new installs */ }
 
-      const cid = (clientUser as { client_id: string } | null)?.client_id
-      if (error || !cid) {
-        // Fallback to 'amalay' for graceful degradation
-        console.warn('No client_users mapping found, falling back to amalay')
-        setClientId('amalay')
-        setClientConfig({ id: 'amalay', name: 'AMALAY Coffee & Market' })
-        return
-      }
+    // Priority 3: email-to-client mapping
+    const emailClientId = getClientIdFromEmail(userEmail || '')
 
-      setClientId(cid)
+    // Use first available
+    const cid = metaClientId || dbClientId || emailClientId
+    setClientId(cid)
 
-      // Fetch client config
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('id', cid)
-        .single()
+    // Load client config from registry
+    const config = getClientConfig(cid)
+    setClientConfig({ id: cid, name: config.name })
 
-      setClientConfig(client ? { id: (client as { id: string }).id, name: (client as { id: string }).id } : { id: cid })
-
-      // Fetch locations for this client
+    // Fetch locations for this client
+    try {
       const { data: locs } = await supabase
         .from('client_locations')
         .select('id,name,address')
@@ -119,12 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (locList.length > 0 && !locationId) {
         setLocationId(locList[0].id)
       }
-    } catch {
-      // Fallback
-      console.warn('Error loading client data, falling back to amalay')
-      setClientId('amalay')
-      setClientConfig({ id: 'amalay', name: 'AMALAY Coffee & Market' })
-    }
+    } catch { /* locations table might not exist */ }
   }, [supabase])
 
   useEffect(() => {
@@ -141,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (parsed.user) {
               setUser(parsed.user)
               setRole(ROLE_MAP[parsed.user.email || ''] || 'staff')
-              await loadClientData(parsed.user.id)
+              await loadClientData(parsed.user.id, parsed.user.email, parsed.user.user_metadata)
               setLoading(false)
               return
             }
@@ -154,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentUser)
         if (currentUser) {
           setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
-          await loadClientData(currentUser.id)
+          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata)
         }
       } catch (err) {
         console.error('Error initializing auth:', err)
@@ -174,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentUser)
         if (currentUser) {
           setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
-          await loadClientData(currentUser.id)
+          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata)
         } else {
           setClientId(null)
           setClientConfig(null)
