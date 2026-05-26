@@ -62,15 +62,15 @@ export default function DemoEstadoResultados() {
   const margenEbitda = ((PL.ebitda / PL.ingresos) * 100).toFixed(1)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Estado de Resultados</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Mayo 2026</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Mayo 2026</p>
           </div>
         </div>
       </header>
@@ -84,25 +84,25 @@ export default function DemoEstadoResultados() {
             { label: 'EBITDA', value: formatDemoMXN(PL.ebitda), icon: TrendingUp, color: 'text-purple-400' },
             { label: 'Margen neto', value: `${margenNeto}%`, icon: Percent, color: 'text-emerald-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* P&L Table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--line)]">
             <h2 className="text-sm font-semibold">Perdidas y Ganancias — Mayo 2026</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 text-zinc-500">
+                <tr className="border-b border-[var(--line)] text-[var(--text-3)]">
                   <th className="text-left px-5 py-3 font-medium">Concepto</th>
                   <th className="text-right px-5 py-3 font-medium">Monto</th>
                   <th className="text-right px-5 py-3 font-medium">% de ingresos</th>
@@ -113,18 +113,18 @@ export default function DemoEstadoResultados() {
                   <tr
                     key={i}
                     className={`
-                      ${line.separator ? 'border-t border-white/10' : 'border-b border-white/5'}
+                      ${line.separator ? 'border-t border-white/10' : 'border-b border-[var(--line)]'}
                       ${line.bold ? 'bg-white/[0.02]' : ''}
                       hover:bg-white/[0.03]
                     `}
                   >
-                    <td className={`px-5 py-3 ${line.indent ? 'pl-10 text-zinc-400' : ''} ${line.bold ? 'font-semibold' : ''}`}>
+                    <td className={`px-5 py-3 ${line.indent ? 'pl-10 text-[var(--text-2)]' : ''} ${line.bold ? 'font-semibold' : ''}`}>
                       {line.label}
                     </td>
                     <td className={`px-5 py-3 text-right font-mono ${line.bold ? 'font-semibold' : ''} ${line.color || 'text-zinc-300'}`}>
                       {line.amount < 0 ? '-' : ''}{formatDemoMXN(Math.abs(line.amount))}
                     </td>
-                    <td className="px-5 py-3 text-right text-zinc-500">
+                    <td className="px-5 py-3 text-right text-[var(--text-3)]">
                       {line.pct}%
                     </td>
                   </tr>
@@ -135,7 +135,7 @@ export default function DemoEstadoResultados() {
         </div>
 
         {/* Margin breakdown */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold mb-4">Desglose de margenes</h2>
           <div className="space-y-4">
             {[
@@ -144,8 +144,8 @@ export default function DemoEstadoResultados() {
               { label: 'Margen neto', pct: Number(margenNeto), color: 'from-emerald-600 to-emerald-400' },
             ].map(m => (
               <div key={m.label} className="flex items-center gap-4">
-                <span className="text-sm text-zinc-400 w-32 shrink-0">{m.label}</span>
-                <div className="flex-1 bg-white/5 rounded-full h-6 overflow-hidden">
+                <span className="text-sm text-[var(--text-2)] w-32 shrink-0">{m.label}</span>
+                <div className="flex-1 bg-[var(--line-soft)] rounded-full h-6 overflow-hidden">
                   <div
                     className={`h-full bg-gradient-to-r ${m.color} rounded-full flex items-center justify-end pr-3`}
                     style={{ width: `${m.pct}%` }}

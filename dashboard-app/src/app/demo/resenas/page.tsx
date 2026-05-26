@@ -59,7 +59,7 @@ function Stars({ count }: { count: number }) {
         <Star
           key={i}
           size={14}
-          className={i <= count ? 'text-amber-400 fill-amber-400' : 'text-zinc-700'}
+          className={i <= count ? 'text-amber-400 fill-amber-400' : 'text-[var(--text-4)]'}
         />
       ))}
     </div>
@@ -68,39 +68,39 @@ function Stars({ count }: { count: number }) {
 
 export default function DemoResenas() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Resenas</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Google & TripAdvisor</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Google & TripAdvisor</p>
           </div>
         </div>
       </header>
 
       <main className="p-6 space-y-6">
         {/* Rating summary */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 flex flex-col sm:flex-row gap-8 items-center">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-6 flex flex-col sm:flex-row gap-8 items-center">
           <div className="text-center">
             <p className="text-5xl font-bold">{RATING}</p>
             <Stars count={Math.round(RATING)} />
-            <p className="text-xs text-zinc-500 mt-1">{TOTAL_RESENAS} resenas</p>
+            <p className="text-xs text-[var(--text-3)] mt-1">{TOTAL_RESENAS} resenas</p>
           </div>
           <div className="flex-1 w-full space-y-2">
             {DISTRIBUCION.map((d) => (
               <div key={d.estrellas} className="flex items-center gap-3 text-sm">
-                <span className="w-4 text-right text-zinc-400">{d.estrellas}</span>
+                <span className="w-4 text-right text-[var(--text-2)]">{d.estrellas}</span>
                 <Star size={12} className="text-amber-400 fill-amber-400" />
-                <div className="flex-1 bg-white/5 rounded-full h-2">
+                <div className="flex-1 bg-[var(--line-soft)] rounded-full h-2">
                   <div
                     className="bg-amber-400 rounded-full h-2"
                     style={{ width: `${d.pct}%` }}
                   />
                 </div>
-                <span className="w-10 text-right text-xs text-zinc-500">{d.pct}%</span>
+                <span className="w-10 text-right text-xs text-[var(--text-3)]">{d.pct}%</span>
               </div>
             ))}
           </div>
@@ -111,11 +111,11 @@ export default function DemoResenas() {
           {RESENAS.map((r, i) => (
             <div
               key={i}
-              className="bg-white/[0.02] border border-white/5 rounded-2xl p-5"
+              className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-zinc-400">
+                  <div className="w-8 h-8 rounded-full bg-[var(--line-soft)] flex items-center justify-center text-xs font-bold text-[var(--text-2)]">
                     {r.nombre.charAt(0)}
                   </div>
                   <div>
@@ -124,13 +124,13 @@ export default function DemoResenas() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--line-soft)] text-[var(--text-2)]">
                     {r.plataforma}
                   </span>
-                  <p className="text-xs text-zinc-600 mt-1">{r.fecha}</p>
+                  <p className="text-xs text-[var(--text-4)] mt-1">{r.fecha}</p>
                 </div>
               </div>
-              <p className="text-sm text-zinc-400 leading-relaxed">{r.comentario}</p>
+              <p className="text-sm text-[var(--text-2)] leading-relaxed">{r.comentario}</p>
             </div>
           ))}
         </div>

@@ -29,7 +29,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string }> = {
 
 export default function PosPagosPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white p-6 md:p-10">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] p-6 md:p-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -37,23 +37,23 @@ export default function PosPagosPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">Formas de Pago</h1>
-          <p className="text-sm text-zinc-500">{METODOS.length} metodos &middot; Casa Montana</p>
+          <p className="text-sm text-[var(--text-3)]">{METODOS.length} metodos &middot; Casa Montana</p>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-center">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-4 text-center">
           <div className="text-2xl font-bold text-emerald-400">{METODOS.filter(m => m.activo).length}</div>
-          <div className="text-xs text-zinc-500 mt-1">Activos</div>
+          <div className="text-xs text-[var(--text-3)] mt-1">Activos</div>
         </div>
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-center">
-          <div className="text-2xl font-bold text-zinc-500">{METODOS.filter(m => !m.activo).length}</div>
-          <div className="text-xs text-zinc-500 mt-1">Inactivos</div>
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-4 text-center">
+          <div className="text-2xl font-bold text-[var(--text-3)]">{METODOS.filter(m => !m.activo).length}</div>
+          <div className="text-xs text-[var(--text-3)] mt-1">Inactivos</div>
         </div>
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-center sm:col-span-1 col-span-2">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-4 text-center sm:col-span-1 col-span-2">
           <div className="text-2xl font-bold text-blue-400">3</div>
-          <div className="text-xs text-zinc-500 mt-1">Delivery apps</div>
+          <div className="text-xs text-[var(--text-3)] mt-1">Delivery apps</div>
         </div>
       </div>
 
@@ -65,20 +65,20 @@ export default function PosPagosPage() {
           return (
             <div
               key={m.id}
-              className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-center gap-4 hover:border-white/10 transition-colors"
+              className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 flex items-center gap-4 hover:border-white/10 transition-colors"
             >
               <div className={`w-11 h-11 rounded-xl ${c.bg} border ${c.border} flex items-center justify-center shrink-0`}>
                 <Icon size={20} className={c.text} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-sm">{m.nombre}</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
+                <p className="text-xs text-[var(--text-3)] mt-0.5">
                   Comision: {m.comision === 0 ? 'Sin comision' : `${m.comision}%`}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
-                  m.activo ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700/50 text-zinc-500'
+                  m.activo ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700/50 text-[var(--text-3)]'
                 }`}>
                   {m.activo ? 'Activo' : 'Inactivo'}
                 </span>

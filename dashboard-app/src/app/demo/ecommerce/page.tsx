@@ -25,15 +25,15 @@ export default function DemoEcommerce() {
   const plataformas = [...new Set(PEDIDOS.map(p => p.plataforma))]
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">eCommerce</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Pedidos online</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Pedidos online</p>
           </div>
         </div>
       </header>
@@ -46,19 +46,19 @@ export default function DemoEcommerce() {
             { label: 'Ventas online', value: formatDemoMXN(totalVentas), icon: DollarSign, color: 'text-emerald-400' },
             { label: 'Plataformas', value: plataformas.join(', '), icon: Smartphone, color: 'text-blue-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Orders table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-[var(--line)]">
             <h3 className="font-bold flex items-center gap-2">
               <ShoppingBag size={18} className="text-purple-400" /> Pedidos recientes
             </h3>
@@ -66,7 +66,7 @@ export default function DemoEcommerce() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-zinc-500 text-xs border-b border-white/5">
+                <tr className="text-[var(--text-3)] text-xs border-b border-[var(--line)]">
                   <th className="text-left px-5 py-3 font-medium">Plataforma</th>
                   <th className="text-left px-5 py-3 font-medium">Pedido #</th>
                   <th className="text-left px-5 py-3 font-medium">Items</th>
@@ -76,13 +76,13 @@ export default function DemoEcommerce() {
               </thead>
               <tbody>
                 {PEDIDOS.map(p => (
-                  <tr key={p.pedido} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <tr key={p.pedido} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                     <td className="px-5 py-3">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${plataformaColor[p.plataforma]}`}>
                         {p.plataforma}
                       </span>
                     </td>
-                    <td className="px-5 py-3 font-mono text-zinc-400">{p.pedido}</td>
+                    <td className="px-5 py-3 font-mono text-[var(--text-2)]">{p.pedido}</td>
                     <td className="px-5 py-3 text-zinc-300">{p.items}</td>
                     <td className="px-5 py-3 text-right tabular-nums font-medium">{formatDemoMXN(p.total)}</td>
                     <td className="px-5 py-3 text-center">

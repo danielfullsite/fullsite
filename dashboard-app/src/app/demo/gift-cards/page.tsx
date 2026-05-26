@@ -25,20 +25,20 @@ const TARJETAS = [
 const statusColor: Record<string, string> = {
   'Activa': 'bg-emerald-500/10 text-emerald-400',
   'Canjeada': 'bg-blue-500/10 text-blue-400',
-  'Expirada': 'bg-zinc-500/10 text-zinc-500',
+  'Expirada': 'bg-zinc-500/10 text-[var(--text-3)]',
 }
 
 export default function DemoGiftCards() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Tarjetas de Regalo</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Mayo 2026</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Mayo 2026</p>
           </div>
         </div>
       </header>
@@ -46,23 +46,23 @@ export default function DemoGiftCards() {
       <main className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {STATS.map((s) => (
-            <div key={s.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={s.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-2">
                 <s.icon size={16} className={s.color} />
-                <span className="text-xs text-zinc-500">{s.label}</span>
+                <span className="text-xs text-[var(--text-3)]">{s.label}</span>
               </div>
               <p className="text-2xl font-bold">{s.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-[var(--line)]">
             <p className="text-sm font-medium">Historial de tarjetas</p>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5 text-xs text-zinc-500">
+              <tr className="border-b border-[var(--line)] text-xs text-[var(--text-3)]">
                 <th className="text-left px-5 py-3 font-medium">Codigo</th>
                 <th className="text-right px-5 py-3 font-medium">Monto</th>
                 <th className="text-left px-5 py-3 font-medium">Comprado por</th>
@@ -72,11 +72,11 @@ export default function DemoGiftCards() {
             </thead>
             <tbody>
               {TARJETAS.map((t) => (
-                <tr key={t.codigo} className="border-b border-white/5 last:border-0">
-                  <td className="px-5 py-3 text-sm font-mono text-zinc-400">{t.codigo}</td>
+                <tr key={t.codigo} className="border-b border-[var(--line)] last:border-0">
+                  <td className="px-5 py-3 text-sm font-mono text-[var(--text-2)]">{t.codigo}</td>
                   <td className="px-5 py-3 text-sm text-right font-medium">{formatDemoMXN(t.monto)}</td>
                   <td className="px-5 py-3 text-sm">{t.comprador}</td>
-                  <td className="px-5 py-3 text-sm text-zinc-400 hidden md:table-cell">{t.fecha}</td>
+                  <td className="px-5 py-3 text-sm text-[var(--text-2)] hidden md:table-cell">{t.fecha}</td>
                   <td className="px-5 py-3 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[t.status]}`}>
                       {t.status}

@@ -55,27 +55,27 @@ const categoriaColor: Record<string, string> = {
 
 export default function DemoCoach() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Coach IA</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Recomendaciones del equipo</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Recomendaciones del equipo</p>
           </div>
         </div>
       </header>
 
       <main className="p-6 space-y-6">
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
             <Brain size={22} className="text-violet-400" />
           </div>
           <div>
             <p className="font-semibold">Analisis de hoy</p>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-[var(--text-2)]">
               {TIPS.length} recomendaciones basadas en datos de las ultimas 2 semanas. {TIPS.filter(t => t.prioridad === 'Alta').length} de prioridad alta.
             </p>
           </div>
@@ -85,12 +85,12 @@ export default function DemoCoach() {
           {TIPS.map((t, i) => (
             <div
               key={i}
-              className="bg-white/[0.02] border border-white/5 rounded-2xl p-5"
+              className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
-                    <t.icon size={16} className="text-zinc-400" />
+                  <div className="w-9 h-9 rounded-xl bg-[var(--line-soft)] flex items-center justify-center">
+                    <t.icon size={16} className="text-[var(--text-2)]" />
                   </div>
                   <div>
                     <p className="font-medium text-sm">{t.mesero}</p>
@@ -105,7 +105,7 @@ export default function DemoCoach() {
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-zinc-400 leading-relaxed">{t.tip}</p>
+              <p className="text-sm text-[var(--text-2)] leading-relaxed">{t.tip}</p>
             </div>
           ))}
         </div>

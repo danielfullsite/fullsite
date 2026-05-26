@@ -24,7 +24,7 @@ export default function PosGruposPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white p-6 md:p-10">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] p-6 md:p-10">
       {toast && (
         <div className="fixed top-6 right-6 z-50 bg-amber-500/10 border border-amber-500/20 text-amber-400 px-4 py-3 rounded-xl text-sm font-medium animate-in fade-in slide-in-from-top-2">
           Solo lectura en demo
@@ -38,7 +38,7 @@ export default function PosGruposPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Grupos POS</h1>
-            <p className="text-sm text-zinc-500">{GRUPOS.length} grupos &middot; Casa Montana</p>
+            <p className="text-sm text-[var(--text-3)]">{GRUPOS.length} grupos &middot; Casa Montana</p>
           </div>
         </div>
         <button
@@ -54,7 +54,7 @@ export default function PosGruposPage() {
         {GRUPOS.map(g => (
           <div
             key={g.id}
-            className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-colors"
+            className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-6 hover:border-white/10 transition-colors"
           >
             <div className="flex items-start justify-between mb-4">
               <div
@@ -73,9 +73,9 @@ export default function PosGruposPage() {
             </div>
             <h3 className="font-semibold text-base mb-1">{g.nombre}</h3>
             <div className="flex items-center justify-between mt-3">
-              <span className="text-sm text-zinc-500">{g.platillos} platillos</span>
+              <span className="text-sm text-[var(--text-3)]">{g.platillos} platillos</span>
               <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                g.activo ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700/50 text-zinc-500'
+                g.activo ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700/50 text-[var(--text-3)]'
               }`}>
                 {g.activo ? 'Activo' : 'Inactivo'}
               </span>

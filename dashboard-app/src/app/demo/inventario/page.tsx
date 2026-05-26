@@ -34,15 +34,15 @@ export default function DemoInventario() {
   const criticos = INVENTARIO.filter(i => i.status === 'Crítico').length
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Inventario</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Control de stock</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Control de stock</p>
           </div>
         </div>
       </header>
@@ -55,19 +55,19 @@ export default function DemoInventario() {
             { label: 'Bajo stock', value: bajoStock, icon: AlertTriangle, color: 'text-amber-400' },
             { label: 'Críticos', value: criticos, icon: XCircle, color: 'text-red-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-[var(--line)]">
             <h3 className="font-bold flex items-center gap-2">
               <Package size={18} className="text-blue-400" /> Ingredientes
             </h3>
@@ -75,7 +75,7 @@ export default function DemoInventario() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-zinc-500 text-xs border-b border-white/5">
+                <tr className="text-[var(--text-3)] text-xs border-b border-[var(--line)]">
                   <th className="text-left px-5 py-3 font-medium">Nombre</th>
                   <th className="text-right px-5 py-3 font-medium">Stock actual</th>
                   <th className="text-center px-5 py-3 font-medium">Unidad</th>
@@ -88,11 +88,11 @@ export default function DemoInventario() {
                   const cfg = statusConfig[item.status]
                   const StatusIcon = cfg.icon
                   return (
-                    <tr key={item.nombre} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <tr key={item.nombre} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                       <td className="px-5 py-3 font-medium">{item.nombre}</td>
                       <td className="px-5 py-3 text-right tabular-nums">{item.stock}</td>
-                      <td className="px-5 py-3 text-center text-zinc-400">{item.unidad}</td>
-                      <td className="px-5 py-3 text-right tabular-nums text-zinc-400">{item.reorden}</td>
+                      <td className="px-5 py-3 text-center text-[var(--text-2)]">{item.unidad}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)]">{item.reorden}</td>
                       <td className="px-5 py-3 text-center">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
                           <StatusIcon size={12} />

@@ -28,44 +28,44 @@ export default function DemoReportes() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white relative">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] relative">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Reportes</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Centro de reportes</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Centro de reportes</p>
           </div>
         </div>
       </header>
 
       <div className="p-6 max-w-[1400px] mx-auto">
         {/* Summary */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 mb-6">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <FileText size={18} className="text-blue-400" />
             <h3 className="font-bold">Reportes disponibles</h3>
           </div>
-          <p className="text-sm text-zinc-500">{REPORTES.length} reportes configurados. Genera y recibe en tu email en segundos.</p>
+          <p className="text-sm text-[var(--text-3)]">{REPORTES.length} reportes configurados. Genera y recibe en tu email en segundos.</p>
         </div>
 
         {/* Report grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {REPORTES.map(r => (
-            <div key={r.nombre} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-start gap-4">
+            <div key={r.nombre} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 flex items-start gap-4">
               <div className={`p-3 rounded-xl bg-white/[0.03] ${r.color}`}>
                 <r.icon size={22} />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="font-bold text-sm">{r.nombre}</h4>
-                <p className="text-xs text-zinc-500 mt-0.5">{r.desc}</p>
-                <p className="text-[11px] text-zinc-600 mt-2">Último: {r.lastGenerated}</p>
+                <p className="text-xs text-[var(--text-3)] mt-0.5">{r.desc}</p>
+                <p className="text-[11px] text-[var(--text-4)] mt-2">Último: {r.lastGenerated}</p>
               </div>
               <button
                 onClick={() => handleGenerar(r.nombre)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-medium transition-colors"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-[var(--line-soft)] hover:bg-[var(--line)] border border-white/10 rounded-lg text-xs font-medium transition-colors"
               >
                 <Download size={13} />
                 Generar
@@ -77,7 +77,7 @@ export default function DemoReportes() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-500/90 text-white px-5 py-3 rounded-xl text-sm font-medium shadow-2xl backdrop-blur-sm animate-in slide-in-from-bottom-4 z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-500/90 text-[var(--text-1)] px-5 py-3 rounded-xl text-sm font-medium shadow-2xl backdrop-blur-sm animate-in slide-in-from-bottom-4 z-50">
           {toast}
         </div>
       )}

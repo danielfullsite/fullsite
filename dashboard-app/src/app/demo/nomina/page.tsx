@@ -36,15 +36,15 @@ export default function DemoNomina() {
   const costoPromedio = Math.round(totalNomina / headcount)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Nomina</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Mayo 2026</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Mayo 2026</p>
           </div>
         </div>
       </header>
@@ -58,25 +58,25 @@ export default function DemoNomina() {
             { label: 'Costo promedio/empleado', value: formatDemoMXN(costoPromedio), icon: Briefcase, color: 'text-purple-400' },
             { label: 'Total compensacion', value: formatDemoMXN(totalComp), icon: Clock, color: 'text-amber-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Staff table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--line)]">
             <h2 className="text-sm font-semibold">Detalle de empleados</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 text-zinc-500">
+                <tr className="border-b border-[var(--line)] text-[var(--text-3)]">
                   <th className="text-left px-5 py-3 font-medium">Nombre</th>
                   <th className="text-left px-5 py-3 font-medium">Puesto</th>
                   <th className="text-right px-5 py-3 font-medium">Sueldo base</th>
@@ -88,22 +88,22 @@ export default function DemoNomina() {
               </thead>
               <tbody>
                 {STAFF.map((e, i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <tr key={i} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                     <td className="px-5 py-3 font-medium">{e.nombre}</td>
                     <td className="px-5 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${PUESTO_COLORS[e.puesto] || 'bg-zinc-400/10 text-zinc-400'}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs ${PUESTO_COLORS[e.puesto] || 'bg-zinc-400/10 text-[var(--text-2)]'}`}>
                         {e.puesto}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right font-mono">{formatDemoMXN(e.sueldo_base)}</td>
-                    <td className="px-5 py-3 text-right font-mono text-zinc-400">
+                    <td className="px-5 py-3 text-right font-mono text-[var(--text-2)]">
                       {e.propinas > 0 ? formatDemoMXN(e.propinas) : '—'}
                     </td>
                     <td className="px-5 py-3 text-right font-mono font-medium text-emerald-400">
                       {formatDemoMXN(e.sueldo_base + e.propinas)}
                     </td>
-                    <td className="px-5 py-3 text-center text-zinc-400">{e.horas_semana}</td>
-                    <td className="px-5 py-3 text-zinc-400">{e.antiguedad}</td>
+                    <td className="px-5 py-3 text-center text-[var(--text-2)]">{e.horas_semana}</td>
+                    <td className="px-5 py-3 text-[var(--text-2)]">{e.antiguedad}</td>
                   </tr>
                 ))}
                 {/* Totals */}
@@ -122,7 +122,7 @@ export default function DemoNomina() {
         </div>
 
         {/* Breakdown by role */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold mb-4">Nomina por puesto</h2>
           <div className="space-y-3">
             {Object.entries(
@@ -138,8 +138,8 @@ export default function DemoNomina() {
                 const pct = (data.total / totalNomina) * 100
                 return (
                   <div key={puesto} className="flex items-center gap-4">
-                    <span className="text-sm text-zinc-400 w-32 shrink-0">{puesto} ({data.count})</span>
-                    <div className="flex-1 bg-white/5 rounded-full h-6 overflow-hidden">
+                    <span className="text-sm text-[var(--text-2)] w-32 shrink-0">{puesto} ({data.count})</span>
+                    <div className="flex-1 bg-[var(--line-soft)] rounded-full h-6 overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-3"
                         style={{ width: `${pct}%` }}
@@ -147,7 +147,7 @@ export default function DemoNomina() {
                         <span className="text-xs font-bold">{formatDemoMXN(data.total)}</span>
                       </div>
                     </div>
-                    <span className="text-xs text-zinc-500 w-12 text-right">{pct.toFixed(0)}%</span>
+                    <span className="text-xs text-[var(--text-3)] w-12 text-right">{pct.toFixed(0)}%</span>
                   </div>
                 )
               })}

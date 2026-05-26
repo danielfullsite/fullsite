@@ -49,18 +49,18 @@ export default function DemoCatchAll() {
   const pageName = PAGE_NAMES[slug] || slug.charAt(0).toUpperCase() + slug.slice(1)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] flex items-center justify-center">
       <div className="text-center max-w-md px-6">
         <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-6">
           <Construction size={32} className="text-emerald-400" />
         </div>
         <h1 className="text-2xl font-bold mb-2">{pageName}</h1>
-        <p className="text-zinc-500 mb-6">
+        <p className="text-[var(--text-3)] mb-6">
           Este módulo está incluido en tu suscripción. Se configura durante el onboarding con datos reales de tu restaurante.
         </p>
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 mb-6 text-left">
-          <p className="text-sm text-zinc-400 mb-3 flex items-center gap-2"><Sparkles size={14} className="text-emerald-400" /> Lo que incluye:</p>
-          <ul className="space-y-2 text-sm text-zinc-500">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4 mb-6 text-left">
+          <p className="text-sm text-[var(--text-2)] mb-3 flex items-center gap-2"><Sparkles size={14} className="text-emerald-400" /> Lo que incluye:</p>
+          <ul className="space-y-2 text-sm text-[var(--text-3)]">
             <li>• Datos en tiempo real conectados a tu POS</li>
             <li>• Reportes automáticos diarios y semanales</li>
             <li>• Alertas inteligentes por Telegram</li>
@@ -68,14 +68,14 @@ export default function DemoCatchAll() {
           </ul>
         </div>
         <div className="flex gap-3 justify-center">
-          <Link href="/demo/dashboard" className="flex items-center gap-2 px-4 py-2.5 bg-white/5 text-zinc-400 rounded-lg hover:bg-white/10 text-sm">
+          <Link href="/demo/dashboard" className="flex items-center gap-2 px-4 py-2.5 bg-[var(--line-soft)] text-[var(--text-2)] rounded-lg hover:bg-[var(--line)] text-sm">
             <ArrowLeft size={16} /> Dashboard
           </Link>
           <a
             href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20el%20módulo%20de%20{pageName}."
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 text-sm font-bold"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-[var(--text-1)] rounded-lg hover:bg-emerald-600 text-sm font-bold"
           >
             Activar módulo
           </a>

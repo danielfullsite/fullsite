@@ -31,15 +31,15 @@ export default function DemoFacturacion() {
   const pendientes = CFDIS.filter(c => c.status === 'pendiente').length
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Facturacion CFDI</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Mayo 2026</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Mayo 2026</p>
           </div>
         </div>
       </header>
@@ -53,25 +53,25 @@ export default function DemoFacturacion() {
             { label: '% facturado vs ventas', value: `${pctFacturado}%`, icon: Percent, color: 'text-purple-400' },
             { label: 'Pendientes / Canceladas', value: `${pendientes} / ${canceladas}`, icon: FileText, color: pendientes > 0 ? 'text-yellow-400' : 'text-emerald-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* CFDI Table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--line)]">
             <h2 className="text-sm font-semibold">Facturas recientes</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 text-zinc-500">
+                <tr className="border-b border-[var(--line)] text-[var(--text-3)]">
                   <th className="text-left px-5 py-3 font-medium">Folio</th>
                   <th className="text-left px-5 py-3 font-medium">RFC receptor</th>
                   <th className="text-left px-5 py-3 font-medium">Razon social</th>
@@ -82,17 +82,17 @@ export default function DemoFacturacion() {
               </thead>
               <tbody>
                 {CFDIS.map((cfdi) => (
-                  <tr key={cfdi.folio} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <tr key={cfdi.folio} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                     <td className="px-5 py-3 font-mono font-medium text-blue-400">{cfdi.folio}</td>
-                    <td className="px-5 py-3 font-mono text-zinc-400 text-xs">{cfdi.rfc}</td>
+                    <td className="px-5 py-3 font-mono text-[var(--text-2)] text-xs">{cfdi.rfc}</td>
                     <td className="px-5 py-3 text-zinc-300">{cfdi.razon_social}</td>
                     <td className="px-5 py-3 text-right font-mono font-medium">
                       {cfdi.status === 'cancelada'
-                        ? <span className="line-through text-zinc-600">{formatDemoMXN(cfdi.monto)}</span>
+                        ? <span className="line-through text-[var(--text-4)]">{formatDemoMXN(cfdi.monto)}</span>
                         : formatDemoMXN(cfdi.monto)
                       }
                     </td>
-                    <td className="px-5 py-3 font-mono text-zinc-400">{cfdi.fecha}</td>
+                    <td className="px-5 py-3 font-mono text-[var(--text-2)]">{cfdi.fecha}</td>
                     <td className="px-5 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[cfdi.status]}`}>
                         {cfdi.status}
@@ -106,7 +106,7 @@ export default function DemoFacturacion() {
         </div>
 
         {/* Status breakdown */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold mb-4">Resumen por status</h2>
           <div className="grid grid-cols-3 gap-4">
             {[
@@ -116,7 +116,7 @@ export default function DemoFacturacion() {
             ].map(s => (
               <div key={s.label} className={`${s.bg} rounded-xl p-4 text-center`}>
                 <p className={`text-2xl font-bold ${s.color}`}>{s.count}</p>
-                <p className="text-xs text-zinc-400 mt-1">{s.label}</p>
+                <p className="text-xs text-[var(--text-2)] mt-1">{s.label}</p>
                 <p className="text-sm font-mono mt-2">{formatDemoMXN(s.total)}</p>
               </div>
             ))}

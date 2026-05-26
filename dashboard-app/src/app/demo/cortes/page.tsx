@@ -40,15 +40,15 @@ export default function DemoCortes() {
   const cortesAlerta = diferencias.filter(d => Math.abs(d) > 200).length
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Cortes de Caja</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Ultimos 7 cortes</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Ultimos 7 cortes</p>
           </div>
         </div>
       </header>
@@ -62,25 +62,25 @@ export default function DemoCortes() {
             { label: 'Cortes sin diferencia', value: `${cortesOk} / ${CORTES.length}`, icon: CheckCircle, color: 'text-emerald-400' },
             { label: 'Cortes con alerta', value: `${cortesAlerta}`, icon: AlertTriangle, color: cortesAlerta > 0 ? 'text-red-400' : 'text-emerald-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--line)]">
             <h2 className="text-sm font-semibold">Detalle de cortes</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 text-zinc-500">
+                <tr className="border-b border-[var(--line)] text-[var(--text-3)]">
                   <th className="text-left px-5 py-3 font-medium">Fecha</th>
                   <th className="text-left px-5 py-3 font-medium">Turno</th>
                   <th className="text-right px-5 py-3 font-medium">Fondo inicial</th>
@@ -95,16 +95,16 @@ export default function DemoCortes() {
                 {CORTES.map((corte, i) => {
                   const diff = getDiferencia(corte)
                   return (
-                    <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <tr key={i} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                       <td className="px-5 py-3 font-mono text-zinc-300">{corte.fecha}</td>
                       <td className="px-5 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs ${corte.turno === 'Matutino' ? 'bg-amber-400/10 text-amber-400' : 'bg-indigo-400/10 text-indigo-400'}`}>
                           {corte.turno}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right text-zinc-400">{formatDemoMXN(corte.fondo_inicial)}</td>
+                      <td className="px-5 py-3 text-right text-[var(--text-2)]">{formatDemoMXN(corte.fondo_inicial)}</td>
                       <td className="px-5 py-3 text-right font-medium">{formatDemoMXN(corte.efectivo_contado)}</td>
-                      <td className="px-5 py-3 text-right text-zinc-400">{formatDemoMXN(corte.esperado)}</td>
+                      <td className="px-5 py-3 text-right text-[var(--text-2)]">{formatDemoMXN(corte.esperado)}</td>
                       <td className="px-5 py-3 text-right">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${getDiferenciaBg(diff)} ${getDiferenciaColor(diff)}`}>
                           {diff >= 0 ? '+' : ''}{formatDemoMXN(diff)}

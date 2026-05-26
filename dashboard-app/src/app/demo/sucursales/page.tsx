@@ -27,15 +27,15 @@ const SUCURSALES = [
 
 export default function DemoSucursales() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Sucursales</h1>
-            <p className="text-xs text-zinc-500">Casa Montaña · Multi-sucursal</p>
+            <p className="text-xs text-[var(--text-3)]">Casa Montaña · Multi-sucursal</p>
           </div>
         </div>
       </header>
@@ -47,7 +47,7 @@ export default function DemoSucursales() {
             return (
               <div
                 key={s.nombre}
-                className={`bg-white/[0.02] border border-white/5 rounded-2xl p-6 relative ${
+                className={`bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-6 relative ${
                   !isActive ? 'opacity-50' : ''
                 }`}
               >
@@ -59,7 +59,7 @@ export default function DemoSucursales() {
                       Activa
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-zinc-400 bg-zinc-400/10">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[var(--text-2)] bg-zinc-400/10">
                       Próximamente
                     </span>
                   )}
@@ -67,7 +67,7 @@ export default function DemoSucursales() {
 
                 {/* Name and address */}
                 <h3 className="text-lg font-bold mb-1 pr-28">{s.nombre}</h3>
-                <p className="text-sm text-zinc-500 flex items-center gap-1.5 mb-6">
+                <p className="text-sm text-[var(--text-3)] flex items-center gap-1.5 mb-6">
                   <MapPin size={14} />
                   {s.direccion}
                 </p>
@@ -75,28 +75,28 @@ export default function DemoSucursales() {
                 {/* Stats grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white/[0.03] rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-zinc-500 mb-2">
+                    <div className="flex items-center gap-2 text-[var(--text-3)] mb-2">
                       <LayoutGrid size={14} />
                       <span className="text-xs">Mesas</span>
                     </div>
                     <p className="text-xl font-bold">{s.mesas}</p>
                   </div>
                   <div className="bg-white/[0.03] rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-zinc-500 mb-2">
+                    <div className="flex items-center gap-2 text-[var(--text-3)] mb-2">
                       <Users size={14} />
                       <span className="text-xs">Meseros</span>
                     </div>
                     <p className="text-xl font-bold">{s.meseros}</p>
                   </div>
                   <div className="bg-white/[0.03] rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-zinc-500 mb-2">
+                    <div className="flex items-center gap-2 text-[var(--text-3)] mb-2">
                       <DollarSign size={14} />
                       <span className="text-xs">Ventas hoy</span>
                     </div>
                     <p className="text-xl font-bold">{isActive ? formatDemoMXN(s.ventasHoy) : '—'}</p>
                   </div>
                   <div className="bg-white/[0.03] rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-zinc-500 mb-2">
+                    <div className="flex items-center gap-2 text-[var(--text-3)] mb-2">
                       <Clock size={14} />
                       <span className="text-xs">Horario</span>
                     </div>

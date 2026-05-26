@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
+import { useTheme as useThemeToggle } from '@/components/ThemeToggle'
 import {
   LayoutDashboard, Building2, DollarSign, Receipt, Users, Utensils,
   TrendingUp, HandCoins, Wallet, FileSpreadsheet, UserCog, Stamp,
@@ -116,17 +116,13 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
   // POS page — full screen
   if (pathname === '/demo/pos') return <>{children}</>
 
-  return (
-    <ThemeProvider defaultTheme="dark">
-      <DemoLayoutInner>{children}</DemoLayoutInner>
-    </ThemeProvider>
-  )
+  return <DemoLayoutInner>{children}</DemoLayoutInner>
 }
 
 function DemoLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
-  const { theme, toggleTheme } = useTheme()
+  const { theme, toggle: toggleTheme } = useThemeToggle()
 
   const isDark = theme === 'dark'
   const sidebarWidth = collapsed ? '64px' : '250px'
@@ -213,18 +209,8 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main — CSS variables for theme */}
-      <main className="flex-1 min-h-screen overflow-auto" style={{
-        // @ts-expect-error CSS custom properties
-        '--demo-bg': isDark ? '#0a0a0c' : '#f9fafb',
-        '--demo-surface': isDark ? 'rgba(255,255,255,0.02)' : '#ffffff',
-        '--demo-border': isDark ? 'rgba(255,255,255,0.05)' : '#e5e7eb',
-        '--demo-text': isDark ? '#ffffff' : '#111827',
-        '--demo-text-2': isDark ? '#a1a1aa' : '#6b7280',
-        '--demo-text-3': isDark ? '#71717a' : '#9ca3af',
-        '--demo-text-muted': isDark ? '#52525b' : '#d1d5db',
-        '--demo-shadow': isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-      }}>
+      {/* Main — uses CSS variables from globals.css [data-theme] */}
+      <main className="flex-1 min-h-screen overflow-auto bg-[var(--bg)] text-[var(--text-1)]">
         {children}
       </main>
     </div>

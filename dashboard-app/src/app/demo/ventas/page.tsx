@@ -16,15 +16,15 @@ export default function DemoVentas() {
   const maxGrupo = DEMO_GRUPOS[0].total
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Ventas</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Ultimos 14 dias</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Ultimos 14 dias</p>
           </div>
         </div>
       </header>
@@ -38,24 +38,24 @@ export default function DemoVentas() {
             { label: 'Promedio/dia', value: formatDemoMXN(promDia), icon: BarChart3, color: 'text-purple-400' },
             { label: 'Tickets 14 dias', value: totalTickets14.toLocaleString(), icon: Receipt, color: 'text-amber-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* 14-day sales table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 overflow-x-auto">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5 overflow-x-auto">
           <h3 className="flex items-center gap-2 font-bold mb-4">
             <DollarSign size={18} className="text-emerald-400" /> Ventas diarias (14 dias)
           </h3>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-zinc-500 text-xs uppercase tracking-wider border-b border-white/5">
+              <tr className="text-[var(--text-3)] text-xs uppercase tracking-wider border-b border-[var(--line)]">
                 <th className="text-left py-3 pr-4">Fecha</th>
                 <th className="text-left py-3 pr-4">Dia</th>
                 <th className="text-right py-3 pr-4">Ventas</th>
@@ -71,12 +71,12 @@ export default function DemoVentas() {
                 const isWeekend = dow === 0 || dow === 6
                 const tp = d.tickets_count > 0 ? Math.round(d.ventas_dia / d.tickets_count) : 0
                 return (
-                  <tr key={d.fecha} className={`border-b border-white/5 last:border-0 ${isWeekend ? 'bg-purple-500/5' : ''}`}>
-                    <td className="py-3 pr-4 text-zinc-400">{d.fecha}</td>
-                    <td className={`py-3 pr-4 ${isWeekend ? 'text-purple-400 font-medium' : 'text-zinc-500'}`}>{dayName}</td>
+                  <tr key={d.fecha} className={`border-b border-[var(--line)] last:border-0 ${isWeekend ? 'bg-purple-500/5' : ''}`}>
+                    <td className="py-3 pr-4 text-[var(--text-2)]">{d.fecha}</td>
+                    <td className={`py-3 pr-4 ${isWeekend ? 'text-purple-400 font-medium' : 'text-[var(--text-3)]'}`}>{dayName}</td>
                     <td className="py-3 pr-4 text-right font-bold text-emerald-400">{formatDemoMXN(d.ventas_dia)}</td>
-                    <td className="py-3 pr-4 text-right text-zinc-400">{d.tickets_count}</td>
-                    <td className="py-3 text-right text-zinc-400">{formatDemoMXN(tp)}</td>
+                    <td className="py-3 pr-4 text-right text-[var(--text-2)]">{d.tickets_count}</td>
+                    <td className="py-3 text-right text-[var(--text-2)]">{formatDemoMXN(tp)}</td>
                   </tr>
                 )
               })}
@@ -86,7 +86,7 @@ export default function DemoVentas() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Payment methods */}
-          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
             <h3 className="flex items-center gap-2 font-bold mb-4">
               <CreditCard size={18} className="text-blue-400" /> Metodos de pago
             </h3>
@@ -96,27 +96,27 @@ export default function DemoVentas() {
                 return (
                   <div key={p.nombre}>
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-zinc-400">{p.nombre}</span>
+                      <span className="text-[var(--text-2)]">{p.nombre}</span>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-600">{pct.toFixed(1)}%</span>
+                        <span className="text-xs text-[var(--text-4)]">{pct.toFixed(1)}%</span>
                         <span className="font-bold">{formatDemoMXN(p.total)}</span>
                       </div>
                     </div>
-                    <div className="w-full h-2.5 bg-white/5 rounded-full">
+                    <div className="w-full h-2.5 bg-[var(--line-soft)] rounded-full">
                       <div className="h-2.5 bg-blue-500/50 rounded-full" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 )
               })}
             </div>
-            <div className="mt-4 pt-4 border-t border-white/5 flex justify-between">
-              <span className="text-sm text-zinc-500">Total</span>
+            <div className="mt-4 pt-4 border-t border-[var(--line)] flex justify-between">
+              <span className="text-sm text-[var(--text-3)]">Total</span>
               <span className="text-sm font-bold text-emerald-400">{formatDemoMXN(totalPagos)}</span>
             </div>
           </div>
 
           {/* Category breakdown */}
-          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
             <h3 className="flex items-center gap-2 font-bold mb-4">
               <BarChart3 size={18} className="text-purple-400" /> Categorias
             </h3>
@@ -126,18 +126,18 @@ export default function DemoVentas() {
                 return (
                   <div key={g.nombre}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-zinc-400">{g.nombre}</span>
+                      <span className="text-[var(--text-2)]">{g.nombre}</span>
                       <span className="font-semibold">{formatDemoMXN(g.total)}</span>
                     </div>
-                    <div className="w-full h-2 bg-white/5 rounded-full">
+                    <div className="w-full h-2 bg-[var(--line-soft)] rounded-full">
                       <div className="h-2 bg-purple-500/40 rounded-full" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 )
               })}
             </div>
-            <div className="mt-4 pt-4 border-t border-white/5 flex justify-between">
-              <span className="text-sm text-zinc-500">Total</span>
+            <div className="mt-4 pt-4 border-t border-[var(--line)] flex justify-between">
+              <span className="text-sm text-[var(--text-3)]">Total</span>
               <span className="text-sm font-bold text-emerald-400">{formatDemoMXN(totalGrupos)}</span>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function DemoVentas() {
 
         {/* Footer */}
         <div className="text-center py-6">
-          <p className="text-xs text-zinc-600">Powered by <strong>fullsite</strong> — IA operativa para restaurantes</p>
+          <p className="text-xs text-[var(--text-4)]">Powered by <strong>fullsite</strong> — IA operativa para restaurantes</p>
         </div>
       </div>
     </div>

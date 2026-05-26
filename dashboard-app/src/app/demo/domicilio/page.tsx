@@ -28,15 +28,15 @@ const statusColor: Record<string, string> = {
 
 export default function DemoDomicilio() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Domicilio</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Entregas del dia</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Entregas del dia</p>
           </div>
         </div>
       </header>
@@ -44,23 +44,23 @@ export default function DemoDomicilio() {
       <main className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {STATS.map((s) => (
-            <div key={s.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={s.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-2">
                 <s.icon size={16} className={s.color} />
-                <span className="text-xs text-zinc-500">{s.label}</span>
+                <span className="text-xs text-[var(--text-3)]">{s.label}</span>
               </div>
               <p className="text-2xl font-bold">{s.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-[var(--line)]">
             <p className="text-sm font-medium">Pedidos recientes</p>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5 text-xs text-zinc-500">
+              <tr className="border-b border-[var(--line)] text-xs text-[var(--text-3)]">
                 <th className="text-left px-5 py-3 font-medium">#</th>
                 <th className="text-left px-5 py-3 font-medium">Cliente</th>
                 <th className="text-left px-5 py-3 font-medium hidden md:table-cell">Direccion</th>
@@ -71,17 +71,17 @@ export default function DemoDomicilio() {
             </thead>
             <tbody>
               {PEDIDOS.map((p) => (
-                <tr key={p.id} className="border-b border-white/5 last:border-0">
-                  <td className="px-5 py-3 text-sm font-mono text-zinc-400">{p.id}</td>
+                <tr key={p.id} className="border-b border-[var(--line)] last:border-0">
+                  <td className="px-5 py-3 text-sm font-mono text-[var(--text-2)]">{p.id}</td>
                   <td className="px-5 py-3 text-sm font-medium">{p.cliente}</td>
-                  <td className="px-5 py-3 text-sm text-zinc-400 hidden md:table-cell">{p.direccion}</td>
+                  <td className="px-5 py-3 text-sm text-[var(--text-2)] hidden md:table-cell">{p.direccion}</td>
                   <td className="px-5 py-3 text-sm text-right font-medium">{formatDemoMXN(p.total)}</td>
                   <td className="px-5 py-3 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[p.status]}`}>
                       {p.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-sm text-center text-zinc-400">{p.tiempo}</td>
+                  <td className="px-5 py-3 text-sm text-center text-[var(--text-2)]">{p.tiempo}</td>
                 </tr>
               ))}
             </tbody>

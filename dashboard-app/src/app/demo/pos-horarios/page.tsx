@@ -18,7 +18,7 @@ function getBloque(hora: number) {
 
 export default function PosHorariosPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white p-6 md:p-10">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)] p-6 md:p-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -26,7 +26,7 @@ export default function PosHorariosPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">Horarios</h1>
-          <p className="text-sm text-zinc-500">Horario semanal &middot; Casa Montana</p>
+          <p className="text-sm text-[var(--text-3)]">Horario semanal &middot; Casa Montana</p>
         </div>
       </div>
 
@@ -45,14 +45,14 @@ export default function PosHorariosPage() {
       </div>
 
       {/* Grid */}
-      <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="min-w-[700px]">
             {/* Header row */}
-            <div className="grid grid-cols-8 border-b border-white/5">
-              <div className="p-3 text-xs text-zinc-600 font-medium">Hora</div>
+            <div className="grid grid-cols-8 border-b border-[var(--line)]">
+              <div className="p-3 text-xs text-[var(--text-4)] font-medium">Hora</div>
               {DIAS.map(d => (
-                <div key={d} className="p-3 text-xs text-zinc-400 font-semibold text-center">{d}</div>
+                <div key={d} className="p-3 text-xs text-[var(--text-2)] font-semibold text-center">{d}</div>
               ))}
             </div>
 
@@ -61,7 +61,7 @@ export default function PosHorariosPage() {
               const bloque = getBloque(h)
               return (
                 <div key={h} className="grid grid-cols-8 border-b border-white/[0.03] last:border-b-0">
-                  <div className="p-3 text-xs text-zinc-600 font-mono">
+                  <div className="p-3 text-xs text-[var(--text-4)] font-mono">
                     {h.toString().padStart(2, '0')}:00
                   </div>
                   {DIAS.map(d => (

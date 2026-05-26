@@ -43,15 +43,15 @@ export default function DemoFoodCost() {
   const masRentable = [...platillosConCalc].sort((a, b) => b.margen - a.margen)[0]
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Food Cost</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · Análisis de costos</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · Análisis de costos</p>
           </div>
         </div>
       </header>
@@ -64,19 +64,19 @@ export default function DemoFoodCost() {
             { label: 'Margen promedio', value: formatDemoMXN(Math.round(avgMargen)), icon: TrendingUp, color: 'text-emerald-400' },
             { label: 'Más rentable', value: masRentable.nombre, icon: Star, color: 'text-amber-400' },
           ].map(card => (
-            <div key={card.label} className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+            <div key={card.label} className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <card.icon size={18} className={card.color} />
               </div>
               <p className="text-2xl font-bold">{card.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{card.label}</p>
+              <p className="text-xs text-[var(--text-3)] mt-1">{card.label}</p>
             </div>
           ))}
         </div>
 
         {/* Table */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-white/5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-[var(--line)]">
             <h3 className="font-bold flex items-center gap-2">
               <ChefHat size={18} className="text-orange-400" /> Análisis por platillo
             </h3>
@@ -84,7 +84,7 @@ export default function DemoFoodCost() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-zinc-500 text-xs border-b border-white/5">
+                <tr className="text-[var(--text-3)] text-xs border-b border-[var(--line)]">
                   <th className="text-left px-5 py-3 font-medium">Platillo</th>
                   <th className="text-right px-5 py-3 font-medium">Costo ingredientes</th>
                   <th className="text-right px-5 py-3 font-medium">Precio venta</th>
@@ -94,9 +94,9 @@ export default function DemoFoodCost() {
               </thead>
               <tbody>
                 {platillosConCalc.map(p => (
-                  <tr key={p.nombre} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <tr key={p.nombre} className="border-b border-[var(--line)] last:border-0 hover:bg-white/[0.02]">
                     <td className="px-5 py-3 font-medium">{p.nombre}</td>
-                    <td className="px-5 py-3 text-right tabular-nums text-zinc-400">{formatDemoMXN(p.costo)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-[var(--text-2)]">{formatDemoMXN(p.costo)}</td>
                     <td className="px-5 py-3 text-right tabular-nums">{formatDemoMXN(p.precio)}</td>
                     <td className="px-5 py-3 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${foodCostBadge(p.foodCost)}`}>

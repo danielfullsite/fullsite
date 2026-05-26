@@ -46,15 +46,15 @@ const tentacleColors: Record<string, string> = {
 
 export default function DemoAgentes() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Agentes IA</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · War Room</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · War Room</p>
           </div>
         </div>
       </header>
@@ -62,31 +62,31 @@ export default function DemoAgentes() {
       <div className="p-6 max-w-[1400px] mx-auto space-y-6">
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
               <Bot size={18} className="text-emerald-400" />
             </div>
             <p className="text-3xl font-bold">{AGENTS.length}</p>
-            <p className="text-xs text-zinc-500 mt-1">Agentes totales</p>
+            <p className="text-xs text-[var(--text-3)] mt-1">Agentes totales</p>
           </div>
-          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 size={18} className="text-emerald-400" />
             </div>
             <p className="text-3xl font-bold text-emerald-400">{activeCount}</p>
-            <p className="text-xs text-zinc-500 mt-1">Activos</p>
+            <p className="text-xs text-[var(--text-3)] mt-1">Activos</p>
           </div>
-          <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
               <Clock size={18} className="text-amber-400" />
             </div>
             <p className="text-3xl font-bold text-amber-400">{scheduledCount}</p>
-            <p className="text-xs text-zinc-500 mt-1">Programados</p>
+            <p className="text-xs text-[var(--text-3)] mt-1">Programados</p>
           </div>
         </div>
 
         {/* Latest insights */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
           <h3 className="flex items-center gap-2 font-bold mb-4">
             <Zap size={18} className="text-emerald-400" /> Ultimos hallazgos
           </h3>
@@ -99,37 +99,37 @@ export default function DemoAgentes() {
                 'bg-emerald-500/5 border-emerald-500/20'
               }`}>
                 <p className="text-sm font-bold mb-1">{insight.title}</p>
-                <p className="text-xs text-zinc-400 leading-relaxed">{insight.desc}</p>
+                <p className="text-xs text-[var(--text-2)] leading-relaxed">{insight.desc}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Agent list */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5">
           <h3 className="flex items-center gap-2 font-bold mb-4">
             <Bot size={18} className="text-blue-400" /> Todos los agentes
           </h3>
           <div className="space-y-2">
             {AGENTS.map(agent => (
-              <div key={agent.name} className="flex items-center gap-4 py-3 border-b border-white/5 last:border-0">
+              <div key={agent.name} className="flex items-center gap-4 py-3 border-b border-[var(--line)] last:border-0">
                 <div className="flex-shrink-0">
                   <div className={`w-2 h-2 rounded-full ${agent.status === 'activo' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm font-semibold">{agent.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tentacleColors[agent.tentacle] || 'bg-zinc-500/10 text-zinc-400'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${tentacleColors[agent.tentacle] || 'bg-zinc-500/10 text-[var(--text-2)]'}`}>
                       {agent.tentacle}
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-500 truncate">{agent.desc}</p>
+                  <p className="text-xs text-[var(--text-3)] truncate">{agent.desc}</p>
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <span className={`text-xs font-medium ${agent.status === 'activo' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {agent.status}
                   </span>
-                  <p className="text-[10px] text-zinc-600 mt-0.5 flex items-center gap-1 justify-end">
+                  <p className="text-[10px] text-[var(--text-4)] mt-0.5 flex items-center gap-1 justify-end">
                     <Calendar size={10} /> {agent.schedule}
                   </p>
                 </div>
@@ -140,7 +140,7 @@ export default function DemoAgentes() {
 
         {/* Footer */}
         <div className="text-center py-6">
-          <p className="text-xs text-zinc-600">Powered by <strong>fullsite</strong> — IA operativa para restaurantes</p>
+          <p className="text-xs text-[var(--text-4)]">Powered by <strong>fullsite</strong> — IA operativa para restaurantes</p>
         </div>
       </div>
     </div>

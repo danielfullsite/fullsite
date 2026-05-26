@@ -34,15 +34,15 @@ const PROMOS = [
 
 export default function DemoTiendaPromos() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text-1)]">
+      <header className="border-b border-[var(--line)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/demo/dashboard" className="text-zinc-500 hover:text-white">
+          <Link href="/demo/dashboard" className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-lg font-bold">Promos Tienda</h1>
-            <p className="text-xs text-zinc-500">{DEMO_RESTAURANT.name} · {PROMOS.length} promociones activas</p>
+            <p className="text-xs text-[var(--text-3)]">{DEMO_RESTAURANT.name} · {PROMOS.length} promociones activas</p>
           </div>
         </div>
       </header>
@@ -51,7 +51,7 @@ export default function DemoTiendaPromos() {
         {PROMOS.map((p) => (
           <div
             key={p.nombre}
-            className="bg-white/[0.02] border border-white/5 rounded-2xl p-5"
+            className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-5"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -60,7 +60,7 @@ export default function DemoTiendaPromos() {
                 </div>
                 <div>
                   <p className="font-semibold text-lg">{p.nombre}</p>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--line-soft)] text-[var(--text-2)]">
                     {p.tipo}
                   </span>
                 </div>
@@ -69,8 +69,8 @@ export default function DemoTiendaPromos() {
                 Activa
               </span>
             </div>
-            <p className="text-sm text-zinc-400 mb-4">{p.descripcion}</p>
-            <div className="flex flex-wrap gap-4 text-xs text-zinc-500 pt-3 border-t border-white/5">
+            <p className="text-sm text-[var(--text-2)] mb-4">{p.descripcion}</p>
+            <div className="flex flex-wrap gap-4 text-xs text-[var(--text-3)] pt-3 border-t border-[var(--line)]">
               <span className="flex items-center gap-1">
                 <Calendar size={12} />
                 {p.vigencia}
