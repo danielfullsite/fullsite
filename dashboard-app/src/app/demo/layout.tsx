@@ -213,8 +213,18 @@ function DemoLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 min-h-screen overflow-auto">
+      {/* Main — CSS variables for theme */}
+      <main className="flex-1 min-h-screen overflow-auto" style={{
+        // @ts-expect-error CSS custom properties
+        '--demo-bg': isDark ? '#0a0a0c' : '#f9fafb',
+        '--demo-surface': isDark ? 'rgba(255,255,255,0.02)' : '#ffffff',
+        '--demo-border': isDark ? 'rgba(255,255,255,0.05)' : '#e5e7eb',
+        '--demo-text': isDark ? '#ffffff' : '#111827',
+        '--demo-text-2': isDark ? '#a1a1aa' : '#6b7280',
+        '--demo-text-3': isDark ? '#71717a' : '#9ca3af',
+        '--demo-text-muted': isDark ? '#52525b' : '#d1d5db',
+        '--demo-shadow': isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+      }}>
         {children}
       </main>
     </div>

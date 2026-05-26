@@ -139,6 +139,17 @@ body {
 .stagger > *:nth-child(5) { animation-delay: 200ms; }
 .stagger > *:nth-child(6) { animation-delay: 250ms; }
 
+/* Demo pages — theme-aware utility classes using CSS variables from layout */
+.demo-card {
+  background: var(--demo-surface, rgba(255,255,255,0.02));
+  border: 1px solid var(--demo-border, rgba(255,255,255,0.05));
+  box-shadow: var(--demo-shadow, none);
+}
+.demo-text-2 { color: var(--demo-text-2, #a1a1aa); }
+.demo-text-3 { color: var(--demo-text-3, #71717a); }
+.demo-border { border-color: var(--demo-border, rgba(255,255,255,0.05)); }
+.demo-muted-bg { background: var(--demo-text-muted, #52525b); }
+
 /* Scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
