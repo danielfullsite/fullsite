@@ -86,7 +86,7 @@ def main():
 
     hist_data = []
     for hd in hist_dates:
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "fecha": f"eq.{hd}",
             "select": "ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant",
             "limit": "1",

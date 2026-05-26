@@ -184,7 +184,7 @@ def get_monthly_ticket_avg():
     try:
         now_mx = datetime.now(MX_TZ)
         six_months_ago = (now_mx - timedelta(days=180)).strftime("%Y-%m-%d")
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant",
             "fecha": f"gte.{six_months_ago}",
             "order": "fecha.asc",
@@ -222,7 +222,7 @@ def get_tp_weekday_weekend():
     try:
         now_mx = datetime.now(MX_TZ)
         thirty_ago = (now_mx - timedelta(days=30)).strftime("%Y-%m-%d")
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,tickets_count",
             "fecha": f"gte.{thirty_ago}",
             "ventas_dia": "gt.0",

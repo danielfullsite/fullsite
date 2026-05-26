@@ -110,6 +110,7 @@ calendario = sb_get("calendar_sync_log", [
 # Get yesterday's sales from wansoft_daily (fresh data, not stale wansoft_kpis)
 yesterday_str = (today - timedelta(days=1)).isoformat()
 wansoft_rows = sb_get("wansoft_daily", [
+    ("client_slug", f"eq.{CLIENT['id']}"),
     ("fecha", f"eq.{yesterday_str}"),
     ("select", "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros,updated_at"),
     ("limit", "1"),
@@ -117,6 +118,7 @@ wansoft_rows = sb_get("wansoft_daily", [
 # Fallback: try today
 if not wansoft_rows:
     wansoft_rows = sb_get("wansoft_daily", [
+        ("client_slug", f"eq.{CLIENT['id']}"),
         ("select", "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros,updated_at"),
         ("order", "fecha.desc"),
         ("limit", "1"),
@@ -143,6 +145,7 @@ except Exception as e:
 
 # Fetch last 7 days for trend context
 last7_rows = sb_get("wansoft_daily", [
+    ("client_slug", f"eq.{CLIENT['id']}"),
     ("fecha", f"gte.{(today - timedelta(days=8)).isoformat()}"),
     ("fecha", f"lte.{yesterday_str}"),
     ("ventas_dia", "gt.0"),

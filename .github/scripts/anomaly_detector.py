@@ -67,7 +67,7 @@ def get_historical_same_dow(today, weeks=4):
     # Fetch each date individually (OR filters aren't clean in REST)
     results = []
     for fecha in dates:
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant,meseros,ventas_por_grupo",
             "fecha": f"eq.{fecha}",
             "limit": "1",

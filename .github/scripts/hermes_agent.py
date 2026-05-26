@@ -149,7 +149,7 @@ def audit_data_quality():
     yesterday = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Check wansoft_daily freshness
-    daily = sb_get("wansoft_daily", {
+    daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,meseros,ventas_por_grupo",
         "order": "fecha.desc",
         "limit": "3",
@@ -239,7 +239,7 @@ def audit_chat_patterns():
     gaps = []
 
     # Can the chat answer "platillo más vendido"?
-    daily = sb_get("wansoft_daily", {
+    daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_por_grupo",
         "order": "fecha.desc",
         "limit": "1",

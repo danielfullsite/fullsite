@@ -49,7 +49,7 @@ def get_today_orders():
     today = now_mx.strftime("%Y-%m-%d")
     return sb_get("pos_orders", {
         "select": "id,mesa,mesero,items,created_at,closed_at,status,total",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
         "status": "eq.cerrada",
         "created_at": f"gte.{today}T00:00:00",
         "order": "created_at.desc",

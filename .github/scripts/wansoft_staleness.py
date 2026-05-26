@@ -44,49 +44,59 @@ def send_telegram(text):
         timeout=15)
     r.raise_for_status()
 
-# ── Check wansoft_kpis ────────────────────────────────────────────────────────
-print("[wansoft-staleness] Checking wansoft_kpis...")
+# ── Check wansoft_daily (primary — this is the real data source) ──────────────
+print("[wansoft-staleness] Checking wansoft_daily...")
 
-rows = sb_get("wansoft_kpis", [
-    ("id",     f"eq.{CLIENT.get('kpis_row_id', 'amalay')}"),
-    ("select", "updated_at,fecha_reporte,ventas_dia"),
+daily_rows = sb_get("wansoft_daily", [
+    ("client_slug", f"eq.{CLIENT['id']}"),
+    ("ventas_dia", "gt.0"),
+    ("select", "fecha,ventas_dia,updated_at"),
+    ("order", "fecha.desc"),
+    ("limit", "1"),
 ])
 
 status     = "success"
 output_sum = ""
 error_msg  = None
 
-if not rows:
-    msg = "⚠️ Wansoft: tabla wansoft_kpis vacía — sin datos de operaciones."
+MX_TZ = timezone(timedelta(hours=-6))
+
+if not daily_rows:
+    msg = "⚠️ Wansoft: tabla wansoft_daily vacía — sin datos de ventas."
     send_telegram(msg)
     output_sum = "ALERT: tabla vacía"
     print(f"[wansoft-staleness] {output_sum}")
 else:
-    row       = rows[0]
-    upd_str   = row.get("updated_at", "")
-    upd_dt    = datetime.fromisoformat(upd_str.replace("Z", "+00:00"))
-    diff_secs = (now_utc - upd_dt).total_seconds()
-    diff_hrs  = diff_secs / 3600
-    diff_days = int(diff_secs / 86400)
-    diff_rem  = int((diff_secs % 86400) / 3600)
+    row = daily_rows[0]
+    latest_fecha = row.get("fecha", "")
+    upd_str = row.get("updated_at", "")
 
-    MX_TZ     = timezone(timedelta(hours=-6))
-    upd_local = upd_dt.astimezone(MX_TZ).strftime("%Y-%m-%d %H:%M")
+    # Calculate staleness based on fecha (date of data), not updated_at
+    from datetime import date as date_type
+    latest_date = date_type.fromisoformat(latest_fecha)
+    today_date = now_utc.astimezone(MX_TZ).date()
+    days_behind = (today_date - latest_date).days
 
-    if diff_hrs <= 24:
-        print(f"[wansoft-staleness] OK — updated {diff_hrs:.1f}h ago. Silent success.")
-        output_sum = f"OK — sync hace {diff_hrs:.1f}h. Sin alerta."
+    if days_behind <= 1:
+        # Data is from today or yesterday — OK
+        print(f"[wansoft-staleness] OK — latest data: {latest_fecha} (${row.get('ventas_dia', 0):,.0f}). Silent success.")
+        output_sum = f"OK — datos al {latest_fecha}. Sin alerta."
     else:
+        upd_local = ""
+        if upd_str:
+            upd_dt = datetime.fromisoformat(upd_str.replace("Z", "+00:00"))
+            upd_local = upd_dt.astimezone(MX_TZ).strftime("%Y-%m-%d %H:%M")
+
         msg = (
             f"⚠️ Wansoft sync STALE\n"
-            f"Último sync: {row.get('fecha_reporte','')} a las {upd_local} hrs\n"
-            f"Hace: {diff_days}d {diff_rem}h\n"
-            f"Ventas último dato: ${row.get('ventas_dia','N/D')}\n\n"
-            f"Acción: revisar Chrome Extension de Wansoft sync"
+            f"Último dato: {latest_fecha} (hace {days_behind} días)\n"
+            f"Ventas: ${row.get('ventas_dia', 'N/D')}\n"
+            f"Updated: {upd_local}\n\n"
+            f"Acción: revisar scraper de Wansoft"
         )
         send_telegram(msg)
-        output_sum = f"ALERT enviado. Stale {diff_days}d {diff_rem}h."
-        print(f"[wansoft-staleness] STALE alert sent — {diff_days}d {diff_rem}h")
+        output_sum = f"ALERT enviado. Datos de hace {days_behind} días."
+        print(f"[wansoft-staleness] STALE alert sent — {days_behind} days behind")
 
 # ── Log ──────────────────────────────────────────────────────────────────────
 duration_ms = int((time.time() - start) * 1000)

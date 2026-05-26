@@ -51,7 +51,7 @@ def sb_get(table, params):
 def get_weekly_data(weeks=2):
     """Fetch last N weeks of daily data for fraud analysis."""
     cutoff = (datetime.now(MX_TZ) - timedelta(weeks=weeks)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {
+    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_brutas,descuentos,devoluciones,efectivo,tarjeta,tickets_count,meseros,pago_metodos",
         "fecha": f"gte.{cutoff}",
         "ventas_dia": "gt.0",

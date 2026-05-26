@@ -400,7 +400,7 @@ def fetch_historical(days=90):
     try:
         now_mx = datetime.now(MX_TZ)
         start = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,"
                       "personas_restaurant,ticket_promedio_restaurant,propinas_total,"
                       "meseros,platillos_top,ventas_por_grupo,pago_metodos",

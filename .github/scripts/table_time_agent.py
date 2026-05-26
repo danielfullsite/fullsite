@@ -57,7 +57,7 @@ def get_today_kpis():
 
 
 def get_historical(days=30):
-    return sb_get("wansoft_daily", {
+    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant,hora_pico",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
@@ -285,7 +285,7 @@ def main():
     today_kpis = get_today_kpis()
     if not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
         # Fallback to latest wansoft_daily
-        daily = sb_get("wansoft_daily", {"select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
+        daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
         if daily:
             today_kpis = daily[0]
             print(f"[table_time] Using wansoft_daily fallback: {today_kpis.get('fecha')}")

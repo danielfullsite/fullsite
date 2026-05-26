@@ -46,13 +46,13 @@ def main():
     print(f"[weekly] Last week: {last_week_start} to {last_week_end}")
 
     # Fetch both weeks
-    this_week = sb_get("wansoft_daily", {
+    this_week = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros",
         "and": f"(fecha.gte.{this_week_start},fecha.lte.{yesterday})",
         "order": "fecha.asc",
     })
 
-    last_week = sb_get("wansoft_daily", {
+    last_week = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,meseros",
         "and": f"(fecha.gte.{last_week_start},fecha.lte.{last_week_end})",
         "order": "fecha.asc",

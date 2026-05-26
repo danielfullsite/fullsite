@@ -72,7 +72,7 @@ def get_comparison_days(today):
 
     results = {}
     for label, fecha in [("ayer", yesterday), ("semana_pasada", last_week)]:
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant,tickets_count,personas_restaurant,ventas_por_grupo",
             "fecha": f"eq.{fecha}",
             "limit": "1",
@@ -88,7 +88,7 @@ def get_historical_same_dow(today, weeks=4):
     results = []
     for w in range(1, weeks + 1):
         d = today - timedelta(weeks=w)
-        rows = sb_get("wansoft_daily", {
+        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant,ventas_por_grupo",
             "fecha": f"eq.{d.strftime('%Y-%m-%d')}",
             "limit": "1",

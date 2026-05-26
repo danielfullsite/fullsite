@@ -61,7 +61,7 @@ def get_today_kpis():
 
 def get_historical_avg(days=30):
     """Fetch last N days from wansoft_daily for historical averages."""
-    return sb_get("wansoft_daily", {
+    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_por_grupo,meseros,half_half_total,tickets_count,personas_restaurant",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
