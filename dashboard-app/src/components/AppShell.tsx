@@ -32,38 +32,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, router, isPublicPage])
 
-  const splashScreen = (
-    <div className="flex items-center justify-center h-screen bg-black">
-      <div className="text-center">
-        <div className="mb-8 animate-[fadeIn_0.5s_ease-out]">
-          <span className="text-white font-black text-5xl tracking-tight">
-            fullsite
-            <span className="inline-block w-4 h-4 bg-emerald-400 ml-1 mb-1 rounded-none" />
-          </span>
-        </div>
-        <div className="w-48 mx-auto">
-          <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
-            <div className="h-1 rounded-full bg-emerald-400 animate-[loading_1.5s_ease-in-out_infinite]" />
-          </div>
-        </div>
-        <style>{`
-          @keyframes loading {
-            0% { width: 0%; }
-            50% { width: 70%; }
-            100% { width: 100%; }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
-      </div>
-    </div>
-  )
-
   // POS pages: full screen, dark theme, no sidebar
   if (isPosRoute) {
-    if (!showContent && loading) return splashScreen
+    if (!showContent && loading) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
+          <div className="text-center">
+            <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[var(--text-3)] text-sm">Cargando POS...</p>
+          </div>
+        </div>
+      )
+    }
     return <main className="min-h-screen bg-[var(--surface)]">{children}</main>
   }
 
@@ -72,7 +52,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  if (!showContent && loading) return splashScreen
+  if (!showContent && loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[var(--bg)]">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--text-3)] text-sm">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)]">
