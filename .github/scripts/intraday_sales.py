@@ -36,8 +36,11 @@ sb_headers = {
 _cats = CLIENT.get("menu_categories") or {}
 HH_KEYWORDS = _cats.get("hh", ["HALF", "H&H"])
 PAN_KEYWORDS = _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])
-POSTRES_KEYWORDS = _cats.get("postres", ["BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"])
-BEBIDA_GROUPS = CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS"]
+POSTRES_KEYWORDS = _cats.get("postres", ["BROWNIE", "CHEESECAKE", "FLAN", "PASTEL", "CAKE", "CHURRO", "TIRAMISU", "CREPAS", "CREPE"])
+POSTRES_EXCLUDE = ["PANCAKE", "EGG AND PANCAKE", "PARADISE BUTTERMILK"]
+PANADERIA_KEYWORDS = _cats.get("panaderia", ["CONCHA", "CRUNCHY MIX", "MUFFIN", "CUERNO", "DONA", "ROL DE CANELA"])
+CHILAQUILES_KEYWORDS = _cats.get("chilaquiles", ["CHILAQUIL"])
+BEBIDA_GROUPS = CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES", "FRAPPES", "SIGNATURE", "TEA & TISANAS", "SODAS", "BEBIDAS OH"]
 
 
 def sb_get(table, params):
@@ -230,6 +233,19 @@ def get_tp_weekday_weekend():
         return None
 
 
+# ── Category filter with exclusions ────────────────────────────────────────
+def filter_category_ex(saucers, keywords, exclude=None):
+    """Filter saucers by keyword match, with optional exclusion list."""
+    result = []
+    for s in saucers:
+        name_upper = s["name"].upper()
+        if any(kw in name_upper for kw in keywords):
+            if exclude and any(ex in name_upper for ex in exclude):
+                continue
+            result.append(s)
+    return result
+
+
 # ── Build message ───────────────────────────────────────────────────────────
 def build_message(consolidated, users, groups, saucers, order_types, monthly_avg):
     now_mx = datetime.now(MX_TZ)
@@ -237,28 +253,42 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     fecha = now_mx.strftime("%d/%m/%Y")
 
     ventas_netas = consolidated.get("TotalSales", 0)
-    ventas_brutas = consolidated.get("TotalGrossSales", 0)
-    descuentos = consolidated.get("TotalDiscount", 0)
 
     tickets = order_types.get("total_tickets", 0)
     personas = order_types.get("total_personas", 0)
 
-    # Exclude Market staff from ticket promedio
+    # Exclude Market staff from restaurant metrics
     market_ventas = sum(u["total"] for u in users if is_market(u["name"], CLIENT))
     ventas_restaurante = ventas_netas - market_ventas
-    # Estimate Market tickets (Market avg ~$50-80 per ticket)
     market_tickets = round(market_ventas / 65) if market_ventas > 0 else 0
     tickets_restaurante = max(tickets - market_tickets, 1)
     ticket_avg = ventas_restaurante / tickets_restaurante if tickets_restaurante else 0
+    personas_por_orden = round(personas / tickets_restaurante, 2) if tickets_restaurante and personas else 0
 
     # Category totals from saucers
     hh_items = filter_category(saucers, HH_KEYWORDS)
-    pan_items = filter_category(saucers, PAN_KEYWORDS)
-    postre_items = filter_category(saucers, POSTRES_KEYWORDS)
+    chilaquiles_items = filter_category(saucers, CHILAQUILES_KEYWORDS)
+    panaderia_items = filter_category(saucers, PANADERIA_KEYWORDS)
+    postre_items = filter_category_ex(saucers, POSTRES_KEYWORDS, POSTRES_EXCLUDE)
 
-    # Bebidas from groups
-    bebida_total = sum(g["total"] for g in groups if g["name"].upper() in BEBIDA_GROUPS)
-    bebida_groups_found = [g for g in groups if g["name"].upper() in BEBIDA_GROUPS]
+    # Bebidas total and per-person
+    bebida_total_qty = 0
+    bebida_total_mxn = 0
+    for g in groups:
+        if g["name"].upper() in [b.upper() for b in BEBIDA_GROUPS]:
+            bebida_total_mxn += g["total"]
+            bebida_total_qty += g.get("qty", 0)
+    # Fallback: count bebida items from saucers if groups don't have qty
+    if bebida_total_qty == 0:
+        bebida_keywords = ["CAFE", "LATTE", "CAPUCHINO", "AMERICANO", "ESPRESSO",
+                           "JUGO", "SMOOTHIE", "FRAPPE", "TE ", "TISANA", "MATCHA",
+                           "LIMONADA", "NARANJADA", "AGUA", "SODA", "REFRESCO",
+                           "CHOCOLATE", "MOCHA"]
+        for s in saucers:
+            name_upper = s["name"].upper()
+            if any(kw in name_upper for kw in bebida_keywords):
+                bebida_total_qty += s["qty"]
+    bebidas_por_persona = round(bebida_total_qty / personas, 2) if personas else 0
 
     msg = f"""📊 REPORTE INTRADAY — {fecha} {hora}
 
@@ -266,74 +296,37 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 • Ventas netas: ${ventas_netas:,.0f}
 • Ventas restaurante (sin Market): ${ventas_restaurante:,.0f}
 • Market: ${market_ventas:,.0f}
-• Descuentos: ${descuentos:,.0f}
-• Tickets: {tickets} (rest: ~{tickets_restaurante})
+• Tickets restaurante: {tickets_restaurante}
 • Personas: {personas}
 • Ticket promedio restaurante: ${ticket_avg:,.0f}
-
-📈 TICKET PROMEDIO POR MES"""
-
-    for m in monthly_avg[-6:]:
-        msg += f"\n• {m['month']}: ${m['avg']:,.0f} (${m['ventas']:,.0f} en {m['days']} días)"
-
-    # TP weekday vs weekend
-    tp_split = get_tp_weekday_weekend()
-    if tp_split and tp_split["weekday_tp"] > 0:
-        msg += f"\n\n📊 TP ENTRE SEMANA vs FIN DE SEMANA (30d)"
-        msg += f"\n• Lun-Vie: ${tp_split['weekday_tp']:,} ({tp_split['weekday_dias']}d)"
-        msg += f"\n• Sáb-Dom: ${tp_split['weekend_tp']:,} ({tp_split['weekend_dias']}d)"
-        diff = tp_split['weekend_tp'] - tp_split['weekday_tp']
-        if diff > 0:
-            msg += f"\n• Fin de semana +${diff:,} por ticket"
-        elif diff < 0:
-            msg += f"\n• Entre semana +${abs(diff):,} por ticket"
-
-    msg += f"""
+• Personas por orden: {personas_por_orden}
 
 🥘 HALF & HALF
-• Total: ${sum_total(hh_items):,.0f} ({sum_qty(hh_items)} piezas)"""
-    for item in sorted(hh_items, key=lambda x: -x["total"])[:5]:
-        msg += f"\n  - {item['name']}: ${item['total']:,.0f} ({item['qty']})"
+{sum_qty(hh_items)} piezas
 
-    msg += f"""
+🌶️ CHILAQUILES
+{sum_qty(chilaquiles_items)} piezas
 
-🍞 PAN / TOAST / BAGELS
-• Total: ${sum_total(pan_items):,.0f} ({sum_qty(pan_items)} piezas)"""
-    for item in sorted(pan_items, key=lambda x: -x["total"])[:5]:
-        msg += f"\n  - {item['name']}: ${item['total']:,.0f} ({item['qty']})"
+🍞 PAN DULCE
+{sum_qty(panaderia_items)} piezas"""
+    if panaderia_items:
+        for item in sorted(panaderia_items, key=lambda x: -x["qty"]):
+            if item["qty"] > 0:
+                msg += f"\n  - {item['name']}: {item['qty']}"
 
     msg += f"""
 
 🍰 POSTRES
-• Total: ${sum_total(postre_items):,.0f} ({sum_qty(postre_items)} piezas)"""
-    for item in sorted(postre_items, key=lambda x: -x["total"])[:5]:
-        msg += f"\n  - {item['name']}: ${item['total']:,.0f} ({item['qty']})"
+{sum_qty(postre_items)} piezas"""
+    if postre_items:
+        for item in sorted(postre_items, key=lambda x: -x["qty"]):
+            if item["qty"] > 0:
+                msg += f"\n  - {item['name']}: {item['qty']}"
 
     msg += f"""
 
-☕ BEBIDAS
-• Total: ${bebida_total:,.0f}"""
-    for g in sorted(bebida_groups_found, key=lambda x: -x["total"])[:5]:
-        msg += f"\n  - {g['name']}: ${g['total']:,.0f}"
-
-    # Separate meseros from market staff
-    meseros = [u for u in users if u["total"] > 0 and is_mesero(u["name"], CLIENT)]
-    market = [u for u in users if u["total"] > 0 and is_market(u["name"], CLIENT)]
-
-    msg += "\n\n👤 VENTAS POR MESERO"
-    for u in sorted(meseros, key=lambda x: -x["total"]):
-        msg += f"\n• {u['name']}: ${u['total']:,.0f}"
-
-    if market:
-        msg += "\n\n🏪 MARKET"
-        for u in sorted(market, key=lambda x: -x["total"]):
-            msg += f"\n• {u['name']}: ${u['total']:,.0f}"
-
-    msg += f"""
-
-🏆 TOP 10 PLATILLOS"""
-    for item in sorted(saucers, key=lambda x: -x["total"])[:10]:
-        msg += f"\n• {item['name']}: ${item['total']:,.0f} ({item['qty']})"
+☕ BEBIDAS POR PERSONA
+{bebidas_por_persona} bebidas/persona ({bebida_total_qty} bebidas / {personas} personas)"""
 
     return msg
 
