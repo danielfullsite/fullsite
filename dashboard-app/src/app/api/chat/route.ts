@@ -79,12 +79,12 @@ export async function POST(request: NextRequest) {
     const q = message.toLowerCase()
 
     // 1. Recent daily data (use fetch to avoid SDK issues)
-    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
+    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
     const histLimit = wantsHistory ? 90 : 30
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     const recentDays = dailyRes.ok ? await dailyRes.json() : []
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
 
         const descuentos = Number(d.descuentos) || 0
 
-        const pagos = Array.isArray(d.pago_metodos) ? d.pago_metodos : (typeof d.pago_metodos === 'string' ? JSON.parse(d.pago_metodos) : [])
+        const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
         const pagoStr = pagos.map((p: { nombre: string; total: number }) => `${p.nombre}:$${Math.round(p.total)}`).join(', ')
 
         return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`

@@ -25,8 +25,8 @@ function extractEcommerce(day: WansoftDaily) {
   let total = 0
   const channels: Record<string, number> = {}
 
-  if (day.pago_metodos && Array.isArray(day.pago_metodos)) {
-    for (const m of day.pago_metodos) {
+  if (day.pago_métodos && Array.isArray(day.pago_métodos)) {
+    for (const m of day.pago_métodos) {
       const name = (m.nombre || '').toLowerCase()
       for (const kw of ECOMMERCE_KEYWORDS) {
         if (name.includes(kw)) {
@@ -139,7 +139,7 @@ export default function EcommercePage() {
             <KPICard
               label="Ticket promedio eCommerce"
               value={formatCurrency(ecommerceData.ticketPromedio)}
-              subtitle="Promedio por dia con ordenes"
+              subtitle="Promedio por día con ordenes"
               icon={Receipt}
               accentClass="kpi-accent-amber"
             />
@@ -158,7 +158,7 @@ export default function EcommercePage() {
                 Sin datos de eCommerce
               </p>
               <p className="text-xs text-amber-400 mt-1">
-                No se encontraron ventas de Rappi, Ubereats u otras plataformas en los metodos de pago.
+                No se encontraron ventas de Rappi, Ubereats u otras plataformas en los métodos de pago.
                 Si tu restaurante usa delivery, verifica que los pagos se registren correctamente en Wansoft.
               </p>
             </div>

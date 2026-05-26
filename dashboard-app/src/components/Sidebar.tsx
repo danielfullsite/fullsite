@@ -63,7 +63,7 @@ const navSections = [
     ],
   },
   {
-    label: 'Operaciones',
+    label: 'Operaciónes',
     items: [
       { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
@@ -95,7 +95,7 @@ const navSections = [
   {
     label: 'POS Tienda',
     items: [
-      { href: '/admin/tienda/articulos', label: 'Artículos', icon: Package },
+      { href: '/admin/tienda/artículos', label: 'Artículos', icon: Package },
       { href: '/admin/tienda/grupos', label: 'Grupos', icon: Settings },
       { href: '/admin/tienda/precios', label: 'Tipos de Precio', icon: DollarSign },
       { href: '/admin/tienda/promociones', label: 'Promociones', icon: Sparkles },

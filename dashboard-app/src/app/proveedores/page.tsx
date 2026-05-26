@@ -58,7 +58,7 @@ export default function ProveedoresPage() {
     <>
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Proveedores</h2>
-        <p className="text-sm text-[var(--text-3)]">Gasto por proveedor ultimos 30 dias {fecha && `· ${fecha}`}</p>
+        <p className="text-sm text-[var(--text-3)]">Gasto por proveedor últimos 30 dias {fecha && `· ${fecha}`}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

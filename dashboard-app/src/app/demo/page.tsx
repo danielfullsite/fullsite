@@ -9,7 +9,7 @@ export default function DemoPage() {
     nombre: '',
     restaurante: '',
     email: '',
-    telefono: '',
+    teléfono: '',
     pos: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -127,7 +127,7 @@ export default function DemoPage() {
             Como funciona
           </h2>
           <p className="text-[var(--text-2)] text-center mb-12 max-w-2xl mx-auto">
-            Tres pasos para transformar la operacion de tu restaurante
+            Tres pasos para transformar la operación de tu restaurante
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -188,7 +188,7 @@ export default function DemoPage() {
                 price: '$5,000',
                 features: [
                   'Todo de Pro',
-                  'Deteccion anti-fraude',
+                  'Detección anti-fraude',
                   'Onboarding dedicado',
                   'SLA garantizado',
                 ],
@@ -286,12 +286,12 @@ export default function DemoPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Telefono</label>
+                <label className="block text-sm font-medium text-[var(--text-1)] mb-1.5">Teléfono</label>
                 <input
                   type="tel"
                   required
-                  value={form.telefono}
-                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                  value={form.teléfono}
+                  onChange={(e) => setForm({ ...form, teléfono: e.target.value })}
                   className="w-full border border-[var(--line)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="81 1234 5678"
                 />

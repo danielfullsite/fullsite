@@ -13,10 +13,10 @@ function extractPayment(d: WansoftDaily): { efectivo: number; tarjeta: number; t
   if ((d.efectivo || 0) > 0 || (d.tarjeta || 0) > 0) {
     return { efectivo: d.efectivo || 0, tarjeta: d.tarjeta || 0, transferencia: 0 }
   }
-  // Otherwise extract from pago_metodos JSONB
-  const metodos = Array.isArray(d.pago_metodos) ? d.pago_metodos : []
+  // Otherwise extract from pago_métodos JSONB
+  const métodos = Array.isArray(d.pago_métodos) ? d.pago_métodos : []
   let efectivo = 0, tarjeta = 0, transferencia = 0
-  for (const m of metodos) {
+  for (const m of métodos) {
     const name = (m.nombre || '').toLowerCase()
     if (name.includes('efectivo')) efectivo += m.total || 0
     else if (name.includes('tarjeta') || name.includes('crédito') || name.includes('débito')) tarjeta += m.total || 0

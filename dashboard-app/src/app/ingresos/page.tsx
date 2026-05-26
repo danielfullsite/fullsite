@@ -36,8 +36,8 @@ export default function IngresosPage() {
   const totalTransferencia = useMemo(() => {
     let sum = 0
     for (const day of data) {
-      if (!day.pago_metodos || !Array.isArray(day.pago_metodos)) continue
-      for (const m of day.pago_metodos) {
+      if (!day.pago_métodos || !Array.isArray(day.pago_métodos)) continue
+      for (const m of day.pago_métodos) {
         if ((m.nombre || '').toLowerCase().includes('transferencia')) {
           sum += m.total || 0
         }
@@ -64,7 +64,7 @@ export default function IngresosPage() {
       <PageHeader
         eyebrow="AMALAY Coffee & Market"
         title="Control de Ingresos"
-        subtitle="Desglose de metodos de pago y flujo diario"
+        subtitle="Desglose de métodos de pago y flujo diario"
       />
 
       {loading ? (
@@ -149,7 +149,7 @@ export default function IngresosPage() {
                 })}
               </div>
             ) : (
-              <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de metodos de pago</p>
+              <p className="text-[var(--text-3)] text-sm py-8 text-center">Sin datos de métodos de pago</p>
             )}
           </div>
 

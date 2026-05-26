@@ -35,7 +35,7 @@ function makeDailyRow(overrides: Partial<DailyRow> = {}): DailyRow {
       { nombre: 'COFFEE HOT/ICE', total: 8900 },
       { nombre: 'TOAST & BAGELS', total: 4200 },
     ],
-    pago_metodos: [
+    pago_métodos: [
       { nombre: 'Tarjeta de crédito', total: 20000 },
       { nombre: 'Efectivo', total: 15000 },
       { nombre: 'Transferencia electrónica', total: 5000 },
@@ -175,7 +175,7 @@ describe('buildDailyContext', () => {
     expect(ctx).toContain('18pzas')
   })
 
-  it('includes pago_metodos breakdown', () => {
+  it('includes pago_métodos breakdown', () => {
     const ctx = buildDailyContext([makeDailyRow()])
     expect(ctx).toContain('Pagos:')
     expect(ctx).toContain('Tarjeta de crédito:$20000')
@@ -214,7 +214,7 @@ describe('buildDailyContext', () => {
     const row = makeDailyRow({
       meseros: [],
       ventas_por_grupo: [],
-      pago_metodos: [],
+      pago_métodos: [],
       platillos_top: [],
     })
     const ctx = buildDailyContext([row])
@@ -228,7 +228,7 @@ describe('buildDailyContext', () => {
     const row = makeDailyRow({
       meseros: undefined as unknown as string,
       ventas_por_grupo: null as unknown as string,
-      pago_metodos: undefined as unknown as string,
+      pago_métodos: undefined as unknown as string,
       platillos_top: undefined as unknown as string,
     })
     // Should not throw

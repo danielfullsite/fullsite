@@ -22,7 +22,7 @@ export default function TerminosPage() {
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside">
             <li><strong>&quot;Fullsite&quot;</strong> o <strong>&quot;el Servicio&quot;</strong>: la plataforma de punto de venta con inteligencia artificial operada por Fullsite</li>
             <li><strong>&quot;Cliente&quot;</strong> o <strong>&quot;Usuario&quot;</strong>: persona fisica o moral que contrata y utiliza el Servicio</li>
-            <li><strong>&quot;Datos del Cliente&quot;</strong>: toda la informacion que el Cliente ingresa, genera o almacena en la plataforma</li>
+            <li><strong>&quot;Datos del Cliente&quot;</strong>: toda la información que el Cliente ingresa, genera o almacena en la plataforma</li>
             <li><strong>&quot;Contenido IA&quot;</strong>: cualquier texto, analisis, recomendacion o insight generado por los modelos de inteligencia artificial del Servicio</li>
             <li><strong>&quot;Plataforma&quot;</strong>: la aplicacion web accesible en app.fullsite.mx y sus subdominios</li>
           </ul>
@@ -41,7 +41,7 @@ export default function TerminosPage() {
             <li>Asistente de IA para consultas operativas via WhatsApp y dashboard</li>
             <li>Gestion de inventario con deduccion automatica por receta</li>
             <li>Alertas proactivas y reportes automatizados</li>
-            <li>Sistema de agentes de IA (Coach, anomalias, predicciones)</li>
+            <li>Sistema de agentes de IA (Coach, anomalias, predicciónes)</li>
           </ul>
         </section>
 
@@ -82,8 +82,8 @@ export default function TerminosPage() {
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">6. Propiedad de los datos</h2>
           <p className="text-sm text-text-soft leading-relaxed">
-            <strong>El Cliente es y sera en todo momento el unico propietario de sus Datos del Cliente.</strong>{' '}
-            Fullsite actua como encargado del tratamiento (procesador) conforme al articulo 50 de la LFPDPPP.
+            <strong>El Cliente es y sera en todo momento el único propietario de sus Datos del Cliente.</strong>{' '}
+            Fullsite actua como encargado del tratamiento (procesador) conforme al artículo 50 de la LFPDPPP.
           </p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside mt-2">
             <li>El Cliente puede solicitar la exportacion completa de sus datos en formato CSV en cualquier momento</li>
@@ -111,16 +111,16 @@ export default function TerminosPage() {
             </p>
           </div>
           <p className="text-sm text-text-soft leading-relaxed">
-            El Servicio utiliza modelos de inteligencia artificial para generar analisis, predicciones,
+            El Servicio utiliza modelos de inteligencia artificial para generar analisis, predicciónes,
             recomendaciones e insights operativos (&quot;Contenido IA&quot;). Al respecto, el Cliente reconoce y acepta que:
           </p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside mt-2">
             <li>El Contenido IA se proporciona &quot;tal cual&quot; y tiene caracter <strong>informativo y sugerente, no vinculante</strong></li>
-            <li>El Contenido IA <strong>no constituye asesoria profesional</strong> de ningun tipo (financiera, contable, fiscal, legal, laboral, de salud ni de seguridad alimentaria)</li>
-            <li>Los modelos de IA pueden generar informacion inexacta, incompleta o desactualizada (&quot;alucinaciones&quot;)</li>
-            <li>El Cliente es el <strong>unico responsable</strong> de evaluar, validar y decidir sobre cualquier accion derivada del Contenido IA</li>
+            <li>El Contenido IA <strong>no constituye asesoría profesional</strong> de ningun tipo (financiera, contable, fiscal, legal, laboral, de salud ni de seguridad alimentaria)</li>
+            <li>Los modelos de IA pueden generar información inexacta, incompleta o desactualizada (&quot;alucinaciones&quot;)</li>
+            <li>El Cliente es el <strong>único responsable</strong> de evaluar, validar y decidir sobre cualquier accion derivada del Contenido IA</li>
             <li>Fullsite <strong>no garantiza</strong> resultados comerciales, ahorros, incrementos de ventas ni ningun resultado economico especifico derivado del uso del Contenido IA</li>
-            <li>Las predicciones y proyecciones son estimaciones basadas en datos historicos y no garantizan resultados futuros</li>
+            <li>Las predicciónes y proyecciónes son estimaciones basadas en datos históricos y no garantizan resultados futuros</li>
             <li>El Cliente debe consultar a profesionales calificados para decisiones financieras, legales, fiscales o de cualquier otra naturaleza especializada</li>
           </ul>
         </section>
@@ -128,12 +128,12 @@ export default function TerminosPage() {
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">9. Limitacion de responsabilidad</h2>
           <p className="text-sm text-text-soft leading-relaxed">
-            EN LA MAXIMA MEDIDA PERMITIDA POR LA LEY APLICABLE:
+            EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY APLICABLE:
           </p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside mt-2">
             <li>Fullsite proporciona el Servicio &quot;tal cual&quot; (&quot;as is&quot;) y &quot;segun disponibilidad&quot; (&quot;as available&quot;)</li>
-            <li>Fullsite <strong>no sera responsable</strong> por danos indirectos, incidentales, especiales, consecuentes o punitivos, incluyendo pero no limitado a: perdida de ganancias, perdida de datos, interrupcion del negocio o perdida de oportunidades comerciales</li>
-            <li>La responsabilidad total acumulada de Fullsite no excedera el monto pagado por el Cliente en los <strong>ultimos 3 meses</strong> de servicio</li>
+            <li>Fullsite <strong>no sera responsable</strong> por daños indirectos, incidentales, especiales, consecuentes o punitivos, incluyendo pero no limitado a: pérdida de ganancias, pérdida de datos, interrupcion del negocio o pérdida de oportunidades comerciales</li>
+            <li>La responsabilidad total acumulada de Fullsite no excedera el monto pagado por el Cliente en los <strong>últimos 3 meses</strong> de servicio</li>
             <li>Fullsite no es responsable por la exactitud de los datos provenientes de sistemas de terceros (POS anteriores, proveedores, APIs externas)</li>
             <li>Fullsite no es responsable por decisiones tomadas por el Cliente basadas en el Contenido IA</li>
             <li>Fullsite no es responsable por interrupciones causadas por fallas en la conectividad a internet del Cliente, cortes de energia o fallas en dispositivos del Cliente</li>

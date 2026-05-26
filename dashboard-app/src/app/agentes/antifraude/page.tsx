@@ -83,7 +83,7 @@ export default function AntiFraudePage() {
           </Link>
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Anti-Fraude</h2>
-            <p className="text-sm text-[var(--text-3)]">Deteccion de patrones sospechosos {fecha && `· ${fecha}`}</p>
+            <p className="text-sm text-[var(--text-3)]">Detección de patrónes sospechosos {fecha && `· ${fecha}`}</p>
           </div>
         </div>
         <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">

@@ -117,7 +117,7 @@ export default function PropinasPage() {
             <KPICard
               label="Propina promedio"
               value={formatCurrency(propinaPromedio)}
-              subtitle="Promedio por dia"
+              subtitle="Promedio por día"
               icon={TrendingUp}
               accentClass="kpi-accent-green"
             />

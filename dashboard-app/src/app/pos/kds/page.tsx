@@ -86,6 +86,7 @@ export default function KDSPage() {
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
+  const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const prevCount = useRef(0)
 
   const fetchOrders = useCallback(async () => {
@@ -127,6 +128,29 @@ export default function KDSPage() {
     await updateOrderStatus(id, 'entregada')
     logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
     fetchOrders()
+  }
+
+  const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
+    const key = `${orderId}-${itemIndex}`
+    setDoneItems(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+        // Check if all active items are now done — auto-advance to "lista"
+        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        const allDone = items.every((item, idx) => {
+          if (item.cancelled) return true // skip cancelled items
+          const k = `${orderId}-${idx}`
+          return k === key || prev.has(k)
+        })
+        if (allDone && order.status === 'preparando') {
+          advance(orderId, order.status, order.mesa, order.mesero)
+        }
+      }
+      return next
+    })
   }
 
   // Filter orders by station
@@ -224,16 +248,22 @@ export default function KDSPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredOrders.map(order => {
               const mins = elapsed(order.created_at)
-              const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              const activeItems = items.filter(i => {
-                if (i.cancelled) return false
-                if (station === 'todas') return true
-                return getStation(i.nombre || i.name || '') === station
-              })
 
               const isNew = order.status === 'enviada'
               const isPrep = order.status === 'preparando'
               const isDone = order.status === 'lista'
+
+              // Item-level done tracking — use original index (before station filter) for stable keys
+              const allItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+              const activeItemsWithIndex = allItems
+                .map((item, idx) => ({ item, originalIndex: idx }))
+                .filter(({ item }) => {
+                  if (item.cancelled) return false
+                  if (station === 'todas') return true
+                  return getStation(item.nombre || item.name || '') === station
+                })
+              const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
+              const totalCount = activeItemsWithIndex.length
 
               const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
               const headerBg = isNew ? 'bg-[var(--surface)] text-black' : isPrep ? 'bg-amber-500/100 text-black' : 'bg-emerald-500/100 text-black'
@@ -243,7 +273,7 @@ export default function KDSPage() {
                   key={order.id}
                   className={`rounded-2xl border-2 ${borderColor} bg-[var(--surface)] flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''}`}
                 >
-                  {/* Header — mesa + timer */}
+                  {/* Header — mesa + timer + progress */}
                   <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-3xl font-black">{order.mesa || 'D'}</span>
@@ -252,28 +282,75 @@ export default function KDSPage() {
                         <p className="opacity-70">{order.mesero?.split(' ')[0]}</p>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border ${timerBg(mins)}`}>
-                      <span className={`text-lg font-mono font-black ${timerColor(mins)}`}>
-                        {mins}m
-                      </span>
+                    <div className="flex items-center gap-2">
+                      {isPrep && totalCount > 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-black/20">
+                          {doneCount}/{totalCount}
+                        </span>
+                      )}
+                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border ${timerBg(mins)}`}>
+                        <span className={`text-lg font-mono font-black ${timerColor(mins)}`}>
+                          {mins}m
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Items */}
-                  <div className="flex-1 px-4 py-3 space-y-1.5">
-                    {activeItems.map((item, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-emerald-400 font-bold text-base min-w-[28px]">
-                          {item.cantidad || item.quantity || 1}x
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-white text-sm font-medium">{item.nombre || item.name}</p>
-                          {item.modificadores && item.modificadores.length > 0 && (
-                            <p className="text-amber-400/80 text-xs">{item.modificadores.join(' · ')}</p>
+                  {/* Progress bar for preparando orders */}
+                  {isPrep && totalCount > 0 && (
+                    <div className="h-1 bg-slate-700">
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${(doneCount / totalCount) * 100}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Items — tappable in preparando state */}
+                  <div className="flex-1 px-4 py-3 space-y-0.5">
+                    {activeItemsWithIndex.map(({ item, originalIndex }) => {
+                      const itemKey = `${order.id}-${originalIndex}`
+                      const itemDone = doneItems.has(itemKey)
+                      const canToggle = isPrep
+
+                      return (
+                        <button
+                          key={originalIndex}
+                          type="button"
+                          disabled={!canToggle}
+                          onClick={() => canToggle && toggleItemDone(order.id, originalIndex, order)}
+                          className={`flex items-start gap-2 w-full text-left rounded-lg px-2 py-1.5 min-h-[48px] transition-colors ${
+                            canToggle ? 'active:bg-slate-700/50 cursor-pointer' : 'cursor-default'
+                          } ${itemDone ? 'opacity-60' : ''}`}
+                        >
+                          {/* Done indicator */}
+                          {canToggle && (
+                            <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                              itemDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'
+                            }`}>
+                              {itemDone && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
                           )}
-                        </div>
-                      </div>
-                    ))}
+                          <span className={`font-bold text-base min-w-[28px] ${itemDone ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                            {item.cantidad || item.quantity || 1}x
+                          </span>
+                          <div className="flex-1">
+                            <p className={`text-sm font-medium ${itemDone ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                              {item.nombre || item.name}
+                            </p>
+                            {item.modificadores && item.modificadores.length > 0 && (
+                              <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : 'text-amber-400/80'}`}>
+                                {item.modificadores.join(' · ')}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {/* Action button — BIG touch target */}

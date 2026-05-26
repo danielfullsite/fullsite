@@ -40,27 +40,27 @@ export default function PrivacidadPage() {
           <ul className="text-sm text-text-soft leading-relaxed space-y-1 list-disc list-inside">
             <li>Nombre completo del titular o representante legal</li>
             <li>Correo electronico</li>
-            <li>Numero de telefono (opcional)</li>
+            <li>Numero de teléfono (opcional)</li>
             <li>Nombre del establecimiento comercial</li>
           </ul>
           <p className="text-sm font-medium text-text mt-3 mb-1">Datos operativos del negocio:</p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1 list-disc list-inside">
-            <li>Datos de punto de venta: transacciones, tickets, montos, metodos de pago</li>
+            <li>Datos de punto de venta: transacciones, tickets, montos, métodos de pago</li>
             <li>Datos de personal operativo: nombres de meseros, ventas por empleado, horarios</li>
             <li>Datos de inventario: productos, ingredientes, costos, recetas</li>
-            <li>Datos de clientes del restaurante: reservaciones (nombre, telefono, fecha)</li>
+            <li>Datos de clientes del restaurante: reservaciones (nombre, teléfono, fecha)</li>
             <li>Metricas operativas generadas por la plataforma</li>
           </ul>
           <p className="text-sm font-medium text-text mt-3 mb-1">Datos de uso de la plataforma:</p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1 list-disc list-inside">
-            <li>Direccion IP, tipo de navegador, paginas visitadas</li>
+            <li>Dirección IP, tipo de navegador, páginas visitadas</li>
             <li>Consultas realizadas al asistente de inteligencia artificial</li>
-            <li>Registros de acceso y auditoria (logs)</li>
+            <li>Registros de acceso y auditoría (logs)</li>
           </ul>
           <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <p className="text-xs text-amber-800 leading-relaxed">
-              <strong>Datos sensibles:</strong> No recabamos datos sensibles conforme al articulo 3, fraccion VI de la LFPDPPP
-              (datos de salud, origen etnico, creencias religiosas, orientacion sexual, etc.).
+              <strong>Datos sensibles:</strong> No recabamos datos sensibles conforme al artículo 3, fraccion VI de la LFPDPPP
+              (datos de salud, origen étnico, creencias religiosas, orientación sexual, etc.).
             </p>
           </div>
         </section>
@@ -72,7 +72,7 @@ export default function PrivacidadPage() {
             <li>Proveer acceso y funcionalidad del punto de venta (POS)</li>
             <li>Generar reportes de ventas, inventario y desempeno operativo</li>
             <li>Procesar consultas mediante inteligencia artificial para insights operativos</li>
-            <li>Enviar alertas automatizadas sobre anomalias en la operacion</li>
+            <li>Enviar alertas automatizadas sobre anomalias en la operación</li>
             <li>Gestionar cuentas de usuario y autenticacion</li>
             <li>Cumplir obligaciones contractuales del servicio</li>
           </ul>
@@ -93,7 +93,7 @@ export default function PrivacidadPage() {
           <h2 className="text-sm font-semibold text-text mb-3">4. Transferencias de datos</h2>
           <p className="text-sm text-text-soft leading-relaxed mb-2">
             Sus datos personales podran ser transferidos a los siguientes terceros para las finalidades
-            indicadas, conforme al articulo 37 de la LFPDPPP:
+            indicadas, conforme al artículo 37 de la LFPDPPP:
           </p>
           <div className="overflow-x-auto mt-2">
             <table className="w-full text-sm">
@@ -144,7 +144,7 @@ export default function PrivacidadPage() {
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside mt-2">
             <li>Los datos operativos se envian al modelo de IA unicamente durante la sesion de consulta</li>
             <li>Anthropic no almacena los prompts ni las respuestas de forma permanente cuando se utiliza su API comercial</li>
-            <li>Las respuestas generadas por IA son sugerencias y no constituyen asesoria profesional (financiera, legal, fiscal o de otro tipo)</li>
+            <li>Las respuestas generadas por IA son sugerencias y no constituyen asesoría profesional (financiera, legal, fiscal o de otro tipo)</li>
             <li>El usuario es responsable de validar y decidir sobre cualquier recomendacion generada por la IA</li>
             <li>Fullsite no garantiza la exactitud, completitud o idoneidad de las respuestas generadas por IA</li>
           </ul>
@@ -153,7 +153,7 @@ export default function PrivacidadPage() {
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
           <h2 className="text-sm font-semibold text-text mb-3">6. Derechos ARCO</h2>
           <p className="text-sm text-text-soft leading-relaxed">
-            Conforme a los articulos 28 y 29 de la LFPDPPP, usted tiene derecho a:
+            Conforme a los artículos 28 y 29 de la LFPDPPP, usted tiene derecho a:
           </p>
           <ul className="text-sm text-text-soft leading-relaxed space-y-1.5 list-disc list-inside mt-2">
             <li><strong>Acceder</strong> a sus datos personales en posesion de Fullsite</li>
@@ -175,17 +175,17 @@ export default function PrivacidadPage() {
             <strong>Plazos:</strong> Responderemos en un plazo maximo de 20 dias habiles contados desde la
             recepcion de la solicitud. La respuesta indicara si la solicitud es procedente y, en su
             caso, se hara efectiva dentro de los 15 dias habiles siguientes. Estos plazos podran
-            ampliarse una sola vez por un periodo igual, conforme al articulo 32 de la LFPDPPP.
+            ampliarse una sola vez por un periodo igual, conforme al artículo 32 de la LFPDPPP.
           </p>
         </section>
 
         <section className="bg-card rounded-xl border border-border card-shadow p-6">
-          <h2 className="text-sm font-semibold text-text mb-3">7. Revocacion del consentimiento</h2>
+          <h2 className="text-sm font-semibold text-text mb-3">7. Revocación del consentimiento</h2>
           <p className="text-sm text-text-soft leading-relaxed">
             Usted puede revocar su consentimiento para el tratamiento de sus datos personales en
             cualquier momento, sin efectos retroactivos, enviando solicitud a{' '}
             <a href="mailto:privacidad@fullsite.mx" className="text-accent hover:underline">privacidad@fullsite.mx</a>.
-            Tenga en cuenta que la revocacion del consentimiento para finalidades primarias podra
+            Tenga en cuenta que la revocación del consentimiento para finalidades primarias podra
             implicar la imposibilidad de continuar prestando el servicio.
           </p>
         </section>
@@ -222,7 +222,7 @@ export default function PrivacidadPage() {
           <h2 className="text-sm font-semibold text-text mb-3">11. Autoridad competente</h2>
           <p className="text-sm text-text-soft leading-relaxed">
             Si considera que su derecho a la proteccion de datos ha sido vulnerado, puede presentar
-            una queja ante el Instituto Nacional de Transparencia, Acceso a la Informacion y
+            una queja ante el Instituto Nacional de Transparencia, Acceso a la Información y
             Proteccion de Datos Personales (INAI):{' '}
             <span className="text-accent">www.inai.org.mx</span>
           </p>

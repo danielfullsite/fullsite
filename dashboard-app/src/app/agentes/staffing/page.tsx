@@ -70,7 +70,7 @@ export default function StaffingPage() {
           </Link>
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Optimizacion de Staffing</h2>
-            <p className="text-sm text-[var(--text-3)]">Cobertura de personal por dia {fecha && `· ${fecha}`}</p>
+            <p className="text-sm text-[var(--text-3)]">Cobertura de personal por día {fecha && `· ${fecha}`}</p>
           </div>
         </div>
         <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
@@ -89,7 +89,7 @@ export default function StaffingPage() {
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm mb-6">
         <div className="px-4 py-3 border-b border-[var(--line-soft)]">
           <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
-            <Users size={14} className="text-amber-500" /> Staffing por dia de la semana
+            <Users size={14} className="text-amber-500" /> Staffing por día de la semana
           </h3>
         </div>
         {porDia.length === 0 ? (

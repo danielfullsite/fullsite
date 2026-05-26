@@ -63,7 +63,7 @@ function safeArray<T>(val: unknown): T[] {
 
 function findRecentDataForField<T>(
   recentData: WansoftDaily[],
-  fieldName: 'ventas_por_grupo' | 'pago_metodos',
+  fieldName: 'ventas_por_grupo' | 'pago_métodos',
 ): T[] {
   for (let i = recentData.length - 1; i >= 0; i--) {
     const arr = safeArray<T>(recentData[i][fieldName])
@@ -80,7 +80,7 @@ const WIDGET_DEFS = [
   { id: 'insight', label: 'Insight del día', defaultOn: true },
   { id: 'month_progress', label: 'Progreso del mes', defaultOn: true },
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
-  { id: 'prediction', label: 'Prediccion de cierre', defaultOn: true },
+  { id: 'prediction', label: 'Predicción de cierre', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
   { id: 'agent_status', label: 'Status de agentes', defaultOn: true },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
@@ -200,7 +200,7 @@ export default function DashboardPage() {
     }
   })()
 
-  const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
   const todayDOWName = latestDay ? dayNames[new Date(latestDay.fecha + 'T12:00:00').getDay()] : ''
 
   // Period-aware calculations
@@ -320,11 +320,11 @@ export default function DashboardPage() {
   const gruposData = gruposRaw.map(g => ({ ...g, nombre: cleanCategoryName(g.nombre) }))
 
   const paymentMethods = (() => {
-    const latestPayments = safeArray<PagoMetodoEntry>(latestDay?.pago_metodos)
+    const latestPayments = safeArray<PagoMetodoEntry>(latestDay?.pago_métodos)
       .filter((p) => p.total > 0)
       .sort((a, b) => b.total - a.total)
     if (latestPayments.length > 0) return latestPayments
-    return findRecentDataForField<PagoMetodoEntry>(recentData, 'pago_metodos')
+    return findRecentDataForField<PagoMetodoEntry>(recentData, 'pago_métodos')
       .sort((a, b) => (b as PagoMetodoEntry).total - (a as PagoMetodoEntry).total)
   })()
   const paymentMax = paymentMethods[0]?.total || 1
@@ -335,7 +335,7 @@ export default function DashboardPage() {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
-            {period === 'dia' ? 'Resumen del dia' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
+            {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {latestDay && (
             <span className="text-sm text-[var(--text-3)]">
@@ -441,7 +441,7 @@ export default function DashboardPage() {
       {/* KPI Summary Cards — 4 across like Toast */}
       {show('kpis') && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
-          label={period === 'dia' ? 'Ventas del dia' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
+          label={period === 'dia' ? 'Ventas del día' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
           value={formatCurrency(periodData.ventas)}
           delta={`${formatPercent(ventasChange)} ${periodData.label}`}
           deltaType={ventasChange >= 0 ? 'up' : 'down'}
@@ -543,7 +543,7 @@ export default function DashboardPage() {
               {agentRuns.slice(0, 8).map(run => {
                 const agentNames: Record<string, string> = {
                   'anomaly-detector': 'Anomalias',
-                  'close-predictor': 'Prediccion',
+                  'close-predictor': 'Predicción',
                   'upselling': 'Upselling',
                   'menu-engineering': 'Menu Eng.',
                   'staffing-optimizer': 'Staffing',
@@ -604,7 +604,7 @@ export default function DashboardPage() {
                 : <TrendingDown size={20} className="text-red-600" />}
               <div>
                 <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-[var(--accent-bright)]' : 'text-red-400'}`}>
-                  {formatPercent(vsLastWeek)} vs mismo dia semana pasada
+                  {formatPercent(vsLastWeek)} vs mismo día semana pasada
                 </p>
                 <p className="text-sm text-[var(--text-2)]">
                   {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {sameDayLastWeek.fecha}
@@ -780,7 +780,7 @@ export default function DashboardPage() {
                   return peak.fecha ? new Date(peak.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long' }) : '-'
                 })()}
               </span>
-              <span className="text-sm text-[var(--text-3)]">mejor dia (7d)</span>
+              <span className="text-sm text-[var(--text-3)]">mejor día (7d)</span>
             </div>
             <div className="mt-3 flex items-center gap-4 text-sm">
               <div>
@@ -800,7 +800,7 @@ export default function DashboardPage() {
               <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center">
                 <Activity size={14} className="text-cyan-400" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--text-1)]">Eficiencia del dia</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-1)]">Eficiencia del día</h3>
             </div>
             <div className="space-y-3">
               {[

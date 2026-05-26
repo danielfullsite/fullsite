@@ -17,7 +17,7 @@ export interface WansoftDaily {
   meseros: MeseroEntry[]
   platillos_top: PlatilloEntry[]
   ventas_por_grupo: GrupoEntry[]
-  pago_metodos: PagoMetodoEntry[]
+  pago_métodos: PagoMetodoEntry[]
 }
 
 export interface MeseroEntry {

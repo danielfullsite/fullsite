@@ -86,7 +86,7 @@ export interface DailyRow {
   tarjeta?: number
   meseros?: Array<{ nombre: string; total: number }> | string
   ventas_por_grupo?: Array<{ nombre: string; total: number }> | string
-  pago_metodos?: Array<{ nombre: string; total: number }> | string
+  pago_métodos?: Array<{ nombre: string; total: number }> | string
   platillos_top?: Array<{ nombre: string; cantidad?: number; total: number }> | string
 }
 
@@ -126,7 +126,7 @@ export function buildDailyContext(recentDays: DailyRow[]): string {
 
     const descuentos = Number(d.descuentos) || 0
 
-    const pagos = parseJsonArray<{ nombre: string; total: number }>(d.pago_metodos)
+    const pagos = parseJsonArray<{ nombre: string; total: number }>(d.pago_métodos)
     const pagoStr = pagos.map((p) => `${p.nombre}:$${Math.round(p.total)}`).join(', ')
 
     return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
@@ -282,7 +282,7 @@ export function needsExtendedHistory(q: string): boolean {
   const lower = q.toLowerCase()
   const exactWords = ['mes']
   const substrings = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana',
-    'comparar', 'compara', 'mejor dia', 'peor dia', 'patron', 'ultimos',
+    'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos',
     'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año']
   return substrings.some(kw => lower.includes(kw)) ||
     exactWords.some(kw => new RegExp(`\\b${kw}\\b`).test(lower))

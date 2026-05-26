@@ -174,7 +174,7 @@ export default function NominaPage() {
             <div>
               {shifts.length > 0 && (
                 <div className="px-4 py-3 border-b border-[var(--line-soft)] bg-[var(--surface-2)]">
-                  <p className="text-xs font-medium text-[var(--text-2)] mb-2">Turnos del dia</p>
+                  <p className="text-xs font-medium text-[var(--text-2)] mb-2">Turnos del día</p>
                   <div className="flex flex-wrap gap-3">
                     {shifts.map((s, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 text-sm">

@@ -225,11 +225,11 @@ export default function CortePage() {
               </div>
             </div>
 
-            {/* Metodos de pago */}
+            {/* Métodos de pago */}
             <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <CreditCard size={18} className="text-blue-400" />
-                Metodos de pago
+                Métodos de pago
               </h3>
               <div className="space-y-3">
                 {Object.entries(stats.byPayment).map(([method, total]) => (

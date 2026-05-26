@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch 90 days of daily data
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_metodos&ventas_dia=gt.0&order=fecha.desc&limit=90`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,ventas_por_grupo,propinas_total,pago_métodos&ventas_dia=gt.0&order=fecha.desc&limit=90`,
       { headers, cache: 'no-store' }
     )
     const days = dailyRes.ok ? await dailyRes.json() : []
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const mxOffset = -6 * 60 * 60 * 1000
     const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
-    const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
     const systemPrompt = `Eres el COACH OPERATIVO de AMALAY Coffee & Market. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
 

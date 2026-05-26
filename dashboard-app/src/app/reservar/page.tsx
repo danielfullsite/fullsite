@@ -9,7 +9,7 @@ type EspacioId = 'terraza' | 'jardin' | 'salon' | ''
 
 interface FormData {
   nombre: string
-  telefono: string
+  teléfono: string
   fecha: string
   espacio: EspacioId
   horario_inicio: string
@@ -30,7 +30,7 @@ const ESPACIOS = [
     icon: '🌿',
     min: 10, max: 24,
     desc: 'Segundo piso · Sin renta · Solo consumo + 18% servicio',
-    available: 'Disponible todo el dia',
+    available: 'Disponible todo el día',
   },
   {
     id: 'jardin' as const,
@@ -118,7 +118,7 @@ export default function ReservarPage() {
   const [submitted, setSubmitted] = useState(false)
   const [form, setForm] = useState<FormData>({
     nombre: '',
-    telefono: '',
+    teléfono: '',
     fecha: '',
     espacio: '',
     horario_inicio: '',
@@ -153,7 +153,7 @@ export default function ReservarPage() {
 
   const horarios = useMemo(() => getHorarios(form.espacio as EspacioId), [form.espacio])
 
-  const canStep2 = form.nombre && form.telefono && form.fecha && form.espacio && form.horario_inicio && form.horario_fin && !guestError && form.guests > 0
+  const canStep2 = form.nombre && form.teléfono && form.fecha && form.espacio && form.horario_inicio && form.horario_fin && !guestError && form.guests > 0
   const canStep3 = form.paquete !== ''
 
   async function handleSubmit() {
@@ -166,7 +166,7 @@ export default function ReservarPage() {
       const body = {
         codigo_reserva: codigo,
         nombre: form.nombre,
-        telefono: form.telefono,
+        teléfono: form.teléfono,
         fecha: form.fecha,
         espacio: form.espacio,
         horario_inicio: form.horario_inicio,
@@ -212,7 +212,7 @@ export default function ReservarPage() {
             Nos pondremos en contacto contigo para confirmar los detalles y coordinar el anticipo.
           </p>
           <p className="text-sm text-black/60 mb-6">
-            Revisa tu WhatsApp — te enviaremos un mensaje al {form.telefono}
+            Revisa tu WhatsApp — te enviaremos un mensaje al {form.teléfono}
           </p>
           <a
             href={`https://wa.me/528115324371?text=Hola%2C%20acabo%20de%20hacer%20una%20reservacion%20para%20${encodeURIComponent(form.nombre)}%20el%20${form.fecha}`}
@@ -281,10 +281,10 @@ export default function ReservarPage() {
               </div>
               <div>
                 <label className="block text-sm font-bold text-black mb-1">
-                  <Phone className="w-3.5 h-3.5 inline mr-1" />Telefono / WhatsApp
+                  <Phone className="w-3.5 h-3.5 inline mr-1" />Teléfono / WhatsApp
                 </label>
                 <input
-                  type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)}
+                  type="tel" value={form.teléfono} onChange={e => set('teléfono', e.target.value)}
                   placeholder="81 1234 5678"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-black text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                 />
@@ -554,8 +554,8 @@ export default function ReservarPage() {
                   <div className="text-black font-bold">{form.nombre}</div>
                 </div>
                 <div>
-                  <div className="text-black/40 text-xs font-bold">Telefono</div>
-                  <div className="text-black font-bold">{form.telefono}</div>
+                  <div className="text-black/40 text-xs font-bold">Teléfono</div>
+                  <div className="text-black font-bold">{form.teléfono}</div>
                 </div>
                 <div>
                   <div className="text-black/40 text-xs font-bold">Fecha</div>
@@ -629,7 +629,7 @@ export default function ReservarPage() {
               </div>
 
               <div className="mt-3 text-xs text-black/40 font-medium">
-                El resto ({formatMXN(total - anticipo)}) se cubre el dia del evento.
+                El resto ({formatMXN(total - anticipo)}) se cubre el día del evento.
               </div>
             </div>
 

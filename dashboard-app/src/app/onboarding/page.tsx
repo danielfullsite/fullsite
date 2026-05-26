@@ -179,7 +179,7 @@ export default function OnboardingPage() {
           <span className="font-black text-xl tracking-tight text-[var(--text-1)]">
             fullsite<span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5" />
           </span>
-          <span className="text-sm text-[var(--text-3)]">Configuracion inicial</span>
+          <span className="text-sm text-[var(--text-3)]">Configuración inicial</span>
         </div>
       </header>
 
@@ -208,7 +208,7 @@ export default function OnboardingPage() {
           {step === 0 && (
             <div>
               <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Tu restaurante</h2>
-              <p className="text-[var(--text-2)] mb-6">Informacion basica para configurar tu cuenta.</p>
+              <p className="text-[var(--text-2)] mb-6">Información basica para configurar tu cuenta.</p>
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Nombre del restaurante *</label>
@@ -230,7 +230,7 @@ export default function OnboardingPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Telefono</label>
+                    <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Teléfono</label>
                     <input value={info.phone} onChange={e => setInfo({ ...info, phone: e.target.value })}
                       placeholder="81 1234 5678"
                       className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
@@ -336,7 +336,7 @@ export default function OnboardingPage() {
           {/* Step 3: Payments */}
           {step === 3 && (
             <div>
-              <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Metodos de pago</h2>
+              <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Métodos de pago</h2>
               <p className="text-[var(--text-2)] mb-6">Configura como cobras. Puedes editarlos despues en /admin/formas-pago.</p>
               <div className="space-y-3">
                 {payments.map((pm, i) => (
@@ -349,7 +349,7 @@ export default function OnboardingPage() {
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-[var(--text-3)]">Estos son los metodos mas comunes. Puedes agregar mas despues.</p>
+              <p className="mt-4 text-xs text-[var(--text-3)]">Estos son los métodos mas comunes. Puedes agregar mas despues.</p>
             </div>
           )}
 

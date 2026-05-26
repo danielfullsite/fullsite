@@ -29,7 +29,7 @@ const sections = [
     icon: Eye,
     title: 'Audit trail completo',
     description:
-      'Cada accion en el POS se registra en un trail de auditoria inmutable: quien hizo que, cuando, y con que autorizacion. Cancelaciones, descuentos, voids, cambios de mesa, reabrir cuentas — todo queda registrado con timestamp y PIN del operador.',
+      'Cada accion en el POS se registra en un trail de auditoría inmutable: quien hizo que, cuando, y con que autorización. Cancelaciones, descuentos, voids, cambios de mesa, reabrir cuentas — todo queda registrado con timestamp y PIN del operador.',
   },
   {
     icon: Brain,
@@ -77,7 +77,7 @@ export default function SeguridadPage() {
           </div>
           <p className="text-white/60 text-base max-w-2xl leading-relaxed">
             La seguridad de los datos de nuestros clientes es nuestra maxima prioridad.
-            Protegemos tu informacion con los mismos estandares que usan las instituciones financieras.
+            Protegemos tu información con los mismos estandares que usan las instituciones financieras.
           </p>
         </div>
       </div>

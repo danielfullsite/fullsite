@@ -211,7 +211,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
           }`}
         >
           <TrendingUp size={16} className="inline mr-1.5" />
-          Reporte del dia
+          Reporte del día
         </button>
       </div>
 

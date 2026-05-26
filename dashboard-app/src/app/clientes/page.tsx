@@ -137,7 +137,7 @@ export default function ClientesPage() {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
         <input
           type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, telefono o email..."
+          placeholder="Buscar por nombre, teléfono o email..."
           className="w-full pl-10 pr-4 py-2.5 border border-[var(--line)] rounded-xl text-sm focus:outline-none focus:border-emerald-500"
         />
       </div>
@@ -204,7 +204,7 @@ export default function ClientesPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Telefono</label>
+                  <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Teléfono</label>
                   <input value={editing.phone} onChange={e => setEditing({ ...editing, phone: e.target.value })}
                     placeholder="81 1234 5678"
                     className="w-full border border-[var(--line)] rounded-lg px-3 py-2.5 text-sm mt-1 focus:outline-none focus:border-emerald-500" />

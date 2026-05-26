@@ -64,7 +64,7 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
     meseros: parseJsonbField(row.meseros),
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
-    pago_metodos: parseJsonbField(row.pago_metodos),
+    pago_métodos: parseJsonbField(row.pago_métodos),
   }
 }
 
@@ -170,8 +170,8 @@ export function aggregatePayments(
 ): { nombre: string; total: number }[] {
   const map: Record<string, number> = {}
   for (const day of dailyData) {
-    const metodos = parseJsonbField<{ nombre?: string; total?: number }>(day.pago_metodos)
-    for (const m of metodos) {
+    const métodos = parseJsonbField<{ nombre?: string; total?: number }>(day.pago_métodos)
+    for (const m of métodos) {
       if (!m.nombre) continue
       map[m.nombre] = (map[m.nombre] || 0) + (m.total || 0)
     }

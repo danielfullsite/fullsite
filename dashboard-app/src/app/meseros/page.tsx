@@ -356,7 +356,7 @@ export default function MeserosPage() {
             <KPICard
               label="Promedio diario"
               value={formatCurrency(avgDaily)}
-              subtitle="por dia total"
+              subtitle="por día total"
               icon={Ticket}
               accentClass="kpi-accent-green"
             />

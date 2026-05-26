@@ -9,7 +9,7 @@ import { createServiceClient } from '@/lib/supabase'
     nombre TEXT,
     restaurante TEXT,
     email TEXT,
-    telefono TEXT,
+    teléfono TEXT,
     pos TEXT,
     status TEXT DEFAULT 'nuevo',
     notes TEXT,
@@ -19,9 +19,9 @@ import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
-    const { nombre, restaurante, email, telefono, pos } = await req.json()
+    const { nombre, restaurante, email, teléfono, pos } = await req.json()
 
-    if (!nombre || !restaurante || !email || !telefono || !pos) {
+    if (!nombre || !restaurante || !email || !teléfono || !pos) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos' },
         { status: 400 }
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       nombre,
       restaurante,
       email,
-      telefono,
+      teléfono,
       pos,
       status: 'nuevo',
       created_at: new Date().toISOString(),
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: '7654040494',
-            text: `\ud83d\udd14 NUEVO PROSPECTO\n\n${nombre}\n${restaurante}\n${email}\n${telefono}\nPOS: ${pos}`,
+            text: `\ud83d\udd14 NUEVO PROSPECTO\n\n${nombre}\n${restaurante}\n${email}\n${teléfono}\nPOS: ${pos}`,
           }),
         }
       )

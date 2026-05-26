@@ -605,6 +605,8 @@ function POSContent() {
   const [personas, setPersonas] = useState<number>(2)
   const [clock, setClock] = useState<string>('')
   const [showPayment, setShowPayment] = useState(false)
+  const [showMixto, setShowMixto] = useState(false)
+  const [mixtoEfectivo, setMixtoEfectivo] = useState('')
   const [sentToKitchen, setSentToKitchen] = useState(false)
 
   // Modifier modal state
@@ -855,8 +857,8 @@ function POSContent() {
       cajero: ['mesas', 'cocina', 'barra', 'corte'],
       cocina: ['cocina'],
       barra: ['barra'],
-      gerente: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
-      admin: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoria', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+      gerente: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoría', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+      admin: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoría', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
     }
     return (perms[staffRole] || perms.admin).includes(section)
   }
@@ -1151,6 +1153,8 @@ function POSContent() {
 
   const handleCloseOrder = () => {
     if (orderItems.length === 0) return
+    setShowMixto(false)
+    setMixtoEfectivo('')
     setShowPayment(true)
   }
 
@@ -1183,7 +1187,11 @@ function POSContent() {
       descuento: payDiscount,
       propina: splitPayingCuenta === 0 || splitPayingCuenta === 2 ? (propina > 0 ? propina : undefined) : undefined,
       metodoPago: method,
-      notas: splitPayingCuenta > 0 ? `Cuenta ${splitPayingCuenta} de split` : (orderNotes || undefined),
+      notas: splitPayingCuenta > 0
+        ? `Cuenta ${splitPayingCuenta} de split`
+        : method === 'Mixto'
+          ? `Mixto: Efectivo ${formatMXN(parseFloat(mixtoEfectivo) || 0)} + Tarjeta ${formatMXN(payTotal - (parseFloat(mixtoEfectivo) || 0))}${orderNotes ? ' | ' + orderNotes : ''}`
+          : (orderNotes || undefined),
       createdAt: new Date(),
       closedAt: new Date(),
     }
@@ -1334,7 +1342,7 @@ function POSContent() {
                 { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
                 { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
                 { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
-                { href: '/pos/auditoria', icon: FileText, label: 'Auditoria', section: 'auditoria' },
+                { href: '/pos/auditoría', icon: FileText, label: 'Auditoria', section: 'auditoría' },
                 { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
                 { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
                 { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
@@ -1951,11 +1959,46 @@ function POSContent() {
                 Transferencia
               </button>
               <button
-                onClick={() => handlePayment('Mixto')}
-                className="w-full flex items-center justify-center gap-3 bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)] font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
+                onClick={() => { setShowMixto(!showMixto); setMixtoEfectivo('') }}
+                className={`w-full flex items-center justify-center gap-3 ${showMixto ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[var(--line)] hover:bg-[var(--line-soft)]'} text-${showMixto ? 'white' : '[var(--text-2)]'} font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]`}
               >
                 Mixto (efectivo + tarjeta)
               </button>
+              {showMixto && (
+                <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-[var(--text-2)]">Efectivo:</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={mixtoEfectivo}
+                        onChange={(e) => setMixtoEfectivo(e.target.value)}
+                        placeholder="0.00"
+                        className="w-28 bg-[var(--bg)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-right focus:outline-none focus:border-amber-500"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-[var(--text-2)]">Tarjeta:</label>
+                    <span className="text-white text-sm font-medium">
+                      {formatMXN(Math.max(0, total - (parseFloat(mixtoEfectivo) || 0)))}
+                    </span>
+                  </div>
+                  {(parseFloat(mixtoEfectivo) || 0) > total && (
+                    <p className="text-red-400 text-xs text-center">El efectivo excede el total</p>
+                  )}
+                  <button
+                    onClick={() => handlePayment('Mixto')}
+                    disabled={(parseFloat(mixtoEfectivo) || 0) <= 0 || (parseFloat(mixtoEfectivo) || 0) > total}
+                    className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl text-base transition-colors"
+                  >
+                    Confirmar pago mixto
+                  </button>
+                </div>
+              )}
             </div>
               </>)
             })()}

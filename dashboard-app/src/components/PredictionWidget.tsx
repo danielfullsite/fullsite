@@ -75,7 +75,7 @@ export default function PredictionWidget({
 
   const isAboveAvg = vsDowAvg >= 0
   const mainComparison = dowAvgVentas > 0 ? vsDowAvg : vsYesterday
-  const mainCompLabel = dowAvgVentas > 0 ? 'vs promedio del dia' : 'vs ayer'
+  const mainCompLabel = dowAvgVentas > 0 ? 'vs promedio del día' : 'vs ayer'
   const isUp = mainComparison >= 0
 
   return (
@@ -98,7 +98,7 @@ export default function PredictionWidget({
               <Target className={`w-4 h-4 ${isAboveAvg ? 'text-emerald-500' : 'text-amber-500'}`} />
             </div>
             <div>
-              <p className="text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Prediccion de cierre</p>
+              <p className="text-xs font-medium text-[var(--text-3)] uppercase tracking-wider">Predicción de cierre</p>
             </div>
           </div>
           <div className="flex items-center gap-1 text-xs text-[var(--text-3)]">
@@ -122,7 +122,7 @@ export default function PredictionWidget({
         {/* Progress bar */}
         <div className="mb-4">
           <div className="flex justify-between text-xs text-[var(--text-3)] mb-1.5">
-            <span>Progreso del dia</span>
+            <span>Progreso del día</span>
             <span>{pctDone.toFixed(0)}% completado</span>
           </div>
           <div className="w-full bg-[var(--line-soft)] rounded-full h-3 overflow-hidden">

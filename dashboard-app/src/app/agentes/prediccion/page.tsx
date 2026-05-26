@@ -20,7 +20,7 @@ interface BoostSuggestion {
 
 interface PredictionData {
   ventas_actuales?: number
-  proyeccion_cierre?: number
+  proyección_cierre?: number
   gap?: number
   avance_pct?: number
   comparaciones?: Comparison[]
@@ -29,7 +29,7 @@ interface PredictionData {
   hora_corte?: string
 }
 
-export default function PrediccionPage() {
+export default function PredicciónPage() {
   const [data, setData] = useState<PredictionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [fecha, setFecha] = useState('')
@@ -68,8 +68,8 @@ export default function PrediccionPage() {
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Prediccion de Cierre</h2>
-            <p className="text-sm text-[var(--text-3)]">Proyeccion al final del dia {fecha && `· ${fecha}`}{data?.hora_corte && ` · corte ${data.hora_corte}`}</p>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Predicción de Cierre</h2>
+            <p className="text-sm text-[var(--text-3)]">Proyección al final del día {fecha && `· ${fecha}`}{data?.hora_corte && ` · corte ${data.hora_corte}`}</p>
           </div>
         </div>
         <button onClick={load} className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
@@ -79,8 +79,8 @@ export default function PrediccionPage() {
 
       {/* Big projection number */}
       <div className="bg-[var(--surface)] rounded-xl border border-blue-500/20 shadow-sm p-6 mb-6 text-center">
-        <p className="text-xs text-blue-500 font-medium mb-2 uppercase tracking-wider">Proyeccion al cierre</p>
-        <p className="text-4xl font-bold text-blue-400 mb-1">{formatCurrency(data?.proyeccion_cierre)}</p>
+        <p className="text-xs text-blue-500 font-medium mb-2 uppercase tracking-wider">Proyección al cierre</p>
+        <p className="text-4xl font-bold text-blue-400 mb-1">{formatCurrency(data?.proyección_cierre)}</p>
         {data?.avance_pct != null && (
           <div className="mt-3">
             <div className="w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-2.5">
@@ -98,8 +98,8 @@ export default function PrediccionPage() {
           <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(data?.ventas_actuales)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Proyeccion cierre</p>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.proyeccion_cierre)}</p>
+          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Proyección cierre</p>
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.proyección_cierre)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Gap restante</p>
@@ -161,7 +161,7 @@ export default function PrediccionPage() {
 
       {!data && (
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
-          Sin datos de prediccion. El agente corre automaticamente.
+          Sin datos de predicción. El agente corre automaticamente.
         </div>
       )}
     </>

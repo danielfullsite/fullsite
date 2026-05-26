@@ -108,7 +108,7 @@ export default function TarjetasRegaloPage() {
             <input type="number" placeholder="Saldo inicial" value={editing.initial_balance||''} onChange={e=>setEditing({...editing,initial_balance:Number(e.target.value)})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
             {editing.id && <input type="number" placeholder="Saldo actual" value={editing.current_balance||''} onChange={e=>setEditing({...editing,current_balance:Number(e.target.value)})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>}
             <input placeholder="Nombre cliente" value={editing.customer_name} onChange={e=>setEditing({...editing,customer_name:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
-            <input placeholder="Telefono" value={editing.customer_phone} onChange={e=>setEditing({...editing,customer_phone:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
+            <input placeholder="Teléfono" value={editing.customer_phone} onChange={e=>setEditing({...editing,customer_phone:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm"/>
             <input type="date" value={editing.expires_at} onChange={e=>setEditing({...editing,expires_at:e.target.value})} className="border border-[var(--line)] rounded-lg px-3 py-2 text-sm" title="Expira"/>
           </div>
           <div className="flex gap-2 justify-end">

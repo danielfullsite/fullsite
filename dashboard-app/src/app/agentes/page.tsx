@@ -16,11 +16,11 @@ interface AgentResult {
 
 const AGENTS = [
   { id: 'anomaly', name: 'Anomalías', icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-500/8', desc: 'Detecta métricas fuera de patrón', href: '/agentes/anomalias' },
-  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/100/10', desc: 'Proyecta cómo cierra el día', href: '/agentes/prediccion' },
+  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/100/10', desc: 'Proyecta cómo cierra el día', href: '/agentes/predicción' },
   { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/100/10', desc: 'Oportunidades de venta adicional', href: '/agentes/upselling' },
   { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-500/10', desc: 'Matriz BCG del menú', href: '/agentes/menu' },
   { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-500/100/10', desc: 'Optimización de personal', href: '/agentes/staffing' },
-  { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Detección de patrones sospechosos', href: '/agentes/antifraude' },
+  { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Detección de patrónes sospechosos', href: '/agentes/antifraude' },
   { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-500/100/10', desc: 'Cancelaciones y calidad', href: '/agentes/cocina' },
   { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-500/10', desc: 'Velocidad de atención', href: '/agentes/tiempo-mesa' },
   { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-500/100/10', desc: 'Patrones de servicio', href: '/agentes/propinas-agente' },

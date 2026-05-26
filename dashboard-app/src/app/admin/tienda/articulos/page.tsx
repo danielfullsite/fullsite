@@ -88,7 +88,7 @@ export default function ArticulosPage() {
 
       {(adding || editing) && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
-          <h3 className="font-semibold text-emerald-800 mb-3">{adding ? 'Nuevo articulo' : `Editando: ${editing?.name}`}</h3>
+          <h3 className="font-semibold text-emerald-800 mb-3">{adding ? 'Nuevo artículo' : `Editando: ${editing?.name}`}</h3>
           {(() => { const f = adding ? form : editing!; const set = adding ? setForm : (v: RetailItem) => setEditing(v); return (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -143,7 +143,7 @@ export default function ArticulosPage() {
             )})}
           </tbody>
         </table>
-        {filtered.length === 0 && <p className="text-center text-[var(--text-3)] py-10 text-sm">No se encontraron articulos</p>}
+        {filtered.length === 0 && <p className="text-center text-[var(--text-3)] py-10 text-sm">No se encontraron artículos</p>}
       </div>
 
       {toast && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--surface-2)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">{toast}</div>}
