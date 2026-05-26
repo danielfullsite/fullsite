@@ -26,6 +26,7 @@ export function canAccessPage(role: DashboardRole, path: string): boolean {
 const ROLE_MAP: Record<string, DashboardRole> = {
   'ramonfaur.daniel@gmail.com': 'dueño',
   'monica@fullsite.mx': 'dueño',
+  'demo@fullsite.mx': 'dueño',
   // Add more users here or migrate to DB
 }
 

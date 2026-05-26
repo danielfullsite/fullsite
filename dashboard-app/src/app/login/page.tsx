@@ -44,7 +44,9 @@ export default function LoginPage() {
           token_type: data.token_type,
           user: data.user,
         }))
-        window.location.href = '/'
+        // Check if demo user → redirect to demo dashboard
+        const clientId = data.user?.user_metadata?.client_id
+        window.location.href = clientId === 'demo' ? '/demo/dashboard' : '/'
       } else {
         setError('No se pudo crear la sesion.')
         setLoading(false)
