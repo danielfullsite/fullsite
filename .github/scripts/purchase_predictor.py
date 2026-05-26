@@ -136,49 +136,56 @@ try:
     } for i in inventory}
 
     # 6. Estimate ingredient usage for tomorrow
-    # Strategy: use avg_tickets as multiplier for recipe quantities
-    # Each ticket ≈ 1 menu item on average (simplification)
-    # Scale by 1.2x safety margin
-
+    # Strategy: estimate how many of each menu item sells, then multiply by recipe qty
     SAFETY_MARGIN = 1.2
-    estimated_items = avg_tickets * SAFETY_MARGIN
 
-    # Calculate per-ingredient usage across all recipes (weighted equally for now)
-    # More accurate: weight by category popularity
+    # Get actual platillo-level sales from ventas_por_grupo for same DOW
+    # This tells us which CATEGORIES sell how much — we distribute tickets proportionally
+    total_category_sales = sum(category_totals.values())
+
+    # Build per-ingredient usage weighted by actual category sales
+    # First, map menu items to categories (use first word match as heuristic)
+    # Simpler approach: each menu item gets (avg_tickets / total_menu_items) orders
+    # But only for items that have inventory tracking (exist in pos_inventory)
+
+    # Even simpler & more accurate: use recipe qty × (avg_tickets / menu_items_with_recipes)
+    # This assumes uniform distribution but only across items that actually have recipes
+    menu_items_with_recipes = set(r["menu_item_id"] for r in recipes)
+    items_per_item = avg_tickets / max(len(menu_items_with_recipes), 1)
+
+    # Aggregate ingredient usage: for each recipe line, qty × items_per_item
     ingredient_usage = defaultdict(float)
-    menu_items_count = len(set(r["menu_item_id"] for r in recipes))
-
     for r in recipes:
         qty = float(r.get("quantity") or 0)
-        if qty > 0:
-            # Each menu item gets an equal share of estimated items
-            # items_per_menu_item = estimated_items / menu_items_count
-            # But this is too naive — use 1 portion per ingredient link
-            ingredient_usage[r["ingredient_id"]] += qty
+        if qty > 0 and qty < 50:  # Filter out unreasonable quantities (data quality)
+            ingredient_usage[r["ingredient_id"]] += qty * items_per_item
 
-    # Normalize: ingredient_usage now has total qty if you sold 1 of every item
-    # Scale by (estimated_items / menu_items_count) to get tomorrow's estimate
-    scale = estimated_items / max(menu_items_count, 1)
-
-    # 7. Build purchase list: ingredients where (current_stock - predicted_usage) < reorder_point
+    # 7. Build purchase list — ONLY for ingredients that have inventory tracking
+    # Skip ingredients with 0 stock AND 0 reorder_point (never set up)
     purchase_list = []
-    for ing_id, total_usage in ingredient_usage.items():
-        predicted = total_usage * scale
-        inv = inv_map.get(ing_id, {"stock": 0, "reorder_point": 0})
-        ing_info = ing_map.get(ing_id, {})
+    for ing_id, predicted in ingredient_usage.items():
+        inv = inv_map.get(ing_id)
+        if not inv:
+            continue  # No inventory record — skip
+        if inv["stock"] == 0 and inv["reorder_point"] == 0:
+            continue  # Never set up in inventory — skip
 
+        ing_info = ing_map.get(ing_id, {})
         remaining = inv["stock"] - predicted
         reorder = inv["reorder_point"]
 
-        if remaining < reorder and predicted > 0:
+        if remaining < reorder and predicted > 0.01:
             need = max(reorder - remaining, predicted) * SAFETY_MARGIN
+            # Cap at reasonable quantities (no more than 10x reorder_point)
+            if reorder > 0:
+                need = min(need, reorder * 10)
             cost = float(ing_info.get("cost_per_unit") or 0) * need
 
             purchase_list.append({
                 "ingredient_id": ing_id,
                 "name": ing_info.get("name", ing_id),
                 "unit": ing_info.get("unit", "u"),
-                "current_stock": inv["stock"],
+                "current_stock": round(inv["stock"], 2),
                 "predicted_usage": round(predicted, 2),
                 "remaining_after": round(remaining, 2),
                 "suggested_qty": round(need, 1),
