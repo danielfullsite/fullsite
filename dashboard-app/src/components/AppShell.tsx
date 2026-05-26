@@ -23,15 +23,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isDemoRoute = pathname.startsWith('/demo')
   const isPublicPage = publicPages.includes(pathname) || isPosRoute || isDemoRoute
 
+  // Demo user: always redirect to /demo/* world
+  const isDemoUser = user?.user_metadata?.client_id === 'demo'
+
   useEffect(() => {
     if (!loading) {
       if (!user && !isPublicPage) {
         router.push('/login')
+      } else if (isDemoUser && !isDemoRoute) {
+        // Demo user trying to access real dashboard → redirect to demo
+        router.push('/demo/dashboard')
       } else {
         setShowContent(true)
       }
     }
-  }, [loading, user, pathname, router, isPublicPage])
+  }, [loading, user, pathname, router, isPublicPage, isDemoUser, isDemoRoute])
 
   // POS pages: full screen, dark theme, no sidebar
   if (isPosRoute) {
