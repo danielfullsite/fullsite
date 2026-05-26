@@ -31,6 +31,8 @@ import {
   Bell,
   Star,
   Building2,
+  Mic,
+  ShieldOff,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -42,6 +44,7 @@ const navSections = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/roi', label: 'ROI', icon: TrendingUp },
       { href: '/sucursales', label: 'Sucursales', icon: Building2 },
       { href: '/ventas', label: 'Ventas', icon: DollarSign },
       { href: '/cortes', label: 'Cortes', icon: ClipboardList },
@@ -69,6 +72,7 @@ const navSections = [
     label: 'Operaciones',
     items: [
       { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
       { href: '/proveedores', label: 'Proveedores', icon: Truck },
       { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
@@ -111,6 +115,7 @@ const navSections = [
       { href: '/agentes/resenas', label: 'Reseñas', icon: Star },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+      { href: '/voice', label: 'Voice Agent', icon: Mic },
     ],
   },
 ]
