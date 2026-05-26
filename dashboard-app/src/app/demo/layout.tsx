@@ -42,7 +42,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
           <span className="text-white font-black text-xl tracking-tight">
             fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
           </span>
-          <p className="text-zinc-600 text-xs mt-0.5">La Terraza MX</p>
+          <p className="text-zinc-600 text-xs mt-0.5">Casa Montaña</p>
         </div>
 
         <nav className="space-y-1 flex-1">

@@ -6,7 +6,7 @@ import { ArrowRight } from 'lucide-react'
 
 export default function DemoLoginPage() {
   const router = useRouter()
-  const [email] = useState('demo@laterraza.mx')
+  const [email] = useState('admin@casamontana.mx')
   const [password] = useState('••••••••')
   const [loading, setLoading] = useState(false)
 
@@ -52,7 +52,7 @@ export default function DemoLoginPage() {
           {/* Demo badge */}
           <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center">
             <p className="text-emerald-700 text-sm font-medium">
-              Demo interactivo — La Terraza MX
+              Demo interactivo — Casa Montaña
             </p>
             <p className="text-emerald-600 text-xs mt-0.5">
               Explora el dashboard y POS con datos simulados

@@ -9,8 +9,8 @@ import {
 } from 'lucide-react'
 import {
   DEMO_RESTAURANT, DEMO_KPIS, DEMO_YESTERDAY, DEMO_LAST_WEEK, DEMO_DOW_AVG,
-  DEMO_HISTORY, DEMO_MESEROS, DEMO_PLATILLOS, DEMO_GRUPOS, DEMO_PAGOS,
-  DEMO_PROPINAS, formatDemoMXN,
+  DEMO_HISTORY_14, DEMO_MONTHLY, DEMO_MESEROS, DEMO_PLATILLOS, DEMO_GRUPOS, DEMO_PAGOS,
+  DEMO_INSIGHTS, DEMO_HOURLY, DEMO_WOW, formatDemoMXN,
 } from '@/lib/demo-data'
 
 export default function DemoDashboard() {
@@ -222,21 +222,57 @@ export default function DemoDashboard() {
           </div>
         </div>
 
-        {/* Sales trend chart (simple bars) */}
+        {/* AI Insights */}
         <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
-          <h3 className="flex items-center gap-2 font-bold mb-4"><TrendingUp size={18} className="text-emerald-400" /> Tendencia de ventas (14 días)</h3>
+          <h3 className="flex items-center gap-2 font-bold mb-4">
+            <Zap size={18} className="text-emerald-400" /> Insights de IA
+          </h3>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {DEMO_INSIGHTS.map((insight, i) => (
+              <div key={i} className={`rounded-xl border p-4 ${
+                insight.type === 'alert' ? 'bg-red-500/5 border-red-500/20' :
+                insight.type === 'upsell' ? 'bg-amber-500/5 border-amber-500/20' :
+                insight.type === 'staff' ? 'bg-purple-500/5 border-purple-500/20' :
+                'bg-emerald-500/5 border-emerald-500/20'
+              }`}>
+                <p className="text-sm font-bold mb-1">{insight.title}</p>
+                <p className="text-xs text-zinc-400 leading-relaxed">{insight.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Hourly distribution */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <h3 className="flex items-center gap-2 font-bold mb-4"><Clock size={18} className="text-blue-400" /> Ventas por hora (hoy)</h3>
+          <div className="flex items-end gap-1 h-32">
+            {DEMO_HOURLY.map(h => {
+              const max = Math.max(...DEMO_HOURLY.map(x => x.ventas))
+              const height = (h.ventas / max) * 100
+              const isCurrent = parseInt(h.hora) <= new Date().getHours() && parseInt(h.hora) >= new Date().getHours() - 1
+              return (
+                <div key={h.hora} className="flex-1 flex flex-col items-center gap-1" title={`${h.hora}: ${formatDemoMXN(h.ventas)}`}>
+                  <div className={`w-full rounded-t-sm ${isCurrent ? 'bg-blue-500' : 'bg-white/10'}`} style={{ height: `${height}%` }} />
+                  <span className="text-[8px] text-zinc-600">{h.hora.slice(0, 2)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Sales trend chart (14 days) */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <h3 className="flex items-center gap-2 font-bold mb-1"><TrendingUp size={18} className="text-emerald-400" /> Tendencia de ventas</h3>
+          <p className="text-xs text-zinc-500 mb-4">Semana actual vs anterior: <span className={`font-bold ${DEMO_WOW.change.ventas >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>+{DEMO_WOW.change.ventas}%</span> ({formatDemoMXN(DEMO_WOW.thisWeek.ventas)} vs {formatDemoMXN(DEMO_WOW.lastWeek.ventas)})</p>
           <div className="flex items-end gap-1.5 h-40">
-            {DEMO_HISTORY.map((d, i) => {
-              const maxVenta = Math.max(...DEMO_HISTORY.map(h => h.ventas_dia))
+            {DEMO_HISTORY_14.map((d, i) => {
+              const maxVenta = Math.max(...DEMO_HISTORY_14.map(h => h.ventas_dia))
               const height = (d.ventas_dia / maxVenta) * 100
-              const isToday = i === DEMO_HISTORY.length - 1
-              const isWeekend = new Date(d.fecha).getDay() >= 5
+              const isToday = i === DEMO_HISTORY_14.length - 1
+              const isWeekend = [0, 6].includes(new Date(d.fecha).getDay())
               return (
                 <div key={d.fecha} className="flex-1 flex flex-col items-center gap-1" title={`${d.fecha}: ${formatDemoMXN(d.ventas_dia)}`}>
-                  <div
-                    className={`w-full rounded-t-md transition-all ${isToday ? 'bg-emerald-500' : isWeekend ? 'bg-purple-500/40' : 'bg-white/10'}`}
-                    style={{ height: `${height}%` }}
-                  />
+                  <div className={`w-full rounded-t-md ${isToday ? 'bg-emerald-500' : isWeekend ? 'bg-purple-500/40' : 'bg-white/10'}`} style={{ height: `${height}%` }} />
                   <span className="text-[9px] text-zinc-600">{d.fecha.slice(8)}</span>
                 </div>
               )
@@ -249,12 +285,31 @@ export default function DemoDashboard() {
           </div>
         </div>
 
+        {/* Monthly summary */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+          <h3 className="flex items-center gap-2 font-bold mb-4"><BarChart3 size={18} className="text-amber-400" /> Resumen mensual</h3>
+          <div className="grid grid-cols-3 gap-4">
+            {DEMO_MONTHLY.map(m => (
+              <div key={m.month} className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
+                <p className="text-xs text-zinc-500 mb-1">{m.month}</p>
+                <p className="text-xl font-bold text-emerald-400">{formatDemoMXN(m.ventas)}</p>
+                <div className="flex justify-between text-xs text-zinc-500 mt-2">
+                  <span>{m.dias} días</span>
+                  <span>TP: {formatDemoMXN(m.ticketPromedio)}</span>
+                </div>
+                <p className="text-xs text-zinc-600 mt-1">Prom/día: {formatDemoMXN(m.promedioDia)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="text-center py-6">
-          <p className="text-xs text-zinc-600">Demo de fullsite — datos simulados de <strong>{DEMO_RESTAURANT.name}</strong></p>
-          <Link href="/demo/pos" className="text-emerald-400 text-sm font-medium hover:underline mt-1 inline-block">
-            Probar el POS →
-          </Link>
+          <p className="text-xs text-zinc-600">Powered by <strong>fullsite</strong> — IA operativa para restaurantes</p>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <Link href="/demo/pos" className="text-emerald-400 text-sm font-medium hover:underline">Probar POS</Link>
+            <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20vi%20el%20demo%20y%20me%20interesa." target="_blank" rel="noopener noreferrer" className="text-emerald-400 text-sm font-medium hover:underline">Contactar ventas</a>
+          </div>
         </div>
       </div>
     </div>
