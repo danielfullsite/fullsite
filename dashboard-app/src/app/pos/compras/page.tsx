@@ -14,6 +14,7 @@ import {
   MANAGER_PINS, generateId, formatMXN, logAudit,
   type PurchaseOrder, type PurchaseOrderItem, type Factura,
 } from '@/lib/pos-data'
+import { IVA_RATE } from '@/lib/pos-constants'
 
 // ─── OC Status Config ───────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export default function ComprasPage() {
 
     // 3. Calculate actual total based on received qty
     const actualSubtotal = receptionItems.reduce((sum, item) => sum + (item.qty_received * item.unit_cost), 0)
-    const actualIva = actualSubtotal * 0.16
+    const actualIva = actualSubtotal * IVA_RATE
     const actualTotal = actualSubtotal + actualIva
 
     // 4. Update OC status
@@ -202,8 +203,11 @@ export default function ComprasPage() {
       }
     }
 
+    const staffName = (() => {
+      try { const s = sessionStorage.getItem('pos_staff'); return s ? JSON.parse(s).name : 'Gerente' } catch { return 'Gerente' }
+    })()
     await updateFacturaStatus(f.id, newStatus,
-      newStatus === 'aprobada' ? { approved_by: 'Eduardo' } : undefined
+      newStatus === 'aprobada' ? { approved_by: staffName } : undefined
     )
     showToast(`Factura → ${newStatus}`)
     fetchData()
@@ -644,7 +648,7 @@ function NewOCPanel({ onCreated, showToast }: { onCreated: () => void; showToast
       })
 
     const subtotal = items.reduce((sum, i) => sum + i.total_cost, 0)
-    const iva = subtotal * 0.16
+    const iva = subtotal * IVA_RATE
     const total = subtotal + iva
 
     const ok = await createPurchaseOrder({

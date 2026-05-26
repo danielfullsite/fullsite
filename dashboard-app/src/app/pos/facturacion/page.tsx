@@ -11,8 +11,7 @@ import {
   REGIMENES_FISCALES, USOS_CFDI, formatMXN,
   type CFDIRequest,
 } from '@/lib/pos-data'
-
-const IVA_RATE = 0.16
+import { IVA_RATE } from '@/lib/pos-constants'
 
 const STATUS_STYLES: Record<string, { color: string; bg: string; label: string; icon: typeof Clock }> = {
   pendiente: { color: 'text-amber-400', bg: 'bg-amber-900/40', label: 'Pendiente', icon: Clock },

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw } from 'lucide-react'
-import { MESAS_CONFIG, formatMXN } from '@/lib/pos-data'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X } from 'lucide-react'
+import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -113,6 +113,93 @@ export default function MesasPage() {
   const totalVentas = mesas.reduce((s, m) => s + (m.total || 0), 0)
   const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
 
+  // ─── Merge Mesas ──────────────────────────────────────────────────────
+  const [mergeMode, setMergeMode] = useState(false)
+  const [mergeSource, setMergeSource] = useState<number | null>(null)
+  const [mergeTarget, setMergeTarget] = useState<number | null>(null)
+  const [merging, setMerging] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
+  const handleMerge = async () => {
+    if (!mergeSource || !mergeTarget || merging) return
+    const sourceOrder = activeOrders.find(o => o.mesa === mergeSource)
+    const targetOrder = activeOrders.find(o => o.mesa === mergeTarget)
+    if (!sourceOrder || !targetOrder) { showToast('Ambas mesas deben tener ordenes activas'); return }
+
+    setMerging(true)
+    try {
+      // Get full source order with items
+      const srcRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeSource}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      )
+      const tgtRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeTarget}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      )
+      if (!srcRes.ok || !tgtRes.ok) { showToast('Error al cargar ordenes'); setMerging(false); return }
+      const [srcOrder] = await srcRes.json()
+      const [tgtOrder] = await tgtRes.json()
+      if (!srcOrder || !tgtOrder) { showToast('No se encontraron ordenes'); setMerging(false); return }
+
+      // Merge items
+      const srcItems = typeof srcOrder.items === 'string' ? JSON.parse(srcOrder.items) : (srcOrder.items || [])
+      const tgtItems = typeof tgtOrder.items === 'string' ? JSON.parse(tgtOrder.items) : (tgtOrder.items || [])
+      const mergedItems = [...tgtItems, ...srcItems]
+      const newTotal = Number(tgtOrder.total || 0) + Number(srcOrder.total || 0)
+      const newSubtotal = Number(tgtOrder.subtotal || 0) + Number(srcOrder.subtotal || 0)
+      const newIva = Number(tgtOrder.iva || 0) + Number(srcOrder.iva || 0)
+      const newPersonas = (tgtOrder.personas || 0) + (srcOrder.personas || 0)
+
+      // Update target order with merged items
+      await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${tgtOrder.id}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          items: JSON.stringify(mergedItems),
+          total: newTotal, subtotal: newSubtotal, iva: newIva,
+          personas: newPersonas,
+          notas: `Merge: mesa ${mergeSource} → mesa ${mergeTarget}. ${tgtOrder.notas || ''}`.trim(),
+        }),
+      })
+
+      // Cancel source order
+      await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${srcOrder.id}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'cancelada', notas: `Merged a mesa ${mergeTarget}` }),
+      })
+
+      logAudit({
+        order_id: tgtOrder.id, action: 'status_changed', actor: 'Sistema',
+        details: { type: 'mesa_merge', from_mesa: mergeSource, to_mesa: mergeTarget, items_moved: srcItems.length },
+      })
+
+      showToast(`Mesa ${mergeSource} fusionada con mesa ${mergeTarget}`)
+      setMergeMode(false)
+      setMergeSource(null)
+      setMergeTarget(null)
+      fetchData()
+    } catch {
+      showToast('Error al fusionar mesas')
+    }
+    setMerging(false)
+  }
+
+  const handleMesaClick = (mesaNum: number) => {
+    if (!mergeMode) {
+      router.push(`/pos?mesa=${mesaNum}`)
+      return
+    }
+    // Merge mode: select source, then target
+    if (!mergeSource) {
+      setMergeSource(mesaNum)
+    } else if (mesaNum !== mergeSource) {
+      setMergeTarget(mesaNum)
+    }
+  }
+
   return (
     <div className="h-screen flex flex-col text-white">
       <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
@@ -126,6 +213,15 @@ export default function MesasPage() {
           </div>
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={() => { setMergeMode(!mergeMode); setMergeSource(null); setMergeTarget(null) }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              mergeMode ? 'bg-amber-500 text-black' : 'bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]'
+            }`}
+          >
+            {mergeMode ? <X size={14} /> : <Merge size={14} />}
+            {mergeMode ? 'Cancelar' : 'Fusionar'}
           </button>
         </div>
         <div className="flex items-center gap-6">
@@ -151,8 +247,12 @@ export default function MesasPage() {
               {mesas.map(mesa => (
                 <button
                   key={mesa.number}
-                  onClick={() => router.push(`/pos?mesa=${mesa.number}`)}
-                  className={`rounded-2xl border-2 p-5 transition-all active:scale-95 min-h-[160px] flex flex-col justify-between ${statusColor[mesa.status]}`}
+                  onClick={() => handleMesaClick(mesa.number)}
+                  className={`rounded-2xl border-2 p-5 transition-all active:scale-95 min-h-[160px] flex flex-col justify-between ${
+                    mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/50' :
+                    mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/50' :
+                    statusColor[mesa.status]
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-3xl font-bold">{mesa.number}</span>
@@ -218,6 +318,36 @@ export default function MesasPage() {
           </>
         )}
       </div>
+
+      {/* Merge mode instructions + confirm */}
+      {mergeMode && (
+        <div className="px-6 py-3 bg-amber-900/30 border-t border-amber-700/40 flex items-center justify-between">
+          <div className="text-sm">
+            {!mergeSource ? (
+              <span className="text-amber-400">Toca la mesa <strong>origen</strong> (la que se mueve)</span>
+            ) : !mergeTarget ? (
+              <span className="text-amber-400">Mesa {mergeSource} seleccionada. Ahora toca la mesa <strong>destino</strong></span>
+            ) : (
+              <span className="text-emerald-400">Mesa {mergeSource} → Mesa {mergeTarget}</span>
+            )}
+          </div>
+          {mergeSource && mergeTarget && (
+            <button
+              onClick={handleMerge}
+              disabled={merging}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {merging ? 'Fusionando...' : `Fusionar mesa ${mergeSource} → ${mergeTarget}`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--surface-2)] border border-[var(--line)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

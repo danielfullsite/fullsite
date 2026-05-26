@@ -47,6 +47,7 @@ async function cleanup() {
   console.log('\n🧹 Cleanup...')
   await sb('DELETE', `pos_turnos?id=like.${TEST_PREFIX}*`)
   await sb('DELETE', `pos_orders?id=like.${TEST_PREFIX}*`)
+  await sb('DELETE', `pos_orders?id=like.${TEST_PREFIX}-merge*`)
   await sb('DELETE', `pos_staff_shifts?id=like.${TEST_PREFIX}*`)
   await sb('DELETE', `pos_cierres?id=like.${TEST_PREFIX}*`)
   await sb('DELETE', `pos_audit_log?order_id=like.${TEST_PREFIX}*`)
@@ -403,6 +404,56 @@ async function run() {
   }
   const instantRes = await sb('POST', 'pos_staff_shifts', instantShift)
   instantRes.ok ? ok('Turno de 0 horas (edge case)') : fail('Instant shift', instantRes.data)
+
+  // ─── 11e. MERGE DE MESAS ─────────────────────────────────────────────
+  console.log('\n🔗 11e. MERGE DE MESAS')
+  // Create 2 orders on different tables
+  const mergeA = { id: `${TEST_PREFIX}-merge-a`, mesa: 10, mesero: 'Omar Aguilera', personas: 2, status: 'enviada',
+    items: JSON.stringify([{ id: 'cafe', nombre: 'Cafe Americano', precio: 55, cantidad: 2, subtotal: 110 }]),
+    subtotal: 110, iva: 17.6, total: 127.6, descuento: 0 }
+  const mergeB = { id: `${TEST_PREFIX}-merge-b`, mesa: 11, mesero: 'Daniela Rico', personas: 3, status: 'enviada',
+    items: JSON.stringify([{ id: 'latte', nombre: 'Latte', precio: 65, cantidad: 3, subtotal: 195 }]),
+    subtotal: 195, iva: 31.2, total: 226.2, descuento: 0 }
+  await sb('POST', 'pos_orders', { client_id: 'amalay', ...mergeA })
+  await sb('POST', 'pos_orders', { client_id: 'amalay', ...mergeB })
+
+  // Merge mesa 10 → mesa 11
+  const srcFetch = await sbGet(`pos_orders?id=eq.${TEST_PREFIX}-merge-a`)
+  const tgtFetch = await sbGet(`pos_orders?id=eq.${TEST_PREFIX}-merge-b`)
+  const srcItems = JSON.parse(srcFetch[0]?.items || '[]')
+  const tgtItems = JSON.parse(tgtFetch[0]?.items || '[]')
+  const mergedItems = [...tgtItems, ...srcItems]
+
+  await sb('PATCH', `pos_orders?id=eq.${TEST_PREFIX}-merge-b`, {
+    items: JSON.stringify(mergedItems),
+    total: 127.6 + 226.2, subtotal: 110 + 195, iva: 17.6 + 31.2,
+    personas: 5, notas: 'Merge: mesa 10 → mesa 11',
+  })
+  await sb('PATCH', `pos_orders?id=eq.${TEST_PREFIX}-merge-a`, { status: 'cancelada', notas: 'Merged a mesa 11' })
+
+  const mergedOrder = await sbGet(`pos_orders?id=eq.${TEST_PREFIX}-merge-b`)
+  const mergedOrderItems = JSON.parse(mergedOrder[0]?.items || '[]')
+  mergedOrderItems.length === 2 ? ok('Merge: 2 items combinados en mesa destino') : fail('Merge items', mergedOrderItems.length)
+  Number(mergedOrder[0]?.personas) === 5 ? ok('Merge: personas sumadas (2+3=5)') : fail('Merge personas', mergedOrder[0]?.personas)
+  Math.abs(Number(mergedOrder[0]?.total) - 353.8) < 0.01 ? ok('Merge: total combinado $353.80') : fail('Merge total', mergedOrder[0]?.total)
+
+  const cancelledSrc = await sbGet(`pos_orders?id=eq.${TEST_PREFIX}-merge-a`)
+  cancelledSrc[0]?.status === 'cancelada' ? ok('Merge: orden origen cancelada') : fail('Merge source', cancelledSrc[0]?.status)
+
+  // ─── 11f. PAGO MIXTO ───────────────────────────────────────────────
+  console.log('\n💳 11f. PAGO MIXTO')
+  const mixtoOrder = {
+    id: `${TEST_PREFIX}-order-mixto`, mesa: 6, mesero: 'Julio Hernandez', personas: 2, status: 'cerrada',
+    items: JSON.stringify([{ id: 'pizza', name: 'Pizza', price: 250, cantidad: 1 }]),
+    subtotal: 250, iva: 40, total: 290, descuento: 0,
+    metodo_pago: 'Mixto', propina: 0, closed_at: new Date().toISOString(),
+    notas: 'Mixto: Efectivo $150.00 + Tarjeta $140.00',
+  }
+  const mixtoRes = await sb('POST', 'pos_orders', { client_id: 'amalay', ...mixtoOrder })
+  mixtoRes.ok ? ok('Pago mixto: $150 efectivo + $140 tarjeta') : fail('Mixto', mixtoRes.data)
+  const mixtoCheck = await sbGet(`pos_orders?id=eq.${TEST_PREFIX}-order-mixto`)
+  mixtoCheck[0]?.metodo_pago === 'Mixto' ? ok('Metodo de pago = Mixto') : fail('Mixto method', mixtoCheck[0]?.metodo_pago)
+  (mixtoCheck[0]?.notas || '').includes('Efectivo') ? ok('Notas incluyen desglose mixto') : fail('Mixto notas', mixtoCheck[0]?.notas)
 
   // ─── 12. VERIFICACIONES FINALES ───────────────────────────────────────
   console.log('\n🔍 12. VERIFICACIONES FINALES')
