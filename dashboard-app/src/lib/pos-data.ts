@@ -852,20 +852,27 @@ export async function saveOrder(order: Order): Promise<boolean> {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify(orderData),
+      body: JSON.stringify({ id: order.id, ...orderData }),
     })
     if (!res.ok) {
       console.warn(`[saveOrder] Failed: ${res.status} ${res.statusText}`)
     }
     return res.ok
   } catch {
-    // Offline — save to localStorage queue
+    // Offline — save to IndexedDB queue (with localStorage fallback)
     if (typeof window !== 'undefined') {
-      const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-      queue.push({ table: 'pos_orders', data: orderData, timestamp: Date.now(), synced: false })
-      localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+      try {
+        const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
+        await queueOperation('pos_orders', 'POST', { id: order.id, ...orderData })
+        await cacheOrder({ id: order.id, ...orderData })
+      } catch {
+        // Fallback to localStorage if IndexedDB fails
+        const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+        queue.push({ table: 'pos_orders', data: { id: order.id, ...orderData }, timestamp: Date.now(), synced: false })
+        localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+      }
       console.log('[offline] Order saved to queue — will sync when online')
     }
     return true // Return true so the UI continues normally

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -67,6 +67,8 @@ import dynamic from 'next/dynamic'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
+const OfflineIndicator = dynamic(() => import('@/components/pos/OfflineIndicator'), { ssr: false })
+const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts'), { ssr: false })
 
 export default function POSPage() {
   return (
@@ -614,12 +616,39 @@ function POSContent() {
   const [allRecipes, setAllRecipes] = useState<RecipeRow[]>([])
   const [allIngredients, setAllIngredients] = useState<Ingredient[]>([])
 
+  // Out-of-stock tracking
+  const [outOfStockItems, setOutOfStockItems] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     (async () => {
       const [r, i, dbMenu] = await Promise.all([getRecipes(), getIngredients(), getMenuCategoriesFromDB()])
       setAllRecipes(r)
       setAllIngredients(i)
       if (dbMenu.length > 0) setMenuCategories(dbMenu)
+
+      // Check which menu items are out of stock
+      try {
+        const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock&client_id=eq.amalay&stock=lte.0`, {
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+        })
+        if (invRes.ok) {
+          const zeroStock = await invRes.json()
+          const zeroIds = new Set(zeroStock.map((z: { ingredient_id: string }) => z.ingredient_id))
+          // Find menu items whose ALL key ingredients are at zero
+          const oos = new Set<string>()
+          const recipesGrouped = new Map<string, { ingredient_id: string }[]>()
+          for (const recipe of r) {
+            const list = recipesGrouped.get(recipe.menu_item_id) || []
+            list.push(recipe)
+            recipesGrouped.set(recipe.menu_item_id, list)
+          }
+          for (const [menuItemId, ingredients] of recipesGrouped) {
+            const hasZero = ingredients.some(ing => zeroIds.has(ing.ingredient_id))
+            if (hasZero) oos.add(menuItemId)
+          }
+          setOutOfStockItems(oos)
+        }
+      } catch { /* */ }
     })()
   }, [])
 
@@ -659,37 +688,46 @@ function POSContent() {
     return Array.from(names).slice(0, 12) // max 12 options
   }, [allRecipes, allIngredients])
 
-  // Online/offline status
+  // Online/offline + sync (IndexedDB-backed)
   const [online, setOnline] = useState(true)
   const [pendingSync, setPendingSync] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null)
+  const syncRef = useRef(false)
   useEffect(() => {
+    let mounted = true
+    const { syncAll, getPendingQueue } = require('@/lib/pos-offline-db')
     setOnline(navigator.onLine)
-    const goOnline = async () => {
-      setOnline(true)
-      // Sync offline queue
-      try {
-        const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-        const pending = queue.filter((q: { synced: boolean }) => !q.synced)
-        for (const item of pending) {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${item.table}`, {
-            method: 'POST',
-            headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify(item.data),
-          })
-          if (res.ok) item.synced = true
-        }
-        localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
-        setPendingSync(queue.filter((q: { synced: boolean }) => !q.synced).length)
-      } catch { /* */ }
+
+    const updateCount = async () => {
+      try { const q = await getPendingQueue(); if (mounted) setPendingSync(q.length) } catch {}
     }
-    const goOffline = () => setOnline(false)
+
+    const doSync = async () => {
+      if (syncRef.current) return
+      syncRef.current = true
+      if (mounted) setIsSyncing(true)
+      try {
+        const result = await syncAll()
+        if (mounted && result.synced > 0) setLastSyncTime(new Date().toISOString())
+      } catch {}
+      if (mounted) setIsSyncing(false)
+      syncRef.current = false
+      updateCount()
+    }
+
+    const goOnline = () => { if (mounted) setOnline(true); doSync() }
+    const goOffline = () => { if (mounted) setOnline(false) }
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)
-    // Check pending on mount
-    const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-    setPendingSync(queue.filter((q: { synced: boolean }) => !q.synced).length)
-    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline) }
+    updateCount()
+    // Periodic sync every 30s
+    const interval = setInterval(() => { if (navigator.onLine) updateCount() }, 30000)
+    return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval) }
   }, [])
+
+  // Multi-device presence counter
+  const [connectedDevices, setConnectedDevices] = useState(0)
 
   // Nav hamburger
   const [showNav, setShowNav] = useState(false)
@@ -986,7 +1024,7 @@ function POSContent() {
   }, [cancellingItem, orderId, mesero, mesa])
 
   // Void entire order
-  const handleVoidOrder = useCallback((reason: string, managerName: string) => {
+  const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
     const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
     logAudit({
       order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
@@ -994,13 +1032,23 @@ function POSContent() {
       reason,
       approved_by: managerName,
     })
+    // Mark order as cancelled in database (if it was already saved)
+    if (loadedOrderId) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
+          method: 'PATCH',
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'cancelada', notas: `ANULADA: ${reason} (por ${managerName})` }),
+        })
+      } catch { /* offline - will be caught by sync */ }
+    }
     setOrderItems([])
     setCancelledItems(new Set())
     setDiscount(0)
     setOrderNotes('')
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
-  }, [orderId, mesero, mesa, orderItems])
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId])
 
   const updateQuantity = useCallback((id: string, delta: number) => {
     setOrderItems((prev) => {
@@ -1113,8 +1161,10 @@ function POSContent() {
         ? activeItems.filter(i => splitAssignments[i.id] === 2)
         : activeItems
     const paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-    const payIva = paySubtotal * IVA_RATE
-    const payTotal = paySubtotal + payIva
+    const payDiscount = splitPayingCuenta === 0 ? discount : 0
+    const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
+    const payIva = paySubtotalAfterDiscount * IVA_RATE
+    const payTotal = paySubtotalAfterDiscount + payIva
     const payId = splitPayingCuenta > 0 ? `${orderId}-C${splitPayingCuenta}` : orderId
 
     const order: Order = {
@@ -1127,7 +1177,7 @@ function POSContent() {
       subtotal: paySubtotal,
       iva: payIva,
       total: payTotal,
-      descuento: splitPayingCuenta === 0 ? discount : 0,
+      descuento: payDiscount,
       propina: splitPayingCuenta === 0 || splitPayingCuenta === 2 ? (propina > 0 ? propina : undefined) : undefined,
       metodoPago: method,
       notas: splitPayingCuenta > 0 ? `Cuenta ${splitPayingCuenta} de split` : (orderNotes || undefined),
@@ -1193,16 +1243,19 @@ function POSContent() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-[var(--text-3)] flex-shrink-0 ml-2">
-            {!online && (
-              <span className="flex items-center gap-1 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-bold">
-                Offline {pendingSync > 0 && `(${pendingSync})`}
-              </span>
-            )}
-            {pendingSync > 0 && online && (
-              <span className="flex items-center gap-1 bg-amber-600 text-white px-2 py-1 rounded-full text-xs font-bold">
-                Sync {pendingSync}
-              </span>
-            )}
+            <OfflineIndicator
+              isOnline={online}
+              pendingCount={pendingSync}
+              isSyncing={isSyncing}
+              lastSyncTime={lastSyncTime}
+              connectedDevices={connectedDevices}
+              onSync={async () => {
+                const { syncAll } = await import('@/lib/pos-offline-db')
+                setIsSyncing(true)
+                try { await syncAll(); setLastSyncTime(new Date().toISOString()) } catch {}
+                setIsSyncing(false)
+              }}
+            />
             {readyOrders > 0 && (
               <Link href="/pos/cocina" className="flex items-center gap-1 bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
                 {readyOrders} listas
@@ -1600,32 +1653,42 @@ function POSContent() {
               {/* Menu items grid — BIG touch cards for tablet */}
               <div className="flex-1 overflow-y-auto p-3">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {activeCategory.items.filter(item => item.price > 0).map((item) => (
+                  {activeCategory.items.filter(item => item.price > 0).map((item) => {
+                    const isOOS = outOfStockItems.has(item.id)
+                    return (
                     <button
                       key={item.id}
-                      onClick={() => { handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
+                      onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
                       className={`bg-[var(--surface)] hover:bg-[var(--surface-2)] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative shadow-sm ${
-                        (item as MenuItem & { promo?: boolean }).promo
+                        isOOS
+                          ? 'border-red-500/30 opacity-50 cursor-not-allowed'
+                          : (item as MenuItem & { promo?: boolean }).promo
                           ? 'border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20'
                           : 'border-[var(--line)] hover:border-[var(--accent)]/30'
                       }`}
                     >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${activeCategory.color || 'bg-emerald-600'}`} />
-                      {(item as MenuItem & { promo?: boolean }).promo && (
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : activeCategory.color || 'bg-emerald-600'}`} />
+                      {isOOS && (
+                        <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                          Agotado
+                        </span>
+                      )}
+                      {!isOOS && (item as MenuItem & { promo?: boolean }).promo && (
                         <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                           Promo
                         </span>
                       )}
                       <div className="flex flex-col justify-between px-4 py-5 flex-1">
-                        <span className="font-bold text-base leading-snug text-[var(--text-1)]">
+                        <span className={`font-bold text-base leading-snug ${isOOS ? 'text-[var(--text-3)] line-through' : 'text-[var(--text-1)]'}`}>
                           {item.name}
                         </span>
-                        <span className="text-[var(--accent)] font-bold text-lg mt-2">
+                        <span className={`font-bold text-lg mt-2 ${isOOS ? 'text-red-400' : 'text-[var(--accent)]'}`}>
                           ${Math.round(item.price)}
                         </span>
                       </div>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </>
