@@ -30,6 +30,7 @@ import {
   Stamp,
   Bell,
   Star,
+  Building2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -41,6 +42,7 @@ const navSections = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/sucursales', label: 'Sucursales', icon: Building2 },
       { href: '/ventas', label: 'Ventas', icon: DollarSign },
       { href: '/cortes', label: 'Cortes', icon: ClipboardList },
     ],
@@ -124,7 +126,7 @@ function getTodayFormatted(): string {
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { user, role, clientConfig, signOut } = useAuth()
+  const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
 
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
@@ -185,6 +187,20 @@ export default function Sidebar() {
           <div className="pulse-dot" />
           <span className="text-xs text-[var(--text-3)] font-medium">Conectado</span>
         </div>
+
+        {/* Location selector — only when 2+ locations */}
+        {locations.length > 1 && (
+          <select
+            value={locationId || ''}
+            onChange={e => setLocationId(e.target.value || null)}
+            className="w-full mb-3 px-2 py-1.5 text-xs rounded-lg border border-[var(--line)] bg-[var(--surface-2)] text-[var(--text-2)] focus:outline-none focus:border-emerald-500 transition-colors"
+          >
+            <option value="">Todas las sucursales</option>
+            {locations.map(loc => (
+              <option key={loc.id} value={loc.id}>{loc.name}</option>
+            ))}
+          </select>
+        )}
 
         {/* Client name */}
         {clientConfig && (

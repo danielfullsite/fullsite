@@ -29,11 +29,20 @@ const ROLE_MAP: Record<string, DashboardRole> = {
   // Add more users here or migrate to DB
 }
 
+export interface ClientLocation {
+  id: string
+  name: string
+  address?: string
+}
+
 interface AuthContextType {
   user: User | null
   role: DashboardRole
   clientId: string | null
   clientConfig: { id: string; name?: string } | null
+  locations: ClientLocation[]
+  locationId: string | null
+  setLocationId: (id: string | null) => void
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -43,6 +52,9 @@ const AuthContext = createContext<AuthContextType>({
   role: 'staff',
   clientId: null,
   clientConfig: null,
+  locations: [],
+  locationId: null,
+  setLocationId: () => {},
   loading: true,
   signOut: async () => {},
 })
@@ -55,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [clientId, setClientId] = useState<string | null>(null)
   const [clientConfig, setClientConfig] = useState<{ id: string; name?: string } | null>(null)
+  const [locations, setLocations] = useState<ClientLocation[]>([])
+  const [locationId, setLocationId] = useState<string | null>(null)
   const [role, setRole] = useState<DashboardRole>('staff')
   const [loading, setLoading] = useState(true)
 
@@ -90,6 +104,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       setClientConfig(client ? { id: (client as { id: string }).id, name: (client as { id: string }).id } : { id: cid })
+
+      // Fetch locations for this client
+      const { data: locs } = await supabase
+        .from('client_locations')
+        .select('id,name,address')
+        .eq('client_id', cid)
+        .eq('active', true)
+        .order('name')
+
+      const locList = (locs || []) as ClientLocation[]
+      setLocations(locList)
+      if (locList.length > 0 && !locationId) {
+        setLocationId(locList[0].id)
+      }
     } catch {
       // Fallback
       console.warn('Error loading client data, falling back to amalay')
@@ -191,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, clientId, clientConfig, loading, signOut }}>
+    <AuthContext.Provider value={{ user, role, clientId, clientConfig, locations, locationId, setLocationId, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )
