@@ -1,0 +1,26 @@
+name: Auto-86 Agent
+
+on:
+  schedule:
+    # Every 2 hours during service: 9am, 11am, 1pm, 3pm, 5pm, 7pm MX (UTC-6)
+    - cron: '0 15,17,19,21,23,1 * * *'
+  workflow_dispatch:
+
+jobs:
+  auto86:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests pytz
+      - name: Run Auto-86 Agent
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TRIGGER_TYPE: ${{ github.event_name }}
+        run: python .github/scripts/auto86_agent.py
