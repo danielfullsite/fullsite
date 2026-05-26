@@ -69,6 +69,10 @@ const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ss
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
 const OfflineIndicator = dynamic(() => import('@/components/pos/OfflineIndicator'), { ssr: false })
 const InventoryAlerts = dynamic(() => import('@/components/pos/InventoryAlerts'), { ssr: false })
+const MeseroLeaderboard = dynamic(() => import('@/components/pos/MeseroLeaderboard'), { ssr: false })
+const SmartCashCalculator = dynamic(() => import('@/components/pos/SmartCashCalculator'), { ssr: false })
+const CustomerMemory = dynamic(() => import('@/components/pos/CustomerMemory'), { ssr: false })
+const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ssr: false })
 
 export default function POSPage() {
   return (
@@ -607,6 +611,8 @@ function POSContent() {
   const [showPayment, setShowPayment] = useState(false)
   const [showMixto, setShowMixto] = useState(false)
   const [mixtoEfectivo, setMixtoEfectivo] = useState('')
+  const [showCashCalc, setShowCashCalc] = useState(false)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [sentToKitchen, setSentToKitchen] = useState(false)
 
   // Modifier modal state
@@ -1360,6 +1366,12 @@ function POSContent() {
                 </Link>
               ))}
             </div>
+
+            {/* Leaderboard + Kitchen Timer in nav */}
+            <div className="mt-4 pt-4 border-t border-[var(--line)] space-y-3">
+              <MeseroLeaderboard currentMesero={mesero} compact />
+              <KitchenTimer />
+            </div>
           </div>
           <div className="flex-1 bg-black/50" />
         </div>
@@ -1379,6 +1391,11 @@ function POSContent() {
               <span className="text-emerald-400 font-bold text-xl">{formatMXN(total)}</span>
             </div>
             {/* Silla selector removed — not functional yet */}
+          </div>
+
+          {/* Customer memory — allergies, preferences */}
+          <div className="px-4 py-1">
+            <CustomerMemory mesa={mesa} mesero={mesero} />
           </div>
 
           {/* Order items list */}
@@ -1938,12 +1955,20 @@ function POSContent() {
 
             <div className="space-y-3">
               <button
-                onClick={() => handlePayment('Efectivo')}
+                onClick={() => { setShowCashCalc(false); handlePayment('Efectivo') }}
                 className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <Banknote size={24} />
                 Efectivo
               </button>
+              {/* Smart cash calculator */}
+              <button
+                onClick={() => setShowCashCalc(!showCashCalc)}
+                className={`w-full text-center text-xs py-1.5 rounded-lg transition-colors ${showCashCalc ? 'text-emerald-400' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'}`}
+              >
+                {showCashCalc ? 'Ocultar calculadora' : 'Calcular cambio'}
+              </button>
+              {showCashCalc && <SmartCashCalculator total={total + propina} onClose={() => setShowCashCalc(false)} />}
               <button
                 onClick={() => handlePayment('Tarjeta de credito')}
                 className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
