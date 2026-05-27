@@ -1347,20 +1347,23 @@ function POSContent() {
         details: { method, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
 
+      // Print ticket for THIS cuenta
+      handlePrintTicket(order)
+
       // If split and more cuentas remaining, advance to next
       const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
       if (splitPayingCuenta > 0 && splitPayingCuenta < totalCuentas) {
         showToast(`Cuenta ${splitPayingCuenta} de ${totalCuentas} cobrada (${method}) — ahora cobra Cuenta ${splitPayingCuenta + 1}`)
         setSplitPayingCuenta(splitPayingCuenta + 1)
         setPropina(0)
+        setShowCashFlow(false)
+        setCashAmount('')
         setSaving(false)
         return // Don't reset order yet
       }
 
       // Fully done (no split, or last cuenta paid)
-      showToast(`Cuenta cerrada - ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
-      // Auto-print ticket
-      handlePrintTicket(order)
+      showToast(`Todas las cuentas cobradas — ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
     } else {
       showToast('Error al cerrar cuenta')
     }
