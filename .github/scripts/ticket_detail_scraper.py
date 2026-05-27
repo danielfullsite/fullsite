@@ -354,6 +354,14 @@ def compute_waiter_categories(items: list[dict]) -> dict:
 
 def build_telegram_message(waiter_cats: dict, target_date: str) -> str:
     """Build Telegram message with waiter × category breakdown."""
+    # Check if there's any data at all
+    has_any_data = any(
+        any(cats.get(c, {}).get("qty", 0) > 0 for c in ["H&H", "Pan", "Postres"])
+        for cats in waiter_cats.values()
+    )
+    if not waiter_cats or not has_any_data:
+        return f"📊 AMALAY · {target_date}\n\n⏳ Sin datos todavía para hoy.\nEl sync se actualiza con las ventas del día. Si el restaurante aún no abre, los datos aparecerán cuando haya ventas."
+
     msg = f"📊 VENTAS POR CATEGORÍA × MESERO\n{target_date}\n"
 
     for cat in ["H&H", "Pan", "Postres", "2da Bebida"]:
