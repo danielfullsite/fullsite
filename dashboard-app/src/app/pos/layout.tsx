@@ -135,7 +135,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(false)
   }
 
-  if (unlocked) return <>{children}</>
+  if (unlocked) return (
+    <div style={{
+      background:'#0a0a0f', color:'#fff', minHeight:'100vh',
+      colorScheme:'dark',
+      // Force all CSS variables to dark values for POS
+      // @ts-expect-error CSS custom properties
+      '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+      '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
+      '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
+      '--text-4':'rgba(255,255,255,0.25)',
+    }}>{children}</div>
+  )
 
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
