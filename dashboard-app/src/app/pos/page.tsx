@@ -1813,16 +1813,16 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category tabs — big touch targets */}
-              <div className="flex gap-2 px-3 py-2.5 overflow-x-auto border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
+              {/* Category grid — big touch targets for tablet/touch */}
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 px-2 py-2 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
                 {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all min-h-[44px] ${
+                    className={`px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[52px] leading-tight ${
                       selectedCategory === cat.id
                         ? `${(cat as { color?: string }).color || 'bg-emerald-600'} text-white shadow-lg`
-                        : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0'
+                        : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:scale-95'
                     }`}
                   >
                     {cat.name}

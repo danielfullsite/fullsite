@@ -124,11 +124,11 @@ try:
         "limit": "2500",
     })
 
-    # 4. Get ingredients
+    # 4. Get ingredients (including yield_factor for real cost calculation)
     ingredients = sb_get("pos_ingredients", {
         "client_id": f"eq.{cid}",
         "active": "eq.true",
-        "select": "id,name,unit,cost_per_unit",
+        "select": "id,name,unit,cost_per_unit,yield_factor",
         "limit": "1000",
     })
     ing_map = {i["id"]: i for i in ingredients}
@@ -188,7 +188,10 @@ try:
             # Cap at reasonable quantities (no more than 10x reorder_point)
             if reorder > 0:
                 need = min(need, reorder * 10)
-            cost = float(ing_info.get("cost_per_unit") or 0) * need
+            # Apply yield factor: if yield is 90%, you need to buy 10% more
+            yield_factor = float(ing_info.get("yield_factor") or 1) or 1
+            buy_qty = need / yield_factor if yield_factor < 1 else need
+            cost = float(ing_info.get("cost_per_unit") or 0) * buy_qty
 
             purchase_list.append({
                 "ingredient_id": ing_id,
@@ -197,7 +200,8 @@ try:
                 "current_stock": round(inv["stock"], 2),
                 "predicted_usage": round(predicted, 2),
                 "remaining_after": round(remaining, 2),
-                "suggested_qty": round(need, 1),
+                "suggested_qty": round(buy_qty, 1),
+                "yield_factor": yield_factor,
                 "estimated_cost": round(cost, 2),
             })
 
