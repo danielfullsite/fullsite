@@ -286,14 +286,39 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             </div>
           </div>}
 
-          {/* Notas */}
+          {/* Notas por item */}
           <div>
-            <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Notas</h4>
+            <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Notas del platillo</h4>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {['Termino medio', 'Bien cocido', 'Tres cuartos', 'Sin picante', 'Extra caliente', 'Para llevar', 'Urgente', 'Alergia'].map(tag => {
+                const isActive = notas.includes(tag)
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      if (isActive) {
+                        setNotas(notas.replace(tag, '').replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '').trim())
+                      } else {
+                        setNotas(prev => prev ? `${prev}, ${tag}` : tag)
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-amber-600/40 border border-amber-500/60 text-amber-200'
+                        : 'bg-[var(--line)]/50 border border-slate-600/50 text-slate-300 hover:bg-[var(--line)]'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                )
+              })}
+            </div>
             <input
               type="text"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
-              placeholder="Instrucciones especiales..."
+              placeholder="Instrucciones especiales: sin cebolla, termino medio..."
               className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[44px]"
             />
           </div>

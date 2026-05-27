@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
@@ -113,6 +113,19 @@ export default function MesasPage() {
   const totalVentas = mesas.reduce((s, m) => s + (m.total || 0), 0)
   const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
 
+  // Timer: minutes since order created per mesa
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 30000) // refresh every 30s
+    return () => clearInterval(timer)
+  }, [])
+
+  const getMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
+
+  const ALERT_THRESHOLD = 90 // minutes
+  const WARNING_THRESHOLD = 60
+  const alertMesas = activeOrders.filter(o => getMinutes(o.created_at) >= ALERT_THRESHOLD)
+
   // ─── Merge Mesas ──────────────────────────────────────────────────────
   const [mergeMode, setMergeMode] = useState(false)
   const [mergeSource, setMergeSource] = useState<number | null>(null)
@@ -209,7 +222,13 @@ export default function MesasPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold">Mesas</h1>
-            <p className="text-[var(--text-3)] text-sm">{activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}</p>
+            <p className="text-[var(--text-3)] text-sm">
+              {activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
+              {activeOrders.length > 0 && (() => {
+                const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
+                return <span className={avgMins > 60 ? 'text-amber-400' : ''}> · Prom: {avgMins}m</span>
+              })()}
+            </p>
           </div>
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
@@ -235,6 +254,17 @@ export default function MesasPage() {
           ))}
         </div>
       </header>
+
+      {/* Alert banner for slow tables */}
+      {alertMesas.length > 0 && (
+        <div className="mx-6 mt-3 flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-pulse">
+          <AlertTriangle size={18} className="text-red-400 flex-shrink-0" />
+          <span className="text-sm text-red-400 font-medium">
+            {alertMesas.length} mesa{alertMesas.length > 1 ? 's' : ''} con +{ALERT_THRESHOLD} min:{' '}
+            {alertMesas.map(o => `Mesa ${o.mesa} (${getMinutes(o.created_at)}m)`).join(', ')}
+          </span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
@@ -265,8 +295,21 @@ export default function MesasPage() {
                     </span>
                   </div>
                   <div className="mt-3">
-                    {mesa.status !== 'disponible' ? (
+                    {mesa.status !== 'disponible' ? (() => {
+                      const order = ordersByMesa.get(mesa.number)
+                      const mins = order ? getMinutes(order.created_at) : 0
+                      const isAlert = mins >= ALERT_THRESHOLD
+                      const isWarning = mins >= WARNING_THRESHOLD && mins < ALERT_THRESHOLD
+                      return (
                       <>
+                        {/* Timer */}
+                        <div className={`flex items-center gap-1 mb-1.5 ${isAlert ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
+                          <Clock size={12} />
+                          <span className={`text-xs font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
+                            {mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`}
+                          </span>
+                          {isAlert && <AlertTriangle size={10} className="text-red-400" />}
+                        </div>
                         <p className="text-[var(--text-4)] text-sm truncate">{mesa.mesero}</p>
                         <div className="flex items-center justify-between mt-1">
                           <div className="flex items-center gap-1 text-[var(--text-3)] text-sm">
@@ -283,7 +326,8 @@ export default function MesasPage() {
                           </p>
                         ) : null}
                       </>
-                    ) : (
+                      )
+                    })() : (
                       <p className="text-[var(--text-2)] text-sm">{mesa.capacity} lugares</p>
                     )}
                   </div>

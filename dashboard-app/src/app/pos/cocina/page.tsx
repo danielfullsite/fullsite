@@ -457,7 +457,10 @@ export default function CocinaPage() {
                             <p className="text-red-500 text-[10px]">Cancelado: {item.cancelReason} — {item.cancelledBy}</p>
                           )}
                           {!item.cancelled && item.modificadores && item.modificadores.length > 0 && (
-                            <p className="text-[var(--text-2)] text-xs">{item.modificadores.join(' · ')}</p>
+                            <p className="text-[var(--text-2)] text-xs">{typeof item.modificadores === 'string' ? item.modificadores : item.modificadores.join(' · ')}</p>
+                          )}
+                          {!item.cancelled && item.notas && (
+                            <p className="text-sky-400 text-xs italic">{item.notas}</p>
                           )}
                         </div>
                         {!item.cancelled && (

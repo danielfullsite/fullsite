@@ -16,6 +16,7 @@ interface BarraItem {
   cantidad?: number
   quantity?: number
   modificadores?: string[]
+  notas?: string
 }
 
 export default function BarraPage() {
@@ -201,6 +202,9 @@ export default function BarraPage() {
                           <span className="text-white text-sm">{item.nombre || item.name}</span>
                           {item.modificadores && item.modificadores.length > 0 && (
                             <p className="text-[var(--text-2)] text-xs">{item.modificadores.join(' · ')}</p>
+                          )}
+                          {item.notas && (
+                            <p className="text-sky-400 text-xs italic">{item.notas}</p>
                           )}
                         </div>
                       </div>

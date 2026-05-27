@@ -30,6 +30,7 @@ interface ParsedItem {
   cantidad?: number
   quantity?: number
   modificadores?: string[]
+  notas?: string
   cancelled?: boolean
 }
 
@@ -351,6 +352,11 @@ export default function KDSPage() {
                             {item.modificadores && item.modificadores.length > 0 && (
                               <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : 'text-amber-400/80'}`}>
                                 {item.modificadores.join(' · ')}
+                              </p>
+                            )}
+                            {item.notas && (
+                              <p className={`text-xs italic ${itemDone ? 'text-sky-600/60 line-through' : 'text-sky-300/80'}`}>
+                                {item.notas}
                               </p>
                             )}
                           </div>
