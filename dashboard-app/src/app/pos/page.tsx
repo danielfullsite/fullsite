@@ -859,8 +859,31 @@ function POSContent() {
 
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
-  const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1 or 2)
-  const [splitPayingCuenta, setSplitPayingCuenta] = useState<0 | 1 | 2>(0) // 0 = no split, 1 = paying cuenta 1, 2 = paying cuenta 2
+  const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
+  const [splitPayingCuenta, setSplitPayingCuenta] = useState(0) // 0 = no split, 1-6 = which cuenta paying now
+  const [splitCount, setSplitCount] = useState(0) // 0 = no split, 2-6 = number of cuentas
+  const [splitMode, setSplitMode] = useState<'items' | 'parejo' | null>(null) // null = choosing, 'items' = assign items, 'parejo' = equal split
+  const [splitParejoN, setSplitParejoN] = useState(0) // number of people for parejo split
+
+  const CUENTA_COLORS = [
+    '', // index 0 unused
+    'bg-blue-600', // C1
+    'bg-purple-600', // C2
+    'bg-amber-600', // C3
+    'bg-rose-600', // C4
+    'bg-cyan-600', // C5
+    'bg-lime-600', // C6
+  ]
+  const CUENTA_BG = [
+    '',
+    'bg-blue-900/30 border-blue-700',
+    'bg-purple-900/30 border-purple-700',
+    'bg-amber-900/30 border-amber-700',
+    'bg-rose-900/30 border-rose-700',
+    'bg-cyan-900/30 border-cyan-700',
+    'bg-lime-900/30 border-lime-700',
+  ]
+  const CUENTA_TEXT = ['', 'text-blue-400', 'text-purple-400', 'text-amber-400', 'text-rose-400', 'text-cyan-400', 'text-lime-400']
 
   // Propina
   const [propina, setPropina] = useState(0)
@@ -1261,33 +1284,51 @@ function POSContent() {
     setSaving(true)
 
     // Determine which items to pay based on split state
-    const payingItems = splitPayingCuenta === 1
-      ? activeItems.filter(i => (splitAssignments[i.id] || 1) === 1)
-      : splitPayingCuenta === 2
-        ? activeItems.filter(i => splitAssignments[i.id] === 2)
-        : activeItems
-    const paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-    const payDiscount = splitPayingCuenta === 0 ? discount : 0
+    let payingItems = activeItems
+    let paySubtotal: number
+    let payDiscount: number
+    let payTotal: number
+
+    if (splitMode === 'parejo' && splitPayingCuenta > 0) {
+      // Parejo: equal split — each person pays total / N
+      const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
+      const fullDiscount = discount
+      const fullAfterDisc = Math.max(0, fullSubtotal - fullDiscount)
+      const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+      paySubtotal = fullSubtotal / splitParejoN
+      payDiscount = fullDiscount / splitParejoN
+      payTotal = fullTotal / splitParejoN
+    } else if (splitPayingCuenta > 0) {
+      payingItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === splitPayingCuenta)
+      paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
+      payDiscount = 0
+      const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
+      payTotal = paySubtotalAfterDiscount + paySubtotalAfterDiscount * IVA_RATE
+    } else {
+      paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
+      payDiscount = discount
+      const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
+      payTotal = paySubtotalAfterDiscount + paySubtotalAfterDiscount * IVA_RATE
+    }
     const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
     const payIva = paySubtotalAfterDiscount * IVA_RATE
-    const payTotal = paySubtotalAfterDiscount + payIva
     const payId = splitPayingCuenta > 0 ? `${orderId}-C${splitPayingCuenta}` : orderId
 
     const order: Order = {
       id: payId,
       mesa,
       mesero,
-      personas: splitPayingCuenta > 0 ? Math.ceil(personas / 2) : personas,
+      personas: splitPayingCuenta > 0 ? Math.ceil(personas / (splitMode === 'parejo' ? splitParejoN : splitCount)) : personas,
       status: 'cerrada',
       items: payingItems,
       subtotal: paySubtotal,
       iva: payIva,
       total: payTotal,
       descuento: payDiscount,
-      propina: splitPayingCuenta === 0 || splitPayingCuenta === 2 ? (propina > 0 ? propina : undefined) : undefined,
+      propina: splitPayingCuenta === 0 || splitPayingCuenta === (splitMode === 'parejo' ? splitParejoN : splitCount) ? (propina > 0 ? propina : undefined) : undefined,
       metodoPago: method,
       notas: splitPayingCuenta > 0
-        ? `Cuenta ${splitPayingCuenta} de split`
+        ? `Cuenta ${splitPayingCuenta} de ${splitMode === 'parejo' ? splitParejoN : splitCount} (${splitMode === 'parejo' ? 'parejo' : 'split'})`
         : method === 'Mixto'
           ? `Mixto: Efectivo ${formatMXN(parseFloat(mixtoEfectivo) || 0)} + Tarjeta ${formatMXN(payTotal - (parseFloat(mixtoEfectivo) || 0))}${orderNotes ? ' | ' + orderNotes : ''}`
           : (orderNotes || undefined),
@@ -1306,16 +1347,17 @@ function POSContent() {
         details: { method, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
 
-      // If split and just paid Cuenta 1, move to Cuenta 2
-      if (splitPayingCuenta === 1) {
-        showToast(`Cuenta 1 cobrada (${method}) — ahora cobra Cuenta 2`)
-        setSplitPayingCuenta(2)
+      // If split and more cuentas remaining, advance to next
+      const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
+      if (splitPayingCuenta > 0 && splitPayingCuenta < totalCuentas) {
+        showToast(`Cuenta ${splitPayingCuenta} de ${totalCuentas} cobrada (${method}) — ahora cobra Cuenta ${splitPayingCuenta + 1}`)
+        setSplitPayingCuenta(splitPayingCuenta + 1)
         setPropina(0)
         setSaving(false)
         return // Don't reset order yet
       }
 
-      // Fully done (no split, or Cuenta 2 paid)
+      // Fully done (no split, or last cuenta paid)
       showToast(`Cuenta cerrada - ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
       // Auto-print ticket
       handlePrintTicket(order)
@@ -1333,6 +1375,9 @@ function POSContent() {
     setCashAmount('')
     setSplitPayingCuenta(0)
     setSplitAssignments({})
+    setSplitCount(0)
+    setSplitMode(null)
+    setSplitParejoN(0)
   }
 
   const handleApplyDiscount = (amount: number) => {
@@ -1685,7 +1730,7 @@ function POSContent() {
               Cuenta
             </button>
             <button
-              onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
+              onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
               className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500/100 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
             >
@@ -1889,90 +1934,178 @@ function POSContent() {
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-lg border border-[var(--line)] max-h-[85vh] overflow-y-auto mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Split de cuenta — Mesa {mesa}</h3>
-              <button onClick={() => setShowSplit(false)} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center">
+              <button onClick={() => { setShowSplit(false); setSplitMode(null); setSplitCount(0); setSplitParejoN(0) }} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center">
                 <X size={20} />
               </button>
             </div>
-            <p className="text-[var(--text-3)] text-sm mb-4">Toca cada item para asignarlo a Cuenta 1 o Cuenta 2</p>
 
-            <div className="space-y-2 mb-6">
-              {activeItems.map(item => {
-                const cuenta = splitAssignments[item.id] || 1
-                return (
+            {/* Step 1: Choose split mode */}
+            {splitMode === null && (
+              <>
+                <p className="text-[var(--text-3)] text-sm mb-4">¿En cuántas cuentas dividir?</p>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[2, 3, 4, 5, 6].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => { setSplitCount(n); setSplitMode('items'); setSplitAssignments({}) }}
+                      className="py-4 rounded-xl bg-[var(--line)] hover:bg-blue-600/30 border border-transparent hover:border-blue-600 text-white font-bold text-xl transition-all"
+                    >
+                      {n}
+                    </button>
+                  ))}
                   <button
-                    key={item.id}
-                    onClick={() => setSplitAssignments(prev => ({ ...prev, [item.id]: cuenta === 1 ? 2 : 1 }))}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
-                      cuenta === 1 ? 'bg-blue-900/30 border border-blue-700/50' : 'bg-purple-900/30 border border-purple-700/50'
-                    }`}
+                    onClick={() => { setSplitMode('parejo'); setSplitParejoN(0) }}
+                    className="py-4 rounded-xl bg-emerald-900/30 hover:bg-emerald-600/30 border border-emerald-700/50 hover:border-emerald-500 text-emerald-400 font-bold text-sm transition-all"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        cuenta === 1 ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                      }`}>C{cuenta}</span>
-                      <span className="text-white text-sm">{item.cantidad}x {item.nombre}</span>
-                    </div>
-                    <span className="text-white font-semibold">{formatMXN(item.subtotal)}</span>
+                    Parejo
                   </button>
-                )
-              })}
-            </div>
-
-            {/* Totals per cuenta */}
-            {(() => {
-              const cuenta1Items = activeItems.filter(i => (splitAssignments[i.id] || 1) === 1)
-              const cuenta2Items = activeItems.filter(i => splitAssignments[i.id] === 2)
-              const total1 = cuenta1Items.reduce((s, i) => s + i.subtotal, 0)
-              const total2 = cuenta2Items.reduce((s, i) => s + i.subtotal, 0)
-              const iva1 = total1 * IVA_RATE
-              const iva2 = total2 * IVA_RATE
-              return (
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-center">
-                    <p className="text-blue-400 text-xs font-bold mb-1">CUENTA 1</p>
-                    <p className="text-white text-xl font-bold">{formatMXN(total1 + iva1)}</p>
-                    <p className="text-blue-400/60 text-xs">{cuenta1Items.length} items</p>
-                  </div>
-                  <div className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-4 text-center">
-                    <p className="text-purple-400 text-xs font-bold mb-1">CUENTA 2</p>
-                    <p className="text-white text-xl font-bold">{formatMXN(total2 + iva2)}</p>
-                    <p className="text-purple-400/60 text-xs">{cuenta2Items.length} items</p>
-                  </div>
                 </div>
-              )
-            })()}
+              </>
+            )}
 
-            <div className="flex gap-3">
-              <button onClick={() => setShowSplit(false)} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold min-h-[48px]">
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  const cuenta2Items = activeItems.filter(i => splitAssignments[i.id] === 2)
-                  if (cuenta2Items.length === 0) {
-                    setShowSplit(false)
-                    setSplitPayingCuenta(0)
-                    setShowPayment(true)
-                    return
-                  }
-                  logAudit({
-                    order_id: orderId, action: 'status_changed', actor: mesero, mesa,
-                    details: {
-                      type: 'split_cuenta',
-                      cuenta1_items: activeItems.filter(i => (splitAssignments[i.id] || 1) === 1).length,
-                      cuenta2_items: cuenta2Items.length,
-                    },
-                  })
-                  setShowSplit(false)
-                  setSplitPayingCuenta(1) // Start with cuenta 1
-                  setShowPayment(true)
-                  showToast('Cobra Cuenta 1 primero')
-                }}
-                className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold min-h-[48px]"
-              >
-                Dividir y cobrar
-              </button>
-            </div>
+            {/* Parejo mode: choose number of people */}
+            {splitMode === 'parejo' && splitParejoN === 0 && (
+              <>
+                <p className="text-[var(--text-3)] text-sm mb-4">¿Entre cuántas personas dividir parejo?</p>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[2, 3, 4, 5, 6].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setSplitParejoN(n)}
+                      className="py-4 rounded-xl bg-[var(--line)] hover:bg-emerald-600/30 border border-transparent hover:border-emerald-600 text-white font-bold text-xl transition-all"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setSplitMode(null)}
+                  className="w-full py-3 rounded-xl bg-[var(--line)] text-[var(--text-4)] font-semibold min-h-[48px]"
+                >
+                  Atrás
+                </button>
+              </>
+            )}
+
+            {/* Parejo mode: show result */}
+            {splitMode === 'parejo' && splitParejoN > 0 && (
+              <>
+                {(() => {
+                  const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
+                  const fullAfterDisc = Math.max(0, fullSubtotal - discount)
+                  const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+                  const perPerson = fullTotal / splitParejoN
+                  return (
+                    <div className="text-center mb-6">
+                      <p className="text-[var(--text-3)] text-sm mb-2">Total dividido entre {splitParejoN} personas</p>
+                      <p className="text-3xl font-bold text-emerald-400">{formatMXN(perPerson)}</p>
+                      <p className="text-[var(--text-3)] text-xs mt-1">cada persona</p>
+                      <p className="text-[var(--text-2)] text-xs mt-2">Total: {formatMXN(fullTotal)}</p>
+                    </div>
+                  )
+                })()}
+                <div className="flex gap-3">
+                  <button onClick={() => { setSplitParejoN(0) }} className="flex-1 py-3 rounded-xl bg-[var(--line)] text-[var(--text-4)] font-semibold min-h-[48px]">
+                    Atrás
+                  </button>
+                  <button
+                    onClick={() => {
+                      logAudit({
+                        order_id: orderId, action: 'status_changed', actor: mesero, mesa,
+                        details: { type: 'split_parejo', personas: splitParejoN },
+                      })
+                      setShowSplit(false)
+                      setSplitPayingCuenta(1)
+                      setShowPayment(true)
+                      showToast(`Cobra Cuenta 1 de ${splitParejoN}`)
+                    }}
+                    className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold min-h-[48px]"
+                  >
+                    Dividir y cobrar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Items mode: assign items to cuentas */}
+            {splitMode === 'items' && splitCount > 0 && (
+              <>
+                <p className="text-[var(--text-3)] text-sm mb-4">Toca cada item para cambiar de cuenta ({splitCount} cuentas)</p>
+
+                <div className="space-y-2 mb-6">
+                  {activeItems.map(item => {
+                    const cuenta = splitAssignments[item.id] || 1
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setSplitAssignments(prev => ({ ...prev, [item.id]: cuenta >= splitCount ? 1 : cuenta + 1 }))}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${CUENTA_BG[cuenta]} border`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${CUENTA_COLORS[cuenta]} text-white`}>C{cuenta}</span>
+                          <span className="text-white text-sm">{item.cantidad}x {item.nombre}</span>
+                        </div>
+                        <span className="text-white font-semibold">{formatMXN(item.subtotal)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Totals per cuenta */}
+                <div className={`grid gap-3 mb-6 ${splitCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {Array.from({ length: splitCount }, (_, idx) => {
+                    const cNum = idx + 1
+                    const cItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === cNum)
+                    const cTotal = cItems.reduce((s, i) => s + i.subtotal, 0)
+                    const cWithIva = cTotal + cTotal * IVA_RATE
+                    return (
+                      <div key={cNum} className={`${CUENTA_BG[cNum]} border rounded-xl p-3 text-center`}>
+                        <p className={`${CUENTA_TEXT[cNum]} text-xs font-bold mb-1`}>CUENTA {cNum}</p>
+                        <p className="text-white text-lg font-bold">{formatMXN(cWithIva)}</p>
+                        <p className={`${CUENTA_TEXT[cNum]} opacity-60 text-xs`}>{cItems.length} items</p>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={() => { setSplitMode(null); setSplitCount(0) }} className="flex-1 py-3 rounded-xl bg-[var(--line)] text-[var(--text-4)] font-semibold min-h-[48px]">
+                    Atrás
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Check at least 2 cuentas have items
+                      const usedCuentas = new Set(activeItems.map(i => splitAssignments[i.id] || 1))
+                      if (usedCuentas.size < 2) {
+                        setShowSplit(false)
+                        setSplitPayingCuenta(0)
+                        setSplitMode(null)
+                        setSplitCount(0)
+                        setShowPayment(true)
+                        return
+                      }
+                      logAudit({
+                        order_id: orderId, action: 'status_changed', actor: mesero, mesa,
+                        details: {
+                          type: 'split_cuenta',
+                          cuentas: splitCount,
+                          distribution: Array.from({ length: splitCount }, (_, idx) =>
+                            activeItems.filter(i => (splitAssignments[i.id] || 1) === idx + 1).length
+                          ),
+                        },
+                      })
+                      setShowSplit(false)
+                      setSplitPayingCuenta(1)
+                      setShowPayment(true)
+                      showToast(`Cobra Cuenta 1 de ${splitCount}`)
+                    }}
+                    className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold min-h-[48px]"
+                  >
+                    Dividir y cobrar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -2172,23 +2305,40 @@ function POSContent() {
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)]">
             {(() => {
               // Calculate total for current split cuenta or full order
-              const payingItems = splitPayingCuenta === 1
-                ? activeItems.filter(i => (splitAssignments[i.id] || 1) === 1)
-                : splitPayingCuenta === 2
-                  ? activeItems.filter(i => splitAssignments[i.id] === 2)
-                  : activeItems
-              const paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-              const payDiscount = splitPayingCuenta === 0 ? discount : 0
-              const paySubAfterDisc = Math.max(0, paySubtotal - payDiscount)
+              const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
+              let payingItems = activeItems
+              let paySubtotal: number
+              let payDiscountLocal: number
+              let payTotal: number
+
+              if (splitMode === 'parejo' && splitPayingCuenta > 0) {
+                const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
+                const fullAfterDisc = Math.max(0, fullSubtotal - discount)
+                const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+                paySubtotal = fullSubtotal / splitParejoN
+                payDiscountLocal = discount / splitParejoN
+                payTotal = fullTotal / splitParejoN
+              } else if (splitPayingCuenta > 0) {
+                payingItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === splitPayingCuenta)
+                paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
+                payDiscountLocal = 0
+                const sub = Math.max(0, paySubtotal - payDiscountLocal)
+                payTotal = sub + sub * IVA_RATE
+              } else {
+                paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
+                payDiscountLocal = discount
+                const sub = Math.max(0, paySubtotal - payDiscountLocal)
+                payTotal = sub + sub * IVA_RATE
+              }
+              const paySubAfterDisc = Math.max(0, paySubtotal - payDiscountLocal)
               const payIva = paySubAfterDisc * IVA_RATE
-              const payTotal = paySubAfterDisc + payIva
-              const cuentaLabel = splitPayingCuenta > 0 ? ` — Cuenta ${splitPayingCuenta}` : ''
+              const cuentaLabel = splitPayingCuenta > 0 ? ` — Cuenta ${splitPayingCuenta} de ${totalCuentas}` : ''
 
               return (<>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Cerrar cuenta{cuentaLabel}</h3>
               <button
-                onClick={() => { setShowPayment(false); setSplitPayingCuenta(0) }}
+                onClick={() => { setShowPayment(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
                 className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={20} />
@@ -2196,9 +2346,9 @@ function POSContent() {
             </div>
 
             {splitPayingCuenta > 0 && (
-              <div className={`text-center py-2 px-4 rounded-lg mb-3 ${splitPayingCuenta === 1 ? 'bg-blue-900/30 border border-blue-700/40' : 'bg-purple-900/30 border border-purple-700/40'}`}>
-                <p className={`text-sm font-bold ${splitPayingCuenta === 1 ? 'text-blue-400' : 'text-purple-400'}`}>
-                  Cuenta {splitPayingCuenta} · {payingItems.length} items
+              <div className={`text-center py-2 px-4 rounded-lg mb-3 ${CUENTA_BG[splitPayingCuenta] || CUENTA_BG[1]} border`}>
+                <p className={`text-sm font-bold ${CUENTA_TEXT[splitPayingCuenta] || CUENTA_TEXT[1]}`}>
+                  Cuenta {splitPayingCuenta} de {totalCuentas}{splitMode === 'parejo' ? ' (parejo)' : ` · ${payingItems.length} items`}
                 </p>
               </div>
             )}
