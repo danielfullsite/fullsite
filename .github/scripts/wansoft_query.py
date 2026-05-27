@@ -431,6 +431,7 @@ def fetch_historical(days=90):
         rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,"
                       "personas_restaurant,ticket_promedio_restaurant,propinas_total,"
+                      "efectivo,tarjeta,"
                       "meseros,platillos_top,ventas_por_grupo,pago_metodos",
             "fecha": f"gte.{start}",
             "order": "fecha.desc",
@@ -738,11 +739,14 @@ def ask_groq(question, wansoft_data, historical_data):
                 if wants_propinas:
                     entry["propinas_total"] = r.get("propinas_total")
                 if wants_pago:
+                    # Include BOTH peso amounts AND transaction counts
+                    entry["efectivo_mxn"] = r.get("efectivo")
+                    entry["tarjeta_mxn"] = r.get("tarjeta")
                     pm = r.get("pago_metodos")
                     if isinstance(pm, str):
                         try: pm = json.loads(pm)
                         except: pm = None
-                    entry["pago_metodos"] = pm
+                    entry["pago_metodos_transacciones"] = pm
                 hist_compact.append(entry)
             blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 

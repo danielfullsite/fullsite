@@ -287,19 +287,20 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
     # Enrich from group totals if keyword matching missed items
     # This catches items that don't have obvious keywords (e.g., "TRES LECHES")
+    # IMPORTANT: groups have {name, total} where total is PESOS, not qty.
+    # Only use g["qty"] if it exists — NEVER use g["total"] as quantity.
     for g in groups:
         gname = g["name"].upper()
         if gname in [pg.upper() for pg in POSTRES_GROUPS]:
-            group_total = g.get("qty") or g.get("total", 0)
+            group_qty = g.get("qty", 0)  # Only use actual qty, not monetary total
             saucer_total = sum_qty(postre_items)
-            if group_total > saucer_total and group_total > 0 and saucer_total == 0:
-                # Group has items our keywords missed — add group total
-                postre_items.append({"name": f"({gname})", "qty": group_total, "total": g.get("total", 0)})
+            if group_qty and group_qty > saucer_total and saucer_total == 0:
+                postre_items.append({"name": f"({gname})", "qty": group_qty, "total": g.get("total", 0)})
         if gname in [pg.upper() for pg in PANADERIA_GROUPS]:
-            group_total = g.get("qty") or g.get("total", 0)
+            group_qty = g.get("qty", 0)
             saucer_total = sum_qty(panaderia_items)
-            if group_total > saucer_total and group_total > 0 and saucer_total == 0:
-                panaderia_items.append({"name": f"({gname})", "qty": group_total, "total": g.get("total", 0)})
+            if group_qty and group_qty > saucer_total and saucer_total == 0:
+                panaderia_items.append({"name": f"({gname})", "qty": group_qty, "total": g.get("total", 0)})
 
     # Bebidas total and per-person
     bebida_total_qty = 0
