@@ -1,0 +1,27 @@
+name: Wansoft Mega Scraper
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # 11pm MX daily
+  workflow_dispatch:
+
+jobs:
+  mega-scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 playwright && playwright install chromium
+      - name: Run Wansoft Mega Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TRIGGER_TYPE: ${{ github.event_name }}
+        run: python .github/scripts/wansoft_mega_scraper.py
