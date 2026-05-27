@@ -1933,7 +1933,7 @@ function POSContent() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-lg border border-[var(--line)] max-h-[85vh] overflow-y-auto mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Split de cuenta — Mesa {mesa}</h3>
+              <h3 className="text-lg font-bold">Dividir cuenta — Mesa {mesa}</h3>
               <button onClick={() => { setShowSplit(false); setSplitMode(null); setSplitCount(0); setSplitParejoN(0) }} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center">
                 <X size={20} />
               </button>
