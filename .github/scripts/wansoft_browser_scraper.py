@@ -553,6 +553,229 @@ async def run():
         if withdrawal_data.get("count", 0) > 0 and withdrawal_data["type"] != "error":
             results["retiros_caja"] = withdrawal_data.get("count", 0)
 
+        # ── PROMOTIONS (Browser — REST endpoint returns navigation HTML) ───
+        print("\n━━━ PROMOTIONS (Browser) ━━━")
+
+        try:
+            await page.goto(f"{WANSOFT_URL}/Menu/Promotion", wait_until="load", timeout=30000)
+            await asyncio.sleep(3)
+
+            # Select subsidiary
+            await page.evaluate(f"""() => {{
+                const selects = document.querySelectorAll('select');
+                for (const sel of selects) {{
+                    for (const opt of sel.options) {{
+                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                            opt.selected = true;
+                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                }}
+            }}""")
+            await asyncio.sleep(3)
+
+            # Extract promotion table
+            promo_data = await page.evaluate("""() => {
+                const promos = [];
+
+                // Try table rows
+                const rows = document.querySelectorAll('table tr, .rowReport, [class*="grid"] [class*="row"]');
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td, div');
+                    const cols = Array.from(cells).map(c => c.textContent.trim()).filter(c => c);
+                    if (cols.length >= 2) promos.push(cols);
+                }
+
+                // Try list items
+                if (promos.length === 0) {
+                    const items = document.querySelectorAll('[class*="item"], [class*="card"], [class*="promotion"]');
+                    for (const item of items) {
+                        const text = item.textContent.trim();
+                        if (text && text.length > 3) promos.push(text.split(/\\s{2,}|\\|/));
+                    }
+                }
+
+                // Fallback: raw content
+                if (promos.length === 0) {
+                    const main = document.querySelector('.content-wrapper, #content, main, .container');
+                    if (main) return {type: 'raw', data: main.textContent.substring(0, 10000)};
+                }
+
+                return {type: 'table', count: promos.length, data: promos};
+            }""")
+
+            print(f"    Type: {promo_data.get('type')}, Items: {promo_data.get('count', 0)}")
+
+            # Take screenshot for debugging
+            await page.screenshot(path="/tmp/promotions.png", full_page=True)
+            print("    [✓] Screenshot: promotions.png")
+
+            # Parse promotions
+            promos_parsed = []
+            raw = promo_data.get("data", [])
+            if isinstance(raw, list):
+                for row in raw:
+                    if isinstance(row, list) and len(row) >= 2:
+                        promo = {
+                            "nombre": row[0],
+                            "tipo": row[1] if len(row) > 1 else "",
+                            "platillo": row[2] if len(row) > 2 else "",
+                            "descuento": row[3] if len(row) > 3 else "",
+                            "activa": any(s in " ".join(row).lower() for s in ["activ", "si", "yes", "true"]),
+                            "_cols": row,
+                        }
+                        promos_parsed.append(promo)
+            elif isinstance(raw, str):
+                promos_parsed = [{"raw_text": raw[:5000]}]
+
+            if promos_parsed:
+                sb_upsert("wansoft_data", {
+                    "client_id": CLIENT["id"], "fecha": today_str,
+                    "data_key": "promotions_browser",
+                    "data": json.dumps(promos_parsed),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+                results["promociones"] = len(promos_parsed)
+                activas = [p for p in promos_parsed if p.get("activa")]
+                if activas:
+                    results["promos_activas"] = len(activas)
+        except Exception as e:
+            print(f"    ERROR: {e}")
+
+        # ── DISCOUNTS DETAIL (Browser — for proper HTML parsing) ─────────
+        print("\n━━━ DISCOUNTS DETAIL (Browser) ━━━")
+
+        for report_name, report_url, data_key in [
+            ("Descuentos", "Reports/DiscountsDetail", "discounts_detail_browser"),
+            ("Cortesias", "Reports/CourtesiesDetail", "courtesies_browser"),
+        ]:
+            try:
+                await page.goto(f"{WANSOFT_URL}/{report_url}", wait_until="load", timeout=30000)
+                await asyncio.sleep(3)
+
+                # Set date range to today
+                await page.evaluate(f"""() => {{
+                    const inputs = document.querySelectorAll('input[type="text"], input[type="date"]');
+                    for (const inp of inputs) {{
+                        const id = (inp.id || inp.name || '').toLowerCase();
+                        if (id.includes('start') || id.includes('inicio') || id.includes('fecha')) {{
+                            inp.value = '{today_str}';
+                            inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                        if (id.includes('end') || id.includes('fin')) {{
+                            inp.value = '{today_str}';
+                            inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                    // Select subsidiary
+                    const selects = document.querySelectorAll('select');
+                    for (const sel of selects) {{
+                        for (const opt of sel.options) {{
+                            if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                                opt.selected = true;
+                                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            }}
+                        }}
+                    }}
+                }}""")
+                await asyncio.sleep(2)
+
+                # Click search button
+                await page.evaluate("""() => {
+                    const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                    for (const b of btns) {
+                        const txt = (b.textContent || b.value || '').toLowerCase();
+                        if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
+                            b.click();
+                            break;
+                        }
+                    }
+                }""")
+                await asyncio.sleep(5)
+
+                # Extract the actual table content (not the header/section divs)
+                detail_data = await page.evaluate("""() => {
+                    const items = [];
+                    // Wansoft discount detail pages have nested sections
+                    // Look for actual data rows (not section headers)
+                    const allRows = document.querySelectorAll('table tr');
+                    for (const tr of allRows) {
+                        const tds = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                        // Skip header rows and empty rows
+                        if (tds.length >= 3 && tds.some(t => t.includes('$') || /\\d/.test(t))) {
+                            items.push(tds);
+                        }
+                    }
+
+                    // Also try rowReport divs but filter out headers
+                    if (items.length === 0) {
+                        const rows = document.querySelectorAll('.rowReport');
+                        for (const row of rows) {
+                            const divs = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
+                            if (divs.length >= 3 && divs.some(t => t.includes('$') || /\\d/.test(t))) {
+                                items.push(divs);
+                            }
+                        }
+                    }
+
+                    // Grab section headers for context
+                    const headers = [];
+                    const headEls = document.querySelectorAll('h2, h3, h4, .titleReport, [class*="title"], [class*="header"]');
+                    for (const h of headEls) {
+                        const t = h.textContent.trim();
+                        if (t && t.length < 100) headers.push(t);
+                    }
+
+                    return {type: 'detail', count: items.length, data: items, headers: headers};
+                }""")
+
+                print(f"    [{report_name}] Items: {detail_data.get('count', 0)}, Headers: {detail_data.get('headers', [])}")
+
+                # Take screenshot
+                await page.screenshot(path=f"/tmp/{data_key}.png", full_page=True)
+                print(f"    [✓] Screenshot: {data_key}.png")
+
+                # Parse and save
+                parsed = []
+                raw = detail_data.get("data", [])
+                if isinstance(raw, list):
+                    for row in raw:
+                        if isinstance(row, list) and len(row) >= 2:
+                            item = {"_cols": row}
+                            # Try to identify columns by content
+                            for i, val in enumerate(row):
+                                v = val.strip()
+                                if "$" in v:
+                                    try:
+                                        item.setdefault("monto", float(v.replace("$", "").replace(",", "")))
+                                    except: pass
+                                elif v.isdigit() and int(v) < 1000:
+                                    item.setdefault("orden", v) if int(v) > 10 else item.setdefault("cantidad", int(v))
+                                elif len(v) > 3 and not v.startswith("$"):
+                                    if "nombre" not in item:
+                                        item["nombre"] = v
+                                    elif "mesero" not in item:
+                                        item["mesero"] = v
+                                    elif "autorizador" not in item:
+                                        item["autorizador"] = v
+                                    elif "platillo" not in item:
+                                        item["platillo"] = v
+                            parsed.append(item)
+
+                if parsed:
+                    sb_upsert("wansoft_data", {
+                        "client_id": CLIENT["id"], "fecha": today_str,
+                        "data_key": data_key,
+                        "data": json.dumps(parsed),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                    results[data_key] = len(parsed)
+                else:
+                    results[data_key] = f"0 (headers: {detail_data.get('headers', [])})"
+
+            except Exception as e:
+                print(f"    [{report_name}] ERROR: {e}")
+
         # ── Take screenshots of key pages for debugging ─────────
         print("\n━━━ SCREENSHOTS ━━━")
         for name, url in [
