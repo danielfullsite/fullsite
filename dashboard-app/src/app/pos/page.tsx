@@ -64,7 +64,19 @@ import {
   ScanBarcode,
   Stamp,
   Monitor,
+  Settings,
+  Loader2,
+  Smartphone,
 } from 'lucide-react'
+import {
+  getMPConfig,
+  saveMPConfig,
+  clearMPConfig,
+  fetchMPDevices,
+  sendPaymentToPoint,
+  type MPConfig,
+  type MPDevice,
+} from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
@@ -781,6 +793,34 @@ function POSContent() {
     }
   }
 
+  // Person count verification before payment
+  const [showPersonVerify, setShowPersonVerify] = useState(false)
+  const [verifiedPersonas, setVerifiedPersonas] = useState(0)
+  const [customPersonas, setCustomPersonas] = useState('')
+
+  const handlePersonVerified = (count: number) => {
+    setPersonas(count)
+    setShowPersonVerify(false)
+    setShowMixto(false)
+    setMixtoEfectivo('')
+    setShowPayment(true)
+  }
+
+  // Mercado Pago Point
+  const [mpConfig, setMpConfig] = useState<MPConfig | null>(null)
+  const [showMPConfig, setShowMPConfig] = useState(false)
+  const [mpAccessToken, setMpAccessToken] = useState('')
+  const [mpDeviceId, setMpDeviceId] = useState('')
+  const [mpDevices, setMpDevices] = useState<MPDevice[]>([])
+  const [mpLoadingDevices, setMpLoadingDevices] = useState(false)
+  const [mpSending, setMpSending] = useState(false)
+  const [mpStatus, setMpStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [mpError, setMpError] = useState('')
+
+  useEffect(() => {
+    setMpConfig(getMPConfig())
+  }, [])
+
   // Menu search
   const [menuSearch, setMenuSearch] = useState('')
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
@@ -1184,9 +1224,9 @@ function POSContent() {
 
   const handleCloseOrder = () => {
     if (orderItems.length === 0) return
-    setShowMixto(false)
-    setMixtoEfectivo('')
-    setShowPayment(true)
+    setVerifiedPersonas(personas)
+    setCustomPersonas('')
+    setShowPersonVerify(true)
   }
 
   const handlePayment = async (method: string) => {
@@ -1322,6 +1362,20 @@ function POSContent() {
                 {btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}
               </button>
             )}
+            <button
+              onClick={() => {
+                const cfg = getMPConfig()
+                if (cfg) { setMpAccessToken(cfg.accessToken); setMpDeviceId(cfg.deviceId) }
+                setShowMPConfig(true)
+              }}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                mpConfig ? 'bg-cyan-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
+              }`}
+              title="Mercado Pago Point"
+            >
+              <Smartphone size={12} />
+              {mpConfig ? 'Point' : 'MP'}
+            </button>
             {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
             <div className="flex items-center gap-1">
               <Clock size={14} />
@@ -1913,6 +1967,195 @@ function POSContent() {
         </div>
       )}
 
+      {/* Person Count Verification Modal */}
+      {showPersonVerify && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-[var(--line)]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white">Confirmar personas</h3>
+              <button
+                onClick={() => setShowPersonVerify(false)}
+                className="w-9 h-9 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-[var(--text-3)] text-sm mb-4">
+              Mesa {mesa} &middot; {mesero}
+            </p>
+            <p className="text-[var(--text-4)] text-sm mb-3 font-medium">Cuantas personas?</p>
+            <div className="grid grid-cols-6 gap-2 mb-4">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setVerifiedPersonas(n); setCustomPersonas('') }}
+                  className={`py-3 rounded-xl text-lg font-bold transition-colors ${
+                    verifiedPersonas === n && !customPersonas
+                      ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                      : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setCustomPersonas(String(verifiedPersonas > 5 ? verifiedPersonas : 6))
+                  setVerifiedPersonas(0)
+                }}
+                className={`py-3 rounded-xl text-lg font-bold transition-colors ${
+                  customPersonas
+                    ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                    : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
+                }`}
+              >
+                6+
+              </button>
+            </div>
+            {customPersonas && (
+              <div className="mb-4">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={customPersonas}
+                  onChange={e => setCustomPersonas(e.target.value)}
+                  min={1}
+                  max={99}
+                  autoFocus
+                  className="w-full bg-[var(--bg)] border border-slate-600 rounded-xl px-4 py-3 text-white text-2xl text-center font-bold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            )}
+            <button
+              onClick={() => {
+                const count = customPersonas ? parseInt(customPersonas) || personas : verifiedPersonas || personas
+                handlePersonVerified(Math.max(1, count))
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+            >
+              <CreditCard size={20} />
+              Confirmar y cobrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mercado Pago Point Config Modal */}
+      {showMPConfig && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Smartphone size={20} />
+                Mercado Pago Point
+              </h3>
+              <button
+                onClick={() => setShowMPConfig(false)}
+                className="w-9 h-9 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[var(--text-3)] text-xs mb-1 block">Access Token</label>
+                <input
+                  type="password"
+                  value={mpAccessToken}
+                  onChange={e => setMpAccessToken(e.target.value)}
+                  placeholder="APP_USR-..."
+                  className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[var(--text-3)] text-xs mb-1 block">Device ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={mpDeviceId}
+                    onChange={e => setMpDeviceId(e.target.value)}
+                    placeholder="GERTEC_MP35P__..."
+                    className="flex-1 bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!mpAccessToken) { showToast('Ingresa el Access Token primero'); return }
+                      setMpLoadingDevices(true)
+                      const result = await fetchMPDevices(mpAccessToken)
+                      if (result.success && result.devices) {
+                        setMpDevices(result.devices)
+                        if (result.devices.length === 0) showToast('No se encontraron dispositivos')
+                      } else {
+                        showToast(result.error || 'Error al obtener dispositivos')
+                      }
+                      setMpLoadingDevices(false)
+                    }}
+                    disabled={mpLoadingDevices || !mpAccessToken}
+                    className="px-3 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] text-white text-xs font-medium transition-colors whitespace-nowrap"
+                  >
+                    {mpLoadingDevices ? <Loader2 size={16} className="animate-spin" /> : 'Buscar'}
+                  </button>
+                </div>
+              </div>
+
+              {mpDevices.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[var(--text-3)] text-xs">Dispositivos encontrados:</p>
+                  {mpDevices.map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => { setMpDeviceId(d.id); setMpDevices([]) }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                        mpDeviceId === d.id
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
+                      }`}
+                    >
+                      <span className="font-medium">{d.id}</span>
+                      <span className="text-xs opacity-60 ml-2">{d.operating_mode}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                {mpConfig && (
+                  <button
+                    onClick={() => {
+                      clearMPConfig()
+                      setMpConfig(null)
+                      setMpAccessToken('')
+                      setMpDeviceId('')
+                      setShowMPConfig(false)
+                      showToast('Point desconfigurado')
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 font-semibold text-sm transition-colors"
+                  >
+                    Desconectar
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (!mpAccessToken || !mpDeviceId) { showToast('Completa ambos campos'); return }
+                    const cfg: MPConfig = { accessToken: mpAccessToken, deviceId: mpDeviceId }
+                    saveMPConfig(cfg)
+                    setMpConfig(cfg)
+                    setShowMPConfig(false)
+                    showToast('Point configurado')
+                  }}
+                  disabled={!mpAccessToken || !mpDeviceId}
+                  className="flex-[2] py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-semibold text-sm transition-colors"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -2047,12 +2290,57 @@ function POSContent() {
                 )
               })()}
               <button
-                onClick={() => handlePayment('Tarjeta de credito')}
-                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                onClick={async () => {
+                  if (mpConfig) {
+                    setMpSending(true)
+                    setMpStatus('sending')
+                    setMpError('')
+                    const result = await sendPaymentToPoint(payTotal + propina, orderId, `Mesa ${mesa}`)
+                    if (result.success) {
+                      setMpStatus('sent')
+                      showToast('Pasa la tarjeta en el Point')
+                      // Auto-confirm after 3s
+                      setTimeout(() => {
+                        setMpSending(false)
+                        setMpStatus('idle')
+                        handlePayment('Tarjeta de credito')
+                      }, 3000)
+                    } else {
+                      setMpStatus('error')
+                      setMpError(result.error || 'Error desconocido')
+                      setMpSending(false)
+                      showToast(`Point error: ${result.error}`)
+                    }
+                  } else {
+                    handlePayment('Tarjeta de credito')
+                  }
+                }}
+                disabled={mpSending}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 disabled:bg-blue-800 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
-                <CreditCard size={24} />
-                Tarjeta
+                {mpSending ? (
+                  <>
+                    <Loader2 size={24} className="animate-spin" />
+                    {mpStatus === 'sent' ? 'Pasa la tarjeta en el Point...' : 'Enviando al Point...'}
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={24} />
+                    {mpConfig ? 'Cobrar con Point' : 'Tarjeta'}
+                  </>
+                )}
               </button>
+              {mpStatus === 'error' && (
+                <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-2 text-center">
+                  <p className="text-red-400 text-sm">{mpError}</p>
+                  <button
+                    onClick={() => { setMpStatus('idle'); handlePayment('Tarjeta de credito') }}
+                    className="text-xs text-red-300 underline mt-1"
+                  >
+                    Cobrar manual sin Point
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => handlePayment('Transferencia electronica')}
                 className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
