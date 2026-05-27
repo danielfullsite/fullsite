@@ -2167,7 +2167,7 @@ function POSContent() {
                 <button
                   onClick={() => {
                     if (!mpAccessToken || !mpDeviceId) { showToast('Completa ambos campos'); return }
-                    const cfg: MPConfig = { accessToken: mpAccessToken, deviceId: mpDeviceId }
+                    const cfg: MPConfig = { accessToken: mpAccessToken, deviceId: mpDeviceId, deviceModel: 'MINI' }
                     saveMPConfig(cfg)
                     setMpConfig(cfg)
                     setShowMPConfig(false)

@@ -22,6 +22,7 @@ interface ParsedItem {
   cantidad?: number
   quantity?: number
   modificadores?: string[]
+  notas?: string
   cancelled?: boolean
   cancelReason?: string
   cancelledBy?: string
