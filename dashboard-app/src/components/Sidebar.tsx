@@ -111,6 +111,7 @@ const navSections = [
   {
     label: 'Herramientas',
     items: [
+      { href: '/crm', label: 'CRM', icon: Users },
       { href: '/agentes', label: 'Agentes IA', icon: Bot },
       { href: '/agentes/resenas', label: 'Reseñas', icon: Star },
       { href: '/coach', label: 'Coach', icon: Sparkles },
