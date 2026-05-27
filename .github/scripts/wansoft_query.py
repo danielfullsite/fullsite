@@ -453,30 +453,37 @@ PERSONALIDAD:
 - Si preguntan "por qué" → causa raíz con datos. Si preguntan "qué hago" → acciones para HOY.
 - Habla como socio de negocio. Texto plano para Telegram, sin markdown ni asteriscos.
 
-REGLA #0 — SI NO HAY DATOS DE HOY:
-- Si preguntan por "hoy" y los datos vienen vacíos o en 0: di "Aún no hay datos de hoy. El sync se actualiza con las ventas del día. Si el restaurante aún no abre, los datos aparecerán cuando haya ventas."
-- NUNCA muestres un reporte con puros 0s — eso confunde. Di claramente que no hay datos todavía.
+REGLA #0 — NUNCA INVENTAR DATOS:
+- PROHIBIDO usar palabras como "estimado", "aproximadamente", "podría ser", "calculo que" cuando NO tienes el dato real.
+- PROHIBIDO inventar numeros que no estan en los datos proporcionados.
+- Si NO tienes un dato, di EXACTAMENTE que dato falta y DONDE lo pueden encontrar. Ejemplo: "No tengo el costo de receta. Eso está en Wansoft > Reportes > Inventarios > Costo y margen."
+- NUNCA extrapoles datos historicos para inventar meses que no existen en los datos.
+- Si solo tienes datos parciales, di cuantos dias tienes y presenta solo esos.
+
+REGLA #1 — SI NO HAY DATOS DE HOY:
+- Si preguntan por "hoy" y los datos vienen vacíos o en 0: di "Aún no hay datos de hoy. El sync se actualiza con las ventas del día."
 - Si no hay datos de hoy pero sí de ayer, ofrece los de ayer: "Aún no hay datos de hoy, pero ayer..."
 
-REGLA #1 — NUNCA DIGAS "NO TENGO ESE DATO":
-- Si puedes CALCULARLO: suma, promedia, compara. HAZLO.
-- Si puedes INFERIRLO: estima y aclara.
+REGLA #2 — BUSCAR ANTES DE DECIR "NO TENGO":
+- Si puedes CALCULARLO de los datos que SI tienes: suma, promedia, compara. HAZLO.
 - Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert.
-- Si el mesero aparece en CUALQUIER dato: NO digas que no tienes el dato.
-- SOLO di "no tengo ese dato" si realmente no existe en NINGUNA forma.
+- Si el mesero aparece en CUALQUIER dato: NO digas que no tienes info de ese mesero.
+- Propinas: busca en propinas_meseros, propinas_total. Si no aparece, di "Las propinas no están en este reporte. Revisa el corte de caja del día en Wansoft."
+- Efectivo/tarjeta: busca en metodos_pago, pago_metodos. Si hay datos historicos, usa esos.
+- Food cost / costo de receta: busca en food_cost. Si no hay, di "El costo de receta no está disponible por API. Revisa en Wansoft > Reportes > Inventarios > Costo y margen."
 
 CÓMO INTERPRETAR:
 - "cómo vamos" / "qué onda" → hoy vs promedio del mismo DOW
 - "quién es el crack" / "mejor mesero" → ranking por ventas
-- "quién es el manco" → el de menos ventas + por qué
 - "por qué bajaron" → categorías + meseros que cambiaron
 - "cuántos H&H" → desglose diario
 - "cómo subo el ticket" → qué upselling está bajo + quién no vende
 - "compara A con B" → ventas, TP, H&H, postres, bebidas/persona
 - "qué hago ahorita" → staff brief 5 min + $ proyectado
+- "cuánto cuesta X" / "costo de X" → buscar en food_cost. Si no hay, decir donde encontrarlo
 - Cualquier nombre → buscar en TODOS los datos
 
-FORMATO: Moneda SIEMPRE en pesos mexicanos (MXN). Usa $ sin decimales. NUNCA digas "dólares" ni "USD" — todo es pesos. Texto plano para Telegram, sin markdown ni asteriscos ni ##. EXCLUIR de rankings: {_exclude_str}
+FORMATO: Moneda SIEMPRE en pesos mexicanos MXN. Usa $ sin decimales. NUNCA JAMAS digas "dólares", "USD", "dollars" — todo es PESOS MEXICANOS. Texto plano para Telegram, sin markdown, sin asteriscos, sin ##, sin **. EXCLUIR de rankings: {_exclude_str}
 """
 
 
@@ -636,14 +643,21 @@ def ask_groq(question, wansoft_data, historical_data):
         blocks.append(f"PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA ({len(relevant_platillos)}):\n"
                       + json.dumps(relevant_platillos[:50], ensure_ascii=False, indent=1))
 
-    # Block 2: Core sales data (compact)
+    # Block 2: Core sales data (compact) — include propinas + food cost
     core = {
         "ventas_consolidadas": wd.get("ventas_consolidadas"),
         "por_tipo_orden": wd.get("por_tipo_orden"),
         "ventas_por_mesero": wd.get("ventas_por_mesero"),
         "ventas_por_grupo": wd.get("ventas_por_grupo"),
         "metodos_pago": wd.get("metodos_pago"),
+        "propinas_meseros": wd.get("propinas_meseros"),
+        "propinas_total": wd.get("propinas_total"),
     }
+    # Add food cost if available
+    if wd.get("food_cost"):
+        core["food_cost"] = wd["food_cost"][:30]
+    elif wd.get("food_cost_supabase"):
+        core["food_cost"] = wd["food_cost_supabase"][:30]
     blocks.append(f"DATOS CORE ({date_range}):\n" + json.dumps(core, ensure_ascii=False, indent=1))
 
     # Block 3: Detail data (descuentos, cancelaciones, etc.)
@@ -713,9 +727,23 @@ def ask_groq(question, wansoft_data, historical_data):
             print(f"[wansoft-query] History block: {len(hist_lines)-1} days, cat={asked_category}")
             blocks.insert(1, "\n".join(hist_lines))
         else:
-            hist_compact = [{"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
-                             "ticket_prom": r.get("ticket_promedio_restaurant")}
-                            for r in historical_data[:hist_limit]]
+            # Include propinas and pago_metodos in historical for cash/tips queries
+            wants_propinas = any(kw in q_lower for kw in ["propina", "tip", "propinas"])
+            wants_pago = any(kw in q_lower for kw in ["efectivo", "tarjeta", "cash", "card", "pago", "metodo", "método"])
+
+            hist_compact = []
+            for r in historical_data[:hist_limit]:
+                entry = {"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
+                         "ticket_prom": r.get("ticket_promedio_restaurant")}
+                if wants_propinas:
+                    entry["propinas_total"] = r.get("propinas_total")
+                if wants_pago:
+                    pm = r.get("pago_metodos")
+                    if isinstance(pm, str):
+                        try: pm = json.loads(pm)
+                        except: pm = None
+                    entry["pago_metodos"] = pm
+                hist_compact.append(entry)
             blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
     # Assemble context — cap total at 40000 chars
