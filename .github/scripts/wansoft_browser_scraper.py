@@ -152,47 +152,74 @@ async def run():
                 }""")
                 await asyncio.sleep(3)
 
-                # Extract table data
+                # Extract table data — ONLY from main content area (exclude sidebar/nav)
                 data = await page.evaluate("""() => {
                     const results = [];
 
-                    // Try .rowReport first (Wansoft report style)
-                    const rows = document.querySelectorAll('.rowReport');
+                    // Find the main content container (exclude sidebar, nav, header)
+                    const contentArea = document.querySelector(
+                        '.content-wrapper, .main-content, #content, .page-content, ' +
+                        '.panel-body, .card-body, [class*="content"]:not([class*="sidebar"]):not(nav)'
+                    ) || document.body;
+
+                    // Exclude sidebar/nav elements from search
+                    const isInSidebar = (el) => {
+                        let parent = el;
+                        while (parent) {
+                            const cls = (parent.className || '').toLowerCase();
+                            const tag = parent.tagName?.toLowerCase();
+                            if (cls.includes('sidebar') || cls.includes('nav-') || cls.includes('menu-') ||
+                                cls.includes('topbar') || cls.includes('header-') || cls.includes('notification') ||
+                                cls.includes('app-menu') || tag === 'nav' || tag === 'aside') {
+                                return true;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        return false;
+                    };
+
+                    // Try .rowReport first (Wansoft report style) — only in content area
+                    const rows = contentArea.querySelectorAll('.rowReport');
                     if (rows.length > 0) {
                         for (const row of rows) {
-                            const cols = Array.from(row.querySelectorAll('div')).map(d => d.textContent.trim());
-                            if (cols.length > 0 && cols.some(c => c)) results.push(cols);
+                            if (isInSidebar(row)) continue;
+                            const cols = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
+                            if (cols.length > 0 && cols.some(c => c && c.length < 200)) results.push(cols);
                         }
-                        return {type: 'rowReport', count: results.length, data: results};
+                        if (results.length > 0) return {type: 'rowReport', count: results.length, data: results};
                     }
 
-                    // Try regular tables
-                    const tables = document.querySelectorAll('table');
+                    // Try regular tables — only in content area, skip nav tables
+                    const tables = contentArea.querySelectorAll('table');
                     for (const table of tables) {
+                        if (isInSidebar(table)) continue;
                         const trs = table.querySelectorAll('tr');
                         if (trs.length > 2) {
                             for (const tr of trs) {
-                                const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
-                                if (cols.length > 0 && cols.some(c => c)) results.push(cols);
+                                const cols = Array.from(tr.querySelectorAll('td, th')).map(td => td.textContent.trim());
+                                // Filter: must have data-like content (numbers, $, or short text)
+                                if (cols.length >= 2 && cols.some(c => c && c.length < 200)) {
+                                    results.push(cols);
+                                }
                             }
-                            return {type: 'table', count: results.length, data: results};
+                            if (results.length > 0) return {type: 'table', count: results.length, data: results};
                         }
                     }
 
-                    // Try grid/list views
-                    const gridItems = document.querySelectorAll('[class*="grid"] [class*="row"], [class*="list"] [class*="item"]');
+                    // Try grid/list views in content area
+                    const gridItems = contentArea.querySelectorAll('[class*="grid"] [class*="row"], [class*="list"] [class*="item"]');
                     if (gridItems.length > 0) {
                         for (const item of gridItems) {
+                            if (isInSidebar(item)) continue;
                             const text = item.textContent.trim();
-                            if (text) results.push(text.split(/\\s{2,}|\\|/));
+                            if (text && text.length < 500) results.push(text.split(/\\s{2,}|\\|/));
                         }
-                        return {type: 'grid', count: results.length, data: results};
+                        if (results.length > 0) return {type: 'grid', count: results.length, data: results};
                     }
 
-                    // Fallback: get all visible text content
-                    const body = document.querySelector('.content-wrapper, .main-content, #content, main, .container');
-                    if (body) {
-                        return {type: 'raw', count: 1, data: body.textContent.substring(0, 5000)};
+                    // Fallback: raw text from content area only
+                    if (contentArea && contentArea !== document.body) {
+                        return {type: 'raw', count: 1, data: contentArea.textContent.substring(0, 10000)};
                     }
 
                     return {type: 'empty', count: 0, data: []};
@@ -538,6 +565,190 @@ async def run():
         users_data = await scrape_page("PosUsers", "Staff/PosUser")
         if users_data.get("count", 0) > 0 and users_data["type"] != "error":
             results["usuarios_pos"] = users_data.get("count", 0)
+
+        # ── FOOD COST (Browser — critical for "cuanto cuesta X" queries) ───
+        print("\n━━━ FOOD COST (Browser) ━━━")
+
+        try:
+            await page.goto(f"{WANSOFT_URL}/Reports/GetCostBySaucer", wait_until="load", timeout=30000)
+            await asyncio.sleep(3)
+
+            # Set date range (last 30 days for good data)
+            thirty_ago = (now_mx - __import__('datetime').timedelta(days=30)).strftime("%Y-%m-%d")
+            await page.evaluate(f"""() => {{
+                const inputs = document.querySelectorAll('input');
+                for (const inp of inputs) {{
+                    const id = (inp.id || inp.name || '').toLowerCase();
+                    if (id.includes('start') || id.includes('inicio')) {{
+                        inp.value = '{thirty_ago}';
+                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                    }}
+                    if (id.includes('end') || id.includes('fin')) {{
+                        inp.value = '{today_str}';
+                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                    }}
+                }}
+                const selects = document.querySelectorAll('select');
+                for (const sel of selects) {{
+                    for (const opt of sel.options) {{
+                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                            opt.selected = true;
+                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                }}
+            }}""")
+            await asyncio.sleep(2)
+
+            # Click search
+            await page.evaluate("""() => {
+                const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                for (const b of btns) {
+                    const txt = (b.textContent || b.value || '').toLowerCase();
+                    if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
+                        b.click();
+                        break;
+                    }
+                }
+            }""")
+            await asyncio.sleep(5)
+
+            # Extract food cost table
+            food_cost = await page.evaluate("""() => {
+                const items = [];
+                const contentArea = document.querySelector(
+                    '.content-wrapper, .main-content, #content, .page-content, .panel-body'
+                ) || document.body;
+
+                // Look for tables with cost data (has $ or % in cells)
+                const tables = contentArea.querySelectorAll('table');
+                for (const table of tables) {
+                    const trs = table.querySelectorAll('tr');
+                    let headers = [];
+                    for (const tr of trs) {
+                        const ths = Array.from(tr.querySelectorAll('th')).map(th => th.textContent.trim());
+                        if (ths.length >= 3) { headers = ths; continue; }
+                        const tds = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                        if (tds.length >= 3 && tds.some(t => t.includes('$') || t.includes('%') || /\\d/.test(t))) {
+                            items.push({cols: tds, headers: headers});
+                        }
+                    }
+                    if (items.length > 0) break;
+                }
+
+                // Also try .rowReport
+                if (items.length === 0) {
+                    const rows = contentArea.querySelectorAll('.rowReport');
+                    for (const row of rows) {
+                        const cols = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
+                        if (cols.length >= 3 && cols.some(c => c.includes('$') || /\\d/.test(c))) {
+                            items.push({cols: cols, headers: []});
+                        }
+                    }
+                }
+
+                return {count: items.length, data: items};
+            }""")
+
+            print(f"    Food cost items: {food_cost.get('count', 0)}")
+
+            # Take screenshot
+            await page.screenshot(path="/tmp/food_cost.png", full_page=True)
+            print("    [✓] Screenshot: food_cost.png")
+
+            # Parse food cost data
+            cost_items = []
+            for item in food_cost.get("data", []):
+                cols = item.get("cols", [])
+                headers = item.get("headers", [])
+                if len(cols) >= 3:
+                    parsed = {"_cols": cols, "_headers": headers}
+                    # Try to identify columns by content
+                    for i, val in enumerate(cols):
+                        v = val.strip()
+                        header = headers[i].lower() if i < len(headers) else ""
+                        if "platillo" in header or "saucer" in header or "producto" in header:
+                            parsed["platillo"] = v
+                        elif "costo" in header or "cost" in header:
+                            parsed["costo"] = v
+                        elif "precio" in header or "price" in header or "venta" in header:
+                            parsed["precio"] = v
+                        elif "margen" in header or "margin" in header:
+                            parsed["margen"] = v
+                        elif "cantidad" in header or "qty" in header:
+                            parsed["qty"] = v
+                        elif i == 0 and len(v) > 2 and not v.startswith("$"):
+                            parsed.setdefault("platillo", v)
+                        elif "$" in v:
+                            if "precio" not in parsed:
+                                parsed["precio"] = v
+                            elif "costo" not in parsed:
+                                parsed["costo"] = v
+                        elif "%" in v:
+                            parsed.setdefault("margen", v)
+                    cost_items.append(parsed)
+
+            if cost_items:
+                sb_upsert("wansoft_data", {
+                    "client_id": CLIENT["id"], "fecha": today_str,
+                    "data_key": "food_cost_browser",
+                    "data": json.dumps(cost_items),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+                results["food_cost"] = len(cost_items)
+            else:
+                results["food_cost"] = "0 items"
+
+            # Also scrape the saucers with cost page
+            await page.goto(f"{WANSOFT_URL}/Reports/GetSaucersWithCost", wait_until="load", timeout=30000)
+            await asyncio.sleep(3)
+
+            # Set subsidiary
+            await page.evaluate(f"""() => {{
+                const selects = document.querySelectorAll('select');
+                for (const sel of selects) {{
+                    for (const opt of sel.options) {{
+                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
+                            opt.selected = true;
+                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        }}
+                    }}
+                }}
+            }}""")
+            await asyncio.sleep(2)
+
+            # Click search
+            await page.evaluate("""() => {
+                const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                for (const b of btns) {
+                    const txt = (b.textContent || b.value || '').toLowerCase();
+                    if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
+                        b.click(); break;
+                    }
+                }
+            }""")
+            await asyncio.sleep(5)
+
+            saucers_cost_data = await scrape_page("SaucersWithCost-inner", "Reports/GetSaucersWithCost")
+            await page.screenshot(path="/tmp/saucers_with_cost.png", full_page=True)
+
+            if saucers_cost_data.get("count", 0) > 0:
+                raw = saucers_cost_data.get("data", [])
+                saucer_items = []
+                for row in raw:
+                    if isinstance(row, list) and len(row) >= 3:
+                        saucer_items.append({"_cols": row})
+                if saucer_items:
+                    sb_upsert("wansoft_data", {
+                        "client_id": CLIENT["id"], "fecha": today_str,
+                        "data_key": "saucers_cost_browser",
+                        "data": json.dumps(saucer_items),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                    results["saucers_cost"] = len(saucer_items)
+
+        except Exception as e:
+            print(f"    FOOD COST ERROR: {e}")
 
         # ── ECOMMERCE ────────────────────────────────────────────
         print("\n━━━ ECOMMERCE (Browser) ━━━")

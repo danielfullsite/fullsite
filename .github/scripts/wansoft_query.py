@@ -297,6 +297,34 @@ def fetch_all_wansoft_data(session, start, end):
     except Exception:
         pass
 
+    # 16b. Food cost (costo de platillos) — from Wansoft + Supabase fallback
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/GetCostBySaucer",
+                         data={"subsidiaryId": SUBSIDIARY, "startDate": start, "endDate": end},
+                         timeout=15)
+        cost_rows = parse_rows(r.text)
+        if cost_rows and len(cost_rows) > 0 and len(cost_rows[0]) >= 3:
+            data["food_cost"] = cost_rows[:50]
+    except Exception:
+        pass
+
+    # 16c. Food cost fallback from browser scraper (Supabase)
+    if "food_cost" not in data or not data["food_cost"]:
+        try:
+            fc = sb_get("wansoft_data", {
+                "client_id": f"eq.{CLIENT['id']}",
+                "data_key": "eq.food_cost_browser",
+                "order": "fecha.desc",
+                "limit": "1",
+            })
+            if fc and fc[0].get("data"):
+                fc_data = fc[0]["data"]
+                if isinstance(fc_data, str):
+                    fc_data = json.loads(fc_data)
+                data["food_cost_supabase"] = fc_data[:50]
+        except Exception:
+            pass
+
     # 17. Closing cash (corte de caja)
     try:
         r = session.post(f"{WANSOFT_URL}/Reports/ClosingCash",
@@ -768,12 +796,72 @@ def main():
         duration = int((time.time() - start_time) * 1000)
         log_run("success", duration, f"Q: {MESSAGE[:100]} A: {answer[:100]}")
 
+        # Log query for feedback/improvement loop
+        log_query(MESSAGE, answer, wansoft_data, start_date, end_date, "success")
+
     except Exception as e:
         duration = int((time.time() - start_time) * 1000)
         log_run("error", duration, error=str(e))
         send_telegram(f"Error consultando Wansoft: {e}")
         print(f"[wansoft-query] ERROR: {e}")
+        log_query(MESSAGE, str(e), {}, "", "", "error")
         sys.exit(1)
+
+
+def log_query(question, answer, data_available, start_date, end_date, status):
+    """Log query details for self-improvement. Detects gaps in data coverage."""
+    try:
+        # Detect what data was missing
+        missing = []
+        q_lower = question.lower()
+
+        # Check if question asked about food cost but we had no data
+        if any(kw in q_lower for kw in ["costo", "cost", "margen", "food cost", "receta"]):
+            if not data_available.get("food_cost") and not data_available.get("food_cost_supabase"):
+                missing.append("food_cost")
+
+        # Check if question asked about discounts/cortesias
+        if any(kw in q_lower for kw in ["descuento", "cortesia", "cortesía", "discount"]):
+            if not data_available.get("descuentos_detalle"):
+                missing.append("discounts_detail")
+
+        # Check if question asked about inventory
+        if any(kw in q_lower for kw in ["inventario", "stock", "falta", "reorden"]):
+            if not data_available.get("inventario_punto_reorden"):
+                missing.append("inventory")
+
+        # Check if question asked about promotions
+        if any(kw in q_lower for kw in ["promo", "promocion", "promoción"]):
+            missing.append("promotions")
+
+        # Check if answer contains "no tengo" or "no encuentro" (bot couldn't answer)
+        if any(phrase in answer.lower() for phrase in ["no tengo", "no encuentro", "no cuento con",
+                                                        "no disponible", "no hay datos"]):
+            missing.append("answer_incomplete")
+
+        # Log to agent_runs with detail
+        requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs",
+            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={
+                "agent_id": "wansoft-query-feedback",
+                "trigger_type": "auto",
+                "status": status,
+                "duration_ms": 0,
+                "output_summary": json.dumps({
+                    "question": question[:200],
+                    "answer_preview": answer[:200],
+                    "missing_data": missing,
+                    "data_keys_available": [k for k in data_available.keys() if data_available[k]],
+                    "date_range": f"{start_date}..{end_date}",
+                }, ensure_ascii=False)[:500],
+                "tentacle": "kb",
+            })
+
+        if missing:
+            print(f"[wansoft-query] FEEDBACK: missing data for this query: {missing}")
+
+    except Exception as e:
+        print(f"[wansoft-query] Feedback log error: {e}")
 
 
 if __name__ == "__main__":
