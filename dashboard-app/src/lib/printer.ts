@@ -85,6 +85,30 @@ export function printTicketCSS(order: Order) {
 const ESC = 0x1B
 const GS = 0x1D
 const LF = 0x0A
+const DLE = 0x10
+
+// ─── CASH DRAWER ────────────────────────────────────────────────────────────
+
+export async function openCashDrawer(): Promise<boolean> {
+  if (!btCharacteristic) {
+    console.warn('[printer] No BT connection, cannot open cash drawer')
+    return false
+  }
+  try {
+    // ESC p 0 25 250 — kick drawer pin 2 (standard RJ-11 connection)
+    const cmd = new Uint8Array([ESC, 0x70, 0x00, 0x19, 0xFA])
+    if (btCharacteristic.properties.writeWithoutResponse) {
+      await btCharacteristic.writeValueWithoutResponse(cmd)
+    } else {
+      await btCharacteristic.writeValueWithResponse(cmd)
+    }
+    console.log('[printer] Cash drawer opened')
+    return true
+  } catch (e) {
+    console.error('[printer] Cash drawer failed:', e)
+    return false
+  }
+}
 
 function textToBytes(text: string): number[] {
   const encoder = new TextEncoder()

@@ -29,6 +29,7 @@ import {
   printPreTicket,
   printTicketCSS,
   printTicketBluetooth,
+  openCashDrawer,
   isBluetoothAvailable,
   isBluetoothConnected,
   connectBluetoothPrinter,
@@ -613,6 +614,8 @@ function POSContent() {
   const [showMixto, setShowMixto] = useState(false)
   const [mixtoEfectivo, setMixtoEfectivo] = useState('')
   const [showCashCalc, setShowCashCalc] = useState(false)
+  const [showCashFlow, setShowCashFlow] = useState(false)
+  const [cashAmount, setCashAmount] = useState('')
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [sentToKitchen, setSentToKitchen] = useState(false)
 
@@ -1225,9 +1228,14 @@ function POSContent() {
     }
     const ok = await saveOrder(order)
     if (ok) {
+      // Open cash drawer for cash payments
+      if (method === 'Efectivo' || method === 'Mixto') {
+        openCashDrawer()
+      }
+
       logAudit({
         order_id: payId, action: 'payment_processed', actor: mesero, mesa,
-        details: { method, total: payTotal, cuenta: splitPayingCuenta || 'full', propina },
+        details: { method, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
 
       // If split and just paid Cuenta 1, move to Cuenta 2
@@ -1253,6 +1261,8 @@ function POSContent() {
     setPropina(0)
     setOrderNotes('')
     setShowPayment(false)
+    setShowCashFlow(false)
+    setCashAmount('')
     setSplitPayingCuenta(0)
     setSplitAssignments({})
   }
@@ -1985,20 +1995,57 @@ function POSContent() {
 
             <div className="space-y-3">
               <button
-                onClick={() => { setShowCashCalc(false); handlePayment('Efectivo') }}
+                onClick={() => setShowCashFlow(!showCashFlow)}
                 className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <Banknote size={24} />
                 Efectivo
               </button>
-              {/* Smart cash calculator */}
-              <button
-                onClick={() => setShowCashCalc(!showCashCalc)}
-                className={`w-full text-center text-xs py-1.5 rounded-lg transition-colors ${showCashCalc ? 'text-emerald-400' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'}`}
-              >
-                {showCashCalc ? 'Ocultar calculadora' : 'Calcular cambio'}
-              </button>
-              {showCashCalc && <SmartCashCalculator total={total + propina} onClose={() => setShowCashCalc(false)} />}
+              {showCashFlow && (() => {
+                const totalConPropina = payTotal + propina
+                const cashReceived = parseFloat(cashAmount) || 0
+                const cambio = cashReceived - totalConPropina
+                return (
+                  <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-4 space-y-3">
+                    <p className="text-emerald-400 text-sm font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
+                    <div>
+                      <label className="text-[var(--text-3)] text-xs mb-1 block">Cliente paga con:</label>
+                      <div className="flex gap-2 mb-2">
+                        {[100, 200, 500, 1000].map(bill => (
+                          <button key={bill} onClick={() => setCashAmount(String(bill))}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                          >${bill}</button>
+                        ))}
+                      </div>
+                      <input
+                        type="number" inputMode="decimal" value={cashAmount}
+                        onChange={e => setCashAmount(e.target.value)}
+                        placeholder="Monto recibido" autoFocus
+                        className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-2xl text-center font-bold focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    {cashReceived > 0 && (
+                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
+                        {cambio >= 0 ? (
+                          <>
+                            <p className="text-[var(--text-3)] text-xs">Cambio</p>
+                            <p className="text-3xl font-black text-emerald-400">{formatMXN(cambio)}</p>
+                          </>
+                        ) : (
+                          <p className="text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
+                      disabled={cashReceived < totalConPropina}
+                      className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-lg transition-colors"
+                    >
+                      {cashReceived >= totalConPropina ? `Cobrar — Cambio ${formatMXN(cambio)}` : 'Ingresa el monto recibido'}
+                    </button>
+                  </div>
+                )
+              })()}
               <button
                 onClick={() => handlePayment('Tarjeta de credito')}
                 className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
