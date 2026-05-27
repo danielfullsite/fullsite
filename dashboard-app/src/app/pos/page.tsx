@@ -2293,90 +2293,12 @@ function POSContent() {
                 )
               })()}
               <button
-                onClick={async () => {
-                  if (mpConfig) {
-                    setMpSending(true)
-                    setMpStatus('sending')
-                    setMpError('')
-                    const result = await sendPaymentToPoint(payTotal + propina, orderId)
-                    if (result.success && result.intentId) {
-                      setMpStatus('sent')
-                      showToast('Pasa la tarjeta en el Point')
-                      // Poll for payment confirmation
-                      const cancel = pollPaymentStatus(result.intentId, (status: PaymentStatus, _paymentId?: string) => {
-                        if (status === 'approved') {
-                          setMpSending(false)
-                          setMpStatus('idle')
-                          showToast('Pago aprobado')
-                          handlePayment('Tarjeta de credito')
-                        } else if (status === 'rejected') {
-                          setMpSending(false)
-                          setMpStatus('error')
-                          setMpError('Pago rechazado — intenta de nuevo')
-                        } else if (status === 'cancelled') {
-                          setMpSending(false)
-                          setMpStatus('idle')
-                          showToast('Pago cancelado')
-                        } else if (status === 'error') {
-                          setMpSending(false)
-                          setMpStatus('error')
-                          setMpError('Error en el pago')
-                        }
-                        // pending/processing — keep polling
-                      })
-                      // Store cancel fn for the cancel button
-                      ;(window as unknown as Record<string, unknown>).__mpCancelPoll = cancel
-                    } else {
-                      setMpStatus('error')
-                      setMpError(result.error || 'Error desconocido')
-                      setMpSending(false)
-                      showToast(`Point error: ${result.error}`)
-                    }
-                  } else {
-                    handlePayment('Tarjeta de credito')
-                  }
-                }}
-                disabled={mpSending}
-                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 disabled:bg-blue-800 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                onClick={() => handlePayment('Tarjeta de credito')}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
-                {mpSending ? (
-                  <>
-                    <Loader2 size={24} className="animate-spin" />
-                    {mpStatus === 'sent' ? 'Esperando tarjeta en el Point...' : 'Enviando al Point...'}
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={24} />
-                    {mpConfig ? 'Cobrar con Point' : 'Tarjeta'}
-                  </>
-                )}
+                <CreditCard size={24} />
+                Tarjeta
               </button>
-              {mpSending && mpStatus === 'sent' && (
-                <button
-                  onClick={async () => {
-                    const cancelFn = (window as unknown as Record<string, unknown>).__mpCancelPoll as (() => void) | undefined
-                    if (cancelFn) cancelFn()
-                    await cancelPaymentIntent()
-                    setMpSending(false)
-                    setMpStatus('idle')
-                    showToast('Cobro cancelado')
-                  }}
-                  className="w-full py-2 text-sm text-red-400 hover:text-red-300"
-                >
-                  Cancelar cobro
-                </button>
-              )}
-              {mpStatus === 'error' && (
-                <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-2 text-center">
-                  <p className="text-red-400 text-sm">{mpError}</p>
-                  <button
-                    onClick={() => { setMpStatus('idle'); handlePayment('Tarjeta de credito') }}
-                    className="text-xs text-red-300 underline mt-1"
-                  >
-                    Cobrar manual sin Point
-                  </button>
-                </div>
-              )}
               <button
                 onClick={() => handlePayment('Transferencia electronica')}
                 className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500/100 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
