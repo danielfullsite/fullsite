@@ -669,10 +669,33 @@ def main():
     if complements:
         results["modificadores_menu"] = len(complements)
 
+    def transform_promotions(r):
+        """Parse promotions with all detail columns."""
+        if r["type"] == "json": return r["data"]
+        if r["type"] == "html":
+            items = []
+            for c in r["data"]:
+                if len(c) >= 2:
+                    item = {"nombre": c[0], "_cols": c}
+                    # Typical promo columns: nombre, tipo, platillo, descuento%, monto, activa
+                    if len(c) >= 3: item["tipo"] = c[1]
+                    if len(c) >= 4: item["platillo"] = c[2]
+                    if len(c) >= 5: item["descuento_pct"] = safe_float(c[3])
+                    if len(c) >= 6: item["monto"] = safe_float(c[4])
+                    if len(c) >= 7: item["activa"] = c[5].strip().lower() in ("si", "yes", "activa", "1", "true", "activo")
+                    else: item["activa"] = True  # assume active if no column
+                    items.append(item)
+            return items
+        return []
+
     promotions = scrape_endpoint(session, "Promotions", "Menu/GetPromotionList",
-                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_generic)
+                                 {"subsidiaryId": SUBSIDIARY_ID}, None, transform_promotions)
     if promotions:
+        save_data("promotions", promotions)
         results["promociones"] = len(promotions)
+        # Flag how many are active
+        activas = [p for p in promotions if p.get("activa", True)]
+        results["promos_activas"] = len(activas)
 
     # ══════════════════════════════════════════════════════════════
     # SUMMARY
