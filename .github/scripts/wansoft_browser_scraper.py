@@ -715,6 +715,140 @@ async def run():
         else:
             results["tips"] = "0 items"
 
+        # ══════════════════════════════════════════════════════════════
+        # ALL ENDPOINTS THAT FAIL VIA HTTP (empty HTML or 500)
+        # These need Playwright's JS rendering to work.
+        # ══════════════════════════════════════════════════════════════
+
+        # Helper: scrape and save to wansoft_data
+        async def scrape_and_save(name, url, data_key, date_range=None, wait_time=5):
+            data = await scrape_page(name, url, wait_time=wait_time, date_range=date_range)
+            count = data.get("count", 0)
+            if count > 0:
+                raw = data.get("data", [])
+                items = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+                sb_upsert("wansoft_data", {
+                    "client_id": CLIENT["id"], "fecha": today_str,
+                    "data_key": data_key,
+                    "data": json.dumps(items),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+                results[data_key] = count
+            else:
+                results[data_key] = "0"
+            return count
+
+        # ── FOOD COST (4 endpoints — all need JS) ───────────────
+        print("\n━━━ FOOD COST (all 4 endpoints) ━━━")
+
+        thirty_ago = (now_mx - __import__('datetime').timedelta(days=30)).strftime("%Y-%m-%d")
+        month_start = today_str[:8] + "01"
+
+        await scrape_and_save("CostBySaucer", "Reports/GetCostBySaucer",
+                              "food_cost_browser", date_range=(thirty_ago, today_str))
+        await page.screenshot(path="/tmp/food_cost.png", full_page=True)
+
+        await scrape_and_save("CostBySaucer-Month", "Reports/GetCostBySaucer",
+                              "food_cost_month", date_range=(month_start, today_str))
+
+        await scrape_and_save("CostByGroup", "Reports/GetCostByGroup",
+                              "cost_by_group_browser", date_range=(thirty_ago, today_str))
+
+        await scrape_and_save("SaucersWithCost", "Reports/GetSaucersWithCost",
+                              "saucers_cost_browser")
+        await page.screenshot(path="/tmp/saucers_with_cost.png", full_page=True)
+
+        # ── INVENTORY (6 endpoints — all return 500 via HTTP) ───
+        print("\n━━━ INVENTORY (all 6 endpoints) ━━━")
+
+        await scrape_and_save("Inventory", "Inventory/GetInventoryBySubsidiary",
+                              "inventory_browser", wait_time=8)
+        await page.screenshot(path="/tmp/inventory_detail.png", full_page=True)
+
+        await scrape_and_save("InventoryStatement", "Inventory/GetInventoryStatementBySubsidiary",
+                              "inventory_movements_browser", date_range=(thirty_ago, today_str))
+
+        await scrape_and_save("ReorderPoint", "Inventory/GetReorderPointReport",
+                              "reorder_point_browser")
+
+        await scrape_and_save("PhysicalVsSystem", "Inventory/GetPhysicalInventoryVsSystem",
+                              "physical_vs_system_browser")
+
+        await scrape_and_save("ProductsInRecipes", "Inventory/GetProductsThatAreInRecipes",
+                              "products_in_recipes_browser")
+
+        await scrape_and_save("ProductsNotInRecipes", "Inventory/GetProductsThatAreNotInRecipes",
+                              "products_not_in_recipes_browser")
+
+        # ── PROCUREMENT (2 empty endpoints) ─────────────────────
+        print("\n━━━ PROCUREMENT (empty endpoints) ━━━")
+
+        await scrape_and_save("PO_Issued", "Purchasing/GetPurchaseOrderIssued",
+                              "purchase_orders_browser")
+
+        await scrape_and_save("SupplierList", "Purchasing/GetSupplierList",
+                              "supplier_list_browser")
+
+        # ── STAFF/LABOR (4 endpoints — all empty via HTTP) ──────
+        print("\n━━━ STAFF/LABOR (all 4 endpoints) ━━━")
+
+        await scrape_and_save("AccessControl", "Staff/GetAccessControlReport",
+                              "access_control_browser", date_range=(today_str, today_str))
+
+        await scrape_and_save("HoursWorked", "Staff/GetUserHoursWorkedReport",
+                              "hours_worked_browser", date_range=(today_str, today_str))
+
+        await scrape_and_save("PosUsers", "Staff/GetPosUsersList",
+                              "pos_users_browser")
+
+        await scrape_and_save("Shifts", "Staff/GetShiftList",
+                              "shifts_browser")
+
+        # ── FINANCE (3 empty endpoints) ─────────────────────────
+        print("\n━━━ FINANCE (empty endpoints) ━━━")
+
+        await scrape_and_save("ClosingCash", "Reports/ClosingCash",
+                              "closing_cash_browser", date_range=(today_str, today_str))
+        await page.screenshot(path="/tmp/closing_cash.png", full_page=True)
+
+        await scrape_and_save("CashFlow", "Finance/GetCashFlowList",
+                              "cash_flow_browser")
+
+        await scrape_and_save("BankDeposits", "Finance/GetBankDepositList",
+                              "bank_deposits_browser")
+
+        # ── TIPS (already done above, but also add weekly range) ─
+        print("\n━━━ TIPS WEEKLY ━━━")
+
+        week_start = (now_mx - __import__('datetime').timedelta(days=now_mx.weekday())).strftime("%Y-%m-%d")
+        await scrape_and_save("TipsWeekly", "Reports/SalesByUser",
+                              "tips_weekly_browser", date_range=(week_start, today_str))
+
+        # ── BILLING (empty via HTTP) ────────────────────────────
+        print("\n━━━ BILLING ━━━")
+
+        await scrape_and_save("Invoices", "Billing/GetDocumentList",
+                              "invoices_browser", date_range=(month_start, today_str))
+
+        # ── MENU CONFIG (empty via HTTP) ────────────────────────
+        print("\n━━━ MENU CONFIG (empty endpoints) ━━━")
+
+        await scrape_and_save("MenuGroups", "Menu/GetGroupList",
+                              "menu_groups_browser")
+
+        await scrape_and_save("MenuSaucers", "Menu/GetSaucerList",
+                              "menu_saucers_browser")
+
+        await scrape_and_save("MenuComplements", "Menu/GetComplementaryList",
+                              "menu_complements_browser")
+
+        await scrape_and_save("MenuPromotions", "Menu/GetPromotionList",
+                              "menu_promotions_browser")
+
+        # ══════════════════════════════════════════════════════════════
+        # EXISTING SECTIONS (kept for backward compatibility)
+        # ══════════════════════════════════════════════════════════════
+
         # ── ECOMMERCE ────────────────────────────────────────────
         print("\n━━━ ECOMMERCE (Browser) ━━━")
 
