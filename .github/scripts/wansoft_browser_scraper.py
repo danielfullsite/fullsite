@@ -557,8 +557,43 @@ async def run():
         print("\n━━━ PROMOTIONS (Browser) ━━━")
 
         try:
-            await page.goto(f"{WANSOFT_URL}/Menu/Promotion", wait_until="load", timeout=30000)
-            await asyncio.sleep(3)
+            # The correct path is under POS > Restaurant > Promotions
+            # Try multiple known paths since Wansoft URL structure varies
+            promo_loaded = False
+            for promo_url in [
+                "PointOfSale/Promotion",
+                "Restaurant/Promotion",
+                "Menu/PromotionList",
+                "PointOfSale/Restaurant/Promotion",
+            ]:
+                try:
+                    await page.goto(f"{WANSOFT_URL}/{promo_url}", wait_until="load", timeout=15000)
+                    await asyncio.sleep(3)
+                    # Check if we got a real page (not redirect to dashboard)
+                    content = await page.text_content("body")
+                    if content and ("promoci" in content.lower() or "promotion" in content.lower()):
+                        print(f"    [✓] Found promotions at: {promo_url}")
+                        promo_loaded = True
+                        break
+                    else:
+                        print(f"    [!] {promo_url} — no promotion content, trying next...")
+                except Exception:
+                    print(f"    [!] {promo_url} — failed, trying next...")
+
+            if not promo_loaded:
+                # Last resort: navigate via sidebar menu
+                print("    [!] Trying sidebar navigation to Punto de venta > Restaurante > Promociones...")
+                await page.goto(f"{WANSOFT_URL}/Dashboard/Index", wait_until="load", timeout=15000)
+                await asyncio.sleep(2)
+                # Click through menu
+                for menu_text in ["Punto de venta", "Restaurante", "Promociones"]:
+                    try:
+                        link = page.locator(f"text={menu_text}").first
+                        await link.click(timeout=5000)
+                        await asyncio.sleep(2)
+                    except Exception:
+                        pass
+                await asyncio.sleep(3)
 
             # Select subsidiary
             await page.evaluate(f"""() => {{
