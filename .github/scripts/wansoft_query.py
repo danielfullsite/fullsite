@@ -84,6 +84,15 @@ def detect_date_range(question):
     week_start = (now_mx - timedelta(days=now_mx.weekday())).strftime("%Y-%m-%d")
     month_start = now_mx.strftime("%Y-%m-01")
 
+    # Calculate last weekend (always the PAST one, never future)
+    days_since_sunday = now_mx.weekday() + 1  # Monday=0+1=1, Sunday=6+1=7
+    if days_since_sunday == 7:  # Today IS Sunday
+        last_sunday = now_mx.strftime("%Y-%m-%d")
+        last_saturday = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        last_sunday = (now_mx - timedelta(days=days_since_sunday)).strftime("%Y-%m-%d")
+        last_saturday = (now_mx - timedelta(days=days_since_sunday + 1)).strftime("%Y-%m-%d")
+
     try:
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {GROQ_API_KEY}",
@@ -99,7 +108,10 @@ Responde SOLO JSON: {{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}
 - "ayer" → {{"start":"{yesterday_str}","end":"{yesterday_str}"}}
 - "esta semana" → {{"start":"{week_start}","end":"{today_str}"}}
 - "este mes" → {{"start":"{month_start}","end":"{today_str}"}}
+- "fin de semana" / "finde" / "sabado y domingo" → {{"start":"{last_saturday}","end":"{last_sunday}"}} (siempre el PASADO, nunca futuro)
+- "el fin de semana pasado" → {{"start":"{last_saturday}","end":"{last_sunday}"}}
 - Sin fecha → {{"start":"{today_str}","end":"{today_str}"}}
+REGLA: "fin de semana" SIEMPRE es el pasado (sábado y domingo más recientes). NUNCA el futuro.
 Solo JSON."""},
                     {"role": "user", "content": question},
                 ],
@@ -122,6 +134,8 @@ Solo JSON."""},
         q = question.lower()
         if "ayer" in q:
             return yesterday_str, yesterday_str
+        elif "fin de semana" in q or "finde" in q:
+            return last_saturday, last_sunday
         elif "esta semana" in q or "semana" in q:
             return week_start, today_str
         elif "este mes" in q or "mes" in q:
@@ -780,22 +794,43 @@ def ask_groq(question, wansoft_data, historical_data):
             wants_pago = any(kw in q_lower for kw in ["efectivo", "tarjeta", "cash", "card", "pago", "metodo", "método"])
 
             hist_compact = []
+            sum_efectivo = 0
+            sum_tarjeta = 0
+            sum_propinas = 0
             for r in historical_data[:hist_limit]:
                 entry = {"fecha": r.get("fecha"), "ventas": r.get("ventas_dia"),
                          "ticket_prom": r.get("ticket_promedio_restaurant")}
                 if wants_propinas:
-                    entry["propinas_total"] = r.get("propinas_total")
+                    pt = float(r.get("propinas_total") or 0)
+                    entry["propinas_total"] = pt
+                    sum_propinas += pt
                 if wants_pago:
-                    # Include BOTH peso amounts AND transaction counts
-                    entry["efectivo_mxn"] = r.get("efectivo")
-                    entry["tarjeta_mxn"] = r.get("tarjeta")
+                    ef = float(r.get("efectivo") or 0)
+                    tj = float(r.get("tarjeta") or 0)
+                    entry["efectivo_mxn"] = ef
+                    entry["tarjeta_mxn"] = tj
+                    sum_efectivo += ef
+                    sum_tarjeta += tj
                     pm = r.get("pago_metodos")
                     if isinstance(pm, str):
                         try: pm = json.loads(pm)
                         except: pm = None
                     entry["pago_metodos_transacciones"] = pm
                 hist_compact.append(entry)
-            blocks.append(f"HISTÓRICO ({len(hist_compact)} días):\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
+
+            # Pre-calculate totals so LLM doesn't have to sum
+            summary_line = f"HISTÓRICO ({len(hist_compact)} días)"
+            if wants_pago and (sum_efectivo > 0 or sum_tarjeta > 0):
+                total_pagos = sum_efectivo + sum_tarjeta
+                pct_ef = (sum_efectivo / total_pagos * 100) if total_pagos > 0 else 0
+                pct_tj = (sum_tarjeta / total_pagos * 100) if total_pagos > 0 else 0
+                summary_line += f"\nTOTAL EFECTIVO PERIODO: ${round(sum_efectivo):,} ({pct_ef:.0f}%)"
+                summary_line += f"\nTOTAL TARJETA PERIODO: ${round(sum_tarjeta):,} ({pct_tj:.0f}%)"
+                summary_line += f"\nTOTAL COBRADO: ${round(total_pagos):,}"
+            if wants_propinas and sum_propinas > 0:
+                summary_line += f"\nTOTAL PROPINAS PERIODO: ${round(sum_propinas):,}"
+
+            blocks.append(summary_line + "\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
     # Assemble context — cap total at 40000 chars
     context = ""
