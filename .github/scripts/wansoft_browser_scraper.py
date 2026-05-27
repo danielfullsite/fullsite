@@ -88,7 +88,9 @@ async def run():
 
         print("[✓] Login OK\n")
 
-        # XHR interceptor — captures JSON responses from Wansoft AJAX calls
+        # ── XHR interceptor — captures JSON responses from ALL Wansoft AJAX calls ──
+        # This is the KEY mechanism: Wansoft uses jqGrid which loads data via AJAX.
+        # Capturing the JSON response directly is more reliable than parsing rendered HTML.
         captured_responses = []
 
         async def capture_response(response):
@@ -106,20 +108,142 @@ async def run():
 
         page.on("response", capture_response)
 
-        # Helper: navigate to page, wait, extract table data
-        async def scrape_page(name, url, wait_selector=None, wait_time=5):
+        # ── GARBAGE DETECTION ────────────────────────────────────────
+        NAV_GARBAGE_MARKERS = [
+            "Reportes ->", "Inventario ->", "Punto de venta ->", "Administraci",
+            "Ecommerce ->", "Egresos ->", "Facturaci", "Configuraci",
+            "App Menu", "Calendar", "File Manager", "Taskboard", "Notifications",
+            "Project Status", "Project Name", "Admin Template",
+        ]
+
+        def is_garbage_data(rows):
+            """Detect if scraped data is actually sidebar/navigation content."""
+            if not rows or not isinstance(rows, list):
+                return False
+            sample = str(rows[0]) if rows else ""
+            return any(marker in sample for marker in NAV_GARBAGE_MARKERS)
+
+        # ── SMART WAIT — wait for jqGrid/table data, not arbitrary sleep ──
+        async def wait_for_data(timeout_ms=15000):
+            """Wait for actual data to appear in DOM (jqGrid rows, table rows, or report rows)."""
+            selectors = [
+                '.jqgrow',                    # jqGrid data rows
+                'table.table tbody tr td',    # Bootstrap tables
+                '.rowReport',                 # Wansoft report rows
+                'table tbody tr:nth-child(2)', # Any table with >1 row
+                '.ui-jqgrid-bdiv tr',         # jqGrid body div
+            ]
+            for sel in selectors:
+                try:
+                    await page.wait_for_selector(sel, timeout=timeout_ms // len(selectors))
+                    print(f"    [wait] Found data via: {sel}")
+                    return True
+                except Exception:
+                    continue
+            print(f"    [wait] No data selectors found after {timeout_ms}ms")
+            return False
+
+        # ── EXTRACT DATA — prefers XHR JSON, falls back to DOM ──
+        def extract_xhr_data(url_fragment=None):
+            """Get data from captured XHR responses. Returns list of rows or None."""
+            for resp in reversed(captured_responses):  # newest first
+                if url_fragment and url_fragment not in resp["url"]:
+                    continue
+                data = resp["data"]
+                # jqGrid returns {rows: [...], total: N, page: N}
+                if isinstance(data, dict) and "rows" in data:
+                    rows = data["rows"]
+                    if isinstance(rows, list) and len(rows) > 0:
+                        # jqGrid rows have {id, cell: [...]}
+                        if isinstance(rows[0], dict) and "cell" in rows[0]:
+                            return [r["cell"] for r in rows]
+                        return rows
+                # Direct array response
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+                # Dict with data key
+                if isinstance(data, dict) and "data" in data:
+                    return data["data"] if isinstance(data["data"], list) else [data["data"]]
+            return None
+
+        async def extract_dom_data():
+            """Extract table data from DOM, filtering out sidebar/nav garbage."""
+            return await page.evaluate("""() => {
+                const results = [];
+                const GARBAGE = ['Reportes ->', 'Inventario ->', 'Punto de venta ->',
+                    'App Menu', 'Calendar', 'File Manager', 'Taskboard',
+                    'Project Status', 'Admin Template', 'Notifications'];
+
+                // Helper: check if text looks like navigation
+                const isNavText = (text) => GARBAGE.some(g => text.includes(g));
+
+                // Try jqGrid first (most Wansoft reports use this)
+                const jqRows = document.querySelectorAll('.jqgrow, .ui-jqgrid-bdiv tr[role="row"]');
+                if (jqRows.length > 0) {
+                    for (const row of jqRows) {
+                        const cols = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
+                        if (cols.length >= 2 && !isNavText(cols.join(' '))) {
+                            results.push(cols);
+                        }
+                    }
+                    if (results.length > 0) return {type: 'jqgrid', count: results.length, data: results};
+                }
+
+                // Try .rowReport divs
+                const reportRows = document.querySelectorAll('.rowReport');
+                if (reportRows.length > 0) {
+                    for (const row of reportRows) {
+                        const cols = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
+                        const text = cols.join(' ');
+                        if (cols.length >= 2 && !isNavText(text) && cols.some(c => c && c.length < 100)) {
+                            results.push(cols);
+                        }
+                    }
+                    if (results.length > 0) return {type: 'rowReport', count: results.length, data: results};
+                }
+
+                // Try regular tables (skip sidebar tables)
+                const tables = document.querySelectorAll('table');
+                for (const table of tables) {
+                    // Skip tables inside sidebar/nav
+                    const parent = table.closest('nav, aside, [class*="sidebar"], [class*="menu"]');
+                    if (parent) continue;
+                    const trs = table.querySelectorAll('tbody tr, tr');
+                    if (trs.length >= 2) {
+                        let headers = [];
+                        for (const tr of trs) {
+                            const ths = Array.from(tr.querySelectorAll('th')).map(th => th.textContent.trim());
+                            if (ths.length >= 2) { headers = ths; continue; }
+                            const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+                            if (cols.length >= 2 && !isNavText(cols.join(' '))) {
+                                results.push(cols);
+                            }
+                        }
+                        if (results.length > 0) return {type: 'table', count: results.length, data: results, headers: headers};
+                    }
+                }
+
+                return {type: 'empty', count: 0, data: []};
+            }""")
+
+        # ── MASTER SCRAPE FUNCTION ────────────────────────────────────
+        async def scrape_page(name, url, wait_selector=None, wait_time=3, date_range=None):
+            """Navigate to page, wait for data, extract via XHR or DOM."""
             print(f"  [{name}] → {url}")
             try:
-                await page.goto(f"{WANSOFT_URL}/{url}", wait_until="load", timeout=30000)
-                await asyncio.sleep(wait_time)
+                # Clear XHR captures for this page
+                captured_responses.clear()
 
-                # Close any modal overlays
+                await page.goto(f"{WANSOFT_URL}/{url}", wait_until="load", timeout=30000)
+                await asyncio.sleep(2)  # Minimal wait for DOM
+
+                # Close modals
                 await page.evaluate("""() => {
                     document.querySelectorAll('.ui-widget-overlay, .modal-backdrop').forEach(el => el.remove());
                     document.querySelectorAll('.ui-dialog').forEach(el => el.remove());
                 }""")
 
-                # Select subsidiary if dropdown exists
+                # Select subsidiary
                 await page.evaluate(f"""() => {{
                     const selects = document.querySelectorAll('select');
                     for (const sel of selects) {{
@@ -130,16 +254,34 @@ async def run():
                             }}
                         }}
                     }}
-                    // Select all in multi-selects
                     const multiSel = document.querySelector('select[multiple]');
                     if (multiSel) {{
                         for (const o of multiSel.options) o.selected = true;
                         multiSel.dispatchEvent(new Event('change', {{bubbles: true}}));
                     }}
                 }}""")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
-                # Click search/filter button if exists
+                # Set date range if provided
+                if date_range:
+                    start_d, end_d = date_range
+                    await page.evaluate(f"""() => {{
+                        const inputs = document.querySelectorAll('input');
+                        for (const inp of inputs) {{
+                            const id = (inp.id || inp.name || '').toLowerCase();
+                            if (id.includes('start') || id.includes('inicio')) {{
+                                inp.value = '{start_d}';
+                                inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            }}
+                            if (id.includes('end') || id.includes('fin')) {{
+                                inp.value = '{end_d}';
+                                inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            }}
+                        }}
+                    }}""")
+                    await asyncio.sleep(1)
+
+                # Click search button
                 await page.evaluate("""() => {
                     const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
                     for (const b of btns) {
@@ -150,83 +292,32 @@ async def run():
                         }
                     }
                 }""")
-                await asyncio.sleep(3)
 
-                # Extract table data — ONLY from main content area (exclude sidebar/nav)
-                data = await page.evaluate("""() => {
-                    const results = [];
+                # SMART WAIT — wait for actual data rows instead of arbitrary sleep
+                await wait_for_data(timeout_ms=15000)
 
-                    // Find the main content container (exclude sidebar, nav, header)
-                    const contentArea = document.querySelector(
-                        '.content-wrapper, .main-content, #content, .page-content, ' +
-                        '.panel-body, .card-body, [class*="content"]:not([class*="sidebar"]):not(nav)'
-                    ) || document.body;
+                # Additional wait for slow jqGrid renders
+                await asyncio.sleep(wait_time)
 
-                    // Exclude sidebar/nav elements from search
-                    const isInSidebar = (el) => {
-                        let parent = el;
-                        while (parent) {
-                            const cls = (parent.className || '').toLowerCase();
-                            const tag = parent.tagName?.toLowerCase();
-                            if (cls.includes('sidebar') || cls.includes('nav-') || cls.includes('menu-') ||
-                                cls.includes('topbar') || cls.includes('header-') || cls.includes('notification') ||
-                                cls.includes('app-menu') || tag === 'nav' || tag === 'aside') {
-                                return true;
-                            }
-                            parent = parent.parentElement;
-                        }
-                        return false;
-                    };
+                # 1. Try XHR data first (most reliable — JSON from AJAX)
+                xhr_data = extract_xhr_data()
+                if xhr_data and not is_garbage_data(xhr_data):
+                    print(f"    [XHR] Captured {len(xhr_data)} rows from AJAX")
+                    return {"type": "xhr", "count": len(xhr_data), "data": xhr_data}
 
-                    // Try .rowReport first (Wansoft report style) — only in content area
-                    const rows = contentArea.querySelectorAll('.rowReport');
-                    if (rows.length > 0) {
-                        for (const row of rows) {
-                            if (isInSidebar(row)) continue;
-                            const cols = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
-                            if (cols.length > 0 && cols.some(c => c && c.length < 200)) results.push(cols);
-                        }
-                        if (results.length > 0) return {type: 'rowReport', count: results.length, data: results};
-                    }
+                # 2. Fall back to DOM extraction
+                dom_data = await extract_dom_data()
+                if dom_data.get("count", 0) > 0 and not is_garbage_data(dom_data.get("data", [])):
+                    print(f"    [DOM] Extracted {dom_data['count']} rows ({dom_data['type']})")
+                    return dom_data
 
-                    // Try regular tables — only in content area, skip nav tables
-                    const tables = contentArea.querySelectorAll('table');
-                    for (const table of tables) {
-                        if (isInSidebar(table)) continue;
-                        const trs = table.querySelectorAll('tr');
-                        if (trs.length > 2) {
-                            for (const tr of trs) {
-                                const cols = Array.from(tr.querySelectorAll('td, th')).map(td => td.textContent.trim());
-                                // Filter: must have data-like content (numbers, $, or short text)
-                                if (cols.length >= 2 && cols.some(c => c && c.length < 200)) {
-                                    results.push(cols);
-                                }
-                            }
-                            if (results.length > 0) return {type: 'table', count: results.length, data: results};
-                        }
-                    }
+                # 3. Nothing found — log debug info
+                print(f"    [!] No data found. XHR captured: {len(captured_responses)}, taking screenshot...")
+                await page.screenshot(path=f"/tmp/debug_{name}.png", full_page=True)
+                raw_text = await page.evaluate("() => document.body?.textContent?.substring(0, 2000) || ''")
+                print(f"    [debug] Page text preview: {raw_text[:300]}")
+                return {"type": "empty", "count": 0, "data": []}
 
-                    // Try grid/list views in content area
-                    const gridItems = contentArea.querySelectorAll('[class*="grid"] [class*="row"], [class*="list"] [class*="item"]');
-                    if (gridItems.length > 0) {
-                        for (const item of gridItems) {
-                            if (isInSidebar(item)) continue;
-                            const text = item.textContent.trim();
-                            if (text && text.length < 500) results.push(text.split(/\\s{2,}|\\|/));
-                        }
-                        if (results.length > 0) return {type: 'grid', count: results.length, data: results};
-                    }
-
-                    // Fallback: raw text from content area only
-                    if (contentArea && contentArea !== document.body) {
-                        return {type: 'raw', count: 1, data: contentArea.textContent.substring(0, 10000)};
-                    }
-
-                    return {type: 'empty', count: 0, data: []};
-                }""")
-
-                print(f"    Type: {data.get('type')}, Items: {data.get('count', 0)}")
-                return data
             except Exception as e:
                 print(f"    ERROR: {e}")
                 return {"type": "error", "count": 0, "data": [], "error": str(e)}
@@ -569,186 +660,60 @@ async def run():
         # ── FOOD COST (Browser — critical for "cuanto cuesta X" queries) ───
         print("\n━━━ FOOD COST (Browser) ━━━")
 
-        try:
-            await page.goto(f"{WANSOFT_URL}/Reports/GetCostBySaucer", wait_until="load", timeout=30000)
-            await asyncio.sleep(3)
+        from datetime import timedelta as td
+        thirty_ago = (now_mx - td(days=30)).strftime("%Y-%m-%d")
 
-            # Set date range (last 30 days for good data)
-            thirty_ago = (now_mx - __import__('datetime').timedelta(days=30)).strftime("%Y-%m-%d")
-            await page.evaluate(f"""() => {{
-                const inputs = document.querySelectorAll('input');
-                for (const inp of inputs) {{
-                    const id = (inp.id || inp.name || '').toLowerCase();
-                    if (id.includes('start') || id.includes('inicio')) {{
-                        inp.value = '{thirty_ago}';
-                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    }}
-                    if (id.includes('end') || id.includes('fin')) {{
-                        inp.value = '{today_str}';
-                        inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    }}
-                }}
-                const selects = document.querySelectorAll('select');
-                for (const sel of selects) {{
-                    for (const opt of sel.options) {{
-                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
-                            opt.selected = true;
-                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        }}
-                    }}
-                }}
-            }}""")
-            await asyncio.sleep(2)
+        # Food cost by dish (30 days)
+        fc_data = await scrape_page("FoodCost", "Reports/GetCostBySaucer",
+                                     wait_time=5, date_range=(thirty_ago, today_str))
+        await page.screenshot(path="/tmp/food_cost.png", full_page=True)
 
-            # Click search
-            await page.evaluate("""() => {
-                const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-                for (const b of btns) {
-                    const txt = (b.textContent || b.value || '').toLowerCase();
-                    if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
-                        b.click();
-                        break;
-                    }
-                }
-            }""")
-            await asyncio.sleep(5)
+        if fc_data.get("count", 0) > 0:
+            raw = fc_data.get("data", [])
+            cost_items = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+            sb_upsert("wansoft_data", {
+                "client_id": CLIENT["id"], "fecha": today_str,
+                "data_key": "food_cost_browser",
+                "data": json.dumps(cost_items),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            results["food_cost"] = len(cost_items)
+        else:
+            results["food_cost"] = "0 items"
 
-            # Extract food cost table
-            food_cost = await page.evaluate("""() => {
-                const items = [];
-                const contentArea = document.querySelector(
-                    '.content-wrapper, .main-content, #content, .page-content, .panel-body'
-                ) || document.body;
+        # Saucers with cost (master list)
+        sc_data = await scrape_page("SaucersWithCost", "Reports/GetSaucersWithCost", wait_time=5)
+        await page.screenshot(path="/tmp/saucers_with_cost.png", full_page=True)
 
-                // Look for tables with cost data (has $ or % in cells)
-                const tables = contentArea.querySelectorAll('table');
-                for (const table of tables) {
-                    const trs = table.querySelectorAll('tr');
-                    let headers = [];
-                    for (const tr of trs) {
-                        const ths = Array.from(tr.querySelectorAll('th')).map(th => th.textContent.trim());
-                        if (ths.length >= 3) { headers = ths; continue; }
-                        const tds = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
-                        if (tds.length >= 3 && tds.some(t => t.includes('$') || t.includes('%') || /\\d/.test(t))) {
-                            items.push({cols: tds, headers: headers});
-                        }
-                    }
-                    if (items.length > 0) break;
-                }
+        if sc_data.get("count", 0) > 0:
+            raw = sc_data.get("data", [])
+            saucer_items = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+            sb_upsert("wansoft_data", {
+                "client_id": CLIENT["id"], "fecha": today_str,
+                "data_key": "saucers_cost_browser",
+                "data": json.dumps(saucer_items),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            results["saucers_cost"] = len(saucer_items)
 
-                // Also try .rowReport
-                if (items.length === 0) {
-                    const rows = contentArea.querySelectorAll('.rowReport');
-                    for (const row of rows) {
-                        const cols = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
-                        if (cols.length >= 3 && cols.some(c => c.includes('$') || /\\d/.test(c))) {
-                            items.push({cols: cols, headers: []});
-                        }
-                    }
-                }
+        # Tips by mesero (SalesByUser report)
+        print("\n━━━ TIPS (Browser) ━━━")
+        tips_data = await scrape_page("Tips", "Reports/SalesByUser",
+                                       wait_time=5, date_range=(today_str, today_str))
+        await page.screenshot(path="/tmp/tips.png", full_page=True)
 
-                return {count: items.length, data: items};
-            }""")
-
-            print(f"    Food cost items: {food_cost.get('count', 0)}")
-
-            # Take screenshot
-            await page.screenshot(path="/tmp/food_cost.png", full_page=True)
-            print("    [✓] Screenshot: food_cost.png")
-
-            # Parse food cost data
-            cost_items = []
-            for item in food_cost.get("data", []):
-                cols = item.get("cols", [])
-                headers = item.get("headers", [])
-                if len(cols) >= 3:
-                    parsed = {"_cols": cols, "_headers": headers}
-                    # Try to identify columns by content
-                    for i, val in enumerate(cols):
-                        v = val.strip()
-                        header = headers[i].lower() if i < len(headers) else ""
-                        if "platillo" in header or "saucer" in header or "producto" in header:
-                            parsed["platillo"] = v
-                        elif "costo" in header or "cost" in header:
-                            parsed["costo"] = v
-                        elif "precio" in header or "price" in header or "venta" in header:
-                            parsed["precio"] = v
-                        elif "margen" in header or "margin" in header:
-                            parsed["margen"] = v
-                        elif "cantidad" in header or "qty" in header:
-                            parsed["qty"] = v
-                        elif i == 0 and len(v) > 2 and not v.startswith("$"):
-                            parsed.setdefault("platillo", v)
-                        elif "$" in v:
-                            if "precio" not in parsed:
-                                parsed["precio"] = v
-                            elif "costo" not in parsed:
-                                parsed["costo"] = v
-                        elif "%" in v:
-                            parsed.setdefault("margen", v)
-                    cost_items.append(parsed)
-
-            if cost_items:
-                sb_upsert("wansoft_data", {
-                    "client_id": CLIENT["id"], "fecha": today_str,
-                    "data_key": "food_cost_browser",
-                    "data": json.dumps(cost_items),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                })
-                results["food_cost"] = len(cost_items)
-            else:
-                results["food_cost"] = "0 items"
-
-            # Also scrape the saucers with cost page
-            await page.goto(f"{WANSOFT_URL}/Reports/GetSaucersWithCost", wait_until="load", timeout=30000)
-            await asyncio.sleep(3)
-
-            # Set subsidiary
-            await page.evaluate(f"""() => {{
-                const selects = document.querySelectorAll('select');
-                for (const sel of selects) {{
-                    for (const opt of sel.options) {{
-                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
-                            opt.selected = true;
-                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        }}
-                    }}
-                }}
-            }}""")
-            await asyncio.sleep(2)
-
-            # Click search
-            await page.evaluate("""() => {
-                const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-                for (const b of btns) {
-                    const txt = (b.textContent || b.value || '').toLowerCase();
-                    if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
-                        b.click(); break;
-                    }
-                }
-            }""")
-            await asyncio.sleep(5)
-
-            saucers_cost_data = await scrape_page("SaucersWithCost-inner", "Reports/GetSaucersWithCost")
-            await page.screenshot(path="/tmp/saucers_with_cost.png", full_page=True)
-
-            if saucers_cost_data.get("count", 0) > 0:
-                raw = saucers_cost_data.get("data", [])
-                saucer_items = []
-                for row in raw:
-                    if isinstance(row, list) and len(row) >= 3:
-                        saucer_items.append({"_cols": row})
-                if saucer_items:
-                    sb_upsert("wansoft_data", {
-                        "client_id": CLIENT["id"], "fecha": today_str,
-                        "data_key": "saucers_cost_browser",
-                        "data": json.dumps(saucer_items),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    })
-                    results["saucers_cost"] = len(saucer_items)
-
-        except Exception as e:
-            print(f"    FOOD COST ERROR: {e}")
+        if tips_data.get("count", 0) > 0:
+            raw = tips_data.get("data", [])
+            tips_items = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+            sb_upsert("wansoft_data", {
+                "client_id": CLIENT["id"], "fecha": today_str,
+                "data_key": "tips_browser",
+                "data": json.dumps(tips_items),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            results["tips"] = len(tips_items)
+        else:
+            results["tips"] = "0 items"
 
         # ── ECOMMERCE ────────────────────────────────────────────
         print("\n━━━ ECOMMERCE (Browser) ━━━")
@@ -764,39 +729,24 @@ async def run():
         if withdrawal_data.get("count", 0) > 0 and withdrawal_data["type"] != "error":
             results["retiros_caja"] = withdrawal_data.get("count", 0)
 
-        # ── PROMOTIONS (Browser — REST endpoint returns navigation HTML) ───
+        # ── PROMOTIONS (Browser — uses scrape_page with XHR capture) ───
         print("\n━━━ PROMOTIONS (Browser) ━━━")
 
-        try:
-            # The correct path is under POS > Restaurant > Promotions
-            # Try multiple known paths since Wansoft URL structure varies
-            promo_loaded = False
-            for promo_url in [
-                "PointOfSale/Promotion",
-                "Restaurant/Promotion",
-                "Menu/PromotionList",
-                "PointOfSale/Restaurant/Promotion",
-            ]:
-                try:
-                    await page.goto(f"{WANSOFT_URL}/{promo_url}", wait_until="load", timeout=15000)
-                    await asyncio.sleep(3)
-                    # Check if we got a real page (not redirect to dashboard)
-                    content = await page.text_content("body")
-                    if content and ("promoci" in content.lower() or "promotion" in content.lower()):
-                        print(f"    [✓] Found promotions at: {promo_url}")
-                        promo_loaded = True
-                        break
-                    else:
-                        print(f"    [!] {promo_url} — no promotion content, trying next...")
-                except Exception:
-                    print(f"    [!] {promo_url} — failed, trying next...")
+        # Try multiple known paths for promotions
+        promo_data = None
+        for promo_url in ["PointOfSale/Promotion", "Restaurant/Promotion", "Menu/PromotionList"]:
+            promo_data = await scrape_page("Promotions", promo_url, wait_time=5)
+            if promo_data.get("count", 0) > 0 and not is_garbage_data(promo_data.get("data", [])):
+                print(f"    [✓] Found promotions at: {promo_url}")
+                break
+            promo_data = None
 
-            if not promo_loaded:
-                # Last resort: navigate via sidebar menu
-                print("    [!] Trying sidebar navigation to Punto de venta > Restaurante > Promociones...")
+        # Fallback: sidebar navigation
+        if not promo_data or promo_data.get("count", 0) == 0:
+            print("    [!] Trying sidebar navigation...")
+            try:
                 await page.goto(f"{WANSOFT_URL}/Dashboard/Index", wait_until="load", timeout=15000)
                 await asyncio.sleep(2)
-                # Click through menu
                 for menu_text in ["Punto de venta", "Restaurante", "Promociones"]:
                     try:
                         link = page.locator(f"text={menu_text}").first
@@ -804,223 +754,55 @@ async def run():
                         await asyncio.sleep(2)
                     except Exception:
                         pass
-                await asyncio.sleep(3)
+                await wait_for_data(timeout_ms=10000)
+                xhr_data = extract_xhr_data()
+                if xhr_data and not is_garbage_data(xhr_data):
+                    promo_data = {"type": "xhr", "count": len(xhr_data), "data": xhr_data}
+                else:
+                    dom_data = await extract_dom_data()
+                    if dom_data.get("count", 0) > 0:
+                        promo_data = dom_data
+            except Exception as e:
+                print(f"    Sidebar nav error: {e}")
 
-            # Select subsidiary
-            await page.evaluate(f"""() => {{
-                const selects = document.querySelectorAll('select');
-                for (const sel of selects) {{
-                    for (const opt of sel.options) {{
-                        if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
-                            opt.selected = true;
-                            sel.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        }}
-                    }}
-                }}
-            }}""")
-            await asyncio.sleep(3)
+        await page.screenshot(path="/tmp/promotions.png", full_page=True)
 
-            # Extract promotion table
-            promo_data = await page.evaluate("""() => {
-                const promos = [];
-
-                // Try table rows
-                const rows = document.querySelectorAll('table tr, .rowReport, [class*="grid"] [class*="row"]');
-                for (const row of rows) {
-                    const cells = row.querySelectorAll('td, div');
-                    const cols = Array.from(cells).map(c => c.textContent.trim()).filter(c => c);
-                    if (cols.length >= 2) promos.push(cols);
-                }
-
-                // Try list items
-                if (promos.length === 0) {
-                    const items = document.querySelectorAll('[class*="item"], [class*="card"], [class*="promotion"]');
-                    for (const item of items) {
-                        const text = item.textContent.trim();
-                        if (text && text.length > 3) promos.push(text.split(/\\s{2,}|\\|/));
-                    }
-                }
-
-                // Fallback: raw content
-                if (promos.length === 0) {
-                    const main = document.querySelector('.content-wrapper, #content, main, .container');
-                    if (main) return {type: 'raw', data: main.textContent.substring(0, 10000)};
-                }
-
-                return {type: 'table', count: promos.length, data: promos};
-            }""")
-
-            print(f"    Type: {promo_data.get('type')}, Items: {promo_data.get('count', 0)}")
-
-            # Take screenshot for debugging
-            await page.screenshot(path="/tmp/promotions.png", full_page=True)
-            print("    [✓] Screenshot: promotions.png")
-
-            # Parse promotions
-            promos_parsed = []
+        if promo_data and promo_data.get("count", 0) > 0:
             raw = promo_data.get("data", [])
-            if isinstance(raw, list):
-                for row in raw:
-                    if isinstance(row, list) and len(row) >= 2:
-                        promo = {
-                            "nombre": row[0],
-                            "tipo": row[1] if len(row) > 1 else "",
-                            "platillo": row[2] if len(row) > 2 else "",
-                            "descuento": row[3] if len(row) > 3 else "",
-                            "activa": any(s in " ".join(row).lower() for s in ["activ", "si", "yes", "true"]),
-                            "_cols": row,
-                        }
-                        promos_parsed.append(promo)
-            elif isinstance(raw, str):
-                promos_parsed = [{"raw_text": raw[:5000]}]
+            promos_parsed = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+            sb_upsert("wansoft_data", {
+                "client_id": CLIENT["id"], "fecha": today_str,
+                "data_key": "promotions_browser",
+                "data": json.dumps(promos_parsed),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            results["promociones"] = len(promos_parsed)
+        else:
+            results["promociones"] = "0 items"
 
-            if promos_parsed:
-                sb_upsert("wansoft_data", {
-                    "client_id": CLIENT["id"], "fecha": today_str,
-                    "data_key": "promotions_browser",
-                    "data": json.dumps(promos_parsed),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                })
-                results["promociones"] = len(promos_parsed)
-                activas = [p for p in promos_parsed if p.get("activa")]
-                if activas:
-                    results["promos_activas"] = len(activas)
-        except Exception as e:
-            print(f"    ERROR: {e}")
-
-        # ── DISCOUNTS DETAIL (Browser — for proper HTML parsing) ─────────
+        # ── DISCOUNTS & COURTESIES DETAIL (Browser) ─────────────────
         print("\n━━━ DISCOUNTS DETAIL (Browser) ━━━")
 
         for report_name, report_url, data_key in [
             ("Descuentos", "Reports/DiscountsDetail", "discounts_detail_browser"),
             ("Cortesias", "Reports/CourtesiesDetail", "courtesies_browser"),
         ]:
-            try:
-                await page.goto(f"{WANSOFT_URL}/{report_url}", wait_until="load", timeout=30000)
-                await asyncio.sleep(3)
+            detail_data = await scrape_page(report_name, report_url,
+                                             wait_time=5, date_range=(today_str, today_str))
+            await page.screenshot(path=f"/tmp/{data_key}.png", full_page=True)
 
-                # Set date range to today
-                await page.evaluate(f"""() => {{
-                    const inputs = document.querySelectorAll('input[type="text"], input[type="date"]');
-                    for (const inp of inputs) {{
-                        const id = (inp.id || inp.name || '').toLowerCase();
-                        if (id.includes('start') || id.includes('inicio') || id.includes('fecha')) {{
-                            inp.value = '{today_str}';
-                            inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        }}
-                        if (id.includes('end') || id.includes('fin')) {{
-                            inp.value = '{today_str}';
-                            inp.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        }}
-                    }}
-                    // Select subsidiary
-                    const selects = document.querySelectorAll('select');
-                    for (const sel of selects) {{
-                        for (const opt of sel.options) {{
-                            if (opt.value === '{SUBSIDIARY_ID}' || opt.text.includes('AMALAY')) {{
-                                opt.selected = true;
-                                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
-                            }}
-                        }}
-                    }}
-                }}""")
-                await asyncio.sleep(2)
-
-                # Click search button
-                await page.evaluate("""() => {
-                    const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-                    for (const b of btns) {
-                        const txt = (b.textContent || b.value || '').toLowerCase();
-                        if (txt.includes('buscar') || txt.includes('search') || txt.includes('consultar')) {
-                            b.click();
-                            break;
-                        }
-                    }
-                }""")
-                await asyncio.sleep(5)
-
-                # Extract the actual table content (not the header/section divs)
-                detail_data = await page.evaluate("""() => {
-                    const items = [];
-                    // Wansoft discount detail pages have nested sections
-                    // Look for actual data rows (not section headers)
-                    const allRows = document.querySelectorAll('table tr');
-                    for (const tr of allRows) {
-                        const tds = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
-                        // Skip header rows and empty rows
-                        if (tds.length >= 3 && tds.some(t => t.includes('$') || /\\d/.test(t))) {
-                            items.push(tds);
-                        }
-                    }
-
-                    // Also try rowReport divs but filter out headers
-                    if (items.length === 0) {
-                        const rows = document.querySelectorAll('.rowReport');
-                        for (const row of rows) {
-                            const divs = Array.from(row.querySelectorAll(':scope > div')).map(d => d.textContent.trim());
-                            if (divs.length >= 3 && divs.some(t => t.includes('$') || /\\d/.test(t))) {
-                                items.push(divs);
-                            }
-                        }
-                    }
-
-                    // Grab section headers for context
-                    const headers = [];
-                    const headEls = document.querySelectorAll('h2, h3, h4, .titleReport, [class*="title"], [class*="header"]');
-                    for (const h of headEls) {
-                        const t = h.textContent.trim();
-                        if (t && t.length < 100) headers.push(t);
-                    }
-
-                    return {type: 'detail', count: items.length, data: items, headers: headers};
-                }""")
-
-                print(f"    [{report_name}] Items: {detail_data.get('count', 0)}, Headers: {detail_data.get('headers', [])}")
-
-                # Take screenshot
-                await page.screenshot(path=f"/tmp/{data_key}.png", full_page=True)
-                print(f"    [✓] Screenshot: {data_key}.png")
-
-                # Parse and save
-                parsed = []
+            if detail_data.get("count", 0) > 0:
                 raw = detail_data.get("data", [])
-                if isinstance(raw, list):
-                    for row in raw:
-                        if isinstance(row, list) and len(row) >= 2:
-                            item = {"_cols": row}
-                            # Try to identify columns by content
-                            for i, val in enumerate(row):
-                                v = val.strip()
-                                if "$" in v:
-                                    try:
-                                        item.setdefault("monto", float(v.replace("$", "").replace(",", "")))
-                                    except: pass
-                                elif v.isdigit() and int(v) < 1000:
-                                    item.setdefault("orden", v) if int(v) > 10 else item.setdefault("cantidad", int(v))
-                                elif len(v) > 3 and not v.startswith("$"):
-                                    if "nombre" not in item:
-                                        item["nombre"] = v
-                                    elif "mesero" not in item:
-                                        item["mesero"] = v
-                                    elif "autorizador" not in item:
-                                        item["autorizador"] = v
-                                    elif "platillo" not in item:
-                                        item["platillo"] = v
-                            parsed.append(item)
-
-                if parsed:
-                    sb_upsert("wansoft_data", {
-                        "client_id": CLIENT["id"], "fecha": today_str,
-                        "data_key": data_key,
-                        "data": json.dumps(parsed),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    })
-                    results[data_key] = len(parsed)
-                else:
-                    results[data_key] = f"0 (headers: {detail_data.get('headers', [])})"
-
-            except Exception as e:
-                print(f"    [{report_name}] ERROR: {e}")
+                parsed = [{"_cols": r} if isinstance(r, list) else r for r in raw]
+                sb_upsert("wansoft_data", {
+                    "client_id": CLIENT["id"], "fecha": today_str,
+                    "data_key": data_key,
+                    "data": json.dumps(parsed),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+                results[data_key] = len(parsed)
+            else:
+                results[data_key] = "0 items"
 
         # ── Take screenshots of key pages for debugging ─────────
         print("\n━━━ SCREENSHOTS ━━━")

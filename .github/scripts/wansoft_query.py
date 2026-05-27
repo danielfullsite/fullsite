@@ -325,6 +325,34 @@ def fetch_all_wansoft_data(session, start, end):
         except Exception:
             pass
 
+    # 16d. Tips fallback from browser scraper
+    if not data.get("propinas_meseros"):
+        try:
+            for tips_key in ["tips_browser", "tips_raw"]:
+                tips_fb = sb_get("wansoft_data", {
+                    "client_id": f"eq.{CLIENT['id']}",
+                    "data_key": f"eq.{tips_key}",
+                    "order": "fecha.desc",
+                    "limit": "1",
+                })
+                if tips_fb and tips_fb[0].get("data"):
+                    t_data = tips_fb[0]["data"]
+                    if isinstance(t_data, str):
+                        t_data = json.loads(t_data)
+                    if t_data and isinstance(t_data, list) and len(t_data) > 0:
+                        # Check if it has real propinas data (not all zeros)
+                        has_propinas = any(float(t.get("propinas", 0) or 0) > 0 for t in t_data if isinstance(t, dict))
+                        if has_propinas:
+                            data["propinas_meseros"] = [
+                                {"nombre": t.get("mesero", ""), "total": float(t.get("propinas", 0) or 0)}
+                                for t in t_data if isinstance(t, dict) and float(t.get("propinas", 0) or 0) > 0
+                            ]
+                            data["propinas_total"] = sum(float(t.get("propinas", 0) or 0) for t in t_data if isinstance(t, dict))
+                            print(f"[wansoft-query] Tips loaded from {tips_key}: {len(data['propinas_meseros'])} meseros")
+                            break
+        except Exception:
+            pass
+
     # 17. Closing cash (corte de caja)
     try:
         r = session.post(f"{WANSOFT_URL}/Reports/ClosingCash",
@@ -483,6 +511,25 @@ CÓMO INTERPRETAR:
 - "qué hago ahorita" → staff brief 5 min + $ proyectado
 - "cuánto cuesta X" / "costo de X" → buscar en food_cost. Si no hay, decir donde encontrarlo
 - Cualquier nombre → buscar en TODOS los datos
+
+MAPA DE DATOS DISPONIBLES:
+Lo que SI tienes:
+- Ventas diarias (brutas, netas, por mesero, por grupo, por platillo) — DATOS REALES, confiables
+- Tickets, personas, ticket promedio — DATOS REALES
+- Metodos de pago (conteo de transacciones) — DATOS REALES
+- Efectivo y tarjeta en PESOS (historico diario) — DATOS REALES
+- Mesero x categoria: H&H, Pan, Postres, 2da Bebida, bebidas por persona — DATOS REALES
+- Historico diario de hasta 90 dias — DATOS REALES
+- Descuentos y cortesias (resumen diario) — DATOS REALES cuando hay
+- Cancelaciones y anulaciones — DATOS REALES cuando hay
+
+Lo que NO tienes y DONDE encontrarlo:
+- Propinas por mesero → "Revisa en Wansoft > Reportes > Modulo de propinas > Reporte de propinas"
+- Costo de receta / food cost → "Revisa en Wansoft > Reportes > Inventarios > Costo y margen"
+- Inventario actual → "Revisa en Wansoft > Inventario > Auditoria > Reporte de existencias"
+- Detalle de una orden especifica → "Revisa en Wansoft > Reportes > Ingresos > Detalle de ticket"
+- Promociones activas → "Revisa en Wansoft > Punto de venta > Restaurante > Promociones"
+- Horarios de empleados → "Revisa en Wansoft > Reportes > Horas trabajadas"
 
 FORMATO: Moneda SIEMPRE en pesos mexicanos MXN. Usa $ sin decimales. NUNCA JAMAS digas "dólares", "USD", "dollars" — todo es PESOS MEXICANOS. Texto plano para Telegram, sin markdown, sin asteriscos, sin ##, sin **. EXCLUIR de rankings: {_exclude_str}
 """

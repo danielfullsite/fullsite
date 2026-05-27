@@ -64,20 +64,36 @@ def safe_int(val):
         return 0
 
 
+# Navigation garbage markers — these appear when scraper captures sidebar/menu instead of data
+NAV_GARBAGE_MARKERS = [
+    "Reportes ->", "Inventario ->", "Punto de venta ->", "Administraci",
+    "Ecommerce ->", "Egresos ->", "Facturaci", "Configuraci",
+    "App Menu", "Calendar", "File Manager", "Taskboard", "Notifications",
+    "Project Status", "Project Name", "Admin Template",
+    "Conoce el escritorio", "Crear un platillo", "Crear un grupo",
+]
+
+
+def is_garbage_row(cols):
+    """Detect if a row is actually sidebar/navigation content, not real data."""
+    text = " ".join(str(c) for c in cols)
+    return any(marker in text for marker in NAV_GARBAGE_MARKERS)
+
+
 def parse_html_rows(html):
-    """Parse .rowReport rows → list of column arrays."""
+    """Parse .rowReport rows → list of column arrays. Filters out navigation garbage."""
     soup = BeautifulSoup(html, "html.parser")
     rows = soup.select(".rowReport")
     results = []
     for row in rows:
         cols = [c.text.strip() for c in row.select("div")]
-        if cols and any(c for c in cols):
+        if cols and any(c for c in cols) and not is_garbage_row(cols):
             results.append(cols)
     return results
 
 
 def parse_any_table(html):
-    """Try to parse any table structure from HTML."""
+    """Try to parse any table structure from HTML. Filters navigation garbage."""
     soup = BeautifulSoup(html, "html.parser")
 
     # Try .rowReport first
@@ -86,9 +102,10 @@ def parse_any_table(html):
         results = []
         for row in rows:
             cols = [c.text.strip() for c in row.select("div")]
-            if cols and any(c for c in cols):
+            if cols and any(c for c in cols) and not is_garbage_row(cols):
                 results.append(cols)
-        return results
+        if results:
+            return results
 
     # Try regular table
     tables = soup.select("table")
@@ -96,9 +113,10 @@ def parse_any_table(html):
         results = []
         for tr in tables[0].select("tr"):
             cols = [td.text.strip() for td in tr.select("td")]
-            if cols and any(c for c in cols):
+            if cols and any(c for c in cols) and not is_garbage_row(cols):
                 results.append(cols)
-        return results
+        if results:
+            return results
 
     # Try any divs with data pattern
     all_divs = soup.select("div[class*='row'], div[class*='item'], div[class*='record']")
@@ -106,9 +124,10 @@ def parse_any_table(html):
         results = []
         for div in all_divs:
             text = div.get_text(separator="|").strip()
-            if text:
+            if text and not any(m in text for m in NAV_GARBAGE_MARKERS):
                 results.append(text.split("|"))
-        return results
+        if results:
+            return results
 
     return []
 
@@ -224,9 +243,18 @@ def main():
 
     # 2. Sales by area
     def transform_generic(r):
+        """Parse generic endpoints — preserve nombre+total AND all raw columns."""
         if r["type"] == "json": return r["data"]
         if r["type"] == "html":
-            return [{"nombre": c[0], "total": safe_float(c[-1])} for c in r["data"] if len(c) >= 2]
+            items = []
+            for c in r["data"]:
+                if len(c) >= 2:
+                    item = {"nombre": c[0], "total": safe_float(c[-1])}
+                    # Preserve ALL columns for discovery/debugging
+                    if len(c) > 2:
+                        item["_cols"] = c
+                    items.append(item)
+            return items
         return []
 
     # Helper: save any endpoint data to wansoft_data table
@@ -364,11 +392,28 @@ def main():
     def transform_tips(r):
         if r["type"] == "html":
             data = []
+            # Log first row columns for discovery
+            if r["data"]:
+                print(f"    [tips] First row ({len(r['data'][0])} cols): {r['data'][0]}")
             for c in r["data"]:
-                if len(c) >= 4:
-                    data.append({"mesero": c[0], "ventas": safe_float(c[3]) if len(c) > 3 else 0,
-                                 "tickets": safe_int(c[2]) if len(c) > 2 else 0,
-                                 "propinas": safe_float(c[5]) if len(c) > 5 else safe_float(c[-1])})
+                if len(c) >= 3:
+                    # Wansoft SalesByUser columns vary — try to identify dynamically
+                    item = {"_cols": c, "mesero": c[0]}
+                    # Search for numeric values in remaining columns
+                    nums = []
+                    for val in c[1:]:
+                        f = safe_float(val)
+                        if f > 0:
+                            nums.append(f)
+                    # Typical order: tickets (int), subtotal, ventas, propinas
+                    item["tickets"] = safe_int(c[1]) if len(c) > 1 else 0
+                    if len(nums) >= 1:
+                        item["ventas"] = nums[0]
+                    if len(nums) >= 2:
+                        item["propinas"] = nums[-1]  # Propinas usually last numeric column
+                    else:
+                        item["propinas"] = 0
+                    data.append(item)
             return data
         if r["type"] == "json": return r["data"]
         return []
@@ -381,6 +426,8 @@ def main():
         sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": today_str,
                    "data": json.dumps(tips), "updated_at": datetime.now(timezone.utc).isoformat()})
         results["propinas"] = len(tips)
+        # Also save raw for discovery
+        save_data("tips_raw", tips)
 
     # ══════════════════════════════════════════════════════════════
     # FOOD COST & MENU
