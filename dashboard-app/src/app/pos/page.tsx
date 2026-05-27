@@ -91,7 +91,7 @@ const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ss
 export default function POSPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen flex items-center justify-center text-white bg-[var(--surface)]">
+      <div className="h-screen flex items-center justify-center text-white" style={{background:'#0a0a0f',color:'#fff'}}>
         <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
@@ -1317,7 +1317,7 @@ function POSContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col text-white overflow-hidden">
+    <div className="h-screen flex flex-col text-white overflow-hidden" style={{'--bg':'#000000','--surface':'#0a0a0c','--surface-2':'#0f1014','--panel':'#0b0b0e','--line':'#1c1d22','--line-soft':'#141519','--text-1':'#f5f5f7','--text-2':'#c4c4cc','--text-3':'#87878f','--text-4':'#555560','--accent':'#10b981','--accent-bright':'#34d399','--accent-deep':'#059669','--accent-soft':'rgba(16,185,129,0.12)','--accent-line':'rgba(16,185,129,0.28)',background:'#0a0a0f',color:'#fff',colorScheme:'dark'} as React.CSSProperties}>
       {/* Top Bar */}
       <header className="flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
@@ -1693,7 +1693,7 @@ function POSContent() {
         </div>
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
-        <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col bg-slate-850 ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`}>
+        <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'#0d0d12'}}>
           {/* Search bar — big touch target + barcode scanner */}
           <div className="px-3 pt-3 pb-2 flex-shrink-0 flex gap-2">
             <input
