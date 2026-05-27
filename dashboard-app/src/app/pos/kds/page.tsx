@@ -51,7 +51,7 @@ function getStation(itemName: string): string {
 
 const STATION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   todas: { label: 'Todas', color: 'text-white', bg: 'bg-slate-600' },
-  caliente: { label: 'Caliente', color: 'text-red-400', bg: 'bg-red-600' },
+  caliente: { label: 'Cocina', color: 'text-red-400', bg: 'bg-red-600' },
   fria: { label: 'Fria', color: 'text-cyan-400', bg: 'bg-cyan-600' },
   panaderia: { label: 'Panaderia', color: 'text-orange-400', bg: 'bg-orange-600' },
   barra: { label: 'Barra', color: 'text-blue-400', bg: 'bg-blue-600' },
@@ -187,8 +187,14 @@ export default function KDSPage() {
     <div className="h-screen flex flex-col bg-black text-white select-none overflow-hidden">
       {/* Top bar — minimal, touch targets */}
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface)] border-b border-slate-800 flex-shrink-0">
-        {/* Station filter tabs */}
-        <div className="flex gap-1.5">
+        {/* Back button + Station filter tabs */}
+        <div className="flex gap-1.5 items-center">
+          <button
+            onClick={() => window.history.back()}
+            className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 flex items-center justify-center mr-2 text-white"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
           {(Object.keys(STATION_CONFIG) as Station[]).map(s => {
             const cfg = STATION_CONFIG[s]
             const count = stationCounts[s]
@@ -266,7 +272,7 @@ export default function KDSPage() {
               const totalCount = activeItemsWithIndex.length
 
               const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
-              const headerBg = isNew ? 'bg-[var(--surface)] text-black' : isPrep ? 'bg-amber-500/100 text-black' : 'bg-emerald-500/100 text-black'
+              const headerBg = isNew ? 'bg-white text-black' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
 
               return (
                 <div
@@ -275,11 +281,11 @@ export default function KDSPage() {
                 >
                   {/* Header — mesa + timer + progress */}
                   <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <span className="text-3xl font-black">{order.mesa || 'D'}</span>
-                      <div className="text-xs leading-tight">
-                        <p className="font-bold uppercase">{isNew ? 'NUEVA' : isPrep ? 'PREP' : 'LISTA'}</p>
-                        <p className="opacity-70">{order.mesero?.split(' ')[0]}</p>
+                      <div className="leading-tight">
+                        <p className="text-sm font-black uppercase tracking-wide">{isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}</p>
+                        <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
