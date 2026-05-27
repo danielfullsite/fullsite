@@ -1518,7 +1518,7 @@ function POSContent() {
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
             {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => { setMesero(e.target.value); try { localStorage.setItem('pos_mesero', e.target.value) } catch {} }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>

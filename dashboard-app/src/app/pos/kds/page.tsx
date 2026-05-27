@@ -34,7 +34,7 @@ interface ParsedItem {
   cancelled?: boolean
 }
 
-type Station = 'todas' | 'caliente' | 'fria' | 'panaderia' | 'barra'
+type Station = 'caliente' | 'fria' | 'panaderia' | 'barra'
 
 const STATION_KEYWORDS: Record<string, string[]> = {
   barra: ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
@@ -51,7 +51,6 @@ function getStation(itemName: string): string {
 }
 
 const STATION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  todas: { label: 'Todas', color: 'text-white', bg: 'bg-slate-600' },
   caliente: { label: 'Cocina', color: 'text-red-400', bg: 'bg-red-600' },
   fria: { label: 'Fria', color: 'text-cyan-400', bg: 'bg-cyan-600' },
   panaderia: { label: 'Panaderia', color: 'text-orange-400', bg: 'bg-orange-600' },
@@ -83,7 +82,7 @@ function playAlert() {
 
 export default function KDSPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
-  const [station, setStation] = useState<Station>('todas')
+  const [station, setStation] = useState<Station>('caliente')
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
@@ -158,7 +157,7 @@ export default function KDSPage() {
   const filteredOrders = orders
     .filter(o => o.status !== 'entregada')
     .filter(o => {
-      if (station === 'todas') return true
+      // all items shown for this station
       const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
       return items.some(item => !item.cancelled && getStation(item.nombre || item.name || '') === station)
     })
@@ -170,7 +169,7 @@ export default function KDSPage() {
     })
 
   // Station counts
-  const stationCounts: Record<string, number> = { todas: 0, caliente: 0, fria: 0, panaderia: 0, barra: 0 }
+  const stationCounts: Record<string, number> = { caliente: 0, fria: 0, panaderia: 0, barra: 0 }
   for (const o of orders.filter(o => o.status === 'enviada' || o.status === 'preparando')) {
     const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
     for (const item of items) {
@@ -178,7 +177,6 @@ export default function KDSPage() {
       const s = getStation(item.nombre || item.name || '')
       const qty = item.cantidad || item.quantity || 1
       stationCounts[s] += qty
-      stationCounts.todas += qty
     }
   }
 
@@ -266,7 +264,7 @@ export default function KDSPage() {
                 .map((item, idx) => ({ item, originalIndex: idx }))
                 .filter(({ item }) => {
                   if (item.cancelled) return false
-                  if (station === 'todas') return true
+                  // all items shown for this station
                   return getStation(item.nombre || item.name || '') === station
                 })
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length

@@ -6,20 +6,27 @@ import type { User } from '@supabase/supabase-js'
 import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientConfig } from '@/lib/client-config'
 
 // Dashboard roles — controls page visibility
-// dueño: sees EVERYTHING (financials, gastos, nómina, P&L, all agents)
-// gerente: sees operations (ventas, meseros, inventario, coach) but NOT financials
-// staff: sees only POS-related pages
-export type DashboardRole = 'dueño' | 'gerente' | 'staff'
+// dueño: sees EVERYTHING
+// gerente: operations + agents + inventario, NOT financials
+// capitan: operations + POS + inventario/merma, NOT financials/agents
+// cajero: POS + cortes + propinas, NOT financials/agents/admin
+// mesero: POS only (own tables)
+export type DashboardRole = 'dueño' | 'gerente' | 'capitan' | 'cajero' | 'mesero' | 'staff'
 
 // Role-based page access
-const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/proveedores', '/food-cost']
-const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/ecommerce', '/reportes', '/coach', '/chat']
-const STAFF_PAGES = ['/pos']
+const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/proveedores', '/food-cost', '/roi']
+const AGENT_PAGES = ['/agentes', '/coach', '/chat']
+const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/auto86', '/ecommerce', '/reportes', '/sucursales']
+const POS_PAGES = ['/pos']
+const CAPITAN_PAGES = [...OPERATIONS_PAGES, ...POS_PAGES, '/admin']
+const CAJERO_PAGES = ['/pos', '/cortes', '/propinas', '/ventas']
 
 export function canAccessPage(role: DashboardRole, path: string): boolean {
   if (role === 'dueño') return true
-  if (role === 'gerente') return !FINANCIAL_PAGES.some(p => path.startsWith(p)) || OPERATIONS_PAGES.some(p => path === p || path.startsWith(p + '/'))
-  if (role === 'staff') return STAFF_PAGES.some(p => path.startsWith(p))
+  if (role === 'gerente') return !FINANCIAL_PAGES.some(p => path.startsWith(p))
+  if (role === 'capitan') return CAPITAN_PAGES.some(p => path === p || path.startsWith(p + '/')) || path === '/'
+  if (role === 'cajero') return CAJERO_PAGES.some(p => path === p || path.startsWith(p + '/')) || path === '/'
+  if (role === 'mesero' || role === 'staff') return POS_PAGES.some(p => path.startsWith(p))
   return false
 }
 

@@ -33,6 +33,15 @@ export default function MesasPage() {
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([])
   const [reservas, setReservas] = useState<Reserva[]>([])
   const [loading, setLoading] = useState(true)
+  const [soloMisMesas, setSoloMisMesas] = useState(false)
+  const [currentMesero, setCurrentMesero] = useState<string>('')
+
+  // Get current mesero from URL or localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const m = params.get('mesero') || localStorage.getItem('pos_mesero') || ''
+    setCurrentMesero(m)
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -233,6 +242,17 @@ export default function MesasPage() {
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
+          {currentMesero && (
+            <button
+              onClick={() => setSoloMisMesas(!soloMisMesas)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                soloMisMesas ? 'bg-emerald-500 text-black' : 'bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]'
+              }`}
+            >
+              <Users size={14} />
+              {soloMisMesas ? 'Mis mesas' : 'Todas'}
+            </button>
+          )}
           <button
             onClick={() => { setMergeMode(!mergeMode); setMergeSource(null); setMergeTarget(null) }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -274,7 +294,11 @@ export default function MesasPage() {
         ) : (
           <>
             <div className="grid grid-cols-4 gap-4 max-w-5xl mx-auto">
-              {mesas.map(mesa => (
+              {mesas.filter(mesa => {
+                if (!soloMisMesas || !currentMesero) return true
+                // Show: own occupied mesas + all available mesas
+                return mesa.status === 'disponible' || mesa.mesero === currentMesero
+              }).map(mesa => (
                 <button
                   key={mesa.number}
                   onClick={() => handleMesaClick(mesa.number)}
