@@ -2043,7 +2043,7 @@ function POSContent() {
       {/* Mercado Pago Point Config Modal */}
       {showMPConfig && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)]">
+          <div className="rounded-2xl p-6 w-full max-w-md border border-slate-700" style={{background:'#1a1a2e'}}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Smartphone size={20} />
@@ -2065,7 +2065,7 @@ function POSContent() {
                   value={mpAccessToken}
                   onChange={e => setMpAccessToken(e.target.value)}
                   placeholder="APP_USR-..."
-                  className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500"
+                  className="w-full border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'#0f0f1a'}}
                 />
               </div>
 
@@ -2077,7 +2077,7 @@ function POSContent() {
                     value={mpDeviceId}
                     onChange={e => setMpDeviceId(e.target.value)}
                     placeholder="GERTEC_MP35P__..."
-                    className="flex-1 bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500"
+                    className="flex-1 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500" style={{background:'#0f0f1a'}}
                   />
                   <button
                     onClick={async () => {
