@@ -852,7 +852,16 @@ def ask_groq(question, wansoft_data, historical_data):
             "messages": [{"role": "user", "content": context}],
         }, timeout=30)
     r.raise_for_status()
-    return r.json()["content"][0]["text"].strip()
+    answer = r.json()["content"][0]["text"].strip()
+
+    # Post-processing: strip markdown that Telegram can't render
+    answer = answer.replace("**", "").replace("##", "").replace("# ", "")
+    answer = answer.replace("```", "").replace("`", "")
+    # Replace "dólares" / "dollars" / "USD" just in case LLM slips
+    for bad_word in ["dólares", "dolares", "dollars", "USD"]:
+        answer = answer.replace(bad_word, "pesos")
+
+    return answer
 
 
 # ── Log ─────────────────────────────────────────────────────────────────────
