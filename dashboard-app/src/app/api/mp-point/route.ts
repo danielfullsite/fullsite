@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
               external_reference: orderId || 'fullsite-pos',
               print_on_terminal: true,
             },
-            description: description || 'Fullsite POS',
           }),
         }
       )
