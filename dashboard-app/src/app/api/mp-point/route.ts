@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { action, accessToken, deviceId, amount, orderId, description } = await request.json()
+    const { action, accessToken, deviceId, amount, orderId, paymentIntentId } = await request.json()
 
     if (!accessToken) {
       return Response.json({ error: 'Access token requerido' }, { status: 400 })
@@ -47,6 +47,54 @@ export async function POST(request: NextRequest) {
       } else {
         return Response.json({ success: false, error: data.message || 'Error de Mercado Pago', data }, { status: res.status })
       }
+    }
+
+    // Check payment intent status
+    if (action === 'status') {
+      if (!paymentIntentId) {
+        return Response.json({ error: 'paymentIntentId requerido' }, { status: 400 })
+      }
+
+      const res = await fetch(
+        `https://api.mercadopago.com/point/integration-api/payment-intents/${paymentIntentId}`,
+        { headers }
+      )
+
+      const data = await res.json()
+      return Response.json(data)
+    }
+
+    // Cancel payment intent
+    if (action === 'cancel') {
+      if (!deviceId) {
+        return Response.json({ error: 'deviceId requerido' }, { status: 400 })
+      }
+
+      const res = await fetch(
+        `https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`,
+        { method: 'DELETE', headers }
+      )
+
+      if (res.ok || res.status === 204) {
+        return Response.json({ success: true })
+      }
+      const data = await res.json().catch(() => ({}))
+      return Response.json({ success: false, error: data.message || 'Error al cancelar' })
+    }
+
+    // Get last payment status for device
+    if (action === 'last-payment') {
+      if (!deviceId) {
+        return Response.json({ error: 'deviceId requerido' }, { status: 400 })
+      }
+
+      const res = await fetch(
+        `https://api.mercadopago.com/point/integration-api/payment-intents/events?startDate=${new Date(Date.now() - 3600000).toISOString()}&endDate=${new Date().toISOString()}`,
+        { headers }
+      )
+
+      const data = await res.json()
+      return Response.json(data)
     }
 
     return Response.json({ error: 'Accion no valida' }, { status: 400 })

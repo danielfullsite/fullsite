@@ -74,6 +74,9 @@ import {
   clearMPConfig,
   fetchMPDevices,
   sendPaymentToPoint,
+  pollPaymentStatus,
+  cancelPaymentIntent,
+  type PaymentStatus,
   type MPConfig,
   type MPDevice,
 } from '@/lib/mercadopago'
@@ -2295,16 +2298,34 @@ function POSContent() {
                     setMpSending(true)
                     setMpStatus('sending')
                     setMpError('')
-                    const result = await sendPaymentToPoint(payTotal + propina, orderId, `Mesa ${mesa}`)
-                    if (result.success) {
+                    const result = await sendPaymentToPoint(payTotal + propina, orderId)
+                    if (result.success && result.intentId) {
                       setMpStatus('sent')
                       showToast('Pasa la tarjeta en el Point')
-                      // Auto-confirm after 3s
-                      setTimeout(() => {
-                        setMpSending(false)
-                        setMpStatus('idle')
-                        handlePayment('Tarjeta de credito')
-                      }, 3000)
+                      // Poll for payment confirmation
+                      const cancel = pollPaymentStatus(result.intentId, (status: PaymentStatus, _paymentId?: string) => {
+                        if (status === 'approved') {
+                          setMpSending(false)
+                          setMpStatus('idle')
+                          showToast('Pago aprobado')
+                          handlePayment('Tarjeta de credito')
+                        } else if (status === 'rejected') {
+                          setMpSending(false)
+                          setMpStatus('error')
+                          setMpError('Pago rechazado — intenta de nuevo')
+                        } else if (status === 'cancelled') {
+                          setMpSending(false)
+                          setMpStatus('idle')
+                          showToast('Pago cancelado')
+                        } else if (status === 'error') {
+                          setMpSending(false)
+                          setMpStatus('error')
+                          setMpError('Error en el pago')
+                        }
+                        // pending/processing — keep polling
+                      })
+                      // Store cancel fn for the cancel button
+                      ;(window as unknown as Record<string, unknown>).__mpCancelPoll = cancel
                     } else {
                       setMpStatus('error')
                       setMpError(result.error || 'Error desconocido')
@@ -2321,7 +2342,7 @@ function POSContent() {
                 {mpSending ? (
                   <>
                     <Loader2 size={24} className="animate-spin" />
-                    {mpStatus === 'sent' ? 'Pasa la tarjeta en el Point...' : 'Enviando al Point...'}
+                    {mpStatus === 'sent' ? 'Esperando tarjeta en el Point...' : 'Enviando al Point...'}
                   </>
                 ) : (
                   <>
@@ -2330,6 +2351,21 @@ function POSContent() {
                   </>
                 )}
               </button>
+              {mpSending && mpStatus === 'sent' && (
+                <button
+                  onClick={async () => {
+                    const cancelFn = (window as unknown as Record<string, unknown>).__mpCancelPoll as (() => void) | undefined
+                    if (cancelFn) cancelFn()
+                    await cancelPaymentIntent()
+                    setMpSending(false)
+                    setMpStatus('idle')
+                    showToast('Cobro cancelado')
+                  }}
+                  className="w-full py-2 text-sm text-red-400 hover:text-red-300"
+                >
+                  Cancelar cobro
+                </button>
+              )}
               {mpStatus === 'error' && (
                 <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-2 text-center">
                   <p className="text-red-400 text-sm">{mpError}</p>

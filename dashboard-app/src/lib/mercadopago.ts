@@ -1,5 +1,4 @@
-// Mercado Pago Point integration
-// Uses /api/mp-point proxy to avoid CORS issues
+// Mercado Pago Point — full integration via /api/mp-point proxy
 
 export interface MPConfig {
   accessToken: string
@@ -13,6 +12,8 @@ export interface MPDevice {
   external_pos_id: string
   operating_mode: string
 }
+
+export type PaymentStatus = 'pending' | 'processing' | 'approved' | 'rejected' | 'cancelled' | 'error'
 
 export function getMPConfig(): MPConfig | null {
   if (typeof window === 'undefined') return null
@@ -38,10 +39,9 @@ export async function fetchMPDevices(accessToken: string): Promise<{ success: bo
     if (res.ok) {
       const data = await res.json()
       return { success: true, devices: data.devices || data }
-    } else {
-      const err = await res.json().catch(() => ({}))
-      return { success: false, error: err.message || err.error || `Error ${res.status}` }
     }
+    const err = await res.json().catch(() => ({}))
+    return { success: false, error: err.message || err.error || `Error ${res.status}` }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Error de conexion' }
   }
@@ -50,7 +50,6 @@ export async function fetchMPDevices(accessToken: string): Promise<{ success: bo
 export async function sendPaymentToPoint(
   amount: number,
   orderId: string,
-  description?: string
 ): Promise<{ success: boolean; intentId?: string; error?: string }> {
   const config = getMPConfig()
   if (!config) return { success: false, error: 'Point no configurado' }
@@ -65,18 +64,111 @@ export async function sendPaymentToPoint(
         deviceId: config.deviceId,
         amount,
         orderId,
-        description: description || 'Fullsite POS',
       }),
     })
 
     if (res.ok) {
       const data = await res.json()
       return { success: true, intentId: data.data?.id }
-    } else {
-      const err = await res.json().catch(() => ({}))
-      return { success: false, error: err.error || err.message || `Error ${res.status}` }
     }
+    const err = await res.json().catch(() => ({}))
+    return { success: false, error: err.error || err.message || `Error ${res.status}` }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Error de conexion' }
   }
+}
+
+export async function checkPaymentStatus(
+  paymentIntentId: string
+): Promise<{ status: PaymentStatus; paymentId?: string; error?: string }> {
+  const config = getMPConfig()
+  if (!config) return { status: 'error', error: 'Point no configurado' }
+
+  try {
+    const res = await fetch('/api/mp-point', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'status',
+        accessToken: config.accessToken,
+        paymentIntentId,
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      // MP returns status: open, on_terminal, processing, processed, cancelled, abandoned, error
+      const statusMap: Record<string, PaymentStatus> = {
+        open: 'pending',
+        on_terminal: 'processing',
+        processing: 'processing',
+        processed: 'approved',
+        cancelled: 'cancelled',
+        abandoned: 'cancelled',
+        error: 'error',
+      }
+      return {
+        status: statusMap[data.state || data.status] || 'pending',
+        paymentId: data.payment?.id?.toString(),
+      }
+    }
+    return { status: 'error', error: 'Error al verificar status' }
+  } catch {
+    return { status: 'error', error: 'Error de conexion' }
+  }
+}
+
+export async function cancelPaymentIntent(): Promise<{ success: boolean; error?: string }> {
+  const config = getMPConfig()
+  if (!config) return { success: false, error: 'Point no configurado' }
+
+  try {
+    const res = await fetch('/api/mp-point', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'cancel',
+        accessToken: config.accessToken,
+        deviceId: config.deviceId,
+      }),
+    })
+
+    const data = await res.json()
+    return { success: data.success || false, error: data.error }
+  } catch {
+    return { success: false, error: 'Error de conexion' }
+  }
+}
+
+// Poll payment status until resolved (approved/rejected/cancelled/error)
+export function pollPaymentStatus(
+  intentId: string,
+  onUpdate: (status: PaymentStatus, paymentId?: string) => void,
+  intervalMs = 2000,
+  maxAttempts = 60 // 2 min max
+): () => void {
+  let attempts = 0
+  let cancelled = false
+
+  const poll = async () => {
+    if (cancelled || attempts >= maxAttempts) {
+      if (!cancelled) onUpdate('error')
+      return
+    }
+    attempts++
+
+    const result = await checkPaymentStatus(intentId)
+    onUpdate(result.status, result.paymentId)
+
+    if (result.status === 'approved' || result.status === 'rejected' || result.status === 'cancelled' || result.status === 'error') {
+      return // Done polling
+    }
+
+    setTimeout(poll, intervalMs)
+  }
+
+  poll()
+
+  // Return cancel function
+  return () => { cancelled = true }
 }
