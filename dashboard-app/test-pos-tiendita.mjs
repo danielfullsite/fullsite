@@ -455,6 +455,75 @@ async function run() {
   mixtoCheck[0]?.metodo_pago === 'Mixto' ? ok('Metodo de pago = Mixto') : fail('Mixto method', mixtoCheck[0]?.metodo_pago)
   (mixtoCheck[0]?.notas || '').includes('Efectivo') ? ok('Notas incluyen desglose mixto') : fail('Mixto notas', mixtoCheck[0]?.notas)
 
+  // ─── 11g. MESA TIMER ─────────────────────────────────────────────────
+  console.log('\n⏱️  11g. MESA TIMER')
+
+  // Create an order from 2 hours ago to test timer
+  const oldOrderId = `${TEST_PREFIX}-order-old`
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  await sb('POST', 'pos_orders', {
+    id: oldOrderId, client_id: 'amalay', mesa: 16, mesero: 'Omar Aguilera',
+    personas: 4, status: 'enviada', items: '[]', subtotal: 0, iva: 0, total: 500,
+    descuento: 0, created_at: twoHoursAgo,
+  })
+  const oldOrder = await sbGet(`pos_orders?id=eq.${oldOrderId}`)
+  if (oldOrder.length === 1) {
+    const createdAt = new Date(oldOrder[0].created_at).getTime()
+    const mins = Math.floor((Date.now() - createdAt) / 60000)
+    mins >= 110 && mins <= 130
+      ? ok(`Mesa 16: orden de hace ~2h (${mins}m) — trigger alerta >90min`)
+      : fail('Timer calc', `Expected ~120m, got ${mins}m`)
+  } else {
+    fail('Old order', 'Not created')
+  }
+
+  // Create a recent order (5 min ago) — should NOT trigger alert
+  const recentOrderId = `${TEST_PREFIX}-order-recent`
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  await sb('POST', 'pos_orders', {
+    id: recentOrderId, client_id: 'amalay', mesa: 17, mesero: 'Daniela Rico',
+    personas: 2, status: 'preparando', items: '[]', subtotal: 0, iva: 0, total: 200,
+    descuento: 0, created_at: fiveMinAgo,
+  })
+  const recentOrder = await sbGet(`pos_orders?id=eq.${recentOrderId}`)
+  if (recentOrder.length === 1) {
+    const mins = Math.floor((Date.now() - new Date(recentOrder[0].created_at).getTime()) / 60000)
+    mins >= 3 && mins <= 10
+      ? ok(`Mesa 17: orden reciente (${mins}m) — sin alerta`)
+      : fail('Recent timer', `Expected ~5m, got ${mins}m`)
+  }
+
+  // Verify both active at same time (simulates mesas page view)
+  const activeForTimer = await sbGet(`pos_orders?id=like.${TEST_PREFIX}-order-*&status=in.(enviada,preparando,lista)`)
+  activeForTimer.length >= 2
+    ? ok(`${activeForTimer.length} ordenes activas para vista de mesas`)
+    : fail('Active orders for mesas', activeForTimer.length)
+
+  // Cleanup timer orders
+  await sb('DELETE', `pos_orders?id=eq.${oldOrderId}`)
+  await sb('DELETE', `pos_orders?id=eq.${recentOrderId}`)
+
+  // ─── 11h. CLIENT CONFIG FROM DB ────────────────────────────────────
+  console.log('\n🧠 11h. CEREBRO CENTRAL (clients table)')
+
+  const clientRes = await sbGet('clients?id=eq.amalay')
+  if (clientRes.length === 1) {
+    const c = clientRes[0]
+    c.display_name ? ok(`Client name: ${c.display_name}`) : fail('Client name', 'null')
+    c.mesas === 16 ? ok('Mesas: 16') : fail('Mesas', c.mesas)
+    c.features?.pos === true ? ok('Feature POS: enabled') : fail('POS feature', c.features?.pos)
+    c.features?.nomina === false ? ok('Feature Nomina: disabled (correct for AMALAY)') : fail('Nomina', c.features?.nomina)
+    Array.isArray(c.meseros) && c.meseros.length === 8 ? ok('8 meseros configured') : fail('Meseros', c.meseros?.length)
+  } else {
+    fail('Client config', 'amalay not found')
+  }
+
+  const demoClient = await sbGet('clients?id=eq.demo')
+  if (demoClient.length === 1) {
+    demoClient[0].data_source === 'demo' ? ok('Demo client: data_source=demo') : fail('Demo source', demoClient[0].data_source)
+    demoClient[0].features?.nomina === true ? ok('Demo: nomina enabled (all features)') : fail('Demo nomina', demoClient[0].features?.nomina)
+  }
+
   // ─── 12. VERIFICACIONES FINALES ───────────────────────────────────────
   console.log('\n🔍 12. VERIFICACIONES FINALES')
 
