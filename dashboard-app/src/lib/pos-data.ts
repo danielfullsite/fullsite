@@ -957,6 +957,7 @@ export type AuditAction =
   | 'discount_removed'
   | 'status_changed'
   | 'payment_processed'
+  | 'merma_registered'
 
 export interface AuditEvent {
   client_id?: string

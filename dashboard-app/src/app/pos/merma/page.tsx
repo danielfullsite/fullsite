@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Trash2, Search, Plus, Check, ArrowLeft } from 'lucide-react'
 import { getIngredients, logAudit } from '@/lib/pos-data'
-import { formatMXN } from '@/lib/format'
+import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -239,7 +239,7 @@ export default function MermaPage() {
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden mb-4">
           <div className="px-4 py-3 border-b border-[var(--line-soft)] flex items-center justify-between">
             <h3 className="text-sm font-bold text-[var(--text-1)]">Merma del día ({entries.length} items)</h3>
-            <span className="text-sm font-bold text-red-400">-{formatMXN(totalCost)}</span>
+            <span className="text-sm font-bold text-red-400">-{formatCurrency(totalCost)}</span>
           </div>
           <div className="divide-y divide-[var(--line-soft)]">
             {entries.map((entry, i) => (
@@ -249,7 +249,7 @@ export default function MermaPage() {
                   <p className="text-xs text-[var(--text-3)]">{entry.quantity} {entry.unit} — {entry.motivo}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-red-400 font-medium">-{formatMXN(entry.cost)}</span>
+                  <span className="text-sm text-red-400 font-medium">-{formatCurrency(entry.cost)}</span>
                   <button onClick={() => removeEntry(i)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-3)] hover:text-red-400 transition-colors">
                     <Trash2 size={14} />
                   </button>
@@ -267,7 +267,7 @@ export default function MermaPage() {
           disabled={saving}
           className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
         >
-          {saving ? 'Guardando...' : `Registrar merma (${entries.length} items — ${formatMXN(totalCost)})`}
+          {saving ? 'Guardando...' : `Registrar merma (${entries.length} items — ${formatCurrency(totalCost)})`}
         </button>
       )}
 
