@@ -368,17 +368,24 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 
 interface DiscountModalProps {
   subtotal: number
+  personas: number
   onApply: (discount: number) => void
   onCancel: () => void
 }
 
-function DiscountModal({ subtotal, onApply, onCancel }: DiscountModalProps) {
-  const [mode, setMode] = useState<'percent' | 'fixed'>('percent')
-  const [value, setValue] = useState('')
+const CORTESIA_POR_PERSONA = 480
 
+function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalProps) {
+  const [mode, setMode] = useState<'percent' | 'fixed' | 'cortesia'>('percent')
+  const [value, setValue] = useState('')
+  const [cortesiaPersonas, setCortesiaPersonas] = useState(1)
+
+  const maxCortesia = CORTESIA_POR_PERSONA * cortesiaPersonas
   const discountAmount = mode === 'percent'
     ? subtotal * (Math.min(100, Math.max(0, Number(value) || 0)) / 100)
-    : Math.min(subtotal, Math.max(0, Number(value) || 0))
+    : mode === 'fixed'
+    ? Math.min(subtotal, Math.max(0, Number(value) || 0))
+    : Math.min(subtotal, maxCortesia)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -395,33 +402,70 @@ function DiscountModal({ subtotal, onApply, onCancel }: DiscountModalProps) {
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setMode('percent')}
-            className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors min-h-[44px] ${
+            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
               mode === 'percent' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
-            <Percent size={16} className="inline mr-1 -mt-0.5" /> Porcentaje
+            <Percent size={14} className="inline mr-1 -mt-0.5" /> %
           </button>
           <button
             onClick={() => setMode('fixed')}
-            className={`flex-1 py-3 rounded-lg font-medium text-sm transition-colors min-h-[44px] ${
+            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
               mode === 'fixed' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
-            $ Monto fijo
+            $ Fijo
+          </button>
+          <button
+            onClick={() => setMode('cortesia')}
+            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
+              mode === 'cortesia' ? 'bg-violet-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
+            }`}
+          >
+            Cortesía
           </button>
         </div>
 
-        <input
-          type="number"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={mode === 'percent' ? 'Ej. 10' : 'Ej. 50'}
-          className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 text-lg text-center focus:outline-none focus:border-emerald-500 min-h-[48px] mb-3"
-          autoFocus
-        />
+        {mode !== 'cortesia' ? (
+          <input
+            type="number"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={mode === 'percent' ? 'Ej. 10' : 'Ej. 50'}
+            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 text-lg text-center focus:outline-none focus:border-emerald-500 min-h-[48px] mb-3"
+            autoFocus
+          />
+        ) : (
+          <div className="mb-3">
+            <p className="text-center text-sm text-[var(--text-3)] mb-3">
+              ${CORTESIA_POR_PERSONA} por persona
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => setCortesiaPersonas(Math.max(1, cortesiaPersonas - 1))}
+                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-white text-lg font-bold"
+              >
+                −
+              </button>
+              <div className="text-center">
+                <span className="text-3xl font-bold text-white">{cortesiaPersonas}</span>
+                <p className="text-xs text-[var(--text-3)]">{cortesiaPersonas === 1 ? 'persona' : 'personas'}</p>
+              </div>
+              <button
+                onClick={() => setCortesiaPersonas(Math.min(personas || 10, cortesiaPersonas + 1))}
+                className="w-12 h-12 rounded-xl bg-[var(--line)] flex items-center justify-center text-white text-lg font-bold"
+              >
+                +
+              </button>
+            </div>
+            <p className="text-center text-violet-400 font-semibold text-lg mt-3">
+              Cortesía: {formatMXN(maxCortesia)}
+            </p>
+          </div>
+        )}
 
-        {discountAmount > 0 && (
+        {discountAmount > 0 && mode !== 'cortesia' && (
           <p className="text-center text-[var(--text-3)] text-sm mb-4">
             Descuento: <span className="text-red-400 font-semibold">-{formatMXN(discountAmount)}</span>
           </p>
@@ -434,9 +478,9 @@ function DiscountModal({ subtotal, onApply, onCancel }: DiscountModalProps) {
           <button
             onClick={() => onApply(discountAmount)}
             disabled={discountAmount <= 0}
-            className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]"
+            className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : 'bg-emerald-600 hover:bg-emerald-500/100'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
           >
-            Aplicar -{formatMXN(discountAmount)}
+            {mode === 'cortesia' ? `Cortesía -${formatMXN(discountAmount)}` : `Aplicar -${formatMXN(discountAmount)}`}
           </button>
         </div>
       </div>
@@ -1900,6 +1944,7 @@ function POSContent() {
       {showDiscount && (
         <DiscountModal
           subtotal={subtotal}
+          personas={personas}
           onApply={handleApplyDiscount}
           onCancel={() => setShowDiscount(false)}
         />
