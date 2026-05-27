@@ -71,7 +71,15 @@ export function printTicketCSS(order: Order) {
   <div class="line"></div>
 
   <div class="center small" style="margin-top:2px">${order.metodoPago || ''}</div>
-  <div class="center" style="margin-top:6px;font-size:10px">¡Gracias por tu visita!</div>
+
+  <div class="center" style="margin-top:8px">
+    <div style="font-size:9px;font-weight:bold;margin-bottom:4px">FACTURA ELECTRÓNICA</div>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://app.fullsite.mx/factura?order=${order.id.slice(0, 8)}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`)}" style="width:100px;height:100px" />
+    <div style="font-size:8px;color:#666;margin-top:2px">Escanea para solicitar tu factura</div>
+  </div>
+
+  <div class="line"></div>
+  <div class="center" style="margin-top:4px;font-size:10px">¡Gracias por tu visita!</div>
   <div class="center small">fullsite.mx</div>
 
   <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
@@ -358,6 +366,27 @@ function buildESCPOS(order: Order): Uint8Array {
     cmds.push(...textToBytes(`${order.metodoPago}\n`))
   }
   cmds.push(LF)
+
+  // QR Code for CFDI self-service invoice
+  const facturaURL = `https://app.fullsite.mx/factura?order=${order.id.slice(0, 8)}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`
+  cmds.push(...textToBytes('FACTURA ELECTRONICA\n'))
+  // ESC/POS QR Code: GS ( k — store + print QR
+  const qrData = new TextEncoder().encode(facturaURL)
+  const qrLen = qrData.length + 3
+  // Set QR model
+  cmds.push(GS, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00)
+  // Set QR size (module size 4)
+  cmds.push(GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04)
+  // Set error correction (L)
+  cmds.push(GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30)
+  // Store QR data
+  cmds.push(GS, 0x28, 0x6B, qrLen & 0xFF, (qrLen >> 8) & 0xFF, 0x31, 0x50, 0x30, ...qrData)
+  // Print QR
+  cmds.push(GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30)
+  cmds.push(LF)
+  cmds.push(...textToBytes('Escanea para tu factura\n'))
+
+  cmds.push(...textToBytes('--------------------------------\n'))
   cmds.push(...textToBytes('Gracias por tu visita!\n'))
   cmds.push(...textToBytes('fullsite.mx\n'))
 
