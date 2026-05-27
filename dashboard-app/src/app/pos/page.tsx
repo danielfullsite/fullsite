@@ -1349,12 +1349,12 @@ function POSContent() {
       {/* Top Bar */}
       <header className="flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowNav(!showNav)} className="w-12 h-12 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
-              {showNav ? <X size={20} /> : <Menu size={20} />}
+        <div className="flex items-center justify-between px-3 py-1.5">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowNav(!showNav)} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
+              {showNav ? <X size={18} /> : <Menu size={18} />}
             </button>
-            <span className="text-white font-black text-lg tracking-tight">
+            <span className="text-white font-black text-base tracking-tight">
               fullsite
               <span className="inline-block w-1.5 h-1.5 bg-emerald-500/100 ml-0.5 mb-0.5" />
             </span>
@@ -1411,8 +1411,8 @@ function POSContent() {
             </div>
           </div>
         </div>
-        {/* Row 2: Selectors (compact on mobile) */}
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-[var(--line)]/50 overflow-x-auto">
+        {/* Row 2: Selectors (compact for tablet) */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--line)]/50 overflow-x-auto">
           <select value={mesa} onChange={(e) => {
             const newMesa = Number(e.target.value)
             if (orderItems.length > 0 && newMesa !== mesa) {
@@ -1420,13 +1420,13 @@ function POSContent() {
               showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
             }
             setMesa(newMesa)
-          }} className="bg-[var(--line)] text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px]">
+          }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
             {Array.from({ length: 16 }, (_, i) => (<option key={i + 1} value={i + 1}>Mesa {i + 1}</option>))}
           </select>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px]">
-            {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1} pers</option>))}
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
+            {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-[var(--line)] text-white rounded-xl px-4 py-3 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => setMesero(e.target.value)} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
@@ -1494,45 +1494,31 @@ function POSContent() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-[var(--line)] bg-[var(--surface)] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
-          {/* Order header */}
-          {/* Order header — Wansoft style */}
-          <div className="px-3 py-2 border-b border-[var(--line)] bg-[var(--surface-2)]/50">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold">
+          {/* Order header — compact */}
+          <div className="px-3 py-1.5 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold">
                 Mesa {mesa}
-                <span className="text-[var(--text-3)] font-normal text-sm ml-2">{personas} pers · {mesero}</span>
+                <span className="text-[var(--text-3)] font-normal text-xs ml-2">{personas}p · {mesero.split(' ')[0]}</span>
               </h2>
-              <span className="text-emerald-400 font-bold text-xl">{formatMXN(total)}</span>
+              <span className="text-emerald-400 font-bold text-lg">{formatMXN(total)}</span>
             </div>
-            {/* Silla selector removed — not functional yet */}
           </div>
 
-          {/* Customer memory — allergies, preferences */}
-          <div className="px-4 py-1">
-            <CustomerMemory mesa={mesa} mesero={mesero} />
-          </div>
-
-          {/* Order items list */}
-          <div className="flex-1 overflow-y-auto px-4 py-2">
-            {/* AI Copilot */}
-            <POSCopilot
-              orderItems={orderItems.map(i => ({ id: i.id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad, subtotal: i.subtotal }))}
-              mesa={mesa}
-              personas={personas}
-              mesero={mesero}
-            />
+          {/* Order items list — MAIN AREA, takes all available space */}
+          <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0">
             {orderItems.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-[var(--text-2)]">
-                <p className="text-lg">Toca un producto para agregar</p>
+              <div className="flex items-center justify-center h-32 text-[var(--text-2)]">
+                <p className="text-sm">Toca un producto para agregar</p>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {orderItems.map((item) => {
                   const isCancelled = cancelledItems.has(item.id)
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 py-3 px-3 rounded-lg transition-all ${
+                      className={`flex items-center gap-2 py-2 px-2 rounded-lg transition-all ${
                         isCancelled
                           ? 'bg-red-500/10 border border-red-500/20 opacity-60'
                           : flashItemId === item.id
@@ -1541,51 +1527,48 @@ function POSContent() {
                       }`}
                     >
                       {/* Quantity controls */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
                           disabled={isCancelled}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-9 h-9 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
-                          <Minus size={14} />
+                          <Minus size={12} />
                         </button>
-                        <span className="w-8 text-center font-semibold text-lg">
+                        <span className="w-6 text-center font-semibold text-base">
                           {item.cantidad}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
                           disabled={isCancelled}
-                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-9 h-9 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
-                          <Plus size={14} />
+                          <Plus size={12} />
                         </button>
                       </div>
 
                       {/* Item name + modifiers */}
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-[15px] ${isCancelled ? 'line-through text-red-400' : ''}`}>
+                        <p className={`font-medium text-sm leading-tight ${isCancelled ? 'line-through text-red-400' : ''}`}>
                           {item.nombre}
                         </p>
                         {isCancelled && (
-                          <p className="text-red-500 text-xs font-semibold">CANCELADO</p>
+                          <p className="text-red-500 text-[10px] font-semibold">CANCELADO</p>
                         )}
                         {item.modificadores.length > 0 && (
-                          <p className="text-[var(--text-3)] text-xs mt-0.5 truncate">
+                          <p className="text-[var(--text-3)] text-[11px] truncate">
                             {item.modificadores.join(' · ')}
                           </p>
                         )}
                         {item.notas && (
-                          <p className="text-[var(--text-2)] text-xs italic mt-0.5 truncate">
+                          <p className="text-[var(--text-2)] text-[11px] italic truncate">
                             {item.notas}
                           </p>
                         )}
-                        <p className="text-[var(--text-3)] text-sm">
-                          {formatMXN(item.precio + item.precioExtra)} c/u
-                        </p>
                       </div>
 
                       {/* Line total */}
-                      <span className={`font-semibold text-lg w-24 text-right flex-shrink-0 ${isCancelled ? 'line-through text-red-400/60' : ''}`}>
+                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 ${isCancelled ? 'line-through text-red-400/60' : ''}`}>
                         {formatMXN(item.subtotal)}
                       </span>
 
@@ -1594,18 +1577,18 @@ function POSContent() {
                           {/* Edit */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
                           >
-                            <Pencil size={14} />
+                            <Pencil size={12} />
                           </button>
 
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
-                            className="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
                             title="Cancelar item (requiere gerente)"
                           >
-                            <Ban size={14} />
+                            <Ban size={12} />
                           </button>
                         </>
                       )}
@@ -1614,19 +1597,33 @@ function POSContent() {
                 })}
               </div>
             )}
+
+            {/* AI Copilot + Customer Memory — below items, scrollable */}
+            {orderItems.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <POSCopilot
+                  orderItems={orderItems.map(i => ({ id: i.id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad, subtotal: i.subtotal }))}
+                  mesa={mesa}
+                  personas={personas}
+                  mesero={mesero}
+                />
+                <CustomerMemory mesa={mesa} mesero={mesero} />
+              </div>
+            )}
           </div>
 
-          {/* Discount + Order notes + Totals */}
-          <div className="border-t border-[var(--line)] px-4 py-3 bg-[var(--surface-2)]/50">
-            {/* Discount button */}
-            <div className="flex gap-2 mb-3">
+          {/* Discount + Order notes + Totals — fixed at bottom, compact */}
+          <div className="border-t border-[var(--line)] px-3 py-2 bg-[var(--surface-2)]/50 flex-shrink-0">
+            {/* Inline tools row: discount, notes, void */}
+            <div className="flex items-center gap-1.5 mb-1.5">
               <button
                 onClick={() => setShowDiscount(true)}
                 disabled={orderItems.length === 0}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm transition-colors min-h-[40px]"
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-xs transition-colors"
+                title="Aplicar descuento"
               >
-                <Percent size={14} />
-                {discount > 0 ? `Descuento: -${formatMXN(discount)}` : 'Aplicar descuento'}
+                <Percent size={12} />
+                {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
               </button>
               {discount > 0 && (
                 <button
@@ -1634,87 +1631,72 @@ function POSContent() {
                     logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
                     setDiscount(0)
                   }}
-                  className="px-2 py-2 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 text-sm transition-colors min-h-[40px]"
+                  className="px-1.5 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 text-xs transition-colors"
                 >
-                  <X size={14} />
+                  <X size={12} />
                 </button>
               )}
+              {/* Order notes — inline input */}
+              <div className="flex-1 flex items-center gap-1 min-w-0">
+                <StickyNote size={12} className="text-[var(--text-3)] flex-shrink-0" />
+                <input
+                  type="text"
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder="Nota..."
+                  className="flex-1 min-w-0 bg-[var(--line)]/60 border border-slate-600/50 rounded-md px-2 py-1 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 text-sm transition-colors min-h-[40px] ml-auto"
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 text-xs transition-colors"
+                title="Anular orden"
               >
-                <ShieldAlert size={14} />
-                Anular orden
+                <ShieldAlert size={12} />
               </button>
             </div>
 
-            {/* Order notes */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <StickyNote size={14} className="text-[var(--text-3)]" />
-                <span className="text-xs text-[var(--text-3)] font-medium">Nota de la orden</span>
-              </div>
-              <input
-                type="text"
-                value={orderNotes}
-                onChange={(e) => setOrderNotes(e.target.value)}
-                placeholder="Nota de la orden..."
-                className="w-full bg-[var(--line)]/60 border border-slate-600/50 rounded-lg px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-
-            <div className="flex justify-between text-[var(--text-3)] text-sm mb-1">
-              <span>Subtotal</span>
-              <span>{formatMXN(subtotal)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-red-400 text-sm mb-1">
-                <span>Descuento</span>
-                <span>-{formatMXN(discount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-[var(--text-3)] text-sm mb-2">
-              <span>IVA (16%)</span>
-              <span>{formatMXN(iva)}</span>
-            </div>
-            <div className="flex justify-between text-white text-2xl font-bold">
-              <span>Total</span>
-              <span>{formatMXN(total)}</span>
+            {/* Totals — compact */}
+            <div className="flex items-center justify-between text-xs text-[var(--text-3)] mb-0.5">
+              <span>Sub {formatMXN(subtotal)}</span>
+              {discount > 0 && <span className="text-red-400">-{formatMXN(discount)}</span>}
+              <span>IVA {formatMXN(iva)}</span>
+              <span className="text-white text-base font-bold">{formatMXN(total)}</span>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="px-4 py-3 border-t border-[var(--line)] flex gap-3">
+          {/* Action buttons — compact for tablets */}
+          <div className="px-3 py-2 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500/100 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500/100 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
             >
-              <Send size={22} />
-              {saving ? 'Guardando...' : sentToKitchen ? 'Enviado!' : 'Cocina'}
+              <Send size={18} />
+              {saving ? '...' : sentToKitchen ? 'Enviado' : 'Cocina'}
             </button>
             <button
               onClick={handlePreTicket}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.6] flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-base transition-all min-h-[72px]"
+              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
             >
-              <Receipt size={18} />
+              <Receipt size={16} />
               Cuenta
             </button>
             <button
               onClick={() => { if (activeItems.length >= 2) setShowSplit(true); else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500/100 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-6 rounded-2xl text-base transition-all min-h-[72px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500/100 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500/100 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-black py-6 rounded-2xl text-xl transition-all min-h-[72px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500/100 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
             >
-              <CreditCard size={22} />
+              <CreditCard size={18} />
               Cobrar
             </button>
           </div>
@@ -1722,21 +1704,21 @@ function POSContent() {
 
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'#0d0d12'}}>
-          {/* Search bar — big touch target + barcode scanner */}
-          <div className="px-3 pt-3 pb-2 flex-shrink-0 flex gap-2">
+          {/* Search bar — touch target + barcode scanner */}
+          <div className="px-3 pt-2 pb-1.5 flex-shrink-0 flex gap-2">
             <input
               type="text"
               value={menuSearch}
               onChange={(e) => setMenuSearch(e.target.value)}
               placeholder="Buscar platillo..."
-              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-xl px-5 py-3.5 text-white placeholder-slate-400 text-base focus:outline-none focus:border-emerald-500 min-h-[50px]"
+              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[44px]"
             />
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="w-[50px] h-[50px] bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-colors"
+              className="w-[44px] h-[44px] bg-amber-600 hover:bg-amber-500/100 active:bg-amber-700 rounded-xl flex items-center justify-center text-white flex-shrink-0 transition-colors"
               title="Escanear código de barras"
             >
-              <ScanBarcode size={22} />
+              <ScanBarcode size={20} />
             </button>
           </div>
 
