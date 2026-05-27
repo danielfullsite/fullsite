@@ -1,5 +1,5 @@
 // Mercado Pago Point integration
-// Config stored in localStorage for now (device ID + access token)
+// Uses /api/mp-point proxy to avoid CORS issues
 
 export interface MPConfig {
   accessToken: string
@@ -30,17 +30,17 @@ export function clearMPConfig() {
 
 export async function fetchMPDevices(accessToken: string): Promise<{ success: boolean; devices?: MPDevice[]; error?: string }> {
   try {
-    const res = await fetch('https://api.mercadopago.com/point/integration-api/devices', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+    const res = await fetch('/api/mp-point', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'devices', accessToken }),
     })
     if (res.ok) {
       const data = await res.json()
       return { success: true, devices: data.devices || data }
     } else {
       const err = await res.json().catch(() => ({}))
-      return { success: false, error: err.message || `Error ${res.status}` }
+      return { success: false, error: err.message || err.error || `Error ${res.status}` }
     }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Error de conexion' }
@@ -56,31 +56,25 @@ export async function sendPaymentToPoint(
   if (!config) return { success: false, error: 'Point no configurado' }
 
   try {
-    const res = await fetch(
-      `https://api.mercadopago.com/point/integration-api/devices/${config.deviceId}/payment-intents`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: Math.round(amount * 100),
-          additional_info: {
-            external_reference: orderId,
-            print_on_terminal: true,
-          },
-          description: description || 'Fullsite POS',
-        }),
-      }
-    )
+    const res = await fetch('/api/mp-point', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'payment',
+        accessToken: config.accessToken,
+        deviceId: config.deviceId,
+        amount,
+        orderId,
+        description: description || 'Fullsite POS',
+      }),
+    })
 
     if (res.ok) {
       const data = await res.json()
-      return { success: true, intentId: data.id }
+      return { success: true, intentId: data.data?.id }
     } else {
       const err = await res.json().catch(() => ({}))
-      return { success: false, error: err.message || `Error ${res.status}` }
+      return { success: false, error: err.error || err.message || `Error ${res.status}` }
     }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Error de conexion' }
