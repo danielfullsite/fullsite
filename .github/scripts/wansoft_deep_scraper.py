@@ -250,33 +250,104 @@ def main():
         save_data("sales_terminal", terminals)
         results["terminales"] = len(terminals)
 
-    # 4. Discounts detail
+    # 4. Discounts detail — capture ALL columns for fraud detection
+    def transform_discounts(r):
+        if r["type"] == "json": return r["data"]
+        if r["type"] == "html":
+            items = []
+            for c in r["data"]:
+                if len(c) >= 2:
+                    item = {"nombre": c[0], "total": safe_float(c[-1])}
+                    # Wansoft DiscountsDetail columns vary but typically:
+                    # [0]=tipo/nombre, [1]=orden/folio, [2]=mesa, [3]=mesero, [4]=autorizador,
+                    # [5]=platillo, [6]=cantidad, [7]=monto
+                    if len(c) >= 4:
+                        item["orden"] = c[1]
+                        item["mesa"] = c[2]
+                        item["mesero"] = c[3]
+                    if len(c) >= 5:
+                        item["autorizador"] = c[4]
+                    if len(c) >= 6:
+                        item["platillo"] = c[5]
+                    if len(c) >= 7:
+                        item["cantidad"] = safe_int(c[6])
+                    # Keep all raw columns for discovery
+                    item["_cols"] = c
+                    items.append(item)
+            return items
+        return []
+
     discounts = scrape_endpoint(session, "DiscountsDetail", "Reports/DiscountsDetail", base_params,
-                                None, transform_generic)
+                                None, transform_discounts)
     if discounts:
         save_data("discounts_detail", discounts)
         results["descuentos_detalle"] = len(discounts)
+        # Also save total to wansoft_daily-compatible format
+        total_descuentos = sum(safe_float(d.get("total", 0)) for d in discounts)
+        save_data("discounts_total", {"total": total_descuentos, "count": len(discounts)})
 
-    # 5. Cancellations detail
+    # 5. Cancellations detail — capture all columns
+    def transform_cancels(r):
+        if r["type"] == "json": return r["data"]
+        if r["type"] == "html":
+            items = []
+            for c in r["data"]:
+                if len(c) >= 2:
+                    item = {"nombre": c[0], "total": safe_float(c[-1])}
+                    if len(c) >= 4:
+                        item["orden"] = c[1]
+                        item["mesa"] = c[2]
+                        item["mesero"] = c[3]
+                    if len(c) >= 5:
+                        item["platillo"] = c[4] if len(c) >= 6 else ""
+                    item["_cols"] = c
+                    items.append(item)
+            return items
+        return []
+
     cancels = scrape_endpoint(session, "CancelSalesDetail", "Reports/CancelSalesDetail", base_params,
-                              None, transform_generic)
+                              None, transform_cancels)
     if cancels:
         save_data("cancel_sales", cancels)
         results["cancelaciones"] = len(cancels)
 
     # 6. Voids detail
     voids = scrape_endpoint(session, "SaleNullificationDetail", "Reports/SaleNullificationDetail", base_params,
-                            None, transform_generic)
+                            None, transform_cancels)
     if voids:
         save_data("voids", voids)
         results["anulaciones"] = len(voids)
 
-    # 7. Courtesies
+    # 7. Courtesies — capture ALL columns (same structure as discounts)
+    def transform_courtesies(r):
+        if r["type"] == "json": return r["data"]
+        if r["type"] == "html":
+            items = []
+            for c in r["data"]:
+                if len(c) >= 2:
+                    item = {"nombre": c[0], "total": safe_float(c[-1])}
+                    if len(c) >= 4:
+                        item["orden"] = c[1]
+                        item["mesa"] = c[2]
+                        item["mesero"] = c[3]
+                    if len(c) >= 5:
+                        item["autorizador"] = c[4]
+                    if len(c) >= 6:
+                        item["platillo"] = c[5]
+                    if len(c) >= 7:
+                        item["cantidad"] = safe_int(c[6])
+                    item["_cols"] = c
+                    items.append(item)
+            return items
+        return []
+
     courtesies = scrape_endpoint(session, "CourtesiesDetail", "Reports/CourtesiesDetail", base_params,
-                                 None, transform_generic)
+                                 None, transform_courtesies)
     if courtesies:
         save_data("courtesies", courtesies)
         results["cortesias"] = len(courtesies)
+        total_cortesias = sum(safe_float(d.get("total", 0)) for d in courtesies)
+        save_data("courtesies_total", {"total": total_cortesias, "count": len(courtesies)})
 
     # 8. Sales by modifiers (extras)
     modifiers = scrape_endpoint(session, "SalesByModifiers", "Reports/SalesByModifiers", base_params,

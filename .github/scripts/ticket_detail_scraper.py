@@ -137,13 +137,41 @@ asyncio.run(dl())
 
 
 def parse_sale_detail(txt: str) -> list[dict]:
-    """Parse pipe-delimited TXT into list of sale line items."""
+    """Parse pipe-delimited TXT into list of sale line items.
+    Includes discount/courtesy columns for fraud detection."""
     lines = txt.strip().split("\n")
     if not lines:
         return []
 
-    # First line is header
+    # First line is header — log for column discovery
     headers = lines[0].split("|")
+    header_map = {h.strip().upper(): i for i, h in enumerate(headers)}
+    print(f"[ticket_detail] {len(headers)} columns: {[h.strip() for h in headers]}")
+
+    # Build dynamic column index — try known names, fallback to fixed positions
+    def col_idx(names, default):
+        for name in names:
+            if name in header_map:
+                return header_map[name]
+        return default
+
+    IDX_ORDEN = col_idx(["ORDEN", "FOLIO", "TICKET", "NUMORDEN"], 3)
+    IDX_TIPO = col_idx(["TIPOORDEN", "TIPO_ORDEN", "TIPO"], 4)
+    IDX_PERSONAS = col_idx(["PERSONAS", "COMENSALES"], 6)
+    IDX_MESERO = col_idx(["MESERO", "USUARIO", "WAITER"], 7)
+    IDX_DESCUENTO = col_idx(["DESCUENTO", "DISCOUNT", "MONTO_DESCUENTO"], 11)
+    IDX_TIPO_DESC = col_idx(["TIPO_DESCUENTO", "DISCOUNT_TYPE", "TIPODESCUENTO"], 12)
+    IDX_TOTAL = col_idx(["TOTAL", "IMPORTE", "MONTO"], 13)
+    IDX_CANTIDAD = col_idx(["CANTIDAD", "QTY"], 15)
+    IDX_GRUPO = col_idx(["GRUPO", "GROUP", "CATEGORY"], 20)
+    IDX_PLATILLO = col_idx(["PLATILLO", "SAUCER", "PRODUCTO"], 22)
+    IDX_CLAVE = col_idx(["CLAVE", "SKU", "CODE"], 24)
+    IDX_ESMOD = col_idx(["ESMODIFICADOR", "ISMODIFIER"], 26)
+    # Additional discount columns
+    IDX_CORTESIA = col_idx(["CORTESIA", "COURTESY", "ESCORTESIA"], -1)
+    IDX_AUTORIZADOR = col_idx(["AUTORIZADOR", "AUTHORIZED_BY", "AUTORIZO"], -1)
+    IDX_PRECIO_ORIG = col_idx(["PRECIO_ORIGINAL", "PRECIO", "PRICE"], 10)
+
     items = []
     for line in lines[1:]:
         cols = line.split("|")
@@ -151,26 +179,56 @@ def parse_sale_detail(txt: str) -> list[dict]:
             continue
 
         # Skip modifiers (ESMODIFICADOR = Si)
-        if len(cols) > 26 and cols[26].strip() == "Si":
+        if len(cols) > IDX_ESMOD >= 0 and cols[IDX_ESMOD].strip() == "Si":
             continue
 
         personas = 0
         try:
-            personas = int(cols[6].strip())
+            personas = int(cols[IDX_PERSONAS].strip())
         except (ValueError, IndexError):
             pass
 
-        items.append({
-            "orden": cols[3].strip(),
-            "mesero": cols[7].strip(),
-            "grupo": cols[20].strip(),
-            "platillo": cols[22].strip(),
-            "clave": cols[24].strip() if len(cols) > 24 else "",
-            "cantidad": int(cols[15]) if cols[15].strip().isdigit() else 1,
-            "total": float(cols[13]) if cols[13].strip().replace(".", "").replace("-", "").isdigit() else 0,
-            "tipo_orden": cols[4].strip(),
+        def safe_col(idx, default=""):
+            if 0 <= idx < len(cols):
+                return cols[idx].strip()
+            return default
+
+        def safe_col_float(idx):
+            v = safe_col(idx, "0")
+            try:
+                return float(v.replace("$", "").replace(",", ""))
+            except (ValueError, TypeError):
+                return 0.0
+
+        item = {
+            "orden": safe_col(IDX_ORDEN),
+            "mesero": safe_col(IDX_MESERO),
+            "grupo": safe_col(IDX_GRUPO),
+            "platillo": safe_col(IDX_PLATILLO),
+            "clave": safe_col(IDX_CLAVE),
+            "cantidad": int(safe_col(IDX_CANTIDAD, "1")) if safe_col(IDX_CANTIDAD, "1").isdigit() else 1,
+            "total": safe_col_float(IDX_TOTAL),
+            "tipo_orden": safe_col(IDX_TIPO),
             "personas": personas,
-        })
+            # Discount fields
+            "descuento": safe_col_float(IDX_DESCUENTO),
+            "tipo_descuento": safe_col(IDX_TIPO_DESC) if IDX_TIPO_DESC >= 0 else "",
+            "precio_original": safe_col_float(IDX_PRECIO_ORIG),
+        }
+
+        # Optional columns (only if found in headers)
+        if IDX_CORTESIA >= 0:
+            item["es_cortesia"] = safe_col(IDX_CORTESIA).upper() in ("SI", "YES", "1", "TRUE")
+        if IDX_AUTORIZADOR >= 0:
+            item["autorizador"] = safe_col(IDX_AUTORIZADOR)
+
+        items.append(item)
+
+    # Log discount summary
+    items_con_descuento = [i for i in items if i.get("descuento", 0) > 0]
+    if items_con_descuento:
+        total_desc = sum(i["descuento"] for i in items_con_descuento)
+        print(f"[ticket_detail] {len(items_con_descuento)} items con descuento, total: ${total_desc:,.2f}")
 
     return items
 

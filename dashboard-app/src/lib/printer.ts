@@ -368,11 +368,33 @@ function buildESCPOS(order: Order): Uint8Array {
   return new Uint8Array(cmds)
 }
 
-// Bluetooth printer state
+// ─── MULTI-PRINTER SYSTEM ──────────────────────────────────────────────────
+// Each station (cocina, barra, caja) can have its own Bluetooth printer.
+// The 'default' key is the main POS printer (for tickets, pre-tickets).
+
+type PrinterSlot = StationName | 'default'
+
+interface PrinterConnection {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  device: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  characteristic: any
+  name: string
+}
+
+const printers = new Map<PrinterSlot, PrinterConnection>()
+
+// Backward-compatible aliases
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let btDevice: any = null
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let btCharacteristic: any = null
+
+function syncLegacyRefs() {
+  const main = printers.get('default')
+  btDevice = main?.device ?? null
+  btCharacteristic = main?.characteristic ?? null
+}
 
 export function isBluetoothAvailable(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator
@@ -382,68 +404,157 @@ export function isBluetoothAvailable(): boolean {
 const getNavigatorBluetooth = (): any => (navigator as any).bluetooth
 
 export function isBluetoothConnected(): boolean {
-  return btDevice?.gatt?.connected ?? false
+  const main = printers.get('default')
+  return main?.device?.gatt?.connected ?? false
 }
 
 export function getBluetoothPrinterName(): string | null {
-  return btDevice?.name ?? null
+  return printers.get('default')?.name ?? null
 }
 
-export async function connectBluetoothPrinter(): Promise<string> {
+export function getStationPrinterName(station: PrinterSlot): string | null {
+  return printers.get(station)?.name ?? null
+}
+
+export function isStationPrinterConnected(station: PrinterSlot): boolean {
+  const p = printers.get(station)
+  return p?.device?.gatt?.connected ?? false
+}
+
+export function getAllConnectedPrinters(): { slot: PrinterSlot; name: string }[] {
+  const result: { slot: PrinterSlot; name: string }[] = []
+  for (const [slot, conn] of printers) {
+    if (conn.device?.gatt?.connected) {
+      result.push({ slot, name: conn.name })
+    }
+  }
+  return result
+}
+
+async function connectPrinterDevice(): Promise<PrinterConnection> {
   if (!isBluetoothAvailable()) {
     throw new Error('Bluetooth no disponible en este navegador')
   }
 
-  try {
-    // Request any printer device
-    btDevice = await getNavigatorBluetooth().requestDevice({
-      filters: [
-        { namePrefix: 'SEAFON' },
-        { namePrefix: 'Printer' },
-        { namePrefix: 'POS' },
-        { namePrefix: 'BlueTooth' },
-        { namePrefix: 'MTP' },
-      ],
-      optionalServices: [
-        '000018f0-0000-1000-8000-00805f9b34fb', // Common printer service
-        '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Nordic UART
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Other common
-      ],
-    })
+  const device = await getNavigatorBluetooth().requestDevice({
+    filters: [
+      { namePrefix: 'SEAFON' },
+      { namePrefix: 'Printer' },
+      { namePrefix: 'POS' },
+      { namePrefix: 'BlueTooth' },
+      { namePrefix: 'MTP' },
+    ],
+    optionalServices: [
+      '000018f0-0000-1000-8000-00805f9b34fb',
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+    ],
+  })
 
-    if (!btDevice || !btDevice.gatt) {
-      throw new Error('No se seleccionó impresora')
-    }
+  if (!device || !device.gatt) {
+    throw new Error('No se seleccionó impresora')
+  }
 
-    const server = await btDevice.gatt.connect()
+  const server = await device.gatt.connect()
+  const services = await server.getPrimaryServices()
 
-    // Try to find the writable characteristic
-    const services = await server.getPrimaryServices()
-    for (const service of services) {
-      const chars = await service.getCharacteristics()
-      for (const char of chars) {
-        if (char.properties.write || char.properties.writeWithoutResponse) {
-          btCharacteristic = char
-          console.log(`[printer] Connected to ${btDevice.name}, characteristic: ${char.uuid}`)
-          return btDevice.name || 'Impresora Bluetooth'
-        }
+  for (const service of services) {
+    const chars = await service.getCharacteristics()
+    for (const char of chars) {
+      if (char.properties.write || char.properties.writeWithoutResponse) {
+        const name = device.name || 'Impresora Bluetooth'
+        console.log(`[printer] Connected to ${name}, characteristic: ${char.uuid}`)
+        return { device, characteristic: char, name }
       }
     }
+  }
 
-    throw new Error('No se encontró característica de escritura en la impresora')
+  throw new Error('No se encontró característica de escritura en la impresora')
+}
+
+/** Connect the default (main POS) printer */
+export async function connectBluetoothPrinter(): Promise<string> {
+  try {
+    const conn = await connectPrinterDevice()
+    printers.set('default', conn)
+    syncLegacyRefs()
+    return conn.name
   } catch (e) {
-    btDevice = null
-    btCharacteristic = null
+    printers.delete('default')
+    syncLegacyRefs()
+    throw e
+  }
+}
+
+/** Connect a station-specific printer */
+export async function connectStationPrinter(station: StationName): Promise<string> {
+  try {
+    const conn = await connectPrinterDevice()
+    printers.set(station, conn)
+    console.log(`[printer] Station ${station} → ${conn.name}`)
+    savePrinterAssignments()
+    return conn.name
+  } catch (e) {
+    printers.delete(station)
     throw e
   }
 }
 
 export async function disconnectBluetoothPrinter() {
-  if (btDevice?.gatt?.connected) {
-    btDevice.gatt.disconnect()
+  const main = printers.get('default')
+  if (main?.device?.gatt?.connected) {
+    main.device.gatt.disconnect()
   }
-  btDevice = null
-  btCharacteristic = null
+  printers.delete('default')
+  syncLegacyRefs()
+}
+
+export async function disconnectStationPrinter(station: StationName) {
+  const conn = printers.get(station)
+  if (conn?.device?.gatt?.connected) {
+    conn.device.gatt.disconnect()
+  }
+  printers.delete(station)
+  savePrinterAssignments()
+}
+
+export async function disconnectAllPrinters() {
+  for (const [, conn] of printers) {
+    if (conn.device?.gatt?.connected) {
+      conn.device.gatt.disconnect()
+    }
+  }
+  printers.clear()
+  syncLegacyRefs()
+  savePrinterAssignments()
+}
+
+/** Get the characteristic for a station (falls back to default) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getCharForStation(station?: StationName): any | null {
+  if (station) {
+    const stationConn = printers.get(station)
+    if (stationConn?.device?.gatt?.connected) return stationConn.characteristic
+  }
+  // Fallback to default printer
+  const def = printers.get('default')
+  if (def?.device?.gatt?.connected) return def.characteristic
+  return null
+}
+
+/** Persist printer assignments (name only — BT reconnects manually) */
+function savePrinterAssignments() {
+  const assignments: Record<string, string> = {}
+  for (const [slot, conn] of printers) {
+    assignments[slot] = conn.name
+  }
+  localStorage.setItem('printer_assignments', JSON.stringify(assignments))
+}
+
+export function getSavedPrinterAssignments(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem('printer_assignments') || '{}')
+  } catch { return {} }
 }
 
 export async function printTicketBluetooth(order: Order): Promise<boolean> {
@@ -640,9 +751,11 @@ export function splitOrderByStation(order: Order): Record<StationName, OrderItem
 
 /**
  * Print a kitchen ticket for a specific station via Bluetooth ESC/POS.
+ * Uses station-specific printer if connected, otherwise falls back to default.
  */
 async function printStationTicketBluetooth(order: Order, station: StationName, items: OrderItem[]): Promise<boolean> {
-  if (!btCharacteristic) throw new Error('Impresora no conectada')
+  const char = getCharForStation(station)
+  if (!char) throw new Error('Impresora no conectada')
 
   const cmds: number[] = []
   const now = new Date()
@@ -695,10 +808,10 @@ async function printStationTicketBluetooth(order: Order, station: StationName, i
   const CHUNK_SIZE = 128
   for (let i = 0; i < data.length; i += CHUNK_SIZE) {
     const chunk = data.slice(i, i + CHUNK_SIZE)
-    if (btCharacteristic.properties.writeWithoutResponse) {
-      await btCharacteristic.writeValueWithoutResponse(chunk)
+    if (char.properties.writeWithoutResponse) {
+      await char.writeValueWithoutResponse(chunk)
     } else {
-      await btCharacteristic.writeValueWithResponse(chunk)
+      await char.writeValueWithResponse(chunk)
     }
     await new Promise(r => setTimeout(r, 50))
   }
@@ -769,9 +882,11 @@ export async function printByStation(order: Order) {
       await new Promise(r => setTimeout(r, 200))
     }
 
-    if (isBluetoothConnected() && btCharacteristic) {
+    // Try station-specific printer first, then default
+    const char = getCharForStation(station)
+    if (char) {
       try {
-        console.log(`[printer] Attempting Bluetooth print for ${station}...`)
+        console.log(`[printer] Attempting Bluetooth print for ${station} (printer: ${getStationPrinterName(station) || getBluetoothPrinterName()})...`)
         await printStationTicketBluetooth(order, station, items)
         console.log(`[printer] Bluetooth print SUCCESS for ${station}`)
         printed = true
@@ -780,7 +895,7 @@ export async function printByStation(order: Order) {
         console.warn(`[printer] Bluetooth station print (${station}) FAILED, CSS fallback:`, e)
       }
     } else {
-      console.log(`[printer] No BT connection, using CSS for ${station}`)
+      console.log(`[printer] No BT connection for ${station}, using CSS`)
     }
     printStationTicketCSS(order, station, items)
     printed = true

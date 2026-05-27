@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { registerServiceWorker } from '@/lib/service-worker'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,6 +26,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
+
+  // Register service worker for offline support
+  const swRegistered = useRef(false)
+  useEffect(() => {
+    if (!swRegistered.current) {
+      swRegistered.current = true
+      registerServiceWorker()
+    }
+  }, [])
 
   // Restore session
   useEffect(() => {

@@ -74,6 +74,37 @@ def get_waiter_categories():
         return []
 
 
+def get_discount_details(weeks=2):
+    """Fetch detailed discount data from wansoft_data (deep scraper).
+    This is the REAL source — wansoft_daily.descuentos is often 0."""
+    cutoff = (datetime.now(MX_TZ) - timedelta(weeks=weeks)).strftime("%Y-%m-%d")
+    try:
+        return sb_get("wansoft_data", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "data_key": "eq.discounts_detail",
+            "fecha": f"gte.{cutoff}",
+            "order": "fecha.desc",
+            "limit": str(weeks * 7),
+        })
+    except:
+        return []
+
+
+def get_courtesy_details(weeks=2):
+    """Fetch detailed courtesy data from wansoft_data (deep scraper)."""
+    cutoff = (datetime.now(MX_TZ) - timedelta(weeks=weeks)).strftime("%Y-%m-%d")
+    try:
+        return sb_get("wansoft_data", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "data_key": "eq.courtesies",
+            "fecha": f"gte.{cutoff}",
+            "order": "fecha.desc",
+            "limit": str(weeks * 7),
+        })
+    except:
+        return []
+
+
 # ── Analysis ────────────────────────────────────────────────────────────────
 def analyze_cancellations(data):
     """Detect meseros with high cancellation/void rates."""
@@ -100,29 +131,24 @@ def analyze_cancellations(data):
 
 
 def analyze_discounts(data):
-    """Detect unusual discount patterns."""
+    """Detect unusual discount patterns.
+    Uses BOTH wansoft_daily (summary) AND wansoft_data (detail) for full picture."""
     findings = []
 
-    # Calculate weekly totals
-    this_week = []
-    last_week = []
+    # ── 1. Summary-level analysis from wansoft_daily ──
     now_mx = datetime.now(MX_TZ)
     week_cutoff = (now_mx - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    for day in data:
-        if day["fecha"] >= week_cutoff:
-            this_week.append(day)
-        else:
-            last_week.append(day)
+    this_week = [d for d in data if d["fecha"] >= week_cutoff]
+    last_week = [d for d in data if d["fecha"] < week_cutoff]
 
-    # This week's discount rate
     tw_ventas = sum(float(d.get("ventas_brutas") or 0) for d in this_week)
     tw_descuentos = sum(float(d.get("descuentos") or 0) for d in this_week)
 
     lw_ventas = sum(float(d.get("ventas_brutas") or 0) for d in last_week)
     lw_descuentos = sum(float(d.get("descuentos") or 0) for d in last_week)
 
-    if tw_ventas > 0:
+    if tw_ventas > 0 and tw_descuentos > 0:
         tw_rate = tw_descuentos / tw_ventas
         lw_rate = lw_descuentos / lw_ventas if lw_ventas > 0 else 0
 
@@ -134,13 +160,101 @@ def analyze_discounts(data):
                 "detail": f"Semana pasada fue {lw_rate*100:.1f}%",
             })
 
-        # Spike vs last week
         if lw_rate > 0 and tw_rate > lw_rate * 1.5:
             findings.append({
                 "type": "discount_spike",
                 "severity": "medium",
                 "message": f"Descuentos subieron {((tw_rate/lw_rate)-1)*100:.0f}% vs semana pasada ({lw_rate*100:.1f}% → {tw_rate*100:.1f}%)",
             })
+
+    # ── 2. Detail-level analysis from wansoft_data (deep scraper) ──
+    discount_rows = get_discount_details(weeks=2)
+    courtesy_rows = get_courtesy_details(weeks=2)
+
+    for day_record in discount_rows:
+        fecha = day_record.get("fecha", "?")
+        items = day_record.get("data", [])
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except:
+                continue
+
+        # Flag self-authorized discounts (mesero == autorizador)
+        for item in items:
+            mesero = (item.get("mesero") or "").strip()
+            autorizador = (item.get("autorizador") or "").strip()
+            monto = float(item.get("total") or 0)
+
+            if mesero and autorizador and mesero.lower() == autorizador.lower() and monto > 0:
+                findings.append({
+                    "type": "self_authorized_discount",
+                    "severity": "high",
+                    "fecha": fecha,
+                    "message": f"Auto-descuento: {mesero} se autoriza ${monto:,.0f} a si mismo ({fecha})",
+                    "detail": f"Orden: {item.get('orden', '?')}, Mesa: {item.get('mesa', '?')}, Platillo: {item.get('platillo', '?')}",
+                })
+
+        # Flag single-table discount totals over $1,000
+        mesa_totals = defaultdict(lambda: {"total": 0, "items": [], "mesero": ""})
+        for item in items:
+            mesa = item.get("mesa", "?")
+            mesa_totals[mesa]["total"] += float(item.get("total") or 0)
+            mesa_totals[mesa]["items"].append(item.get("platillo") or item.get("nombre", "?"))
+            mesa_totals[mesa]["mesero"] = item.get("mesero", "?")
+
+        for mesa, info in mesa_totals.items():
+            if info["total"] >= 1000:
+                findings.append({
+                    "type": "high_table_discount",
+                    "severity": "high",
+                    "fecha": fecha,
+                    "message": f"Mesa {mesa}: ${info['total']:,.0f} en descuentos ({len(info['items'])} items) — {info['mesero']} ({fecha})",
+                    "detail": f"Items: {', '.join(info['items'][:5])}{'...' if len(info['items']) > 5 else ''}",
+                })
+
+        # Flag high daily discount count (20+ items)
+        if len(items) >= 20:
+            daily_total = sum(float(i.get("total") or 0) for i in items)
+            findings.append({
+                "type": "excessive_daily_discounts",
+                "severity": "medium",
+                "fecha": fecha,
+                "message": f"{len(items)} descuentos en un dia (${daily_total:,.0f} total) — {fecha}",
+            })
+
+    # ── 3. Courtesy analysis ──
+    for day_record in courtesy_rows:
+        fecha = day_record.get("fecha", "?")
+        items = day_record.get("data", [])
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except:
+                continue
+
+        daily_courtesy_total = sum(float(i.get("total") or 0) for i in items)
+        if daily_courtesy_total >= COURTESY_THRESHOLD:
+            findings.append({
+                "type": "high_daily_courtesies",
+                "severity": "high",
+                "fecha": fecha,
+                "message": f"Cortesias: ${daily_courtesy_total:,.0f} en un dia ({len(items)} items) — {fecha}",
+            })
+
+        # Self-authorized courtesies
+        for item in items:
+            mesero = (item.get("mesero") or "").strip()
+            autorizador = (item.get("autorizador") or "").strip()
+            monto = float(item.get("total") or 0)
+            if mesero and autorizador and mesero.lower() == autorizador.lower() and monto > 0:
+                findings.append({
+                    "type": "self_authorized_courtesy",
+                    "severity": "high",
+                    "fecha": fecha,
+                    "message": f"Auto-cortesia: {mesero} se autoriza cortesia de ${monto:,.0f} ({fecha})",
+                    "detail": f"Orden: {item.get('orden', '?')}, Platillo: {item.get('platillo', '?')}",
+                })
 
     return findings
 
