@@ -1857,21 +1857,23 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category grid — big touch targets for tablet/touch */}
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 px-2 py-2 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
-                {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[52px] leading-tight ${
-                      selectedCategory === cat.id
-                        ? `${(cat as { color?: string }).color || 'bg-emerald-600'} text-white shadow-lg`
-                        : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:scale-95'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
+              {/* Category grid — scrollable, compact for tablet */}
+              <div className="overflow-y-auto max-h-[180px] border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
+                <div className="grid grid-cols-4 md:grid-cols-5 gap-1 px-2 py-1.5">
+                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-2 py-2 rounded-lg text-[11px] font-bold text-center transition-all min-h-[38px] leading-tight ${
+                        selectedCategory === cat.id
+                          ? `${(cat as { color?: string }).color || 'bg-emerald-600'} text-white shadow-lg`
+                          : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:scale-95'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Menu items grid — BIG touch cards for tablet */}
