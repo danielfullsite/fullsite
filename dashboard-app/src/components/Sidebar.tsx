@@ -93,20 +93,8 @@ const navSections = [
       { href: '/admin/grupos', label: 'Grupos', icon: Package },
       { href: '/admin/modificadores', label: 'Modificadores', icon: Settings },
       { href: '/admin/horarios', label: 'Horarios', icon: Calendar },
-      { href: '/admin/tamaños', label: 'Tamaños', icon: Settings },
       { href: '/admin/promociones', label: 'Promociones', icon: Sparkles },
       { href: '/admin/formas-pago', label: 'Formas de Pago', icon: Banknote },
-      { href: '/admin/domicilio', label: 'Domicilio', icon: Truck },
-      { href: '/admin/tarjetas-regalo', label: 'Tarjetas de Regalo', icon: ShoppingCart },
-    ],
-  },
-  {
-    label: 'POS Tienda',
-    items: [
-      { href: '/admin/tienda/articulos', label: 'Artículos', icon: Package },
-      { href: '/admin/tienda/grupos', label: 'Grupos', icon: Settings },
-      { href: '/admin/tienda/precios', label: 'Tipos de Precio', icon: DollarSign },
-      { href: '/admin/tienda/promociones', label: 'Promociones', icon: Sparkles },
     ],
   },
   {
