@@ -1,0 +1,26 @@
+name: CRM Recompra Agent
+
+on:
+  schedule:
+    # Mondays at 9am MX (15:00 UTC)
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+
+jobs:
+  crm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests pytz
+      - name: Run CRM Recompra Agent
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TRIGGER_TYPE: ${{ github.event_name }}
+        run: python .github/scripts/crm_recompra_agent.py

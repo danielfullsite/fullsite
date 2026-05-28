@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
-  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura']
+  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
   const isPosRoute = pathname.startsWith('/pos')
   const isDemoRoute = pathname.startsWith('/demo')
   const isPublicPage = publicPages.includes(pathname) || isPosRoute || isDemoRoute
