@@ -24,6 +24,7 @@ const ECOMMERCE_KEYWORDS = ['ubereats', 'rappi', 'uber eats', 'didi food']
 function extractEcommerce(day: WansoftDaily) {
   let total = 0
   const channels: Record<string, number> = {}
+  const ventasDia = day.ventas_dia || 0
 
   if (day.pago_métodos && Array.isArray(day.pago_métodos)) {
     for (const m of day.pago_métodos) {
@@ -31,8 +32,10 @@ function extractEcommerce(day: WansoftDaily) {
       for (const kw of ECOMMERCE_KEYWORDS) {
         if (name.includes(kw)) {
           const label = name.includes('rappi') ? 'Rappi' : name.includes('ubereats') || name.includes('uber eats') ? 'Ubereats' : 'Otro'
-          channels[label] = (channels[label] || 0) + (m.total || 0)
-          total += m.total || 0
+          // m.total can be percentage or MXN — if < 100, treat as percentage of ventas_dia
+          const amount = (m.total || 0) < 100 ? (m.total || 0) / 100 * ventasDia : (m.total || 0)
+          channels[label] = (channels[label] || 0) + amount
+          total += amount
           break
         }
       }
