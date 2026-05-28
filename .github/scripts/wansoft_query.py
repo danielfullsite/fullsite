@@ -322,22 +322,38 @@ def fetch_all_wansoft_data(session, start, end):
     except Exception:
         pass
 
-    # 16c. Food cost fallback from browser scraper (Supabase)
+    # 16c. Food cost fallback — cascade: wansoft_food_cost → food_cost_real → food_cost_browser
     if "food_cost" not in data or not data["food_cost"]:
-        try:
-            fc = sb_get("wansoft_data", {
+        for fc_source, fc_table, fc_params in [
+            ("wansoft_food_cost", "wansoft_food_cost", {
+                "client_id": f"eq.{CLIENT['id']}",
+                "order": "fecha.desc", "limit": "1",
+            }),
+            ("food_cost_real", "wansoft_data", {
+                "client_id": f"eq.{CLIENT['id']}",
+                "data_key": "eq.food_cost_real",
+                "order": "fecha.desc", "limit": "1",
+            }),
+            ("food_cost_browser", "wansoft_data", {
                 "client_id": f"eq.{CLIENT['id']}",
                 "data_key": "eq.food_cost_browser",
-                "order": "fecha.desc",
-                "limit": "1",
-            })
-            if fc and fc[0].get("data"):
-                fc_data = fc[0]["data"]
-                if isinstance(fc_data, str):
-                    fc_data = json.loads(fc_data)
-                data["food_cost_supabase"] = fc_data[:50]
-        except Exception:
-            pass
+                "order": "fecha.desc", "limit": "1",
+            }),
+        ]:
+            try:
+                fc = sb_get(fc_table, fc_params)
+                if fc and fc[0].get("data"):
+                    fc_data = fc[0]["data"]
+                    if isinstance(fc_data, str):
+                        fc_data = json.loads(fc_data)
+                    if isinstance(fc_data, list) and len(fc_data) > 0 and isinstance(fc_data[0], dict):
+                        # Verify it's real data (not NR garbage or zeros)
+                        if fc_data[0].get("platillo") or fc_data[0].get("nombre"):
+                            data["food_cost_supabase"] = fc_data
+                            print(f"[wansoft-query] Food cost loaded from {fc_source}: {len(fc_data)} items")
+                            break
+            except Exception:
+                continue
 
     # 16d. Tips fallback from browser scraper
     if not data.get("propinas_meseros"):
@@ -513,7 +529,7 @@ REGLA #2 — BUSCAR ANTES DE DECIR "NO TENGO":
 - Si el mesero aparece en CUALQUIER dato: NO digas que no tienes info de ese mesero.
 - Propinas: busca en propinas_meseros, propinas_total. Si no aparece, di "Las propinas no están en este reporte. Revisa el corte de caja del día en Wansoft."
 - Efectivo/tarjeta: busca en metodos_pago, pago_metodos. Si hay datos historicos, usa esos.
-- Food cost / costo de receta: busca en food_cost. Si no hay, di "El costo de receta no está disponible por API. Revisa en Wansoft > Reportes > Inventarios > Costo y margen."
+- Food cost / costo de receta: busca en food_cost o food_cost_supabase. Tiene datos reales de 306 platillos con: platillo, cantidad, subtotal_venta, costo_ideal, costo_ideal_pct, costo_real, costo_real_pct. Si el platillo buscado no aparece, di que no esta en el reporte de costos.
 
 CÓMO INTERPRETAR:
 - "cómo vamos" / "qué onda" → hoy vs promedio del mismo DOW
