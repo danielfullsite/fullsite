@@ -13,10 +13,10 @@ import {
   Area,
   Cell,
 } from 'recharts'
-import { UtensilsCrossed, TrendingUp, BarChart3, Coffee } from 'lucide-react'
+import { UtensilsCrossed, TrendingUp, BarChart3, Coffee, Sparkles } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregateGrupos } from '@/lib/data'
+import { getRecentDays, aggregateGrupos, getWansoftDataLatest } from '@/lib/data'
 import { formatCurrency, formatShortDate, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -28,13 +28,21 @@ const CATEGORY_COLORS = [
 
 export default function PlatillosPage() {
   const [recentData, setRecentData] = useState<WansoftDaily[]>([])
+  const [modifiers, setModifiers] = useState<{ nombre: string; total: number; _cols?: string[] }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await getRecentDays(30)
+        const [data, modsResult] = await Promise.all([
+          getRecentDays(30),
+          getWansoftDataLatest('modifiers_sold'),
+        ])
         setRecentData(data)
+        if (modsResult?.data) {
+          const raw = Array.isArray(modsResult.data) ? modsResult.data : []
+          setModifiers(raw.filter((m: any) => m.nombre && m.total > 0).sort((a: any, b: any) => b.total - a.total))
+        }
       } catch (err) {
         console.error('Error loading platillos data:', err)
       } finally {
@@ -369,6 +377,34 @@ export default function PlatillosPage() {
           </table>
         </div>
       </div>
+
+      {/* Modifiers sold */}
+      {modifiers.length > 0 && (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden mt-6">
+          <div className="px-4 py-3 border-b border-[var(--line-soft)]">
+            <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
+              <Sparkles size={14} className="text-amber-400" /> Modificadores más vendidos
+            </h3>
+            <p className="text-xs text-[var(--text-3)]">Extras, quitar, agregar — lo que más piden los clientes</p>
+          </div>
+          <div className="divide-y divide-[var(--line-soft)]">
+            {modifiers.slice(0, 20).map((mod, i) => (
+              <div key={i} className="px-4 py-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-[var(--text-3)] w-5">{i + 1}</span>
+                  <div>
+                    <span className="text-sm text-[var(--text-1)]">{mod.nombre}</span>
+                    {mod._cols && mod._cols[1] && (
+                      <p className="text-xs text-[var(--text-3)]">{mod._cols[1]}</p>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(mod.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   )
 }
