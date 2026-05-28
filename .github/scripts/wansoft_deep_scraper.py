@@ -470,16 +470,25 @@ def main():
         if total_propinas > 0:
             print(f"    [tips] Updating wansoft_daily with propinas_total=${total_propinas:,.2f} ({len(propinas_meseros)} meseros)")
             try:
-                requests.patch(
+                # Update propinas_total (numeric field — simple value)
+                r = requests.patch(
                     f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
                     headers={**sb_headers, "Prefer": "return=minimal"},
-                    json={
-                        "propinas_total": round(total_propinas, 2),
-                        "propinas_meseros": json.dumps(propinas_meseros) if propinas_meseros else None,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }, timeout=10
+                    json={"propinas_total": round(total_propinas, 2)},
+                    timeout=10
                 )
-                print(f"    [✓] wansoft_daily.propinas_total updated")
+                if r.ok:
+                    print(f"    [✓] wansoft_daily.propinas_total updated")
+                else:
+                    print(f"    [!] PATCH failed ({r.status_code}): {r.text[:200]}")
+                # Update propinas_meseros separately (JSONB field)
+                if propinas_meseros:
+                    requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                        headers={**sb_headers, "Prefer": "return=minimal"},
+                        json={"propinas_meseros": propinas_meseros},
+                        timeout=10
+                    )
             except Exception as e:
                 print(f"    [!] Failed to update wansoft_daily propinas: {e}")
 
