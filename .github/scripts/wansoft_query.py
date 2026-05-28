@@ -383,24 +383,23 @@ def fetch_all_wansoft_data(session, start, end):
         except Exception:
             pass
 
-    # 16e. Recetas e ingredientes (from Excel costeo import)
-    if any(kw in q_lower for kw in ["receta", "ingrediente", "materia prima", "proveedor", "merma"]):
-        for key in ["recetas_costeo", "materia_prima"]:
-            try:
-                rc = sb_get("wansoft_data", {
-                    "client_id": f"eq.{CLIENT['id']}",
-                    "data_key": f"eq.{key}",
-                    "order": "fecha.desc", "limit": "1",
-                })
-                if rc and rc[0].get("data"):
-                    rc_data = rc[0]["data"]
-                    if isinstance(rc_data, str):
-                        rc_data = json.loads(rc_data)
-                    if rc_data:
-                        data[key] = rc_data
-                        print(f"[wansoft-query] {key}: {len(rc_data)} items")
-            except Exception:
-                pass
+    # 16e. Recetas e ingredientes (from Excel costeo import) — always load, small data
+    for key in ["recetas_costeo", "materia_prima"]:
+        try:
+            rc = sb_get("wansoft_data", {
+                "client_id": f"eq.{CLIENT['id']}",
+                "data_key": f"eq.{key}",
+                "order": "fecha.desc", "limit": "1",
+            })
+            if rc and rc[0].get("data"):
+                rc_data = rc[0]["data"]
+                if isinstance(rc_data, str):
+                    rc_data = json.loads(rc_data)
+                if rc_data:
+                    data[key] = rc_data
+                    print(f"[wansoft-query] {key}: {len(rc_data)} items")
+        except Exception:
+            pass
 
     # 17. Closing cash (corte de caja)
     try:
@@ -498,6 +497,89 @@ def fetch_all_wansoft_data(session, start, end):
         print(f"[wansoft-query] Waiter categories FAILED: {e}")
 
     return data
+
+
+def fetch_inventory_and_costs():
+    """Fetch inventory, ingredients, recipes, and cost data from Supabase."""
+    extra = {}
+
+    # Ingredients with costs, yield factor, suppliers
+    try:
+        ings = sb_get("pos_ingredients", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "active": "eq.true",
+            "select": "name,unit,cost_per_unit,yield_factor,supplier,category",
+            "limit": "500",
+        })
+        extra["ingredientes"] = {
+            "total": len(ings),
+            "con_costo": len([i for i in ings if (i.get("cost_per_unit") or 0) > 0]),
+            "con_merma": len([i for i in ings if (i.get("yield_factor") or 1) < 1]),
+            "top_costos": sorted(ings, key=lambda x: -(x.get("cost_per_unit") or 0))[:10],
+            "proveedores": list(set(i.get("supplier", "") for i in ings if i.get("supplier"))),
+        }
+        print(f"[wansoft-query] Ingredients loaded: {len(ings)}")
+    except Exception as e:
+        print(f"[wansoft-query] Ingredients FAILED: {e}")
+
+    # Inventory levels (current stock)
+    try:
+        inv = sb_get("pos_inventory", {
+            "client_id": f"eq.{CLIENT['id']}",
+            "select": "ingredient_id,stock,reorder_point",
+            "limit": "500",
+        })
+        # Join with ingredient names
+        ing_map = {i["name"].lower(): i for i in ings} if "ingredientes" in extra else {}
+        critical = []
+        for item in inv:
+            stock = float(item.get("stock") or 0)
+            reorder = float(item.get("reorder_point") or 0)
+            if reorder > 0 and stock < reorder:
+                critical.append({"id": item["ingredient_id"], "stock": stock, "reorder": reorder})
+        extra["inventario"] = {
+            "total_items": len(inv),
+            "criticos": len(critical),
+            "en_cero": len([c for c in critical if c["stock"] == 0]),
+            "items_criticos": critical[:15],
+        }
+        print(f"[wansoft-query] Inventory loaded: {len(inv)} items, {len(critical)} critical")
+    except Exception as e:
+        print(f"[wansoft-query] Inventory FAILED: {e}")
+
+    # Agent results (latest from each agent)
+    try:
+        agent_results = sb_get("agent_results", {
+            "select": "agent_id,fecha,priority,summary",
+            "order": "updated_at.desc",
+            "limit": "50",
+        })
+        latest = {}
+        for r in agent_results:
+            if r["agent_id"] not in latest:
+                latest[r["agent_id"]] = r
+        extra["agentes"] = latest
+        print(f"[wansoft-query] Agent results loaded: {len(latest)} agents")
+    except Exception as e:
+        print(f"[wansoft-query] Agent results FAILED: {e}")
+
+    # Reservations
+    try:
+        from datetime import date
+        today = date.today().isoformat()
+        reservas = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), {
+            "fecha": f"gte.{today}",
+            "status": "neq.cancelled",
+            "select": "fecha,nombre,guests,espacio,horario_inicio,status",
+            "order": "fecha.asc",
+            "limit": "20",
+        })
+        extra["reservaciones"] = reservas
+        print(f"[wansoft-query] Reservations loaded: {len(reservas)}")
+    except Exception as e:
+        print(f"[wansoft-query] Reservations FAILED: {e}")
+
+    return extra
 
 
 def fetch_historical(days=90):
@@ -939,9 +1021,15 @@ def main():
         print("[wansoft-query] Fetching historical...")
         historical = fetch_historical(90)
 
+        # Fetch inventory, costs, agents, reservations
+        print("[wansoft-query] Fetching inventory & costs...")
+        extra_data = fetch_inventory_and_costs()
+        wansoft_data.update(extra_data)
+
         platillos_count = wansoft_data.get("total_platillos_distintos", 0)
         meseros_count = len(wansoft_data.get("ventas_por_mesero", []))
         print(f"[wansoft-query] Data: {meseros_count} meseros, {platillos_count} platillos, range={start_date}..{end_date}")
+        print(f"[wansoft-query] Extra: ingredientes={len(extra_data.get('ingredientes', {}).get('top_costos', []))}, inv_criticos={extra_data.get('inventario', {}).get('criticos', 0)}, agentes={len(extra_data.get('agentes', {}))}, reservas={len(extra_data.get('reservaciones', []))}")
 
         # Ask Groq to answer
         print("[wansoft-query] Asking Groq...")
