@@ -940,15 +940,20 @@ def ask_groq(question, wansoft_data, historical_data):
     if detail:
         blocks.append("DATOS DETALLE:\n" + json.dumps(detail, ensure_ascii=False, indent=1))
 
-    # Block 3b: Recetas, ingredientes, inventario, reservaciones, agentes
-    extra_block = {}
-    for key in ["recetas_costeo", "materia_prima", "ingredientes", "inventario",
-                 "agentes", "reservaciones"]:
+    # Block 3b: CRITICAL — ingredientes, costos, compras, inventario (INSERT EARLY so Groq sees them)
+    cost_block = {}
+    for key in ["ingredientes", "inventario", "purchases_by_product", "materia_prima",
+                 "recetas_costeo", "tips_raw", "discounts_detail", "discounts_total",
+                 "courtesies", "courtesies_total", "cancel_sales", "voids",
+                 "closing_cash_mega", "hours_worked", "sales_terminal",
+                 "modifiers_sold", "proveedores_gasto", "food_cost_data",
+                 "propinas_detalle", "agentes", "reservaciones"]:
         if key in wd and wd[key]:
-            extra_block[key] = wd[key]
-    if extra_block:
-        blocks.append("DATOS EXTRA (recetas, inventario, agentes, reservaciones):\n"
-                      + json.dumps(extra_block, ensure_ascii=False, indent=1))
+            cost_block[key] = wd[key]
+    if cost_block:
+        # Insert at position 1 (right after rankings) so Groq reads it early
+        blocks.insert(1, "COSTOS, INVENTARIO, COMPRAS, AGENTES, RESERVACIONES:\n"
+                      + json.dumps(cost_block, ensure_ascii=False, indent=1))
 
     # Block 4: Top platillos (always useful)
     blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
