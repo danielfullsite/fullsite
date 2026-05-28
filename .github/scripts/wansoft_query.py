@@ -966,8 +966,9 @@ def ask_groq(question, wansoft_data, historical_data):
     # Smart: only include detailed data if question is about that topic
     keyword_map = {
         "purchases_by_product": ["compr", "compra", "proveedor", "gast", "kilo"],
-        "materia_prima": ["materia", "ingrediente", "costo", "merma", "rendimiento", "yield"],
-        "recetas_costeo": ["receta", "costeo", "platillo", "ingrediente", "porcion"],
+        "materia_prima": ["materia", "ingrediente", "merma", "rendimiento", "yield"],
+        "recetas_costeo": ["receta", "ingrediente", "porcion"],
+        "costeo_por_platillo": ["costo", "costeo", "margen", "precio", "food cost", "cuanto cuesta", "cuánto cuesta"],
         "tips_raw": ["propina", "tip"],
         "discounts_detail": ["descuento", "discount"],
         "discounts_total": ["descuento"],
