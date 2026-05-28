@@ -47,9 +47,10 @@ export default function NominaPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [laborRow, tipsRow, recent, hoursRow, shiftsRow] = await Promise.all([
+        const [laborRow, tipsRow, tipsRawRow, recent, hoursRow, shiftsRow] = await Promise.all([
           getLatestDeep('wansoft_labor'),
           getLatestDeep('wansoft_tips'),
+          getWansoftData('tips_raw'),
           getRecentDays(7),
           getWansoftData('hours_worked'),
           getWansoftData('shifts'),
@@ -58,7 +59,12 @@ export default function NominaPage() {
           setLabor(laborRow.data)
           setFecha(laborRow.fecha as string || '')
         }
-        if (tipsRow?.data && Array.isArray(tipsRow.data)) setTips(tipsRow.data)
+        // Prefer tips_raw (real data) over wansoft_tips (often zeros)
+        if (tipsRawRow?.data && Array.isArray(tipsRawRow.data) && tipsRawRow.data.length > 0) {
+          setTips(tipsRawRow.data)
+        } else if (tipsRow?.data && Array.isArray(tipsRow.data)) {
+          setTips(tipsRow.data)
+        }
         if (hoursRow?.data && Array.isArray(hoursRow.data)) setHoursWorked(hoursRow.data as HoursEntry[])
         if (shiftsRow?.data && Array.isArray(shiftsRow.data)) setShifts(shiftsRow.data as ShiftEntry[])
         setDailyData(recent)

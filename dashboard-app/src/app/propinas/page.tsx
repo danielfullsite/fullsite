@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregatePayments, getLatestDeep } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -19,9 +19,13 @@ export default function PropinasPage() {
     Promise.all([
       getRecentDays(30),
       getLatestDeep('wansoft_tips'),
-    ]).then(([d, tips]) => {
+      getWansoftData('tips_raw'),
+    ]).then(([d, tips, tipsRaw]) => {
       setData(d)
-      if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
+      // Prefer tips_raw (real data from deep scraper) over wansoft_tips (often zeros)
+      if (tipsRaw && Array.isArray(tipsRaw.data) && tipsRaw.data.length > 0) {
+        setRealTips(tipsRaw.data as typeof realTips)
+      } else if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
         setRealTips(tips.data as typeof realTips)
       }
       setLoading(false)
