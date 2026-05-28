@@ -25,7 +25,7 @@ export default function AdminGruposPage() {
       })))
       setLoading(false)
     })()
-  }, [CLIENT_ID])
+  }, [])
 
   const totalItems = groups.reduce((s, g) => s + g.itemCount, 0)
 
