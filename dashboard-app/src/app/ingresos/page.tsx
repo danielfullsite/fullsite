@@ -50,8 +50,16 @@ export default function IngresosPage() {
     })
   }, [])
 
-  const totalEfectivo = useMemo(() => data.reduce((s, d) => s + (d.efectivo || 0), 0), [data])
-  const totalTarjeta = useMemo(() => data.reduce((s, d) => s + (d.tarjeta || 0), 0), [data])
+  // efectivo/tarjeta in wansoft_daily are PERCENTAGES, not MXN
+  // Multiply by ventas_dia to get real amounts
+  const totalEfectivo = useMemo(() => data.reduce((s, d) => {
+    const pct = d.efectivo || 0
+    return s + (pct < 100 ? (pct / 100) * (d.ventas_dia || 0) : pct)
+  }, 0), [data])
+  const totalTarjeta = useMemo(() => data.reduce((s, d) => {
+    const pct = d.tarjeta || 0
+    return s + (pct < 100 ? (pct / 100) * (d.ventas_dia || 0) : pct)
+  }, 0), [data])
   const totalVentas = useMemo(() => data.reduce((s, d) => s + (d.ventas_dia || 0), 0), [data])
   const totalTransferencia = useMemo(() => {
     let sum = 0
@@ -59,7 +67,9 @@ export default function IngresosPage() {
       if (!day.pago_métodos || !Array.isArray(day.pago_métodos)) continue
       for (const m of day.pago_métodos) {
         if ((m.nombre || '').toLowerCase().includes('transferencia')) {
-          sum += m.total || 0
+          // m.total is percentage — convert to MXN
+          const pct = m.total || 0
+          sum += pct < 100 ? (pct / 100) * (day.ventas_dia || 0) : pct
         }
       }
     }
