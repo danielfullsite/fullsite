@@ -500,84 +500,146 @@ def fetch_all_wansoft_data(session, start, end):
 
 
 def fetch_inventory_and_costs():
-    """Fetch inventory, ingredients, recipes, and cost data from Supabase."""
+    """Fetch ALL available data from Supabase — inventory, costs, agents, reservations, and wansoft_data."""
     extra = {}
+    cid = CLIENT['id']
 
-    # Ingredients with costs, yield factor, suppliers
+    # 1. Ingredients with costs, yield factor, suppliers
+    ings = []
     try:
         ings = sb_get("pos_ingredients", {
-            "client_id": f"eq.{CLIENT['id']}",
-            "active": "eq.true",
-            "select": "name,unit,cost_per_unit,yield_factor,supplier,category",
+            "client_id": f"eq.{cid}", "active": "eq.true",
+            "select": "id,name,unit,cost_per_unit,yield_factor,supplier,category",
             "limit": "500",
         })
         extra["ingredientes"] = {
             "total": len(ings),
             "con_costo": len([i for i in ings if (i.get("cost_per_unit") or 0) > 0]),
             "con_merma": len([i for i in ings if (i.get("yield_factor") or 1) < 1]),
-            "top_costos": sorted(ings, key=lambda x: -(x.get("cost_per_unit") or 0))[:10],
+            "top_costos": sorted(ings, key=lambda x: -(x.get("cost_per_unit") or 0))[:15],
             "proveedores": list(set(i.get("supplier", "") for i in ings if i.get("supplier"))),
         }
-        print(f"[wansoft-query] Ingredients loaded: {len(ings)}")
+        print(f"[wansoft-query] Ingredients: {len(ings)}")
     except Exception as e:
         print(f"[wansoft-query] Ingredients FAILED: {e}")
 
-    # Inventory levels (current stock)
+    # 2. Inventory levels
     try:
         inv = sb_get("pos_inventory", {
-            "client_id": f"eq.{CLIENT['id']}",
+            "client_id": f"eq.{cid}",
             "select": "ingredient_id,stock,reorder_point",
             "limit": "500",
         })
-        # Join with ingredient names
-        ing_map = {i["name"].lower(): i for i in ings} if "ingredientes" in extra else {}
+        ing_id_map = {i["id"]: i["name"] for i in ings}
         critical = []
         for item in inv:
             stock = float(item.get("stock") or 0)
             reorder = float(item.get("reorder_point") or 0)
             if reorder > 0 and stock < reorder:
-                critical.append({"id": item["ingredient_id"], "stock": stock, "reorder": reorder})
+                critical.append({
+                    "nombre": ing_id_map.get(item["ingredient_id"], item["ingredient_id"]),
+                    "stock": stock, "reorder": reorder,
+                })
         extra["inventario"] = {
             "total_items": len(inv),
             "criticos": len(critical),
             "en_cero": len([c for c in critical if c["stock"] == 0]),
-            "items_criticos": critical[:15],
+            "items_criticos": critical[:20],
         }
-        print(f"[wansoft-query] Inventory loaded: {len(inv)} items, {len(critical)} critical")
+        print(f"[wansoft-query] Inventory: {len(inv)} items, {len(critical)} critical")
     except Exception as e:
         print(f"[wansoft-query] Inventory FAILED: {e}")
 
-    # Agent results (latest from each agent)
+    # 3. ALL wansoft_data keys (35 data types!)
+    WANSOFT_DATA_KEYS = [
+        "recetas_costeo", "materia_prima", "purchases_by_product",
+        "tips_raw", "modifiers_sold", "discounts_detail", "discounts_total",
+        "courtesies", "courtesies_total", "cancel_sales", "voids",
+        "cash_closing", "closing_cash_mega", "hours_worked", "shifts",
+        "sales_area", "sales_terminal", "promotions_browser",
+        "purchase_orders", "supplier_list", "cost_by_group",
+    ]
+    for key in WANSOFT_DATA_KEYS:
+        try:
+            rows = sb_get("wansoft_data", {
+                "client_id": f"eq.{cid}", "data_key": f"eq.{key}",
+                "select": "data", "order": "fecha.desc", "limit": "1",
+            })
+            if rows:
+                raw = rows[0].get("data", "[]")
+                if isinstance(raw, str):
+                    try:
+                        import json as _json
+                        raw = _json.loads(raw)
+                    except:
+                        pass
+                if isinstance(raw, str):
+                    try:
+                        raw = _json.loads(raw)
+                    except:
+                        pass
+                # Only include if there's real data (not just empty arrays)
+                if raw and raw != [] and raw != {}:
+                    has_data = False
+                    if isinstance(raw, list):
+                        has_data = any(item.get("nombre") or item.get("total") or item.get("platillo") or item.get("empleado") or item.get("ingrediente") or item.get("mesero") or item.get("ProductName") for item in raw if isinstance(item, dict))
+                    elif isinstance(raw, dict):
+                        has_data = bool(raw.get("total") or raw.get("count") or raw.get("Result") or raw.get("ClosingCashPayments"))
+                    if has_data:
+                        extra[key] = raw
+        except:
+            pass
+    loaded_keys = [k for k in WANSOFT_DATA_KEYS if k in extra]
+    print(f"[wansoft-query] wansoft_data loaded: {len(loaded_keys)} keys: {', '.join(loaded_keys)}")
+
+    # 4. Agent results
     try:
         agent_results = sb_get("agent_results", {
             "select": "agent_id,fecha,priority,summary",
-            "order": "updated_at.desc",
-            "limit": "50",
+            "order": "updated_at.desc", "limit": "50",
         })
         latest = {}
         for r in agent_results:
             if r["agent_id"] not in latest:
                 latest[r["agent_id"]] = r
         extra["agentes"] = latest
-        print(f"[wansoft-query] Agent results loaded: {len(latest)} agents")
+        print(f"[wansoft-query] Agents: {len(latest)}")
     except Exception as e:
-        print(f"[wansoft-query] Agent results FAILED: {e}")
+        print(f"[wansoft-query] Agents FAILED: {e}")
 
-    # Reservations
+    # 5. Reservations
     try:
         from datetime import date
         today = date.today().isoformat()
         reservas = sb_get(CLIENT.get("reservaciones_table", "amalay_reservaciones"), {
-            "fecha": f"gte.{today}",
-            "status": "neq.cancelled",
+            "fecha": f"gte.{today}", "status": "neq.cancelled",
             "select": "fecha,nombre,guests,espacio,horario_inicio,status",
-            "order": "fecha.asc",
-            "limit": "20",
+            "order": "fecha.asc", "limit": "20",
         })
         extra["reservaciones"] = reservas
-        print(f"[wansoft-query] Reservations loaded: {len(reservas)}")
+        print(f"[wansoft-query] Reservations: {len(reservas)}")
     except Exception as e:
         print(f"[wansoft-query] Reservations FAILED: {e}")
+
+    # 6. Deep scraper tables
+    for table, key in [("wansoft_tips", "propinas_detalle"), ("wansoft_suppliers", "proveedores_gasto"),
+                       ("wansoft_labor", "labor_data"), ("wansoft_food_cost", "food_cost_data"),
+                       ("wansoft_inventory", "inventario_wansoft")]:
+        try:
+            rows = sb_get(table, {"select": "data", "order": "fecha.desc", "limit": "1"})
+            if rows:
+                raw = rows[0].get("data", "[]")
+                if isinstance(raw, str):
+                    try: raw = _json.loads(raw)
+                    except: pass
+                if isinstance(raw, str):
+                    try: raw = _json.loads(raw)
+                    except: pass
+                if raw and raw != []:
+                    extra[key] = raw
+        except:
+            pass
+    print(f"[wansoft-query] Deep tables: {', '.join(k for k in ['propinas_detalle','proveedores_gasto','labor_data','food_cost_data','inventario_wansoft'] if k in extra)}")
 
     return extra
 
@@ -628,16 +690,32 @@ REGLA #2 — BUSCAR ANTES DE DECIR "NO TENGO":
 - Si puedes CALCULARLO de los datos que SI tienes: suma, promedia, compara. HAZLO.
 - Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert.
 
-DATOS DISPONIBLES (tienes acceso a TODO):
-- ventas_consolidadas: ventas por fecha, mesero, platillo, categoría, método de pago
-- ingredientes: 412 ingredientes con costo limpio (incluyendo merma), yield factor, proveedor, categoría
-- inventario: stock actual, punto de reorden, items críticos y en cero
-- agentes: resultados de los 30 agentes IA (anomalías, anti-fraude, auto-86, compras, etc.)
-- reservaciones: próximas reservas con nombre, personas, espacio, hora
-- histórico: 870+ días de ventas diarias en wansoft_daily
-- propinas, meseros x categoría, métodos de pago, food cost
+DATOS DISPONIBLES (tienes acceso a ABSOLUTAMENTE TODO):
+VENTAS: ventas_consolidadas, ventas por fecha/mesero/platillo/categoría/método de pago, histórico 870+ días
+COSTOS: ingredientes (412 con costo limpio incluyendo merma), yield factor, proveedor, categoría
+RECETAS: recetas_costeo — cada platillo con sus ingredientes y porciones exactas
+INVENTARIO: stock actual, punto de reorden, items críticos y en cero
+COMPRAS: purchases_by_product — compras por producto con cantidades y costos reales
+MATERIA PRIMA: materia_prima — todos los ingredientes con merma y rendimiento
+PROPINAS: tips_raw — propinas detalladas por mesero (ventas, propinas, porcentaje)
+DESCUENTOS: discounts_detail y discounts_total — quién autorizó, monto, detalle
+CORTESÍAS: courtesies y courtesies_total — cortesías por orden con autorizador
+CANCELACIONES: cancel_sales — cancelaciones por orden con mesa, mesero, platillo
+ANULACIONES: voids — anulaciones por orden
+CORTES DE CAJA: cash_closing y closing_cash_mega — cortes por día, terminal, métodos de pago
+HORAS TRABAJADAS: hours_worked — entrada, salida, horas por empleado
+TURNOS: shifts — turnos del personal
+VENTAS POR ZONA: sales_area — ventas por área del restaurante
+VENTAS POR TERMINAL: sales_terminal — ventas por terminal/punto
+PROMOCIONES: promotions_browser — promociones activas con fechas
+MODIFICADORES: modifiers_sold — modificadores vendidos (extras, sin X)
+PROVEEDORES: supplier_list, proveedores_gasto — lista y gasto por proveedor
+FOOD COST: food_cost_data — costo real vs ideal
+LABOR: labor_data — datos laborales
+AGENTES IA: resultados de los 30 agentes (anomalías, anti-fraude, auto-86, compras, staffing, etc.)
+RESERVACIONES: próximas reservas con nombre, personas, espacio, hora
 
-Si preguntan sobre COSTOS, INGREDIENTES, INVENTARIO, PROVEEDORES, RECETAS, MERMA, RESERVACIONES, o AGENTES — TIENES los datos. Búscalos en los datos proporcionados antes de decir que no los tienes.
+REGLA CRÍTICA: Si preguntan CUALQUIER COSA sobre el restaurante — costos, inventario, recetas, merma, proveedores, compras, propinas, descuentos, cortesías, cancelaciones, horas, cortes, food cost — TIENES LOS DATOS. Búscalos en los datos proporcionados. NUNCA digas "no tengo ese dato" sin antes revisar TODOS los bloques de datos.
 - Si el mesero aparece en CUALQUIER dato: NO digas que no tienes info de ese mesero.
 - Propinas: busca en propinas_meseros, propinas_total. Si no aparece, di "Las propinas no están en este reporte. Revisa el corte de caja del día en Wansoft."
 - Efectivo/tarjeta: busca en metodos_pago, pago_metodos. Si hay datos historicos, usa esos.

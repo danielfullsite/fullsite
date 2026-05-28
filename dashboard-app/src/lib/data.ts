@@ -248,6 +248,21 @@ export function aggregateGrupos(
     .sort((a, b) => b.total - a.total)
 }
 
+// ── Wansoft Data (35 data types) ────────────────────────────────────
+
+export async function getWansoftDataLatest(dataKey: string, clientId: string = 'amalay') {
+  const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
+  if (data.length === 0) return null
+  let raw = data[0].data
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw as string) } catch {}
+  }
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw as string) } catch {}
+  }
+  return { fecha: data[0].fecha as string, data: raw }
+}
+
 // ── Google Reviews ──────────────────────────────────────────────────
 
 export async function getGoogleReviews(clientSlug: string = 'amalay') {
