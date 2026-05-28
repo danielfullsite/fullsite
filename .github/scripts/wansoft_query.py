@@ -862,6 +862,16 @@ def ask_groq(question, wansoft_data, historical_data):
     if detail:
         blocks.append("DATOS DETALLE:\n" + json.dumps(detail, ensure_ascii=False, indent=1))
 
+    # Block 3b: Recetas, ingredientes, inventario, reservaciones, agentes
+    extra_block = {}
+    for key in ["recetas_costeo", "materia_prima", "ingredientes", "inventario",
+                 "agentes", "reservaciones"]:
+        if key in wd and wd[key]:
+            extra_block[key] = wd[key]
+    if extra_block:
+        blocks.append("DATOS EXTRA (recetas, inventario, agentes, reservaciones):\n"
+                      + json.dumps(extra_block, ensure_ascii=False, indent=1))
+
     # Block 4: Top platillos (always useful)
     blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
                   + json.dumps(platillos[:20], ensure_ascii=False, indent=1))
