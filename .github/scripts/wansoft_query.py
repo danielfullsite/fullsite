@@ -1114,17 +1114,40 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    r = requests.post("https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 4000,
-            "system": SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": context}],
-        }, timeout=30)
-    r.raise_for_status()
-    answer = r.json()["content"][0]["text"].strip()
+    # Try Anthropic first, fallback to Groq, then friendly error
+    answer = None
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 4000,
+                "system": SYSTEM_PROMPT,
+                "messages": [{"role": "user", "content": context}],
+            }, timeout=30)
+        r.raise_for_status()
+        answer = r.json()["content"][0]["text"].strip()
+        print("[wansoft-query] Answered via Anthropic")
+    except Exception as e1:
+        print(f"[wansoft-query] Anthropic failed: {e1}, trying Groq...")
+        try:
+            r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": context},
+                    ],
+                    "temperature": 0.2, "max_tokens": 4000,
+                }, timeout=30)
+            r.raise_for_status()
+            answer = r.json()["choices"][0]["message"]["content"].strip()
+            print("[wansoft-query] Answered via Groq (fallback)")
+        except Exception as e2:
+            print(f"[wansoft-query] Groq also failed: {e2}")
+            answer = "Estamos con intermitencia en este momento. Intenta de nuevo en 5 minutos. Si sigue sin funcionar, escríbele a Daniel."
 
     # Post-processing: strip markdown that Telegram can't render
     answer = answer.replace("**", "").replace("##", "").replace("# ", "")
