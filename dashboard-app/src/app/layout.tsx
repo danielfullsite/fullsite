@@ -4,6 +4,7 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
 import PosthogInit from '@/components/PosthogInit'
+import SupabasePatch from '@/components/SupabasePatch'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text-1)]">
         <PosthogInit />
+        <SupabasePatch />
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
