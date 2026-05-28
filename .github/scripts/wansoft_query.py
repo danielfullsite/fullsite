@@ -383,6 +383,25 @@ def fetch_all_wansoft_data(session, start, end):
         except Exception:
             pass
 
+    # 16e. Recetas e ingredientes (from Excel costeo import)
+    if any(kw in q_lower for kw in ["receta", "ingrediente", "materia prima", "proveedor", "merma"]):
+        for key in ["recetas_costeo", "materia_prima"]:
+            try:
+                rc = sb_get("wansoft_data", {
+                    "client_id": f"eq.{CLIENT['id']}",
+                    "data_key": f"eq.{key}",
+                    "order": "fecha.desc", "limit": "1",
+                })
+                if rc and rc[0].get("data"):
+                    rc_data = rc[0]["data"]
+                    if isinstance(rc_data, str):
+                        rc_data = json.loads(rc_data)
+                    if rc_data:
+                        data[key] = rc_data
+                        print(f"[wansoft-query] {key}: {len(rc_data)} items")
+            except Exception:
+                pass
+
     # 17. Closing cash (corte de caja)
     try:
         r = session.post(f"{WANSOFT_URL}/Reports/ClosingCash",
