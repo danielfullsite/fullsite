@@ -66,7 +66,7 @@ const controls = [
   { name: '5 roles de acceso', status: true, detail: 'Dueño, gerente, capitán, cajero, mesero — cada uno con permisos específicos' },
   { name: 'Aviso de privacidad LFPDPPP', status: true, detail: 'Publicado con derechos ARCO completos' },
   { name: 'Exportación de datos', status: true, detail: 'El cliente puede exportar toda su información en CSV en cualquier momento' },
-  { name: 'MFA en infraestructura', status: false, detail: 'En proceso de activación en GitHub, Supabase, Vercel, Cloudflare' },
+  { name: 'MFA en infraestructura', status: true, detail: 'Activo en GitHub, Supabase, Vercel y Cloudflare' },
 ]
 
 const statusConfig = {
