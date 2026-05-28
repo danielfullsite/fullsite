@@ -627,6 +627,17 @@ REGLA #1 — SI NO HAY DATOS DE HOY:
 REGLA #2 — BUSCAR ANTES DE DECIR "NO TENGO":
 - Si puedes CALCULARLO de los datos que SI tienes: suma, promedia, compara. HAZLO.
 - Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert.
+
+DATOS DISPONIBLES (tienes acceso a TODO):
+- ventas_consolidadas: ventas por fecha, mesero, platillo, categoría, método de pago
+- ingredientes: 412 ingredientes con costo limpio (incluyendo merma), yield factor, proveedor, categoría
+- inventario: stock actual, punto de reorden, items críticos y en cero
+- agentes: resultados de los 30 agentes IA (anomalías, anti-fraude, auto-86, compras, etc.)
+- reservaciones: próximas reservas con nombre, personas, espacio, hora
+- histórico: 870+ días de ventas diarias en wansoft_daily
+- propinas, meseros x categoría, métodos de pago, food cost
+
+Si preguntan sobre COSTOS, INGREDIENTES, INVENTARIO, PROVEEDORES, RECETAS, MERMA, RESERVACIONES, o AGENTES — TIENES los datos. Búscalos en los datos proporcionados antes de decir que no los tienes.
 - Si el mesero aparece en CUALQUIER dato: NO digas que no tienes info de ese mesero.
 - Propinas: busca en propinas_meseros, propinas_total. Si no aparece, di "Las propinas no están en este reporte. Revisa el corte de caja del día en Wansoft."
 - Efectivo/tarjeta: busca en metodos_pago, pago_metodos. Si hay datos historicos, usa esos.
