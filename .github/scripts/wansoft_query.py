@@ -940,20 +940,67 @@ def ask_groq(question, wansoft_data, historical_data):
     if detail:
         blocks.append("DATOS DETALLE:\n" + json.dumps(detail, ensure_ascii=False, indent=1))
 
-    # Block 3b: CRITICAL — ingredientes, costos, compras, inventario (INSERT EARLY so Groq sees them)
+    # Block 3b: CRITICAL — smart extraction based on question keywords
     cost_block = {}
-    for key in ["ingredientes", "inventario", "purchases_by_product", "materia_prima",
-                 "recetas_costeo", "tips_raw", "discounts_detail", "discounts_total",
-                 "courtesies", "courtesies_total", "cancel_sales", "voids",
-                 "closing_cash_mega", "hours_worked", "sales_terminal",
-                 "modifiers_sold", "proveedores_gasto", "food_cost_data",
-                 "propinas_detalle", "agentes", "reservaciones"]:
+
+    # Always include compact summaries
+    if "ingredientes" in wd:
+        ing_data = wd["ingredientes"]
+        # Only send top 15 most expensive + summary stats
+        cost_block["ingredientes_resumen"] = {
+            "total": ing_data.get("total", 0),
+            "con_costo": ing_data.get("con_costo", 0),
+            "proveedores": ing_data.get("proveedores", []),
+            "top_15_por_costo": ing_data.get("top_costos", [])[:15],
+        }
+
+    if "inventario" in wd:
+        cost_block["inventario"] = wd["inventario"]
+
+    if "agentes" in wd:
+        cost_block["agentes"] = wd["agentes"]
+
+    if "reservaciones" in wd:
+        cost_block["reservaciones"] = wd["reservaciones"]
+
+    # Smart: only include detailed data if question is about that topic
+    keyword_map = {
+        "purchases_by_product": ["compr", "compra", "proveedor", "gast", "kilo"],
+        "materia_prima": ["materia", "ingrediente", "costo", "merma", "rendimiento", "yield"],
+        "recetas_costeo": ["receta", "costeo", "platillo", "ingrediente", "porcion"],
+        "tips_raw": ["propina", "tip"],
+        "discounts_detail": ["descuento", "discount"],
+        "discounts_total": ["descuento"],
+        "courtesies": ["cortesia", "cortesía", "comps"],
+        "courtesies_total": ["cortesia", "cortesía"],
+        "cancel_sales": ["cancelaci", "cancela"],
+        "voids": ["anulaci", "anula", "void"],
+        "closing_cash_mega": ["corte", "caja", "cierre", "efectivo"],
+        "hours_worked": ["hora", "asistencia", "entrada", "salida", "turno"],
+        "sales_terminal": ["terminal", "punto de venta"],
+        "modifiers_sold": ["modificador", "extra", "sin "],
+        "proveedores_gasto": ["proveedor", "gasto", "compra"],
+        "food_cost_data": ["food cost", "costo", "margen"],
+        "propinas_detalle": ["propina", "tip"],
+    }
+
+    for key, keywords in keyword_map.items():
         if key in wd and wd[key]:
-            cost_block[key] = wd[key]
+            if any(kw in q_lower for kw in keywords):
+                data = wd[key]
+                # Truncate lists to max 30 items
+                if isinstance(data, list) and len(data) > 30:
+                    data = data[:30]
+                elif isinstance(data, dict) and "Result" in data:
+                    data["Result"] = data["Result"][:30]
+                cost_block[key] = data
+
     if cost_block:
-        # Insert at position 1 (right after rankings) so Groq reads it early
-        blocks.insert(1, "COSTOS, INVENTARIO, COMPRAS, AGENTES, RESERVACIONES:\n"
-                      + json.dumps(cost_block, ensure_ascii=False, indent=1))
+        cost_json = json.dumps(cost_block, ensure_ascii=False, indent=1)
+        # Hard cap at 25000 chars for this block
+        if len(cost_json) > 25000:
+            cost_json = cost_json[:25000] + "\n... (truncado)"
+        blocks.insert(1, "COSTOS, INVENTARIO, COMPRAS, AGENTES, RESERVACIONES:\n" + cost_json)
 
     # Block 4: Top platillos (always useful)
     blocks.append(f"TOP 20 PLATILLOS (de {len(platillos)} distintos):\n"
