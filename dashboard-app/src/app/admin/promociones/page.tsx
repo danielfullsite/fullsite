@@ -46,7 +46,7 @@ export default function PromocionesPage() {
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
-    setLoading(true)
+    if (!CLIENT_ID) return; setLoading(true)
     try {
       const data = await api(`pos_promotions?client_id=eq.${CLIENT_ID}&order=active.desc,valid_until.desc`)
       setPromos(data || [])
@@ -54,7 +54,7 @@ export default function PromocionesPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const save = async () => {
     if (!editing?.name) return

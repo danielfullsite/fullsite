@@ -42,7 +42,7 @@ export default function PreciosPage() {
     if (r.ok) setItems(await r.json())
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const grouped = TIERS.map(t => ({ tier: t, items: items.filter(i => tierLabel(i.price) === t) })).filter(g => g.items.length > 0)
 

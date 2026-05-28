@@ -42,7 +42,7 @@ export default function ArticulosPage() {
     if (r.ok) setItems(await r.json())
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const departments = [...new Set(items.map(i => i.department).filter(Boolean))]
 

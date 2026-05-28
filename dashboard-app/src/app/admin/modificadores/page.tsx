@@ -61,7 +61,7 @@ export default function ModificadoresPage() {
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500) }
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!CLIENT_ID) return; setLoading(true)
     const [g, m, c, a] = await Promise.all([
       api(`pos_modifier_groups?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
       api(`pos_modifiers?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
@@ -70,7 +70,7 @@ export default function ModificadoresPage() {
     ])
     setGroups(g); setMods(m); setCategories(c); setAssignments(a)
     setLoading(false)
-  }, [])
+  }, [CLIENT_ID])
 
   useEffect(() => { load() }, [load])
 

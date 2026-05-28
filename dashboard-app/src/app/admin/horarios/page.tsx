@@ -55,7 +55,7 @@ export default function AdminHorariosPage() {
       setSchedules(data || [])
     } catch { showToast('Error cargando horarios', 'err') }
     finally { setLoading(false) }
-  }, [])
+  }, [CLIENT_ID])
 
   useEffect(() => { load() }, [load])
 

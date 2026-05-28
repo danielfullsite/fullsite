@@ -46,7 +46,7 @@ export default function PromosTiendaPage() {
     if (iRes.ok) setItems(await iRes.json())
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const handleSave = async (p: Promo, isNew: boolean) => {
     const { id, ...body } = p

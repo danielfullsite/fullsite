@@ -43,7 +43,7 @@ export default function FormasPagoPage() {
     const data = await api(`pos_payment_methods?client_id=eq.${CLIENT_ID}&order=name`)
     setItems(data)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const handleSave = async () => {
     if (!modal || !modal.name) return

@@ -42,7 +42,7 @@ export default function TarjetasRegaloPage() {
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
-    setLoading(true)
+    if (!CLIENT_ID) return; setLoading(true)
     try {
       const data = await api(`pos_gift_cards?client_id=eq.${CLIENT_ID}&order=created_at.desc`)
       setCards(data || [])
@@ -50,7 +50,7 @@ export default function TarjetasRegaloPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const save = async () => {
     if (!editing?.code) return

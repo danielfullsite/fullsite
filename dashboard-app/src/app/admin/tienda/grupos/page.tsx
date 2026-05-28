@@ -48,7 +48,7 @@ export default function GruposTiendaPage() {
     }).sort((a, b) => a.department.localeCompare(b.department) || a.group_name.localeCompare(b.group_name)))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const departments = [...new Set(groups.map(g => g.department).filter(Boolean))]
 

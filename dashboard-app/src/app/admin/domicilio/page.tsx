@@ -42,7 +42,7 @@ export default function DomicilioPage() {
     const data = await api(`pos_delivery_zones?client_id=eq.${CLIENT_ID}&order=name`)
     setZones(data)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [CLIENT_ID])
 
   const handleSave = async () => {
     if (!modal || !modal.name) return

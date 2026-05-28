@@ -49,7 +49,7 @@ export default function AdminTamañosPage() {
       setSizes(data || [])
     } catch { showToast('Error cargando tamaños', 'err') }
     finally { setLoading(false) }
-  }, [])
+  }, [CLIENT_ID])
 
   useEffect(() => { load() }, [load])
 

@@ -59,7 +59,7 @@ export default function AdminMenuPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!CLIENT_ID) return; setLoading(true)
     const [cats, menuItems] = await Promise.all([
       api(`pos_menu_categories?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
       api(`pos_menu_items?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
@@ -67,7 +67,7 @@ export default function AdminMenuPage() {
     setCategories(cats)
     setItems(menuItems)
     setLoading(false)
-  }, [])
+  }, [CLIENT_ID])
 
   useEffect(() => { load() }, [load])
 
