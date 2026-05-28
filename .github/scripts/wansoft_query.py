@@ -1055,11 +1055,15 @@ def ask_groq(question, wansoft_data, historical_data):
 
     # Assemble context — cap total at 40000 chars
     context = ""
-    for block in blocks:
+    for i, block in enumerate(blocks):
         if len(context) + len(block) > 40000:
+            print(f"[wansoft-query] Block {i} truncated ({len(block)} chars)")
             break
         context += block + "\n\n"
     print(f"[wansoft-query] Context size: {len(context)} chars, {len(blocks)} blocks")
+    # Debug: show block sizes
+    for i, block in enumerate(blocks):
+        print(f"[wansoft-query] Block {i}: {len(block)} chars, starts with: {block[:60]}...")
 
     context += f"PREGUNTA: {question}"
 
