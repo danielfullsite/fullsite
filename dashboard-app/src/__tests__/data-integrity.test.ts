@@ -55,31 +55,31 @@ describe('Data Integrity — timezone', () => {
 
 describe('Data Integrity — week calculation logic', () => {
   it('dow=6 (Saturday) goes back 5 days', () => {
-    const dow = 6
+    const dow: number = 6
     const daysBack = dow === 0 ? 6 : dow - 1
     expect(daysBack).toBe(5)
   })
 
   it('dow=0 (Sunday) goes back 6 days', () => {
-    const dow = 0
+    const dow: number = 0
     const daysBack = dow === 0 ? 6 : dow - 1
     expect(daysBack).toBe(6)
   })
 
   it('dow=1 (Monday) goes back 0 days', () => {
-    const dow = 1
+    const dow: number = 1
     const daysBack = dow === 0 ? 6 : dow - 1
     expect(daysBack).toBe(0)
   })
 
   it('dow=3 (Wednesday) goes back 2 days', () => {
-    const dow = 3
+    const dow: number = 3
     const daysBack = dow === 0 ? 6 : dow - 1
     expect(daysBack).toBe(2)
   })
 
   it('dow=5 (Friday) goes back 4 days', () => {
-    const dow = 5
+    const dow: number = 5
     const daysBack = dow === 0 ? 6 : dow - 1
     expect(daysBack).toBe(4)
   })

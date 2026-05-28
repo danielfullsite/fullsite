@@ -7,8 +7,9 @@ import type { Order } from '@/lib/pos-data'
 function makeOrder(items: Array<{ nombre: string; menuItemId?: string }>): Order {
   return {
     id: 'test-order-1',
-    mesa: '5',
+    mesa: 5,
     mesero: 'Test',
+    personas: 2,
     items: items.map((i, idx) => ({
       id: `item-${idx}`,
       menuItemId: i.menuItemId || `mi-${idx}`,
@@ -24,8 +25,8 @@ function makeOrder(items: Array<{ nombre: string; menuItemId?: string }>): Order
     descuento: 0,
     iva: items.length * 16,
     total: items.length * 116,
-    status: 'open',
-    createdAt: new Date().toISOString(),
+    status: 'abierta',
+    createdAt: new Date(),
   }
 }
 
@@ -37,7 +38,6 @@ describe('splitOrderByStation', () => {
       { nombre: 'Smoothie Verde' },
     ])
     const split = splitOrderByStation(order)
-    // All beverages should go to barra (via name fallback since no real menuItemId match)
     expect(split.barra.length).toBe(3)
     expect(split.cocina.length).toBe(0)
     expect(split.caja.length).toBe(0)
@@ -49,7 +49,6 @@ describe('splitOrderByStation', () => {
       { nombre: 'Huevos Rancheros' },
     ])
     const split = splitOrderByStation(order)
-    // Non-beverage items default to cocina
     expect(split.cocina.length).toBe(2)
     expect(split.barra.length).toBe(0)
   })
@@ -61,7 +60,6 @@ describe('splitOrderByStation', () => {
       { nombre: 'Brownie de Chocolate' },
     ])
     const split = splitOrderByStation(order)
-    // chilaquiles -> cocina, cafe -> barra, brownie -> cocina (no category match, not a beverage)
     expect(split.cocina.length).toBeGreaterThanOrEqual(1)
     expect(split.barra.length).toBeGreaterThanOrEqual(1)
   })
