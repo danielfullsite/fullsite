@@ -93,15 +93,26 @@ async def run():
         # Capturing the JSON response directly is more reliable than parsing rendered HTML.
         captured_responses = []
 
+        def _is_telemetry(data):
+            """Detect New Relic / analytics JSON — NOT real data."""
+            if isinstance(data, dict):
+                if "nrServerTime" in data or "entityGuid" in str(data)[:200]:
+                    return True
+                if set(data.keys()) & {"stn", "err", "ins", "spa", "sr", "srs"}:
+                    return True
+            return False
+
         async def capture_response(response):
             url = response.url
             if "wansoft.net" not in url:
+                return
+            if any(s in url.lower() for s in ["newrelic", "nr-data", "bam.", "analytics"]):
                 return
             ct = response.headers.get("content-type", "")
             if "json" in ct or "javascript" in ct:
                 try:
                     body = await response.json()
-                    if body and (isinstance(body, list) or (isinstance(body, dict) and len(body) > 0)):
+                    if body and not _is_telemetry(body) and (isinstance(body, list) or (isinstance(body, dict) and len(body) > 0)):
                         captured_responses.append({"url": url, "data": body, "status": response.status})
                 except Exception:
                     pass

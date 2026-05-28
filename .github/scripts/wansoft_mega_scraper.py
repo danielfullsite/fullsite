@@ -94,15 +94,35 @@ async def run():
         # ── UNIVERSAL XHR CAPTURE ──────────────────────────────────
         captured_xhr = []
 
+        # URLs to SKIP in XHR capture (telemetry, analytics, not real data)
+        SKIP_XHR_URLS = ["newrelic", "nr-data", "bam.", "google-analytics", "analytics",
+                         "gtag", "facebook", "sentry", "hotjar", "clarity"]
+
+        def is_telemetry(data):
+            """Detect New Relic / analytics telemetry disguised as data."""
+            if isinstance(data, dict):
+                keys = set(data.keys())
+                # New Relic signature: stn, err, ins, spa, nrServerTime, entityGuid
+                if "nrServerTime" in keys or "entityGuid" in str(data):
+                    return True
+                if keys & {"stn", "err", "ins", "spa", "sr", "srs", "st", "sts"}:
+                    return True
+                if "app" in keys and "agents" in str(data.get("app", "")):
+                    return True
+            return False
+
         async def on_response(response):
             url = response.url
             if "wansoft.net" not in url:
+                return
+            # Skip known telemetry URLs
+            if any(skip in url.lower() for skip in SKIP_XHR_URLS):
                 return
             ct = response.headers.get("content-type", "")
             if "json" in ct or "javascript" in ct:
                 try:
                     body = await response.json()
-                    if body:
+                    if body and not is_telemetry(body):
                         captured_xhr.append({"url": url, "data": body})
                 except Exception:
                     pass
@@ -110,11 +130,14 @@ async def run():
         page.on("response", on_response)
 
         def get_xhr_data(url_contains=None):
-            """Get captured XHR data, optionally filtered by URL."""
+            """Get captured XHR data, optionally filtered by URL. Skips telemetry."""
             for resp in reversed(captured_xhr):
                 if url_contains and url_contains not in resp["url"]:
                     continue
                 d = resp["data"]
+                # Double-check: skip if telemetry slipped through
+                if is_telemetry(d):
+                    continue
                 if isinstance(d, list) and len(d) > 0:
                     return d
                 if isinstance(d, dict):
