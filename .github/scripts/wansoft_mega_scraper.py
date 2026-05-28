@@ -372,6 +372,14 @@ async def run():
                 save_data(key, r["data"])
                 results[key] = r["count"]
 
+                # Also write to wansoft_food_cost for the dashboard
+                if key == "food_cost_mega":
+                    sb_upsert("wansoft_food_cost", {
+                        "client_id": CLIENT["id"], "fecha": TODAY,
+                        "data": json.dumps(r["data"]),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    })
+
         # ── INVENTORY ──────────────────────────────────────────────
         print("\n━━━ INVENTORY ━━━")
 

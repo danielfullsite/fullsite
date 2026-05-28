@@ -310,9 +310,25 @@ def main():
     if discounts:
         save_data("discounts_detail", discounts)
         results["descuentos_detalle"] = len(discounts)
-        # Also save total to wansoft_daily-compatible format
         total_descuentos = sum(safe_float(d.get("total", 0)) for d in discounts)
         save_data("discounts_total", {"total": total_descuentos, "count": len(discounts)})
+
+        # ── UPDATE wansoft_daily with descuentos ──
+        # This is CRITICAL — the dashboard reads descuentos from wansoft_daily
+        if total_descuentos > 0:
+            print(f"    [discounts] Updating wansoft_daily with descuentos=${total_descuentos:,.2f}")
+            try:
+                requests.patch(
+                    f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                    headers={**sb_headers, "Prefer": "return=minimal"},
+                    json={
+                        "descuentos": round(total_descuentos, 2),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }, timeout=10
+                )
+                print(f"    [✓] wansoft_daily.descuentos updated")
+            except Exception as e:
+                print(f"    [!] Failed to update wansoft_daily descuentos: {e}")
 
     # 5. Cancellations detail — capture all columns
     def transform_cancels(r):
@@ -345,6 +361,24 @@ def main():
     if voids:
         save_data("voids", voids)
         results["anulaciones"] = len(voids)
+
+    # ── UPDATE wansoft_daily with devoluciones (cancels + voids) ──
+    total_devoluciones = (sum(safe_float(d.get("total", 0)) for d in (cancels or []))
+                         + sum(safe_float(d.get("total", 0)) for d in (voids or [])))
+    if total_devoluciones > 0:
+        print(f"    [devol] Updating wansoft_daily with devoluciones=${total_devoluciones:,.2f}")
+        try:
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                headers={**sb_headers, "Prefer": "return=minimal"},
+                json={
+                    "devoluciones": round(total_devoluciones, 2),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }, timeout=10
+            )
+            print(f"    [✓] wansoft_daily.devoluciones updated")
+        except Exception as e:
+            print(f"    [!] Failed to update devoluciones: {e}")
 
     # 7. Courtesies — capture ALL columns (same structure as discounts)
     def transform_courtesies(r):
@@ -397,22 +431,23 @@ def main():
                 print(f"    [tips] First row ({len(r['data'][0])} cols): {r['data'][0]}")
             for c in r["data"]:
                 if len(c) >= 3:
-                    # Wansoft SalesByUser columns vary — try to identify dynamically
+                    # Wansoft SalesByUser confirmed columns (from real data):
+                    # [0]=mesero, [1]=subtotal, [2]=propinas, [3]=total, [4]=propina_%
                     item = {"_cols": c, "mesero": c[0]}
-                    # Search for numeric values in remaining columns
-                    nums = []
-                    for val in c[1:]:
-                        f = safe_float(val)
-                        if f > 0:
-                            nums.append(f)
-                    # Typical order: tickets (int), subtotal, ventas, propinas
-                    item["tickets"] = safe_int(c[1]) if len(c) > 1 else 0
-                    if len(nums) >= 1:
+                    nums = [safe_float(val) for val in c[1:]]
+                    if len(nums) >= 4:
+                        # 5-col format: mesero, subtotal, propinas, total, %
+                        item["ventas"] = nums[0]     # subtotal
+                        item["propinas"] = nums[1]    # propinas
+                        item["total"] = nums[2]       # total (subtotal + propinas)
+                        item["propina_pct"] = nums[3] # percentage
+                    elif len(nums) >= 2:
                         item["ventas"] = nums[0]
-                    if len(nums) >= 2:
-                        item["propinas"] = nums[-1]  # Propinas usually last numeric column
+                        item["propinas"] = nums[-1]
                     else:
+                        item["ventas"] = nums[0] if nums else 0
                         item["propinas"] = 0
+                    item["tickets"] = safe_int(c[1]) if len(c) > 1 and safe_int(c[1]) < 1000 else 0
                     data.append(item)
             return data
         if r["type"] == "json": return r["data"]
@@ -426,8 +461,27 @@ def main():
         sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": today_str,
                    "data": json.dumps(tips), "updated_at": datetime.now(timezone.utc).isoformat()})
         results["propinas"] = len(tips)
-        # Also save raw for discovery
         save_data("tips_raw", tips)
+
+        # ── UPDATE wansoft_daily with propinas_total ──
+        # This is CRITICAL — the dashboard reads from wansoft_daily
+        total_propinas = sum(t.get("propinas", 0) for t in tips)
+        propinas_meseros = [{"nombre": t["mesero"], "total": round(t.get("propinas", 0), 2)} for t in tips if t.get("propinas", 0) > 0]
+        if total_propinas > 0:
+            print(f"    [tips] Updating wansoft_daily with propinas_total=${total_propinas:,.2f} ({len(propinas_meseros)} meseros)")
+            try:
+                requests.patch(
+                    f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                    headers={**sb_headers, "Prefer": "return=minimal"},
+                    json={
+                        "propinas_total": round(total_propinas, 2),
+                        "propinas_meseros": json.dumps(propinas_meseros) if propinas_meseros else None,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }, timeout=10
+                )
+                print(f"    [✓] wansoft_daily.propinas_total updated")
+            except Exception as e:
+                print(f"    [!] Failed to update wansoft_daily propinas: {e}")
 
     # ══════════════════════════════════════════════════════════════
     # FOOD COST & MENU
