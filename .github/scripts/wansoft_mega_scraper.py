@@ -137,7 +137,7 @@ async def run():
         await page.fill('input[name="UserName"]', WANSOFT_USER)
         await page.fill('input[name="Password"]', WANSOFT_PASS)
         await page.click('input[type="submit"]')
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
 
         if "Dashboard" not in page.url:
             print(f"[!] Login failed: {page.url}")
@@ -236,23 +236,16 @@ async def run():
                 else:
                     print(f"    No search button found")
 
-                # Wait for data to load (try multiple strategies)
-                data_found = False
-                for wait_ms in [5000, 10000, 15000]:
-                    try:
-                        await page.wait_for_selector(
-                            '.jqgrow, table tbody tr td, .rowReport, .ui-jqgrid-bdiv tr',
-                            timeout=wait_ms
-                        )
-                        data_found = True
-                        print(f"    Data appeared after ~{wait_ms}ms")
-                        break
-                    except Exception:
-                        continue
-
-                if not data_found:
-                    # Extra wait for slow AJAX
-                    await asyncio.sleep(5)
+                # Wait for data to load — single aggressive wait
+                try:
+                    await page.wait_for_selector(
+                        '.jqgrow, table tbody tr td, .rowReport, .ui-jqgrid-bdiv tr',
+                        timeout=8000
+                    )
+                    print(f"    Data appeared")
+                except Exception:
+                    # Brief extra wait then continue
+                    await asyncio.sleep(3)
 
                 # Take screenshot
                 if screenshot:
