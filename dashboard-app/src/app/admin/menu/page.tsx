@@ -1,11 +1,35 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Pencil, Search, Save, X, ChevronDown, GripVertical } from 'lucide-react'
 import { useClientId } from '@/hooks/useClientId'
+import { createClient } from '@/lib/supabase-browser'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function api(path: string, opts?: RequestInit) {
+  // Get session token for authenticated requests
+  let token = SUPABASE_KEY
+  try {
+    const stored = localStorage.getItem(`sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed.access_token) token = parsed.access_token
+    }
+  } catch {}
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...opts?.headers,
+    },
+  })
+  return res.ok ? res.json() : []
+}
 
 interface Category {
   id: string
@@ -25,22 +49,9 @@ interface MenuItem {
   active: boolean
 }
 
-async function api(path: string, opts?: RequestInit) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-      ...opts?.headers,
-    },
-  })
-  return res.ok ? res.json() : []
-}
-
 export default function AdminMenuPage() {
   const CLIENT_ID = useClientId()
+  const supabase = useMemo(() => createClient(), [])
   const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,14 +71,12 @@ export default function AdminMenuPage() {
 
   const load = useCallback(async () => {
     if (!CLIENT_ID) return; setLoading(true)
-    const [cats, menuItems] = await Promise.all([
-      api(`pos_menu_categories?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
-      api(`pos_menu_items?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
-    ])
-    setCategories(cats)
-    setItems(menuItems)
+    const { data: cats } = await supabase.from('pos_menu_categories').select('*').eq('client_id', CLIENT_ID).order('sort_order')
+    const { data: menuItems } = await supabase.from('pos_menu_items').select('*').eq('client_id', CLIENT_ID).order('sort_order')
+    setCategories(cats || [])
+    setItems(menuItems || [])
     setLoading(false)
-  }, [CLIENT_ID])
+  }, [CLIENT_ID, supabase])
 
   useEffect(() => { load() }, [load])
 
