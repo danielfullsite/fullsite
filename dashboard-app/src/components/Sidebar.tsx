@@ -74,6 +74,7 @@ const navSections = [
       { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
+      { href: '/compras', label: 'Compras', icon: ShoppingCart },
       { href: '/proveedores', label: 'Proveedores', icon: Truck },
       { href: '/ecommerce', label: 'eCommerce', icon: ShoppingCart },
       { href: '/reportes', label: 'Reportes', icon: FileBarChart },
