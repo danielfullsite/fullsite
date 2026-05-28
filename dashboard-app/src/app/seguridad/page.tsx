@@ -67,6 +67,11 @@ const controls = [
   { name: 'Aviso de privacidad LFPDPPP', status: true, detail: 'Publicado con derechos ARCO completos' },
   { name: 'Exportación de datos', status: true, detail: 'El cliente puede exportar toda su información en CSV en cualquier momento' },
   { name: 'MFA en infraestructura', status: true, detail: 'Activo en GitHub, Supabase, Vercel y Cloudflare' },
+  { name: 'Rate limiting en APIs', status: true, detail: '100 requests/min por IP en rutas /api/' },
+  { name: 'Input sanitization', status: true, detail: 'XSS prevention, SQL injection protection, validación de RFC/email/CP' },
+  { name: 'Permissions-Policy', status: true, detail: 'Cámara, geolocation, USB, payment — restringidos por política' },
+  { name: 'HSTS Preload', status: true, detail: 'Strict-Transport-Security con max-age 2 años + includeSubDomains + preload' },
+  { name: 'X-Frame-Options DENY', status: true, detail: 'Previene clickjacking — el sitio no puede ser embebido en iframes' },
 ]
 
 const statusConfig = {
