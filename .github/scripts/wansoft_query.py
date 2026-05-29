@@ -553,6 +553,7 @@ def fetch_inventory_and_costs():
     # 3. ALL wansoft_data keys (35 data types!)
     WANSOFT_DATA_KEYS = [
         "recetas_costeo", "materia_prima", "purchases_by_product",
+        "costeo_por_platillo",
         "tips_raw", "modifiers_sold", "discounts_detail", "discounts_total",
         "courtesies", "courtesies_total", "cancel_sales", "voids",
         "cash_closing", "closing_cash_mega", "hours_worked", "shifts",
