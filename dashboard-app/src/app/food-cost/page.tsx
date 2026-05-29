@@ -43,7 +43,28 @@ export default function FoodCostPage() {
         else {
         const row = await getLatestDeep('wansoft_food_cost')
         if (row?.data && Array.isArray(row.data) && row.data.length > 0) {
-          setItems(row.data)
+          // Map Wansoft format to display format
+          // Wansoft has: costo_real (total), costo_ideal (total), subtotal_venta (total), cantidad
+          // We need: costo (per unit), precio (per unit), margen_pct
+          const mapped = (row.data as any[]).map((p: any) => {
+            const qty = p.cantidad || p.qty || 1
+            const ventaTotal = p.subtotal_venta || p.precio || 0
+            const costoTotal = p.costo_real || p.costo_ideal || p.costo || 0
+            const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : ventaTotal
+            const costoUnit = qty > 0 ? Math.round(costoTotal / qty) : costoTotal
+            const margen = p.costo_real_pct ? (100 - p.costo_real_pct) :
+                           p.costo_ideal_pct ? (100 - p.costo_ideal_pct) :
+                           p.margen_pct ? p.margen_pct :
+                           precioUnit > 0 ? Math.round((1 - costoUnit / precioUnit) * 100) : 0
+            return {
+              platillo: p.platillo || p.nombre || '',
+              qty: qty,
+              precio: precioUnit,
+              costo: costoUnit,
+              margen_pct: Math.round(margen * 10) / 10,
+            }
+          }).filter((p: CostItem) => p.platillo && p.precio > 0)
+          setItems(mapped)
           setFecha(row.fecha as string || '')
         } else {
           // Fallback: calculate from pos_recipes + pos_ingredients
