@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 const formatMXN = (n: number) => `$${n.toLocaleString('es-MX')}`
-const tabs = ['Dashboard', 'Agentes IA', 'ROI', 'Food Cost', 'Vinos'] as const
+const tabs = ['Dashboard', 'Agentes IA', 'Bot IA', 'POS', 'ROI', 'Food Cost', 'Vinos', 'Anti-Fraude'] as const
 
 export default function DemoAtopePage() {
   const [tab, setTab] = useState<typeof tabs[number]>('Dashboard')
@@ -58,9 +58,12 @@ export default function DemoAtopePage() {
       <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
         {tab === 'Dashboard' && <DashboardTab />}
         {tab === 'Agentes IA' && <AgentesTab />}
+        {tab === 'Bot IA' && <BotIATab />}
+        {tab === 'POS' && <POSTab />}
         {tab === 'ROI' && <ROITab />}
         {tab === 'Food Cost' && <FoodCostTab />}
         {tab === 'Vinos' && <VinosTab />}
+        {tab === 'Anti-Fraude' && <AntiFraudeTab />}
       </div>
 
       {/* Footer CTA */}
@@ -341,6 +344,198 @@ function VinosTab() {
               </div>
             </div>
             <span style={{ fontWeight: 700, fontSize: 14 }}>{formatMXN(v.total)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Bot IA Tab (Simulated Telegram Chat) ─────────────────
+const CHAT_MESSAGES = [
+  { from: 'user', text: 'Como vamos hoy?', time: '14:02' },
+  { from: 'bot', text: 'HOY SABADO — VENTAS: $68,500\n\nTickets: 86 | Personas: 178\nTicket promedio: $797\nPropinas: $10,275 (15%)\n\nVas 10.5% arriba del promedio de sabados.\nProyeccion de cierre: $94,500 (confianza 87%)\n\nTop mesero: Rodrigo Martinez $12,400', time: '14:02' },
+  { from: 'user', text: 'Cuanto cuesta hacer la paella valenciana?', time: '14:05' },
+  { from: 'bot', text: 'PAELLA VALENCIANA\n\nPrecio venta: $1,150\nCosto ideal: $287\nFood cost: 25%\nMargen: 75%\n\nCategoria: ESTRELLA\nVende mucho + margen alto. Perfecto.', time: '14:05' },
+  { from: 'user', text: 'Quien vendio mas vino hoy?', time: '14:08' },
+  { from: 'bot', text: 'RANKING VINOS HOY:\n\n1. Rodrigo Martinez — 8 botellas ($14,200)\n   Muga Rsva x3, Atope España x5\n2. Valentina Solis — 5 botellas ($8,950)\n3. Andres Navarro — 4 botellas ($6,800)\n\nDato: Rodrigo cierra maridaje en 78% de sus paellas. El resto del equipo en 38%.', time: '14:08' },
+  { from: 'user', text: 'Que recomiendas para subir el ticket?', time: '14:12' },
+  { from: 'bot', text: 'OPORTUNIDADES HOY:\n\n1. MARIDAJE VINO + PAELLA: 62% de mesas con paella NO piden vino. Potencial: +$890/mesa\n\n2. POSTRE DESPUES DE PLATO FUERTE: Solo 28% pide postre. La Tarta Vasca tiene 80% margen. Potencial: +$330/mesa\n\n3. UPGRADE JAMON: Ofrecer Iberico de Salamanca ($1,190) vs tabla de quesos ($385). 3 de cada 10 aceptan.\n\nAccion: briefear a meseros en cambio de turno a las 3pm.', time: '14:12' },
+  { from: 'user', text: 'Algo raro hoy?', time: '16:30' },
+  { from: 'bot', text: 'ALERTA DETECTADA:\n\nCarlos Ruiz autorizo cortesia de $790 (Chuletillas de Cordero) en mesa 14. El es mesero, no supervisor.\n\nRegla: meseros no pueden autorizar cortesias. Solo el gerente.\n\nRevisa con el encargado de turno.', time: '16:30' },
+]
+
+function BotIATab() {
+  return (
+    <div style={{ maxWidth: 500, margin: '0 auto' }}>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Bot de Fullsite — WhatsApp / Telegram</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Pregunta lo que quieras sobre tu restaurante. Responde en 2 segundos.</div>
+      </div>
+      <div style={{ background: '#0d1117', borderRadius: 16, padding: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
+        {CHAT_MESSAGES.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+            <div style={{
+              maxWidth: '85%', padding: '10px 14px', borderRadius: 12,
+              background: m.from === 'user' ? '#1a472a' : '#1a1a2e',
+              borderTopRightRadius: m.from === 'user' ? 2 : 12,
+              borderTopLeftRadius: m.from === 'bot' ? 2 : 12,
+            }}>
+              <div style={{ fontSize: 13, whiteSpace: 'pre-line', lineHeight: 1.5, color: 'rgba(255,255,255,0.85)' }}>{m.text}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'right' }}>{m.time}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
+        Preguntas reales, datos reales, respuestas en 2 segundos. 24/7.
+      </div>
+    </div>
+  )
+}
+
+// ─── POS Tab (Interactive) ────────────────────────────────
+const POS_MENU = [
+  { cat: 'TAPAS', items: [
+    { name: 'Patatas Bravas', price: 255 }, { name: 'Gambas al Ajillo', price: 380 },
+    { name: 'Croquetas Jamon Iberico', price: 250 }, { name: 'Pulpo a la Gallega', price: 445 },
+    { name: 'Tortilla Española', price: 265 }, { name: 'Alcachofas de Sevilla', price: 445 },
+  ]},
+  { cat: 'PAELLAS', items: [
+    { name: 'Paella Valenciana', price: 1150 }, { name: 'Paella Negra', price: 1290 },
+    { name: 'Paella Mixta', price: 990 }, { name: 'Paella Solomillo', price: 1390 },
+    { name: 'Meloso de Bogavante', price: 990 }, { name: 'Meloso Hongos Trufa', price: 590 },
+  ]},
+  { cat: 'FUERTES', items: [
+    { name: 'Cochinillo Atope', price: 1150 }, { name: 'Solomillo con Foie', price: 845 },
+    { name: 'Solomillo Pimienta', price: 790 }, { name: 'Chuletillas Cordero', price: 790 },
+    { name: 'Rabo de Toro', price: 480 }, { name: 'Bacalao a la Gallega', price: 590 },
+  ]},
+  { cat: 'POSTRES', items: [
+    { name: 'Tarta Queso Vasca', price: 330 }, { name: 'Torrija Valenciana', price: 340 },
+    { name: 'Peras al Obispo', price: 290 }, { name: 'La Merienda', price: 345 },
+    { name: 'Socarrat Arroz con Leche', price: 310 },
+  ]},
+  { cat: 'VINOS', items: [
+    { name: 'Atope España (Copa)', price: 240 }, { name: 'Muga Reserva', price: 1990 },
+    { name: 'Sol y Nieve (Copa)', price: 190 }, { name: 'Sangria Tinto (Jarra)', price: 385 },
+  ]},
+]
+
+function POSTab() {
+  const [selectedCat, setSelectedCat] = useState('TAPAS')
+  const [order, setOrder] = useState<Array<{ name: string; price: number; qty: number }>>([])
+
+  const addItem = (name: string, price: number) => {
+    setOrder(prev => {
+      const existing = prev.find(i => i.name === name)
+      if (existing) return prev.map(i => i.name === name ? { ...i, qty: i.qty + 1 } : i)
+      return [...prev, { name, price, qty: 1 }]
+    })
+  }
+
+  const total = order.reduce((s, i) => s + i.price * i.qty, 0)
+  const currentItems = POS_MENU.find(c => c.cat === selectedCat)?.items || []
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, minHeight: 500 }}>
+      <div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {POS_MENU.map(c => (
+            <button key={c.cat} onClick={() => setSelectedCat(c.cat)} style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              background: selectedCat === c.cat ? '#10b981' : '#1a1a24', color: '#fff',
+            }}>{c.cat}</button>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {currentItems.map(item => (
+            <button key={item.name} onClick={() => addItem(item.name, item.price)} style={{
+              background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10,
+              padding: 14, cursor: 'pointer', textAlign: 'left', color: '#fff',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{item.name}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981' }}>{formatMXN(item.price)}</div>
+            </button>
+          ))}
+        </div>
+        <div style={{ marginTop: 16, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 12, color: '#818cf8', fontWeight: 600, marginBottom: 4 }}>IA COPILOT</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+            {order.some(i => i.name.includes('Paella')) && !order.some(i => i.name.includes('Copa') || i.name.includes('Muga') || i.name.includes('Sangria'))
+              ? '💡 Esta mesa pidio paella sin vino. Ofrece Atope España copa ($240) o Muga Reserva ($1,990). El maridaje sube el ticket $890 promedio.'
+              : order.length >= 2 && !order.some(i => POS_MENU.find(c => c.cat === 'POSTRES')?.items.some(p => p.name === i.name))
+              ? '💡 Mesa sin postre. Ofrece Tarta de Queso Vasca ($330) — 80% margen, la favorita de la casa.'
+              : order.length > 0
+              ? '💡 Tip: el Jamon Iberico de Salamanca ($1,190) como entrada compartida sube el ticket $600+ en 30% de las mesas.'
+              : 'Selecciona platillos para ver sugerencias de IA en tiempo real.'}
+          </div>
+        </div>
+      </div>
+      <div style={{ background: '#111118', borderRadius: 12, padding: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Mesa 7 · Rodrigo M.</div>
+        {order.length === 0 ? (
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center', padding: 40 }}>Toca un platillo para agregarlo</div>
+        ) : (
+          <>
+            {order.map(item => (
+              <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}>
+                <span>{item.qty}x {item.name}</span>
+                <span style={{ fontWeight: 600 }}>{formatMXN(item.price * item.qty)}</span>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 12, paddingTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800 }}>
+                <span>TOTAL</span><span>{formatMXN(total)}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button onClick={() => setOrder([])} style={{ flex: 1, padding: 12, background: '#1e293b', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Limpiar</button>
+                <button style={{ flex: 1, padding: 12, background: '#10b981', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Cobrar</button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Anti-Fraude Tab ──────────────────────────────────────
+const FRAUD_ALERTS = [
+  { severity: 'high', title: 'Auto-descuento detectado', detail: 'Carlos Ruiz (mesero) autorizo cortesia de Chuletillas de Cordero ($790) en Mesa 14. El mesero no tiene permiso de autorizar cortesias — solo el gerente.', fecha: 'Hoy 16:30', action: 'Revisar con encargado de turno. Configurar permisos: cortesia solo para perfil Gerente.' },
+  { severity: 'medium', title: 'Descuentos concentrados', detail: 'Ana Beltran aplico 4 descuentos en las ultimas 2 horas por un total de $1,280. Patron inusual vs su promedio de 0.5 descuentos/turno.', fecha: 'Hoy 15:45', action: 'Verificar si hubo evento especial o promocion activa.' },
+  { severity: 'low', title: 'Cancelacion de Paella Negra', detail: 'Mesa 9 cancelo Paella Negra ($1,290) despues de 25 minutos. Motivo: "cliente cambio de opinion". Food cost perdido: ~$412.', fecha: 'Hoy 14:20', action: 'Verificar con cocina si la paella se preparo. Si si, registrar como merma.' },
+  { severity: 'info', title: 'Semana sin alertas criticas', detail: 'Esta semana: 0 fraudes confirmados, 2 alertas investigadas y resueltas, $0 en perdidas por cortesias no autorizadas.', fecha: 'Resumen semanal', action: 'Buen trabajo del equipo. Mantener protocolos.' },
+]
+
+function AntiFraudeTab() {
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <KPI label="Alertas esta semana" value="3" icon={Shield} />
+        <KPI label="Fraudes confirmados" value="0" sub="Semana limpia" icon={Shield} color="#10b981" />
+        <KPI label="Cortesias no autorizadas" value="$790" sub="1 caso" icon={AlertTriangle} color="#f59e0b" />
+        <KPI label="Perdida prevenida/mes" value="$12,800" sub="Deteccion automatica" icon={DollarSign} color="#10b981" />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {FRAUD_ALERTS.map((a, i) => (
+          <div key={i} style={{
+            background: '#111118', borderRadius: 12, padding: 20, border: '1px solid rgba(255,255,255,0.06)',
+            borderLeft: `4px solid ${a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f59e0b' : a.severity === 'low' ? '#3b82f6' : '#10b981'}`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{a.title}</div>
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
+                background: a.severity === 'high' ? 'rgba(239,68,68,0.15)' : a.severity === 'medium' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+                color: a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f59e0b' : '#10b981',
+              }}>{a.severity === 'high' ? 'ALTA' : a.severity === 'medium' ? 'MEDIA' : a.severity === 'low' ? 'BAJA' : 'INFO'}</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 10 }}>{a.detail}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>{a.fecha}</div>
+            <div style={{ fontSize: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, color: 'rgba(255,255,255,0.5)' }}>
+              Accion recomendada: {a.action}
+            </div>
           </div>
         ))}
       </div>
