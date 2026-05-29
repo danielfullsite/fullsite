@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { PieChart, Search, ArrowUpDown, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
-import { getLatestDeep } from '@/lib/data'
+import { getLatestDeep, getWansoftDataLatest } from '@/lib/data'
 import { getRecipes, getIngredients, getMenuCategoriesFromDB, type RecipeRow, type Ingredient } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 
@@ -27,7 +27,20 @@ export default function FoodCostPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Try wansoft_food_cost first
+        // Try costeo_por_platillo first (Eduardo's real costs from Excel)
+        const costeoRow = await getWansoftDataLatest('costeo_por_platillo')
+        if (costeoRow?.data && Array.isArray(costeoRow.data) && costeoRow.data.length > 0) {
+          setItems((costeoRow.data as any[]).map(p => ({
+            platillo: p.platillo,
+            qty: 0,
+            precio: p.precio,
+            costo: p.costo,
+            margen_pct: p.margen_pct,
+          })))
+          setFecha('Costeo Eduardo ' + (costeoRow.fecha || ''))
+        }
+        // Fallback: wansoft_food_cost
+        else {
         const row = await getLatestDeep('wansoft_food_cost')
         if (row?.data && Array.isArray(row.data) && row.data.length > 0) {
           setItems(row.data)
@@ -73,6 +86,7 @@ export default function FoodCostPage() {
           }
           setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
           setFecha('pos_recipes')
+        }
         }
       } catch (err) {
         console.error('Error:', err)
