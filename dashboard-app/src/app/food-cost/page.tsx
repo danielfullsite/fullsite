@@ -27,63 +27,78 @@ export default function FoodCostPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Try costeo_por_platillo first (Eduardo's real costs from Excel)
-        const costeoRow = await getWansoftDataLatest('costeo_por_platillo')
-        if (costeoRow?.data && Array.isArray(costeoRow.data) && costeoRow.data.length > 0) {
-          setItems((costeoRow.data as any[]).map(p => ({
-            platillo: p.platillo,
-            qty: 0,
-            precio: p.precio,
-            costo: p.costo,
-            margen_pct: p.margen_pct,
-          })))
-          setFecha('Costeo Eduardo ' + (costeoRow.fecha || ''))
-        }
-        // Fallback: wansoft_food_cost
-        else {
-        const row = await getLatestDeep('wansoft_food_cost')
-        if (row?.data && Array.isArray(row.data) && row.data.length > 0) {
-          // Map Wansoft format to display format
-          // Wansoft has: costo_real (total), costo_ideal (total), subtotal_venta (total), cantidad
-          // We need: costo (per unit), precio (per unit), margen_pct
-          const mapped = (row.data as any[]).map((p: any) => {
+        // Helper: map Wansoft food cost format to display format
+        const mapWansoftCost = (data: any[]): CostItem[] => {
+          return data.map((p: any) => {
             const qty = p.cantidad || p.qty || 1
-            const ventaTotal = p.subtotal_venta || p.precio || 0
-            const costoTotal = p.costo_real || p.costo_ideal || p.costo || 0
-            const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : ventaTotal
-            const costoUnit = qty > 0 ? Math.round(costoTotal / qty) : costoTotal
-            const margen = p.costo_real_pct ? (100 - p.costo_real_pct) :
-                           p.costo_ideal_pct ? (100 - p.costo_ideal_pct) :
-                           p.margen_pct ? p.margen_pct :
-                           precioUnit > 0 ? Math.round((1 - costoUnit / precioUnit) * 100) : 0
+            const ventaTotal = p.subtotal_venta || 0
+            const costoTotal = p.costo_real || p.costo_ideal || 0
+            // If it has per-unit fields already (precio/costo), use them directly
+            const precioUnit = p.precio || (qty > 0 ? Math.round(ventaTotal / qty) : 0)
+            const costoUnit = p.costo || (qty > 0 ? Math.round(costoTotal / qty) : 0)
+            const margen = p.margen_pct ? p.margen_pct :
+                           p.costo_real_pct ? Math.round((100 - p.costo_real_pct) * 10) / 10 :
+                           p.costo_ideal_pct ? Math.round((100 - p.costo_ideal_pct) * 10) / 10 :
+                           precioUnit > 0 ? Math.round((1 - costoUnit / precioUnit) * 1000) / 10 : 0
             return {
               platillo: p.platillo || p.nombre || '',
               qty: qty,
               precio: precioUnit,
               costo: costoUnit,
-              margen_pct: Math.round(margen * 10) / 10,
+              margen_pct: margen,
             }
-          }).filter((p: CostItem) => p.platillo && p.precio > 0)
-          setItems(mapped)
-          setFecha(row.fecha as string || '')
-        } else {
-          // Fallback: calculate from pos_recipes + pos_ingredients
+          }).filter((p: CostItem) => p.platillo && p.precio > 0 && p.margen_pct > -100)
+        }
+
+        // 1. Try costeo_por_platillo (Eduardo's Excel)
+        const costeoRow = await getWansoftDataLatest('costeo_por_platillo')
+        if (costeoRow?.data && Array.isArray(costeoRow.data) && costeoRow.data.length > 0) {
+          setItems(mapWansoftCost(costeoRow.data))
+          setFecha('Costeo Eduardo ' + (costeoRow.fecha || ''))
+          setLoading(false)
+          return
+        }
+
+        // 2. Try wansoft_food_cost table
+        const row = await getLatestDeep('wansoft_food_cost')
+        if (row?.data) {
+          const rawData = Array.isArray(row.data) ? row.data :
+                          typeof row.data === 'string' ? (() => { try { return JSON.parse(row.data as string) } catch { return [] } })() : []
+          if (Array.isArray(rawData) && rawData.length > 0 && rawData[0]?.platillo) {
+            setItems(mapWansoftCost(rawData))
+            setFecha(row.fecha as string || '')
+            setLoading(false)
+            return
+          }
+        }
+
+        // 3. Try food_cost_real from wansoft_data
+        const fcReal = await getWansoftDataLatest('food_cost_real')
+        if (fcReal?.data && Array.isArray(fcReal.data) && fcReal.data.length > 0) {
+          setItems(mapWansoftCost(fcReal.data))
+          setFecha(fcReal.fecha || '')
+          setLoading(false)
+          return
+        }
+
+        // 4. Last resort: pos_recipes + pos_ingredients
+        {
           const [recipes, ingredients, menuCats] = await Promise.all([getRecipes(), getIngredients(), getMenuCategoriesFromDB()])
           const ingMap = new Map(ingredients.map((i: Ingredient) => [i.id, i]))
 
-          // Group recipes by platillo
           const platilloMap = new Map<string, { name: string; cost: number; ingredients: number }>()
           for (const r of recipes) {
             const existing = platilloMap.get(r.menu_item_id) || { name: r.menu_item_name, cost: 0, ingredients: 0 }
             const ing = ingMap.get(r.ingredient_id)
             if (ing) {
-              existing.cost += (ing.cost_per_unit || 0) * r.quantity
+              // cost_per_unit is per KG/LT, quantity is in recipe units — multiply correctly
+              const unitCost = (ing.cost_per_unit || 0) / (ing.yield_factor || 1)
+              existing.cost += unitCost * r.quantity
               existing.ingredients++
             }
             platilloMap.set(r.menu_item_id, existing)
           }
 
-          // Match with menu prices from DB
           const menuPrices = new Map<string, number>()
           for (const cat of menuCats) {
             for (const item of cat.items) {
@@ -95,7 +110,7 @@ export default function FoodCostPage() {
           for (const [, p] of platilloMap) {
             const price = menuPrices.get(p.name.toLowerCase()) || 0
             const margen = price > 0 ? Math.round((1 - p.cost / price) * 100) : 0
-            if (p.cost > 0 || price > 0) {
+            if ((p.cost > 0 || price > 0) && margen > -100) {
               costItems.push({
                 platillo: p.name,
                 qty: p.ingredients,
@@ -107,7 +122,6 @@ export default function FoodCostPage() {
           }
           setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
           setFecha('pos_recipes')
-        }
         }
       } catch (err) {
         console.error('Error:', err)
