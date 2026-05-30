@@ -146,7 +146,7 @@ export default function ModificadoresPage() {
       {tab === 'mods' && (
         <>
           <div className="flex justify-end mb-4">
-            <button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            <button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
               <Plus size={16} /> Agregar
             </button>
           </div>
@@ -225,7 +225,7 @@ export default function ModificadoresPage() {
                     return (
                       <td key={g.id} className="text-center px-4 py-3">
                         <button onClick={() => toggleAssign(cat.id, g.id)}
-                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500/100 border-emerald-500 text-white' : 'border-[var(--line)] text-transparent hover:border-[var(--line)]'}`}>
+                          className={`w-8 h-8 rounded-lg border-2 transition-colors ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)] text-transparent hover:border-[var(--line)]'}`}>
                           {on && <span className="text-xs font-bold">&#10003;</span>}
                         </button>
                       </td>
@@ -261,7 +261,7 @@ export default function ModificadoresPage() {
                     return (
                       <td key={ot} className="text-center px-5 py-4">
                         <button onClick={() => toggleOrderType(g.id, ot)}
-                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500/100' : 'bg-[var(--line)]'}`}>
+                          className={`w-10 h-6 rounded-full transition-colors relative ${on ? 'bg-emerald-500' : 'bg-[var(--line)]'}`}>
                           <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-[var(--surface)] shadow transition-transform ${on ? 'left-[18px]' : 'left-0.5'}`} />
                         </button>
                       </td>

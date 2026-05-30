@@ -141,7 +141,7 @@ export default function InventarioPage() {
                   <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('costo_total')}>Costo total <ArrowUpDown size={12} className="inline" /></th>
                 </tr></thead>
                 <tbody>{filtered.slice(0, 200).map((item, i) => (
-                  <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.existencia < 5 && item.existencia > 0 ? 'bg-amber-500/100/10' : ''}`}>
+                  <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.existencia < 5 && item.existencia > 0 ? 'bg-amber-500/10' : ''}`}>
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
                     <td className={`px-4 py-3 text-right tabular-nums ${item.existencia < 5 ? 'text-amber-400 font-bold' : 'text-[var(--text-1)]'}`}>{item.existencia}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{item.unidad}</td>
@@ -168,7 +168,7 @@ export default function InventarioPage() {
                   <th className="text-right px-4 py-3 font-medium">Costo dif.</th>
                 </tr></thead>
                 <tbody>{shrinkage.map((item, i) => (
-                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/100/10">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10">
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.sistema}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.fisico}</td>

@@ -106,7 +106,7 @@ export default function ProveedoresPage() {
                     <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{pct.toFixed(1)}%</td>
                     <td className="px-4 py-3">
                       <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
-                        <div className="h-2 rounded-full bg-blue-500/100" style={{ width: `${Math.min(pct, 100)}%` }} />
+                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(pct, 100)}%` }} />
                       </div>
                     </td>
                   </tr>

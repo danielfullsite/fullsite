@@ -88,7 +88,6 @@ export default function PlatillosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Platillos y Categorías"
         subtitle="Desglose de ventas por grupo y platillos destacados (30 días)"
       />
@@ -339,7 +338,7 @@ export default function PlatillosPage() {
                 return (
                   <tr
                     key={g.nombre}
-                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors"
+                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors"
                   >
                     <td className="py-3 px-4 text-sm text-[var(--text-3)] tabular-nums font-medium">{i + 1}</td>
                     <td className="py-3 px-4">

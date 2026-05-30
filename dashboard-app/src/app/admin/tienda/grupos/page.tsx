@@ -63,7 +63,7 @@ export default function GruposTiendaPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <PageHeader title="Grupos y Departamentos" subtitle={`${departments.length} departamentos · ${groups.length} grupos`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nuevo grupo</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nuevo grupo</button>} />
 
       {adding && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">

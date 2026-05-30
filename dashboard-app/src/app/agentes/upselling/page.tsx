@@ -88,7 +88,7 @@ export default function UpsellingPage() {
 
       {/* Potencial total */}
       {data?.potencial_total != null && (
-        <div className="bg-[var(--surface)] rounded-xl border border-emerald-500/20 shadow-sm p-6 mb-6 text-center bg-emerald-500/10/30">
+        <div className="bg-[var(--surface)] rounded-xl border border-emerald-500/20 shadow-sm p-6 mb-6 text-center bg-emerald-500/10">
           <p className="text-xs text-emerald-600 font-medium mb-2 uppercase tracking-wider">Potencial de upselling diario</p>
           <p className="text-4xl font-bold text-emerald-600">{formatCurrency(data.potencial_total)}</p>
         </div>
@@ -202,7 +202,7 @@ export default function UpsellingPage() {
                     </div>
                     <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full transition-all ${b.bebidas_persona >= (bebidas.meta || 1) ? 'bg-emerald-500/100' : b.bebidas_persona >= (bebidas.promedio_general || 0) ? 'bg-amber-400' : 'bg-red-400'}`}
+                        className={`h-2 rounded-full transition-all ${b.bebidas_persona >= (bebidas.meta || 1) ? 'bg-emerald-500' : b.bebidas_persona >= (bebidas.promedio_general || 0) ? 'bg-amber-400' : 'bg-red-400'}`}
                         style={{ width: `${maxBPP > 0 ? (b.bebidas_persona / maxBPP) * 100 : 0}%` }}
                       />
                     </div>

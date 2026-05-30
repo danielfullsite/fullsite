@@ -290,7 +290,6 @@ export default function MeserosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Meseros"
         subtitle={`Performance de meseros - últimos ${period} días`}
       />
@@ -503,7 +502,7 @@ export default function MeserosPage() {
                     return (
                       <tr
                         key={m.nombre}
-                        className={`border-b border-[var(--line-soft)]/80 hover:bg-blue-500/10/40 transition-colors duration-150 ${
+                        className={`border-b border-[var(--line-soft)]/80 hover:bg-blue-500/10 transition-colors duration-150 ${
                           i % 2 === 1 ? 'bg-[var(--surface-2)]/40' : ''
                         }`}
                       >
@@ -823,7 +822,7 @@ export default function MeserosPage() {
                             <p className="text-2xl font-bold text-[var(--text-1)] tabular-nums mb-1">{kpi.fmt(kpi.val)}</p>
                             <div className="flex items-center gap-1.5">
                               <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                isAbove ? 'bg-emerald-500/100/10 text-emerald-400' : 'bg-red-500/10 text-red-500'
+                                isAbove ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-500'
                               }`}>
                                 {isAbove ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                                 {pctDiff}%

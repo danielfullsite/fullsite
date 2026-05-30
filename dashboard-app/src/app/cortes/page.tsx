@@ -135,7 +135,6 @@ export default function CortesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Cortes de Caja"
         subtitle={`Histórico de cortes diarios - últimos ${period} días`}
       />
@@ -246,7 +245,7 @@ export default function CortesPage() {
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 bg-[var(--surface-2)] rounded-full h-2">
               <div
-                className="h-2 rounded-full bg-emerald-500/100 animate-progress"
+                className="h-2 rounded-full bg-emerald-500 animate-progress"
                 style={{ width: `${totalVentas > 0 ? (totalEfectivo / totalVentas) * 100 : 0}%` }}
               />
             </div>
@@ -266,7 +265,7 @@ export default function CortesPage() {
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 bg-[var(--surface-2)] rounded-full h-2">
               <div
-                className="h-2 rounded-full bg-blue-500/100 animate-progress"
+                className="h-2 rounded-full bg-blue-500 animate-progress"
                 style={{ width: `${totalVentas > 0 ? (totalTarjeta / totalVentas) * 100 : 0}%` }}
               />
             </div>
@@ -305,7 +304,7 @@ export default function CortesPage() {
                 return (
                   <tr
                     key={d.fecha}
-                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors"
+                    className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors"
                   >
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -317,7 +316,7 @@ export default function CortesPage() {
                           })}
                         </span>
                         {prev && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-500/100/10 text-emerald-400' : 'bg-red-500/100/10 text-red-400'}`}>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                             {change >= 0 ? '+' : ''}{change.toFixed(0)}%
                           </span>
                         )}
@@ -398,7 +397,7 @@ export default function CortesPage() {
               </thead>
               <tbody>
                 {cashClosing.map((item, i) => (
-                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                     <td className="py-3 px-4 text-sm font-medium text-[var(--text-1)]">{item.nombre}</td>
                     <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">
                       {formatCurrency(item.total)}
@@ -446,7 +445,7 @@ export default function CortesPage() {
                   </thead>
                   <tbody>
                     {withdrawals.map((item, i) => (
-                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10/30 transition-colors">
+                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10 transition-colors">
                         <td className="py-3 px-4 text-sm text-[var(--text-1)]">{item.nombre}</td>
                         <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-red-600">
                           {formatCurrency(item.total)}
@@ -493,7 +492,7 @@ export default function CortesPage() {
                   </thead>
                   <tbody>
                     {deposits.map((item, i) => (
-                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                      <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                         <td className="py-3 px-4 text-sm text-[var(--text-1)]">{item.nombre}</td>
                         <td className="py-3 px-4 text-sm text-right tabular-nums font-bold text-blue-400">
                           {formatCurrency(item.total)}

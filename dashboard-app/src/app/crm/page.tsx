@@ -465,7 +465,7 @@ function CampanasTab({ clients, campaigns, setCampaigns, messages, setMessages }
         clientName: c.name,
         phone: c.phone,
         incentive: campaign.incentive || 'un detalle especial',
-        restaurantName: 'AMALAY',
+        restaurantName: 'Tu Restaurante',
         validDays: 'lunes a viernes',
       })).replace('{name}', c.name),
       status: 'pending' as const,
@@ -756,7 +756,7 @@ function CampaignWizard({ clients, onClose, onCreate }: {
   const [targetDays, setTargetDays] = useState(60)
   const [customDays, setCustomDays] = useState('')
   const [template, setTemplate] = useState(
-    'Hola {name}, te habla el conserje digital de AMALAY. Hace tiempo que no te vemos y nos encantaria regalarte {incentive} en tu proxima visita. Yo te puedo ayudar con tu reservacion, si te interesa visitarnos, contestame aqui y yo me encargo del resto. Promocion valida de {valid_days}.'
+    'Hola {name}, te habla el conserje digital de {restaurant}. Hace tiempo que no te vemos y nos encantaria regalarte {incentive} en tu proxima visita. Yo te puedo ayudar con tu reservacion, si te interesa visitarnos, contestame aqui y yo me encargo del resto. Promocion valida de {valid_days}.'
   )
   const [incentive, setIncentive] = useState('')
 
@@ -770,7 +770,7 @@ function CampaignWizard({ clients, onClose, onCreate }: {
     return template
       .replace('{name}', sampleName)
       .replace('{incentive}', incentive || 'un detalle especial')
-      .replace('{restaurant}', 'AMALAY')
+      .replace('{restaurant}', 'Tu Restaurante')
       .replace('{valid_days}', 'lunes a viernes')
   }, [template, incentive, targetClients])
 

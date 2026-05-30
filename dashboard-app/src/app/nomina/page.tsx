@@ -184,7 +184,7 @@ export default function NominaPage() {
                   <div className="flex flex-wrap gap-3">
                     {shifts.map((s, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 text-sm">
-                        <span className="w-2 h-2 rounded-full bg-blue-500/100" />
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
                         <span className="font-medium text-[var(--text-1)]">{s.nombre}</span>
                         <span className="text-[var(--text-3)]">{s.total}</span>
                       </span>

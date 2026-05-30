@@ -58,7 +58,7 @@ export default function AntiFraudePage() {
   function scoreBg(s: number): string {
     if (s >= 70) return 'border-red-300 bg-red-500/8'
     if (s >= 40) return 'border-amber-500/20 bg-amber-500/8'
-    return 'border-emerald-500/20 bg-emerald-500/10/30'
+    return 'border-emerald-500/20 bg-emerald-500/10'
   }
 
   function scoreLabel(s: number): string {
@@ -98,7 +98,7 @@ export default function AntiFraudePage() {
         <p className={`text-sm font-medium mt-1 ${scoreColor(score)}`}>{scoreLabel(score)}</p>
         <div className="mt-3 w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-3">
           <div
-            className={`h-3 rounded-full transition-all ${score >= 70 ? 'bg-red-500/100' : score >= 40 ? 'bg-amber-400' : 'bg-emerald-500/100'}`}
+            className={`h-3 rounded-full transition-all ${score >= 70 ? 'bg-red-500' : score >= 40 ? 'bg-amber-400' : 'bg-emerald-500'}`}
             style={{ width: `${Math.min(score, 100)}%` }}
           />
         </div>

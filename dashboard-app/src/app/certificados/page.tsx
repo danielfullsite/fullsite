@@ -156,7 +156,7 @@ function CertSecurity() {
 
         <h3>Monitoreo y Detección</h3>
         <ul>
-          <li>29 agentes de IA monitorean la operación 24/7</li>
+          <li>30 agentes de IA monitorean la operación 24/7</li>
           <li>Anti-fraude automático: detecta cancelaciones y descuentos sospechosos</li>
           <li>Auto-86: alerta cuando ingredientes llegan a nivel crítico</li>
           <li>Audit trail inmutable de cada acción en el POS</li>

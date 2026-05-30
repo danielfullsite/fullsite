@@ -47,15 +47,14 @@ const DEMO_CATEGORIES = [
 ]
 
 const DEMO_ROI = {
-  total: 47200,
-  monthly: 47200,
+  total: 80000,
+  monthly: 80000,
   agents: [
-    { name: 'Staffing Optimizer', value: 12800, desc: '4 semanas × $3,200 ahorro' },
-    { name: 'Anti-Fraude', value: 9200, desc: '5 hallazgos prevenidos × $1,840' },
-    { name: 'Anomalías', value: 8500, desc: '17 alertas × $500 corrección' },
-    { name: 'Briefing Diario', value: 7500, desc: '30 briefings × 15min × $500/hr' },
-    { name: 'Upselling', value: 5400, desc: '36 oportunidades × 10% conversión' },
-    { name: 'Predicción Compras', value: 3800, desc: 'Reducción de desperdicio 8%' },
+    { name: 'Reducción de merma', value: 39000, desc: 'De 3.2% a 0.8% — ahorro 75%' },
+    { name: 'Food cost optimizado', value: 22000, desc: '-9 pts de margen (38% → 29%)' },
+    { name: 'Upselling incremental', value: 8500, desc: 'Coach de meseros — postres y extras' },
+    { name: 'Reportes eliminados', value: 6400, desc: '12h/semana × $133/hr gerente' },
+    { name: 'Anti-Fraude', value: 4100, desc: '4 fraudes detectados/mes promedio' },
   ],
 }
 
@@ -80,7 +79,7 @@ export default function DemoLivePage() {
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">29 agentes activos</span>
+            <span className="text-xs font-medium text-emerald-400">30 agentes activos</span>
           </div>
         </div>
 

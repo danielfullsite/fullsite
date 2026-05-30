@@ -16,27 +16,27 @@ interface AgentResult {
 
 const AGENTS = [
   { id: 'anomaly', name: 'Anomalías', icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-500/8', desc: 'Detecta métricas fuera de patrón', href: '/agentes/anomalias' },
-  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/100/10', desc: 'Proyecta cómo cierra el día', href: '/agentes/prediccion' },
-  { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/100/10', desc: 'Oportunidades de venta adicional', href: '/agentes/upselling' },
+  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10', desc: 'Proyecta cómo cierra el día', href: '/agentes/prediccion' },
+  { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10', desc: 'Oportunidades de venta adicional', href: '/agentes/upselling' },
   { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-500/10', desc: 'Matriz BCG del menú', href: '/agentes/menu' },
-  { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-500/100/10', desc: 'Optimización de personal', href: '/agentes/staffing' },
+  { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Optimización de personal', href: '/agentes/staffing' },
   { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Detección de patrones sospechosos', href: '/agentes/antifraude' },
-  { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-500/100/10', desc: 'Cancelaciones y calidad', href: '/agentes/cocina' },
+  { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-500/10', desc: 'Cancelaciones y calidad', href: '/agentes/cocina' },
   { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-500/10', desc: 'Velocidad de atención', href: '/agentes/tiempo-mesa' },
-  { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-500/100/10', desc: 'Patrones de servicio', href: '/agentes/propinas-agente' },
-  { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-400', bg: 'bg-blue-500/100/10', desc: 'Gasto y concentración', href: '/agentes/proveedores-agente' },
+  { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-500/10', desc: 'Patrones de servicio', href: '/agentes/propinas-agente' },
+  { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-400', bg: 'bg-blue-500/10', desc: 'Gasto y concentración', href: '/agentes/proveedores-agente' },
   { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-400', bg: 'bg-red-500/8', desc: 'Compras vs consumo', href: '/agentes/desperdicio' },
-  { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-500/100/10', desc: 'Pronóstico × historial', href: '/agentes/clima' },
-  { id: 'hermes', name: 'Hermes', icon: Bot, color: 'text-indigo-500', bg: 'bg-indigo-500/100/10', desc: 'Mejora continua de agentes', href: '/agentes/hermes' },
+  { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-500/10', desc: 'Pronóstico × historial', href: '/agentes/clima' },
+  { id: 'hermes', name: 'Hermes', icon: Bot, color: 'text-indigo-500', bg: 'bg-indigo-500/10', desc: 'Mejora continua de agentes', href: '/agentes/hermes' },
   { id: 'speed-of-service', name: 'Velocidad', icon: Timer, color: 'text-cyan-600', bg: 'bg-cyan-500/10', desc: 'Tiempo de preparación por platillo' },
-  { id: 'inventory-auto-order', name: 'Auto-Orden', icon: Package, color: 'text-teal-500', bg: 'bg-teal-500/100/10', desc: 'OC automática cuando baja stock' },
-  { id: 'daily-briefing', name: 'Briefing Diario', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/100/10', desc: 'Resumen 7 AM en Telegram' },
-  { id: 'weekly-summary', name: 'Reporte Semanal', icon: BarChart3, color: 'text-purple-500', bg: 'bg-purple-500/100/10', desc: 'Ejecutivo cada lunes' },
-  { id: 'wansoft-query', name: 'KB 24/7', icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-500/100/10', desc: 'Preguntas on-demand por Telegram' },
-  { id: 'reservas', name: 'Reservaciones', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-500/100/10', desc: 'Alertas de reservas pendientes' },
+  { id: 'inventory-auto-order', name: 'Auto-Orden', icon: Package, color: 'text-teal-500', bg: 'bg-teal-500/10', desc: 'OC automática cuando baja stock' },
+  { id: 'daily-briefing', name: 'Briefing Diario', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10', desc: 'Resumen 7 AM en Telegram' },
+  { id: 'weekly-summary', name: 'Reporte Semanal', icon: BarChart3, color: 'text-purple-500', bg: 'bg-purple-500/10', desc: 'Ejecutivo cada lunes' },
+  { id: 'wansoft-query', name: 'KB 24/7', icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-500/10', desc: 'Preguntas on-demand por Telegram' },
+  { id: 'reservas', name: 'Reservaciones', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Alertas de reservas pendientes' },
   { id: 'wansoft-staleness', name: 'Monitor Sync', icon: Activity, color: 'text-red-500', bg: 'bg-red-500/8', desc: 'Alerta si datos >24h sin sync' },
   { id: 'proactive-alerts', name: 'Alertas Proactivas', icon: Bell, color: 'text-red-400', bg: 'bg-red-500/8', desc: 'Clima, eventos, días festivos' },
-  { id: 'intraday-sales', name: 'Ventas Intraday', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-500/100/10', desc: 'Avance de ventas en tiempo real' },
+  { id: 'intraday-sales', name: 'Ventas Intraday', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-500/10', desc: 'Avance de ventas en tiempo real' },
   { id: 'menu-gap', name: 'Análisis de Menú', icon: Sparkles, color: 'text-violet-600', bg: 'bg-violet-500/10', desc: 'Gaps y oportunidades del menú' },
   { id: 'config-validator', name: 'Config Validator', icon: Settings, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Verifica configuración del cliente' },
   { id: 'orquestador', name: 'Orquestador', icon: Bot, color: 'text-[var(--text-1)]', bg: 'bg-[var(--surface-2)]', desc: 'Cerebro central — despacha agentes' },
@@ -45,8 +45,8 @@ const AGENTS = [
 
 const priorityColors: Record<string, string> = {
   critical: 'bg-red-500/80 text-white',
-  warning: 'bg-amber-500/100/15 text-amber-400',
-  info: 'bg-emerald-500/100/15 text-emerald-400',
+  warning: 'bg-amber-500/15 text-amber-400',
+  info: 'bg-emerald-500/15 text-emerald-400',
 }
 
 export default function AgentesPage() {
@@ -87,7 +87,7 @@ export default function AgentesPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Agentes de IA</h2>
-          <p className="text-sm text-[var(--text-3)]">26 agentes monitoreando tu operación 24/7</p>
+          <p className="text-sm text-[var(--text-3)]">30 agentes monitoreando tu operación 24/7</p>
         </div>
         <button onClick={() => { setLoading(true); loadResults() }}
           className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
@@ -99,7 +99,7 @@ export default function AgentesPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Agentes activos</p>
-          <p className="text-2xl font-bold text-[var(--text-1)]">{activeCount} <span className="text-sm font-normal text-[var(--text-3)]">/ 26</span></p>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{activeCount} <span className="text-sm font-normal text-[var(--text-3)]">/ 30</span></p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4">
           <p className="text-xs text-[var(--text-2)] font-medium mb-1">Alertas críticas</p>
@@ -121,7 +121,7 @@ export default function AgentesPage() {
 
           const agentHref = (agent as { href?: string }).href
           const cardClass = `bg-[var(--surface)] rounded-xl border shadow-sm p-5 transition-all hover:shadow-md block ${
-            result?.priority === 'critical' ? 'border-red-300 bg-red-500/8/30' :
+            result?.priority === 'critical' ? 'border-red-300 bg-red-500/10' :
             result?.priority === 'warning' ? 'border-amber-500/20' : 'border-[var(--line)]'
           } ${agentHref ? 'cursor-pointer' : ''}`
 

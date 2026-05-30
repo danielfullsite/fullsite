@@ -343,7 +343,7 @@ MEMORIA DEL NEGOCIO:
 - Categorias principales: CHILAQUILES & ENCHILADAS, EGGS & KETO, COFFEE, TOAST & BAGELS, PANINIS, BOWLS, SMOOTHIES, PANCAKES & WAFFLES, BAKERY, DESSERTS
 - Meseros activos: Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo
 - Precio Fullsite: $4,999 MXN/mes por sucursal + $4,999 setup
-- 26 agentes de IA operando 24/7
+- 30 agentes de IA operando 24/7
 - Briefing diario a las 7 AM por Telegram
 - Anti-fraude semanal los viernes
 - Menu engineering los lunes

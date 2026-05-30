@@ -200,7 +200,6 @@ export default function TendenciasPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Tendencias"
         subtitle="Comparativos mensuales, por día de la semana, y acumulado del año"
       />
@@ -275,7 +274,7 @@ export default function TendenciasPage() {
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-[var(--line-soft)]">
-                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${card.change >= 0 ? 'bg-emerald-500/100/10 text-emerald-400' : 'bg-red-500/100/10 text-red-400'}`}>
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${card.change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                   {card.change >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                   {formatPercent(card.change)}
                 </span>
@@ -439,8 +438,8 @@ export default function TendenciasPage() {
                             <span
                               className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold ${
                                 isPositive
-                                  ? 'bg-emerald-500/100/10 text-emerald-400'
-                                  : 'bg-red-500/100/10 text-red-400'
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'bg-red-500/10 text-red-400'
                               }`}
                             >
                               {isPositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
@@ -603,7 +602,7 @@ export default function TendenciasPage() {
         </h3>
         <p className="text-xs text-[var(--text-3)] mb-5">Eduardo: &quot;No mezclar weekday con weekend — son clientes diferentes&quot;</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-blue-500/20 bg-blue-500/100/10 p-5">
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-5">
             <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-2">Lunes a Viernes</p>
             <p className="text-3xl font-bold text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekday.ticketPromedio)}</p>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--text-2)]">
@@ -617,7 +616,7 @@ export default function TendenciasPage() {
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/100/10 p-5">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-5">
             <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Sábado y Domingo</p>
             <p className="text-3xl font-bold text-[var(--text-1)]">{formatCurrency(tpWeekdayWeekend.weekend.ticketPromedio)}</p>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--text-2)]">
@@ -636,7 +635,7 @@ export default function TendenciasPage() {
           <div className="mt-4 pt-4 border-t border-[var(--line-soft)] text-center">
             <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold ${
               tpWeekdayWeekend.weekend.ticketPromedio > tpWeekdayWeekend.weekday.ticketPromedio
-                ? 'bg-amber-500/100/10 text-amber-400'
+                ? 'bg-amber-500/10 text-amber-400'
                 : 'bg-blue-500/10 text-blue-700'
             }`}>
               {tpWeekdayWeekend.weekend.ticketPromedio > tpWeekdayWeekend.weekday.ticketPromedio ? (

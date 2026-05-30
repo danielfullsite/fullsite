@@ -271,8 +271,8 @@ export default function CocinaPage() {
 
   const statusConfig: Record<string, { bg: string; border: string; badge: string; badgeText: string; label: string; nextLabel: string }> = {
     enviada: { bg: 'bg-[var(--surface-2)]', border: 'border-white/20', badge: 'bg-[var(--surface)]', badgeText: 'text-[var(--text-1)]', label: 'NUEVA', nextLabel: 'Preparando' },
-    preparando: { bg: 'bg-amber-950/40', border: 'border-amber-500/40', badge: 'bg-amber-500/100', badgeText: 'text-black', label: 'PREPARANDO', nextLabel: 'Lista' },
-    lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500/100', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
+    preparando: { bg: 'bg-amber-950/40', border: 'border-amber-500/40', badge: 'bg-amber-500', badgeText: 'text-black', label: 'PREPARANDO', nextLabel: 'Lista' },
+    lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
 
   // Production area classification for summary bar
@@ -285,7 +285,7 @@ export default function CocinaPage() {
   }
 
   const AREA_COLORS: Record<string, string> = {
-    'Caliente': 'bg-red-500/100',
+    'Caliente': 'bg-red-500',
     'Fría': 'bg-cyan-500',
     'Panadería': 'bg-orange-400',
   }
@@ -345,11 +345,11 @@ export default function CocinaPage() {
             <span className="text-sm text-[var(--text-4)]">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500/100" />
+            <div className="w-3 h-3 rounded-full bg-amber-500" />
             <span className="text-sm text-[var(--text-4)]">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500/100" />
+            <div className="w-3 h-3 rounded-full bg-emerald-500" />
             <span className="text-sm text-[var(--text-4)]">Listas ({orders.filter(o => o.status === 'lista').length})</span>
           </div>
         </div>
@@ -481,8 +481,8 @@ export default function CocinaPage() {
                     <button
                       onClick={() => advanceStatus(order.id, order.status, order.mesa, order.mesero)}
                       className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
-                        order.status === 'enviada' ? 'bg-amber-500/100 hover:bg-amber-400 text-black' :
-                        order.status === 'preparando' ? 'bg-emerald-500/100 hover:bg-emerald-400 text-black' :
+                        order.status === 'enviada' ? 'bg-amber-500 hover:bg-amber-400 text-black' :
+                        order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
                         'bg-slate-600 hover:bg-[var(--surface-2)]0 text-white'
                       }`}
                     >
@@ -660,7 +660,7 @@ export default function CocinaPage() {
               </button>
               <button
                 onClick={handleCancelItem}
-                className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500/100 text-white font-semibold flex items-center justify-center gap-2"
+                className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold flex items-center justify-center gap-2"
               >
                 <Ban size={18} />
                 Cancelar item

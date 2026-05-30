@@ -96,7 +96,6 @@ export default function PropinasPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Modulo de Propinas"
         subtitle="Analisis de propinas por mesero y metodo de pago"
       />
@@ -150,12 +149,12 @@ export default function PropinasPage() {
               <p className="text-xs mb-5">
                 {isRealTipsData ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Datos reales de Wansoft
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/100/10 text-amber-400 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500/100" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                     Estimado proporcional
                   </span>
                 )}

@@ -118,7 +118,6 @@ export default function EstadoResultadosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Estado de Resultados"
         subtitle="Profit & Loss - Resumen financiero mensual"
       />

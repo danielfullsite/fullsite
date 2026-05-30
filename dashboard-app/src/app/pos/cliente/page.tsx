@@ -67,7 +67,7 @@ export default function ClienteDisplay() {
       <header className="text-center py-6 border-b border-slate-800">
         <span className="text-white font-black text-3xl tracking-tight">
           fullsite
-          <span className="inline-block w-2.5 h-2.5 bg-emerald-500/100 ml-1 mb-1" />
+          <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-1 mb-1" />
         </span>
         {order && (
           <p className="text-[var(--text-3)] text-lg mt-2">Mesa {order.mesa}</p>

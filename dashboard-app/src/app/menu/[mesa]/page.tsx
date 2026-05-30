@@ -121,7 +121,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       <header className="bg-[var(--surface)] text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-20">
         <div>
           <span className="font-black text-lg tracking-tight">
-            fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500/100 ml-0.5 mb-0.5" />
+            fullsite<span className="inline-block w-1.5 h-1.5 bg-emerald-500 ml-0.5 mb-0.5" />
           </span>
           <span className="text-[var(--text-3)] text-sm ml-2">Mesa {mesaNum}</span>
         </div>
@@ -184,7 +184,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
                         </button>
                         <span className="font-bold text-emerald-600 text-lg">{inCart.qty}</span>
                         <button onClick={() => addItem(item)}
-                          className="w-8 h-8 rounded-full bg-emerald-500/100/10 text-emerald-400 flex items-center justify-center">
+                          className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                           <Plus size={14} />
                         </button>
                       </div>
@@ -208,7 +208,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       {totalItems > 0 && !showCart && (
         <div className="sticky bottom-0 bg-[var(--surface)] border-t border-[var(--line)] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-10">
           <button onClick={() => setShowCart(true)}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500/100 text-white font-bold text-lg rounded-2xl transition-colors flex items-center justify-center gap-3 shadow-lg shadow-emerald-200">
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-2xl transition-colors flex items-center justify-center gap-3 shadow-lg shadow-emerald-200">
             <ShoppingCart size={20} />
             Ver pedido ({totalItems}) · {formatMXN(totalPrice)}
           </button>
@@ -259,7 +259,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
                 <span>Total</span><span>{formatMXN(totalPrice + iva)}</span>
               </div>
               <button onClick={handleSend} disabled={sending}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500/100 disabled:bg-emerald-300 text-white font-bold text-lg rounded-2xl transition-colors flex items-center justify-center gap-3">
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white font-bold text-lg rounded-2xl transition-colors flex items-center justify-center gap-3">
                 <Send size={20} />
                 {sending ? 'Enviando...' : 'Enviar a cocina'}
               </button>

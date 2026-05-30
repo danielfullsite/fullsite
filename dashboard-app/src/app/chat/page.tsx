@@ -127,7 +127,7 @@ export default function ChatPage() {
             </p>
           </div>
           <div className="ml-auto hidden sm:flex items-center gap-1.5 bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-3 py-1 shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500/100" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-[11px] text-[var(--text-2)] font-medium">Powered by Claude</span>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function ChatPage() {
                 <button
                   key={card.title}
                   onClick={() => sendMessage(card.title)}
-                  className="group text-left bg-[var(--surface)] border border-[var(--line)] rounded-xl px-4 py-3.5 hover:shadow-md hover:border-blue-500/20 hover:bg-blue-500/10/30 transition-all duration-200 cursor-pointer"
+                  className="group text-left bg-[var(--surface)] border border-[var(--line)] rounded-xl px-4 py-3.5 hover:shadow-md hover:border-blue-500/20 hover:bg-blue-500/10 transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-xl shrink-0 mt-0.5">{card.icon}</span>
@@ -199,7 +199,7 @@ export default function ChatPage() {
                   <div
                     className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                       msg.role === 'user'
-                        ? 'bg-blue-500/100 text-white rounded-br-md'
+                        ? 'bg-blue-500 text-white rounded-br-md'
                         : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line-soft)] shadow-sm rounded-bl-md'
                     }`}
                   >
@@ -262,7 +262,7 @@ export default function ChatPage() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="w-11 h-11 bg-blue-500/100 text-white rounded-xl hover:bg-blue-600 transition-all disabled:opacity-40 disabled:hover:bg-blue-500/100 flex items-center justify-center shadow-sm hover:shadow shrink-0"
+            className="w-11 h-11 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all disabled:opacity-40 disabled:hover:bg-blue-500 flex items-center justify-center shadow-sm hover:shadow shrink-0"
           >
             <ArrowUp size={18} />
           </button>

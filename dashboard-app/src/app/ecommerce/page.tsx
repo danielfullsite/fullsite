@@ -110,7 +110,6 @@ export default function EcommercePage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="eCommerce"
         subtitle="Rappi, Ubereats y plataformas de delivery"
       />

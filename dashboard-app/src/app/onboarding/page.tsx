@@ -177,7 +177,7 @@ export default function OnboardingPage() {
       <header className="bg-[var(--surface)] border-b border-[var(--line)] px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <span className="font-black text-xl tracking-tight text-[var(--text-1)]">
-            fullsite<span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5" />
+            fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5" />
           </span>
           <span className="text-sm text-[var(--text-3)]">Configuración inicial</span>
         </div>

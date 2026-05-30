@@ -72,7 +72,7 @@ export default function ArticulosPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader title="Articulos Tienda" subtitle={`${items.length} productos`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Agregar</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Agregar</button>} />
 
       <div className="flex gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">

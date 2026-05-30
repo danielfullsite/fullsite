@@ -160,7 +160,6 @@ export default function VentasPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Ventas Detalladas"
         subtitle={`${dates.from} al ${dates.to} ${data.length > 0 ? `- ${data.length} días con datos` : ''}`}
       />
@@ -480,7 +479,7 @@ export default function VentasPage() {
                         </thead>
                         <tbody>
                           {cancelaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/100/10 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-red-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
@@ -506,7 +505,7 @@ export default function VentasPage() {
                         </thead>
                         <tbody>
                           {anulaciones.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-amber-500/100/10 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-amber-500/10 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-amber-400 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>
@@ -532,7 +531,7 @@ export default function VentasPage() {
                         </thead>
                         <tbody>
                           {cortesias.map((item, i) => (
-                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-orange-500/10/50 transition-colors">
+                            <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-orange-500/10 transition-colors">
                               <td className="py-2.5 text-[var(--text-1)]">{item.nombre}</td>
                               <td className="py-2.5 text-right font-medium text-orange-600 tabular-nums">{formatCurrency(item.total)}</td>
                             </tr>

@@ -200,7 +200,7 @@ export default function FoodCostPage() {
                 <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('margen_pct')}>Margen <ArrowUpDown size={12} className="inline" /></th>
               </tr></thead>
               <tbody>{filtered.map((item, i) => (
-                <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.margen_pct < 30 ? 'bg-red-500/100/10' : item.margen_pct > 70 ? 'bg-emerald-500/10/30' : ''}`}>
+                <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.margen_pct < 30 ? 'bg-red-500/10' : item.margen_pct > 70 ? 'bg-emerald-500/10' : ''}`}>
                   <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.platillo}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{item.qty}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(item.precio)}</td>
@@ -208,7 +208,7 @@ export default function FoodCostPage() {
                   <td className={`px-4 py-3 text-right tabular-nums font-bold ${item.margen_pct < 30 ? 'text-red-600' : item.margen_pct > 70 ? 'text-emerald-600' : 'text-[var(--text-1)]'}`}>
                     {item.margen_pct.toFixed(0)}%
                     <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5 mt-1">
-                      <div className={`h-1.5 rounded-full ${item.margen_pct < 30 ? 'bg-red-500/100' : item.margen_pct > 70 ? 'bg-emerald-500/100' : 'bg-amber-400'}`} style={{ width: `${Math.min(item.margen_pct, 100)}%` }} />
+                      <div className={`h-1.5 rounded-full ${item.margen_pct < 30 ? 'bg-red-500' : item.margen_pct > 70 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${Math.min(item.margen_pct, 100)}%` }} />
                     </div>
                   </td>
                 </tr>

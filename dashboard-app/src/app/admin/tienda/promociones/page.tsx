@@ -89,7 +89,7 @@ export default function PromosTiendaPage() {
           <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
             {items.map(i => (
               <button key={i.id} onClick={() => toggleAppliesTo(f, set, i.id)}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${f.applies_to.includes(i.id) ? 'bg-emerald-500/100 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--line)]'}`}>
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${f.applies_to.includes(i.id) ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)] hover:bg-[var(--line)]'}`}>
                 {i.name}
               </button>
             ))}
@@ -109,7 +109,7 @@ export default function PromosTiendaPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Promociones Tienda" subtitle={`${active.length} activas · ${inactive.length} inactivas`} eyebrow="Tienda"
-        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nueva promo</button>} />
+        action={<button onClick={() => setAdding(true)} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"><Plus size={16}/>Nueva promo</button>} />
 
       {adding && renderForm(form, setForm, true)}
       {editing && renderForm(editing, (v) => setEditing(v), false)}

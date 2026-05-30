@@ -45,7 +45,7 @@ export default function QRPage() {
                 <a
                   href={qrUrl}
                   download={`qr-mesa-${mesa}.png`}
-                  className="mt-2 inline-block px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500/100 text-white text-xs rounded-lg"
+                  className="mt-2 inline-block px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg"
                 >
                   Descargar
                 </a>

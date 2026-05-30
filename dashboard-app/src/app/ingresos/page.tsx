@@ -92,7 +92,6 @@ export default function IngresosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Control de Ingresos"
         subtitle="Desglose de métodos de pago y flujo diario"
       />
@@ -251,11 +250,11 @@ export default function IngresosPage() {
               </div>
               <div className="flex items-center gap-6 mt-4 justify-center">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500/100" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
                   <span className="text-xs text-[var(--text-2)]">Efectivo</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500/100" />
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
                   <span className="text-xs text-[var(--text-2)]">Tarjeta</span>
                 </div>
               </div>

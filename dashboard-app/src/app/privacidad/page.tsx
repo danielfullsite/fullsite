@@ -7,7 +7,7 @@ export default function PrivacidadPage() {
           <a href="/login" className="inline-block mb-6">
             <span className="text-[#1a1a1a] font-black text-2xl tracking-tight">
               fullsite
-              <span className="inline-block w-2 h-2 bg-emerald-500/100 ml-0.5 mb-0.5 rounded-none" />
+              <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
             </span>
           </a>
           <h1 className="text-2xl font-bold text-text mb-2">Aviso de Privacidad Integral</h1>

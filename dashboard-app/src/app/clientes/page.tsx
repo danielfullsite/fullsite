@@ -106,7 +106,7 @@ export default function ClientesPage() {
         </div>
         <button
           onClick={() => { setEditing({ ...emptyCustomer }); setIsNew(true) }}
-          className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
+          className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
         >
           <Plus size={16} /> Nuevo cliente
         </button>
@@ -238,7 +238,7 @@ export default function ClientesPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSave}
-                className="flex-1 px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
                 <Save size={14} /> Guardar
               </button>
               {!isNew && (

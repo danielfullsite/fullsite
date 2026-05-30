@@ -84,7 +84,7 @@ export default function PredicciónPage() {
         {data?.avance_pct != null && (
           <div className="mt-3">
             <div className="w-full max-w-xs mx-auto bg-[var(--surface-2)] rounded-full h-2.5">
-              <div className="h-2.5 rounded-full bg-blue-500/100 transition-all" style={{ width: `${Math.min(data.avance_pct, 100)}%` }} />
+              <div className="h-2.5 rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(data.avance_pct, 100)}%` }} />
             </div>
             <p className="text-xs text-[var(--text-2)] mt-1">{data.avance_pct.toFixed(0)}% avance</p>
           </div>

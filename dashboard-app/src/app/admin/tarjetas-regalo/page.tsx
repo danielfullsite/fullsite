@@ -145,7 +145,7 @@ export default function TarjetasRegaloPage() {
                   <td className="px-4 py-3">
                     <div className="text-[var(--text-1)] font-medium">${c.current_balance.toFixed(2)} <span className="text-[var(--text-4)] font-normal">/ ${c.initial_balance.toFixed(2)}</span></div>
                     <div className="w-24 h-1.5 bg-[var(--surface-2)] rounded-full mt-1 overflow-hidden">
-                      <div className={`h-full rounded-full ${pct(c) > 50 ? 'bg-green-500/100' : pct(c) > 20 ? 'bg-yellow-500/100' : 'bg-red-500/100'}`} style={{width:`${pct(c)}%`}}/>
+                      <div className={`h-full rounded-full ${pct(c) > 50 ? 'bg-green-500' : pct(c) > 20 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width:`${pct(c)}%`}}/>
                     </div>
                   </td>
                   <td className="px-4 py-3"><span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${statusColor[c.status]||'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>{c.status}</span></td>

@@ -100,7 +100,7 @@ export default function AdminHorariosPage() {
     <div className="flex gap-1">
       {DAYS.map((d, i) => (
         <button key={i} type="button" onClick={() => toggleDay(i, target)}
-          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500/100 text-white' : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'}`}>
+          className={`w-9 h-8 rounded-lg text-xs font-semibold transition-colors ${days.includes(i) ? 'bg-emerald-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'}`}>
           {d}
         </button>
       ))}
@@ -115,7 +115,7 @@ export default function AdminHorariosPage() {
         eyebrow="Admin"
         action={
           <button onClick={() => setAdding(true)}
-            className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
             <Plus size={16} /> Agregar horario
           </button>
         }

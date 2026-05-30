@@ -112,7 +112,7 @@ export default function StaffingPage() {
                   const isMax = d.ventas_por_mesero === maxVPM
                   const isMin = d.ventas_por_mesero === minVPM && porDia.length > 1
                   return (
-                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-500/8' : isMin ? 'bg-emerald-500/10/30' : ''}`}>
+                    <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${isMax ? 'bg-red-500/8' : isMin ? 'bg-emerald-500/10' : ''}`}>
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">{d.dia}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(d.ventas_promedio)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{d.meseros}</td>

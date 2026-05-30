@@ -92,7 +92,7 @@ export default function AdminTamañosPage() {
         eyebrow="Admin"
         action={
           <button onClick={() => setAdding(true)}
-            className="px-4 py-2.5 bg-emerald-500/100 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
             <Plus size={16} /> Agregar tamaño
           </button>
         }

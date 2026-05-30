@@ -120,7 +120,7 @@ export default function PreciosPage() {
                 return (
                   <div key={item.id} className="px-5 py-2.5 flex items-center gap-3 hover:bg-[var(--surface-2)]">
                     <button onClick={() => toggleSelect(item.id)}
-                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500/100 border-emerald-500 text-white' : 'border-[var(--line)]'}`}>
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selected.has(item.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--line)]'}`}>
                       {selected.has(item.id) && <Check size={12} />}
                     </button>
                     <span className="text-sm font-medium text-[var(--text-1)] flex-1">{item.name}</span>

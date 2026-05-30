@@ -120,7 +120,6 @@ export default function ReportesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="AMALAY Coffee & Market"
         title="Generador de Reportes"
         subtitle="Selecciona un tipo de reporte, rango de fechas y genera"
       />
@@ -179,7 +178,7 @@ export default function ReportesPage() {
           <button
             onClick={generate}
             disabled={loading}
-            className="px-6 py-2.5 bg-blue-500/100 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
           >
             <FileBarChart size={16} />
             {loading ? 'Generando...' : 'Generar reporte'}
@@ -264,7 +263,7 @@ export default function ReportesPage() {
                     </thead>
                     <tbody>
                       {reportData.payments.map(p => (
-                        <tr key={p.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                        <tr key={p.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                           <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">{p.nombre}</td>
                           <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(p.total)}</td>
                           <td className="py-2.5 px-4 text-sm text-right tabular-nums text-[var(--text-2)]">
@@ -297,14 +296,14 @@ export default function ReportesPage() {
                         const meseroMax = reportData.meseros[0]?.total || 1
                         const barWidth = meseroMax > 0 ? ((m.total / meseroMax) * 100) : 0
                         return (
-                          <tr key={m.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                          <tr key={m.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                             <td className="py-2.5 px-4 text-sm text-[var(--text-3)] font-medium">{i + 1}</td>
                             <td className="py-2.5 px-4">
                               <div className="flex items-center gap-3">
                                 <span className="text-sm font-medium text-[var(--text-1)]">{m.nombre}</span>
                               </div>
                               <div className="mt-1 w-32 bg-[var(--surface-2)] rounded-full h-1">
-                                <div className="h-1 rounded-full bg-blue-500/100 animate-progress" style={{ width: `${barWidth}%` }} />
+                                <div className="h-1 rounded-full bg-blue-500 animate-progress" style={{ width: `${barWidth}%` }} />
                               </div>
                             </td>
                             <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(m.total)}</td>
@@ -336,7 +335,7 @@ export default function ReportesPage() {
                       {reportData.grupos.map((g, i) => {
                         const totalG = reportData.grupos.reduce((s, x) => s + x.total, 0)
                         return (
-                          <tr key={g.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                          <tr key={g.nombre} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                             <td className="py-2.5 px-4 text-sm text-[var(--text-3)]">{i + 1}</td>
                             <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">{g.nombre}</td>
                             <td className="py-2.5 px-4 text-sm text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(g.total)}</td>
@@ -369,7 +368,7 @@ export default function ReportesPage() {
                     </thead>
                     <tbody>
                       {[...data].reverse().map(d => (
-                        <tr key={d.fecha} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10/30 transition-colors">
+                        <tr key={d.fecha} className="border-b border-[var(--line-soft)] hover:bg-blue-500/10 transition-colors">
                           <td className="py-2.5 px-4 text-sm font-medium text-[var(--text-1)]">
                             {new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
                               weekday: 'short',
