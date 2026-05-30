@@ -1168,7 +1168,7 @@ def ask_groq(question, wansoft_data, historical_data):
                 "max_tokens": 4000,
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": context}],
-            }, timeout=30)
+            }, timeout=90)
         r.raise_for_status()
         answer = r.json()["content"][0]["text"].strip()
         print("[wansoft-query] Answered via Anthropic")
