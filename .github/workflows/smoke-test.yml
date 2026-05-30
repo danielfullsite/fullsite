@@ -1,0 +1,39 @@
+name: Smoke Test (Post-Deploy)
+
+on:
+  # Run after every push to main (deploys)
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard-app/**'
+      - 'index.html'
+  # Manual trigger
+  workflow_dispatch:
+  # Also run every 6 hours as a safety net
+  schedule:
+    - cron: '0 13,19,1,7 * * *'  # 7am, 1pm, 7pm, 1am MX
+
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  DASHBOARD_URL: https://app.fullsite.mx
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    # Wait 90 seconds after push for Vercel to deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Vercel deploy
+        if: github.event_name == 'push'
+        run: sleep 90
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run smoke test
+        run: python .github/scripts/smoke_test.py
