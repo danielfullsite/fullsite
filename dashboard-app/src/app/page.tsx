@@ -340,6 +340,11 @@ export default function DashboardPage() {
           {latestDay && (
             <span className="text-sm text-[var(--text-3)]">
               {formatDate(latestDay.fecha)}
+              {latestDay.updated_at && (
+                <span className="ml-2 text-xs text-[var(--text-4)]">
+                  · Actualizado {new Date(latestDay.updated_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </span>
           )}
         </div>

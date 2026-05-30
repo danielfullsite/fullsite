@@ -18,6 +18,7 @@ export interface WansoftDaily {
   platillos_top: PlatilloEntry[]
   ventas_por_grupo: GrupoEntry[]
   pago_métodos: PagoMetodoEntry[]
+  updated_at?: string
 }
 
 export interface MeseroEntry {
