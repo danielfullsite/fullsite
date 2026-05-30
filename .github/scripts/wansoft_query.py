@@ -642,6 +642,36 @@ def fetch_inventory_and_costs():
             pass
     print(f"[wansoft-query] Deep tables: {', '.join(k for k in ['propinas_detalle','proveedores_gasto','labor_data','food_cost_data','inventario_wansoft'] if k in extra)}")
 
+    # 7. Weather forecast (free API — wttr.in)
+    try:
+        city = CLIENT.get("city", "Monterrey")
+        wr = requests.get(f"https://wttr.in/{city}?format=j1", timeout=5)
+        if wr.ok:
+            weather = wr.json()
+            current = weather.get("current_condition", [{}])[0]
+            forecast_days = weather.get("weather", [])
+            extra["clima"] = {
+                "actual": {
+                    "temp_c": current.get("temp_C"),
+                    "desc": current.get("lang_es", [{}])[0].get("value", current.get("weatherDesc", [{}])[0].get("value", "")),
+                    "humedad": current.get("humidity"),
+                    "lluvia_mm": current.get("precipMM"),
+                },
+                "pronostico": [
+                    {
+                        "fecha": d.get("date"),
+                        "max_c": d.get("maxtempC"),
+                        "min_c": d.get("mintempC"),
+                        "desc": d.get("hourly", [{}])[4].get("lang_es", [{}])[0].get("value", "") if d.get("hourly") else "",
+                        "lluvia_mm": max(float(h.get("precipMM", 0)) for h in d.get("hourly", [{"precipMM": "0"}])),
+                    }
+                    for d in forecast_days[:3]
+                ],
+            }
+            print(f"[wansoft-query] Weather loaded: {extra['clima']['actual']['temp_c']}°C, {extra['clima']['actual']['desc']}")
+    except Exception as e:
+        print(f"[wansoft-query] Weather FAILED: {e}")
+
     return extra
 
 
@@ -735,22 +765,29 @@ CÓMO INTERPRETAR:
 
 MAPA DE DATOS DISPONIBLES:
 Lo que SI tienes:
-- Ventas diarias (brutas, netas, por mesero, por grupo, por platillo) — DATOS REALES, confiables
+- Ventas diarias (brutas, netas, por mesero, por grupo, por platillo) — DATOS REALES
 - Tickets, personas, ticket promedio — DATOS REALES
-- Metodos de pago (conteo de transacciones) — DATOS REALES
+- Metodos de pago (conteo de transacciones + pesos) — DATOS REALES
 - Efectivo y tarjeta en PESOS (historico diario) — DATOS REALES
 - Mesero x categoria: H&H, Pan, Postres, 2da Bebida, bebidas por persona — DATOS REALES
 - Historico diario de hasta 90 dias — DATOS REALES
-- Descuentos y cortesias (resumen diario) — DATOS REALES cuando hay
-- Cancelaciones y anulaciones — DATOS REALES cuando hay
+- Descuentos y cortesias (resumen diario) — DATOS REALES
+- Cancelaciones y anulaciones — DATOS REALES
+- Food cost por platillo (costo, margen, recetas con ingredientes) — DATOS REALES
+- Propinas por mesero — DATOS REALES (cuando hay datos del dia)
+- Inventario (existencias, criticos, proveedores) — DATOS REALES
+- Clima actual y pronostico 3 dias (temperatura, lluvia, descripcion) — DATOS REALES
+- Reservaciones proximas — DATOS REALES
+- Ventas por hora del dia — cuando Wansoft lo reporta
 
-Lo que NO tienes y DONDE encontrarlo:
-- Propinas por mesero → "Revisa en Wansoft > Reportes > Modulo de propinas > Reporte de propinas"
-- Costo de receta / food cost → "Revisa en Wansoft > Reportes > Inventarios > Costo y margen"
-- Inventario actual → "Revisa en Wansoft > Inventario > Auditoria > Reporte de existencias"
+IMPORTANTE sobre ventas "a cierta hora":
+- Los datos que tienes son el CONSOLIDADO del dia hasta el momento del ultimo sync.
+- NO tienes snapshots por hora. Si preguntan "cuanto llevabamos a las 2pm", di que solo tienes el consolidado actual y la hora del ultimo sync.
+
+Lo que NO tienes:
+- Ventas acumuladas a una hora especifica del pasado → "Solo tengo el consolidado del dia. No tengo snapshots por hora."
 - Detalle de una orden especifica → "Revisa en Wansoft > Reportes > Ingresos > Detalle de ticket"
 - Promociones activas → "Revisa en Wansoft > Punto de venta > Restaurante > Promociones"
-- Horarios de empleados → "Revisa en Wansoft > Reportes > Horas trabajadas"
 
 FORMATO: Moneda SIEMPRE en pesos mexicanos MXN. Usa $ sin decimales. NUNCA JAMAS digas "dólares", "USD", "dollars" — todo es PESOS MEXICANOS. Texto plano para Telegram, sin markdown, sin asteriscos, sin ##, sin **. EXCLUIR de rankings: {_exclude_str}
 """
@@ -964,6 +1001,9 @@ def ask_groq(question, wansoft_data, historical_data):
     if "reservaciones" in wd:
         cost_block["reservaciones"] = wd["reservaciones"]
 
+    if "clima" in wd:
+        cost_block["clima"] = wd["clima"]
+
     # Smart: only include detailed data if question is about that topic
     keyword_map = {
         "purchases_by_product": ["compr", "compra", "proveedor", "gast", "kilo"],
@@ -984,6 +1024,7 @@ def ask_groq(question, wansoft_data, historical_data):
         "proveedores_gasto": ["proveedor", "gasto", "compra"],
         "food_cost_data": ["food cost", "costo", "margen"],
         "propinas_detalle": ["propina", "tip"],
+        "clima": ["clima", "tiempo", "lluvia", "llover", "temperatura", "calor", "frio", "pronostico", "pronóstico", "weather"],
     }
 
     for key, keywords in keyword_map.items():

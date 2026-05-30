@@ -49,7 +49,19 @@ def sb_get(table, params):
 
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis():
-    """Fetch today's real-time data from wansoft_kpis."""
+    """Fetch today's data — prefer wansoft_daily (fresh) over wansoft_kpis (often stale)."""
+    today_str = datetime.now(MX_TZ).strftime("%Y-%m-%d")
+    # Try wansoft_daily first (updated by scrapers throughout the day)
+    rows = sb_get("wansoft_daily", {
+        "client_slug": f"eq.{CLIENT['id']}",
+        "fecha": f"eq.{today_str}",
+        "select": "*",
+        "order": "updated_at.desc",
+        "limit": "1",
+    })
+    if rows and float(rows[0].get("ventas_dia") or 0) > 0:
+        return rows[0]
+    # Fallback to wansoft_kpis (real-time but often stale)
     rows = sb_get("wansoft_kpis", {"select": "*", "limit": "1"})
     return rows[0] if rows else None
 
