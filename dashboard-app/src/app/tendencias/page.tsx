@@ -185,6 +185,18 @@ export default function TendenciasPage() {
     )
   }
 
+  if (allData.length === 0) {
+    return (
+      <>
+        <PageHeader title="Tendencias" subtitle="Análisis de tendencias y comparativos" />
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-12 text-center">
+          <TrendingUp size={32} className="text-[var(--text-3)] mx-auto mb-4" />
+          <p className="text-[var(--text-2)] text-sm">Sin datos históricos. Las tendencias se generan con al menos 7 días de información.</p>
+        </div>
+      </>
+    )
+  }
+
   const currentMonth = monthlyAgg[monthlyAgg.length - 1]
   const prevMonth = monthlyAgg.length >= 2 ? monthlyAgg[monthlyAgg.length - 2] : null
 

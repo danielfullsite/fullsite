@@ -55,15 +55,63 @@ export default function AgentesPage() {
 
   async function loadResults() {
     try {
-      const data = await getDeepTable('agent_results', 50)
+      // Fetch from both agent_results (detailed) and agent_runs (execution log)
+      const [resultsData, runsData] = await Promise.all([
+        getDeepTable('agent_results', 50),
+        getDeepTable('agent_runs', 100),
+      ])
       const map: Record<string, AgentResult> = {}
-      for (const row of data) {
+
+      // First pass: agent_results (has detailed summary/priority)
+      for (const row of resultsData) {
         const r = row as unknown as AgentResult
-        // Keep latest per agent
         if (!map[r.agent_id] || r.fecha > map[r.agent_id].fecha) {
           map[r.agent_id] = r
         }
       }
+
+      // Second pass: agent_runs (many agents only log here)
+      // Map agent_runs IDs to AGENTS IDs
+      const runsIdMap: Record<string, string> = {
+        'anomaly-detector': 'anomaly',
+        'close-predictor': 'predictor',
+        'antifraud-agent': 'antifraud',
+        'kitchen-quality': 'kitchen',
+        'tips-analyzer': 'tips',
+        'supplier-monitor': 'suppliers',
+        'waste-detector': 'waste',
+        'staffing-optimizer': 'staffing',
+        'climate-events': 'climate',
+        'reservas-pendientes': 'reservas',
+        'weekly-amalay': 'weekly-summary',
+      }
+      const runCounts: Record<string, { count: number; lastRun: string }> = {}
+      for (const row of runsData) {
+        const r = row as unknown as { agent_id: string; status: string; created_at: string; updated_at: string }
+        const mappedId = runsIdMap[r.agent_id] || r.agent_id
+        if (!runCounts[mappedId]) {
+          runCounts[mappedId] = { count: 1, lastRun: r.updated_at || r.created_at || '' }
+        } else {
+          runCounts[mappedId].count++
+          const ts = r.updated_at || r.created_at || ''
+          if (ts > runCounts[mappedId].lastRun) runCounts[mappedId].lastRun = ts
+        }
+      }
+
+      // Fill in agents that only have agent_runs data
+      for (const [agentId, info] of Object.entries(runCounts)) {
+        if (!map[agentId]) {
+          map[agentId] = {
+            agent_id: agentId,
+            fecha: info.lastRun.slice(0, 10),
+            data: null,
+            summary: `${info.count} ejecuciones registradas`,
+            priority: 'info',
+            updated_at: info.lastRun,
+          }
+        }
+      }
+
       setResults(map)
     } catch (err) {
       console.error('Error loading agent results:', err)
