@@ -103,7 +103,6 @@ const navSections = [
       { href: '/crm', label: 'CRM', icon: Users },
       { href: '/mission-control', label: 'Mission Control', icon: Bot },
       { href: '/agentes', label: 'Agentes IA', icon: Bot },
-      { href: '/agentes/resenas', label: 'Reseñas', icon: Star },
       { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/chat', label: 'Chat IA', icon: MessageCircle },
       { href: '/voice', label: 'Voice Agent', icon: Mic },

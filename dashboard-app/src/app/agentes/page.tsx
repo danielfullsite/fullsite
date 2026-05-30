@@ -40,7 +40,6 @@ const AGENTS = [
   { id: 'menu-gap', name: 'Análisis de Menú', icon: Sparkles, color: 'text-violet-600', bg: 'bg-violet-500/10', desc: 'Gaps y oportunidades del menú' },
   { id: 'config-validator', name: 'Config Validator', icon: Settings, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Verifica configuración del cliente' },
   { id: 'orquestador', name: 'Orquestador', icon: Bot, color: 'text-[var(--text-1)]', bg: 'bg-[var(--surface-2)]', desc: 'Cerebro central — despacha agentes' },
-  { id: 'reviews', name: 'Reseñas Google', icon: Star, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Auto-responder con IA', href: '/agentes/resenas' },
 ]
 
 const priorityColors: Record<string, string> = {
