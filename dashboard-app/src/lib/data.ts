@@ -3,6 +3,16 @@ import type { WansoftDaily } from './types'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+/** Get the current client slug from AuthContext (stored in localStorage after login). Falls back to 'amalay' for backward compat. */
+export function getActiveClientSlug(): string {
+  if (typeof window === 'undefined') return 'amalay'
+  try {
+    const stored = localStorage.getItem('fullsite_client_id')
+    if (stored) return stored
+  } catch { /* SSR or private browsing */ }
+  return 'amalay'
+}
+
 async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
   try {
@@ -95,25 +105,25 @@ function locationFilter(locationId?: string | null): string {
   return locationId ? `&location_id=eq.${locationId}` : ''
 }
 
-export async function getRecentDays(days: number = 30, clientSlug: string = 'amalay', locationId?: string | null): Promise<WansoftDaily[]> {
+export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const filtered = dedupeByFecha(data).slice(0, days)
   return filtered.reverse().map(parseRow)
 }
 
-export async function getLatestDay(clientSlug: string = 'amalay', locationId?: string | null): Promise<WansoftDaily | null> {
+export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
-export async function getDayData(fecha: string, clientSlug: string = 'amalay', locationId?: string | null): Promise<WansoftDaily | null> {
+export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=eq.${fecha}&ventas_dia=gt.0&order=ventas_dia.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   return deduped.length > 0 ? parseRow(deduped[0]) : null
 }
 
-export async function getMonthlyData(clientSlug: string = 'amalay', locationId?: string | null): Promise<WansoftDaily[]> {
+export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
   return dedupeByFecha(data).map(parseRow)
 }
@@ -158,7 +168,7 @@ export function aggregateMeseros(
 }
 
 // Get data for a date range
-export async function getDateRange(from: string, to: string, clientSlug: string = 'amalay', locationId?: string | null): Promise<WansoftDaily[]> {
+export async function getDateRange(from: string, to: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch(
     'wansoft_daily',
     `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
@@ -216,14 +226,14 @@ export async function getLatestDeep(table: string): Promise<{ fecha: string; dat
 }
 
 // Get data from wansoft_data generic table
-export async function getWansoftData(dataKey: string, clientId: string = 'amalay') {
+export async function getWansoftData(dataKey: string, clientId: string = getActiveClientSlug()) {
   const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
   if (data.length === 0) return null
   return { fecha: data[0].fecha as string, data: parseJsonb(data[0].data) }
 }
 
 // Get multiple days of wansoft_data
-export async function getWansoftDataRange(dataKey: string, days: number = 30, clientId: string = 'amalay') {
+export async function getWansoftDataRange(dataKey: string, days: number = 30, clientId: string = getActiveClientSlug()) {
   const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=${days}`) as Record<string, unknown>[]
   return data.map(row => ({ fecha: row.fecha as string, data: parseJsonb(row.data) }))
 }
@@ -250,7 +260,7 @@ export function aggregateGrupos(
 
 // ── Wansoft Data (35 data types) ────────────────────────────────────
 
-export async function getWansoftDataLatest(dataKey: string, clientId: string = 'amalay') {
+export async function getWansoftDataLatest(dataKey: string, clientId: string = getActiveClientSlug()) {
   const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
   if (data.length === 0) return null
   let raw = data[0].data
@@ -265,7 +275,7 @@ export async function getWansoftDataLatest(dataKey: string, clientId: string = '
 
 // ── Google Reviews ──────────────────────────────────────────────────
 
-export async function getGoogleReviews(clientSlug: string = 'amalay') {
+export async function getGoogleReviews(clientSlug: string = getActiveClientSlug()) {
   return sbFetch('google_reviews', `select=*&client_slug=eq.${clientSlug}&order=create_time.desc&limit=100`)
 }
 

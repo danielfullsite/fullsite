@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Search, RefreshCw, FileText, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Search, RefreshCw, FileText, ChevronDown, ChevronRight, Printer } from 'lucide-react'
 import { formatMXN } from '@/lib/pos-data'
+import { printTicketCSS } from '@/lib/printer'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -168,11 +169,45 @@ export default function HistorialPage() {
                             </div>
                           ))}
                         </div>
-                        <div className="border-t border-slate-700 pt-2 text-xs text-[var(--text-2)] flex gap-4">
+                        <div className="border-t border-slate-700 pt-2 text-xs text-[var(--text-2)] flex items-center gap-4">
                           <span>Sub: {formatMXN(order.subtotal)}</span>
                           <span>IVA: {formatMXN(order.iva)}</span>
                           {order.descuento > 0 && <span className="text-red-400">Desc: -{formatMXN(order.descuento)}</span>}
                           <span>ID: {order.id.slice(0, 8)}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              printTicketCSS({
+                                id: order.id,
+                                mesa: order.mesa,
+                                mesero: order.mesero,
+                                personas: order.personas,
+                                status: (order.status as 'cerrada') || 'cerrada',
+                                items: items.map((it: { nombre?: string; name?: string; cantidad?: number; quantity?: number; subtotal?: number; precio?: number; precioExtra?: number; modificadores?: string[]; notas?: string; menuItemId?: string }) => ({
+                                  id: it.menuItemId || '',
+                                  menuItemId: it.menuItemId || '',
+                                  nombre: it.nombre || it.name || '',
+                                  precio: it.precio || (it.subtotal || 0) / (it.cantidad || it.quantity || 1),
+                                  cantidad: it.cantidad || it.quantity || 1,
+                                  subtotal: it.subtotal || 0,
+                                  precioExtra: it.precioExtra || 0,
+                                  modificadores: it.modificadores || [],
+                                  notas: it.notas || '',
+                                })),
+                                subtotal: order.subtotal,
+                                iva: order.iva,
+                                descuento: order.descuento,
+                                total: order.total,
+                                metodoPago: order.metodo_pago || undefined,
+                                createdAt: new Date(order.created_at),
+                                closedAt: order.closed_at ? new Date(order.closed_at) : undefined,
+                              })
+                            }}
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-medium transition-colors"
+                          >
+                            <Printer size={12} />
+                            Reimprimir
+                          </button>
                         </div>
                       </div>
                     </div>

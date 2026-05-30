@@ -248,11 +248,19 @@ const _SUPABASE_URL = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_S
 const _SUPABASE_KEY = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' : ''
 const _SB_HEADERS = { apikey: _SUPABASE_KEY, Authorization: `Bearer ${_SUPABASE_KEY}` }
 
+/** Get current client ID from localStorage (set by AuthContext on login). Falls back to 'amalay'. */
+function _getClientId(): string {
+  if (typeof window === 'undefined') return 'amalay'
+  try {
+    return localStorage.getItem('fullsite_client_id') || 'amalay'
+  } catch { return 'amalay' }
+}
+
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
     const [catRes, itemsRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.amalay&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${_getClientId()}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
     ])
     if (!catRes.ok || !itemsRes.ok) return MENU_CATEGORIES
 
@@ -284,7 +292,7 @@ export async function getModifiersForCategoryFromDB(categoryId: string): Promise
 }> {
   try {
     const assignRes = await fetch(
-      `${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.amalay&category_id=eq.${categoryId}&select=modifier_group_id`,
+      `${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${_getClientId()}&category_id=eq.${categoryId}&select=modifier_group_id`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
     if (!assignRes.ok) return getModifiersForCategory(categoryId)
@@ -294,7 +302,7 @@ export async function getModifiersForCategoryFromDB(categoryId: string): Promise
 
     const groupIds = assignments.map(a => a.modifier_group_id)
     const modRes = await fetch(
-      `${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.amalay&active=eq.true&group_id=in.(${groupIds.join(',')})&order=sort_order.asc`,
+      `${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${_getClientId()}&active=eq.true&group_id=in.(${groupIds.join(',')})&order=sort_order.asc`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
     if (!modRes.ok) return getModifiersForCategory(categoryId)
@@ -828,7 +836,7 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function saveOrder(order: Order): Promise<boolean> {
   const orderData: Record<string, unknown> = {
-    client_id: 'amalay',
+    client_id: _getClientId(),
     mesa: order.mesa,
     mesero: order.mesero,
     personas: order.personas,
@@ -920,7 +928,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   const cutoff = today.toISOString()
 
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.amalay&created_at=gte.${cutoff}&order=created_at.desc`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
     {
       headers: {
         apikey: SUPABASE_KEY,
@@ -1113,7 +1121,7 @@ export interface InventoryMovement {
 
 export async function getIngredients(): Promise<Ingredient[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&order=name.asc&limit=1000`,
+    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=1000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1124,7 +1132,7 @@ export async function getIngredients(): Promise<Ingredient[]> {
 
 export async function getRecipes(): Promise<RecipeRow[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&order=menu_item_name.asc&limit=2000`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.${_getClientId()}&order=menu_item_name.asc&limit=2000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1133,7 +1141,7 @@ export async function getRecipes(): Promise<RecipeRow[]> {
 
 export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.amalay&menu_item_id=eq.${encodeURIComponent(menuItemId)}&limit=50`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.${_getClientId()}&menu_item_id=eq.${encodeURIComponent(menuItemId)}&limit=50`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1147,7 +1155,7 @@ export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name:
       apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json', Prefer: 'return=minimal',
     },
-    body: JSON.stringify({ client_id: 'amalay', ...row }),
+    body: JSON.stringify({ client_id: _getClientId(), ...row }),
   })
   return res.ok
 }
@@ -1166,11 +1174,11 @@ export async function getInventory(): Promise<InventoryItem[]> {
   // Get inventory + join ingredient info client-side
   const [invRes, ingRes] = await Promise.all([
     fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&order=ingredient_id.asc&limit=500`,
+      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&order=ingredient_id.asc&limit=500`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     ),
     fetch(
-      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.amalay&active=eq.true&limit=500`,
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&limit=500`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     ),
   ])
@@ -1192,7 +1200,7 @@ export async function getInventory(): Promise<InventoryItem[]> {
 
 export async function updateInventoryStock(ingredientId: string, newStock: number): Promise<boolean> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&ingredient_id=eq.${ingredientId}`,
+    `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&ingredient_id=eq.${ingredientId}`,
     {
       method: 'PATCH',
       headers: {
@@ -1215,7 +1223,7 @@ export async function logInventoryMovement(movement: {
       apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json', Prefer: 'return=minimal',
     },
-    body: JSON.stringify({ client_id: 'amalay', ...movement }),
+    body: JSON.stringify({ client_id: _getClientId(), ...movement }),
   })
   return res.ok
 }
@@ -1324,7 +1332,7 @@ export async function deductIngredientsForOrder(
 
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.amalay&order=created_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.${_getClientId()}&order=created_at.desc&limit=${limit}`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1432,7 +1440,7 @@ export async function createPurchaseOrder(po: {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({
-      id: po.id, client_id: 'amalay', supplier: po.supplier, status: 'borrador',
+      id: po.id, client_id: _getClientId(), supplier: po.supplier, status: 'borrador',
       created_by: po.created_by, notes: po.notes || null,
       subtotal: po.subtotal, iva: po.iva, total: po.total,
       ai_suggested: po.ai_suggested || false,
@@ -1456,7 +1464,7 @@ export async function createPurchaseOrder(po: {
 
 export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_purchase_orders?client_id=eq.amalay&order=created_at.desc&limit=100`,
+    `${SUPABASE_URL}/rest/v1/pos_purchase_orders?client_id=eq.${_getClientId()}&order=created_at.desc&limit=100`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1541,7 +1549,7 @@ export async function createFactura(factura: {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({
-      id: factura.id, client_id: 'amalay', purchase_order_id: factura.purchase_order_id || null,
+      id: factura.id, client_id: _getClientId(), purchase_order_id: factura.purchase_order_id || null,
       supplier: factura.supplier, folio: factura.folio || null,
       subtotal: factura.subtotal, iva: factura.iva, total: factura.total,
       status: 'capturada', captured_by: factura.captured_by, notes: factura.notes || null,
@@ -1552,7 +1560,7 @@ export async function createFactura(factura: {
 
 export async function getFacturas(): Promise<Factura[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_facturas?client_id=eq.amalay&order=created_at.desc&limit=100`,
+    `${SUPABASE_URL}/rest/v1/pos_facturas?client_id=eq.${_getClientId()}&order=created_at.desc&limit=100`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1729,7 +1737,7 @@ export async function createCFDIRequest(req: {
   const id = `CFDI-${generateId()}`
   const body = {
     id,
-    client_id: 'amalay',
+    client_id: _getClientId(),
     ...req,
     status: 'pendiente',
     created_at: new Date().toISOString(),
@@ -1748,7 +1756,7 @@ export async function createCFDIRequest(req: {
 
 export async function getCFDIRequests(limit = 50): Promise<CFDIRequest[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.amalay&order=created_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.${_getClientId()}&order=created_at.desc&limit=${limit}`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []

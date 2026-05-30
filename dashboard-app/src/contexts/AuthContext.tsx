@@ -107,6 +107,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cid = metaClientId || dbClientId || emailClientId
     setClientId(cid)
 
+    // Persist for data.ts getActiveClientSlug() — allows data functions to auto-resolve client
+    if (cid) {
+      try { localStorage.setItem('fullsite_client_id', cid) } catch { /* SSR */ }
+    }
+
     // Load full client config from Supabase (with fallback to hardcoded)
     const config = await fetchClientConfig(cid)
     setClientConfig(config)
