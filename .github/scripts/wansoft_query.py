@@ -1164,7 +1164,7 @@ def ask_groq(question, wansoft_data, historical_data):
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
             json={
-                "model": "claude-sonnet-4-6-20250514",
+                "model": "claude-sonnet-4-5-20241022",
                 "max_tokens": 4000,
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": context}],
