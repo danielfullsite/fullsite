@@ -183,13 +183,16 @@ export function aggregatePayments(
   const map: Record<string, number> = {}
   for (const day of dailyData) {
     const métodos = parseJsonbField<{ nombre?: string; total?: number }>(day.pago_métodos)
+    const ventasDia = day.ventas_dia || 0
     for (const m of métodos) {
       if (!m.nombre) continue
-      map[m.nombre] = (map[m.nombre] || 0) + (m.total || 0)
+      // m.total is a PERCENTAGE (e.g. 42.0 = 42%), convert to MXN
+      const mxn = (m.total || 0) < 100 ? ((m.total || 0) / 100) * ventasDia : (m.total || 0)
+      map[m.nombre] = (map[m.nombre] || 0) + mxn
     }
   }
   return Object.entries(map)
-    .map(([nombre, total]) => ({ nombre, total }))
+    .map(([nombre, total]) => ({ nombre, total: Math.round(total) }))
     .sort((a, b) => b.total - a.total)
 }
 

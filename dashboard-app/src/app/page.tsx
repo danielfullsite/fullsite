@@ -721,8 +721,10 @@ export default function DashboardPage() {
           {paymentMethods.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {paymentMethods.map((p, i) => {
-                const total = latestDay?.ventas_dia || 1
-                const pct = ((p.total / total) * 100).toFixed(0)
+                const ventasDia = latestDay?.ventas_dia || 0
+                // p.total is a PERCENTAGE (e.g. 42.0 = 42%), not MXN
+                const pct = p.total < 100 ? p.total : (ventasDia > 0 ? (p.total / ventasDia) * 100 : 0)
+                const mxnAmount = p.total < 100 ? (p.total / 100) * ventasDia : p.total
                 const barWidth = paymentMax > 0 ? ((p.total / paymentMax) * 100) : 0
                 const barColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
                 return (
@@ -738,11 +740,11 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <span className="text-xs text-[var(--text-3)] font-medium">
-                        {pct}%
+                        {pct.toFixed(0)}%
                       </span>
                     </div>
                     <p className="text-lg font-bold text-[var(--text-1)] tabular-nums mb-2">
-                      {formatCurrency(p.total)}
+                      {formatCurrency(mxnAmount)}
                     </p>
                     <div className="w-full bg-[var(--line)] rounded-full h-1.5 overflow-hidden">
                       <div
