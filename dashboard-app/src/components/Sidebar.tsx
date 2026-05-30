@@ -29,7 +29,6 @@ import {
   Bot,
   Stamp,
   Bell,
-  Star,
   Building2,
   Mic,
   ShieldOff,
