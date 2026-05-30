@@ -1143,10 +1143,10 @@ def ask_groq(question, wansoft_data, historical_data):
 
             blocks.append(summary_line + "\n" + json.dumps(hist_compact, ensure_ascii=False, indent=1))
 
-    # Assemble context — cap total at 40000 chars
+    # Assemble context — cap at 25000 chars (Groq has 32K limit, leave room for system prompt)
     context = ""
     for i, block in enumerate(blocks):
-        if len(context) + len(block) > 40000:
+        if len(context) + len(block) > 25000:
             print(f"[wansoft-query] Block {i} truncated ({len(block)} chars)")
             break
         context += block + "\n\n"
@@ -1164,7 +1164,7 @@ def ask_groq(question, wansoft_data, historical_data):
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
             json={
-                "model": "claude-sonnet-4-5-20241022",
+                "model": "claude-haiku-4-5-20251001",
                 "max_tokens": 4000,
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": context}],
