@@ -6,7 +6,7 @@ import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, Ar
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
-import { getRecentDays, getLatestDay, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getLatestAgentRuns, type AgentRun } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
 import type { WansoftDaily, GrupoEntry, PagoMetodoEntry } from '@/lib/types'
@@ -145,8 +145,15 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const recent = await getRecentDays(30)
-        const latest = await getLatestDay()
+        let recent = await getRecentDays(30)
+        let latest = await getLatestDay()
+
+        // Fallback: if no wansoft_daily data, build from pos_orders
+        if (recent.length === 0) {
+          recent = await getDashboardFromPosOrders(30)
+          latest = recent.length > 0 ? recent[recent.length - 1] : null
+        }
+
         setRecentData(recent)
         setLatestDay(latest)
         if (recent.length >= 2) {

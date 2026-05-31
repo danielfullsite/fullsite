@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowRight, ArrowLeft, Check, Store, Users, UtensilsCrossed, CreditCard, Rocket } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { ArrowRight, ArrowLeft, Check, Store, Users, UtensilsCrossed, CreditCard, Rocket, Upload } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -89,6 +89,10 @@ export default function OnboardingPage() {
   // Step 4: Payments
   const [payments, setPayments] = useState<PaymentMethod[]>([...DEFAULT_PAYMENT_METHODS])
 
+  // CSV upload
+  const csvRef = useRef<HTMLInputElement>(null)
+  const [csvCount, setCsvCount] = useState(0)
+
   const clientId = info.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) || 'nuevo'
 
   const canNext = () => {
@@ -161,6 +165,24 @@ export default function OnboardingPage() {
           active: true,
         })
       }
+
+      // 5. Create default location
+      const locationId = `${clientId}-main`
+      await api('client_locations', {
+        id: locationId,
+        client_id: clientId,
+        name: info.name,
+        address: info.city,
+        active: true,
+      }).catch(() => {}) // OK if table doesn't exist yet
+
+      // 6. Create MESAS config based on table count
+      // (MESAS_CONFIG in pos-data.ts is static, but the table count is saved in clients)
+
+      // 7. Save clientId to localStorage for data.ts auto-resolution
+      try {
+        localStorage.setItem('fullsite_client_id', clientId)
+      } catch {}
 
       setStep(4) // Done!
     } catch (err) {
@@ -310,9 +332,48 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              {/* CSV Upload */}
+              <div className="mb-6 p-4 border-2 border-dashed border-[var(--line)] rounded-xl text-center hover:border-emerald-400 transition-colors">
+                <input
+                  ref={csvRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (ev) => {
+                      const text = ev.target?.result as string
+                      const lines = text.split('\n').filter(l => l.trim())
+                      const parsed: MenuItemInput[] = []
+                      for (const line of lines) {
+                        const parts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''))
+                        if (parts.length >= 2 && parts[0] && !isNaN(Number(parts[1]))) {
+                          const cat = parts[2] || categories[0] || 'General'
+                          if (cat && !categories.includes(cat)) setCategories(prev => [...prev, cat])
+                          parsed.push({ name: parts[0], price: parts[1], category: cat })
+                        }
+                      }
+                      if (parsed.length > 0) {
+                        setMenuItems(prev => [...prev.filter(i => i.name), ...parsed])
+                        setCsvCount(parsed.length)
+                      }
+                    }
+                    reader.readAsText(file)
+                  }}
+                />
+                <button onClick={() => csvRef.current?.click()} className="flex items-center gap-2 mx-auto text-sm text-emerald-600 font-semibold">
+                  <Upload size={16} />
+                  Subir CSV (nombre, precio, categoria)
+                </button>
+                <p className="text-xs text-[var(--text-3)] mt-2">Formato: nombre,precio,categoria — una fila por platillo</p>
+                {csvCount > 0 && <p className="text-xs text-emerald-600 mt-2 font-semibold">{csvCount} platillos importados del CSV</p>}
+              </div>
+
               {/* Items */}
-              <label className="text-xs font-semibold text-[var(--text-2)] uppercase mb-2 block">Platillos</label>
-              <div className="space-y-2">
+              <label className="text-xs font-semibold text-[var(--text-2)] uppercase mb-2 block">Platillos ({menuItems.filter(i => i.name).length})</label>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
                 {menuItems.map((item, i) => (
                   <div key={i} className="flex gap-2">
                     <input value={item.name} onChange={e => { const n = [...menuItems]; n[i].name = e.target.value; setMenuItems(n) }}

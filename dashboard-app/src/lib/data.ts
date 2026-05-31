@@ -300,3 +300,78 @@ export async function getLatestAgentRuns(): Promise<AgentRun[]> {
   }
   return Array.from(map.values())
 }
+
+// ── POS Orders fallback (for clients without Wansoft) ─────────────────
+
+/** Aggregate pos_orders into WansoftDaily-compatible format for dashboard pages.
+ *  Used when wansoft_daily has no data for a client (new clients using only Fullsite POS). */
+export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  const cutoffStr = cutoff.toISOString().split('T')[0]
+
+  const orders = await sbFetch('pos_orders',
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,metodo_pago,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00&order=created_at.asc&limit=5000`
+  ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; metodo_pago: string; status: string; created_at: string }[]
+
+  if (orders.length === 0) return []
+
+  // Group by date
+  const byDate = new Map<string, typeof orders>()
+  for (const o of orders) {
+    const fecha = o.created_at.slice(0, 10)
+    if (!byDate.has(fecha)) byDate.set(fecha, [])
+    byDate.get(fecha)!.push(o)
+  }
+
+  const result: WansoftDaily[] = []
+  for (const [fecha, dayOrders] of byDate) {
+    const ventas = dayOrders.reduce((s, o) => s + (o.total || 0), 0)
+    const descuentos = dayOrders.reduce((s, o) => s + (o.descuento || 0), 0)
+    const personas = dayOrders.reduce((s, o) => s + (o.personas || 0), 0)
+    const tp = dayOrders.length > 0 ? Math.round(ventas / dayOrders.length) : 0
+
+    // Meseros
+    const meseroMap = new Map<string, number>()
+    for (const o of dayOrders) {
+      if (o.mesero) meseroMap.set(o.mesero, (meseroMap.get(o.mesero) || 0) + o.total)
+    }
+    const meseros = Array.from(meseroMap.entries())
+      .map(([nombre, total]) => ({ nombre, total }))
+      .sort((a, b) => b.total - a.total)
+
+    // Payment methods
+    const pagoMap = new Map<string, number>()
+    for (const o of dayOrders) {
+      const method = o.metodo_pago || 'Efectivo'
+      pagoMap.set(method, (pagoMap.get(method) || 0) + o.total)
+    }
+    const pagoMetodos = Array.from(pagoMap.entries())
+      .map(([nombre, total]) => ({ nombre, total }))
+      .sort((a, b) => b.total - a.total)
+
+    result.push({
+      fecha,
+      ventas_brutas: ventas + descuentos,
+      ventas_dia: ventas,
+      descuentos,
+      devoluciones: 0,
+      efectivo: 0,
+      tarjeta: 0,
+      tickets_count: dayOrders.length,
+      mesas_atendidas: new Set(dayOrders.map(o => o.mesa)).size,
+      ordenes_llevar: 0,
+      personas_restaurant: personas,
+      ticket_promedio_restaurant: tp,
+      propinas_total: 0,
+      chilaquiles_total: 0,
+      half_half_total: 0,
+      meseros,
+      platillos_top: [],
+      ventas_por_grupo: [],
+      pago_métodos: pagoMetodos,
+      updated_at: new Date().toISOString(),
+    })
+  }
+  return result
+}
