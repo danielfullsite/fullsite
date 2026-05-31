@@ -13,7 +13,7 @@ import {
 import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldAlert, XCircle, HeartHandshake } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData } from '@/lib/data'
+import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -83,7 +83,14 @@ export default function VentasPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await getDateRange(dates.from, dates.to)
+      let result = await getDateRange(dates.from, dates.to)
+      // Fallback: if no wansoft_daily data, build from pos_orders
+      if (result.length === 0) {
+        const fromDate = new Date(dates.from + 'T12:00:00')
+        const toDate = new Date(dates.to + 'T12:00:00')
+        const diff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        result = await getDashboardFromPosOrders(diff)
+      }
       setData(result)
 
       const fromDate = new Date(dates.from + 'T12:00:00')

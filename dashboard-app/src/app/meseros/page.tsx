@@ -34,7 +34,7 @@ import {
 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregateMeseros, getWaiterCategories } from '@/lib/data'
+import { getRecentDays, aggregateMeseros, getWaiterCategories, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import type { WansoftDaily, WaiterCategoryData } from '@/lib/types'
 
@@ -90,7 +90,12 @@ export default function MeserosPage() {
           getRecentDays(30),
           getWaiterCategories(30),
         ])
-        setRecentData(data)
+        // Fallback: if no wansoft_daily data, build from pos_orders
+        let recentResult = data
+        if (recentResult.length === 0) {
+          recentResult = await getDashboardFromPosOrders(30)
+        }
+        setRecentData(recentResult)
         setWaiterData(waiterCats as { fecha: string; data: WaiterCategoryData }[])
       } catch (err) {
         console.error('Error loading meseros data:', err)

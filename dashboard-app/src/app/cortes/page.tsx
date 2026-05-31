@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, Ticket, Users, Receipt, Banknote, CreditCard, Vault, ArrowDownCircle, Building2 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, getWansoftData } from '@/lib/data'
+import { getRecentDays, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily, PagoMetodoEntry } from '@/lib/types'
 
@@ -57,7 +57,13 @@ export default function CortesPage() {
           getWansoftData('cash_withdrawals'),
           getWansoftData('bank_deposits'),
         ])
-        setRecentData(data)
+        // Fallback: if no wansoft_daily data, build from pos_orders
+        if (data.length === 0) {
+          const fallback = await getDashboardFromPosOrders(90)
+          setRecentData(fallback)
+        } else {
+          setRecentData(data)
+        }
         if (cashClosingRes) {
           setCashClosingFecha(cashClosingRes.fecha)
           const items = Array.isArray(cashClosingRes.data) ? cashClosingRes.data as { nombre: string; total: number }[] : []

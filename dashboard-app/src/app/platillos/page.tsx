@@ -16,7 +16,7 @@ import {
 import { UtensilsCrossed, TrendingUp, BarChart3, Coffee, Sparkles } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregateGrupos, getWansoftDataLatest } from '@/lib/data'
+import { getRecentDays, aggregateGrupos, getWansoftDataLatest, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatShortDate, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -38,7 +38,12 @@ export default function PlatillosPage() {
           getRecentDays(30),
           getWansoftDataLatest('modifiers_sold'),
         ])
-        setRecentData(data)
+        // Fallback: if no wansoft_daily data, build from pos_orders
+        let recentResult = data
+        if (recentResult.length === 0) {
+          recentResult = await getDashboardFromPosOrders(30)
+        }
+        setRecentData(recentResult)
         if (modsResult?.data) {
           const raw = Array.isArray(modsResult.data) ? modsResult.data : []
           setModifiers(raw.filter((m: any) => m.nombre && m.total > 0).sort((a: any, b: any) => b.total - a.total))

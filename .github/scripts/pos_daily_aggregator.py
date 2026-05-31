@@ -114,7 +114,7 @@ def fetch_closed_orders(fecha):
     # Use PostgREST AND filter for date range
     orders = sb_get("pos_orders", {
         "select": "*",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
         "status": "eq.cerrada",
         "or": f"(closed_at.gte.{start},created_at.gte.{start})",
         "order": "created_at.asc",
@@ -134,7 +134,7 @@ def fetch_menu_categories():
     """Fetch menu categories for group mapping."""
     cats = sb_get("pos_menu_categories", {
         "select": "id,name",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
     })
     return {c["id"]: c["name"] for c in cats}
 
@@ -143,7 +143,7 @@ def fetch_menu_items():
     """Fetch menu items with their category."""
     items = sb_get("pos_menu_items", {
         "select": "id,name,category_id",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
     })
     return {i["name"].lower(): i.get("category_id", "") for i in items}
 
@@ -229,7 +229,7 @@ def aggregate(orders, cat_map, item_cat_map):
     # -- Build wansoft_daily row --
     row = {
         "fecha": get_target_date(),
-        "client_slug": "amalay",
+        "client_slug": CLIENT["id"],
         "report_type": "fullsite_pos",  # mark as coming from Fullsite, not Wansoft
         "ventas_dia": round(ventas_dia, 2),
         "ventas_brutas": round(ventas_brutas, 2),

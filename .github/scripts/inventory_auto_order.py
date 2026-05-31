@@ -58,12 +58,12 @@ def get_low_stock():
     """Find ingredients below reorder point."""
     inventory = sb_get("pos_inventory", {
         "select": "ingredient_id,stock,reorder_point,reorder_quantity",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
     })
 
     ingredients = sb_get("pos_ingredients", {
         "select": "id,name,unit,cost_per_unit,category",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
         "active": "eq.true",
     })
 
@@ -100,7 +100,7 @@ def get_suppliers():
     """Get supplier list for matching."""
     return sb_get("pos_suppliers", {
         "select": "id,name,category,phone,email",
-        "client_id": "eq.amalay",
+        "client_id": f"eq.{CLIENT['id']}",
     })
 
 

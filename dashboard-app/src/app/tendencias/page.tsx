@@ -17,7 +17,7 @@ import {
 import { TrendingUp, Calendar, Target, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getMonthlyData } from '@/lib/data'
+import { getMonthlyData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatPercent, percentChange, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -30,7 +30,11 @@ export default function TendenciasPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getMonthlyData()
+        let data = await getMonthlyData()
+        // Fallback: if no wansoft_daily data, build from pos_orders
+        if (data.length === 0) {
+          data = await getDashboardFromPosOrders(365)
+        }
         setAllData(data)
       } catch (err) {
         console.error('Error loading trends data:', err)
