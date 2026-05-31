@@ -9,6 +9,8 @@ import Link from 'next/link'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 const MOTIVOS = [
   'Caducado',
   'Dañado',
@@ -99,7 +101,7 @@ export default function MermaPage() {
             Prefer: 'return=minimal',
           },
           body: JSON.stringify({
-            client_id: 'amalay',
+            client_id: _cid(),
             ingredient_id: entry.ingredient_id,
             type: 'merma',
             quantity: -entry.quantity,
@@ -110,7 +112,7 @@ export default function MermaPage() {
 
         // Also deduct from pos_inventory
         const invRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&ingredient_id=eq.${entry.ingredient_id}&select=id,stock`,
+          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${entry.ingredient_id}&select=id,stock`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (invRes.ok) {

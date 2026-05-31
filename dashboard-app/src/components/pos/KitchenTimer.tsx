@@ -6,6 +6,8 @@ import { Clock, ChefHat, AlertTriangle } from 'lucide-react'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface OrderTimer {
   id: string
   mesa: number
@@ -31,7 +33,7 @@ export default function KitchenTimer() {
   async function fetchOrders() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando)&client_id=eq.amalay&order=created_at.asc&limit=20`,
+        `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando)&client_id=eq.${_cid()}&order=created_at.asc&limit=20`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (!res.ok) return
@@ -53,7 +55,7 @@ export default function KitchenTimer() {
 
       // Calculate average prep time from recent completed orders
       const completedRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?status=eq.cerrada&client_id=eq.amalay&order=closed_at.desc&limit=20&select=created_at,closed_at`,
+        `${SUPABASE_URL}/rest/v1/pos_orders?status=eq.cerrada&client_id=eq.${_cid()}&order=closed_at.desc&limit=20&select=created_at,closed_at`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (completedRes.ok) {

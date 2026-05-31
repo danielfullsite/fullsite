@@ -7,6 +7,8 @@ import { formatMXN, MANAGER_PINS, logAudit } from '@/lib/pos-data'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 // Mexican denominations
 const BILLETES = [
   { value: 1000, label: '$1,000' },
@@ -80,7 +82,7 @@ export default function CierreCajaWizard({
     async function fetchShiftData() {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.amalay&created_at=gte.${turnoOpenedAt}`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${turnoOpenedAt}`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (res.ok) {
@@ -136,7 +138,7 @@ export default function CierreCajaWizard({
     const cierreId = `cierre-${Date.now().toString(36)}`
     const cierreData = {
       id: cierreId,
-      client_id: 'amalay',
+      client_id: _cid(),
       turno_id: turnoId,
       fecha: new Date().toISOString().split('T')[0],
       fondo_inicial: fondoInicial,

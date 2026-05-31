@@ -30,6 +30,8 @@ interface Ingredient {
 
 const VARIANCE_THRESHOLD = 10 // Alert if price varies >10%
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 export default function FacturasProveedorPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [items, setItems] = useState<FacturaItem[]>([])
@@ -94,7 +96,7 @@ export default function FacturasProveedorPage() {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
-          client_id: 'amalay',
+          client_id: _cid(),
           fecha: today,
           proveedor,
           num_factura: numFactura,
@@ -108,7 +110,7 @@ export default function FacturasProveedorPage() {
       // Update ingredient costs if price changed
       for (const item of items) {
         if (Math.abs(item.variance_pct) > 0.1) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${item.ingredient_id}&client_id=eq.amalay`, {
+          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${item.ingredient_id}&client_id=eq.${_cid()}`, {
             method: 'PATCH',
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
             body: JSON.stringify({ cost_per_unit: item.unit_price }),
@@ -122,7 +124,7 @@ export default function FacturasProveedorPage() {
           method: 'POST',
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({
-            client_id: 'amalay',
+            client_id: _cid(),
             ingredient_id: item.ingredient_id,
             type: 'compra',
             quantity: item.quantity,
@@ -133,7 +135,7 @@ export default function FacturasProveedorPage() {
 
         // Update stock
         const invRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&ingredient_id=eq.${item.ingredient_id}&select=id,stock`,
+          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${item.ingredient_id}&select=id,stock`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (invRes.ok) {

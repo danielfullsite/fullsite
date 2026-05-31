@@ -6,6 +6,8 @@ import { User, AlertTriangle, Heart, Clock, Star } from 'lucide-react'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface CustomerNote {
   id: string
   mesa: number
@@ -35,7 +37,7 @@ export default function CustomerMemory({ mesa, mesero }: CustomerMemoryProps) {
   async function fetchNotes() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_customer_notes?mesa=eq.${mesa}&client_id=eq.amalay&order=created_at.desc&limit=10`,
+        `${SUPABASE_URL}/rest/v1/pos_customer_notes?mesa=eq.${mesa}&client_id=eq.${_cid()}&order=created_at.desc&limit=10`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (res.ok) {
@@ -54,7 +56,7 @@ export default function CustomerMemory({ mesa, mesero }: CustomerMemoryProps) {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
-          id, client_id: 'amalay', mesa, note: newNote.trim(),
+          id, client_id: _cid(), mesa, note: newNote.trim(),
           type: noteType, created_by: mesero,
         }),
       })

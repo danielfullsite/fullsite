@@ -7,6 +7,8 @@ import { formatMXN, MANAGER_PINS, logAudit } from '@/lib/pos-data'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface StaffShift {
   id: string
   staff_id: string
@@ -38,7 +40,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
     try {
       const today = new Date().toISOString().split('T')[0]
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_staff_shifts?client_id=eq.amalay&clock_in=gte.${today}T00:00:00&order=clock_in.desc`,
+        `${SUPABASE_URL}/rest/v1/pos_staff_shifts?client_id=eq.${_cid()}&clock_in=gte.${today}T00:00:00&order=clock_in.desc`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (res.ok) {
@@ -78,7 +80,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
           id,
-          client_id: 'amalay',
+          client_id: _cid(),
           staff_id: pin,
           staff_name: staffName,
           clock_in: new Date().toISOString(),

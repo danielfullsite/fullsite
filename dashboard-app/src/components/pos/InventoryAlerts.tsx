@@ -7,6 +7,8 @@ import { formatMXN } from '@/lib/pos-data'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface InventoryItem {
   ingredient_id: string
   ingredient_name: string
@@ -47,14 +49,14 @@ export default function InventoryAlerts({ onItemOutOfStock, compact = false }: I
     try {
       // Fetch inventory with reorder points
       const invRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&client_id=eq.amalay`,
+        `${SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&client_id=eq.${_cid()}`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       const inventory = invRes.ok ? await invRes.json() : []
 
       // Fetch ingredients for names
       const ingRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_ingredients?select=id,name,unit&client_id=eq.amalay&active=eq.true`,
+        `${SUPABASE_URL}/rest/v1/pos_ingredients?select=id,name,unit&client_id=eq.${_cid()}&active=eq.true`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       const ingredients = ingRes.ok ? await ingRes.json() : []
@@ -62,7 +64,7 @@ export default function InventoryAlerts({ onItemOutOfStock, compact = false }: I
 
       // Fetch recipes to calculate orders remaining
       const recRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_recipes?select=menu_item_id,menu_item_name,ingredient_id,quantity&client_id=eq.amalay`,
+        `${SUPABASE_URL}/rest/v1/pos_recipes?select=menu_item_id,menu_item_name,ingredient_id,quantity&client_id=eq.${_cid()}`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       const recipes = recRes.ok ? await recRes.json() : []

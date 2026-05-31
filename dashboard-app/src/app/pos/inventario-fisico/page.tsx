@@ -9,6 +9,8 @@ import Link from 'next/link'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface InventoryItem {
   ingredient_id: string
   name: string
@@ -68,7 +70,7 @@ export default function InventarioFisicoPage() {
       for (const item of counted) {
         const diff = (item.physical || 0) - item.stock
         // Update stock to physical count
-        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.amalay&ingredient_id=eq.${item.ingredient_id}`, {
+        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${item.ingredient_id}`, {
           method: 'PATCH',
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({ stock: item.physical }),
@@ -79,7 +81,7 @@ export default function InventarioFisicoPage() {
             method: 'POST',
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
             body: JSON.stringify({
-              client_id: 'amalay',
+              client_id: _cid(),
               ingredient_id: item.ingredient_id,
               type: 'conteo_fisico',
               quantity: diff,

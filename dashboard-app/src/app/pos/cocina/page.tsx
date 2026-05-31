@@ -12,6 +12,8 @@ import {
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
 }
@@ -120,7 +122,7 @@ export default function CocinaPage() {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       const delRes = await fetch(
-        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.amalay&order=created_at.desc`,
+        `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.${_cid()}&order=created_at.desc`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
       )
       if (delRes.ok) {

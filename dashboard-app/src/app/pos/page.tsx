@@ -91,6 +91,8 @@ const SmartCashCalculator = dynamic(() => import('@/components/pos/SmartCashCalc
 const CustomerMemory = dynamic(() => import('@/components/pos/CustomerMemory'), { ssr: false })
 const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ssr: false })
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 export default function POSPage() {
   return (
     <Suspense fallback={
@@ -724,7 +726,7 @@ function POSContent() {
 
       // Check which menu items are out of stock
       try {
-        const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock&client_id=eq.amalay&stock=lte.0`, {
+        const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_inventory?select=ingredient_id,stock&client_id=eq.${_cid()}&stock=lte.0`, {
           headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
         })
         if (invRes.ok) {
@@ -2586,7 +2588,7 @@ function POSAlerts({ role }: { role: string }) {
         if (role === 'admin' || role === 'gerente') {
           try {
             const invRes = await fetch(
-              `${sbUrl}/rest/v1/pos_inventory?stock=lt.5&stock=gt.0&client_id=eq.amalay&limit=5`,
+              `${sbUrl}/rest/v1/pos_inventory?stock=lt.5&stock=gt.0&client_id=eq.${_cid()}&limit=5`,
               { headers }
             )
             if (invRes.ok) {
@@ -2625,7 +2627,7 @@ function POSAlerts({ role }: { role: string }) {
         // Check ready orders (all roles)
         try {
           const readyRes = await fetch(
-            `${sbUrl}/rest/v1/pos_orders?status=eq.lista&client_id=eq.amalay&limit=5`,
+            `${sbUrl}/rest/v1/pos_orders?status=eq.lista&client_id=eq.${_cid()}&limit=5`,
             { headers }
           )
           if (readyRes.ok) {
@@ -2644,7 +2646,7 @@ function POSAlerts({ role }: { role: string }) {
         // Check delivery orders (all roles)
         try {
           const delRes = await fetch(
-            `${sbUrl}/rest/v1/delivery_orders?status=eq.nueva&client_id=eq.amalay&limit=3`,
+            `${sbUrl}/rest/v1/delivery_orders?status=eq.nueva&client_id=eq.${_cid()}&limit=3`,
             { headers }
           )
           if (delRes.ok) {

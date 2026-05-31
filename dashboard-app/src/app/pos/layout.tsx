@@ -7,6 +7,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Fallback PIN for when DB is not available (override via env)
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 const FALLBACK_PIN = process.env.NEXT_PUBLIC_POS_FALLBACK_PIN || '2835'
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
@@ -105,7 +107,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     try {
       // Try staff table first
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_staff?pin=eq.${pin}&active=eq.true&client_id=eq.amalay&limit=1`,
+        `${SUPABASE_URL}/rest/v1/pos_staff?pin=eq.${pin}&active=eq.true&client_id=eq.${_cid()}&limit=1`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (res.ok) {

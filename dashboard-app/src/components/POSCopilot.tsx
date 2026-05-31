@@ -101,6 +101,8 @@ function getTimeBasedSuggestions(): CopilotSuggestion[] {
   return suggestions
 }
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function POSCopilot({ orderItems, mesa, personas, mesero, onAddItem }: POSCopilotProps) {
@@ -116,7 +118,7 @@ export default function POSCopilot({ orderItems, mesa, personas, mesero, onAddIt
         if (!url || !key) return
 
         const res = await fetch(
-          `${url}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&client_id=eq.amalay`,
+          `${url}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&client_id=eq.${_cid()}`,
           { headers: { apikey: key, Authorization: `Bearer ${key}` } }
         )
         if (res.ok) {

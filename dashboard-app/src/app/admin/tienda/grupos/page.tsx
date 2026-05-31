@@ -10,6 +10,8 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 interface Group { department: string; group_name: string; count: number }
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 async function sbFetch(path: string) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
@@ -17,7 +19,7 @@ async function sbFetch(path: string) {
   return r.ok ? r.json() : []
 }
 
-async function sbPatch(filter: string, body: Record<string, string>, clientId: string = 'amalay') {
+async function sbPatch(filter: string, body: Record<string, string>, clientId: string = _cid()) {
   return fetch(`${SUPABASE_URL}/rest/v1/pos_retail_items?${filter}&client_id=eq.${clientId}`, {
     method: 'PATCH',
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },

@@ -12,6 +12,8 @@ const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface Turno {
   id: string
   opened_by: string
@@ -42,7 +44,7 @@ export default function TurnoPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.amalay&order=opened_at.desc&limit=1`,
+        `${SUPABASE_URL}/rest/v1/pos_turnos?closed_at=is.null&client_id=eq.${_cid()}&order=opened_at.desc&limit=1`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
       )
       if (res.ok) {
@@ -62,7 +64,7 @@ export default function TurnoPage() {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
-        id, client_id: 'amalay', opened_by: openedBy, fondo_inicial: Number(fondoInicial),
+        id, client_id: _cid(), opened_by: openedBy, fondo_inicial: Number(fondoInicial),
       }),
     })
     if (res.ok) {

@@ -7,6 +7,8 @@ import { formatMXN } from '@/lib/pos-data'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
 interface MeseroStats {
   name: string
   ventas: number
@@ -38,7 +40,7 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
       const todayStr = new Date(today.toLocaleString('en-US', { timeZone: 'America/Monterrey' })).toISOString().split('T')[0]
 
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.amalay&created_at=gte.${todayStr}T00:00:00`,
+        `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.${_cid()}&created_at=gte.${todayStr}T00:00:00`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       if (!res.ok) return
