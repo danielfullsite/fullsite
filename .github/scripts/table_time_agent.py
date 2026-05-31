@@ -75,10 +75,10 @@ def get_historical(days=30):
 def get_pos_orders_today(today_str):
     """Try to fetch Fullsite POS orders if available."""
     return sb_get("pos_orders", {
-        "select": "id,opened_at,paid_at,table_number,total,status",
-        "opened_at": f"gte.{today_str}T00:00:00",
-        "status": "eq.paid",
-        "order": "opened_at.asc",
+        "select": "id,created_at,closed_at,mesa,total,status",
+        "created_at": f"gte.{today_str}T00:00:00",
+        "status": "eq.cerrada",
+        "order": "created_at.asc",
         "limit": "500",
     })
 
@@ -97,16 +97,16 @@ def analyze_from_pos(orders):
     """Analyze table times from POS orders (opened_at to paid_at)."""
     times = []
     for o in orders:
-        opened = o.get("opened_at")
-        paid = o.get("paid_at")
-        if not opened or not paid:
+        opened = o.get("created_at")
+        closed = o.get("closed_at")
+        if not opened or not closed:
             continue
         try:
             t_open = datetime.fromisoformat(opened.replace("Z", "+00:00"))
-            t_paid = datetime.fromisoformat(paid.replace("Z", "+00:00"))
-            mins = (t_paid - t_open).total_seconds() / 60
+            t_closed = datetime.fromisoformat(closed.replace("Z", "+00:00"))
+            mins = (t_closed - t_open).total_seconds() / 60
             if 5 < mins < 300:  # Filter outliers
-                times.append({"table": o.get("table_number"), "minutes": round(mins)})
+                times.append({"table": o.get("mesa"), "minutes": round(mins)})
         except:
             continue
 
@@ -129,9 +129,9 @@ def analyze_from_wansoft(today_kpis, historical, now_mx):
     if hours_open < 1:
         return None
 
-    today_tickets = today_kpis.get("tickets_count", 0) or 0
-    today_mesas = today_kpis.get("mesas_atendidas", 0) or 0
-    today_personas = today_kpis.get("personas_restaurant", 0) or 0
+    today_tickets = int(today_kpis.get("tickets_count", 0) or 0)
+    today_mesas = int(today_kpis.get("mesas_atendidas", 0) or 0)
+    today_personas = int(today_kpis.get("personas_restaurant", 0) or 0)
 
     if today_tickets == 0:
         return None
@@ -290,16 +290,15 @@ def main():
 
     # 1. Fetch today's KPIs (try kpis first, fallback to wansoft_daily)
     today_kpis = get_today_kpis()
-    if not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
-        # Fallback to latest wansoft_daily
-        daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
-        if daily:
-            today_kpis = daily[0]
-            print(f"[table_time] Using wansoft_daily fallback: {today_kpis.get('fecha')}")
-        else:
-            print("[table_time] No KPI data — skipping")
-            log_run("skipped", 0, "no KPI data")
-            return
+    # KPIs often have tickets_count=0 — always try wansoft_daily as primary
+    daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
+    if daily and int(daily[0].get("tickets_count", 0) or 0) > 0:
+        today_kpis = daily[0]
+        print(f"[table_time] Using wansoft_daily: {today_kpis.get('fecha')} ({today_kpis.get('tickets_count')} tickets)")
+    elif not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
+        print("[table_time] No KPI data — skipping")
+        log_run("skipped", int((time.time() - start) * 1000), "no KPI data")
+        return
 
     ventas = float(today_kpis.get("ventas_dia", 0) or 0)
     if ventas == 0:
