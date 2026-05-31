@@ -45,8 +45,13 @@ def sb_get(table, params):
             f"{SUPABASE_URL}/rest/v1/{table}",
             headers=sb_headers, params=params, timeout=10,
         )
-        return r.json() if r.ok else []
-    except:
+        if not r.ok:
+            print(f"    [sb_get] {table} ERROR {r.status_code}: {r.text[:200]}")
+            return []
+        data = r.json()
+        return data
+    except Exception as e:
+        print(f"    [sb_get] {table} EXCEPTION: {e}")
         return []
 
 
@@ -57,12 +62,14 @@ def get_today_kpis():
 
 
 def get_historical(days=30):
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
-        "select": "fecha,ventas_dia,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant,hora_pico",
+    data = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+        "select": "fecha,ventas_dia,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
         "limit": str(days),
     })
+    print(f"    [historical] Query returned {len(data)} rows")
+    return data
 
 
 def get_pos_orders_today(today_str):
@@ -294,10 +301,10 @@ def main():
             log_run("skipped", 0, "no KPI data")
             return
 
-    ventas = today_kpis.get("ventas_dia", 0) or 0
+    ventas = float(today_kpis.get("ventas_dia", 0) or 0)
     if ventas == 0:
         print("[table_time] Ventas = $0 — skipping")
-        log_run("skipped", 0, "ventas=0")
+        log_run("skipped", int((time.time() - start) * 1000), "ventas=0")
         return
 
     # 2. Try POS orders first
@@ -317,6 +324,8 @@ def main():
 
     if not analysis:
         print("[table_time] No analysis possible — skipping")
+        elapsed = int((time.time() - start) * 1000)
+        log_run("skipped", elapsed, "no analysis possible")
         return
 
     # 4. Build structured data and save to DB
