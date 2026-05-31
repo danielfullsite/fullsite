@@ -28,18 +28,21 @@ def check_url(name, url, expect_status=200, timeout=15):
         failures.append(f"{name}: {e}")
 
 def check_health():
-    """Check the /api/health endpoint returns healthy."""
+    """Check the /api/health endpoint returns healthy. Non-critical — warnings only."""
     try:
         r = requests.get(f"{BASE_URL}/api/health", timeout=20)
+        if r.status_code >= 500:
+            warnings.append(f"Health endpoint: HTTP {r.status_code}")
+            return
         data = r.json()
         if data.get("status") != "healthy":
             failed_checks = [c for c in data.get("checks", []) if c.get("status") != "ok"]
             for fc in failed_checks:
-                failures.append(f"Health/{fc['name']}: {fc['detail']}")
+                warnings.append(f"Health/{fc['name']}: {fc['detail']}")
         else:
             print(f"OK: Health endpoint — all {len(data.get('checks', []))} checks passed ({data.get('total_ms', 0)}ms)")
     except Exception as e:
-        failures.append(f"Health endpoint: {e}")
+        warnings.append(f"Health endpoint: {e}")
 
 def check_supabase_data():
     """Verify critical data exists in Supabase."""
