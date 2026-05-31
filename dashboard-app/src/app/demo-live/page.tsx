@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Bot, TrendingUp, AlertTriangle, Shield, Package, Users, ChefHat, DollarSign, Clock, CheckCircle2, Zap, Target, Star, BarChart3, FileText } from 'lucide-react'
+import { Bot, TrendingUp, AlertTriangle, Shield, Package, Users, ChefHat, DollarSign, Clock, CheckCircle2, Zap, Target, Star, BarChart3, FileText, PieChart, MessageCircle } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════════════
 // DEMO MODE — Fake data that looks real for prospect demos
@@ -11,17 +11,17 @@ import { Bot, TrendingUp, AlertTriangle, Shield, Package, Users, ChefHat, Dollar
 const DEMO_RESTAURANT = 'Tu Restaurante'
 
 const DEMO_VENTAS = {
-  hoy: 18420, ayer: 16800, semana: 124500, mes: 487200,
-  tickets: 74, personas: 42, ticketPromedio: 249,
-  vsAyer: 9.6, vsSemana: 12.3,
+  hoy: 68450, ayer: 54200, semana: 412800, mes: 1645000,
+  tickets: 182, personas: 156, ticketPromedio: 439,
+  vsAyer: 26.3, vsSemana: 8.7,
 }
 
 const DEMO_MESEROS = [
-  { nombre: 'Carlos M.', ventas: 5200, tickets: 21, tp: 248, propinas: 420 },
-  { nombre: 'Andrea L.', ventas: 4800, tickets: 19, tp: 253, propinas: 380 },
-  { nombre: 'Roberto S.', ventas: 4100, tickets: 17, tp: 241, propinas: 310 },
-  { nombre: 'Luis G.', ventas: 2800, tickets: 11, tp: 255, propinas: 220 },
-  { nombre: 'Diana R.', ventas: 1520, tickets: 6, tp: 253, propinas: 120 },
+  { nombre: 'Carlos M.', ventas: 22400, tickets: 48, tp: 467, propinas: 3580 },
+  { nombre: 'Andrea L.', ventas: 18200, tickets: 42, tp: 433, propinas: 2910 },
+  { nombre: 'Roberto S.', ventas: 14800, tickets: 38, tp: 389, propinas: 2370 },
+  { nombre: 'Luis G.', ventas: 8200, tickets: 32, tp: 256, propinas: 1310 },
+  { nombre: 'Diana R.', ventas: 4850, tickets: 22, tp: 220, propinas: 776 },
 ]
 
 const DEMO_AGENTS = [
@@ -36,14 +36,14 @@ const DEMO_AGENTS = [
 ]
 
 const DEMO_CATEGORIES = [
-  { name: 'Especialidades', ventas: 4200, pct: 22.8 },
-  { name: 'Café', ventas: 3100, pct: 16.8 },
-  { name: 'Desayunos', ventas: 2800, pct: 15.2 },
-  { name: 'Jugos & Smoothies', ventas: 2400, pct: 13.0 },
-  { name: 'Panadería', ventas: 2100, pct: 11.4 },
-  { name: 'Postres', ventas: 1800, pct: 9.8 },
-  { name: 'Ensaladas', ventas: 1200, pct: 6.5 },
-  { name: 'Otros', ventas: 820, pct: 4.5 },
+  { name: 'Especialidades', ventas: 18200, pct: 26.6 },
+  { name: 'Desayunos', ventas: 12400, pct: 18.1 },
+  { name: 'Café & Bebidas', ventas: 9800, pct: 14.3 },
+  { name: 'Panadería', ventas: 7200, pct: 10.5 },
+  { name: 'Jugos & Smoothies', ventas: 6800, pct: 9.9 },
+  { name: 'Postres', ventas: 5400, pct: 7.9 },
+  { name: 'Ensaladas & Bowls', ventas: 4800, pct: 7.0 },
+  { name: 'Extras', ventas: 3850, pct: 5.6 },
 ]
 
 const DEMO_ROI = {
@@ -63,7 +63,7 @@ function fmt(n: number) {
 }
 
 export default function DemoLivePage() {
-  const [tab, setTab] = useState<'dashboard' | 'agents' | 'roi' | 'auto86'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'agents' | 'roi' | 'auto86' | 'foodcost' | 'bot'>('dashboard')
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white p-4 md:p-8">
@@ -88,8 +88,10 @@ export default function DemoLivePage() {
           {[
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'agents', label: 'Agentes IA' },
+            { id: 'foodcost', label: 'Food Cost' },
             { id: 'roi', label: 'ROI' },
             { id: 'auto86', label: 'Auto-86' },
+            { id: 'bot', label: 'Bot 24/7' },
           ].map(t => (
             <button
               key={t.id}
@@ -174,7 +176,7 @@ export default function DemoLivePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                 <p className="text-xs text-white/40">Agentes activos</p>
-                <p className="text-2xl font-bold text-emerald-400">29</p>
+                <p className="text-2xl font-bold text-emerald-400">30</p>
               </div>
               <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                 <p className="text-xs text-white/40">Ejecuciones hoy</p>
@@ -305,10 +307,119 @@ export default function DemoLivePage() {
           </div>
         )}
 
+        {/* FOOD COST TAB */}
+        {tab === 'foodcost' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white/5 rounded-xl border border-white/10 p-4">
+                <p className="text-xs text-white/40">Platillos costeados</p>
+                <p className="text-2xl font-bold">63</p>
+              </div>
+              <div className="bg-white/5 rounded-xl border border-emerald-500/20 p-4">
+                <p className="text-xs text-white/40">Margen promedio</p>
+                <p className="text-2xl font-bold text-emerald-400">68%</p>
+              </div>
+              <div className="bg-white/5 rounded-xl border border-violet-500/20 p-4">
+                <p className="text-xs text-white/40">Estrellas (&gt;70%)</p>
+                <p className="text-2xl font-bold text-violet-400">24</p>
+              </div>
+              <div className="bg-white/5 rounded-xl border border-red-500/20 p-4">
+                <p className="text-xs text-white/40">Problema (&lt;30%)</p>
+                <p className="text-2xl font-bold text-red-400">3</p>
+              </div>
+            </div>
+            <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+                <PieChart size={14} className="text-emerald-400" />
+                <h3 className="text-sm font-bold">Costo por platillo</h3>
+                <span className="text-xs text-white/30 ml-auto">Con yield factor y merma real</span>
+              </div>
+              {[
+                { name: 'Chilaquiles Verdes', precio: 195, costo: 30.85, margen: 84.2 },
+                { name: 'Huevos Benedict', precio: 225, costo: 42.30, margen: 81.2 },
+                { name: 'Avocado Toast', precio: 185, costo: 38.50, margen: 79.2 },
+                { name: 'Pancakes Stack', precio: 175, costo: 28.40, margen: 83.8 },
+                { name: 'Acai Bowl', precio: 195, costo: 52.80, margen: 72.9 },
+                { name: 'Salmon Bowl', precio: 265, costo: 112.40, margen: 57.6 },
+                { name: 'Club Sandwich', precio: 195, costo: 68.20, margen: 65.0 },
+                { name: 'Pizza Margarita', precio: 185, costo: 142.50, margen: 23.0 },
+              ].map(p => (
+                <div key={p.name} className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                  <span className="text-sm">{p.name}</span>
+                  <div className="flex items-center gap-6 text-xs">
+                    <span className="text-white/40">{fmt(p.precio)}</span>
+                    <span className="text-white/40">{fmt(p.costo)}</span>
+                    <div className="w-20">
+                      <div className="flex justify-between mb-1">
+                        <span className={`font-bold ${p.margen < 30 ? 'text-red-400' : p.margen > 70 ? 'text-emerald-400' : 'text-white'}`}>
+                          {p.margen.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/5 rounded-full h-1.5">
+                        <div className={`h-1.5 rounded-full ${p.margen < 30 ? 'bg-red-500' : p.margen > 70 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${Math.min(p.margen, 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BOT TAB */}
+        {tab === 'bot' && (
+          <div className="max-w-lg mx-auto">
+            <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                  <Bot size={20} className="text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">Fullsite Bot</p>
+                  <p className="text-xs text-emerald-400">Telegram · en línea</p>
+                </div>
+              </div>
+              <div className="p-4 space-y-3 min-h-[400px]">
+                <div className="bg-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm text-white/70">
+                  <p className="font-bold text-emerald-400 text-xs mb-1">7:01 AM · Briefing</p>
+                  Buenos días. Ayer cerraron con <strong className="text-white">$68,450</strong>. Ticket promedio <strong className="text-white">$439</strong>. Carlos M. fue top con <strong className="text-white">$22,400</strong>. Hoy hay reserva de 25 personas a las 10am en jardín.
+                </div>
+                <div className="bg-emerald-600/20 rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] ml-auto text-sm text-white/80">
+                  Cuánto cuesta el huevo benedict?
+                </div>
+                <div className="bg-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm text-white/70">
+                  Precio: <strong className="text-white">$225</strong><br/>
+                  Costo: <strong className="text-white">$42.30</strong><br/>
+                  Margen: <strong className="text-emerald-400">81.2%</strong><br/>
+                  Subreceta: 3 ingredientes, yield factor 0.85
+                </div>
+                <div className="bg-emerald-600/20 rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] ml-auto text-sm text-white/80">
+                  Quién vendió más esta semana?
+                </div>
+                <div className="bg-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm text-white/70">
+                  Top meseros semana:<br/>
+                  1. Carlos M. — <strong className="text-white">$98,200</strong><br/>
+                  2. Andrea L. — <strong className="text-white">$82,400</strong><br/>
+                  3. Roberto S. — <strong className="text-white">$67,100</strong><br/>
+                  <span className="text-white/40 text-xs">Responde en 2 segundos. Datos reales. 24/7.</span>
+                </div>
+                <div className="bg-emerald-600/20 rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] ml-auto text-sm text-white/80">
+                  Hay algo raro hoy?
+                </div>
+                <div className="bg-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm text-white/70">
+                  <span className="text-amber-400 font-bold text-xs">⚠ ALERTA</span><br/>
+                  Luis G. tiene 3 cancelaciones en la última hora. Patrón inusual — normalmente cancela 1/día. Anti-fraude lo marcó para revisión.
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-white/30 text-xs mt-4">El bot responde preguntas sobre ventas, meseros, costos, inventario, reservas — en tiempo real por Telegram.</p>
+          </div>
+        )}
+
         {/* CTA */}
         <div className="mt-8 text-center">
           <p className="text-white/30 text-xs mb-3">Esto es una demo con datos de ejemplo. ¿Quieres verlo con los datos de tu restaurante?</p>
-          <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20vi%20la%20demo%20de%20Fullsite%20y%20quiero%20probarlo%20en%20mi%20restaurante." target="_blank" rel="noopener"
+          <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20vi%20la%20demo%20de%20Fullsite%20y%20quiero%20probarlo%20en%20mi%20restaurante." target="_blank" rel="noopener"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors">
             Agendar demo con datos reales →
           </a>
