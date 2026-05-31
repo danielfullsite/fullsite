@@ -431,9 +431,18 @@ def main():
                 print(f"    [tips] First row ({len(r['data'][0])} cols): {r['data'][0]}")
             for c in r["data"]:
                 if len(c) >= 3:
+                    # Skip header rows and empty rows
+                    # Headers contain "Usuario", "Subtotal", "Total", etc.
+                    if any(h in str(c[0]).strip() for h in ["Usuario", "Mesero", ""]) and safe_float(c[1] if len(c) > 1 else "0") == 0:
+                        if not c[0].strip() or c[0].strip() in ("Usuario", "Mesero", "\n"):
+                            print(f"    [tips] Skipping header/empty row: {c[0][:30]}")
+                            continue
                     # Wansoft SalesByUser confirmed columns (from real data):
                     # [0]=mesero, [1]=subtotal, [2]=propinas, [3]=total, [4]=propina_%
-                    item = {"_cols": c, "mesero": c[0]}
+                    mesero_name = c[0].strip()
+                    if not mesero_name or mesero_name in ("\n", "Usuario", "Mesero"):
+                        continue
+                    item = {"_cols": c, "mesero": mesero_name}
                     nums = [safe_float(val) for val in c[1:]]
                     if len(nums) >= 4:
                         # 5-col format: mesero, subtotal, propinas, total, %
@@ -447,6 +456,9 @@ def main():
                     else:
                         item["ventas"] = nums[0] if nums else 0
                         item["propinas"] = 0
+                    # Skip rows where mesero has no real sales
+                    if item.get("ventas", 0) == 0 and item.get("propinas", 0) == 0:
+                        continue
                     item["tickets"] = safe_int(c[1]) if len(c) > 1 and safe_int(c[1]) < 1000 else 0
                     data.append(item)
             return data
@@ -455,18 +467,24 @@ def main():
 
     tips = scrape_endpoint(session, "SalesByUser+Tips", "Reports/SalesByUser", base_params,
                            "wansoft_tips", transform_tips)
-    if tips:
-        for t in tips:
+    # Filter out empty/header-only results
+    real_tips = [t for t in (tips or []) if t.get("mesero") and t.get("ventas", 0) > 0]
+    if real_tips:
+        for t in real_tips:
             t["propina_promedio"] = round(t.get("propinas", 0) / t["tickets"], 2) if t.get("tickets", 0) > 0 else 0
         sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": today_str,
-                   "data": json.dumps(tips), "updated_at": datetime.now(timezone.utc).isoformat()})
-        results["propinas"] = len(tips)
-        save_data("tips_raw", tips)
+                   "data": json.dumps(real_tips), "updated_at": datetime.now(timezone.utc).isoformat()})
+        results["propinas"] = len(real_tips)
+        save_data("tips_raw", real_tips)
+    else:
+        print("    [tips] No real tip data found (headers only or empty) — skipping wansoft_daily update")
+        real_tips = None  # Prevent updating wansoft_daily with stale data
 
+    if real_tips:
         # ── UPDATE wansoft_daily with propinas_total ──
         # This is CRITICAL — the dashboard reads from wansoft_daily
-        total_propinas = sum(t.get("propinas", 0) for t in tips)
-        propinas_meseros = [{"nombre": t["mesero"], "total": round(t.get("propinas", 0), 2)} for t in tips if t.get("propinas", 0) > 0]
+        total_propinas = sum(t.get("propinas", 0) for t in real_tips)
+        propinas_meseros = [{"nombre": t["mesero"], "total": round(t.get("propinas", 0), 2)} for t in real_tips if t.get("propinas", 0) > 0]
         if total_propinas > 0:
             print(f"    [tips] Updating wansoft_daily with propinas_total=${total_propinas:,.2f} ({len(propinas_meseros)} meseros)")
             try:
