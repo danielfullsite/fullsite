@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 200 })
     }
 
-    const { message, history = [], client_id = 'amalay' } = await request.json()
+    const { message, history = [], client_id } = await request.json()
 
     if (!message || typeof message !== 'string') {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })

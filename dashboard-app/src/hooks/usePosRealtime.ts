@@ -38,12 +38,14 @@ export function usePosRealtime(): RealtimeState {
   const subscribe = useCallback((callbacks: RealtimeCallbacks) => {
     callbacksRef.current = callbacks
 
+    const clientId = typeof window !== 'undefined' ? (localStorage.getItem('fullsite_client_id') || 'amalay') : 'amalay'
+
     // Orders channel
     const channel = supabase
       .channel('pos-orders-live')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'pos_orders', filter: 'client_id=eq.amalay' },
+        { event: '*', schema: 'public', table: 'pos_orders', filter: 'client_id=eq.${clientId}' },
         (payload) => {
           const p: RealtimePayload = {
             eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
@@ -55,7 +57,7 @@ export function usePosRealtime(): RealtimeState {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'pos_inventory', filter: 'client_id=eq.amalay' },
+        { event: '*', schema: 'public', table: 'pos_inventory', filter: 'client_id=eq.${clientId}' },
         (payload) => {
           const p: RealtimePayload = {
             eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
@@ -67,7 +69,7 @@ export function usePosRealtime(): RealtimeState {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'pos_staff_shifts', filter: 'client_id=eq.amalay' },
+        { event: '*', schema: 'public', table: 'pos_staff_shifts', filter: 'client_id=eq.${clientId}' },
         (payload) => {
           const p: RealtimePayload = {
             eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
