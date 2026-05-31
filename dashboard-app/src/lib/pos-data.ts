@@ -989,7 +989,7 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
         Prefer: 'return=minimal',
       },
       body: JSON.stringify({
-        client_id: event.client_id || 'amalay',
+        client_id: event.client_id || _getClientId(),
         order_id: event.order_id,
         action: event.action,
         actor: event.actor,

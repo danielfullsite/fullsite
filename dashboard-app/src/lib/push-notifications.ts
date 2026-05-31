@@ -85,7 +85,7 @@ async function saveSubscription(subscription: PushSubscription): Promise<void> {
     body: JSON.stringify({
       endpoint: subscription.endpoint,
       keys: JSON.stringify(subscription.toJSON().keys),
-      client_id: 'amalay',
+      client_id: typeof window !== 'undefined' ? (localStorage.getItem('fullsite_client_id') || 'amalay') : 'amalay',
       created_at: new Date().toISOString(),
     }),
   })
