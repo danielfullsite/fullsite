@@ -254,7 +254,7 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Preg\u00FAntame lo que quieras..."
+            placeholder="Preguntame lo que quieras..."
             rows={1}
             className="flex-1 text-sm bg-[var(--surface-2)] border border-[var(--line)] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
             disabled={isLoading}
