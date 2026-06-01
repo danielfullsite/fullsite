@@ -28,6 +28,7 @@ export default function VoicePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animFrameRef = useRef<number>(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -181,31 +182,55 @@ export default function VoicePage() {
         })
       }
 
-      // Speak the response
-      if (fullText && 'speechSynthesis' in window) {
+      // Speak the response — try ElevenLabs first, fallback to browser TTS
+      if (fullText) {
         setState('speaking')
-        const utterance = new SpeechSynthesisUtterance(fullText)
-        utterance.lang = 'es-MX'
-        utterance.rate = 1.1
-        utterance.pitch = 1.0
+        try {
+          const ttsRes = await fetch('/api/voice-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: fullText }),
+          })
 
-        // Try to find a Spanish voice
-        const voices = window.speechSynthesis.getVoices()
-        const spanishVoice = voices.find(v => v.lang.startsWith('es-MX')) ||
-          voices.find(v => v.lang.startsWith('es-ES')) ||
-          voices.find(v => v.lang.startsWith('es'))
-        if (spanishVoice) utterance.voice = spanishVoice
-
-        synthRef.current = utterance
-        utterance.onend = () => {
+          if (ttsRes.ok && ttsRes.status === 200 && ttsRes.body) {
+            // ElevenLabs audio stream — play via Audio element
+            const audioBlob = await ttsRes.blob()
+            const audioUrl = URL.createObjectURL(audioBlob)
+            const audio = new Audio(audioUrl)
+            audioRef.current = audio
+            audio.onended = () => {
+              setState('idle')
+              audioRef.current = null
+              URL.revokeObjectURL(audioUrl)
+            }
+            audio.onerror = () => {
+              setState('idle')
+              audioRef.current = null
+              URL.revokeObjectURL(audioUrl)
+            }
+            await audio.play()
+          } else {
+            // Fallback: browser SpeechSynthesis
+            if ('speechSynthesis' in window) {
+              const utterance = new SpeechSynthesisUtterance(fullText)
+              utterance.lang = 'es-MX'
+              utterance.rate = 0.9
+              utterance.pitch = 1.0
+              const voices = window.speechSynthesis.getVoices()
+              const spanishVoice = voices.find(v => v.lang.startsWith('es-MX')) ||
+                voices.find(v => v.lang.startsWith('es'))
+              if (spanishVoice) utterance.voice = spanishVoice
+              synthRef.current = utterance
+              utterance.onend = () => { setState('idle'); synthRef.current = null }
+              utterance.onerror = () => { setState('idle'); synthRef.current = null }
+              window.speechSynthesis.speak(utterance)
+            } else {
+              setState('idle')
+            }
+          }
+        } catch {
           setState('idle')
-          synthRef.current = null
         }
-        utterance.onerror = () => {
-          setState('idle')
-          synthRef.current = null
-        }
-        window.speechSynthesis.speak(utterance)
       } else {
         setState('idle')
       }
