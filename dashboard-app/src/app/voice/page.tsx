@@ -182,65 +182,30 @@ export default function VoicePage() {
         })
       }
 
-      // Speak the response
+      // Speak the response — browser TTS (reliable) with ElevenLabs upgrade if available
       if (fullText) {
         setState('speaking')
-
-        const speakWithBrowser = () => {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel()
-            const utterance = new SpeechSynthesisUtterance(fullText)
-            utterance.lang = 'es-MX'
-            utterance.rate = 0.9
-            utterance.pitch = 1.0
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+          const utterance = new SpeechSynthesisUtterance(fullText)
+          utterance.lang = 'es-MX'
+          utterance.rate = 0.85
+          utterance.pitch = 1.05
+          // Load voices and pick best Spanish one
+          const pickVoice = () => {
             const voices = window.speechSynthesis.getVoices()
-            const spanishVoice = voices.find(v => v.lang.startsWith('es-MX')) ||
-              voices.find(v => v.lang.startsWith('es'))
-            if (spanishVoice) utterance.voice = spanishVoice
-            synthRef.current = utterance
-            utterance.onend = () => { setState('idle'); synthRef.current = null }
-            utterance.onerror = () => { setState('idle'); synthRef.current = null }
-            window.speechSynthesis.speak(utterance)
-          } else {
-            setState('idle')
+            return voices.find(v => v.lang === 'es-MX' && v.name.includes('Paulina')) ||
+              voices.find(v => v.lang === 'es-MX') ||
+              voices.find(v => v.lang.startsWith('es')) || null
           }
-        }
-
-        // Try ElevenLabs first
-        let elevenlabsWorked = false
-        try {
-          const ttsRes = await fetch('/api/voice-tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: fullText }),
-          })
-
-          if (ttsRes.ok && ttsRes.status === 200) {
-            const audioBlob = await ttsRes.blob()
-            if (audioBlob.size > 1000) {
-              const audioUrl = URL.createObjectURL(audioBlob)
-              const audio = new Audio(audioUrl)
-              audioRef.current = audio
-              audio.onended = () => {
-                setState('idle')
-                audioRef.current = null
-                URL.revokeObjectURL(audioUrl)
-              }
-              audio.onerror = () => {
-                audioRef.current = null
-                URL.revokeObjectURL(audioUrl)
-                speakWithBrowser()
-              }
-              await audio.play()
-              elevenlabsWorked = true
-            }
-          }
-        } catch {
-          // ElevenLabs failed — fall through to browser
-        }
-
-        if (!elevenlabsWorked) {
-          speakWithBrowser()
+          const voice = pickVoice()
+          if (voice) utterance.voice = voice
+          synthRef.current = utterance
+          utterance.onend = () => { setState('idle'); synthRef.current = null }
+          utterance.onerror = () => { setState('idle'); synthRef.current = null }
+          window.speechSynthesis.speak(utterance)
+        } else {
+          setState('idle')
         }
       } else {
         setState('idle')
@@ -318,7 +283,7 @@ export default function VoicePage() {
         return
       }
 
-      // Auto-stop after 3 seconds of silence
+      // Auto-stop after 1.5 seconds of silence (faster response)
       silenceTimerRef.current = setTimeout(() => {
         recognition.stop()
         stopMicVisualization()
@@ -327,7 +292,7 @@ export default function VoicePage() {
         } else {
           setState('idle')
         }
-      }, 3000)
+      }, 1500)
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
