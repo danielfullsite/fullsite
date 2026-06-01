@@ -375,9 +375,9 @@ export default function VoicePage() {
       source.connect(scriptProcessor)
       scriptProcessor.connect(audioCtx.destination) // required for onaudioprocess to fire
 
-      // 4. Open Deepgram WebSocket
-      const dgUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=es-419&punctuate=true&interim_results=true&endpointing=300&encoding=linear16&sample_rate=16000`
-      const socket = new WebSocket(dgUrl, ['token', key])
+      // 4. Open Deepgram WebSocket (key in URL for maximum compatibility)
+      const dgUrl = `wss://api.deepgram.com/v1/listen?token=${key}&model=nova-2&language=es-419&punctuate=true&interim_results=true&endpointing=300&encoding=linear16&sample_rate=16000`
+      const socket = new WebSocket(dgUrl)
       dgSocketRef.current = socket
 
       socket.onopen = () => {
