@@ -24,11 +24,31 @@ export default function VoicePage() {
   const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
   const [supported, setSupported] = useState(true)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoiceIdx, setSelectedVoiceIdx] = useState<number>(-1)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Pre-load voices on mount
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    const loadVoices = () => {
+      const all = window.speechSynthesis.getVoices()
+      const spanish = all.filter(v => v.lang.startsWith('es'))
+      setVoices(spanish.length > 0 ? spanish : all)
+      // Auto-select best Spanish voice
+      if (selectedVoiceIdx === -1 && spanish.length > 0) {
+        const paulina = spanish.findIndex(v => v.name.includes('Paulina'))
+        const esMX = spanish.findIndex(v => v.lang === 'es-MX')
+        setSelectedVoiceIdx(paulina >= 0 ? paulina : esMX >= 0 ? esMX : 0)
+      }
+    }
+    loadVoices()
+    window.speechSynthesis.onvoiceschanged = loadVoices
+  }, [selectedVoiceIdx])
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animFrameRef = useRef<number>(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -191,15 +211,10 @@ export default function VoicePage() {
           utterance.lang = 'es-MX'
           utterance.rate = 0.85
           utterance.pitch = 1.05
-          // Load voices and pick best Spanish one
-          const pickVoice = () => {
-            const voices = window.speechSynthesis.getVoices()
-            return voices.find(v => v.lang === 'es-MX' && v.name.includes('Paulina')) ||
-              voices.find(v => v.lang === 'es-MX') ||
-              voices.find(v => v.lang.startsWith('es')) || null
+          // Use selected voice from dropdown
+          if (voices.length > 0 && selectedVoiceIdx >= 0) {
+            utterance.voice = voices[selectedVoiceIdx]
           }
-          const voice = pickVoice()
-          if (voice) utterance.voice = voice
           synthRef.current = utterance
           utterance.onend = () => { setState('idle'); synthRef.current = null }
           utterance.onerror = () => { setState('idle'); synthRef.current = null }
@@ -387,6 +402,21 @@ export default function VoicePage() {
               <p style={{ color: '#737373', fontSize: 15 }}>
                 Preguntame sobre ventas, meseros, tendencias y mas.
               </p>
+              {voices.length > 0 && (
+                <select
+                  value={selectedVoiceIdx}
+                  onChange={e => setSelectedVoiceIdx(Number(e.target.value))}
+                  style={{
+                    marginTop: 12, padding: '6px 12px', fontSize: 12, borderRadius: 8,
+                    background: '#1a1a1a', color: '#aaa', border: '1px solid #333',
+                    cursor: 'pointer', maxWidth: 280,
+                  }}
+                >
+                  {voices.map((v, i) => (
+                    <option key={i} value={i}>{v.name} ({v.lang})</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
