@@ -182,9 +182,32 @@ export default function VoicePage() {
         })
       }
 
-      // Speak the response — try ElevenLabs first, fallback to browser TTS
+      // Speak the response
       if (fullText) {
         setState('speaking')
+
+        const speakWithBrowser = () => {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel()
+            const utterance = new SpeechSynthesisUtterance(fullText)
+            utterance.lang = 'es-MX'
+            utterance.rate = 0.9
+            utterance.pitch = 1.0
+            const voices = window.speechSynthesis.getVoices()
+            const spanishVoice = voices.find(v => v.lang.startsWith('es-MX')) ||
+              voices.find(v => v.lang.startsWith('es'))
+            if (spanishVoice) utterance.voice = spanishVoice
+            synthRef.current = utterance
+            utterance.onend = () => { setState('idle'); synthRef.current = null }
+            utterance.onerror = () => { setState('idle'); synthRef.current = null }
+            window.speechSynthesis.speak(utterance)
+          } else {
+            setState('idle')
+          }
+        }
+
+        // Try ElevenLabs first
+        let elevenlabsWorked = false
         try {
           const ttsRes = await fetch('/api/voice-tts', {
             method: 'POST',
@@ -192,44 +215,32 @@ export default function VoicePage() {
             body: JSON.stringify({ text: fullText }),
           })
 
-          if (ttsRes.ok && ttsRes.status === 200 && ttsRes.body) {
-            // ElevenLabs audio stream — play via Audio element
+          if (ttsRes.ok && ttsRes.status === 200) {
             const audioBlob = await ttsRes.blob()
-            const audioUrl = URL.createObjectURL(audioBlob)
-            const audio = new Audio(audioUrl)
-            audioRef.current = audio
-            audio.onended = () => {
-              setState('idle')
-              audioRef.current = null
-              URL.revokeObjectURL(audioUrl)
-            }
-            audio.onerror = () => {
-              setState('idle')
-              audioRef.current = null
-              URL.revokeObjectURL(audioUrl)
-            }
-            await audio.play()
-          } else {
-            // Fallback: browser SpeechSynthesis
-            if ('speechSynthesis' in window) {
-              const utterance = new SpeechSynthesisUtterance(fullText)
-              utterance.lang = 'es-MX'
-              utterance.rate = 0.9
-              utterance.pitch = 1.0
-              const voices = window.speechSynthesis.getVoices()
-              const spanishVoice = voices.find(v => v.lang.startsWith('es-MX')) ||
-                voices.find(v => v.lang.startsWith('es'))
-              if (spanishVoice) utterance.voice = spanishVoice
-              synthRef.current = utterance
-              utterance.onend = () => { setState('idle'); synthRef.current = null }
-              utterance.onerror = () => { setState('idle'); synthRef.current = null }
-              window.speechSynthesis.speak(utterance)
-            } else {
-              setState('idle')
+            if (audioBlob.size > 1000) {
+              const audioUrl = URL.createObjectURL(audioBlob)
+              const audio = new Audio(audioUrl)
+              audioRef.current = audio
+              audio.onended = () => {
+                setState('idle')
+                audioRef.current = null
+                URL.revokeObjectURL(audioUrl)
+              }
+              audio.onerror = () => {
+                audioRef.current = null
+                URL.revokeObjectURL(audioUrl)
+                speakWithBrowser()
+              }
+              await audio.play()
+              elevenlabsWorked = true
             }
           }
         } catch {
-          setState('idle')
+          // ElevenLabs failed — fall through to browser
+        }
+
+        if (!elevenlabsWorked) {
+          speakWithBrowser()
         }
       } else {
         setState('idle')
