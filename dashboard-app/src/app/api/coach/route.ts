@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const { client_id } = await request.json().catch(() => ({} as { client_id?: string }))
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
     if (!apiKey || apiKey === 'PLACEHOLDER_NEEDS_REAL_KEY') {
       return Response.json({ insights: [] }, { status: 200 })
     }

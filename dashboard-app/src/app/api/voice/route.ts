@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return new Response('Mensaje requerido', { status: 400 })
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
     if (!apiKey || apiKey === 'PLACEHOLDER_NEEDS_REAL_KEY') {
       return new Response('Agrega ANTHROPIC_API_KEY a .env.local para activar el agente de voz.', { status: 200 })
     }

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
     if (!apiKey || apiKey === 'PLACEHOLDER_NEEDS_REAL_KEY') {
       return Response.json(
         { response: 'Agrega ANTHROPIC_API_KEY a .env.local para activar el chat.' },
