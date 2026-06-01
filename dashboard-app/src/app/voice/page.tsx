@@ -18,6 +18,29 @@ const STATUS_TEXT: Record<VoiceState, string> = {
   speaking: 'Hablando...',
 }
 
+// Convert Float32 audio samples to Int16 PCM ArrayBuffer for Deepgram
+function float32ToInt16(float32Array: Float32Array): ArrayBuffer {
+  const int16 = new Int16Array(float32Array.length)
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]))
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+  }
+  return int16.buffer
+}
+
+// Downsample audio from source sample rate to target sample rate
+function downsample(buffer: Float32Array, fromRate: number, toRate: number): Float32Array {
+  if (fromRate === toRate) return buffer
+  const ratio = fromRate / toRate
+  const newLength = Math.round(buffer.length / ratio)
+  const result = new Float32Array(newLength)
+  for (let i = 0; i < newLength; i++) {
+    const idx = Math.round(i * ratio)
+    result[i] = buffer[idx] ?? 0
+  }
+  return result
+}
+
 export default function VoicePage() {
   const [state, setState] = useState<VoiceState>('idle')
   const [messages, setMessages] = useState<Message[]>([])
@@ -26,20 +49,39 @@ export default function VoicePage() {
   const [supported, setSupported] = useState(true)
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoiceIdx, setSelectedVoiceIdx] = useState<number>(-1)
+  const [useDeepgram, setUseDeepgram] = useState(true) // true = try Deepgram first
 
+  // Refs for audio/speech
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<any>(null) // Web Speech API fallback
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Pre-load voices on mount
+  // Refs for Deepgram WebSocket STT
+  const dgSocketRef = useRef<WebSocket | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null)
+  const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+
+  // Refs for visualization
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animFrameRef = useRef<number>(0)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Track accumulated transcript for Deepgram
+  const dgTranscriptRef = useRef('')
+  const dgInterimRef = useRef('')
+
+  // Pre-load browser TTS voices on mount (for fallback)
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
     const loadVoices = () => {
       const all = window.speechSynthesis.getVoices()
       const spanish = all.filter(v => v.lang.startsWith('es'))
       setVoices(spanish.length > 0 ? spanish : all)
-      // Auto-select best Spanish voice
       if (selectedVoiceIdx === -1 && spanish.length > 0) {
         const paulina = spanish.findIndex(v => v.name.includes('Paulina'))
         const esMX = spanish.findIndex(v => v.lang === 'es-MX')
@@ -49,27 +91,21 @@ export default function VoicePage() {
     loadVoices()
     window.speechSynthesis.onvoiceschanged = loadVoices
   }, [selectedVoiceIdx])
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const animFrameRef = useRef<number>(0)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Check browser support
+  // Check browser support (Web Speech API as fallback)
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) {
+    if (!SR && !useDeepgram) {
       setSupported(false)
       setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.')
     }
-  }, [])
+  }, [useDeepgram])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -77,6 +113,16 @@ export default function VoicePage() {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+      if (dgSocketRef.current) {
+        try { dgSocketRef.current.close() } catch { /* ignore */ }
+      }
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close() } catch { /* ignore */ }
+      }
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
       window.speechSynthesis.cancel()
     }
   }, [])
@@ -122,23 +168,6 @@ export default function VoicePage() {
     draw()
   }, [])
 
-  // Start mic visualization
-  const startMicVisualization = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const audioCtx = new AudioContext()
-      const source = audioCtx.createMediaStreamSource(stream)
-      const analyser = audioCtx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      analyserRef.current = analyser
-      drawWaveform()
-    } catch {
-      // Mic permission denied — no visualization but still works
-    }
-  }, [drawWaveform])
-
   // Stop mic visualization
   const stopMicVisualization = useCallback(() => {
     if (animFrameRef.current) {
@@ -157,7 +186,34 @@ export default function VoicePage() {
     }
   }, [])
 
-  // Send message to API and speak response
+  // Cleanup Deepgram resources
+  const cleanupDeepgram = useCallback(() => {
+    if (scriptProcessorRef.current) {
+      scriptProcessorRef.current.disconnect()
+      scriptProcessorRef.current = null
+    }
+    if (mediaSourceRef.current) {
+      mediaSourceRef.current.disconnect()
+      mediaSourceRef.current = null
+    }
+    if (dgSocketRef.current) {
+      try {
+        if (dgSocketRef.current.readyState === WebSocket.OPEN) {
+          // Send empty buffer to signal end of audio
+          dgSocketRef.current.send(new ArrayBuffer(0))
+        }
+        dgSocketRef.current.close()
+      } catch { /* ignore */ }
+      dgSocketRef.current = null
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close() } catch { /* ignore */ }
+      audioContextRef.current = null
+    }
+    stopMicVisualization()
+  }, [stopMicVisualization])
+
+  // Send message to API and speak response (ElevenLabs with browser TTS fallback)
   const sendAndSpeak = useCallback(async (text: string) => {
     setState('processing')
     setInterim('')
@@ -202,26 +258,47 @@ export default function VoicePage() {
         })
       }
 
-      // Speak the response — browser TTS (reliable) with ElevenLabs upgrade if available
+      // Speak the response — try ElevenLabs first, fall back to browser TTS
       if (fullText) {
         setState('speaking')
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel()
-          const utterance = new SpeechSynthesisUtterance(fullText)
-          utterance.lang = 'es-MX'
-          utterance.rate = 0.85
-          utterance.pitch = 1.05
-          // Use selected voice from dropdown
-          if (voices.length > 0 && selectedVoiceIdx >= 0) {
-            utterance.voice = voices[selectedVoiceIdx]
+
+        try {
+          const ttsRes = await fetch('/api/voice-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: fullText }),
+          })
+
+          if (ttsRes.ok && ttsRes.status === 200) {
+            // ElevenLabs returned audio
+            const blob = await ttsRes.blob()
+            const url = URL.createObjectURL(blob)
+            const audio = new Audio(url)
+            audioRef.current = audio
+            audio.onended = () => {
+              setState('idle')
+              URL.revokeObjectURL(url)
+              audioRef.current = null
+            }
+            audio.onerror = () => {
+              setState('idle')
+              URL.revokeObjectURL(url)
+              audioRef.current = null
+            }
+            audio.play().catch(() => {
+              // Autoplay blocked — fall back to browser TTS
+              URL.revokeObjectURL(url)
+              audioRef.current = null
+              speakWithBrowserTTS(fullText)
+            })
+            return
           }
-          synthRef.current = utterance
-          utterance.onend = () => { setState('idle'); synthRef.current = null }
-          utterance.onerror = () => { setState('idle'); synthRef.current = null }
-          window.speechSynthesis.speak(utterance)
-        } else {
-          setState('idle')
+        } catch {
+          // ElevenLabs failed — fall back
         }
+
+        // Fallback: browser TTS
+        speakWithBrowserTTS(fullText)
       } else {
         setState('idle')
       }
@@ -231,30 +308,170 @@ export default function VoicePage() {
       setState('idle')
       setTimeout(() => setError(''), 3000)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages])
 
-  // Handle main button click
-  const handleButtonClick = useCallback(() => {
-    if (state === 'speaking') {
-      // Stop speaking
+  // Browser TTS fallback
+  const speakWithBrowserTTS = useCallback((text: string) => {
+    if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'es-MX'
+      utterance.rate = 0.85
+      utterance.pitch = 1.05
+      if (voices.length > 0 && selectedVoiceIdx >= 0) {
+        utterance.voice = voices[selectedVoiceIdx]
+      }
+      synthRef.current = utterance
+      utterance.onend = () => { setState('idle'); synthRef.current = null }
+      utterance.onerror = () => { setState('idle'); synthRef.current = null }
+      window.speechSynthesis.speak(utterance)
+    } else {
       setState('idle')
-      return
     }
+  }, [voices, selectedVoiceIdx])
 
-    if (state === 'listening') {
-      // Stop listening
-      recognitionRef.current?.stop()
-      stopMicVisualization()
-      return
+  // Start listening with Deepgram WebSocket STT
+  const startDeepgramListening = useCallback(async () => {
+    setError('')
+    setState('listening')
+    dgTranscriptRef.current = ''
+    dgInterimRef.current = ''
+
+    try {
+      // 1. Get temp API key from our backend
+      const tokenRes = await fetch('/api/deepgram-token')
+      if (!tokenRes.ok) throw new Error('No Deepgram token')
+      const { key } = await tokenRes.json()
+      if (!key) throw new Error('Empty Deepgram key')
+
+      // 2. Get mic stream
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      })
+      streamRef.current = stream
+
+      // 3. Set up AudioContext for visualization + PCM extraction
+      const audioCtx = new AudioContext()
+      audioContextRef.current = audioCtx
+      const source = audioCtx.createMediaStreamSource(stream)
+      mediaSourceRef.current = source
+
+      // Analyser for waveform visualization
+      const analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      analyserRef.current = analyser
+      drawWaveform()
+
+      // ScriptProcessor for PCM extraction → Deepgram WebSocket
+      const scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1)
+      scriptProcessorRef.current = scriptProcessor
+      source.connect(scriptProcessor)
+      scriptProcessor.connect(audioCtx.destination) // required for onaudioprocess to fire
+
+      // 4. Open Deepgram WebSocket
+      const dgUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=es-419&punctuate=true&interim_results=true&endpointing=300&encoding=linear16&sample_rate=16000`
+      const socket = new WebSocket(dgUrl, ['token', key])
+      dgSocketRef.current = socket
+
+      socket.onopen = () => {
+        // Start sending audio data
+        scriptProcessor.onaudioprocess = (e) => {
+          if (socket.readyState !== WebSocket.OPEN) return
+          const input = e.inputBuffer.getChannelData(0)
+          // Downsample from AudioContext sample rate to 16000
+          const downsampled = downsample(input, audioCtx.sampleRate, 16000)
+          const pcm = float32ToInt16(downsampled)
+          socket.send(pcm)
+        }
+      }
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === 'Results' && data.channel?.alternatives?.[0]) {
+            const alt = data.channel.alternatives[0]
+            const transcript = alt.transcript || ''
+
+            if (data.is_final && transcript.trim()) {
+              // Accumulate final transcript
+              dgTranscriptRef.current += (dgTranscriptRef.current ? ' ' : '') + transcript.trim()
+              dgInterimRef.current = ''
+              setInterim(dgTranscriptRef.current)
+
+              // After endpointing (speech_final), close and send
+              if (data.speech_final) {
+                const finalText = dgTranscriptRef.current.trim()
+                cleanupDeepgram()
+                if (finalText) {
+                  sendAndSpeak(finalText)
+                } else {
+                  setState('idle')
+                }
+              }
+            } else if (!data.is_final && transcript.trim()) {
+              // Interim result — show accumulated + current interim
+              dgInterimRef.current = transcript.trim()
+              const display = dgTranscriptRef.current
+                ? dgTranscriptRef.current + ' ' + dgInterimRef.current
+                : dgInterimRef.current
+              setInterim(display)
+            }
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      socket.onerror = () => {
+        console.error('[Deepgram] WebSocket error — falling back to Web Speech API')
+        cleanupDeepgram()
+        setUseDeepgram(false)
+        // Retry with Web Speech API
+        startWebSpeechListening()
+      }
+
+      socket.onclose = (event) => {
+        // If closed unexpectedly while still listening, submit what we have
+        if (state === 'listening' || dgTranscriptRef.current.trim()) {
+          const finalText = dgTranscriptRef.current.trim()
+          cleanupDeepgram()
+          if (finalText) {
+            sendAndSpeak(finalText)
+          } else {
+            setState('idle')
+          }
+        }
+        // Normal close after speech_final is handled in onmessage
+        void event // suppress unused
+      }
+    } catch (err) {
+      console.error('[Deepgram] Setup error:', err)
+      cleanupDeepgram()
+      // Fall back to Web Speech API
+      setUseDeepgram(false)
+      startWebSpeechListening()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawWaveform, cleanupDeepgram, sendAndSpeak])
 
-    if (state !== 'idle') return
-
+  // Web Speech API fallback for STT
+  const startWebSpeechListening = useCallback(() => {
     setError('')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) return
+    if (!SR) {
+      setSupported(false)
+      setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.')
+      setState('idle')
+      return
+    }
 
     const recognition = new SR()
     recognition.lang = 'es-MX'
@@ -266,12 +483,21 @@ export default function VoicePage() {
 
     recognition.onstart = () => {
       setState('listening')
-      startMicVisualization()
+      // Start visualization via mic
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        streamRef.current = stream
+        const audioCtx = new AudioContext()
+        const source = audioCtx.createMediaStreamSource(stream)
+        const analyser = audioCtx.createAnalyser()
+        analyser.fftSize = 256
+        source.connect(analyser)
+        analyserRef.current = analyser
+        drawWaveform()
+      }).catch(() => { /* no viz, still works */ })
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
-      // Reset silence timer on any result
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
 
       let finalTranscript = ''
@@ -298,7 +524,7 @@ export default function VoicePage() {
         return
       }
 
-      // Auto-stop after 1.5 seconds of silence (faster response)
+      // Auto-stop after 1.5 seconds of silence
       silenceTimerRef.current = setTimeout(() => {
         recognition.stop()
         stopMicVisualization()
@@ -325,13 +551,52 @@ export default function VoicePage() {
 
     recognition.onend = () => {
       stopMicVisualization()
-      // State will be updated by onresult if final transcript was captured,
-      // or by onerror if there was an error. Only reset to idle if neither happened.
       setState((prev: VoiceState) => prev === 'listening' ? 'idle' : prev)
     }
 
     recognition.start()
-  }, [state, interim, startMicVisualization, stopMicVisualization, sendAndSpeak])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawWaveform, stopMicVisualization, sendAndSpeak])
+
+  // Handle main button click
+  const handleButtonClick = useCallback(() => {
+    if (state === 'speaking') {
+      // Stop speaking — ElevenLabs audio or browser TTS
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      window.speechSynthesis.cancel()
+      setState('idle')
+      return
+    }
+
+    if (state === 'listening') {
+      // Stop listening — Deepgram or Web Speech API
+      if (dgSocketRef.current) {
+        const finalText = dgTranscriptRef.current.trim()
+        cleanupDeepgram()
+        if (finalText) {
+          sendAndSpeak(finalText)
+        } else {
+          setState('idle')
+        }
+      } else if (recognitionRef.current) {
+        recognitionRef.current.stop()
+        stopMicVisualization()
+      }
+      return
+    }
+
+    if (state !== 'idle') return
+
+    // Start listening — try Deepgram first, fall back to Web Speech API
+    if (useDeepgram) {
+      startDeepgramListening()
+    } else {
+      startWebSpeechListening()
+    }
+  }, [state, useDeepgram, cleanupDeepgram, sendAndSpeak, stopMicVisualization, startDeepgramListening, startWebSpeechListening])
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
