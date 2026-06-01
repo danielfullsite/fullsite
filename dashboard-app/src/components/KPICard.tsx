@@ -12,6 +12,8 @@ interface KPICardProps {
   icon?: LucideIcon
   accentClass?: string
   index?: number
+  sparklineData?: number[]
+  weekChange?: number | null
 }
 
 const iconStyles: Record<string, { bg: string; icon: string }> = {
@@ -23,6 +25,22 @@ const iconStyles: Record<string, { bg: string; icon: string }> = {
   'kpi-accent-cyan': { bg: 'bg-cyan-500/10', icon: 'text-cyan-400' },
 }
 
+function Sparkline({ data, color }: { data: number[]; color?: string }) {
+  if (data.length < 2) return null
+  const max = Math.max(...data)
+  const min = Math.min(...data)
+  const range = max - min || 1
+  const w = 80, h = 24
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ')
+  const trending = data[data.length - 1] > data[0]
+  const c = color || (data[data.length - 1] === data[0] ? '#6b7280' : trending ? '#10b981' : '#ef4444')
+  return (
+    <svg width={w} height={h} className="inline-block">
+      <polyline points={points} fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function KPICard({
   label,
   value,
@@ -32,6 +50,8 @@ export default function KPICard({
   icon: Icon,
   accentClass,
   index = 0,
+  sparklineData,
+  weekChange,
 }: KPICardProps) {
   const style = accentClass ? iconStyles[accentClass] || { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]' } : { bg: 'bg-[var(--surface-2)]', icon: 'text-[var(--text-3)]' }
 
@@ -61,14 +81,37 @@ export default function KPICard({
         )}
         <div className="flex-1 min-w-0">
           <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.15em] font-mono text-[var(--text-3)] mb-1">{label}</p>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
-            className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--text-1)] tnum"
-          >
-            {value}
-          </motion.p>
+          <div className="flex items-center gap-2">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: index * 0.06 + 0.15 }}
+              className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--text-1)] tnum"
+            >
+              {value}
+            </motion.p>
+            {sparklineData && sparklineData.length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: index * 0.06 + 0.2 }}
+              >
+                <Sparkline data={sparklineData} />
+              </motion.div>
+            )}
+          </div>
+          {weekChange !== undefined && weekChange !== null && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: index * 0.06 + 0.22 }}
+              className={`text-[10px] font-semibold mt-0.5 ${
+                weekChange > 0 ? 'text-emerald-400' : weekChange < 0 ? 'text-red-400' : 'text-[var(--text-4)]'
+              }`}
+            >
+              {weekChange > 0 ? '+' : ''}{weekChange.toFixed(1)}% vs semana pasada
+            </motion.p>
+          )}
         </div>
       </div>
       {delta && (

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import AppShell from '@/components/AppShell'
 import PosthogInit from '@/components/PosthogInit'
 import SupabasePatch from '@/components/SupabasePatch'
+import InstallPrompt from '@/components/InstallPrompt'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -49,6 +50,7 @@ export default function RootLayout({
         <SupabasePatch />
         <AuthProvider>
           <AppShell>{children}</AppShell>
+          <InstallPrompt />
         </AuthProvider>
       </body>
     </html>

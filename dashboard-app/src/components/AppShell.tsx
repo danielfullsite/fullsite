@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Sidebar from '@/components/Sidebar'
 import ChatWidget from '@/components/ChatWidget'
+import NotificationBell from '@/components/NotificationBell'
 import { PageTransition } from '@/components/motion'
 import { useEffect, useState } from 'react'
 
@@ -78,7 +79,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden">
         <Sidebar />
       </div>
-      <main className="min-h-screen overflow-auto lg:pt-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+      <main className="min-h-screen overflow-auto lg:pt-0 relative" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+        {/* Notification bell — top right */}
+        <div className="absolute right-4 lg:right-8 z-30 hidden lg:block" style={{ top: '1.25rem' }}>
+          <NotificationBell />
+        </div>
         <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
           <PageTransition key={pathname}>
             {children}

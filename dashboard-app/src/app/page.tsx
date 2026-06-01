@@ -453,40 +453,82 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Summary Cards — 4 across like Toast */}
-      {show('kpis') && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard
-          label={period === 'dia' ? 'Ventas del día' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
-          value={formatCurrency(periodData.ventas)}
-          delta={`${formatPercent(ventasChange)} ${periodData.label}`}
-          deltaType={ventasChange >= 0 ? 'up' : 'down'}
-          icon={DollarSign}
-          accentClass="kpi-accent-blue"
-        />
-        <KPICard
-          label="Tickets"
-          value={formatNumber(periodData.tickets)}
-          delta={`${formatPercent(ticketsChange)} ${periodData.label}`}
-          deltaType={ticketsChange >= 0 ? 'up' : 'down'}
-          icon={Ticket}
-          accentClass="kpi-accent-green"
-        />
-        <KPICard
-          label="Personas"
-          value={formatNumber(periodData.personas)}
-          delta={`${formatPercent(personasChange)} ${periodData.label}`}
-          deltaType={personasChange >= 0 ? 'up' : 'down'}
-          icon={Users}
-          accentClass="kpi-accent-amber"
-        />
-        <KPICard
-          label="Ticket promedio"
-          value={formatCurrency(periodData.tp)}
-          delta={`${formatPercent(ticketPromChange)} ${periodData.label}`}
-          deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
-          icon={Receipt}
-          accentClass="kpi-accent-purple"
-        />
-      </div>}
+      {show('kpis') && (() => {
+        // Sparkline data: last 7 days
+        const spark7 = recentData.slice(-7)
+        const sparkVentas = spark7.map(d => d.ventas_dia || 0)
+        const sparkTickets = spark7.map(d => d.tickets_count || 0)
+        const sparkPersonas = spark7.map(d => d.personas_restaurant || 0)
+        const sparkTP = spark7.map(d => d.ticket_promedio_restaurant || 0)
+
+        // Week-over-week comparison: last 7 days total vs previous 7 days total
+        const thisWeek7 = recentData.slice(-7)
+        const prevWeek7 = recentData.slice(-14, -7)
+        const sumField = (arr: WansoftDaily[], key: keyof WansoftDaily) =>
+          arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
+        const avgField = (arr: WansoftDaily[], key: keyof WansoftDaily) => {
+          const vals = arr.map(d => Number(d[key]) || 0).filter(v => v > 0)
+          return vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : 0
+        }
+
+        const wkVentas = prevWeek7.length >= 3
+          ? percentChange(sumField(thisWeek7, 'ventas_dia'), sumField(prevWeek7, 'ventas_dia'))
+          : null
+        const wkTickets = prevWeek7.length >= 3
+          ? percentChange(sumField(thisWeek7, 'tickets_count'), sumField(prevWeek7, 'tickets_count'))
+          : null
+        const wkPersonas = prevWeek7.length >= 3
+          ? percentChange(sumField(thisWeek7, 'personas_restaurant'), sumField(prevWeek7, 'personas_restaurant'))
+          : null
+        const wkTP = prevWeek7.length >= 3
+          ? percentChange(avgField(thisWeek7, 'ticket_promedio_restaurant'), avgField(prevWeek7, 'ticket_promedio_restaurant'))
+          : null
+
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KPICard
+              label={period === 'dia' ? 'Ventas del día' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
+              value={formatCurrency(periodData.ventas)}
+              delta={`${formatPercent(ventasChange)} ${periodData.label}`}
+              deltaType={ventasChange >= 0 ? 'up' : 'down'}
+              icon={DollarSign}
+              accentClass="kpi-accent-blue"
+              sparklineData={sparkVentas}
+              weekChange={wkVentas}
+            />
+            <KPICard
+              label="Tickets"
+              value={formatNumber(periodData.tickets)}
+              delta={`${formatPercent(ticketsChange)} ${periodData.label}`}
+              deltaType={ticketsChange >= 0 ? 'up' : 'down'}
+              icon={Ticket}
+              accentClass="kpi-accent-green"
+              sparklineData={sparkTickets}
+              weekChange={wkTickets}
+            />
+            <KPICard
+              label="Personas"
+              value={formatNumber(periodData.personas)}
+              delta={`${formatPercent(personasChange)} ${periodData.label}`}
+              deltaType={personasChange >= 0 ? 'up' : 'down'}
+              icon={Users}
+              accentClass="kpi-accent-amber"
+              sparklineData={sparkPersonas}
+              weekChange={wkPersonas}
+            />
+            <KPICard
+              label="Ticket promedio"
+              value={formatCurrency(periodData.tp)}
+              delta={`${formatPercent(ticketPromChange)} ${periodData.label}`}
+              deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
+              icon={Receipt}
+              accentClass="kpi-accent-purple"
+              sparklineData={sparkTP}
+              weekChange={wkTP}
+            />
+          </div>
+        )
+      })()}
 
       {/* Prediction Widget */}
       {show('prediction') && period === 'dia' && (() => {
