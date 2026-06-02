@@ -190,26 +190,29 @@ export default function VoicePage() {
         setState('speaking')
         let spoke = false
 
-        // Try ElevenLabs (natural Mexican Spanish voice)
-        try {
-          const ttsRes = await fetch('/api/voice-tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: fullText }),
-          })
-          if (ttsRes.ok && ttsRes.status === 200) {
-            const blob = await ttsRes.blob()
-            if (blob.size > 500) {
-              const url = URL.createObjectURL(blob)
-              const audio = new Audio(url)
-              audioRef.current = audio
-              audio.onended = () => { setState('idle'); audioRef.current = null; URL.revokeObjectURL(url) }
-              audio.onerror = () => { audioRef.current = null; URL.revokeObjectURL(url) }
-              await audio.play()
-              spoke = true
+        // Try ElevenLabs (natural Mexican Spanish voice) — skip on iOS (autoplay blocked)
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        if (!isIOS) {
+          try {
+            const ttsRes = await fetch('/api/voice-tts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: fullText }),
+            })
+            if (ttsRes.ok && ttsRes.status === 200) {
+              const blob = await ttsRes.blob()
+              if (blob.size > 500) {
+                const url = URL.createObjectURL(blob)
+                const audio = new Audio(url)
+                audioRef.current = audio
+                audio.onended = () => { setState('idle'); audioRef.current = null; URL.revokeObjectURL(url) }
+                audio.onerror = () => { audioRef.current = null; URL.revokeObjectURL(url) }
+                await audio.play()
+                spoke = true
+              }
             }
-          }
-        } catch { /* ElevenLabs failed, use browser */ }
+          } catch { /* ElevenLabs failed, use browser */ }
+        }
 
         // Fallback: browser TTS
         if (!spoke && 'speechSynthesis' in window) {
