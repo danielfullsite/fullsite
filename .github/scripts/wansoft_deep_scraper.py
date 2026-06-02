@@ -426,41 +426,39 @@ def main():
     def transform_tips(r):
         if r["type"] == "html":
             data = []
-            # Log first row columns for discovery
+            SKIP_NAMES = {"", "\n", "usuario", "mesero", "subtotal", "total", "iva", "%"}
             if r["data"]:
-                print(f"    [tips] First row ({len(r['data'][0])} cols): {r['data'][0]}")
+                print(f"    [tips] {len(r['data'])} rows, first: {r['data'][0][:5] if r['data'][0] else '?'}")
             for c in r["data"]:
-                if len(c) >= 3:
-                    # Skip header rows and empty rows
-                    # Headers contain "Usuario", "Subtotal", "Total", etc.
-                    if any(h in str(c[0]).strip() for h in ["Usuario", "Mesero", ""]) and safe_float(c[1] if len(c) > 1 else "0") == 0:
-                        if not c[0].strip() or c[0].strip() in ("Usuario", "Mesero", "\n"):
-                            print(f"    [tips] Skipping header/empty row: {c[0][:30]}")
-                            continue
-                    # Wansoft SalesByUser confirmed columns (from real data):
-                    # [0]=mesero, [1]=subtotal, [2]=propinas, [3]=total, [4]=propina_%
-                    mesero_name = c[0].strip()
-                    if not mesero_name or mesero_name in ("\n", "Usuario", "Mesero"):
-                        continue
-                    item = {"_cols": c, "mesero": mesero_name}
-                    nums = [safe_float(val) for val in c[1:]]
-                    if len(nums) >= 4:
-                        # 5-col format: mesero, subtotal, propinas, total, %
-                        item["ventas"] = nums[0]     # subtotal
-                        item["propinas"] = nums[1]    # propinas
-                        item["total"] = nums[2]       # total (subtotal + propinas)
-                        item["propina_pct"] = nums[3] # percentage
-                    elif len(nums) >= 2:
-                        item["ventas"] = nums[0]
-                        item["propinas"] = nums[-1]
-                    else:
-                        item["ventas"] = nums[0] if nums else 0
-                        item["propinas"] = 0
-                    # Skip rows where mesero has no real sales
-                    if item.get("ventas", 0) == 0 and item.get("propinas", 0) == 0:
-                        continue
-                    item["tickets"] = safe_int(c[1]) if len(c) > 1 and safe_int(c[1]) < 1000 else 0
-                    data.append(item)
+                if len(c) < 3:
+                    continue
+                mesero_name = str(c[0]).strip()
+                # Simple skip: empty name, header keywords, or all-whitespace
+                if not mesero_name or mesero_name.lower() in SKIP_NAMES:
+                    continue
+                # Skip if name looks like a header (contains only non-name chars)
+                if all(ch in ' \n\t\r' for ch in mesero_name):
+                    continue
+                nums = [safe_float(val) for val in c[1:]]
+                # Skip if ALL numeric columns are zero (header row parsed as data)
+                if all(n == 0 for n in nums):
+                    print(f"    [tips] Skipping all-zero row: {mesero_name[:30]}")
+                    continue
+                item = {"mesero": mesero_name}
+                if len(nums) >= 4:
+                    item["ventas"] = nums[0]
+                    item["propinas"] = nums[1]
+                    item["total"] = nums[2]
+                    item["propina_pct"] = nums[3]
+                elif len(nums) >= 2:
+                    item["ventas"] = nums[0]
+                    item["propinas"] = nums[-1]
+                else:
+                    item["ventas"] = nums[0] if nums else 0
+                    item["propinas"] = 0
+                item["tickets"] = safe_int(c[1]) if len(c) > 1 and safe_int(c[1]) < 1000 else 0
+                data.append(item)
+            print(f"    [tips] Parsed {len(data)} meseros with data")
             return data
         if r["type"] == "json": return r["data"]
         return []
