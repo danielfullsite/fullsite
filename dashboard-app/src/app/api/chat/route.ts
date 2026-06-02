@@ -345,9 +345,16 @@ export async function POST(request: NextRequest) {
         const descuentos = Number(d.descuentos) || 0
 
         const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
-        const pagoStr = pagos.map((p: { nombre: string; total: number }) => `${p.nombre}:$${Math.round(p.total)}`).join(', ')
+        const ventasDia = Number(d.ventas_dia) || 0
+        const pagoStr = pagos.map((p: { nombre: string; total: number }) => {
+          const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
+          return `${p.nombre}:$${mxn}`
+        }).join(', ')
 
-        return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
+        const dowNames = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
+        const dow = dowNames[new Date(d.fecha + 'T12:00:00').getDay()]
+
+        return `${d.fecha} (${dow}): Ventas $${ventasDia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
       })
 
       dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días).
