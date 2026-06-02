@@ -47,7 +47,10 @@ export default function VoicePage() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) {
       setSupported(false)
-      setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.')
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      setError(isIOS
+        ? 'Safari no soporta voz. Abre en Chrome para iOS o usa el Chat IA.'
+        : 'Tu navegador no soporta reconocimiento de voz. Usa Chrome.')
     }
   }, [])
 
@@ -241,8 +244,9 @@ export default function VoicePage() {
   // Handle main button click
   const handleButtonClick = useCallback(() => {
     if (state === 'speaking') {
-      // Stop speaking
-      window.speechSynthesis.cancel()
+      // Stop speaking — both ElevenLabs audio and browser TTS
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+      window.speechSynthesis?.cancel()
       setState('idle')
       return
     }
