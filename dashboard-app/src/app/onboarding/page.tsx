@@ -11,6 +11,7 @@ interface RestaurantInfo {
   city: string
   phone: string
   email: string
+  password: string
   tables: number
   timezone: string
 }
@@ -71,7 +72,7 @@ export default function OnboardingPage() {
 
   // Step 1: Restaurant info
   const [info, setInfo] = useState<RestaurantInfo>({
-    name: '', city: 'Monterrey', phone: '', email: '', tables: 10, timezone: 'America/Monterrey',
+    name: '', city: 'Monterrey', phone: '', email: '', password: '', tables: 10, timezone: 'America/Monterrey',
   })
 
   // Step 2: Staff
@@ -96,7 +97,7 @@ export default function OnboardingPage() {
   const clientId = info.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) || 'nuevo'
 
   const canNext = () => {
-    if (step === 0) return info.name.length > 0
+    if (step === 0) return info.name.length > 0 && info.email.includes('@') && info.password.length >= 6
     if (step === 1) return staff.some(s => s.name && s.pin)
     if (step === 2) return menuItems.some(i => i.name && i.price)
     if (step === 3) return payments.length > 0
@@ -166,7 +167,27 @@ export default function OnboardingPage() {
         })
       }
 
-      // 5. Create default location
+      // 5. Create auth user (server-side with service role)
+      if (info.email && info.password) {
+        const authRes = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: info.email,
+            password: info.password,
+            clientId,
+            displayName: info.name,
+          }),
+        })
+        if (!authRes.ok) {
+          const err = await authRes.json().catch(() => ({ error: 'Error creando usuario' }))
+          setError(err.error || 'Error creando usuario')
+          setSaving(false)
+          return
+        }
+      }
+
+      // 6. Create default location
       const locationId = `${clientId}-main`
       await api('client_locations', {
         id: locationId,
@@ -258,10 +279,18 @@ export default function OnboardingPage() {
                       className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Email</label>
-                    <input value={info.email} onChange={e => setInfo({ ...info, email: e.target.value })}
+                    <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Email *</label>
+                    <input type="email" value={info.email} onChange={e => setInfo({ ...info, email: e.target.value })}
+                      placeholder="tu@restaurante.com"
                       className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Contraseña del dashboard *</label>
+                  <input type="password" value={info.password} onChange={e => setInfo({ ...info, password: e.target.value })}
+                    placeholder="Minimo 6 caracteres"
+                    className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                  <p className="text-xs text-[var(--text-3)] mt-1">Con este email y contraseña entras al dashboard.</p>
                 </div>
               </div>
             </div>
