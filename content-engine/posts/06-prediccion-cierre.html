@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>Predicción de Cierre</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 60px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px;">
+            A las <span style="color: var(--accent);">2 PM</span> ya sé<br>cuánto voy a<br>cerrar hoy.
+        </h2>
+        <p style="font-size: 56px; color: var(--white); margin-top: 32px; text-align: center; font-weight: 900;">
+            Con <span style="color: var(--accent);">97%</span> de<br>precisión.
+        </p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: How it works -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Cómo funciona la predicción</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 24px;">
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <span style="font-size: 28px; font-weight: 900; color: var(--accent);">1</span>
+                </div>
+                <div>
+                    <p style="font-size: 30px; font-weight: 700; color: var(--white);">Histórico del mismo día</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 4px;">Cuánto vendes un martes típico? La IA lo sabe.</p>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <span style="font-size: 28px; font-weight: 900; color: var(--accent);">2</span>
+                </div>
+                <div>
+                    <p style="font-size: 30px; font-weight: 700; color: var(--white);">Tendencia de hoy</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 4px;">A las 2 PM ya tienes 60% de la data. Se proyecta.</p>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <span style="font-size: 28px; font-weight: 900; color: var(--accent);">3</span>
+                </div>
+                <div>
+                    <p style="font-size: 30px; font-weight: 700; color: var(--white);">Factores externos</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 4px;">Día festivo? Quincena? Evento cercano? Se ajusta.</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Real example -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Ejemplo real — Viernes pasado</h3>
+        <div style="width: 100%; background: var(--card-bg); border-radius: 24px; padding: 48px;">
+            <!-- Timeline -->
+            <div style="display: flex; flex-direction: column; gap: 32px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <div style="width: 100px; text-align: right;">
+                        <p style="font-size: 24px; color: var(--gray); font-weight: 600;">2:00 PM</p>
+                    </div>
+                    <div style="width: 4px; height: 48px; background: var(--accent); border-radius: 2px;"></div>
+                    <div>
+                        <p style="font-size: 28px; color: var(--white); font-weight: 600;">Predicción: <span style="color: var(--accent);">$138,500</span></p>
+                        <p style="font-size: 20px; color: var(--gray);">Basado en $57,500 vendidos hasta ahora</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <div style="width: 100px; text-align: right;">
+                        <p style="font-size: 24px; color: var(--gray); font-weight: 600;">4:00 PM</p>
+                    </div>
+                    <div style="width: 4px; height: 48px; background: var(--accent); border-radius: 2px;"></div>
+                    <div>
+                        <p style="font-size: 28px; color: var(--white); font-weight: 600;">Ajuste: <span style="color: var(--accent);">$140,200</span></p>
+                        <p style="font-size: 20px; color: var(--gray);">Tendencia ligeramente arriba</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <div style="width: 100px; text-align: right;">
+                        <p style="font-size: 24px; color: var(--gray); font-weight: 600;">6:00 PM</p>
+                    </div>
+                    <div style="width: 4px; height: 48px; background: var(--accent); border-radius: 2px;"></div>
+                    <div>
+                        <p style="font-size: 28px; color: var(--white); font-weight: 600;">Ajuste final: <span style="color: var(--accent);">$139,800</span></p>
+                        <p style="font-size: 20px; color: var(--gray);">Precisión: 99.1%</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="width: 100px; text-align: right;">
+                        <p style="font-size: 24px; color: var(--amber); font-weight: 600;">CIERRE</p>
+                    </div>
+                    <div style="width: 4px; height: 48px; background: var(--amber); border-radius: 2px;"></div>
+                    <div>
+                        <p style="font-size: 28px; color: var(--amber); font-weight: 700;">Real: $140,000</p>
+                        <p style="font-size: 20px; color: var(--gray);">Error: 0.1% ($200 de diferencia)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: What you do with this -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Qué haces con esta info?</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 24px;">
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 16px; padding: 32px;">
+                <p style="font-size: 22px; color: var(--coral); font-weight: 700;">SI VAS ABAJO DEL PROMEDIO:</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px; font-weight: 600;">Activa promoción, empuja platillos estrella, manda al mejor mesero al piso</p>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--accent); border-radius: 16px; padding: 32px;">
+                <p style="font-size: 22px; color: var(--accent); font-weight: 700;">SI VAS ARRIBA DEL PROMEDIO:</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px; font-weight: 600;">Confirma que tienes staff suficiente, prepara cocina para rush, no bajes la guardia</p>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--amber); border-radius: 16px; padding: 32px;">
+                <p style="font-size: 22px; color: var(--amber); font-weight: 700;">SIEMPRE:</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px; font-weight: 600;">Sabes si puedes mandar a alguien temprano o si necesitas refuerzo</p>
+            </div>
+        </div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 40px; text-align: center;">Decisiones a las 2 PM, no a las 10 PM cuando ya es tarde.</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: 3 predictions daily -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 48px; font-weight: 900; color: var(--white); margin-bottom: 48px;">3 predicciones al día</h3>
+            <div style="display: flex; gap: 24px; justify-content: center;">
+                <div style="background: var(--card-bg); border-radius: 20px; padding: 40px 32px; text-align: center; flex: 1;">
+                    <p style="font-size: 56px; font-weight: 900; color: var(--accent);">2 PM</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 12px;">Primera lectura</p>
+                    <p style="font-size: 18px; color: var(--gray); margin-top: 4px;">60% de data</p>
+                </div>
+                <div style="background: var(--card-bg); border-radius: 20px; padding: 40px 32px; text-align: center; flex: 1;">
+                    <p style="font-size: 56px; font-weight: 900; color: var(--accent);">4 PM</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 12px;">Ajuste</p>
+                    <p style="font-size: 18px; color: var(--gray); margin-top: 4px;">80% de data</p>
+                </div>
+                <div style="background: var(--card-bg); border-radius: 20px; padding: 40px 32px; text-align: center; flex: 1;">
+                    <p style="font-size: 56px; font-weight: 900; color: var(--accent);">6 PM</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 12px;">Final</p>
+                    <p style="font-size: 18px; color: var(--gray); margin-top: 4px;">95% de data</p>
+                </div>
+            </div>
+            <p style="font-size: 32px; color: var(--white); margin-top: 48px; font-weight: 700;">Precisión promedio: <span style="color: var(--accent);">97.2%</span></p>
+            <p style="font-size: 24px; color: var(--gray); margin-top: 12px;">Basado en 90 días de histórico</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Solution -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <span style="display: inline-block; background: rgba(0,255,136,0.1); color: var(--accent); font-size: 22px; font-weight: 700; padding: 10px 20px; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;">Automático</span>
+            <h2 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 32px; line-height: 1.2;">
+                Fullsite predice<br>tu cierre a las<br><span style="color: var(--accent);">2, 4 y 6 PM</span>
+            </h2>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 32px; line-height: 1.5;">
+                Te llega por WhatsApp.<br>
+                Con recomendaciones de acción.<br>
+                Sin que preguntes.
+            </p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+A las 2 PM ya sé cuánto voy a cerrar hoy. Con 97% de precisión.
+
+No es magia. Es IA analizando:
+- Tu histórico del mismo día de la semana
+- La tendencia de ventas de HOY
+- Factores externos (quincena, eventos, clima)
+
+Ejemplo real del viernes pasado:
+- Predicción 2 PM: $138,500
+- Cierre real: $140,000
+- Error: 0.1%
+
+Para qué sirve?
+- Si vas abajo: activa promociones AHORA, no a las 9 PM
+- Si vas arriba: prepara cocina para el rush
+- Siempre: sabes si necesitas más staff o puedes mandar a alguien temprano
+
+Fullsite te manda 3 predicciones al día: 2 PM, 4 PM y 6 PM. Por WhatsApp. Automáticamente.
+
+Link en bio.
+
+---
+#restaurantesmty #restaurantesmonterrey #prediccionventas #inteligenciaartificial #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #datosreales #machinelearning #tecnologiarestaurante #monterreyfood #foodtech #ventasrestaurante #analisisdeventas
+-->

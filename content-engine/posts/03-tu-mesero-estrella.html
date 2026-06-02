@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>Tu Mesero Estrella Vende 2.4x Más</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 56px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.15; letter-spacing: -2px;">
+            Tu mesero estrella<br>vende<br>
+            <span style="font-size: 140px; color: var(--accent); letter-spacing: -5px;">2.4x</span><br>
+            más que el peor
+        </h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 40px; text-align: center;">Así lo descubrimos.</p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: Real ranking -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: left; width: 100%; margin-bottom: 40px;">Ranking real — Semana pasada</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 16px;">
+            <div style="background: var(--card-bg); border-left: 4px solid var(--accent); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-size: 32px; font-weight: 900; color: var(--accent);">1</span>
+                    <span style="font-size: 28px; font-weight: 600; color: var(--white);">Carlos M.</span>
+                </div>
+                <span style="font-size: 32px; font-weight: 900; color: var(--accent);">$13,200</span>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-size: 32px; font-weight: 900; color: var(--gray);">2</span>
+                    <span style="font-size: 28px; font-weight: 600; color: var(--white);">Miguel R.</span>
+                </div>
+                <span style="font-size: 32px; font-weight: 700; color: var(--white);">$11,800</span>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-size: 32px; font-weight: 900; color: var(--gray);">3</span>
+                    <span style="font-size: 28px; font-weight: 600; color: var(--white);">Andres L.</span>
+                </div>
+                <span style="font-size: 32px; font-weight: 700; color: var(--white);">$10,500</span>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-size: 32px; font-weight: 900; color: var(--gray);">4</span>
+                    <span style="font-size: 28px; font-weight: 600; color: var(--white);">Laura S.</span>
+                </div>
+                <span style="font-size: 32px; font-weight: 700; color: var(--white);">$9,900</span>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-size: 32px; font-weight: 900; color: var(--coral);">5</span>
+                    <span style="font-size: 28px; font-weight: 600; color: var(--white);">Roberto P.</span>
+                </div>
+                <span style="font-size: 32px; font-weight: 900; color: var(--coral);">$5,500</span>
+            </div>
+        </div>
+        <p style="font-size: 24px; color: var(--gray); margin-top: 32px; text-align: center;">Mismo horario. Mismas mesas. Mismo menú.</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: What top mesero does -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Qué hace diferente<br>el <span style="color: var(--accent);">mesero #1</span>?</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 28px;">
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 12px; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 28px; color: var(--accent); font-weight: 900;">1</span>
+                </div>
+                <div>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--white);">Vende Half & Half</p>
+                    <p style="font-size: 24px; color: var(--gray); margin-top: 4px;">El plato con mayor ticket. Siempre lo sugiere.</p>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 12px; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 28px; color: var(--accent); font-weight: 900;">2</span>
+                </div>
+                <div>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--white);">Ofrece postre siempre</p>
+                    <p style="font-size: 24px; color: var(--gray); margin-top: 4px;">+$89-$129 por mesa. Consistente.</p>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px; display: flex; align-items: center; gap: 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 12px; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 28px; color: var(--accent); font-weight: 900;">3</span>
+                </div>
+                <div>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--white);">Segunda bebida</p>
+                    <p style="font-size: 24px; color: var(--gray); margin-top: 4px;">"Otro café?" antes de pedir la cuenta. +$65 promedio.</p>
+                </div>
+            </div>
+        </div>
+        <p style="font-size: 28px; color: var(--amber); margin-top: 40px; font-weight: 600; text-align: center;">Resultado: +$7,700 vs el peor mesero</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: How to train -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Cómo entrenar<br>al resto del equipo</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 24px;">
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 28px; color: var(--accent); font-weight: 700;">Paso 1</p>
+                <p style="font-size: 32px; color: var(--white); font-weight: 600; margin-top: 8px;">Muestra el ranking cada semana</p>
+                <p style="font-size: 24px; color: var(--gray); margin-top: 8px;">La competencia sana sube las ventas un 15-20%.</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 28px; color: var(--accent); font-weight: 700;">Paso 2</p>
+                <p style="font-size: 32px; color: var(--white); font-weight: 600; margin-top: 8px;">Identifica QUÉ vende el top</p>
+                <p style="font-size: 24px; color: var(--gray); margin-top: 8px;">No es suerte. Son 2-3 hábitos replicables.</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 28px; color: var(--accent); font-weight: 700;">Paso 3</p>
+                <p style="font-size: 32px; color: var(--white); font-weight: 600; margin-top: 8px;">Incentiva con datos, no con feeling</p>
+                <p style="font-size: 24px; color: var(--gray); margin-top: 8px;">Bono al que suba su ticket promedio en la semana.</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: The impact -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--gray);">Si tu peor mesero vende como tu mejor mesero:</h3>
+            <div style="margin-top: 48px;">
+                <p style="font-size: 36px; color: var(--gray);">Ventas extra por semana</p>
+                <p style="font-size: 96px; font-weight: 900; color: var(--accent); letter-spacing: -3px; margin-top: 8px;">+$30,800</p>
+            </div>
+            <div style="margin-top: 32px;">
+                <p style="font-size: 36px; color: var(--gray);">Ventas extra por mes</p>
+                <p style="font-size: 96px; font-weight: 900; color: var(--accent); letter-spacing: -3px; margin-top: 8px;">+$123,200</p>
+            </div>
+            <p style="font-size: 28px; color: var(--amber); margin-top: 48px; font-weight: 600;">Solo entrenando a 4 meseros con los hábitos del #1</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Solution -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <span style="display: inline-block; background: rgba(0,255,136,0.1); color: var(--accent); font-size: 22px; font-weight: 700; padding: 10px 20px; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;">Automático</span>
+            <h2 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 32px; line-height: 1.2;">
+                Fullsite rankea<br>a tus meseros<br><span style="color: var(--accent);">automáticamente</span>
+            </h2>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 32px; line-height: 1.5;">
+                Cada día sabes quién vende más,<br>
+                qué vende, y cómo capacitar al resto.
+            </p>
+            <p style="font-size: 28px; color: var(--white); margin-top: 40px; font-weight: 600;">
+                Sin Excel. Sin calcular nada.<br>
+                <span style="color: var(--accent);">Te llega por WhatsApp.</span>
+            </p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+Tu mesero estrella vende 2.4x más que el peor. Y probablemente no lo sabes.
+
+Datos reales de un restaurante en Monterrey:
+- Mesero #1: $13,200/día
+- Mesero #5: $5,500/día
+
+Mismo turno. Mismas mesas. Mismo menú.
+
+La diferencia? 3 hábitos simples:
+1. Siempre sugiere el plato de mayor ticket
+2. Ofrece postre antes de pedir la cuenta
+3. "Otro café?" = +$65 por mesa
+
+Si entrenas a todo tu equipo con los hábitos del #1, son +$123K al mes.
+
+Fullsite te muestra el ranking automáticamente. Cada día. Sin calcular nada.
+
+Link en bio.
+
+---
+#restaurantesmty #restaurantesmonterrey #meseros #ventasrestaurante #capacitacion #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #upselling #ticketpromedio #equipodetrabajo #liderazgo #monterreyfood #foodtech #gestionrestaurante
+-->

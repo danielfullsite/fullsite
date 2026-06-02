@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fullsite — War Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#08080a;--surface:#111114;--card:#18181c;--border:#1c1c1f;
+  --border2:#27272a;--text:#e4e4e2;--muted:#52525b;--dim:#2a2a2f;
+  --green:#4ade80;--green-bg:#052e16;--amber:#f59e0b;--blue:#60a5fa;
+  --red:#f87171;--red-bg:#3a0d0d;--amber-bg:#301604;
+}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;}
+button{cursor:pointer;font-family:'Syne',sans-serif;}
+input,textarea,select{font-family:'Syne',sans-serif;outline:none;}
+/* ---- SETUP ---- */
+#setup{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.setup-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center;}
+.setup-logo{font-weight:800;font-size:22px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:8px;}
+.setup-logo em{color:var(--green);font-style:normal;}
+.setup-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:32px;}
+.setup-label{font-size:11px;color:var(--muted);text-align:left;margin-bottom:6px;display:block;}
+.setup-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:16px;}
+.setup-input:focus{border-color:var(--border2);}
+.setup-btn{width:100%;background:var(--green);color:var(--green-bg);border:none;border-radius:8px;padding:11px;font-weight:700;font-size:13px;letter-spacing:.04em;transition:background .15s;}
+.setup-btn:hover{background:#86efac;}
+.setup-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:14px;line-height:1.6;}
+/* ---- APP ---- */
+#app{display:none;flex-direction:column;height:100vh;}
+/* Topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:48px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;position:sticky;top:0;z-index:100;}
+.logo{font-weight:800;font-size:14px;letter-spacing:.18em;text-transform:uppercase;}
+.logo em{color:var(--green);font-style:normal;}
+.pills{display:flex;gap:14px;}
+.pill{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);cursor:pointer;transition:color .15s;background:none;border:none;padding:0;}
+.pill:hover{color:#a0a0a8;}
+.pill.sel{color:var(--text);}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.dot-on{background:var(--green);animation:blink 2.5s ease-in-out infinite;}
+.dot-idle{background:var(--amber);}
+.dot-off{background:var(--dim);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.clk{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);}
+.icon-btn{background:none;border:none;color:var(--dim);font-size:16px;padding:4px;transition:color .15s;line-height:1;}
+.icon-btn:hover{color:var(--muted);}
+/* Layout */
+.layout{display:flex;flex:1;min-height:0;overflow:hidden;}
+/* Sidebar */
+.sidebar{width:192px;border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.nl{padding:14px 18px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);}
+.ni{display:flex;align-items:center;gap:9px;width:100%;padding:9px 18px;background:none;border:none;border-left:2px solid transparent;color:#38383f;font-size:12px;font-weight:500;text-align:left;transition:all .12s;letter-spacing:.02em;}
+.ni:hover{color:#a0a0a8;background:#0f0f12;}
+.ni.on{color:var(--text);border-left-color:var(--green);background:#0f0f12;}
+/* Main */
+.main{flex:1;overflow:auto;padding:24px;min-height:0;}
+/* Chat panel */
+.cp{width:0;overflow:hidden;transition:width .2s;border-left:0px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.cp.open{width:300px;border-left-width:1px;}
+.cp-head{padding:12px 14px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.cp-title{font-size:12px;font-weight:700;}
+.cp-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:2px;}
+.cp-close{background:none;border:none;color:var(--dim);font-size:18px;padding:0;line-height:1;transition:color .15s;}
+.cp-close:hover{color:var(--muted);}
+.cp-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.msg{display:flex;flex-direction:column;gap:3px;}
+.msg-who{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;}
+.msg-body{font-size:11px;line-height:1.6;color:#c0c0c8;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;white-space:pre-wrap;word-break:break-word;}
+.msg.user .msg-body{background:#0f1a12;border-color:#1a2e1e;color:#a8d4b0;}
+.msg.user .msg-who{text-align:right;}
+.msg.user{align-items:flex-end;}
+.cp-input-row{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);flex-shrink:0;}
+.cp-ta{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:11px;resize:none;height:36px;min-height:36px;max-height:100px;transition:border-color .15s;line-height:1.4;}
+.cp-ta:focus{border-color:var(--border2);}
+.cp-ta::placeholder{color:var(--dim);}
+.send-btn{background:var(--green);border:none;border-radius:7px;width:34px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}
+.send-btn:hover{background:#86efac;}
+.send-btn:disabled{background:var(--card);cursor:not-allowed;}
+.send-btn svg{width:14px;height:14px;fill:#052e16;}
+/* Page headers */
+.ph{font-size:20px;font-weight:800;color:#fafafa;margin-bottom:3px;letter-spacing:-.01em;}
+.ps{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:22px;}
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-l{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px;}
+.kpi-v{font-size:26px;font-weight:800;color:#fafafa;line-height:1;margin-bottom:3px;}
+.kpi-d{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);}
+.kpi-d.warn{color:var(--amber);}
+/* Agents */
+.ags{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+.ag{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;}
+.ag:hover{border-color:#4ade8055;background:#0a150c;}
+.ag.sel{border-color:var(--green);background:#071208;}
+.ag-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.ag-name{font-size:12px;font-weight:700;}
+.ag-st{display:flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);}
+.ag-role{font-size:10px;color:var(--dim);margin-bottom:7px;}
+.ag-hint{font-family:'JetBrains Mono',monospace;font-size:8px;color:#1a3020;}
+.ag.sel .ag-hint,.ag:hover .ag-hint{color:#2a6038;}
+/* Section */
+.sec{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.sec-t{font-size:12px;font-weight:600;color:var(--muted);}
+.sec-btn{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 11px;font-size:11px;font-weight:600;color:var(--muted);transition:all .15s;}
+.sec-btn:hover{color:var(--text);border-color:var(--border2);}
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.kcol{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.kcol-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid var(--border);}
+.kcol-t{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);}
+.kcol-n{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);background:var(--card);padding:1px 6px;border-radius:8px;}
+.tk{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;margin-bottom:7px;transition:border-color .15s;}
+.tk:hover{border-color:#3f3f46;}
+.tk-t{font-size:11px;color:var(--text);margin-bottom:7px;line-height:1.45;}
+.tk-m{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.tk-cl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);}
+.tk-actions{display:flex;gap:4px;align-items:center;}
+.tk-advance{background:none;border:1px solid var(--border);border-radius:4px;color:var(--dim);font-size:9px;padding:1px 6px;font-family:'JetBrains Mono',monospace;transition:all .15s;}
+.tk-advance:hover{color:var(--text);border-color:var(--border2);}
+.tk-del{background:none;border:none;color:var(--dim);font-size:12px;padding:0 2px;transition:color .15s;line-height:1;}
+.tk-del:hover{color:var(--red);}
+/* Badges */
+.bd{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:4px;}
+.bh{background:var(--red-bg);color:var(--red);}
+.bm{background:var(--amber-bg);color:var(--amber);}
+.bl{background:var(--card);color:var(--dim);}
+.bok{background:var(--green-bg);color:var(--green);}
+/* Panel / Table */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+table{width:100%;border-collapse:collapse;}
+th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);font-weight:400;}
+td{padding:11px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#0c0c0f;}
+.tn{color:var(--text) !important;font-weight:600;}
+.tags{display:flex;flex-wrap:wrap;gap:4px;}
+.tag{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;background:var(--card);color:#52525b;}
+/* Content grid */
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;transition:border-color .15s;}
+.cc:hover{border-color:var(--border2);}
+.cc-plt{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px;}
+.cc-t{font-size:11px;color:var(--text);margin-bottom:10px;line-height:1.4;}
+.cc-f{display:flex;align-items:center;justify-content:space-between;}
+.cc-d{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);}
+.cc-del{background:none;border:none;color:var(--dim);font-size:12px;padding:0;transition:color .15s;}
+.cc-del:hover{color:var(--red);}
+.bdp{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:4px;}
+.pub{background:var(--green-bg);color:var(--green);}
+.act{background:var(--green-bg);color:var(--green);}
+.dft{background:var(--card);color:var(--muted);}
+.idea{background:#16142a;color:#818cf8;}
+/* Report */
+.rpt{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.rpt-s{margin-bottom:16px;}
+.rpt-h{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;}
+.rpt-i{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;color:#8a8a98;line-height:1.55;}
+.rpt-i:last-child{border-bottom:none;}
+.rd{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:6px;flex-shrink:0;}
+.rd.w{background:var(--amber);}
+.rd.i{background:var(--blue);}
+hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
+/* Detail grid */
+.dtl{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px;}
+.dtl-l{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--dim);margin-bottom:3px;text-transform:uppercase;letter-spacing:.08em;}
+.dtl-v{font-size:11px;color:var(--muted);}
+/* Modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;}
+.modal-h{font-size:15px;font-weight:700;margin-bottom:20px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;}
+.field input,.field textarea,.field select{width:100%;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:12px;transition:border-color .15s;}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--border2);}
+.field textarea{min-height:70px;resize:vertical;}
+.field select option{background:var(--surface);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+.btn-cancel{background:transparent;border:1px solid var(--border);border-radius:7px;padding:8px 16px;color:var(--muted);font-size:12px;font-weight:600;transition:all .15s;}
+.btn-cancel:hover{border-color:var(--border2);color:var(--text);}
+.btn-save{background:var(--green);border:none;border-radius:7px;padding:8px 18px;color:var(--green-bg);font-size:12px;font-weight:700;transition:background .15s;}
+.btn-save:hover{background:#86efac;}
+/* Empty state */
+.empty{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);text-align:center;padding:20px;line-height:1.6;}
+/* Add card placeholder */
+.add-card{background:transparent;border:1px dashed var(--border);border-radius:10px;padding:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);width:100%;}
+.add-card:hover{border-color:var(--border2);color:var(--muted);}
+/* Status dot row */
+.st{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10px;}
+.st-act{color:var(--green);}
+.st-pro{color:var(--dim);}
+/* Settings panel */
+.settings-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);}
+.settings-row:last-child{border-bottom:none;}
+.settings-label{font-size:12px;color:var(--text);flex:1;}
+.settings-val{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);}
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup">
+  <div class="setup-box">
+    <div class="setup-logo">Full<em>site</em></div>
+    <div class="setup-sub">war room · agencia digital</div>
+    <label class="setup-label">Clave API de Anthropic (Claude)</label>
+    <input class="setup-input" type="password" id="setup-key" placeholder="sk-ant-api03-..." autocomplete="off">
+    <button class="setup-btn" onclick="saveKey()">Entrar al War Room →</button>
+    <div class="setup-note">Tu clave se guarda solo en este navegador.<br>Consíguela en console.anthropic.com</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <!-- Topbar -->
+  <div class="topbar">
+    <span class="logo">Full<em>site</em></span>
+    <div class="pills" id="pills"></div>
+    <div class="topbar-right">
+      <span class="clk" id="clk"></span>
+      <button class="icon-btn" onclick="openModal('client')" title="Nuevo cliente">＋</button>
+      <button class="icon-btn" onclick="showSettings()" title="Ajustes">⚙</button>
+    </div>
+  </div>
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nl">Sistema</div>
+      <button class="ni on" onclick="showTab('warroom',this)">⬡ War Room</button>
+      <button class="ni" onclick="showTab('clientes',this)">◈ Clientes</button>
+      <button class="ni" onclick="showTab('tareas',this)">◻ Tareas</button>
+      <button class="ni" onclick="showTab('contenido',this)">◇ Contenido</button>
+      <button class="ni" onclick="showTab('reportes',this)">◈ Reportes</button>
+      <div class="nl" style="margin-top:16px">Agentes</div>
+      <button class="ni" onclick="openAgent('contenido')">· Contenido</button>
+      <button class="ni" onclick="openAgent('reportes')">· Reportes</button>
+      <button class="ni" onclick="openAgent('ops')">· Ops</button>
+      <button class="ni" onclick="openAgent('kb')">· AMALAY KB</button>
+    </nav>
+    <!-- Main -->
+    <main class="main">
+      <div id="tab-warroom"></div>
+      <div id="tab-clientes" style="display:none"></div>
+      <div id="tab-tareas" style="display:none"></div>
+      <div id="tab-contenido" style="display:none"></div>
+      <div id="tab-reportes" style="display:none"></div>
+    </main>
+    <!-- Chat panel -->
+    <div class="cp" id="cp">
+      <div class="cp-head">
+        <div><div class="cp-title" id="cp-name">Agente</div><div class="cp-sub" id="cp-role"></div></div>
+        <button class="cp-close" onclick="closeAgent()">✕</button>
+      </div>
+      <div class="cp-msgs" id="cp-msgs"></div>
+      <div class="cp-input-row">
+        <textarea class="cp-ta" id="cp-ta" placeholder="Escríbele al agente..." onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMsg()">
+          <svg viewBox="0 0 24 24"><path d="M2 21L23 12 2 3v7l15 2-15 2v7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="overlay-client" onclick="if(event.target===this)closeModal('client')">
+  <div class="modal">
+    <div class="modal-h">Nuevo cliente</div>
+    <div class="field"><label>Nombre del negocio</label><input id="f-name" type="text" placeholder="Ej: AMALAY Coffee & Market"></div>
+    <div class="field"><label>Contacto</label><input id="f-contact" type="text" placeholder="Nombre del dueño o contacto"></div>
+    <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="email@ejemplo.com"></div>
+    <div class="field"><label>Teléfono</label><input id="f-phone" type="text" placeholder="81 0000 0000"></div>
+    <div class="field"><label>Sitio web</label><input id="f-web" type="text" placeholder="ejemplo.com"></div>
+    <div class="field"><label>Servicios (separados por coma)</label><input id="f-services" type="text" placeholder="Web, Google Ads, GBP"></div>
+    <div class="field"><label>Presupuesto mensual</label><input id="f-budget" type="text" placeholder="MX$150/día"></div>
+    <div class="field"><label>Notas</label><textarea id="f-notes" placeholder="Información adicional, horarios, ubicación..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('client')">Cancelar</button>
+      <button class="btn-save" onclick="saveClient()">Guardar cliente</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-task" onclick="if(event.target===this)closeModal('task')">
+  <div class="modal">
+    <div class="modal-h">Nueva tarea</div>
+    <div class="field"><label>Título de la tarea</label><input id="t-title" type="text" placeholder="Ej: Publicar post semanal GBP"></div>
+    <div class="field"><label>Cliente</label><select id="t-client"></select></div>
+    <div class="field"><label>Agente responsable</label>
+      <select id="t-agent"><option value="Contenido">Contenido</option><option value="Reportes">Reportes</option><option value="Ops">Ops</option></select>
+    </div>
+    <div class="field"><label>Prioridad</label>
+      <select id="t-priority"><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baja</option></select>
+    </div>
+    <div class="field"><label>Fecha límite</label><input id="t-due" type="text" placeholder="Ej: Esta semana, Hoy, 15 Abr"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('task')">Cancelar</button>
+      <button class="btn-save" onclick="saveTask()">Guardar tarea</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-content" onclick="if(event.target===this)closeModal('content')">
+  <div class="modal">
+    <div class="modal-h">Nuevo contenido</div>
+    <div class="field"><label>Título / descripción</label><input id="c-title" type="text" placeholder="Ej: Post brunch San Pedro"></div>
+    <div class="field"><label>Cliente</label><select id="c-client"></select></div>
+    <div class="field"><label>Plataforma</label>
+      <select id="c-platform"><option>GBP</option><option>Instagram</option><option>Facebook</option><option>TikTok</option><option>Google Ads</option><option>Google Reviews</option><option>WhatsApp</option></select>
+    </div>
+    <div class="field"><label>Estado</label>
+      <select id="c-status"><option value="idea">Idea</option><option value="draft">Borrador</option><option value="published">Publicado</option><option value="active">Activo</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('content')">Cancelar</button>
+      <button class="btn-save" onclick="saveContent()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-settings" onclick="if(event.target===this)closeModal('settings')">
+  <div class="modal">
+    <div class="modal-h">Ajustes</div>
+    <div class="field"><label>API Key de Anthropic</label><input id="s-key" type="password" placeholder="sk-ant-..."></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('settings')">Cerrar</button>
+      <button class="btn-save" onclick="updateKey()">Guardar clave</button>
+    </div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+      <button onclick="resetAll()" style="background:none;border:1px solid var(--red-bg);border-radius:7px;padding:7px 14px;color:var(--red);font-size:11px;font-weight:600;width:100%;">Borrar todos los datos y reiniciar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STORAGE (localStorage — solo para API keys y chat)
+// ============================================================
+const LS = {
+  get: k => { try { return JSON.parse(localStorage.getItem('fs_'+k)); } catch { return null; } },
+  set: (k,v) => localStorage.setItem('fs_'+k, JSON.stringify(v)),
+  del: k => localStorage.removeItem('fs_'+k)
+};
+
+// ============================================================
+// SUPABASE
+// ============================================================
+const SB_URL = 'https://qjiomlvudfmzuvqvhwpk.supabase.co';
+const SB_KEY = 'sb_publishable_8_nNPHJT1RsfZhpXB6ARGA_6aOwZasM';
+const SB_H = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+async function sbGet(table, order='id') {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?order=${order}`, { headers: SB_H });
+  return r.json();
+}
+async function sbInsert(table, data) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, { method:'POST', headers: SB_H, body: JSON.stringify(data) });
+  return r.json();
+}
+async function sbUpdate(table, id, data) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, { method:'PATCH', headers: SB_H, body: JSON.stringify(data) });
+  return r.json();
+}
+async function sbDelete(table, id) {
+  await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, { method:'DELETE', headers: SB_H });
+}
+
+// Cache en memoria para render inmediato
+let _clients=[], _tasks=[], _content=[];
+
+async function loadAll() {
+  [_clients, _tasks, _content] = await Promise.all([sbGet('clients'), sbGet('tasks'), sbGet('content')]);
+}
+function getClients(){ return _clients; }
+function getTasks()  { return _tasks; }
+function getContent(){ return _content; }
+
+async function initData() { await loadAll(); }
+
+// ============================================================
+// AGENTS
+// ============================================================
+const AGENT_DEFS = {
+  contenido: { name:'Contenido', role:'Posts, reels, reseñas GBP', dot:'on' },
+  reportes:  { name:'Reportes',  role:'Métricas semanales',         dot:'on' },
+  ops:       { name:'Ops',       role:'Tareas y SOPs',              dot:'idle' },
+  kb:        { name:'AMALAY KB', role:'Base de conocimiento',       dot:'on' }
+};
+
+function buildSystemPrompt(agentId) {
+  const clients = getClients();
+  const tasks = getTasks();
+  const activeClients = clients.filter(c=>c.status==='active');
+  const pendingTasks = tasks.filter(t=>t.status!=='done');
+
+  const clientContext = activeClients.map(c =>
+    `CLIENTE: ${c.name}\n- Contacto: ${c.contact} | ${c.email} | ${c.phone}\n- Web: ${c.website}\n- Servicios: ${c.services.join(', ')}\n- Budget: ${c.budget}\n- Notas: ${c.notes}`
+  ).join('\n\n');
+
+  const taskContext = pendingTasks.map(t =>
+    `[${t.priority.toUpperCase()}] ${t.title} → ${t.client} | agente: ${t.agent} | estado: ${t.status}`
+  ).join('\n');
+
+  const base = `Eres un agente de Fullsite, una agencia de marketing digital en Monterrey, México.\n\nCONTEXTO DE CLIENTES ACTIVOS:\n${clientContext}\n\nTAREAS PENDIENTES:\n${taskContext}\n\nResponde siempre en español. Sé concreto y accionable.`;
+
+  const specific = {
+    contenido: `\n\nTU ROL — AGENTE DE CONTENIDO:\nGeneras posts para GBP, respuestas a reseñas de Google, ideas para reels, copies para anuncios. Keywords SEO para AMALAY: "brunch San Pedro Garza García", "AMALAY Coffee & Market", "Plaza Duendes", "terraza Monterrey", "desayuno San Pedro". Tono: cálido, auténtico, local regio, premium sin ser pretencioso. Cuando generes contenido, dalo listo para copiar/pegar.`,
+    reportes: `\n\nTU ROL — AGENTE DE REPORTES:\nAnalizas métricas, identificas problemas y das recomendaciones concretas. Issue crítico actual: Asset group "Pal Norte 2026" en Google Ads marcado "Limited by policy" por imágenes con alcohol (festival terminó Mar 27-29, 2026). Sé analítico y da pasos accionables.`,
+    ops: `\n\nTU ROL — AGENTE DE OPERACIONES:\nGestionas prioridades, creas SOPs, defines próximos pasos, haces checklists. Ayudas a organizar el trabajo del día/semana. Sé muy práctico y organizado.`,
+    kb: `\n\nTU ROL — BASE DE CONOCIMIENTO:\nRespondes cualquier pregunta sobre los clientes con información precisa. Si no tienes el dato, dilo claramente. Eres la fuente de verdad sobre la agencia y sus clientes.`
+  };
+
+  return base + (specific[agentId] || '');
+}
+
+// Chat history per agent (in memory + localStorage)
+let chatHistory = LS.get('chat_history') || { contenido:[], reportes:[], ops:[], kb:[] };
+let currentAgent = null;
+
+function saveChatHistory() { LS.set('chat_history', chatHistory); }
+
+function openAgent(id) {
+  currentAgent = id;
+  const ag = AGENT_DEFS[id];
+  document.getElementById('cp-name').textContent = ag.name;
+  document.getElementById('cp-role').textContent = ag.role;
+  document.getElementById('cp').classList.add('open');
+  document.querySelectorAll('.ag').forEach(el => el.classList.remove('sel'));
+  const agEl = document.getElementById('ag-'+id);
+  if(agEl) agEl.classList.add('sel');
+  document.querySelectorAll('.pill').forEach(el => el.classList.remove('sel'));
+  const pill = document.getElementById('pill-'+id);
+  if(pill) pill.classList.add('sel');
+  renderMsgs();
+  setTimeout(() => document.getElementById('cp-ta').focus(), 200);
+}
+
+function closeAgent() {
+  document.getElementById('cp').classList.remove('open');
+  document.querySelectorAll('.ag').forEach(el => el.classList.remove('sel'));
+  document.querySelectorAll('.pill').forEach(el => el.classList.remove('sel'));
+  currentAgent = null;
+}
+
+function renderMsgs() {
+  if(!currentAgent) return;
+  const msgs = chatHistory[currentAgent] || [];
+  const container = document.getElementById('cp-msgs');
+  if(!msgs.length) {
+    container.innerHTML = `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);text-align:center;margin-top:24px;line-height:1.8">Agente listo.<br>Escríbele algo para empezar.</div>`;
+    return;
+  }
+  container.innerHTML = msgs.map(m => `
+    <div class="msg ${m.role==='user'?'user':''}">
+      <div class="msg-who">${m.role==='user'?'Tú':AGENT_DEFS[currentAgent].name}</div>
+      <div class="msg-body">${m.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
+    </div>`).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function addTyping() {
+  const c = document.getElementById('cp-msgs');
+  const t = document.createElement('div');
+  t.id = 'typing'; t.className = 'msg';
+  t.innerHTML = `<div class="msg-who">${AGENT_DEFS[currentAgent].name}</div><div class="msg-body" style="color:var(--dim)">···</div>`;
+  c.appendChild(t);
+  c.scrollTop = c.scrollHeight;
+}
+
+async function sendMsg() {
+  if(!currentAgent) return;
+  const ta = document.getElementById('cp-ta');
+  const text = ta.value.trim();
+  if(!text) return;
+  ta.value = '';
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+
+  if(!chatHistory[currentAgent]) chatHistory[currentAgent] = [];
+  chatHistory[currentAgent].push({ role:'user', content:text });
+  renderMsgs();
+  addTyping();
+
+  const apiKey = LS.get('apikey');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system: buildSystemPrompt(currentAgent),
+        messages: chatHistory[currentAgent]
+      })
+    });
+    const data = await resp.json();
+    const reply = data.content?.map(b=>b.text||'').join('') || (data.error?.message || 'Error al obtener respuesta.');
+    chatHistory[currentAgent].push({ role:'assistant', content:reply });
+    saveChatHistory();
+  } catch(e) {
+    chatHistory[currentAgent].push({ role:'assistant', content:'Error de conexión. Verifica tu API key en ⚙ Ajustes.' });
+  }
+
+  document.getElementById('typing')?.remove();
+  renderMsgs();
+  btn.disabled = false;
+  ta.focus();
+}
+
+function handleKey(e) {
+  if(e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+}
+
+// ============================================================
+// TAB RENDERING
+// ============================================================
+const TABS = ['warroom','clientes','tareas','contenido','reportes'];
+let currentTab = 'warroom';
+
+function showTab(id, btn) {
+  currentTab = id;
+  TABS.forEach(t => document.getElementById('tab-'+t).style.display = t===id?'block':'none');
+  document.querySelectorAll('.ni').forEach(b => b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  renderTab(id);
+}
+
+function renderTab(id) {
+  const fns = { warroom:renderWarRoom, clientes:renderClientes, tareas:renderTareas, contenido:renderContenido, reportes:renderReportes };
+  if(fns[id]) fns[id]();
+}
+
+function renderWarRoom() {
+  const clients = getClients();
+  const tasks = getTasks();
+  const content = getContent();
+  const active = clients.filter(c=>c.status==='active').length;
+  const pending = tasks.filter(t=>t.status==='pending');
+  const inProgress = tasks.filter(t=>t.status==='progress');
+  const done = tasks.filter(t=>t.status==='done');
+  const published = content.filter(c=>c.status==='published'||c.status==='active').length;
+  const highPending = pending.filter(t=>t.priority==='high').length;
+
+  const kanbanCol = (label, items, accent) => `
+    <div class="kcol">
+      <div class="kcol-h"><span class="kcol-t" style="color:${accent}">${label}</span><span class="kcol-n">${items.length}</span></div>
+      ${items.length===0?'<div class="empty">vacío</div>':''}
+      ${items.map(t=>`
+        <div class="tk">
+          <div class="tk-t">${esc(t.title)}</div>
+          <div class="tk-m">
+            <span class="tk-cl">${esc(t.client.split(' ')[0])}</span>
+            <div class="tk-actions">
+              ${t.status!=='done'?`<button class="tk-advance" onclick="advanceTask(${t.id})">→</button>`:''}
+              <span class="bd ${priClass(t.priority)}">${priLabel(t.priority)}</span>
+              <button class="tk-del" onclick="deleteTask(${t.id})" title="Eliminar">×</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  document.getElementById('tab-warroom').innerHTML = `
+    <h1 class="ph">War Room</h1>
+    <p class="ps" id="wr-date">FULLSITE · ${dateStr()}</p>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-l">Clientes activos</div><div class="kpi-v">${active}</div><div class="kpi-d">${active===1?clients.filter(c=>c.status==='active')[0]?.name.split(' ')[0]+' activo':'clientes activos'}</div></div>
+      <div class="kpi"><div class="kpi-l">Tareas pendientes</div><div class="kpi-v">${pending.length}</div><div class="kpi-d ${highPending>0?'warn':''}">${highPending} de alta prioridad</div></div>
+      <div class="kpi"><div class="kpi-l">Contenido activo</div><div class="kpi-v">${published}</div><div class="kpi-d">publicados / activos</div></div>
+      <div class="kpi"><div class="kpi-l">En progreso</div><div class="kpi-v">${inProgress.length}</div><div class="kpi-d">tareas en curso</div></div>
+    </div>
+    <div class="sec"><span class="sec-t">Agentes — clic para chatear</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)">3/4 activos</span></div>
+    <div class="ags">
+      ${Object.entries(AGENT_DEFS).map(([id,ag])=>`
+        <div class="ag" id="ag-${id}" onclick="openAgent('${id}')">
+          <div class="ag-top"><span class="ag-name">${ag.name}</span><span class="ag-st"><span class="dot dot-${ag.dot}"></span>${ag.dot==='on'?'activo':'idle'}</span></div>
+          <div class="ag-role">${ag.role}</div>
+          <div class="ag-hint">→ clic para chatear</div>
+        </div>`).join('')}
+    </div>
+    <div class="sec">
+      <span class="sec-t">Operations Board</span>
+      <button class="sec-btn" onclick="openModal('task')">＋ Tarea</button>
+    </div>
+    <div class="kanban">
+      ${kanbanCol('Pendiente', pending, 'var(--amber)')}
+      ${kanbanCol('En progreso', inProgress, 'var(--blue)')}
+      ${kanbanCol('Completado', done, 'var(--green)')}
+    </div>`;
+}
+
+function renderClientes() {
+  const clients = getClients();
+  document.getElementById('tab-clientes').innerHTML = `
+    <h1 class="ph">Clientes</h1>
+    <p class="ps">FULLSITE · ${clients.filter(c=>c.status==='active').length} activo(s) · ${clients.filter(c=>c.status!=='active').length} prospecto(s)</p>
+    <div class="sec"><span class="sec-t">Directorio</span><button class="sec-btn" onclick="openModal('client')">＋ Cliente</button></div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Cliente</th><th>Contacto</th><th>Servicios</th><th>Estado</th><th>Budget</th><th></th></tr></thead>
+        <tbody>
+          ${clients.map(c=>`
+            <tr>
+              <td><div class="tn">${esc(c.name)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:2px">${esc(c.website||'')}</div></td>
+              <td><div style="color:#a0a0a8">${esc(c.contact||'—')}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:2px">${esc(c.phone||'')}</div></td>
+              <td><div class="tags">${(c.services||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div></td>
+              <td><span class="st ${c.status==='active'?'st-act':'st-pro'}"><span class="dot ${c.status==='active'?'dot-on':'dot-off'}"></span>${c.status==='active'?'Activo':'Prospecto'}</span></td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:10px">${esc(c.budget||'—')}</td>
+              <td><button class="tk-del" onclick="deleteClient(${c.id})" title="Eliminar">×</button></td>
+            </tr>
+            ${c.notes?`<tr><td colspan="6" style="font-size:10px;color:var(--dim);padding-top:0;padding-bottom:12px">${esc(c.notes)}</td></tr>`:''}
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderTareas() {
+  const tasks = getTasks();
+  const pending   = tasks.filter(t=>t.status==='pending');
+  const inProgress= tasks.filter(t=>t.status==='progress');
+  const done      = tasks.filter(t=>t.status==='done');
+
+  const col = (label, items, accent) => `
+    <div class="kcol">
+      <div class="kcol-h"><span class="kcol-t" style="color:${accent}">${label}</span><span class="kcol-n">${items.length}</span></div>
+      ${items.length===0?'<div class="empty">sin tareas</div>':''}
+      ${items.map(t=>`
+        <div class="tk">
+          <div class="tk-t">${esc(t.title)}</div>
+          <div class="tk-m" style="margin-bottom:4px"><span class="tk-cl">${esc(t.client)}</span><span class="bd ${priClass(t.priority)}">${priLabel(t.priority)}</span></div>
+          <div class="tk-m"><span class="tk-cl">agente: ${esc(t.agent)}</span>
+            <div class="tk-actions">
+              ${t.status!=='done'?`<button class="tk-advance" onclick="advanceTask(${t.id})">→</button>`:''}
+              <button class="tk-del" onclick="deleteTask(${t.id})">×</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  document.getElementById('tab-tareas').innerHTML = `
+    <h1 class="ph">Tareas</h1>
+    <p class="ps">FULLSITE · ${tasks.filter(t=>t.status!=='done').length} activas · ${done.length} completadas</p>
+    <div class="sec"><span class="sec-t">Kanban</span><button class="sec-btn" onclick="openModal('task')">＋ Tarea</button></div>
+    <div class="kanban">
+      ${col('Pendiente', pending, 'var(--amber)')}
+      ${col('En progreso', inProgress, 'var(--blue)')}
+      ${col('Completado', done, 'var(--green)')}
+    </div>`;
+}
+
+function renderContenido() {
+  const content = getContent();
+  const statusMap = { published:'pub', active:'act', draft:'dft', idea:'idea' };
+  const statusLabel = { published:'publicado', active:'activo', draft:'borrador', idea:'idea' };
+
+  document.getElementById('tab-contenido').innerHTML = `
+    <h1 class="ph">Contenido</h1>
+    <p class="ps">FULLSITE · ${content.filter(c=>c.status==='published'||c.status==='active').length} publicados · ${content.filter(c=>c.status==='draft'||c.status==='idea').length} en prep.</p>
+    <div class="sec"><span class="sec-t">Tracker</span><button class="sec-btn" onclick="openModal('content')">＋ Contenido</button></div>
+    <div class="cgrid">
+      ${content.map(c=>`
+        <div class="cc">
+          <div class="cc-plt">${esc(c.platform)}</div>
+          <div class="cc-t">${esc(c.title)}</div>
+          <div class="cc-f">
+            <span class="cc-d">${esc(c.date||'—')}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="bdp ${statusMap[c.status]||'dft'}">${statusLabel[c.status]||c.status}</span>
+              <button class="cc-del" onclick="deleteContent(${c.id})" title="Eliminar">×</button>
+            </div>
+          </div>
+        </div>`).join('')}
+      <button class="add-card" onclick="openModal('content')">＋ nuevo contenido</button>
+    </div>`;
+}
+
+function renderReportes() {
+  const clients = getClients();
+  const tasks = getTasks();
+  const highTasks = tasks.filter(t=>t.priority==='high'&&t.status!=='done');
+  const doneTasks = tasks.filter(t=>t.status==='done');
+
+  document.getElementById('tab-reportes').innerHTML = `
+    <h1 class="ph">Reporte Semanal</h1>
+    <p class="ps">AMALAY Coffee & Market · ${dateStr()}</p>
+    <div class="rpt">
+      <div class="rpt-s">
+        <div class="rpt-h">Google Ads — Performance Max</div>
+        <div class="rpt-i"><span class="rd"></span><span>Campaña "Amalay Coffee Market" activa · MX$150/día · monigp75@gmail.com</span></div>
+        <div class="rpt-i"><span class="rd w"></span><span>Asset group Pal Norte 2026: "Limited by policy" por imágenes con alcohol — acción pendiente</span></div>
+        <div class="rpt-i"><span class="rd i"></span><span>Recomendación: pausar asset group o remover imágenes con cerveza/alcohol</span></div>
+      </div>
+      <hr class="div">
+      <div class="rpt-s">
+        <div class="rpt-h">Google Business Profile</div>
+        <div class="rpt-i"><span class="rd"></span><span>cafeamalay.com vinculado · SEO: brunch San Pedro, desayuno Monterrey, Plaza Duendes</span></div>
+        <div class="rpt-i"><span class="rd"></span><span>+35 reseñas respondidas con keywords · staff destacado: Oscar, Omar</span></div>
+        <div class="rpt-i"><span class="rd w"></span><span>Reseñas nuevas pendientes de responder</span></div>
+      </div>
+      <hr class="div">
+      <div class="rpt-s">
+        <div class="rpt-h">Tareas de alta prioridad (${highTasks.length})</div>
+        ${highTasks.length===0?'<div class="rpt-i"><span class="rd"></span><span>Sin tareas críticas pendientes ✓</span></div>':
+          highTasks.map(t=>`<div class="rpt-i"><span class="rd w"></span><span>${esc(t.title)} — ${esc(t.client)}</span></div>`).join('')}
+      </div>
+      <hr class="div">
+      <div class="rpt-s">
+        <div class="rpt-h">Completado esta semana (${doneTasks.length})</div>
+        ${doneTasks.map(t=>`<div class="rpt-i"><span class="rd"></span><span>${esc(t.title)}</span></div>`).join('')}
+      </div>
+      <hr class="div">
+      <div class="rpt-s">
+        <div class="rpt-h">Próximos pasos</div>
+        <div class="rpt-i"><span class="rd w"></span><span>Resolver flag alcohol en Performance Max (alta prioridad)</span></div>
+        <div class="rpt-i"><span class="rd"></span><span>Publicar post terraza + cocktails en GBP</span></div>
+        <div class="rpt-i"><span class="rd i"></span><span>Planear Reel brunch para Instagram — hook: "así se ve un brunch en Monterrey"</span></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:.1em">Generar reporte con IA</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Pídele al agente de Reportes que genere un reporte completo basado en el estado actual.</p>
+      <button class="sec-btn" onclick="openAgent('reportes');setTimeout(()=>{document.getElementById('cp-ta').value='Genera un reporte semanal completo de AMALAY basado en el estado actual de las tareas y campañas.';},300)">→ Abrir agente Reportes</button>
+    </div>`;
+}
+
+// ============================================================
+// CRUD
+// ============================================================
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function priClass(p) { return p==='high'?'bh':p==='medium'?'bm':'bl'; }
+function priLabel(p) { return p==='high'?'alta':p==='medium'?'media':'baja'; }
+
+async function advanceTask(id) {
+  const t = _tasks.find(t=>t.id===id);
+  if(!t) return;
+  const flow = { pending:'progress', progress:'done', done:'pending' };
+  const newStatus = flow[t.status] || 'pending';
+  await sbUpdate('tasks', id, { status: newStatus });
+  t.status = newStatus;
+  renderTab(currentTab);
+}
+
+async function deleteTask(id) {
+  if(!confirm('¿Eliminar esta tarea?')) return;
+  await sbDelete('tasks', id);
+  _tasks = _tasks.filter(t=>t.id!==id);
+  renderTab(currentTab);
+}
+
+async function deleteClient(id) {
+  if(!confirm('¿Eliminar este cliente?')) return;
+  await sbDelete('clients', id);
+  _clients = _clients.filter(c=>c.id!==id);
+  renderTab(currentTab);
+}
+
+async function deleteContent(id) {
+  await sbDelete('content', id);
+  _content = _content.filter(c=>c.id!==id);
+  renderTab(currentTab);
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(type) {
+  if(type==='task' || type==='content') {
+    const sel = type==='task' ? document.getElementById('t-client') : document.getElementById('c-client');
+    sel.innerHTML = getClients().map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  }
+  if(type==='settings') {
+    document.getElementById('s-key').value = LS.get('apikey') || '';
+  }
+  document.getElementById('overlay-'+type).classList.add('show');
+}
+
+function closeModal(type) {
+  document.getElementById('overlay-'+type).classList.remove('show');
+}
+
+function showSettings() { openModal('settings'); }
+
+async function saveClient() {
+  const data = {
+    name: document.getElementById('f-name').value.trim(),
+    contact: document.getElementById('f-contact').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    phone: document.getElementById('f-phone').value.trim(),
+    website: document.getElementById('f-web').value.trim(),
+    services: document.getElementById('f-services').value.split(',').map(s=>s.trim()).filter(Boolean),
+    budget: document.getElementById('f-budget').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    status: 'active'
+  };
+  const result = await sbInsert('clients', data);
+  if(Array.isArray(result)) _clients.push(...result);
+  closeModal('client');
+  ['f-name','f-contact','f-email','f-phone','f-web','f-services','f-budget','f-notes'].forEach(id=>document.getElementById(id).value='');
+  renderTab(currentTab);
+}
+
+async function saveTask() {
+  const data = {
+    title: document.getElementById('t-title').value.trim(),
+    client: document.getElementById('t-client').value,
+    agent: document.getElementById('t-agent').value,
+    priority: document.getElementById('t-priority').value,
+    due: document.getElementById('t-due').value.trim() || '—',
+    status: 'pending'
+  };
+  const result = await sbInsert('tasks', data);
+  if(Array.isArray(result)) _tasks.push(...result);
+  closeModal('task');
+  document.getElementById('t-title').value = '';
+  document.getElementById('t-due').value = '';
+  renderTab(currentTab);
+}
+
+async function saveContent() {
+  const st = document.getElementById('c-status').value;
+  const today = new Date().toLocaleDateString('es-MX',{day:'numeric',month:'short'});
+  const data = {
+    title: document.getElementById('c-title').value.trim(),
+    client: document.getElementById('c-client').value.split(' ')[0],
+    platform: document.getElementById('c-platform').value,
+    status: st,
+    date: (st==='published'||st==='active') ? today : null
+  };
+  const result = await sbInsert('content', data);
+  if(Array.isArray(result)) _content.push(...result);
+  closeModal('content');
+  document.getElementById('c-title').value = '';
+  renderTab(currentTab);
+}
+
+function updateKey() {
+  const key = document.getElementById('s-key').value.trim();
+  if(key) { LS.set('apikey', key); closeModal('settings'); }
+}
+
+function resetAll() {
+  if(!confirm('¿Seguro? Se borrarán las keys y el historial de chat (los datos en Supabase se mantienen).')) return;
+  ['apikey','chat_history'].forEach(k => LS.del(k));
+  location.reload();
+}
+
+// ============================================================
+// SETUP & INIT
+// ============================================================
+function saveKey() {
+  const key = document.getElementById('setup-key').value.trim();
+  if(!key.startsWith('sk-ant')) { alert('Esa no parece una clave válida de Anthropic. Debe empezar con sk-ant-'); return; }
+  LS.set('apikey', key);
+  boot();
+}
+
+function buildPills() {
+  document.getElementById('pills').innerHTML = Object.entries(AGENT_DEFS).map(([id,ag])=>
+    `<button class="pill" id="pill-${id}" onclick="openAgent('${id}')"><span class="dot dot-${ag.dot}"></span>${ag.name}</button>`
+  ).join('');
+}
+
+function dateStr() {
+  return new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+}
+
+function tick() {
+  const t = new Date();
+  document.getElementById('clk').textContent = t.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function boot() {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  buildPills();
+  // Show loading state
+  document.getElementById('tab-warroom').innerHTML = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--dim);padding:40px;text-align:center">Cargando datos desde Supabase...</div>';
+  await initData();
+  renderTab('warroom');
+  tick();
+  setInterval(tick, 30000);
+}
+
+// Start
+window.addEventListener('DOMContentLoaded', () => {
+  if(LS.get('apikey')) { boot(); }
+  else { document.getElementById('setup').style.display = 'flex'; }
+});
+</script>
+</body>
+</html>

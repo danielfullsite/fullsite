@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>Pregúntale a tu Restaurante por WhatsApp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; --whatsapp: #25d366; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+        .chat-bubble-user { background: #005c4b; border-radius: 16px 16px 4px 16px; padding: 20px 28px; margin-left: auto; max-width: 600px; }
+        .chat-bubble-bot { background: #1a2e1a; border-radius: 16px 16px 16px 4px; padding: 20px 28px; max-width: 700px; border: 1px solid rgba(0,255,136,0.1); }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -100px; right: -100px; background: radial-gradient(circle, rgba(37,211,102,0.1) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 60px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px;">
+            Pregúntale a tu<br>restaurante por<br><span style="color: var(--whatsapp); font-size: 76px;">WhatsApp.</span>
+        </h2>
+        <p style="font-size: 36px; color: var(--gray); margin-top: 40px; text-align: center;">Te contesta con datos reales.</p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: Chat mockup 1 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+            <!-- User message -->
+            <div class="chat-bubble-user">
+                <p style="font-size: 28px; color: var(--white);">Cuánto vendimos ayer?</p>
+                <p style="font-size: 18px; color: rgba(255,255,255,0.5); text-align: right; margin-top: 8px;">9:15 AM</p>
+            </div>
+            <!-- Bot response -->
+            <div class="chat-bubble-bot">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 14px; font-weight: 900; color: var(--bg);">F</span>
+                    </div>
+                    <span style="font-size: 20px; font-weight: 700; color: var(--accent);">Fullsite IA</span>
+                </div>
+                <p style="font-size: 26px; color: var(--white); line-height: 1.6;">
+                    Ayer lunes vendiste <strong>$48,500</strong><br>
+                    <br>
+                    <span style="color: var(--amber);">-7.2%</span> vs lunes promedio ($52,000)<br>
+                    <br>
+                    Tickets: 168<br>
+                    Ticket promedio: $287<br>
+                    Hora pico: 1:15 PM<br>
+                    <br>
+                    Mesero top: Carlos ($13,200)
+                </p>
+                <p style="font-size: 18px; color: rgba(255,255,255,0.5); margin-top: 12px;">9:15 AM</p>
+            </div>
+        </div>
+        <p style="font-size: 24px; color: var(--gray); margin-top: 40px; text-align: center;">Respuesta instantánea. Datos reales. 24/7.</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Chat mockup 2 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+            <div class="chat-bubble-user">
+                <p style="font-size: 28px; color: var(--white);">Quién vendió más esta semana?</p>
+                <p style="font-size: 18px; color: rgba(255,255,255,0.5); text-align: right; margin-top: 8px;">2:30 PM</p>
+            </div>
+            <div class="chat-bubble-bot">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 14px; font-weight: 900; color: var(--bg);">F</span>
+                    </div>
+                    <span style="font-size: 20px; font-weight: 700; color: var(--accent);">Fullsite IA</span>
+                </div>
+                <p style="font-size: 26px; color: var(--white); line-height: 1.8;">
+                    Ranking semanal (Lun-Vie):<br>
+                    <br>
+                    1. Carlos — <strong style="color: var(--accent);">$65,000</strong><br>
+                    2. Miguel — $59,000<br>
+                    3. Andres — $53,500<br>
+                    4. Laura — $48,000<br>
+                    5. Roberto — $27,500<br>
+                    <br>
+                    <span style="color: var(--amber);">Carlos vende 2.4x más que Roberto.</span>
+                </p>
+                <p style="font-size: 18px; color: rgba(255,255,255,0.5); margin-top: 12px;">2:30 PM</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: More examples -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 40px;">Más preguntas que puedes hacer:</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 16px;">
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Cómo van las propinas este mes?"</p>
+            </div>
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Cuál es mi platillo más vendido?"</p>
+            </div>
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Cuánto vendimos en cafés esta semana?"</p>
+            </div>
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Cómo vamos hoy vs ayer?"</p>
+            </div>
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Cuántas mesas atendimos el sábado?"</p>
+            </div>
+            <div class="chat-bubble-user" style="padding: 16px 24px;">
+                <p style="font-size: 24px; color: var(--white);">"Qué porcentaje pagó con tarjeta?"</p>
+            </div>
+        </div>
+        <p style="font-size: 28px; color: var(--accent); margin-top: 40px; text-align: center; font-weight: 600;">Pregunta lo que quieras. Respuesta en segundos.</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: How it's different -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Cómo consultabas antes:</h3>
+        <div style="width: 100%; display: flex; gap: 24px;">
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--coral); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 24px; font-weight: 700; color: var(--coral); margin-bottom: 20px;">ANTES</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <p style="font-size: 22px; color: var(--gray);">1. Abrir laptop</p>
+                    <p style="font-size: 22px; color: var(--gray);">2. Entrar al sistema</p>
+                    <p style="font-size: 22px; color: var(--gray);">3. Buscar el reporte</p>
+                    <p style="font-size: 22px; color: var(--gray);">4. Filtrar fechas</p>
+                    <p style="font-size: 22px; color: var(--gray);">5. Exportar</p>
+                    <p style="font-size: 22px; color: var(--gray);">6. Calcular en Excel</p>
+                    <p style="font-size: 22px; color: var(--gray);">7. Interpretar</p>
+                </div>
+                <p style="font-size: 28px; color: var(--coral); font-weight: 700; margin-top: 24px;">20-30 min</p>
+            </div>
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--accent); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 20px;">AHORA</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">1. Abrir WhatsApp</p>
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">2. Preguntar</p>
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">3. Leer respuesta</p>
+                </div>
+                <p style="font-size: 28px; color: var(--accent); font-weight: 700; margin-top: 24px;">10 seg</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Availability -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <p style="font-size: 120px; font-weight: 900; color: var(--accent); letter-spacing: -4px;">24/7</p>
+            <h3 style="font-size: 48px; font-weight: 900; color: var(--white); margin-top: 24px;">Respuesta instantánea.</h3>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 32px; line-height: 1.5;">
+                Domingo a las 11 PM?<br>
+                Lunes a las 6 AM?<br>
+                En la playa de vacaciones?<br>
+            </p>
+            <p style="font-size: 36px; color: var(--accent); margin-top: 32px; font-weight: 700;">
+                Tu restaurante siempre te contesta.
+            </p>
+            <p style="font-size: 28px; color: var(--gray); margin-top: 48px;">
+                Sin depender de que tu contador esté disponible.<br>
+                Sin esperar a que alguien "saque los números".
+            </p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+Pregúntale a tu restaurante por WhatsApp. Te contesta con datos reales.
+
+"Cuánto vendimos ayer?" — Respuesta en 10 segundos.
+"Quién vendió más?" — Ranking instantáneo.
+"Cómo van las propinas?" — Desglose por mesero.
+
+Antes tenías que: abrir sistema, buscar reporte, exportar, calcular en Excel, interpretar. 20-30 minutos (si lo hacías).
+
+Ahora: abres WhatsApp, preguntas, lees. 10 segundos.
+
+24/7. Domingo a las 11 PM. Lunes a las 6 AM. En la playa.
+
+Tu restaurante siempre te contesta. Sin depender de nadie.
+
+Link en bio para tu demo.
+
+---
+#restaurantesmty #restaurantesmonterrey #whatsappbusiness #chatbot #inteligenciaartificial #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #automatizacion #datosreales #monterreyfood #foodtech #gestionrestaurante #tecnologiarestaurante #24horas
+-->

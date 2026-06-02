@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>Menú Engineering</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(255,200,87,0.1) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 64px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px;">
+            Tu menú tiene<br>platillos que te<br><span style="color: var(--coral); font-size: 80px;">cuestan dinero</span>
+        </h2>
+        <p style="font-size: 36px; color: var(--gray); margin-top: 40px; text-align: center;">Así los detectas.</p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: The Matrix -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">La Matriz de Menú Engineering</h3>
+        <div style="width: 100%; position: relative;">
+            <!-- Y axis label -->
+            <div style="position: absolute; left: -20px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 20px; color: var(--gray); font-weight: 600; white-space: nowrap;">RENTABILIDAD</div>
+            <!-- X axis label -->
+            <div style="position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); font-size: 20px; color: var(--gray); font-weight: 600;">POPULARIDAD</div>
+            <!-- Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-left: 40px;">
+                <div style="background: rgba(0,255,136,0.05); border: 2px solid var(--accent); border-radius: 20px; padding: 32px; text-align: center;">
+                    <p style="font-size: 48px;">&#9733;</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--accent); margin-top: 8px;">ESTRELLAS</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 8px;">Alta rentabilidad<br>Alta popularidad</p>
+                    <p style="font-size: 20px; color: var(--accent); margin-top: 12px; font-weight: 600;">MANTENER Y PROTEGER</p>
+                </div>
+                <div style="background: rgba(255,200,87,0.05); border: 2px solid var(--amber); border-radius: 20px; padding: 32px; text-align: center;">
+                    <p style="font-size: 48px;">&#10067;</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--amber); margin-top: 8px;">PUZZLES</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 8px;">Alta rentabilidad<br>Baja popularidad</p>
+                    <p style="font-size: 20px; color: var(--amber); margin-top: 12px; font-weight: 600;">PROMOVER MÁS</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.02); border: 2px solid var(--gray); border-radius: 20px; padding: 32px; text-align: center;">
+                    <p style="font-size: 48px;">&#128004;</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--white); margin-top: 8px;">VACAS</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 8px;">Baja rentabilidad<br>Alta popularidad</p>
+                    <p style="font-size: 20px; color: var(--white); margin-top: 12px; font-weight: 600;">SUBIR PRECIO O REDUCIR COSTO</p>
+                </div>
+                <div style="background: rgba(255,107,74,0.05); border: 2px solid var(--coral); border-radius: 20px; padding: 32px; text-align: center;">
+                    <p style="font-size: 48px;">&#128021;</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--coral); margin-top: 8px;">PERROS</p>
+                    <p style="font-size: 22px; color: var(--gray); margin-top: 8px;">Baja rentabilidad<br>Baja popularidad</p>
+                    <p style="font-size: 20px; color: var(--coral); margin-top: 12px; font-weight: 600;">ELIMINAR O REINVENTAR</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Stars -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 56px; height: 56px; border-radius: 12px; background: rgba(0,255,136,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+            <span style="font-size: 32px;">&#9733;</span>
+        </div>
+        <h3 style="font-size: 52px; font-weight: 900; color: var(--accent); margin-bottom: 16px;">ESTRELLAS</h3>
+        <p style="font-size: 28px; color: var(--gray); margin-bottom: 48px;">Se venden mucho Y dejan buena utilidad</p>
+        <div style="width: 100%; background: var(--card-bg); border-radius: 20px; padding: 40px;">
+            <p style="font-size: 24px; color: var(--gray); margin-bottom: 20px;">Ejemplo real:</p>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 28px; color: var(--white); font-weight: 600;">Half & Half</span>
+                    <span style="font-size: 24px; color: var(--accent); font-weight: 700;">62% margen</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 28px; color: var(--white); font-weight: 600;">Chilaquiles Verdes</span>
+                    <span style="font-size: 24px; color: var(--accent); font-weight: 700;">58% margen</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 28px; color: var(--white); font-weight: 600;">Bowl Acai</span>
+                    <span style="font-size: 24px; color: var(--accent); font-weight: 700;">67% margen</span>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 32px; background: rgba(0,255,136,0.08); border-radius: 12px; padding: 20px 32px;">
+            <p style="font-size: 24px; color: var(--accent); font-weight: 600;">Acción: Pon estos primero en el menú. Que el mesero los sugiera.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Dogs -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 56px; height: 56px; border-radius: 12px; background: rgba(255,107,74,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+            <span style="font-size: 32px;">&#128021;</span>
+        </div>
+        <h3 style="font-size: 52px; font-weight: 900; color: var(--coral); margin-bottom: 16px;">PERROS</h3>
+        <p style="font-size: 28px; color: var(--gray); margin-bottom: 48px;">No se venden Y no dejan margen. Te cuestan dinero.</p>
+        <div style="width: 100%; background: var(--card-bg); border: 1px solid rgba(255,107,74,0.2); border-radius: 20px; padding: 40px;">
+            <p style="font-size: 24px; color: var(--gray); margin-bottom: 20px;">Ejemplo real:</p>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 28px; color: var(--white); font-weight: 600;">Ensalada Caesar</span>
+                    <span style="font-size: 24px; color: var(--coral); font-weight: 700;">22% margen</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 28px; color: var(--white); font-weight: 600;">Pasta Alfredo</span>
+                    <span style="font-size: 24px; color: var(--coral); font-weight: 700;">18% margen</span>
+                </div>
+            </div>
+            <p style="font-size: 24px; color: var(--gray); margin-top: 24px;">Se venden 2-3 veces por semana. Ocupan espacio en la carta. Confunden al cliente.</p>
+        </div>
+        <div style="margin-top: 32px; background: rgba(255,107,74,0.08); border-radius: 12px; padding: 20px 32px;">
+            <p style="font-size: 24px; color: var(--coral); font-weight: 600;">Acción: Eliminar del menú o reinventar completamente.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: The cost -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--gray);">El costo de no analizar tu menú:</h3>
+            <div style="margin-top: 48px; background: var(--card-bg); border-radius: 24px; padding: 48px; display: inline-block;">
+                <p style="font-size: 28px; color: var(--gray);">Platillos "perro" en menú promedio</p>
+                <p style="font-size: 80px; font-weight: 900; color: var(--coral); margin-top: 8px;">25-35%</p>
+            </div>
+            <div style="margin-top: 32px; background: var(--card-bg); border-radius: 24px; padding: 48px; display: inline-block;">
+                <p style="font-size: 28px; color: var(--gray);">Dinero perdido al mes por no optimizar</p>
+                <p style="font-size: 80px; font-weight: 900; color: var(--coral); margin-top: 8px;">$15K-$40K</p>
+            </div>
+            <p style="font-size: 28px; color: var(--amber); margin-top: 40px; font-weight: 600;">Y la mayoría nunca lo analiza.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Solution -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <span style="display: inline-block; background: rgba(0,255,136,0.1); color: var(--accent); font-size: 22px; font-weight: 700; padding: 10px 20px; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;">Cada lunes</span>
+            <h2 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 32px; line-height: 1.2;">
+                Fullsite analiza<br>tu menú y te dice<br><span style="color: var(--accent);">qué hacer</span>
+            </h2>
+            <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 16px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
+                <p style="font-size: 28px; color: var(--white);">&#10003; Clasifica cada platillo en la matriz</p>
+                <p style="font-size: 28px; color: var(--white);">&#10003; Te dice cuáles eliminar</p>
+                <p style="font-size: 28px; color: var(--white);">&#10003; Te dice cuáles promover</p>
+                <p style="font-size: 28px; color: var(--white);">&#10003; Te dice dónde subir precio</p>
+            </div>
+            <p style="font-size: 28px; color: var(--gray); margin-top: 40px;">Automáticamente. Cada lunes. Sin consultores caros.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+Tu menú tiene platillos que te CUESTAN dinero. Y probablemente no lo sabes.
+
+Se llama Menú Engineering y es así de simple:
+
+Cada platillo cae en 1 de 4 cuadrantes:
+- ESTRELLAS: se venden mucho + buen margen (proteger)
+- PUZZLES: buen margen pero no se venden (promover más)
+- VACAS: se venden pero bajo margen (subir precio)
+- PERROS: ni se venden ni dejan margen (eliminar)
+
+El restaurante promedio tiene 25-35% de "perros" en su menú. Ocupan espacio, confunden al cliente y te cuestan $15K-$40K al mes.
+
+Fullsite clasifica tu menú automáticamente cada lunes. Te dice qué mantener, qué promover, qué eliminar y dónde subir precio.
+
+Sin consultores. Sin Excel. Sin feeling.
+
+Link en bio para tu demo.
+
+---
+#restaurantesmty #menuengineering #restaurantesmonterrey #disenodemenu #rentabilidad #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #foodcost #preciosmenu #estrategia #monterreyfood #foodtech #gestionrestaurante
+-->

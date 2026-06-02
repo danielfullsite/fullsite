@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>Tu POS Sin Cerebro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -100px; left: -100px; background: radial-gradient(circle, rgba(255,107,74,0.08) 0%, transparent 70%);"></div>
+        <div class="glow" style="bottom: -100px; right: -100px; background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 60px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px;">
+            Tu POS registra<br>ventas.
+        </h2>
+        <h2 style="font-size: 60px; font-weight: 900; color: var(--accent); text-align: center; line-height: 1.1; letter-spacing: -2px; margin-top: 32px;">
+            El nuestro te dice<br>QUÉ HACER.
+        </h2>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: Comparison -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; gap: 24px;">
+            <!-- Traditional POS -->
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--coral); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 28px; font-weight: 900; color: var(--coral); margin-bottom: 32px;">POS TRADICIONAL</p>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Registra transacciones</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Genera reportes PDF</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Tú los interpretas</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Tú decides qué hacer</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Tú detectas fraudes</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--coral); font-size: 20px;">&#10005;</span>
+                        <p style="font-size: 22px; color: var(--gray);">Tú calculas todo</p>
+                    </div>
+                </div>
+                <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="font-size: 20px; color: var(--gray);">Resultado:</p>
+                    <p style="font-size: 24px; color: var(--coral); font-weight: 700; margin-top: 4px;">Datos sin contexto</p>
+                </div>
+            </div>
+            <!-- Fullsite -->
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--accent); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 28px; font-weight: 900; color: var(--accent); margin-bottom: 32px;">FULLSITE</p>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Detecta anomalías</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Predice cierre</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Rankea meseros</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Optimiza menú</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Alerta fraudes</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--accent); font-size: 20px;">&#10003;</span>
+                        <p style="font-size: 22px; color: var(--white); font-weight: 600;">Te dice QUÉ hacer</p>
+                    </div>
+                </div>
+                <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="font-size: 20px; color: var(--gray);">Resultado:</p>
+                    <p style="font-size: 24px; color: var(--accent); font-weight: 700; margin-top: 4px;">Acciones claras, sin esfuerzo</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: 26 agents -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 16px;">
+            <span style="color: var(--accent);">26</span> agentes de IA
+        </h3>
+        <p style="font-size: 28px; color: var(--gray); text-align: center; margin-bottom: 40px;">trabajando 24/7 para tu restaurante</p>
+        <div style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Briefing 7 AM</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Anti-fraude</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Predicción cierre</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Menú engineering</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Ranking meseros</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Detector anomalías</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Upselling coach</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Staffing optimizer</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Análisis propinas</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Kitchen quality</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">Table time</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 12px; padding: 20px 24px;">
+                <p style="font-size: 20px; color: var(--gray); font-weight: 600;">+15 más...</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Real examples -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Acciones reales que genera</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; border-left: 4px solid var(--coral);">
+                <p style="font-size: 20px; color: var(--coral); font-weight: 600;">ANTI-FRAUDE | Viernes</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px;">"Miguel aplicó 3 cortesías sin autorización esta semana. Patrón inusual."</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; border-left: 4px solid var(--accent);">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">UPSELLING | Diario</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px;">"Carlos vende 4x más postres que el promedio. Entrenar al equipo con su técnica."</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; border-left: 4px solid var(--amber);">
+                <p style="font-size: 20px; color: var(--amber); font-weight: 600;">PREDICCIÓN | 2 PM</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px;">"Vas 12% abajo del martes promedio. Empuja Half & Half y sugiere 2da bebida."</p>
+            </div>
+            <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; border-left: 4px solid var(--accent);">
+                <p style="font-size: 20px; color: var(--accent); font-weight: 600;">MENU | Lunes</p>
+                <p style="font-size: 26px; color: var(--white); margin-top: 8px;">"Pasta Alfredo es un 'perro': 18% margen, 3 ventas/semana. Considera eliminar."</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: The shift -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--gray); margin-bottom: 48px;">El cambio:</h3>
+            <div style="display: flex; flex-direction: column; gap: 32px; align-items: center;">
+                <div>
+                    <p style="font-size: 28px; color: var(--coral); text-decoration: line-through;">Tú revisas datos</p>
+                    <p style="font-size: 28px; color: var(--coral); text-decoration: line-through; margin-top: 8px;">Tú interpretas</p>
+                    <p style="font-size: 28px; color: var(--coral); text-decoration: line-through; margin-top: 8px;">Tú decides qué hacer</p>
+                    <p style="font-size: 28px; color: var(--coral); text-decoration: line-through; margin-top: 8px;">Tú detectas problemas</p>
+                </div>
+                <div style="font-size: 48px; color: var(--accent);">&#8595;</div>
+                <div>
+                    <p style="font-size: 36px; color: var(--accent); font-weight: 700;">La IA analiza</p>
+                    <p style="font-size: 36px; color: var(--accent); font-weight: 700; margin-top: 8px;">La IA detecta</p>
+                    <p style="font-size: 36px; color: var(--accent); font-weight: 700; margin-top: 8px;">La IA recomienda</p>
+                    <p style="font-size: 36px; color: var(--white); font-weight: 900; margin-top: 16px;">Tú solo ejecutas</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Investment -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--white); margin-bottom: 48px;">26 agentes IA.<br>1 inversión.</h3>
+            <div style="background: var(--card-bg); border: 2px solid var(--accent); border-radius: 24px; padding: 48px; display: inline-block;">
+                <p style="font-size: 32px; color: var(--gray);">Todo incluido</p>
+                <p style="font-size: 80px; font-weight: 900; color: var(--accent); margin-top: 8px;">$4,999</p>
+                <p style="font-size: 28px; color: var(--gray); margin-top: 4px;">MXN / mes por sucursal</p>
+            </div>
+            <p style="font-size: 28px; color: var(--gray); margin-top: 40px; line-height: 1.5;">
+                Sin contratos anuales.<br>
+                Sin costos extra por agente.<br>
+                Sin límite de consultas.
+            </p>
+            <p style="font-size: 24px; color: var(--amber); margin-top: 24px; font-weight: 600;">Menos que el sueldo de medio mesero.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">26 agentes IA por $4,999/mes</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+Tu POS registra ventas. El nuestro te dice QUÉ HACER.
+
+La diferencia entre un POS tradicional y Fullsite:
+
+POS normal: "Vendiste $48,500 ayer"
+Fullsite: "Vendiste $48,500, 7% abajo del martes promedio. Tu mesero top vendió 2.4x más que el peor. Detectamos un descuento sospechoso. Mañana empuja Half & Half para compensar."
+
+26 agentes de IA analizando tu restaurante 24/7:
+- Anti-fraude (cada viernes)
+- Predicción de cierre (3x al día)
+- Menú engineering (cada lunes)
+- Ranking de meseros (diario)
+- Upselling coach (diario)
+- Y 21 más...
+
+Todo por $4,999/mes. Menos que medio mesero.
+
+Link en bio.
+
+---
+#restaurantesmty #restaurantesmonterrey #posrestaurante #inteligenciaartificial #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #tecnologiarestaurante #automatizacion #datosreales #monterreyfood #foodtech #saas #agentesia #gestionrestaurante #innovacion
+-->

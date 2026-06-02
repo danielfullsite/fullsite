@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>7 Señales de que te están robando</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0a0a0b;
+            --accent: #00ff88;
+            --coral: #ff6b4a;
+            --amber: #ffc857;
+            --white: #ffffff;
+            --gray: #8a8a8a;
+            --dark-gray: #1a1a1b;
+            --card-bg: #111112;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 40px;
+        }
+        .slide {
+            width: 1080px;
+            height: 1350px;
+            background: var(--bg);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px;
+            overflow: hidden;
+        }
+        .watermark {
+            position: absolute;
+            top: 40px;
+            left: 50px;
+            font-size: 24px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.3);
+        }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        .dots .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+        }
+        .dots .dot.active {
+            background: var(--white);
+            width: 24px;
+            border-radius: 4px;
+        }
+        .glow {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .grid-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -150px; right: -150px; background: radial-gradient(circle, rgba(255,107,74,0.12) 0%, transparent 70%);"></div>
+        <div style="position: absolute; top: 80px; right: 80px;">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#ff6b4a" stroke-width="3" opacity="0.3"/>
+                <path d="M60 30 L60 65 L80 75" fill="none" stroke="#ff6b4a" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <h1 style="font-size: 160px; font-weight: 900; color: var(--coral); line-height: 0.9; letter-spacing: -6px; text-align: center;">7</h1>
+        <h2 style="font-size: 72px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px; margin-top: 32px;">
+            señales de que<br>te están<br><span style="color: var(--coral);">robando</span><br>en tu restaurante
+        </h2>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 40px; text-align: center;">La #7 es la que nadie revisa</p>
+        <div class="dots">
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: Senal 1-2 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 40px;">
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">1</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Cortesías falsas</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">Descuentos del 100% que nadie autorizó. Aparecen como "cortesía gerente" pero tú no estabas.</p>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">2</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Cancelaciones sospechosas</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">Tickets cancelados después de que el cliente ya pagó. El efectivo desaparece.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Senal 3-4 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 40px;">
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">3</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Descuentos sin autorización</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">20%, 30%, 50% de descuento aplicados por el mesero. Sin motivo registrado.</p>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">4</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Merma inexplicable</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">Inventario que no cuadra. Se vendieron 50 cafés pero faltan insumos para 80.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Senal 5-6 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 40px;">
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">5</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Propinas que no cuadran</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">El mesero reporta $200 de propinas pero los tickets suman $800 en propinas con tarjeta.</p>
+                    </div>
+                </div>
+            </div>
+            <div style="background: var(--card-bg); border-left: 4px solid var(--coral); border-radius: 24px; padding: 48px;">
+                <div style="display: flex; align-items: center; gap: 24px;">
+                    <span style="font-size: 72px; font-weight: 900; color: var(--coral);">6</span>
+                    <div>
+                        <h3 style="font-size: 42px; font-weight: 700; color: var(--white);">Efectivo que falta</h3>
+                        <p style="font-size: 28px; color: var(--gray); margin-top: 8px;">El corte de caja nunca cuadra. Siempre faltan $200-$500. "Es normal" te dicen.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: Senal 7 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(255,107,74,0.1) 0%, transparent 70%);"></div>
+        <div style="background: var(--card-bg); border: 2px solid var(--coral); border-radius: 24px; padding: 64px; width: 100%; text-align: center;">
+            <span style="font-size: 100px; font-weight: 900; color: var(--coral);">7</span>
+            <h3 style="font-size: 52px; font-weight: 700; color: var(--white); margin-top: 24px;">Horarios fantasma</h3>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 16px; line-height: 1.5;">
+                El sistema registra ventas a las 11:45 PM.<br>
+                Tu restaurante cierra a las 10 PM.<br><br>
+                <span style="color: var(--coral); font-weight: 700;">Alguien está usando el sistema fuera de horario.</span>
+            </p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Solution -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="text-align: center;">
+            <span style="display: inline-block; background: rgba(0,255,136,0.1); color: var(--accent); font-size: 24px; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;">La solución</span>
+            <h2 style="font-size: 56px; font-weight: 900; color: var(--white); margin-top: 40px; line-height: 1.2;">
+                Fullsite detecta<br><span style="color: var(--accent);">todo esto</span><br>automáticamente<br>cada viernes
+            </h2>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 32px; line-height: 1.5;">
+                Nuestro agente anti-fraude analiza<br>
+                cancelaciones, descuentos, cortesías<br>
+                y patrones sospechosos.
+            </p>
+            <p style="font-size: 28px; color: var(--accent); margin-top: 32px; font-weight: 600;">
+                Te llega un reporte por WhatsApp.<br>Sin que tú hagas nada.
+            </p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: Social proof -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <p style="font-size: 32px; color: var(--gray); font-style: italic; line-height: 1.6; max-width: 800px;">
+                "En la primera semana Fullsite detectó<br>3 patrones que yo nunca hubiera visto.<br>
+                <span style="color: var(--white); font-weight: 600;">Llevaban meses haciéndolo.</span>"
+            </p>
+            <p style="font-size: 24px; color: var(--accent); margin-top: 40px;">— Restaurante en Monterrey, MX</p>
+            <div style="margin-top: 64px; background: var(--card-bg); border-radius: 16px; padding: 32px 48px; display: inline-block;">
+                <p style="font-size: 28px; color: var(--gray);">Detectado en primera semana:</p>
+                <p style="font-size: 48px; font-weight: 900; color: var(--coral); margin-top: 8px;">$12,500 MXN</p>
+                <p style="font-size: 24px; color: var(--gray); margin-top: 4px;">en operaciones sospechosas</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+            <div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 8: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+7 señales de que te están robando en tu restaurante (y cómo detectarlo automáticamente)
+
+La mayoría de los dueños se enteran MESES después. O nunca.
+
+Cortesías falsas. Cancelaciones post-pago. Descuentos que nadie autorizó.
+
+La #7 es la más común y la que NADIE revisa: operaciones fuera de horario.
+
+Fullsite tiene un agente anti-fraude que analiza TODOS tus tickets cada viernes. Si algo no cuadra, te avisa por WhatsApp.
+
+Sin que tú hagas nada. Sin revisar reportes de 50 páginas.
+
+Link en bio para agendar tu demo.
+
+---
+#restaurantesmty #restaurantesmonterrey #roboenrestaurantes #controldeventas #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #tecnologiarestaurante #inteligenciaartificial #automatizacion #monterreyfood #emprendedoresgastronomicos #foodtech #mermarestaurante #seguridadnegocio #datosreales
+-->

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>7 AM Briefing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -100px; left: 50%; transform: translateX(-50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 68px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px;">
+            A las <span style="color: var(--accent); font-size: 100px;">7 AM</span><br>
+            yo ya sé cuánto<br>vendí ayer.
+        </h2>
+        <p style="font-size: 52px; color: var(--gray); margin-top: 48px; text-align: center; font-weight: 700;">Tú?</p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: WhatsApp mockup -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 36px; font-weight: 700; color: var(--gray); margin-bottom: 32px;">Esto me llega cada mañana:</h3>
+        <!-- WhatsApp-style message -->
+        <div style="width: 100%; max-width: 850px; background: #1a2e1a; border-radius: 20px; padding: 40px; border: 1px solid rgba(0,255,136,0.1);">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 20px; font-weight: 900; color: var(--bg);">F</span>
+                </div>
+                <span style="font-size: 24px; font-weight: 700; color: var(--accent);">Fullsite IA</span>
+                <span style="font-size: 20px; color: var(--gray); margin-left: auto;">7:00 AM</span>
+            </div>
+            <div style="font-size: 24px; color: var(--white); line-height: 1.8;">
+                <p style="font-weight: 700; color: var(--accent); font-size: 26px;">Buenos días. Tu briefing:</p>
+                <br>
+                <p>Ventas ayer: <strong>$48,500</strong> (-7% vs martes prom.)</p>
+                <p>Ticket promedio: <strong>$287</strong></p>
+                <p>Mesero top: <strong>Carlos — $13,200</strong></p>
+                <p>Platillo #1: <strong>Chilaquiles Verdes</strong></p>
+                <p>Hora pico: <strong>1:15 PM</strong></p>
+                <br>
+                <p style="color: var(--coral);">Anomalía: Descuento 50% no autorizado Mesa 7</p>
+                <br>
+                <p style="color: var(--amber);">Predicción hoy: <strong>$52,000</strong> (martes típico)</p>
+                <br>
+                <p style="color: var(--gray); font-size: 20px;">Reservas hoy: 2 eventos (jardin 4pm, terraza 7pm)</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: What it includes -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 48px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Qué incluye tu briefing</h3>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--accent);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Ventas vs promedio histórico del mismo día</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--accent);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Ticket promedio y tendencia</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--accent);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Ranking de meseros</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--coral);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Anomalías detectadas</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--amber);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Predicción de venta para hoy</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; background: var(--card-bg); border-radius: 16px; padding: 28px 32px;">
+                <div style="width: 8px; height: 48px; border-radius: 4px; background: var(--accent);"></div>
+                <span style="font-size: 28px; color: var(--white); font-weight: 600;">Reservas y eventos del día</span>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Before vs After -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <h3 style="font-size: 42px; font-weight: 900; color: var(--white); text-align: center; margin-bottom: 48px;">Antes vs Después</h3>
+        <div style="width: 100%; display: flex; gap: 24px;">
+            <!-- Before -->
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--coral); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 24px; font-weight: 700; color: var(--coral); margin-bottom: 24px;">SIN FULLSITE</p>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <p style="font-size: 22px; color: var(--gray);">Abrir sistema POS</p>
+                    <p style="font-size: 22px; color: var(--gray);">Buscar reporte de ayer</p>
+                    <p style="font-size: 22px; color: var(--gray);">Exportar a Excel</p>
+                    <p style="font-size: 22px; color: var(--gray);">Calcular promedios</p>
+                    <p style="font-size: 22px; color: var(--gray);">Comparar vs semana pasada</p>
+                    <p style="font-size: 22px; color: var(--gray);">Revisar mesero por mesero</p>
+                </div>
+                <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="font-size: 36px; font-weight: 900; color: var(--coral);">45 min</p>
+                    <p style="font-size: 20px; color: var(--gray);">si lo haces (spoiler: no lo haces)</p>
+                </div>
+            </div>
+            <!-- After -->
+            <div style="flex: 1; background: var(--card-bg); border-top: 4px solid var(--accent); border-radius: 20px; padding: 36px;">
+                <p style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 24px;">CON FULLSITE</p>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">Abres WhatsApp</p>
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">Lees tu briefing</p>
+                    <p style="font-size: 22px; color: var(--white); font-weight: 600;">Tomas decisiones</p>
+                    <p style="font-size: 22px; color: var(--gray); font-style: italic;">...eso es todo</p>
+                </div>
+                <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="font-size: 36px; font-weight: 900; color: var(--accent);">2 min</p>
+                    <p style="font-size: 20px; color: var(--accent);">cada mañana, automáticamente</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: Time saved -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--gray);">Tiempo ahorrado al mes:</h3>
+            <p style="font-size: 140px; font-weight: 900; color: var(--accent); letter-spacing: -5px; margin-top: 32px;">22 hrs</p>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">que puedes usar para crecer tu negocio</p>
+            <div style="margin-top: 64px; display: flex; gap: 32px; justify-content: center;">
+                <div style="background: var(--card-bg); border-radius: 16px; padding: 24px 32px; text-align: center;">
+                    <p style="font-size: 20px; color: var(--gray);">Costo del tiempo</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--coral);">$11,000/mes</p>
+                </div>
+                <div style="background: var(--card-bg); border-radius: 16px; padding: 24px 32px; text-align: center;">
+                    <p style="font-size: 20px; color: var(--gray);">Costo Fullsite</p>
+                    <p style="font-size: 32px; font-weight: 900; color: var(--accent);">$4,999/mes</p>
+                </div>
+            </div>
+            <p style="font-size: 28px; color: var(--accent); margin-top: 32px; font-weight: 600;">ROI positivo solo en tiempo ahorrado</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Promise -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <div style="background: rgba(0,255,136,0.08); border: 2px solid var(--accent); border-radius: 24px; padding: 64px; display: inline-block;">
+                <p style="font-size: 28px; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Promesa</p>
+                <h2 style="font-size: 56px; font-weight: 900; color: var(--white); margin-top: 24px; line-height: 1.2;">
+                    Tu primer briefing<br>en <span style="color: var(--accent);">48 horas</span>
+                </h2>
+                <p style="font-size: 28px; color: var(--gray); margin-top: 24px; line-height: 1.5;">
+                    Conectamos tu sistema.<br>
+                    Configuramos tus alertas.<br>
+                    Mañana ya tienes datos.
+                </p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+A las 7 AM yo ya sé cuánto vendí ayer. Tú?
+
+Cada mañana me llega un mensaje de WhatsApp con:
+- Ventas vs promedio del día
+- Ticket promedio
+- Mesero que más vendió
+- Anomalías (si alguien hizo algo raro)
+- Predicción para hoy
+
+Antes me tomaba 45 minutos revisar todo esto manualmente. Si es que lo hacía.
+
+Ahora? 2 minutos. Leo mi briefing mientras tomo café.
+
+La diferencia entre los dueños que crecen y los que solo sobreviven: información a tiempo.
+
+Tu primer briefing listo en 48 horas. Link en bio.
+
+---
+#restaurantesmty #restaurantesmonterrey #briefingdiario #ventasrestaurante #posrestaurante #restauranteroshoy #duenosderestaurantes #negociodealimentos #gastronomia #automatizacion #whatsappbusiness #inteligenciaartificial #datosreales #monterreyfood #foodtech #productividad #gestionrestaurante
+-->

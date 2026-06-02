@@ -26,13 +26,23 @@ interface PredictionWidgetProps {
   yesterdayVentas: number
   lastWeekVentas: number
   dowAvgVentas: number
+  dataFecha?: string
 }
 
-function predict(currentVentas: number): { projected: number; pctDone: number; remaining: number } {
+function predict(currentVentas: number, dataFecha?: string): { projected: number; pctDone: number; remaining: number } {
   const now = new Date()
   // Mexico timezone offset (UTC-6)
   const mxHour = (now.getUTCHours() - 6 + 24) % 24
   const mxMinute = now.getUTCMinutes()
+
+  // Don't predict if data is from a different day (stale data)
+  if (dataFecha) {
+    const mxNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
+    const todayStr = mxNow.toISOString().slice(0, 10)
+    if (dataFecha !== todayStr) {
+      return { projected: 0, pctDone: 0, remaining: 0 }
+    }
+  }
 
   if (currentVentas <= 0 || mxHour < 8) {
     return { projected: 0, pctDone: 0, remaining: 0 }
@@ -64,8 +74,9 @@ export default function PredictionWidget({
   yesterdayVentas,
   lastWeekVentas,
   dowAvgVentas,
+  dataFecha,
 }: PredictionWidgetProps) {
-  const { projected, pctDone, remaining } = predict(currentVentas)
+  const { projected, pctDone, remaining } = predict(currentVentas, dataFecha)
 
   if (projected <= 0) return null
 

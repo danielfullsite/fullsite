@@ -1,0 +1,1842 @@
+{
+  "/Users/danielrg/fullsite/package.json": {
+    "mtime": 1777050078.5168455,
+    "ast_hash": "c554d93f98203b96e8a5296cd01b964d",
+    "semantic_hash": "c554d93f98203b96e8a5296cd01b964d"
+  },
+  "/Users/danielrg/fullsite/manifest.json": {
+    "mtime": 1779651260.4195776,
+    "ast_hash": "2d38f6c5ab61114675826a321aeebd1f",
+    "semantic_hash": "2d38f6c5ab61114675826a321aeebd1f"
+  },
+  "/Users/danielrg/fullsite/sw.js": {
+    "mtime": 1779651229.843628,
+    "ast_hash": "9a3d903535e6ac669d71ab7416b4dbdb",
+    "semantic_hash": "9a3d903535e6ac669d71ab7416b4dbdb"
+  },
+  "/Users/danielrg/fullsite/mobile-app/App.tsx": {
+    "mtime": 1779855398.1770916,
+    "ast_hash": "63fffa631de6465b8c763b19ca78f7f2",
+    "semantic_hash": "63fffa631de6465b8c763b19ca78f7f2"
+  },
+  "/Users/danielrg/fullsite/mobile-app/app.json": {
+    "mtime": 1779855248.4981182,
+    "ast_hash": "2fd87e40433bdbebca4f37949eada5dc",
+    "semantic_hash": "2fd87e40433bdbebca4f37949eada5dc"
+  },
+  "/Users/danielrg/fullsite/mobile-app/package.json": {
+    "mtime": 1779855238.5052974,
+    "ast_hash": "38f313ecb4a5a5d3abd46cbc0f7376a2",
+    "semantic_hash": "38f313ecb4a5a5d3abd46cbc0f7376a2"
+  },
+  "/Users/danielrg/fullsite/mobile-app/tsconfig.json": {
+    "mtime": 1779855254.0512664,
+    "ast_hash": "29da186e2cb529d3c772678fc32594c0",
+    "semantic_hash": "29da186e2cb529d3c772678fc32594c0"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/screens/POSScreen.tsx": {
+    "mtime": 1779855393.359585,
+    "ast_hash": "9bf5097e9926c66604439e7f8693333b",
+    "semantic_hash": "9bf5097e9926c66604439e7f8693333b"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/screens/LoginScreen.tsx": {
+    "mtime": 1779855355.0013463,
+    "ast_hash": "814fbdb4c3c02b4de92079e64ffdacad",
+    "semantic_hash": "814fbdb4c3c02b4de92079e64ffdacad"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/lib/offline-db.ts": {
+    "mtime": 1779855287.1525097,
+    "ast_hash": "15b5514a03604947288ab29315c4b280",
+    "semantic_hash": "15b5514a03604947288ab29315c4b280"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/lib/types.ts": {
+    "mtime": 1779855269.6657286,
+    "ast_hash": "99abba8205a3f79e16f7fef31420589f",
+    "semantic_hash": "99abba8205a3f79e16f7fef31420589f"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/lib/supabase.ts": {
+    "mtime": 1779855259.8385975,
+    "ast_hash": "78311882d5edd6ded42aed21cb9a2ebd",
+    "semantic_hash": "78311882d5edd6ded42aed21cb9a2ebd"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/lib/printer-native.ts": {
+    "mtime": 1779855329.2886662,
+    "ast_hash": "8f95f7320c6f8ddbeb39b19564d00051",
+    "semantic_hash": "8f95f7320c6f8ddbeb39b19564d00051"
+  },
+  "/Users/danielrg/fullsite/mobile-app/src/lib/store.ts": {
+    "mtime": 1779855338.6536336,
+    "ast_hash": "d961594f69b626ea2bb1a79595f25e34",
+    "semantic_hash": "d961594f69b626ea2bb1a79595f25e34"
+  },
+  "/Users/danielrg/fullsite/.context/retros/2026-05-22-1.json": {
+    "mtime": 1779476666.68037,
+    "ast_hash": "35b5a409352ee2fd3a47aefd0a657181",
+    "semantic_hash": "35b5a409352ee2fd3a47aefd0a657181"
+  },
+  "/Users/danielrg/fullsite/landing-site/manifest.json": {
+    "mtime": 1779772889.1224442,
+    "ast_hash": "2d38f6c5ab61114675826a321aeebd1f",
+    "semantic_hash": "2d38f6c5ab61114675826a321aeebd1f"
+  },
+  "/Users/danielrg/fullsite/cloudflare/delivery-worker/src/index.ts": {
+    "mtime": 1779225520.3339453,
+    "ast_hash": "ed41d63a5d23a524fbc2f416f32ba8cd",
+    "semantic_hash": "ed41d63a5d23a524fbc2f416f32ba8cd"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/package.json": {
+    "mtime": 1778616439.906828,
+    "ast_hash": "8e6f9b37843e379d6cf54b64f16a58e7",
+    "semantic_hash": "8e6f9b37843e379d6cf54b64f16a58e7"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/tsconfig.json": {
+    "mtime": 1778616497.911706,
+    "ast_hash": "9fa4779e5f7f6a2c655c4776ed48585a",
+    "semantic_hash": "9fa4779e5f7f6a2c655c4776ed48585a"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/deploy.sh": {
+    "mtime": 1778110517.693895,
+    "ast_hash": "a02a27da2fabebe6c724a1df14bafc56",
+    "semantic_hash": "a02a27da2fabebe6c724a1df14bafc56"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/index.legacy.ts": {
+    "mtime": 1778108369.9575238,
+    "ast_hash": "4eb1b65c818bd2f43ffd339ce9a09060",
+    "semantic_hash": "4eb1b65c818bd2f43ffd339ce9a09060"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/types.ts": {
+    "mtime": 1778731553.5756319,
+    "ast_hash": "578b0ef175c54da5219529a628badfa4",
+    "semantic_hash": "578b0ef175c54da5219529a628badfa4"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/index.ts": {
+    "mtime": 1778777795.407654,
+    "ast_hash": "6930b85740cfe6cd14e0a6457552439e",
+    "semantic_hash": "6930b85740cfe6cd14e0a6457552439e"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/lib/claude-api.ts": {
+    "mtime": 1778733979.217536,
+    "ast_hash": "2eae6db44c63e42ba9486d1462f4e1b1",
+    "semantic_hash": "2eae6db44c63e42ba9486d1462f4e1b1"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/lib/telegram.ts": {
+    "mtime": 1778610718.7374551,
+    "ast_hash": "e3a8b0b1839cde8e6fdb23cfbe454671",
+    "semantic_hash": "e3a8b0b1839cde8e6fdb23cfbe454671"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/lib/supabase.ts": {
+    "mtime": 1778733967.847979,
+    "ast_hash": "46fa507b01295ad0f4a0e4a1c9fbd37c",
+    "semantic_hash": "46fa507b01295ad0f4a0e4a1c9fbd37c"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/handlers/commands.ts": {
+    "mtime": 1778733953.1028285,
+    "ast_hash": "2edc3310c083b697c0249b6d682b8b5b",
+    "semantic_hash": "2edc3310c083b697c0249b6d682b8b5b"
+  },
+  "/Users/danielrg/fullsite/cloudflare/orquestador-worker/src/handlers/chat.ts": {
+    "mtime": 1778731331.5869157,
+    "ast_hash": "1c70b0c20b4bd294d2705e14921938c1",
+    "semantic_hash": "1c70b0c20b4bd294d2705e14921938c1"
+  },
+  "/Users/danielrg/fullsite/tests/security/m1m2-xss-escape.test.js": {
+    "mtime": 1777058199.5237975,
+    "ast_hash": "8b66c62feaceec4da9b067c0437166ce",
+    "semantic_hash": "8b66c62feaceec4da9b067c0437166ce"
+  },
+  "/Users/danielrg/fullsite/.claude/settings.json": {
+    "mtime": 1779385347.4054286,
+    "ast_hash": "ea17ee7d571649e317559d3afb319090",
+    "semantic_hash": "ea17ee7d571649e317559d3afb319090"
+  },
+  "/Users/danielrg/fullsite/.claude/settings.local.json": {
+    "mtime": 1779821677.4560423,
+    "ast_hash": "7e77e3efd0cec5d36057b8975751868d",
+    "semantic_hash": "7e77e3efd0cec5d36057b8975751868d"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/seo-audit/evals/evals.json": {
+    "mtime": 1778128435.6178358,
+    "ast_hash": "33de97debe012834fc1136c61de936c9",
+    "semantic_hash": "33de97debe012834fc1136c61de936c9"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/copywriting/evals/evals.json": {
+    "mtime": 1778128435.6077557,
+    "ast_hash": "bec6a520fbe919cedb8236b49ea253c5",
+    "semantic_hash": "bec6a520fbe919cedb8236b49ea253c5"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/launch-strategy/evals/evals.json": {
+    "mtime": 1778128435.6103501,
+    "ast_hash": "b0544b88d4974e5aeb4bdc9c205639a6",
+    "semantic_hash": "b0544b88d4974e5aeb4bdc9c205639a6"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/social-content/evals/evals.json": {
+    "mtime": 1778128435.6204762,
+    "ast_hash": "3fd33c5dbdae18151ff326ac076491c6",
+    "semantic_hash": "3fd33c5dbdae18151ff326ac076491c6"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/paid-ads/evals/evals.json": {
+    "mtime": 1778128435.6123023,
+    "ast_hash": "d16863e7ff60b4498ba0dd5f12a765c1",
+    "semantic_hash": "d16863e7ff60b4498ba0dd5f12a765c1"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/ad-creative/evals/evals.json": {
+    "mtime": 1778128435.6021445,
+    "ast_hash": "f9689f6425f3e4706433f947461b4a16",
+    "semantic_hash": "f9689f6425f3e4706433f947461b4a16"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/ai-seo/evals/evals.json": {
+    "mtime": 1778128435.605004,
+    "ast_hash": "90a8bb9bcf6399cd2158ecf01f10caf9",
+    "semantic_hash": "90a8bb9bcf6399cd2158ecf01f10caf9"
+  },
+  "/Users/danielrg/fullsite/.claude/skills/schema-markup/evals/evals.json": {
+    "mtime": 1778128435.6151495,
+    "ast_hash": "ce656a928c6992cb91faf8e3623f9f5f",
+    "semantic_hash": "ce656a928c6992cb91faf8e3623f9f5f"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/run_exports.py": {
+    "mtime": 1778704695.094777,
+    "ast_hash": "b7fcb024d75296a4421fda6082b2606b",
+    "semantic_hash": "b7fcb024d75296a4421fda6082b2606b"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/run.py": {
+    "mtime": 1778704091.4414287,
+    "ast_hash": "2a6247c86a28f6ddc464b2a3b0250a72",
+    "semantic_hash": "2a6247c86a28f6ddc464b2a3b0250a72"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/backfill.py": {
+    "mtime": 1778729426.7414975,
+    "ast_hash": "924683618f135ac46ae50d73af7ee32a",
+    "semantic_hash": "924683618f135ac46ae50d73af7ee32a"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/captured_login.json": {
+    "mtime": 1778702608.561993,
+    "ast_hash": "28b37510d6e1966eedc4d62246020e15",
+    "semantic_hash": "28b37510d6e1966eedc4d62246020e15"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/portal_map.json": {
+    "mtime": 1778718764.606,
+    "ast_hash": "46a65c1f7a6d7c10aca56d2f7b38dd45",
+    "semantic_hash": "46a65c1f7a6d7c10aca56d2f7b38dd45"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/crawl_results.json": {
+    "mtime": 1778702446.237415,
+    "ast_hash": "fbbc9e40fe4a259647f4e5a143fab3c2",
+    "semantic_hash": "fbbc9e40fe4a259647f4e5a143fab3c2"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/xlsx_schemas.json": {
+    "mtime": 1778718744.350857,
+    "ast_hash": "de95aa0e5ef2d457d32b00adef644b44",
+    "semantic_hash": "de95aa0e5ef2d457d32b00adef644b44"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/captured.json": {
+    "mtime": 1778701126.6364117,
+    "ast_hash": "56d4acac6d9d2b5bca4e2fdd0d76e20e",
+    "semantic_hash": "56d4acac6d9d2b5bca4e2fdd0d76e20e"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/output/endpoints.json": {
+    "mtime": 1778718764.6080866,
+    "ast_hash": "2d722d3465a314d56c7c66f379e0bcf5",
+    "semantic_hash": "2d722d3465a314d56c7c66f379e0bcf5"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/catalog.py": {
+    "mtime": 1778701285.1493454,
+    "ast_hash": "d4309f7c678fc24613e68c574f494952",
+    "semantic_hash": "d4309f7c678fc24613e68c574f494952"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/auth.py": {
+    "mtime": 1778702543.402354,
+    "ast_hash": "151259caf4454283ea698836f288728e",
+    "semantic_hash": "151259caf4454283ea698836f288728e"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/__init__.py": {
+    "mtime": 1778697817.4720647,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/supabase_client.py": {
+    "mtime": 1778701298.2478936,
+    "ast_hash": "43b4361a6b3849c36505d4047655d2d3",
+    "semantic_hash": "43b4361a6b3849c36505d4047655d2d3"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/export_handler.py": {
+    "mtime": 1778704680.5070834,
+    "ast_hash": "459da3a437fb1848ec365932d543ca3c",
+    "semantic_hash": "459da3a437fb1848ec365932d543ca3c"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/http_interceptor.py": {
+    "mtime": 1778700707.5255702,
+    "ast_hash": "7079cb4e4934c195cf47b841040d6d40",
+    "semantic_hash": "7079cb4e4934c195cf47b841040d6d40"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/screenshot.py": {
+    "mtime": 1778701273.76372,
+    "ast_hash": "a4ee2173bc6a698ab92da418c083b7f1",
+    "semantic_hash": "a4ee2173bc6a698ab92da418c083b7f1"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/crawler.py": {
+    "mtime": 1778702707.9378493,
+    "ast_hash": "9307a0f52d5ec03354d365017858ac37",
+    "semantic_hash": "9307a0f52d5ec03354d365017858ac37"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft-explorer/src/telegram_reporter.py": {
+    "mtime": 1778704025.3343358,
+    "ast_hash": "3a390dc6b17a8864e97b1c85019bba6e",
+    "semantic_hash": "3a390dc6b17a8864e97b1c85019bba6e"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/migrations/001_reviews_tables.sql": {
+    "mtime": 1778561800.1021924,
+    "ast_hash": "0ecafd05f01bcbc611452ddf6eca5141",
+    "semantic_hash": "0ecafd05f01bcbc611452ddf6eca5141"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/package.json": {
+    "mtime": 1778603231.4721448,
+    "ast_hash": "3d9ddc2ca2bdab64ba18e44e11f7ae28",
+    "semantic_hash": "3d9ddc2ca2bdab64ba18e44e11f7ae28"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/tsconfig.json": {
+    "mtime": 1778561260.549967,
+    "ast_hash": "216c84f581365e311f417185df1adc86",
+    "semantic_hash": "216c84f581365e311f417185df1adc86"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/vitest.config.ts": {
+    "mtime": 1778604950.4256854,
+    "ast_hash": "de3818e8711cecb643c172697451fddc",
+    "semantic_hash": "de3818e8711cecb643c172697451fddc"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/tests/prompt-outputs.json": {
+    "mtime": 1778606228.8774292,
+    "ast_hash": "3e8e7222cd66b3d9fc52f3e42271604f",
+    "semantic_hash": "3e8e7222cd66b3d9fc52f3e42271604f"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/tests/claude-api.test.ts": {
+    "mtime": 1778606100.019091,
+    "ast_hash": "06442f442e47a5c83226ad5a346e5241",
+    "semantic_hash": "06442f442e47a5c83226ad5a346e5241"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/index.ts": {
+    "mtime": 1779586307.674219,
+    "ast_hash": "8de262df376911f3d6226dc2375e7b1a",
+    "semantic_hash": "8de262df376911f3d6226dc2375e7b1a"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/lib/google-gbp.ts": {
+    "mtime": 1778561327.9791188,
+    "ast_hash": "1221abef22bcfc29245fcb7a11321657",
+    "semantic_hash": "1221abef22bcfc29245fcb7a11321657"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/lib/telegram.ts": {
+    "mtime": 1778606386.7277822,
+    "ast_hash": "0fb8c1bad96bbb50251448e2d3afc900",
+    "semantic_hash": "0fb8c1bad96bbb50251448e2d3afc900"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/lib/supabase.ts": {
+    "mtime": 1778606455.4613137,
+    "ast_hash": "c37b1a04a0e6613876bdc0abdc60f828",
+    "semantic_hash": "c37b1a04a0e6613876bdc0abdc60f828"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/lib/groq-api.ts": {
+    "mtime": 1779586304.0911129,
+    "ast_hash": "607ff6c799e28ae6806311d52c77fea1",
+    "semantic_hash": "607ff6c799e28ae6806311d52c77fea1"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/handlers/oauth.ts": {
+    "mtime": 1778562095.5459588,
+    "ast_hash": "b757f651bda00a0954dc557230b43e3a",
+    "semantic_hash": "b757f651bda00a0954dc557230b43e3a"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/handlers/cron.ts": {
+    "mtime": 1779586321.5053325,
+    "ast_hash": "4472dbd08443585f76e96e1acae644d3",
+    "semantic_hash": "4472dbd08443585f76e96e1acae644d3"
+  },
+  "/Users/danielrg/fullsite/agents/reviews-manager/worker/src/handlers/telegram.ts": {
+    "mtime": 1778606500.5669706,
+    "ast_hash": "0d399ccc41f53dcd8eaf3e74cb91fa9f",
+    "semantic_hash": "0d399ccc41f53dcd8eaf3e74cb91fa9f"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/test_parser.py": {
+    "mtime": 1778475218.155673,
+    "ast_hash": "509fd92a4be26d31b5bae35cf5d3d734",
+    "semantic_hash": "509fd92a4be26d31b5bae35cf5d3d734"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/sender.py": {
+    "mtime": 1778463140.8291626,
+    "ast_hash": "de756893bf11c6fdc9f4a15e02e3c5d5",
+    "semantic_hash": "de756893bf11c6fdc9f4a15e02e3c5d5"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/scraper.py": {
+    "mtime": 1779583871.4477289,
+    "ast_hash": "ed7c0a1e8fc08060aaf4d66663734a57",
+    "semantic_hash": "ed7c0a1e8fc08060aaf4d66663734a57"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/run.py": {
+    "mtime": 1778613570.3654604,
+    "ast_hash": "59737546a5c67adbdae8f17f5ac51f08",
+    "semantic_hash": "59737546a5c67adbdae8f17f5ac51f08"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/parser.py": {
+    "mtime": 1779213834.8406453,
+    "ast_hash": "35931ff58e1eff7005117be6d8c57af6",
+    "semantic_hash": "35931ff58e1eff7005117be6d8c57af6"
+  },
+  "/Users/danielrg/fullsite/agents/wansoft/supabase_client.py": {
+    "mtime": 1779682234.7555985,
+    "ast_hash": "7ebf4f93dfa7e06aada22fe0f2c7aea9",
+    "semantic_hash": "7ebf4f93dfa7e06aada22fe0f2c7aea9"
+  },
+  "/Users/danielrg/fullsite/.octogent/project.json": {
+    "mtime": 1778116894.1604505,
+    "ast_hash": "04b00f7fe9c2b8cd0936d831cc3d8b6b",
+    "semantic_hash": "04b00f7fe9c2b8cd0936d831cc3d8b6b"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/vercel.json": {
+    "mtime": 1778795716.197018,
+    "ast_hash": "bc5aa3e80777687188606ff2d5a369bc",
+    "semantic_hash": "bc5aa3e80777687188606ff2d5a369bc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/postcss.config.mjs": {
+    "mtime": 1778785351.6288776,
+    "ast_hash": "239f3ebf717465dc636818a1a619398d",
+    "semantic_hash": "239f3ebf717465dc636818a1a619398d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sentry.server.config.ts": {
+    "mtime": 1779422208.0635052,
+    "ast_hash": "4a9e9a2e8514041d169fe472d1bda4c4",
+    "semantic_hash": "4a9e9a2e8514041d169fe472d1bda4c4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/next-env.d.ts": {
+    "mtime": 1779748656.1073537,
+    "ast_hash": "2a74d3909800ca5467fa83b0ab4a4890",
+    "semantic_hash": "2a74d3909800ca5467fa83b0ab4a4890"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sentry.client.config.ts": {
+    "mtime": 1779422202.4099422,
+    "ast_hash": "8f4a83ff9e2205e289e526df77976483",
+    "semantic_hash": "8f4a83ff9e2205e289e526df77976483"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sentry.edge.config.ts": {
+    "mtime": 1779422220.4391158,
+    "ast_hash": "4a9e9a2e8514041d169fe472d1bda4c4",
+    "semantic_hash": "4a9e9a2e8514041d169fe472d1bda4c4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/package.json": {
+    "mtime": 1779670254.0751112,
+    "ast_hash": "daef6a282dfefbd7dfcb97ec1eee87d1",
+    "semantic_hash": "daef6a282dfefbd7dfcb97ec1eee87d1"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/tsconfig.json": {
+    "mtime": 1778785351.6300638,
+    "ast_hash": "ee17fd1c97c735e9f3564e3f5251f125",
+    "semantic_hash": "ee17fd1c97c735e9f3564e3f5251f125"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/test-pos-tiendita.mjs": {
+    "mtime": 1779855588.5427146,
+    "ast_hash": "fe0f19394ad17a1e63638383a889062c",
+    "semantic_hash": "fe0f19394ad17a1e63638383a889062c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/playwright.config.ts": {
+    "mtime": 1779657337.8411796,
+    "ast_hash": "bdebcc87c55d2697e142d9c060d87e87",
+    "semantic_hash": "bdebcc87c55d2697e142d9c060d87e87"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/vitest.config.ts": {
+    "mtime": 1779651420.663205,
+    "ast_hash": "003fc6e22fffa246dc6c37c1db8ad481",
+    "semantic_hash": "003fc6e22fffa246dc6c37c1db8ad481"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/eslint.config.mjs": {
+    "mtime": 1778785351.6287837,
+    "ast_hash": "dfa1f5f6a7037bf39dc510f30b180002",
+    "semantic_hash": "dfa1f5f6a7037bf39dc510f30b180002"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/next.config.ts": {
+    "mtime": 1779747865.8995283,
+    "ast_hash": "f7ed37726984f9946af7367ac621cd30",
+    "semantic_hash": "f7ed37726984f9946af7367ac621cd30"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/migrations/002_menu_to_db.sql": {
+    "mtime": 1779641569.4289033,
+    "ast_hash": "14b8044d6b1eaa4df857631b68c2202e",
+    "semantic_hash": "14b8044d6b1eaa4df857631b68c2202e"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/supabase/crm-recovery.sql": {
+    "mtime": 1779854382.2679193,
+    "ast_hash": "a9d89269a8589dad13e975cd3319c825",
+    "semantic_hash": "a9d89269a8589dad13e975cd3319c825"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/public/manifest.json": {
+    "mtime": 1779473617.282818,
+    "ast_hash": "396070f217251678fa3e35612a41421c",
+    "semantic_hash": "396070f217251678fa3e35612a41421c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/public/sw.js": {
+    "mtime": 1779855120.4917638,
+    "ast_hash": "1d5c4ed4802f5af9c1ffd3109200eaad",
+    "semantic_hash": "1d5c4ed4802f5af9c1ffd3109200eaad"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/e2e/landing.spec.ts": {
+    "mtime": 1779653021.5991495,
+    "ast_hash": "7aea4c4cf7cd3892acb35d3c33a68e29",
+    "semantic_hash": "7aea4c4cf7cd3892acb35d3c33a68e29"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/e2e/login.spec.ts": {
+    "mtime": 1779653006.8843365,
+    "ast_hash": "17eccc10794272a61556668204625249",
+    "semantic_hash": "17eccc10794272a61556668204625249"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/e2e/dashboard.spec.ts": {
+    "mtime": 1779653028.9115205,
+    "ast_hash": "3598b20f803c5fde4dcef6181384ec27",
+    "semantic_hash": "3598b20f803c5fde4dcef6181384ec27"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/e2e/pos.spec.ts": {
+    "mtime": 1779655741.8022585,
+    "ast_hash": "19fba1200ea0ee9aa754aa74b16467ab",
+    "semantic_hash": "19fba1200ea0ee9aa754aa74b16467ab"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/e2e/mobile.spec.ts": {
+    "mtime": 1779657636.738884,
+    "ast_hash": "b5f44a80c4b57d1adb8126d2dd21986b",
+    "semantic_hash": "b5f44a80c4b57d1adb8126d2dd21986b"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/proxy.ts": {
+    "mtime": 1779777511.1590984,
+    "ast_hash": "9acd63b5fd3f874f6d36d1aac5076b4c",
+    "semantic_hash": "9acd63b5fd3f874f6d36d1aac5076b4c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/instrumentation.ts": {
+    "mtime": 1779777511.4475102,
+    "ast_hash": "9d3b3aad9c3c997be8434cebb554c73e",
+    "semantic_hash": "9d3b3aad9c3c997be8434cebb554c73e"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/contexts/ThemeContext.tsx": {
+    "mtime": 1779815275.556712,
+    "ast_hash": "7573aa5af3acd5bb524eebfa8de4fcde",
+    "semantic_hash": "7573aa5af3acd5bb524eebfa8de4fcde"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/contexts/AuthContext.tsx": {
+    "mtime": 1779921120.0791621,
+    "ast_hash": "fdb7cc5d1c300c97cf22af42a1d640f6",
+    "semantic_hash": "fdb7cc5d1c300c97cf22af42a1d640f6"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/layout.tsx": {
+    "mtime": 1779777510.4788365,
+    "ast_hash": "85eee35df100b32d548e1b99978b52e3",
+    "semantic_hash": "85eee35df100b32d548e1b99978b52e3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/page.tsx": {
+    "mtime": 1779777527.7090294,
+    "ast_hash": "6c6db7424cc24a9a688982b281a9c3b4",
+    "semantic_hash": "6c6db7424cc24a9a688982b281a9c3b4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/not-found.tsx": {
+    "mtime": 1779777510.7323833,
+    "ast_hash": "1e3fcad1f573b93b93bb8c1914436066",
+    "semantic_hash": "1e3fcad1f573b93b93bb8c1914436066"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/layout.tsx": {
+    "mtime": 1779817843.5080552,
+    "ast_hash": "5c61714667f4326817cb4464d017643b",
+    "semantic_hash": "5c61714667f4326817cb4464d017643b"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/page.tsx": {
+    "mtime": 1779817851.3124769,
+    "ast_hash": "f4a0f84d0c414bc2a0343eb8c745492f",
+    "semantic_hash": "f4a0f84d0c414bc2a0343eb8c745492f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/gift-cards/page.tsx": {
+    "mtime": 1779817224.5691454,
+    "ast_hash": "b8d25119ec551f585a348bdd486c4360",
+    "semantic_hash": "b8d25119ec551f585a348bdd486c4360"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/tienda-promos/page.tsx": {
+    "mtime": 1779817224.4861882,
+    "ast_hash": "f5998aec16ac2f897902c71885f036d9",
+    "semantic_hash": "f5998aec16ac2f897902c71885f036d9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/tienda-precios/page.tsx": {
+    "mtime": 1779817224.456478,
+    "ast_hash": "48d475e5a67816047e931bd72be76d8c",
+    "semantic_hash": "48d475e5a67816047e931bd72be76d8c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/propinas/page.tsx": {
+    "mtime": 1779817223.776115,
+    "ast_hash": "6c7e00a9eef86f8a6261afec4f4f0a48",
+    "semantic_hash": "6c7e00a9eef86f8a6261afec4f4f0a48"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/ecommerce/page.tsx": {
+    "mtime": 1779817224.0897892,
+    "ast_hash": "82935bb3648004aeecf4428709a050df",
+    "semantic_hash": "82935bb3648004aeecf4428709a050df"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-pagos/page.tsx": {
+    "mtime": 1779817224.3605857,
+    "ast_hash": "eef6d3c2c6df625b8365fb2ce8280c7d",
+    "semantic_hash": "eef6d3c2c6df625b8365fb2ce8280c7d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-tamanos/page.tsx": {
+    "mtime": 1779817224.2939725,
+    "ast_hash": "5de97eb873a8422813f06c2ec8c68db8",
+    "semantic_hash": "5de97eb873a8422813f06c2ec8c68db8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/chat/page.tsx": {
+    "mtime": 1779817224.6845765,
+    "ast_hash": "ad4361fdb024866a6c0a56c3920a4833",
+    "semantic_hash": "ad4361fdb024866a6c0a56c3920a4833"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-platillos/page.tsx": {
+    "mtime": 1779817224.1563025,
+    "ast_hash": "a02f9c2637941ff18a9c7c4c30d3dc39",
+    "semantic_hash": "a02f9c2637941ff18a9c7c4c30d3dc39"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/ventas/page.tsx": {
+    "mtime": 1779817223.7287126,
+    "ast_hash": "7a9208eec4f840a2cff81dfa5fe9619d",
+    "semantic_hash": "7a9208eec4f840a2cff81dfa5fe9619d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/platillos/page.tsx": {
+    "mtime": 1779817223.7525873,
+    "ast_hash": "d924e591da09801c216e0ff712c0f400",
+    "semantic_hash": "d924e591da09801c216e0ff712c0f400"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-horarios/page.tsx": {
+    "mtime": 1779817224.2590961,
+    "ast_hash": "fede8eb384dcd03461632cd3df594be5",
+    "semantic_hash": "fede8eb384dcd03461632cd3df594be5"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/reportes/page.tsx": {
+    "mtime": 1779817224.1198356,
+    "ast_hash": "dc324396b1ed0e58c9f8a5f26ea7b500",
+    "semantic_hash": "dc324396b1ed0e58c9f8a5f26ea7b500"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-modificadores/page.tsx": {
+    "mtime": 1779817224.2251277,
+    "ast_hash": "613b93db3a92f42099333b860dc7a732",
+    "semantic_hash": "613b93db3a92f42099333b860dc7a732"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/ingresos/page.tsx": {
+    "mtime": 1779817223.8846774,
+    "ast_hash": "df6294ba7f032c1719078a5dc1c83dda",
+    "semantic_hash": "df6294ba7f032c1719078a5dc1c83dda"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/nomina/page.tsx": {
+    "mtime": 1779817223.9327292,
+    "ast_hash": "00239af0ca315f017aac37a30d051202",
+    "semantic_hash": "00239af0ca315f017aac37a30d051202"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/estado-resultados/page.tsx": {
+    "mtime": 1779817223.907252,
+    "ast_hash": "96cef8ba24a315f21ef4e06d672ae9cc",
+    "semantic_hash": "96cef8ba24a315f21ef4e06d672ae9cc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/agentes/page.tsx": {
+    "mtime": 1779817223.8349736,
+    "ast_hash": "a4e978ed3b4692ed8b9465c192a03b07",
+    "semantic_hash": "a4e978ed3b4692ed8b9465c192a03b07"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/[...slug]/page.tsx": {
+    "mtime": 1779817224.7246492,
+    "ast_hash": "317918da310fe6e0dc4be6d6cbd42ede",
+    "semantic_hash": "317918da310fe6e0dc4be6d6cbd42ede"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/tienda-articulos/page.tsx": {
+    "mtime": 1779817224.3973367,
+    "ast_hash": "ec7cfb6331ac54f5efdc0a09e3f6623f",
+    "semantic_hash": "ec7cfb6331ac54f5efdc0a09e3f6623f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/facturacion/page.tsx": {
+    "mtime": 1779817223.955344,
+    "ast_hash": "fa7baf7de7a7b64fb7359c99e382baf3",
+    "semantic_hash": "fa7baf7de7a7b64fb7359c99e382baf3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-promociones/page.tsx": {
+    "mtime": 1779817224.3247473,
+    "ast_hash": "fc5eac4e3da20792e148066954e5b099",
+    "semantic_hash": "fc5eac4e3da20792e148066954e5b099"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/sucursales/page.tsx": {
+    "mtime": 1779817224.0634189,
+    "ast_hash": "a4de917ad1086665c1573e4904e5df5e",
+    "semantic_hash": "a4de917ad1086665c1573e4904e5df5e"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/coach/page.tsx": {
+    "mtime": 1779817224.6370115,
+    "ast_hash": "528c32347c0d5003bf68b9829aaf5af9",
+    "semantic_hash": "528c32347c0d5003bf68b9829aaf5af9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/dashboard/page.tsx": {
+    "mtime": 1779817204.4945858,
+    "ast_hash": "29a2c9f26c767616f95e1478a979e118",
+    "semantic_hash": "29a2c9f26c767616f95e1478a979e118"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/cortes/page.tsx": {
+    "mtime": 1779817223.8611224,
+    "ast_hash": "5d2598f2e2b8b0ae211125ac0f389668",
+    "semantic_hash": "5d2598f2e2b8b0ae211125ac0f389668"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos/page.tsx": {
+    "mtime": 1779813658.5352755,
+    "ast_hash": "8463560b40a0ef9bdf3c48448c0d3cdf",
+    "semantic_hash": "8463560b40a0ef9bdf3c48448c0d3cdf"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/food-cost/page.tsx": {
+    "mtime": 1779817224.0045857,
+    "ast_hash": "196590992c11e501f47694e9a08af8fc",
+    "semantic_hash": "196590992c11e501f47694e9a08af8fc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/proveedores/page.tsx": {
+    "mtime": 1779817224.030214,
+    "ast_hash": "2b320249be88bbb4f572b651d7d6dff2",
+    "semantic_hash": "2b320249be88bbb4f572b651d7d6dff2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/inventario/page.tsx": {
+    "mtime": 1779817223.9776232,
+    "ast_hash": "a28a4dea7035d4ce40d730fa0c9adefb",
+    "semantic_hash": "a28a4dea7035d4ce40d730fa0c9adefb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/meseros/page.tsx": {
+    "mtime": 1779817223.702829,
+    "ast_hash": "beb71536d12d96adda79b731cff8534a",
+    "semantic_hash": "beb71536d12d96adda79b731cff8534a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/resenas/page.tsx": {
+    "mtime": 1779817224.6021934,
+    "ast_hash": "0ea7c0eef8f9bbad47acd8ff4b2f55be",
+    "semantic_hash": "0ea7c0eef8f9bbad47acd8ff4b2f55be"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/tendencias/page.tsx": {
+    "mtime": 1779817223.8057716,
+    "ast_hash": "bad3636cdbcd79651aed13182d18fc2d",
+    "semantic_hash": "bad3636cdbcd79651aed13182d18fc2d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/domicilio/page.tsx": {
+    "mtime": 1779817224.51855,
+    "ast_hash": "b86d76b4649b81df6c8ea004e331a0dd",
+    "semantic_hash": "b86d76b4649b81df6c8ea004e331a0dd"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/pos-grupos/page.tsx": {
+    "mtime": 1779817224.1873274,
+    "ast_hash": "55ca58cd528a2f5e035874c921ea71d3",
+    "semantic_hash": "55ca58cd528a2f5e035874c921ea71d3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/demo/tienda-grupos/page.tsx": {
+    "mtime": 1779817224.4268513,
+    "ast_hash": "9ee770392a2e937f4eba250fd70b0325",
+    "semantic_hash": "9ee770392a2e937f4eba250fd70b0325"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/roi/page.tsx": {
+    "mtime": 1779818204.9023201,
+    "ast_hash": "0451d56dec9494c4d7c19fa026334369",
+    "semantic_hash": "0451d56dec9494c4d7c19fa026334369"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/propinas/page.tsx": {
+    "mtime": 1779777509.5487816,
+    "ast_hash": "60658109d10d1cfffae27d0d95d46c8a",
+    "semantic_hash": "60658109d10d1cfffae27d0d95d46c8a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/ecommerce/page.tsx": {
+    "mtime": 1779777509.552182,
+    "ast_hash": "5ae692f0a3e13c4f93a8838148b98b02",
+    "semantic_hash": "5ae692f0a3e13c4f93a8838148b98b02"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/chat/page.tsx": {
+    "mtime": 1779777509.5573082,
+    "ast_hash": "51c82f4e905401a53863e51f366c48ef",
+    "semantic_hash": "51c82f4e905401a53863e51f366c48ef"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/ventas/page.tsx": {
+    "mtime": 1779777509.566651,
+    "ast_hash": "352fc902af89698c6ce648ebff245421",
+    "semantic_hash": "352fc902af89698c6ce648ebff245421"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/auth/callback/page.tsx": {
+    "mtime": 1779777509.5681925,
+    "ast_hash": "5d5b375ea01a683640650d485555280b",
+    "semantic_hash": "5d5b375ea01a683640650d485555280b"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/platillos/page.tsx": {
+    "mtime": 1779777509.5730467,
+    "ast_hash": "b9d7e9c9842dd1f9a094c552e734eabe",
+    "semantic_hash": "b9d7e9c9842dd1f9a094c552e734eabe"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/seguridad/page.tsx": {
+    "mtime": 1779922312.788634,
+    "ast_hash": "beba5cf1c0423c62c7f4c9eafffc8f54",
+    "semantic_hash": "beba5cf1c0423c62c7f4c9eafffc8f54"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/reportes/page.tsx": {
+    "mtime": 1779777509.5828204,
+    "ast_hash": "a2fcd1781013e581af0709a0532bf622",
+    "semantic_hash": "a2fcd1781013e581af0709a0532bf622"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/ingresos/page.tsx": {
+    "mtime": 1779777509.5875747,
+    "ast_hash": "3d27601ab6230fc9d618cd2551c824f3",
+    "semantic_hash": "3d27601ab6230fc9d618cd2551c824f3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/crm/page.tsx": {
+    "mtime": 1779854626.9744682,
+    "ast_hash": "e24cec55abee6439fd4a008e48c83127",
+    "semantic_hash": "e24cec55abee6439fd4a008e48c83127"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/nomina/page.tsx": {
+    "mtime": 1779777509.5921657,
+    "ast_hash": "8651cbb3abdfda31748515aadda9b551",
+    "semantic_hash": "8651cbb3abdfda31748515aadda9b551"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/grupos/page.tsx": {
+    "mtime": 1779777509.594165,
+    "ast_hash": "d655ea4829aa90e11f75b418c07bf8e4",
+    "semantic_hash": "d655ea4829aa90e11f75b418c07bf8e4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/promociones/page.tsx": {
+    "mtime": 1779777509.5969584,
+    "ast_hash": "207c288af17aa14a1856e13891c7a673",
+    "semantic_hash": "207c288af17aa14a1856e13891c7a673"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tienda/grupos/page.tsx": {
+    "mtime": 1779777509.5994291,
+    "ast_hash": "a6984f4635a0a1c02d1437145ea850e1",
+    "semantic_hash": "a6984f4635a0a1c02d1437145ea850e1"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tienda/promociones/page.tsx": {
+    "mtime": 1779777509.6035018,
+    "ast_hash": "13c1929e67af39e6eb0995c7eb96e7dc",
+    "semantic_hash": "13c1929e67af39e6eb0995c7eb96e7dc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tienda/articulos/page.tsx": {
+    "mtime": 1779777509.6070426,
+    "ast_hash": "e966979ecd3db0af5a1a391627024da8",
+    "semantic_hash": "e966979ecd3db0af5a1a391627024da8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tienda/precios/page.tsx": {
+    "mtime": 1779777509.60964,
+    "ast_hash": "05e3b10b696699974d419d9121b75c95",
+    "semantic_hash": "05e3b10b696699974d419d9121b75c95"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/horarios/page.tsx": {
+    "mtime": 1779777509.6141837,
+    "ast_hash": "48abf77931ea9c3eceed3d0610d0c809",
+    "semantic_hash": "48abf77931ea9c3eceed3d0610d0c809"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tama\u00f1os/page.tsx": {
+    "mtime": 1779777509.6188254,
+    "ast_hash": "976f98fec2a4351d2ee48313db387bd5",
+    "semantic_hash": "976f98fec2a4351d2ee48313db387bd5"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/formas-pago/page.tsx": {
+    "mtime": 1779777509.62367,
+    "ast_hash": "37ba943a80cd4b5a2d6e575e89a00b58",
+    "semantic_hash": "37ba943a80cd4b5a2d6e575e89a00b58"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/modificadores/page.tsx": {
+    "mtime": 1779777509.6296775,
+    "ast_hash": "8db451c83a793ac13ef0eb673d98cb2f",
+    "semantic_hash": "8db451c83a793ac13ef0eb673d98cb2f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/menu/page.tsx": {
+    "mtime": 1779777509.6378944,
+    "ast_hash": "bbe61f51581c4d86182cd60b891697d9",
+    "semantic_hash": "bbe61f51581c4d86182cd60b891697d9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/tarjetas-regalo/page.tsx": {
+    "mtime": 1779777509.6450424,
+    "ast_hash": "4a20ccfc386695897725b9288557a7db",
+    "semantic_hash": "4a20ccfc386695897725b9288557a7db"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/admin/domicilio/page.tsx": {
+    "mtime": 1779777509.6486266,
+    "ast_hash": "e2f13f9978e6a31e88df38d0aa450591",
+    "semantic_hash": "e2f13f9978e6a31e88df38d0aa450591"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/estado-resultados/page.tsx": {
+    "mtime": 1779777509.6678336,
+    "ast_hash": "e96e0190e5ceb3ef59b200184c8d85d1",
+    "semantic_hash": "e96e0190e5ceb3ef59b200184c8d85d1"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/page.tsx": {
+    "mtime": 1779779471.4297986,
+    "ast_hash": "3b857b3c99521209bbe313616c0519a2",
+    "semantic_hash": "3b857b3c99521209bbe313616c0519a2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/proveedores-agente/page.tsx": {
+    "mtime": 1779777509.6831489,
+    "ast_hash": "15e43d0e9557a095732bda6a991d6ff3",
+    "semantic_hash": "15e43d0e9557a095732bda6a991d6ff3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/tiempo-mesa/page.tsx": {
+    "mtime": 1779777509.6875672,
+    "ast_hash": "5d3d930c682c1c61ba6c565d36e04d85",
+    "semantic_hash": "5d3d930c682c1c61ba6c565d36e04d85"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/cocina/page.tsx": {
+    "mtime": 1779777509.6905057,
+    "ast_hash": "5644803f18e3dc1d5ed65a3bb04c7268",
+    "semantic_hash": "5644803f18e3dc1d5ed65a3bb04c7268"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/anomalias/page.tsx": {
+    "mtime": 1779777509.6948702,
+    "ast_hash": "1c53995dde1f15fc4c8fef86f240b318",
+    "semantic_hash": "1c53995dde1f15fc4c8fef86f240b318"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/prediccion/page.tsx": {
+    "mtime": 1779777509.6992579,
+    "ast_hash": "f16a3417a5de199046176b3d4db7634f",
+    "semantic_hash": "f16a3417a5de199046176b3d4db7634f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/clima/page.tsx": {
+    "mtime": 1779777509.7031732,
+    "ast_hash": "4f3c1829591a55aee4c175e6bf094e5a",
+    "semantic_hash": "4f3c1829591a55aee4c175e6bf094e5a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/menu/page.tsx": {
+    "mtime": 1779777977.9935744,
+    "ast_hash": "14efab5cbd28853d33ef5857d076d667",
+    "semantic_hash": "14efab5cbd28853d33ef5857d076d667"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/antifraude/page.tsx": {
+    "mtime": 1779777509.7195206,
+    "ast_hash": "8aa9b13a0a31e7aaaac9445e36739bc8",
+    "semantic_hash": "8aa9b13a0a31e7aaaac9445e36739bc8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/resenas/page.tsx": {
+    "mtime": 1779779439.3616974,
+    "ast_hash": "fc357edfd5c024e5877003fd84ffaf75",
+    "semantic_hash": "fc357edfd5c024e5877003fd84ffaf75"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/desperdicio/page.tsx": {
+    "mtime": 1779777509.7220905,
+    "ast_hash": "eed815a79010423797d1c878353c1cb5",
+    "semantic_hash": "eed815a79010423797d1c878353c1cb5"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/hermes/page.tsx": {
+    "mtime": 1779777509.7267985,
+    "ast_hash": "c2beb84fe78a776542af7a69513069b2",
+    "semantic_hash": "c2beb84fe78a776542af7a69513069b2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/upselling/page.tsx": {
+    "mtime": 1779777509.7323766,
+    "ast_hash": "418377f6efa0a250b677f10b0ec2bc62",
+    "semantic_hash": "418377f6efa0a250b677f10b0ec2bc62"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/staffing/page.tsx": {
+    "mtime": 1779777509.736227,
+    "ast_hash": "b8cba23a1c52d3db8d6d810c92efdc97",
+    "semantic_hash": "b8cba23a1c52d3db8d6d810c92efdc97"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/agentes/propinas-agente/page.tsx": {
+    "mtime": 1779777509.7430809,
+    "ast_hash": "562269b971e20732a84e8e70e6aacf14",
+    "semantic_hash": "562269b971e20732a84e8e70e6aacf14"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/sucursales/page.tsx": {
+    "mtime": 1779779859.234869,
+    "ast_hash": "cf8faf27cd073bb99e34352324a9decb",
+    "semantic_hash": "cf8faf27cd073bb99e34352324a9decb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/coach/page.tsx": {
+    "mtime": 1779777509.7437873,
+    "ast_hash": "f8a6cc5c1d1c9bfb844e06dfa79bc876",
+    "semantic_hash": "f8a6cc5c1d1c9bfb844e06dfa79bc876"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/cortes/page.tsx": {
+    "mtime": 1779777509.755369,
+    "ast_hash": "6e7de0bb1e48a6818ec54c26100066f6",
+    "semantic_hash": "6e7de0bb1e48a6818ec54c26100066f6"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/layout.tsx": {
+    "mtime": 1779855142.4000168,
+    "ast_hash": "12578f99fe6ffc4d532508e42d8ab152",
+    "semantic_hash": "12578f99fe6ffc4d532508e42d8ab152"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/page.tsx": {
+    "mtime": 1779925650.289026,
+    "ast_hash": "ce62207c823da70213c7c50df484519c",
+    "semantic_hash": "ce62207c823da70213c7c50df484519c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/kds/page.tsx": {
+    "mtime": 1779920978.9632862,
+    "ast_hash": "2650bb2560297b56297f2c1f79f0b0a4",
+    "semantic_hash": "2650bb2560297b56297f2c1f79f0b0a4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/compras/page.tsx": {
+    "mtime": 1779835705.1109679,
+    "ast_hash": "c2f38fca883edf243947bb111e9a3db1",
+    "semantic_hash": "c2f38fca883edf243947bb111e9a3db1"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/barra/page.tsx": {
+    "mtime": 1779854851.273495,
+    "ast_hash": "6a1f6360b4787b2dc7c135d915f937cb",
+    "semantic_hash": "6a1f6360b4787b2dc7c135d915f937cb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/cocina/page.tsx": {
+    "mtime": 1779854996.1609495,
+    "ast_hash": "db0127c1b7028425ad235f2655c4770f",
+    "semantic_hash": "db0127c1b7028425ad235f2655c4770f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/historial/page.tsx": {
+    "mtime": 1779777509.828221,
+    "ast_hash": "9ca05f2280908950c9ea91383c0c7afb",
+    "semantic_hash": "9ca05f2280908950c9ea91383c0c7afb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/recetas/page.tsx": {
+    "mtime": 1779777509.8457246,
+    "ast_hash": "44dbbdbf8bb7da0d057840dfda41e55c",
+    "semantic_hash": "44dbbdbf8bb7da0d057840dfda41e55c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/corte/page.tsx": {
+    "mtime": 1779777509.8563926,
+    "ast_hash": "dfc98e883b9a6c7d1855a6ed9c616dd9",
+    "semantic_hash": "dfc98e883b9a6c7d1855a6ed9c616dd9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/facturacion/page.tsx": {
+    "mtime": 1779777727.9007654,
+    "ast_hash": "06d56a58d450ab039f653995d7588699",
+    "semantic_hash": "06d56a58d450ab039f653995d7588699"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/qr/page.tsx": {
+    "mtime": 1779777509.864855,
+    "ast_hash": "ee304159a32a97045fe390079c3d882d",
+    "semantic_hash": "ee304159a32a97045fe390079c3d882d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/cliente/page.tsx": {
+    "mtime": 1779777509.8686152,
+    "ast_hash": "e60908b7dad40b62a122754c5a308153",
+    "semantic_hash": "e60908b7dad40b62a122754c5a308153"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/inventario/page.tsx": {
+    "mtime": 1779777509.8814988,
+    "ast_hash": "f89f710b4c6979518c8532280ae38721",
+    "semantic_hash": "f89f710b4c6979518c8532280ae38721"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/merma/page.tsx": {
+    "mtime": 1779923207.1846313,
+    "ast_hash": "1c1fd3013b7759ac47ff0c64fa2f21f9",
+    "semantic_hash": "1c1fd3013b7759ac47ff0c64fa2f21f9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/turno/page.tsx": {
+    "mtime": 1779777509.889705,
+    "ast_hash": "76f51a91082940703546070bb43e0612",
+    "semantic_hash": "76f51a91082940703546070bb43e0612"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/auditoria/page.tsx": {
+    "mtime": 1779777510.2647066,
+    "ast_hash": "b0d1e0a5f69c33e74c1072b59131a4e9",
+    "semantic_hash": "b0d1e0a5f69c33e74c1072b59131a4e9"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/pos/mesas/page.tsx": {
+    "mtime": 1779921033.9138575,
+    "ast_hash": "dec03b881aa7fd0e77dcfd369099e2ac",
+    "semantic_hash": "dec03b881aa7fd0e77dcfd369099e2ac"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/reservar/page.tsx": {
+    "mtime": 1779777510.4423306,
+    "ast_hash": "fa8ac8596129b674513c39322b3582de",
+    "semantic_hash": "fa8ac8596129b674513c39322b3582de"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/voice/page.tsx": {
+    "mtime": 1779817496.33201,
+    "ast_hash": "339b726b5de030ff25f3e42cc21dbb72",
+    "semantic_hash": "339b726b5de030ff25f3e42cc21dbb72"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/terminos/page.tsx": {
+    "mtime": 1779777510.4717453,
+    "ast_hash": "a547da2b7080e8f71dad27cb007c6894",
+    "semantic_hash": "a547da2b7080e8f71dad27cb007c6894"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/auto86/page.tsx": {
+    "mtime": 1779818150.1249444,
+    "ast_hash": "14925ebdf764d3ff968848d9f3433706",
+    "semantic_hash": "14925ebdf764d3ff968848d9f3433706"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/menu/[mesa]/page.tsx": {
+    "mtime": 1779777510.4975924,
+    "ast_hash": "3f8e8763e2652ba189b4972679543291",
+    "semantic_hash": "3f8e8763e2652ba189b4972679543291"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/food-cost/page.tsx": {
+    "mtime": 1779777510.5047448,
+    "ast_hash": "b0f7ac19c770df3eb456c76f45ebcc16",
+    "semantic_hash": "b0f7ac19c770df3eb456c76f45ebcc16"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/proveedores/page.tsx": {
+    "mtime": 1779777510.52944,
+    "ast_hash": "862af89a58708fcee643b116542b53db",
+    "semantic_hash": "862af89a58708fcee643b116542b53db"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/inventario/page.tsx": {
+    "mtime": 1779777510.5371954,
+    "ast_hash": "42442296b70f5be0f2a2388c1b3961db",
+    "semantic_hash": "42442296b70f5be0f2a2388c1b3961db"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/meseros/page.tsx": {
+    "mtime": 1779777510.5742395,
+    "ast_hash": "f7f48f700035041d497d9b078a8f549a",
+    "semantic_hash": "f7f48f700035041d497d9b078a8f549a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/prospect/route.ts": {
+    "mtime": 1779777510.5783858,
+    "ast_hash": "e448f0e6d29f8ad6be867204de244bbb",
+    "semantic_hash": "e448f0e6d29f8ad6be867204de244bbb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/chat/route.ts": {
+    "mtime": 1779777510.6046286,
+    "ast_hash": "6da0d251b09853251369e31e46123ff8",
+    "semantic_hash": "6da0d251b09853251369e31e46123ff8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/coach/route.ts": {
+    "mtime": 1779777527.7095182,
+    "ast_hash": "5061d6899c2bbb2b521fb4aedb0aa376",
+    "semantic_hash": "5061d6899c2bbb2b521fb4aedb0aa376"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/voice/route.ts": {
+    "mtime": 1779817234.449567,
+    "ast_hash": "eeb40adcaa7802ffb87a831929e8a07a",
+    "semantic_hash": "eeb40adcaa7802ffb87a831929e8a07a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/mp-point/route.ts": {
+    "mtime": 1779855004.7134783,
+    "ast_hash": "89dc275519ce59a6a76705c9f0f28375",
+    "semantic_hash": "89dc275519ce59a6a76705c9f0f28375"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/api/backup/route.ts": {
+    "mtime": 1779855215.409255,
+    "ast_hash": "a778cb22d87644988ce1f2ecc466e4ff",
+    "semantic_hash": "a778cb22d87644988ce1f2ecc466e4ff"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/tendencias/page.tsx": {
+    "mtime": 1779777510.6286213,
+    "ast_hash": "42dbfe6355d9eb03c44d491e5acd27ad",
+    "semantic_hash": "42dbfe6355d9eb03c44d491e5acd27ad"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/privacidad/page.tsx": {
+    "mtime": 1779777510.6582515,
+    "ast_hash": "9304f32f7400ed876425114b3e53f5c3",
+    "semantic_hash": "9304f32f7400ed876425114b3e53f5c3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/factura/page.tsx": {
+    "mtime": 1779919661.050696,
+    "ast_hash": "ab69c8c0331cd7d830f0cb9bf582c3d0",
+    "semantic_hash": "ab69c8c0331cd7d830f0cb9bf582c3d0"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/mission-control/page.tsx": {
+    "mtime": 1779924301.0602698,
+    "ast_hash": "5b6303b730856762648441f4815f992d",
+    "semantic_hash": "5b6303b730856762648441f4815f992d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/certificados/page.tsx": {
+    "mtime": 1779922776.0707483,
+    "ast_hash": "3cea9b41b356ccdf4a82b4c8ef3ec367",
+    "semantic_hash": "3cea9b41b356ccdf4a82b4c8ef3ec367"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/clientes/page.tsx": {
+    "mtime": 1779777510.7088757,
+    "ast_hash": "7157b3b63555bf3ec9ed10c7c7cd1d5d",
+    "semantic_hash": "7157b3b63555bf3ec9ed10c7c7cd1d5d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/login/layout.tsx": {
+    "mtime": 1779777510.7112775,
+    "ast_hash": "3037e3534f3aa560089ee36512334fc7",
+    "semantic_hash": "3037e3534f3aa560089ee36512334fc7"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/login/page.tsx": {
+    "mtime": 1779814942.777698,
+    "ast_hash": "071f174e769d3f614ae49a784499c5b4",
+    "semantic_hash": "071f174e769d3f614ae49a784499c5b4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/app/onboarding/page.tsx": {
+    "mtime": 1779777510.7309332,
+    "ast_hash": "7c55cfd544cde278d46506bc7ac16258",
+    "semantic_hash": "7c55cfd544cde278d46506bc7ac16258"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/BarcodeScanner.tsx": {
+    "mtime": 1779777510.7392535,
+    "ast_hash": "779520055d563486dd0d446aa1f12849",
+    "semantic_hash": "779520055d563486dd0d446aa1f12849"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/CoachPanel.tsx": {
+    "mtime": 1779777510.7473707,
+    "ast_hash": "e630713b8c85c34e1b9e19c47893d3cf",
+    "semantic_hash": "e630713b8c85c34e1b9e19c47893d3cf"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/KPICard.tsx": {
+    "mtime": 1779777510.756144,
+    "ast_hash": "eb7ff79e5047c80a8bd3d48ddd074f5b",
+    "semantic_hash": "eb7ff79e5047c80a8bd3d48ddd074f5b"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/ChatWidget.tsx": {
+    "mtime": 1779777510.7631578,
+    "ast_hash": "9463129d229d542f2328ade7498af4bc",
+    "semantic_hash": "9463129d229d542f2328ade7498af4bc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/PosthogInit.tsx": {
+    "mtime": 1779777510.7644045,
+    "ast_hash": "44d4953976d5490e168c1dd69c2cddf8",
+    "semantic_hash": "44d4953976d5490e168c1dd69c2cddf8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/POSCopilot.tsx": {
+    "mtime": 1779777510.7746716,
+    "ast_hash": "f5a34e441320f742767649e7e15cbb7d",
+    "semantic_hash": "f5a34e441320f742767649e7e15cbb7d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/PageHeader.tsx": {
+    "mtime": 1779777510.7758925,
+    "ast_hash": "4ba396f69193eacec12899332dd6a29d",
+    "semantic_hash": "4ba396f69193eacec12899332dd6a29d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/AppShell.tsx": {
+    "mtime": 1779919672.3934872,
+    "ast_hash": "5706ddeae28bd334820c2e4518b534fb",
+    "semantic_hash": "5706ddeae28bd334820c2e4518b534fb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/motion.tsx": {
+    "mtime": 1779777510.7895117,
+    "ast_hash": "4bb0b8c57e0ddd20680af69b8efb8ebb",
+    "semantic_hash": "4bb0b8c57e0ddd20680af69b8efb8ebb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/ThemeToggle.tsx": {
+    "mtime": 1779777510.917412,
+    "ast_hash": "13346ab41e57965dbec39e4844b56bd3",
+    "semantic_hash": "13346ab41e57965dbec39e4844b56bd3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/RevenueDistributionChart.tsx": {
+    "mtime": 1779777510.9214976,
+    "ast_hash": "bc22da770f40a5926fbf0c2ebd47f26c",
+    "semantic_hash": "bc22da770f40a5926fbf0c2ebd47f26c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/Sidebar.tsx": {
+    "mtime": 1779924310.4450681,
+    "ast_hash": "ee04692411e6746309a77b4046c63ad2",
+    "semantic_hash": "ee04692411e6746309a77b4046c63ad2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/RevenueChart.tsx": {
+    "mtime": 1779777510.9452305,
+    "ast_hash": "d6401b8c41e52392a16c38578e7a517d",
+    "semantic_hash": "d6401b8c41e52392a16c38578e7a517d"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/TopNav.tsx": {
+    "mtime": 1779818799.5669,
+    "ast_hash": "a81d7572ecd7a5bb051ea1473d1e6cfd",
+    "semantic_hash": "a81d7572ecd7a5bb051ea1473d1e6cfd"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/PredictionWidget.tsx": {
+    "mtime": 1779777511.000515,
+    "ast_hash": "fb75f1a78a7513de7b2e6ebf3aa9914f",
+    "semantic_hash": "fb75f1a78a7513de7b2e6ebf3aa9914f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/Bento.tsx": {
+    "mtime": 1779777511.003591,
+    "ast_hash": "7924cb7686c27679bdedf322d00f17b2",
+    "semantic_hash": "7924cb7686c27679bdedf322d00f17b2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/demo/DemoPage.tsx": {
+    "mtime": 1779815742.3634226,
+    "ast_hash": "c6bb5d1459b2f2f99a858e5b918b8a55",
+    "semantic_hash": "c6bb5d1459b2f2f99a858e5b918b8a55"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/InventoryAlerts.tsx": {
+    "mtime": 1779777510.7968988,
+    "ast_hash": "1f50a65e6d10fc94301bda73da7eef09",
+    "semantic_hash": "1f50a65e6d10fc94301bda73da7eef09"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/CustomerMemory.tsx": {
+    "mtime": 1779779178.4539073,
+    "ast_hash": "eeb05ff7cb35a2ece46812c7d889e481",
+    "semantic_hash": "eeb05ff7cb35a2ece46812c7d889e481"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/KitchenTimer.tsx": {
+    "mtime": 1779779203.5355678,
+    "ast_hash": "86f5221ccc7ac0c993610936e3772255",
+    "semantic_hash": "86f5221ccc7ac0c993610936e3772255"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/MeseroLeaderboard.tsx": {
+    "mtime": 1779779139.7263427,
+    "ast_hash": "3d21f48834e6efd5965ee6d9b28c7e75",
+    "semantic_hash": "3d21f48834e6efd5965ee6d9b28c7e75"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/CierreCajaWizard.tsx": {
+    "mtime": 1779777510.8772268,
+    "ast_hash": "d032512a81e6babeb2d394065d3f2078",
+    "semantic_hash": "d032512a81e6babeb2d394065d3f2078"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/OfflineIndicator.tsx": {
+    "mtime": 1779777510.879627,
+    "ast_hash": "d3654e4a5eca94c271b19613760ad600",
+    "semantic_hash": "d3654e4a5eca94c271b19613760ad600"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/SmartCashCalculator.tsx": {
+    "mtime": 1779779157.4927704,
+    "ast_hash": "f16f382942210c11454a7bad82739a3a",
+    "semantic_hash": "f16f382942210c11454a7bad82739a3a"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/components/pos/StaffShiftPanel.tsx": {
+    "mtime": 1779777510.9153779,
+    "ast_hash": "496304e37c007b768e46dd4d343f5dde",
+    "semantic_hash": "496304e37c007b768e46dd4d343f5dde"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/data-integrity.test.ts": {
+    "mtime": 1779777511.0063937,
+    "ast_hash": "90cebeca952d5759ccb8d72b53ef955f",
+    "semantic_hash": "90cebeca952d5759ccb8d72b53ef955f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/pos-menu-db.test.ts": {
+    "mtime": 1779777511.0122738,
+    "ast_hash": "d47e865ef01ecdb4518c32f448164089",
+    "semantic_hash": "d47e865ef01ecdb4518c32f448164089"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/pos-calculations.test.ts": {
+    "mtime": 1779777511.112021,
+    "ast_hash": "b7b0d5c52216a953034419d3b87b1d0c",
+    "semantic_hash": "b7b0d5c52216a953034419d3b87b1d0c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/mp-point-api.test.ts": {
+    "mtime": 1779855729.9200287,
+    "ast_hash": "3126205c9fe7e8dd82815f55f7a5f0fa",
+    "semantic_hash": "3126205c9fe7e8dd82815f55f7a5f0fa"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/multi-printer.test.ts": {
+    "mtime": 1779855693.3100848,
+    "ast_hash": "928d0ca7f9b1b01017c8253c5da085a6",
+    "semantic_hash": "928d0ca7f9b1b01017c8253c5da085a6"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/cfdi.test.ts": {
+    "mtime": 1779777511.1180773,
+    "ast_hash": "e481a09b23705d8c4990265847686de8",
+    "semantic_hash": "e481a09b23705d8c4990265847686de8"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/mercadopago-smart.test.ts": {
+    "mtime": 1779855749.4791002,
+    "ast_hash": "7e9a0a00a38dad41a51bb8495224e58e",
+    "semantic_hash": "7e9a0a00a38dad41a51bb8495224e58e"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/full-system.test.ts": {
+    "mtime": 1779921479.4968,
+    "ast_hash": "6838472856dec312e0ff2814f4c779eb",
+    "semantic_hash": "6838472856dec312e0ff2814f4c779eb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/chat-context.test.ts": {
+    "mtime": 1779777511.1304305,
+    "ast_hash": "0900113eb7b48576b7aec8f7f92a13da",
+    "semantic_hash": "0900113eb7b48576b7aec8f7f92a13da"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/push-notifications.test.ts": {
+    "mtime": 1779777511.134259,
+    "ast_hash": "fcf69482ba7e081e8903e5abb3c7260c",
+    "semantic_hash": "fcf69482ba7e081e8903e5abb3c7260c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/offline-sw.test.ts": {
+    "mtime": 1779855762.824513,
+    "ast_hash": "4235bb8a7b021f317b1312d7f63bcdb0",
+    "semantic_hash": "4235bb8a7b021f317b1312d7f63bcdb0"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/data-dedup.test.ts": {
+    "mtime": 1779777511.138752,
+    "ast_hash": "c212650b24b454626ca06c1422e59309",
+    "semantic_hash": "c212650b24b454626ca06c1422e59309"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/__tests__/backup.test.ts": {
+    "mtime": 1779855701.9960542,
+    "ast_hash": "b9392b749cd1883ddde635d480225246",
+    "semantic_hash": "b9392b749cd1883ddde635d480225246"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/hooks/usePosRealtime.ts": {
+    "mtime": 1779777511.1459858,
+    "ast_hash": "c21dfaf7ef9e8898a2da638e5f5effc1",
+    "semantic_hash": "c21dfaf7ef9e8898a2da638e5f5effc1"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/hooks/useClientId.ts": {
+    "mtime": 1779777511.147524,
+    "ast_hash": "73d4df220242ee799d808c260a5e9aeb",
+    "semantic_hash": "73d4df220242ee799d808c260a5e9aeb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/hooks/usePosOffline.ts": {
+    "mtime": 1779777511.1503854,
+    "ast_hash": "165dbb7a25b7f4b77824666d69553cd6",
+    "semantic_hash": "165dbb7a25b7f4b77824666d69553cd6"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/data.ts": {
+    "mtime": 1779779824.3225,
+    "ast_hash": "71ee3b0abfb3685f663fc5940dbdaf91",
+    "semantic_hash": "71ee3b0abfb3685f663fc5940dbdaf91"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/printer.ts": {
+    "mtime": 1779923926.1510499,
+    "ast_hash": "ac316beaf330582c3aff8cb0117395e0",
+    "semantic_hash": "ac316beaf330582c3aff8cb0117395e0"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/demo-data.ts": {
+    "mtime": 1779780791.91737,
+    "ast_hash": "c2862e82064ebdef24a6e9f1066239fb",
+    "semantic_hash": "c2862e82064ebdef24a6e9f1066239fb"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/whatsapp-crm.ts": {
+    "mtime": 1779854391.1624095,
+    "ast_hash": "8ed37312b50ece14dad9ec7a540ae34f",
+    "semantic_hash": "8ed37312b50ece14dad9ec7a540ae34f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/pos-calculations.ts": {
+    "mtime": 1779777511.2077677,
+    "ast_hash": "52b36cd772991c75da50482ce8012b8c",
+    "semantic_hash": "52b36cd772991c75da50482ce8012b8c"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/offline-sync.ts": {
+    "mtime": 1779777511.2111604,
+    "ast_hash": "0f556a2253653f8c32a369ce59fd0264",
+    "semantic_hash": "0f556a2253653f8c32a369ce59fd0264"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/supabase-server.ts": {
+    "mtime": 1779777511.2122915,
+    "ast_hash": "469ee7e811c470cd9cefceb30d79ee21",
+    "semantic_hash": "469ee7e811c470cd9cefceb30d79ee21"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/push-notifications.ts": {
+    "mtime": 1779777511.2160542,
+    "ast_hash": "b439eaedced8d018a5d5f66949dcf4be",
+    "semantic_hash": "b439eaedced8d018a5d5f66949dcf4be"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/cn.ts": {
+    "mtime": 1779777511.2172704,
+    "ast_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429",
+    "semantic_hash": "9a4cc6f9f3155ffdc1fa7c2c097f6429"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/pos-constants.ts": {
+    "mtime": 1779835625.0277922,
+    "ast_hash": "598e752a91714c40561d04fee81863a3",
+    "semantic_hash": "598e752a91714c40561d04fee81863a3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/client-config.ts": {
+    "mtime": 1779818699.6257584,
+    "ast_hash": "d1b91101a3b7de8b8281c4f85f901dad",
+    "semantic_hash": "d1b91101a3b7de8b8281c4f85f901dad"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/chat-context.ts": {
+    "mtime": 1779777511.2298207,
+    "ast_hash": "4637d5e2d3e9ef329be318b62a469c77",
+    "semantic_hash": "4637d5e2d3e9ef329be318b62a469c77"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/service-worker.ts": {
+    "mtime": 1779855131.6099477,
+    "ast_hash": "85d7f3de6b7e35a5a6100cf3923e90ef",
+    "semantic_hash": "85d7f3de6b7e35a5a6100cf3923e90ef"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/posthog.ts": {
+    "mtime": 1779777511.2329082,
+    "ast_hash": "0e570390b3a2c6f093fdb4d432fbd54f",
+    "semantic_hash": "0e570390b3a2c6f093fdb4d432fbd54f"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/types.ts": {
+    "mtime": 1779777511.2504365,
+    "ast_hash": "43ab3a12783744d4b4fa00d0d59668ed",
+    "semantic_hash": "43ab3a12783744d4b4fa00d0d59668ed"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/format.ts": {
+    "mtime": 1779777511.2566073,
+    "ast_hash": "6a9db5a64668e10a06cee8d2fa8542f2",
+    "semantic_hash": "6a9db5a64668e10a06cee8d2fa8542f2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/supabase-browser.ts": {
+    "mtime": 1779777511.2577024,
+    "ast_hash": "faca8033e1ef1e6a2d03c5390e0451bc",
+    "semantic_hash": "faca8033e1ef1e6a2d03c5390e0451bc"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/supabase.ts": {
+    "mtime": 1779777511.2590182,
+    "ast_hash": "c584bad64b33abd8d1a8fa9bca142062",
+    "semantic_hash": "c584bad64b33abd8d1a8fa9bca142062"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/mercadopago.ts": {
+    "mtime": 1779854980.1796246,
+    "ast_hash": "603846291f8b1854f549c2432c0eaebe",
+    "semantic_hash": "603846291f8b1854f549c2432c0eaebe"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/supabase-helpers.ts": {
+    "mtime": 1779816532.7169905,
+    "ast_hash": "37220c54c0e2d9e2d623a179a9babe21",
+    "semantic_hash": "37220c54c0e2d9e2d623a179a9babe21"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/backup.ts": {
+    "mtime": 1779855193.4242053,
+    "ast_hash": "b1d95829e73d3d3807691556003f77e7",
+    "semantic_hash": "b1d95829e73d3d3807691556003f77e7"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/pos-data.ts": {
+    "mtime": 1779923287.61053,
+    "ast_hash": "8ac3bacf8bfb6de11d81cb541bc8a8be",
+    "semantic_hash": "8ac3bacf8bfb6de11d81cb541bc8a8be"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/src/lib/pos-offline-db.ts": {
+    "mtime": 1779777511.4459343,
+    "ast_hash": "828df335c799ed89cf67a665aa961a57",
+    "semantic_hash": "828df335c799ed89cf67a665aa961a57"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/rls_tighten_policies.sql": {
+    "mtime": 1779696460.5830207,
+    "ast_hash": "4071aa5a6387befc5d54830e6fbf689e",
+    "semantic_hash": "4071aa5a6387befc5d54830e6fbf689e"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/create_pos_admin_tables.sql": {
+    "mtime": 1779469743.4903414,
+    "ast_hash": "5bcbb833019cf03cd0d595caca3caab4",
+    "semantic_hash": "5bcbb833019cf03cd0d595caca3caab4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/add_eduardo_pos_user.sql": {
+    "mtime": 1779341686.67775,
+    "ast_hash": "866f707aaa5e654829238cbf3cd759d3",
+    "semantic_hash": "866f707aaa5e654829238cbf3cd759d3"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/create_wansoft_data.sql": {
+    "mtime": 1779394476.7569318,
+    "ast_hash": "7877e74a1e31d9714be7042f842e30ba",
+    "semantic_hash": "7877e74a1e31d9714be7042f842e30ba"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/pos_customer_notes.sql": {
+    "mtime": 1779779211.195035,
+    "ast_hash": "3ea3c054c0fd312fbd7fbf39473ae0c2",
+    "semantic_hash": "3ea3c054c0fd312fbd7fbf39473ae0c2"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/create_wansoft_menu_config.sql": {
+    "mtime": 1779384869.9996085,
+    "ast_hash": "cabaff62a44525b8d40f280e75e518d4",
+    "semantic_hash": "cabaff62a44525b8d40f280e75e518d4"
+  },
+  "/Users/danielrg/fullsite/dashboard-app/sql/pos_features_migration.sql": {
+    "mtime": 1779774933.8622928,
+    "ast_hash": "be8328a456bd544880db68014db4fede",
+    "semantic_hash": "be8328a456bd544880db68014db4fede"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/antifraud_agent.py": {
+    "mtime": 1779902812.7338448,
+    "ast_hash": "06eeb58b9832dcf6cbb6534d8b591d4f",
+    "semantic_hash": "06eeb58b9832dcf6cbb6534d8b591d4f"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/table_time_agent.py": {
+    "mtime": 1779817126.6903121,
+    "ast_hash": "214dccf813c6fc74711b174b0dca6282",
+    "semantic_hash": "214dccf813c6fc74711b174b0dca6282"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/supplier_monitor.py": {
+    "mtime": 1779222660.5607224,
+    "ast_hash": "70725d0fdde7913c733bf405a7a9e12e",
+    "semantic_hash": "70725d0fdde7913c733bf405a7a9e12e"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/reservas_pendientes.py": {
+    "mtime": 1778784675.3152483,
+    "ast_hash": "154eb59689759b2f4698d79543f8748c",
+    "semantic_hash": "154eb59689759b2f4698d79543f8748c"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/kitchen_quality_agent.py": {
+    "mtime": 1779817126.673102,
+    "ast_hash": "fd367fa6af9b2f835e8217825efb0906",
+    "semantic_hash": "fd367fa6af9b2f835e8217825efb0906"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/inventory_auto_order.py": {
+    "mtime": 1779666280.3453436,
+    "ast_hash": "844bd2b4a98d87aad9c135cd236e5784",
+    "semantic_hash": "844bd2b4a98d87aad9c135cd236e5784"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/speed_of_service.py": {
+    "mtime": 1779817157.7885425,
+    "ast_hash": "05985a2777094c6996cd4c362a4a29ea",
+    "semantic_hash": "05985a2777094c6996cd4c362a4a29ea"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/update_intraday_recipients.sql": {
+    "mtime": 1779756253.469349,
+    "ast_hash": "fffbbba7c5439df020164ec1602886a9",
+    "semantic_hash": "fffbbba7c5439df020164ec1602886a9"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/config_validator.py": {
+    "mtime": 1779387398.3156004,
+    "ast_hash": "2f7a1a6282bdc767766da8f8166a5dfc",
+    "semantic_hash": "2f7a1a6282bdc767766da8f8166a5dfc"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/anomaly_detector.py": {
+    "mtime": 1779817126.6617107,
+    "ast_hash": "fa42c20fe85e150a09dc4f2b31659b22",
+    "semantic_hash": "fa42c20fe85e150a09dc4f2b31659b22"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_deep_scraper.py": {
+    "mtime": 1779921886.744699,
+    "ast_hash": "eef425ce7c6e98142bb71d5f37c129e0",
+    "semantic_hash": "eef425ce7c6e98142bb71d5f37c129e0"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/fix_rls.py": {
+    "mtime": 1779388701.18934,
+    "ast_hash": "65223344824f62bf28dbcb66c8d7f859",
+    "semantic_hash": "65223344824f62bf28dbcb66c8d7f859"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/staffing_optimizer.py": {
+    "mtime": 1779817126.6788485,
+    "ast_hash": "5781b96bb65bf68fad95f9ab9b8286dd",
+    "semantic_hash": "5781b96bb65bf68fad95f9ab9b8286dd"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/check_pago_metodos.py": {
+    "mtime": 1779817126.7128096,
+    "ast_hash": "b7bb8bb513b589bd79ef5fb12565ae85",
+    "semantic_hash": "b7bb8bb513b589bd79ef5fb12565ae85"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/weekly_amalay.py": {
+    "mtime": 1779817126.7017655,
+    "ast_hash": "9d56724266d36f71571d73c93d5d0f8a",
+    "semantic_hash": "9d56724266d36f71571d73c93d5d0f8a"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/climate_events_agent.py": {
+    "mtime": 1779817126.6931052,
+    "ast_hash": "f45b9dfc7e0362d4275f4ce44f83bebd",
+    "semantic_hash": "f45b9dfc7e0362d4275f4ce44f83bebd"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_export_discovery.py": {
+    "mtime": 1779924085.8312633,
+    "ast_hash": "4186dddbbcea7c186bd62fc0ba2e3e59",
+    "semantic_hash": "4186dddbbcea7c186bd62fc0ba2e3e59"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/pos_daily_aggregator.py": {
+    "mtime": 1779669924.4031186,
+    "ast_hash": "ce96a8286a69fddc5876548e7d3c2eb4",
+    "semantic_hash": "ce96a8286a69fddc5876548e7d3c2eb4"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/tips_analyzer.py": {
+    "mtime": 1779817126.6875527,
+    "ast_hash": "709c84287ebd181b793deea90ac21b2f",
+    "semantic_hash": "709c84287ebd181b793deea90ac21b2f"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/intraday_sales.py": {
+    "mtime": 1779921082.602507,
+    "ast_hash": "4720e07fe410feca97b7012f23c14e8d",
+    "semantic_hash": "4720e07fe410feca97b7012f23c14e8d"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_mega_scraper.py": {
+    "mtime": 1779925060.5572894,
+    "ast_hash": "25eec2f705f2f2d07657c75e2076db2d",
+    "semantic_hash": "25eec2f705f2f2d07657c75e2076db2d"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/auto86_agent.py": {
+    "mtime": 1779923722.9721684,
+    "ast_hash": "c3c805fe3f0fecd8b393553ef66bc544",
+    "semantic_hash": "c3c805fe3f0fecd8b393553ef66bc544"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/close_predictor.py": {
+    "mtime": 1779817126.669484,
+    "ast_hash": "0b05d65667d7bac2ad564eefd7d26853",
+    "semantic_hash": "0b05d65667d7bac2ad564eefd7d26853"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/client_config.py": {
+    "mtime": 1778784179.5426247,
+    "ast_hash": "ef86d71e2f7e0e0eadebd1d53b671e06",
+    "semantic_hash": "ef86d71e2f7e0e0eadebd1d53b671e06"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/weekly_summary.py": {
+    "mtime": 1779817126.7048235,
+    "ast_hash": "e5304f30a468ecaf4f766a42f55520ce",
+    "semantic_hash": "e5304f30a468ecaf4f766a42f55520ce"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/daily_briefing.py": {
+    "mtime": 1779817151.3195262,
+    "ast_hash": "5bf77cc842db1c873be22c5058309165",
+    "semantic_hash": "5bf77cc842db1c873be22c5058309165"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/add_pos_user.py": {
+    "mtime": 1779386180.737858,
+    "ast_hash": "0f08a6300aff14de4a999307a7f16062",
+    "semantic_hash": "0f08a6300aff14de4a999307a7f16062"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/ticket_detail_scraper.py": {
+    "mtime": 1779903881.0191667,
+    "ast_hash": "b7836f09380ed73f37f7ac7e6d570bf7",
+    "semantic_hash": "b7836f09380ed73f37f7ac7e6d570bf7"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/menu_engineering.py": {
+    "mtime": 1779817126.675934,
+    "ast_hash": "04614cebf56fbcfb8fcf1ee7275a7bfb",
+    "semantic_hash": "04614cebf56fbcfb8fcf1ee7275a7bfb"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/upselling_agent.py": {
+    "mtime": 1779817126.6814203,
+    "ast_hash": "b37070ec748cd1879383bcae55df15d0",
+    "semantic_hash": "b37070ec748cd1879383bcae55df15d0"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/purchase_predictor.py": {
+    "mtime": 1779919565.4799335,
+    "ast_hash": "d70b51ae2f794c2ad18d8477d600fab3",
+    "semantic_hash": "d70b51ae2f794c2ad18d8477d600fab3"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/proactive_alerts.py": {
+    "mtime": 1779817126.6953862,
+    "ast_hash": "6c6c599d27416032d39d71127f5de56c",
+    "semantic_hash": "6c6c599d27416032d39d71127f5de56c"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/cost_variance_agent.py": {
+    "mtime": 1779919605.7770202,
+    "ast_hash": "0c33d696bdf661baaaa2fad8d29cec61",
+    "semantic_hash": "0c33d696bdf661baaaa2fad8d29cec61"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/orquestador.py": {
+    "mtime": 1779632524.8162389,
+    "ast_hash": "6d2672002cecdb0649b8bb769b943e7b",
+    "semantic_hash": "6d2672002cecdb0649b8bb769b943e7b"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_query.py": {
+    "mtime": 1779923586.3612697,
+    "ast_hash": "f05caf8ba2a3c110e7b6983542533bbf",
+    "semantic_hash": "f05caf8ba2a3c110e7b6983542533bbf"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_browser_scraper.py": {
+    "mtime": 1779922914.487432,
+    "ast_hash": "956ef1b8f1ed7d9a7c0e57878e446c59",
+    "semantic_hash": "956ef1b8f1ed7d9a7c0e57878e446c59"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/waste_detector.py": {
+    "mtime": 1779817126.6841059,
+    "ast_hash": "726773299c1822fb6f414656e9aea900",
+    "semantic_hash": "726773299c1822fb6f414656e9aea900"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_staleness.py": {
+    "mtime": 1779817179.5847304,
+    "ast_hash": "d10d34ba4368790127851a1c52b32e3a",
+    "semantic_hash": "d10d34ba4368790127851a1c52b32e3a"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/hermes_agent.py": {
+    "mtime": 1779817126.7106867,
+    "ast_hash": "e8c1cfb6c02f10e33338f77eb5294043",
+    "semantic_hash": "e8c1cfb6c02f10e33338f77eb5294043"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/wansoft_menu_sync.py": {
+    "mtime": 1779385873.0279002,
+    "ast_hash": "e5009d0ed3a24c9fbc143f436f2214a8",
+    "semantic_hash": "e5009d0ed3a24c9fbc143f436f2214a8"
+  },
+  "/Users/danielrg/fullsite/.github/scripts/menu_gap_analysis.py": {
+    "mtime": 1779393583.0501137,
+    "ast_hash": "737279190471c27726baa6f8d826017b",
+    "semantic_hash": "737279190471c27726baa6f8d826017b"
+  },
+  "/Users/danielrg/fullsite/assets/default-layout-1.json": {
+    "mtime": 1776024369.0535157,
+    "ast_hash": "98427bf5213ed663dd1a026527505ffe",
+    "semantic_hash": "98427bf5213ed663dd1a026527505ffe"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/PC/manifest.json": {
+    "mtime": 1776024369.0583432,
+    "ast_hash": "b823a505253d6494f253ff497d7ccac7",
+    "semantic_hash": "b823a505253d6494f253ff497d7ccac7"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/CACTUS/manifest.json": {
+    "mtime": 1776024369.0548866,
+    "ast_hash": "d9d400e924b2c8a5da1d71b29895f00a",
+    "semantic_hash": "d9d400e924b2c8a5da1d71b29895f00a"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/CUSHIONED_BENCH/manifest.json": {
+    "mtime": 1776024369.056169,
+    "ast_hash": "8c08851e2640d5086c7578cd7250f326",
+    "semantic_hash": "8c08851e2640d5086c7578cd7250f326"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/DOUBLE_BOOKSHELF/manifest.json": {
+    "mtime": 1776024369.0570462,
+    "ast_hash": "d6b5830211fbf5806030c35e4f90c5a4",
+    "semantic_hash": "d6b5830211fbf5806030c35e4f90c5a4"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/DESK/manifest.json": {
+    "mtime": 1776024369.0568593,
+    "ast_hash": "577b4045b87b513429eb22d7079b722d",
+    "semantic_hash": "577b4045b87b513429eb22d7079b722d"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/BIN/manifest.json": {
+    "mtime": 1776024369.0545006,
+    "ast_hash": "8fb365453a1439027277c4f852c43b8c",
+    "semantic_hash": "8fb365453a1439027277c4f852c43b8c"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/SMALL_TABLE/manifest.json": {
+    "mtime": 1776024369.0596018,
+    "ast_hash": "980b65bf17abc54fb4380cf0fe245255",
+    "semantic_hash": "980b65bf17abc54fb4380cf0fe245255"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/PLANT/manifest.json": {
+    "mtime": 1776024369.0585694,
+    "ast_hash": "300b63e97e40f8c3a76d0a4c58bf5648",
+    "semantic_hash": "300b63e97e40f8c3a76d0a4c58bf5648"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/WHITEBOARD/manifest.json": {
+    "mtime": 1776024369.0603173,
+    "ast_hash": "049f31bf2eea3f029894906245044503",
+    "semantic_hash": "049f31bf2eea3f029894906245044503"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/COFFEE_TABLE/manifest.json": {
+    "mtime": 1776024369.0558028,
+    "ast_hash": "6b7cbcfe97b58f4026a7fbade5c0a4d5",
+    "semantic_hash": "6b7cbcfe97b58f4026a7fbade5c0a4d5"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/CUSHIONED_CHAIR/manifest.json": {
+    "mtime": 1776024369.0565565,
+    "ast_hash": "ac0de0fc2849691f0bea0e57dcd85b55",
+    "semantic_hash": "ac0de0fc2849691f0bea0e57dcd85b55"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/LARGE_PLANT/manifest.json": {
+    "mtime": 1776024369.057637,
+    "ast_hash": "72ea45f4a130635539f7521461314d59",
+    "semantic_hash": "72ea45f4a130635539f7521461314d59"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/BOOKSHELF/manifest.json": {
+    "mtime": 1776024369.0546997,
+    "ast_hash": "bfafa7cc0c36d6d4d51bc3e17ec9957c",
+    "semantic_hash": "bfafa7cc0c36d6d4d51bc3e17ec9957c"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/SMALL_PAINTING/manifest.json": {
+    "mtime": 1776024369.0591524,
+    "ast_hash": "eda73d060a96d635efdaa1d03422f910",
+    "semantic_hash": "eda73d060a96d635efdaa1d03422f910"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/POT/manifest.json": {
+    "mtime": 1776024369.05897,
+    "ast_hash": "e81bdc316d72e484babd0e025b42351c",
+    "semantic_hash": "e81bdc316d72e484babd0e025b42351c"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/SOFA/manifest.json": {
+    "mtime": 1776024369.0599515,
+    "ast_hash": "51fb49173d4549e5af01e00f89b45f56",
+    "semantic_hash": "51fb49173d4549e5af01e00f89b45f56"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/TABLE_FRONT/manifest.json": {
+    "mtime": 1776024369.0601494,
+    "ast_hash": "e016b2df31f1335baf4bf7e49606e50f",
+    "semantic_hash": "e016b2df31f1335baf4bf7e49606e50f"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/WOODEN_CHAIR/manifest.json": {
+    "mtime": 1776024369.0608203,
+    "ast_hash": "7bcce0f423c44c42387bc3ee1616e07a",
+    "semantic_hash": "7bcce0f423c44c42387bc3ee1616e07a"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/PLANT_2/manifest.json": {
+    "mtime": 1776024369.0587776,
+    "ast_hash": "c62d4a4b44c380903ecb4e2f42cfd2e2",
+    "semantic_hash": "c62d4a4b44c380903ecb4e2f42cfd2e2"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/COFFEE/manifest.json": {
+    "mtime": 1776024369.0555856,
+    "ast_hash": "422338fdc17e85130215298f82ca08f2",
+    "semantic_hash": "422338fdc17e85130215298f82ca08f2"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/SMALL_PAINTING_2/manifest.json": {
+    "mtime": 1776024369.0593476,
+    "ast_hash": "d53f5049cff838adf5edaf9858991805",
+    "semantic_hash": "d53f5049cff838adf5edaf9858991805"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/LARGE_PAINTING/manifest.json": {
+    "mtime": 1776024369.0574448,
+    "ast_hash": "152c5e4a6529bacd37a31a28f4ba7fe9",
+    "semantic_hash": "152c5e4a6529bacd37a31a28f4ba7fe9"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/HANGING_PLANT/manifest.json": {
+    "mtime": 1776024369.0572429,
+    "ast_hash": "ce1bbbaead3d3c103885edaddc0bd23d",
+    "semantic_hash": "ce1bbbaead3d3c103885edaddc0bd23d"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/WOODEN_BENCH/manifest.json": {
+    "mtime": 1776024369.0604887,
+    "ast_hash": "9e1ba45ca6821daf125caa6c0c2f795f",
+    "semantic_hash": "9e1ba45ca6821daf125caa6c0c2f795f"
+  },
+  "/Users/danielrg/fullsite/assets/furniture/CLOCK/manifest.json": {
+    "mtime": 1776024369.0552428,
+    "ast_hash": "c181bfd0fbf1df1920e5fe31103659d4",
+    "semantic_hash": "c181bfd0fbf1df1920e5fe31103659d4"
+  }
+}

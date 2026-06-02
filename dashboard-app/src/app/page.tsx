@@ -559,6 +559,7 @@ export default function DashboardPage() {
             yesterdayVentas={yesterdayData?.ventas_dia || 0}
             lastWeekVentas={lastWeekData?.ventas_dia || 0}
             dowAvgVentas={dowAvg}
+            dataFecha={latestDay?.fecha}
           />
         )
       })()}

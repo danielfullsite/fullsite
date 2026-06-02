@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080">
+    <title>3 Errores de Dueños de Restaurante</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0a0a0b; --accent: #00ff88; --coral: #ff6b4a; --amber: #ffc857; --white: #ffffff; --gray: #8a8a8a; --dark-gray: #1a1a1b; --card-bg: #111112; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #000; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px; }
+        .slide { width: 1080px; height: 1350px; background: var(--bg); position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; overflow: hidden; }
+        .watermark { position: absolute; top: 40px; left: 50px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.3); }
+        .watermark span { color: var(--accent); opacity: 0.5; }
+        .dots { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+        .dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+        .dots .dot.active { background: var(--white); width: 24px; border-radius: 4px; }
+        .glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; pointer-events: none; }
+        .grid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SLIDE 1: Hook -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="glow" style="top: -150px; left: 50%; transform: translateX(-50%); background: radial-gradient(circle, rgba(255,107,74,0.1) 0%, transparent 70%);"></div>
+        <h1 style="font-size: 160px; font-weight: 900; color: var(--coral); line-height: 0.9; letter-spacing: -6px;">3</h1>
+        <h2 style="font-size: 64px; font-weight: 900; color: var(--white); text-align: center; line-height: 1.1; letter-spacing: -2px; margin-top: 32px;">
+            errores que<br>cometen el <span style="color: var(--coral);">90%</span><br>de los dueños<br>de restaurante
+        </h2>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 40px;">El #3 es el más peligroso</p>
+        <div class="dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: Error 1 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="position: absolute; top: 80px; right: 80px;">
+            <span style="font-size: 160px; font-weight: 900; color: rgba(255,107,74,0.08);">1</span>
+        </div>
+        <div style="width: 100%; text-align: left;">
+            <span style="display: inline-block; background: rgba(255,107,74,0.1); color: var(--coral); font-size: 22px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">ERROR #1</span>
+            <h3 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 24px; line-height: 1.2;">
+                Revisar ventas<br>al final del mes
+            </h3>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 24px; line-height: 1.5;">
+                Cuando ves los números 30 días después,<br>ya es tarde para corregir.
+            </p>
+            <div style="margin-top: 48px; background: var(--card-bg); border-radius: 20px; padding: 40px;">
+                <p style="font-size: 28px; color: var(--coral); font-weight: 700;">Lo que pasa:</p>
+                <p style="font-size: 26px; color: var(--gray); margin-top: 16px; line-height: 1.6;">
+                    Tuviste 5 días malos en la segunda semana.<br>
+                    No te diste cuenta hasta fin de mes.<br>
+                    Perdiste $60,000 que pudiste recuperar.
+                </p>
+            </div>
+            <div style="margin-top: 24px; background: rgba(0,255,136,0.05); border-radius: 16px; padding: 24px 32px;">
+                <p style="font-size: 24px; color: var(--accent); font-weight: 600;">Corrección: Revisa DIARIO. Actúa en el momento.</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: Error 2 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="position: absolute; top: 80px; right: 80px;">
+            <span style="font-size: 160px; font-weight: 900; color: rgba(255,107,74,0.08);">2</span>
+        </div>
+        <div style="width: 100%; text-align: left;">
+            <span style="display: inline-block; background: rgba(255,107,74,0.1); color: var(--coral); font-size: 22px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">ERROR #2</span>
+            <h3 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 24px; line-height: 1.2;">
+                No saber qué mesero<br>vende qué
+            </h3>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 24px; line-height: 1.5;">
+                Todos cobran lo mismo.<br>
+                Pero uno vende 2.4x más que otro.
+            </p>
+            <div style="margin-top: 48px; background: var(--card-bg); border-radius: 20px; padding: 40px;">
+                <p style="font-size: 28px; color: var(--coral); font-weight: 700;">Lo que pasa:</p>
+                <p style="font-size: 26px; color: var(--gray); margin-top: 16px; line-height: 1.6;">
+                    Tu mejor mesero podría capacitar al resto.<br>
+                    Pero no sabes quién es ni qué hace diferente.<br>
+                    Estás dejando $100K+/mes en la mesa.
+                </p>
+            </div>
+            <div style="margin-top: 24px; background: rgba(0,255,136,0.05); border-radius: 16px; padding: 24px 32px;">
+                <p style="font-size: 24px; color: var(--accent); font-weight: 600;">Corrección: Mide por mesero. Replica al mejor.</p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: Error 3 -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div class="grid-bg"></div>
+        <div style="position: absolute; top: 80px; right: 80px;">
+            <span style="font-size: 160px; font-weight: 900; color: rgba(255,107,74,0.08);">3</span>
+        </div>
+        <div style="width: 100%; text-align: left;">
+            <span style="display: inline-block; background: rgba(255,107,74,0.1); color: var(--coral); font-size: 22px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">ERROR #3 — EL MÁS PELIGROSO</span>
+            <h3 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 24px; line-height: 1.2;">
+                Confiar en que<br>"todo está bien"<br><span style="color: var(--coral);">sin datos</span>
+            </h3>
+            <p style="font-size: 32px; color: var(--gray); margin-top: 24px; line-height: 1.5;">
+                "El restaurante se ve lleno."<br>
+                "No he tenido quejas."<br>
+                "Conozco a mi equipo."
+            </p>
+            <div style="margin-top: 48px; background: var(--card-bg); border: 1px solid rgba(255,107,74,0.3); border-radius: 20px; padding: 40px;">
+                <p style="font-size: 28px; color: var(--coral); font-weight: 700;">La realidad:</p>
+                <p style="font-size: 26px; color: var(--gray); margin-top: 16px; line-height: 1.6;">
+                    "Se ve lleno" pero tu ticket bajó 15%.<br>
+                    "Sin quejas" pero tus reseñas bajaron a 3.8.<br>
+                    "Conozco a mi equipo" pero alguien lleva<br>
+                    meses con cortesías falsas.
+                </p>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: The pattern -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <h3 style="font-size: 42px; font-weight: 900; color: var(--gray); margin-bottom: 48px;">El patrón de los 3 errores:</h3>
+            <div style="display: flex; flex-direction: column; gap: 24px; align-items: center;">
+                <div style="background: var(--card-bg); border-radius: 16px; padding: 32px 48px; width: 100%; max-width: 700px;">
+                    <p style="font-size: 32px; color: var(--coral); font-weight: 700;">No tienes información a tiempo</p>
+                </div>
+                <div style="font-size: 36px; color: var(--gray);">&#8595;</div>
+                <div style="background: var(--card-bg); border-radius: 16px; padding: 32px 48px; width: 100%; max-width: 700px;">
+                    <p style="font-size: 32px; color: var(--coral); font-weight: 700;">No puedes tomar decisiones a tiempo</p>
+                </div>
+                <div style="font-size: 36px; color: var(--gray);">&#8595;</div>
+                <div style="background: var(--card-bg); border-radius: 16px; padding: 32px 48px; width: 100%; max-width: 700px;">
+                    <p style="font-size: 32px; color: var(--coral); font-weight: 700;">Pierdes dinero sin darte cuenta</p>
+                </div>
+                <div style="font-size: 36px; color: var(--gray);">&#8595;</div>
+                <div style="background: rgba(0,255,136,0.05); border: 2px solid var(--accent); border-radius: 16px; padding: 32px 48px; width: 100%; max-width: 700px;">
+                    <p style="font-size: 32px; color: var(--accent); font-weight: 700;">Solución: datos correctos, al momento correcto</p>
+                </div>
+            </div>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: Solution -->
+    <div class="slide">
+        <div class="watermark">fullsite<span>.</span></div>
+        <div style="text-align: center;">
+            <span style="display: inline-block; background: rgba(0,255,136,0.1); color: var(--accent); font-size: 22px; font-weight: 700; padding: 10px 20px; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px;">La solución</span>
+            <h2 style="font-size: 52px; font-weight: 900; color: var(--white); margin-top: 32px; line-height: 1.2;">
+                Fullsite elimina<br>los 3 errores<br><span style="color: var(--accent);">desde el día 1</span>
+            </h2>
+            <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 20px; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span style="color: var(--accent); font-size: 24px;">&#10003;</span>
+                    <p style="font-size: 28px; color: var(--white);">Error 1: Briefing DIARIO a las 7 AM</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span style="color: var(--accent); font-size: 24px;">&#10003;</span>
+                    <p style="font-size: 28px; color: var(--white);">Error 2: Ranking de meseros automático</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span style="color: var(--accent); font-size: 24px;">&#10003;</span>
+                    <p style="font-size: 28px; color: var(--white);">Error 3: Anomalías detectadas con IA 24/7</p>
+                </div>
+            </div>
+            <p style="font-size: 28px; color: var(--gray); margin-top: 40px;">Todo por WhatsApp. Sin aprender nada nuevo.</p>
+        </div>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" style="text-align: center;">
+        <div class="glow" style="top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);"></div>
+        <h2 style="font-size: 120px; font-weight: 900; color: var(--white); letter-spacing: -4px;">fullsite<span style="color: var(--accent);">.</span></h2>
+        <p style="font-size: 32px; color: var(--gray); margin-top: 16px;">POS + IA para restaurantes</p>
+        <div style="display: inline-block; background: var(--accent); color: var(--bg); font-size: 36px; font-weight: 700; padding: 24px 64px; border-radius: 16px; margin-top: 48px;">Agenda tu demo</div>
+        <p style="font-size: 28px; color: var(--gray); margin-top: 24px;">$4,999 MXN/mes — Todo incluido</p>
+        <p style="font-size: 24px; color: var(--accent); margin-top: 48px;">@fullsite.ia</p>
+        <div class="dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+<!--
+INSTAGRAM CAPTION:
+
+3 errores que cometen el 90% de los dueños de restaurante (el #3 es el más peligroso):
+
+ERROR 1: Revisar ventas al final del mes
+Ya es tarde. Si tuviste 5 días malos en la semana 2, perdiste $60K que pudiste recuperar en el momento.
+
+ERROR 2: No saber qué mesero vende qué
+Todos cobran lo mismo. Pero uno vende 2.4x más. Si no sabes quién ni por qué, estás dejando +$100K/mes en la mesa.
+
+ERROR 3: Confiar en que "todo está bien" sin datos
+"Se ve lleno" — pero tu ticket bajó 15%.
+"Sin quejas" — pero tus reseñas bajaron a 3.8.
+"Conozco a mi equipo" — pero alguien lleva meses con cortesías falsas.
+
+El patrón: sin información a tiempo, no puedes actuar a tiempo.
+
+Fullsite te da datos correctos, al momento correcto, por WhatsApp. Desde el día 1.
+
+Link en bio.
+
+---
+#restaurantesmty #restaurantesmonterrey #errorescomunes #duenosderestaurantes #restauranteroshoy #negociodealimentos #gastronomia #posrestaurante #gestionrestaurante #controldeventas #inteligenciaartificial #automatizacion #monterreyfood #foodtech #datosreales #liderazgo #emprendedoresgastronomicos
+-->
