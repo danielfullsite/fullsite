@@ -167,6 +167,7 @@ def aggregate(orders, cat_map, item_cat_map):
     metodos = defaultdict(float)
     mesero_ventas = defaultdict(float)
     platillo_ventas = defaultdict(float)
+    platillo_counts = defaultdict(int)
     grupo_ventas = defaultdict(float)
 
     for order in orders:
@@ -216,6 +217,7 @@ def aggregate(orders, cat_map, item_cat_map):
 
             if nombre:
                 platillo_ventas[nombre] += item_total
+                platillo_counts[nombre] = platillo_counts.get(nombre, 0) + cantidad
 
                 # Map to category/group
                 cat_id = item_cat_map.get(nombre.lower(), "")
@@ -251,7 +253,7 @@ def aggregate(orders, cat_map, item_cat_map):
                    key=lambda x: x["total"], reverse=True)
         ),
         "platillos_top": json.dumps(
-            sorted([{"nombre": k, "total": round(v, 2)} for k, v in platillo_ventas.items()],
+            sorted([{"nombre": k, "cantidad": platillo_counts.get(k, 0), "total": round(v, 2)} for k, v in platillo_ventas.items()],
                    key=lambda x: x["total"], reverse=True)[:20]
         ),
         "ventas_por_grupo": json.dumps(
