@@ -182,29 +182,49 @@ export default function VoicePage() {
         })
       }
 
-      // Speak the response — browser TTS (reliable) with ElevenLabs upgrade if available
+      // Speak the response — try ElevenLabs first, fallback to browser TTS
       if (fullText) {
         setState('speaking')
-        if ('speechSynthesis' in window) {
+        let spoke = false
+
+        // Try ElevenLabs (natural Mexican Spanish voice)
+        try {
+          const ttsRes = await fetch('/api/voice-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: fullText }),
+          })
+          if (ttsRes.ok && ttsRes.status === 200) {
+            const blob = await ttsRes.blob()
+            if (blob.size > 500) {
+              const url = URL.createObjectURL(blob)
+              const audio = new Audio(url)
+              audioRef.current = audio
+              audio.onended = () => { setState('idle'); audioRef.current = null; URL.revokeObjectURL(url) }
+              audio.onerror = () => { audioRef.current = null; URL.revokeObjectURL(url) }
+              await audio.play()
+              spoke = true
+            }
+          }
+        } catch { /* ElevenLabs failed, use browser */ }
+
+        // Fallback: browser TTS
+        if (!spoke && 'speechSynthesis' in window) {
           window.speechSynthesis.cancel()
           const utterance = new SpeechSynthesisUtterance(fullText)
           utterance.lang = 'es-MX'
           utterance.rate = 0.85
           utterance.pitch = 1.05
-          // Load voices and pick best Spanish one
-          const pickVoice = () => {
-            const voices = window.speechSynthesis.getVoices()
-            return voices.find(v => v.lang === 'es-MX' && v.name.includes('Paulina')) ||
-              voices.find(v => v.lang === 'es-MX') ||
-              voices.find(v => v.lang.startsWith('es')) || null
-          }
-          const voice = pickVoice()
+          const voices = window.speechSynthesis.getVoices()
+          const voice = voices.find(v => v.lang === 'es-MX' && v.name.includes('Paulina')) ||
+            voices.find(v => v.lang === 'es-MX') ||
+            voices.find(v => v.lang.startsWith('es')) || null
           if (voice) utterance.voice = voice
           synthRef.current = utterance
           utterance.onend = () => { setState('idle'); synthRef.current = null }
           utterance.onerror = () => { setState('idle'); synthRef.current = null }
           window.speechSynthesis.speak(utterance)
-        } else {
+        } else if (!spoke) {
           setState('idle')
         }
       } else {
@@ -283,7 +303,7 @@ export default function VoicePage() {
         return
       }
 
-      // Auto-stop after 1.5 seconds of silence (faster response)
+      // Auto-stop after 3 seconds of silence
       silenceTimerRef.current = setTimeout(() => {
         recognition.stop()
         stopMicVisualization()
@@ -292,7 +312,7 @@ export default function VoicePage() {
         } else {
           setState('idle')
         }
-      }, 1500)
+      }, 3000)
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
