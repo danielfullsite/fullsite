@@ -36,6 +36,7 @@ import {
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessPage } from '@/contexts/AuthContext'
+import { canPlanAccessPage } from '@/lib/plans'
 import ThemeToggle from '@/components/ThemeToggle'
 
 const navSections = [
@@ -136,7 +137,9 @@ export default function Sidebar() {
       {/* Navigation sections */}
       <nav className="flex-1 px-3 py-2 overflow-y-auto">
         {navSections.map((section) => {
-          const visibleItems = section.items.filter(item => canAccessPage(role, item.href))
+          const visibleItems = section.items.filter(item =>
+            canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
+          )
           if (visibleItems.length === 0) return null
           return (
           <div key={section.label}>

@@ -22,6 +22,7 @@ export interface ClientFeatures {
 
 export interface ClientConfig {
   id: string
+  plan: string  // 'antifraude' | 'fullsite_os' | 'fullsite_pos'
   display_name: string
   city: string
   timezone: string
@@ -81,6 +82,7 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
         const row = rows[0]
         const config: ClientConfig = {
           id: row.id,
+          plan: row.plan || 'fullsite_pos',
           display_name: row.display_name || row.id,
           city: row.city || '',
           timezone: row.timezone || 'America/Mexico_City',
@@ -135,6 +137,7 @@ function getClientConfigFallback(clientId: string): ClientConfig {
   const fb = FALLBACKS[clientId] || {}
   return {
     id: clientId,
+    plan: 'fullsite_pos',  // default: full access
     display_name: fb.display_name || clientId,
     city: fb.city || '',
     timezone: 'America/Mexico_City',
