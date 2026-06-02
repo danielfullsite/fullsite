@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 
 // ElevenLabs TTS API — streams natural Spanish audio
 // Voice: "Laura" (Latin American Spanish, warm, conversational)
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY || ''
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY || process.env.ELEVENLABS || ''
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'FGY2WhTYpPnrIDTdsKH5' // Laura — LatAm Spanish
 const MODEL_ID = 'eleven_multilingual_v2'
 
@@ -15,9 +15,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!ELEVENLABS_API_KEY) {
-      // Fallback: return empty so client uses browser TTS
+      console.log('[voice-tts] No ElevenLabs key found. Checked: ELEVENLABS_API_KEY, ELEVEN_LABS_API_KEY, ELEVENLABS')
       return new Response(null, { status: 204 })
     }
+    console.log('[voice-tts] ElevenLabs key found, length:', ELEVENLABS_API_KEY.length)
 
     // Stream audio from ElevenLabs
     const response = await fetch(
