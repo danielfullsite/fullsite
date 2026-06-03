@@ -555,13 +555,15 @@ h2.display em{font-family:var(--serif);font-style:italic;color:var(--accent);fon
 
 /* === PRICING === */
 #pricing{background:var(--bg);}
-.pricing-layout{max-width:520px;margin:0 auto;text-align:center;}
+.pricing-layout{max-width:960px;margin:0 auto;text-align:center;}
+.pricing-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:2rem;}
+@media(max-width:768px){.pricing-grid-3{grid-template-columns:1fr;}}
 .pricing-card{
-  border:1px solid rgba(0,255,136,0.22);border-radius:20px;
   background:var(--bg-2);overflow:hidden;position:relative;
 }
-.pricing-card::before{
-  content:'PLAN UNICO';position:absolute;top:-1px;left:50%;transform:translateX(-50%);
+.pricing-card.featured{background:var(--bg-3,#0e1117);}
+.pricing-card.featured::before{
+  content:'MAS POPULAR';position:absolute;top:-1px;left:50%;transform:translateX(-50%);
   font-size:11px;font-weight:700;letter-spacing:0.12em;color:var(--ink-dark);
   background:var(--accent);padding:4px 16px;border-radius:0 0 8px 8px;
 }
@@ -1266,35 +1268,82 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
   <div class="wrap">
     <div class="pricing-layout reveal">
       <div class="eyebrow" style="justify-content:center;">Inversion</div>
-      <h2 class="display" style="margin-bottom:32px;">Un plan. Todo <em>incluido.</em></h2>
-      <div class="pricing-card">
-        <div class="pricing-inner">
-          <div class="pricing-name">Fullsite completo</div>
-          <div class="pricing-tagline">Operacion autonoma con IA</div>
-          <div class="pricing-price">
-            <span class="pricing-amount">$4,999</span>
-            <span class="pricing-period"> MXN/mes por sucursal</span>
-            <div class="pricing-setup">Setup: $4,999 MXN (una vez)</div>
+      <h2 class="display" style="margin-bottom:32px;">3 planes. Escoge el <em>tuyo.</em></h2>
+
+      <div class="pricing-grid-3">
+        <!-- ANTI-FRAUDE -->
+        <div class="pricing-card">
+          <div class="pricing-inner">
+            <div class="pricing-name">Anti-Fraude</div>
+            <div class="pricing-tagline">Detecta lo que no ves</div>
+            <div class="pricing-price">
+              <span class="pricing-amount" style="color:var(--ink);">$999</span>
+              <span class="pricing-period"> MXN/mes</span>
+            </div>
+            <div class="pricing-features">
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Agente anti-fraude</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Reporte semanal</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Alertas por Telegram</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Dashboard basico</span></div>
+              <div class="pf-row"><span class="pf-check" style="color:var(--ink-3);">—</span><span class="pf-label" style="color:var(--ink-3);">30 agentes de IA</span></div>
+              <div class="pf-row"><span class="pf-check" style="color:var(--ink-3);">—</span><span class="pf-label" style="color:var(--ink-3);">POS completo</span></div>
+              <div class="pf-row"><span class="pf-check" style="color:var(--ink-3);">—</span><span class="pf-label" style="color:var(--ink-3);">Facturacion CFDI</span></div>
+            </div>
+            <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20el%20plan%20Anti-Fraude" class="pricing-cta-btn" style="background:transparent;border:1px solid var(--line);color:var(--ink-1);box-shadow:none;">Empezar &rarr;</a>
           </div>
-          <div class="pricing-features">
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">POS completo (mesas, QR, KDS, cortes)</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Copiloto IA 24/7</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Briefing diario 7:00 AM</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Alertas operativas en tiempo real</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">WhatsApp bot para clientes y equipo</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Anti-fraude semanal</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Menu engineering semanal</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Prediccion de cierre 3x/dia</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Inventario + control de merma</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Multi-sucursal (si aplica)</span></div>
-            <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Soporte directo por WhatsApp</span></div>
+        </div>
+
+        <!-- FULLSITE OS — MAS POPULAR -->
+        <div class="pricing-card featured">
+          <div class="pricing-inner">
+            <div class="pricing-name">Fullsite OS</div>
+            <div class="pricing-tagline">Operacion en piloto automatico</div>
+            <div class="pricing-price">
+              <span class="pricing-amount">$2,999</span>
+              <span class="pricing-period"> MXN/mes</span>
+            </div>
+            <div class="pricing-features">
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">30 agentes de IA</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Dashboard completo</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Briefing diario 7 AM</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Bot WhatsApp 24/7</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Anti-fraude + anomalias</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Food cost automatico</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">CRM + recuperacion</span></div>
+              <div class="pf-row"><span class="pf-check" style="color:var(--ink-3);">—</span><span class="pf-label" style="color:var(--ink-3);">POS completo</span></div>
+              <div class="pf-row"><span class="pf-check" style="color:var(--ink-3);">—</span><span class="pf-label" style="color:var(--ink-3);">Facturacion CFDI</span></div>
+            </div>
+            <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20el%20plan%20Fullsite%20OS" class="pricing-cta-btn">Activar mi restaurante &rarr;</a>
           </div>
-          <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20activar%20Fullsite%20en%20mi%20restaurante" class="pricing-cta-btn">Activar mi restaurante &rarr;</a>
-          <p class="pricing-note">Sin contrato &middot; Mes a mes &middot; Cancela cuando quieras</p>
+        </div>
+
+        <!-- FULLSITE POS -->
+        <div class="pricing-card">
+          <div class="pricing-inner">
+            <div class="pricing-name">Fullsite POS</div>
+            <div class="pricing-tagline">Todo. Sin excepciones.</div>
+            <div class="pricing-price">
+              <span class="pricing-amount" style="color:var(--ink);">$4,999</span>
+              <span class="pricing-period"> MXN/mes</span>
+            </div>
+            <div class="pricing-features">
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Todo de Fullsite OS</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">POS completo</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Terminal de cobro</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Facturacion CFDI 4.0</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">KDS + impresion cocina</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Split cuenta + cortesias</span></div>
+              <div class="pf-row"><span class="pf-check">&#10003;</span><span class="pf-label">Inventario fisico</span></div>
+            </div>
+            <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20el%20plan%20Fullsite%20POS" class="pricing-cta-btn" style="background:transparent;border:1px solid var(--line);color:var(--ink-1);box-shadow:none;">Empezar &rarr;</a>
+          </div>
         </div>
       </div>
+
+      <p style="font-size:13px;color:var(--ink-3);margin-bottom:1.5rem;">Setup desde $2,999 una vez &middot; Sin contrato &middot; Mes a mes</p>
+
       <div class="pricing-guarantee">
-        <p><strong>Garantia de 60 dias.</strong> Si en 2 meses no ves valor, te devolvemos el setup completo. Sin preguntas, sin letra chica. Nos quedamos porque funciona.</p>
+        <p><strong>Garantia de 60 dias.</strong> Si en 2 meses no ves valor, te devolvemos el setup completo. Sin preguntas, sin letra chica.</p>
       </div>
     </div>
   </div>
