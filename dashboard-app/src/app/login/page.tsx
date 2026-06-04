@@ -61,7 +61,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left — photo */}
       <div className="hidden lg:block lg:w-[55%] relative">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1920&q=80')` }} />
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('/login-bg.jpg')` }} />
+        {/* Preload fallback from Unsplash if local not available */}
+        <div className="absolute inset-0 bg-cover bg-center -z-10" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=50')` }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <span className="text-white font-black text-7xl tracking-tight drop-shadow-2xl">
