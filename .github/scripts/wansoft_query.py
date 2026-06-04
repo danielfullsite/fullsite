@@ -26,6 +26,28 @@ TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "workflow_dispatch")
 MX_TZ = get_tz(CLIENT)
 sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 
+# ── SECURITY: Bot constraints ──────────────────────────────────────────────
+# Whitelist of tables the bot can read (no writes except agent_runs)
+ALLOWED_TABLES = frozenset({
+    "wansoft_daily", "wansoft_kpis", "wansoft_data", "wansoft_tips",
+    "wansoft_waiter_categories", "wansoft_food_cost", "wansoft_hourly",
+    "wansoft_persons_hourly", "wansoft_pnl", "wansoft_suppliers",
+    "wansoft_shrinkage", "wansoft_inventory", "wansoft_labor",
+    "pos_menu_items", "pos_menu_categories", "pos_ingredients",
+    "pos_inventory", "pos_recipes", "pos_suppliers", "pos_orders",
+    "agent_results", "agent_runs",
+    "amalay_reservaciones", "clients",
+})
+
+MAX_MESSAGE_LENGTH = 2000  # Max chars from user input
+DANGEROUS_PATTERNS = re.compile(r"(DROP|DELETE|TRUNCATE|ALTER|CREATE|INSERT|UPDATE|GRANT|REVOKE)", re.IGNORECASE)
+
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("wansoft_query")
+except ImportError:
+    _audit = None
+
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 def send_telegram(text):
@@ -36,6 +58,13 @@ def send_telegram(text):
 
 
 def sb_get(table, params):
+    # SECURITY: only allow whitelisted tables
+    base_table = table.split("?")[0].strip()
+    if base_table not in ALLOWED_TABLES:
+        print(f"[SECURITY] BLOCKED read from non-whitelisted table: {base_table}")
+        if _audit:
+            _audit.log_error(f"BLOCKED: attempted read from {base_table}", [base_table])
+        return []
     r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers, params=params)
     r.raise_for_status()
     return r.json()
@@ -1217,17 +1246,28 @@ def log_run(status, duration_ms, summary="", error=""):
 # ── Main ────────────────────────────────────────────────────────────────────
 def main():
     start_time = time.time()
+    if _audit:
+        _audit.log_start()
 
     if not MESSAGE:
         print("[wansoft-query] No message provided")
         sys.exit(0)
 
-    print(f"[wansoft-query] Question: {MESSAGE[:100]}")
+    # SECURITY: sanitize user input
+    safe_message = MESSAGE[:MAX_MESSAGE_LENGTH]
+    if DANGEROUS_PATTERNS.search(safe_message):
+        print(f"[SECURITY] BLOCKED dangerous pattern in message: {safe_message[:80]}")
+        if _audit:
+            _audit.log_error(f"BLOCKED: dangerous SQL pattern in user input", [])
+        send_telegram("No puedo procesar esa consulta.")
+        sys.exit(0)
+
+    print(f"[wansoft-query] Question: {safe_message[:100]}")
 
     try:
         # Detect date range from question
         print("[wansoft-query] Detecting date range...")
-        start_date, end_date = detect_date_range(MESSAGE)
+        start_date, end_date = detect_date_range(safe_message)
         print(f"[wansoft-query] Date range: {start_date} to {end_date}")
 
         # Login to Wansoft
@@ -1254,24 +1294,27 @@ def main():
 
         # Ask Groq to answer
         print("[wansoft-query] Asking Groq...")
-        answer = ask_groq(MESSAGE, wansoft_data, historical)
+        answer = ask_groq(safe_message, wansoft_data, historical)
 
         # Send to Telegram
         send_telegram(answer)
         print(f"[wansoft-query] Sent response ({len(answer)} chars)")
 
         duration = int((time.time() - start_time) * 1000)
-        log_run("success", duration, f"Q: {MESSAGE[:100]} A: {answer[:100]}")
-
-        # Log query for feedback/improvement loop
-        log_query(MESSAGE, answer, wansoft_data, start_date, end_date, "success")
+        log_run("success", duration, f"Q: {safe_message[:100]} A: {answer[:100]}")
+        log_query(safe_message, answer, wansoft_data, start_date, end_date, "success")
+        if _audit:
+            _audit.log_read(["wansoft_daily", "wansoft_kpis", "wansoft_data", "pos_ingredients", "pos_inventory"])
+            _audit.log_end(duration, f"Q: {safe_message[:60]}")
 
     except Exception as e:
         duration = int((time.time() - start_time) * 1000)
         log_run("error", duration, error=str(e))
         send_telegram(f"Error consultando Wansoft: {e}")
         print(f"[wansoft-query] ERROR: {e}")
-        log_query(MESSAGE, str(e), {}, "", "", "error")
+        log_query(safe_message, str(e), {}, "", "", "error")
+        if _audit:
+            _audit.log_error(str(e)[:200])
         sys.exit(1)
 
 
