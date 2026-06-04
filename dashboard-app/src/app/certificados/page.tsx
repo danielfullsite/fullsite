@@ -162,6 +162,16 @@ function CertSecurity() {
           <li>Audit trail inmutable de cada acción en el POS</li>
         </ul>
 
+        <h3>AI Governance</h3>
+        <ul>
+          <li><strong>Agent Audit Trail:</strong> Cada agente registra START, SELECT, INSERT y END en tabla inmutable (agent_audit_log). Trazabilidad completa de qué hizo cada agente, cuándo, y en qué tablas.</li>
+          <li><strong>AI Action Controls:</strong> El bot de queries está constreñido a 23 tablas whitelisted. Patrones SQL peligrosos (DROP, DELETE, TRUNCATE) son bloqueados automáticamente antes de procesarse.</li>
+          <li><strong>Safe Execution:</strong> Input del usuario sanitizado (máximo 2,000 caracteres). Ejecución aislada por agente en contenedores GitHub Actions. Sin acceso a DDL.</li>
+          <li><strong>Least Privilege Roles:</strong> Roles PostgreSQL con permisos mínimos: fullsite_readonly (solo SELECT) y fullsite_agent (SELECT + INSERT en logs). Creados en base de datos.</li>
+          <li><strong>Table Whitelist:</strong> 23 tablas permitidas para lectura del bot. Acceso a tablas fuera de la lista es bloqueado y registrado en audit log.</li>
+          <li><strong>Injection Protection:</strong> Todas las queries se ejecutan via Supabase REST API parametrizado (no SQL directo). Input filtrado contra patrones de inyección SQL.</li>
+        </ul>
+
         <h3>Cumplimiento</h3>
         <ul>
           <li>PCI-DSS SAQ-A: nunca almacenamos datos de tarjeta</li>

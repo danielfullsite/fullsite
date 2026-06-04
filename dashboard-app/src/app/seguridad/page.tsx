@@ -72,6 +72,12 @@ const controls = [
   { name: 'Permissions-Policy', status: true, detail: 'Cámara, geolocation, USB, payment — restringidos por política' },
   { name: 'HSTS Preload', status: true, detail: 'Strict-Transport-Security con max-age 2 años + includeSubDomains + preload' },
   { name: 'X-Frame-Options DENY', status: true, detail: 'Previene clickjacking — el sitio no puede ser embebido en iframes' },
+  { name: 'Agent Audit Trail', status: true, detail: '23 agentes registran START, SELECT, INSERT, END en log inmutable (agent_audit_log)' },
+  { name: 'AI Action Controls', status: true, detail: 'Bot constreñido a 23 tablas whitelisted. SQL injection patterns bloqueados automáticamente.' },
+  { name: 'Safe Execution Architecture', status: true, detail: 'Input sanitizado (2,000 chars max), ejecución aislada por agente en GitHub Actions.' },
+  { name: 'Least Privilege DB Roles', status: true, detail: 'Roles fullsite_readonly (solo SELECT) y fullsite_agent (SELECT + log) creados en PostgreSQL.' },
+  { name: 'Table Whitelist (Bot)', status: true, detail: 'El bot de queries solo puede leer 23 tablas específicas. Acceso a tablas fuera de lista es bloqueado y registrado.' },
+  { name: 'Injection Protection', status: true, detail: 'Queries via Supabase REST parametrizado (no SQL directo). Patrones DROP/DELETE/TRUNCATE filtrados en input.' },
 ]
 
 const statusConfig = {
