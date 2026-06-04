@@ -23,6 +23,7 @@ on:
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
   STAFF_NAME: ${{ github.event.inputs.staff_name }}
   STAFF_PIN: ${{ github.event.inputs.staff_pin }}
   STAFF_ROLE: ${{ github.event.inputs.staff_role }}

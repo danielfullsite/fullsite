@@ -20,6 +20,7 @@ env:
   CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
   GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

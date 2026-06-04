@@ -15,7 +15,8 @@ SUBSIDIARY, WANSOFT_USER, WANSOFT_PASS = get_wansoft_creds(CLIENT)
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+# Least privilege: agent key (SELECT + INSERT agent_runs/results)
+SUPABASE_KEY = os.environ.get("SUPABASE_AGENT_KEY") or os.environ["SUPABASE_SERVICE_KEY"]
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT_IDS = get_chat_ids(CLIENT, "daily_briefing")

@@ -20,6 +20,7 @@ import time
 import requests
 from datetime import datetime, timezone
 from client_config import get_client, get_tz, get_chat_ids
+from audit_log import AuditLogger
 
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
@@ -33,6 +34,7 @@ sb_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
 }
+audit = AuditLogger("config_validator")
 
 
 def sb_get(table, params):
@@ -51,6 +53,7 @@ def send_telegram(msg):
 
 def main():
     start = time.time()
+    audit.log_start()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
     issues = []
@@ -212,6 +215,9 @@ def main():
     except Exception:
         pass
 
+    audit.log_read(["pos_menu_items", "pos_ingredients", "pos_inventory", "pos_staff", "pos_recipes", "wansoft_menu_config", "agent_runs", "clients"])
+    audit.log_write(["agent_results", "agent_runs"], f"{len(issues)} issues found")
+    audit.log_end(elapsed, f"{len(issues)} config issues")
     print(f"Done in {elapsed}ms")
 
 

@@ -17,7 +17,8 @@ from client_config import get_client
 
 CLIENT = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+# Least privilege: agent key (SELECT + INSERT agent_runs/results)
+SUPABASE_KEY = os.environ.get("SUPABASE_AGENT_KEY") or os.environ["SUPABASE_SERVICE_KEY"]
 
 sb_headers = {
     "apikey": SUPABASE_KEY,

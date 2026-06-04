@@ -10,7 +10,8 @@ TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT = os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 BASE_URL = os.environ.get("DASHBOARD_URL", "https://app.fullsite.mx")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+# Least privilege: agent key (SELECT + INSERT agent_runs/results)
+SUPABASE_KEY = os.environ.get("SUPABASE_AGENT_KEY") or os.environ["SUPABASE_SERVICE_KEY"]
 
 start = time.time()
 failures = []
