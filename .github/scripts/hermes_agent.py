@@ -23,7 +23,7 @@ CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
-SUPABASE_KEY = os.environ.get("SUPABASE_AGENT_KEY") or os.environ["SUPABASE_SERVICE_KEY"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
