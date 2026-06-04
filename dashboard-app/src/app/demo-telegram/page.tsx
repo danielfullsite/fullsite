@@ -121,31 +121,45 @@ Compras sugeridas para manana:
 Total: $497`,
 }
 
-function getResponse(input: string): string {
+// Try keyword match first, then call Claude API for anything else
+async function getResponse(input: string): Promise<string> {
   const q = input.toLowerCase().trim()
 
-  // Exact command matches
+  // Exact command matches (instant)
   if (q.startsWith('/')) {
     const cmd = q.split(' ')[0]
     if (RESPONSES[cmd]) return RESPONSES[cmd]
     return RESPONSES['/help']
   }
 
-  // Keyword matching
+  // Keyword matching (instant)
   for (const [key, response] of Object.entries(RESPONSES)) {
     if (key.startsWith('/')) continue
     if (q.includes(key)) return response
   }
 
-  // Greetings
+  // Greetings (instant)
   if (q.match(/hola|buenos|buenas|que onda|hey/)) {
     return `Hola! Soy el bot de ${DEMO_RESTAURANT}. Preguntame lo que quieras sobre ventas, meseros, inventario o costos. Escribe /help para ver los comandos.`
   }
 
-  // Fallback
-  return `Ayer cerraron con $68,450 en ventas. 182 tickets, ticket promedio $439. Carlos fue top con $22,400. Hay que hablar con Luis que lleva 3 dias bajo en upselling.
+  // For everything else: call Claude API with demo context
+  try {
+    const res = await fetch('/api/demo-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: input }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.response) return data.response
+    }
+  } catch { /* fall through */ }
 
-Preguntame algo mas especifico: chilaquiles, food cost, inventario, fraude, prediccion...`
+  // Final fallback
+  return `Ayer cerraron con $68,450 en ventas. 182 tickets, ticket promedio $439. Carlos fue top con $22,400.
+
+Preguntame algo mas especifico o escribe /help.`
 }
 
 function getTime(): string {
@@ -174,14 +188,13 @@ export default function DemoTelegramPage() {
     setInput('')
     setTyping(true)
 
-    // Simulate bot thinking
-    const delay = 800 + Math.random() * 1200
-    setTimeout(() => {
-      const response = getResponse(text)
+    // Get response (keyword match is instant, Claude API takes ~2s)
+    setTyping(true)
+    getResponse(text).then(response => {
       const botMsg: Message = { id: Date.now() + 1, from: 'bot', text: response, time: getTime() }
       setMessages(prev => [...prev, botMsg])
       setTyping(false)
-    }, delay)
+    })
   }
 
   const quickActions = ['/briefing', '/ventas', '/top', 'food cost', 'inventario']
