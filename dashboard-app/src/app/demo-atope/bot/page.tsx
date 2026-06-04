@@ -168,18 +168,28 @@ function getTime(): string {
 
 async function getResponse(input: string): Promise<string> {
   const q = input.toLowerCase().trim()
+
+  // Only exact slash commands use keyword responses
   if (q.startsWith('/')) {
     const cmd = q.split(' ')[0]
     if (RESPONSES[cmd]) return RESPONSES[cmd]
     return RESPONSES['/help']
   }
-  for (const [key, response] of Object.entries(RESPONSES)) {
-    if (key.startsWith('/')) continue
-    if (q.includes(key)) return response
-  }
-  if (q.match(/hola|buenos|buenas|que onda|hey/)) {
+
+  // Short greetings
+  if (q.match(/^(hola|buenos|buenas|que onda|hey)$/)) {
     return `Hola Ricardo! Soy el bot de Atope. Preguntame lo que quieras sobre ventas, meseros, inventario o costos. Escribe /help para ver los comandos.`
   }
+
+  // Only match keywords if the message is very short (1-2 words) and matches exactly
+  if (q.split(' ').length <= 2) {
+    for (const [key, response] of Object.entries(RESPONSES)) {
+      if (key.startsWith('/')) continue
+      if (q === key || q === key + 's') return response
+    }
+  }
+
+  // Everything else → Claude for a rich, contextual answer
   try {
     const res = await fetch('/api/demo-chat-atope', {
       method: 'POST',

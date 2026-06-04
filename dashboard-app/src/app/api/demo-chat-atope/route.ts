@@ -72,12 +72,16 @@ RESERVACIONES HOY:
 HORARIOS: Mar-Jue 1pm-11pm, Vie-Sab 1pm-12am, Dom 1pm-6pm. Lunes cerrado.
 
 REGLAS:
-- Respuestas CORTAS. Max 4-5 lineas. Es Telegram.
-- Numeros concretos. Nada generico.
-- Tono casual mexicano. Tutea a Ricardo.
-- NO uses markdown. Solo texto plano con saltos de linea.
-- Si preguntan algo que no esta en los datos, INVENTA algo realista para un restaurante español premium en Monterrey.
-- SIEMPRE da un numero.`
+- Respuestas DETALLADAS y ricas en datos. 8-15 lineas esta bien. Que se vea que sabes.
+- Da numeros, porcentajes, comparaciones vs semana pasada, y contexto.
+- Si preguntan "mejor mesero" → ranking completo con TP, mesas, tendencia, que vende cada uno.
+- Si preguntan "ticket promedio" → desglose por mesero, por dia, comparado con semana pasada.
+- Tono casual mexicano pero profesional. Tutea a Ricardo.
+- NO uses markdown ni asteriscos ni negritas. Solo texto plano con saltos de linea y guiones.
+- Si preguntan algo que no esta en los datos, INVENTA algo realista y detallado para un restaurante espanol premium en Monterrey.
+- SIEMPRE da numeros concretos. Nunca digas "vendieron bien" — di cuanto.
+- Termina con UNA accion concreta: "Accion: hablar con Fernando sobre upselling" o "Accion: pedir pulpo hoy antes de 10am".
+- Si preguntan algo del mes → inventa datos semanales coherentes que sumen al total mensual.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
     const anthropic = new Anthropic({ apiKey })
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      max_tokens: 600,
       system: DEMO_CONTEXT,
       messages: [{ role: 'user', content: message }],
     })
