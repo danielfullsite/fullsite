@@ -19,9 +19,9 @@ class AuditLogger:
         self.agent_name = agent_name
         env = env or os.environ
         self.url = env.get("SUPABASE_URL", "").rstrip("/")
-        self.key = env.get("SUPABASE_AGENT_KEY") or env.get("SUPABASE_SERVICE_KEY", "")
+        self.key = env.get("SUPABASE_SERVICE_KEY") or env.get("SUPABASE_AGENT_KEY", "")
         self.trigger = env.get("TRIGGER_TYPE", "unknown")
-        self.role = "fullsite_agent" if env.get("SUPABASE_AGENT_KEY") else "service_role"
+        self.role = "service_role"
         self.headers = {
             "apikey": self.key,
             "Authorization": f"Bearer {self.key}",
