@@ -14,7 +14,11 @@ import os
 import json
 import requests
 from client_config import get_client
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("menu_gap_analysis")
+except ImportError:
+    _audit = None
 CLIENT = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)

@@ -8,7 +8,11 @@ Runs every Monday at 9am MX.
 import os, json, requests
 from datetime import date, timedelta, datetime, timezone
 from client_config import get_client, get_tz, get_chat_ids
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("weekly_summary")
+except ImportError:
+    _audit = None
 CLIENT = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)

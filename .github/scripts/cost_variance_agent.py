@@ -13,7 +13,11 @@ import time
 import requests
 from datetime import datetime, timezone
 from client_config import get_client, get_tz, get_chat_ids
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("cost_variance_agent")
+except ImportError:
+    _audit = None
 CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
@@ -26,6 +30,7 @@ VARIANCE_THRESHOLD = 0.10  # 10% — alert if cost changed more than this
 
 sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 start_time = time.time()
+if _audit: _audit.log_start()
 status = "success"
 output_sum = ""
 error_msg = None

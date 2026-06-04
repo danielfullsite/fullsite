@@ -9,7 +9,11 @@ import os, sys, json, time, requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
 from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("proactive_alerts")
+except ImportError:
+    _audit = None
 CLIENT = get_client()
 SUBSIDIARY, WANSOFT_USER, WANSOFT_PASS = get_wansoft_creds(CLIENT)
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"

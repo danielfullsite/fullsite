@@ -16,7 +16,11 @@ import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("tips_analyzer")
+except ImportError:
+    _audit = None
 # -- Config --
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
@@ -358,6 +362,7 @@ def send_telegram(msg):
 # -- Main --
 def main():
     start = time.time()
+    if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
 
@@ -429,7 +434,7 @@ def main():
     print(f"[tips] Done in {elapsed}ms — {summary}")
 
     log_run("success", elapsed, f"{len(mesero_ranking)} meseros, {len(correlations)} patterns")
-
+    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else int((time.time() - start) * 1000), "success")
 
 def log_run(status, elapsed, summary):
     try:

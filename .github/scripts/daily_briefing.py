@@ -12,7 +12,11 @@ import requests
 from datetime import date, timedelta, datetime, timezone
 from collections import defaultdict
 from client_config import get_client, get_tz, get_chat_ids
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("daily_briefing")
+except ImportError:
+    _audit = None
 # ── Config ──────────────────────────────────────────────────────────────────
 CLIENT           = get_client()
 SUPABASE_URL     = os.environ["SUPABASE_URL"].rstrip("/")
@@ -40,6 +44,7 @@ sb_headers = {
 }
 
 start_time   = time.time()
+if _audit: _audit.log_start()
 tokens_in    = 0
 tokens_out   = 0
 status       = "error"

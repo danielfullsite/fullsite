@@ -15,7 +15,11 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone, date
 from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("climate_events_agent")
+except ImportError:
+    _audit = None
 # ── Config ──────────────────────────────────────────────────────────────────
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
@@ -485,6 +489,7 @@ def send_telegram(msg):
 # ── Main ─────────────────────────────────────────────────────────────────
 def main():
     start = time.time()
+    if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
     tomorrow_str = (now_mx + timedelta(days=1)).strftime("%Y-%m-%d")

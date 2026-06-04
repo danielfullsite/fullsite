@@ -9,7 +9,11 @@ from datetime import date, timedelta, datetime, timezone
 from collections import defaultdict
 
 from client_config import get_client, get_chat_ids
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("weekly_amalay")
+except ImportError:
+    _audit = None
 CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
@@ -38,6 +42,7 @@ sb_headers = {
 }
 
 start = time.time()
+if _audit: _audit.log_start()
 
 def sb_get(table, params):
     r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}",

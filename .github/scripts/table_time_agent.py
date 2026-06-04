@@ -18,7 +18,11 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from client_config import get_client, get_tz, get_chat_ids
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("table_time_agent")
+except ImportError:
+    _audit = None
 # -- Config --
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
@@ -284,6 +288,7 @@ def send_telegram(msg):
 # -- Main --
 def main():
     start = time.time()
+    if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
 
@@ -370,7 +375,7 @@ def main():
     print(f"[table_time] Done in {elapsed}ms — {summary}")
 
     log_run("success", elapsed, f"source={analysis['source']}")
-
+    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else duration if "duration" in dir() else 0, "success")
 
 def log_run(status, elapsed, summary):
     try:

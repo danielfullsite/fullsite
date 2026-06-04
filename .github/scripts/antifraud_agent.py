@@ -13,7 +13,11 @@ import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("antifraud_agent")
+except ImportError:
+    _audit = None
 # ── Config ──────────────────────────────────────────────────────────────────
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
@@ -484,6 +488,7 @@ def send_telegram(msg):
 # ── Main ────────────────────────────────────────────────────────────────────
 def main():
     start = time.time()
+    if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
 
     print(f"[antifraud] Starting for {CLIENT['id']}")

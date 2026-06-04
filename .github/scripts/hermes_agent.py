@@ -18,7 +18,11 @@ import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from client_config import get_client, get_tz
-
+try:
+    from audit_log import AuditLogger
+    _audit = AuditLogger("hermes_agent")
+except ImportError:
+    _audit = None
 CLIENT = get_client()
 MX_TZ = get_tz(CLIENT)
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
@@ -513,6 +517,7 @@ def generate_improvements(all_issues):
 
 def main():
     start = time.time()
+    if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
 
