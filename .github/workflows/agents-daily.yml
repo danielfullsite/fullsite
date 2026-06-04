@@ -15,6 +15,7 @@ env:
   CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TRIGGER_TYPE: ${{ github.event_name }}
 
