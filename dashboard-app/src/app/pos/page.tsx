@@ -1591,9 +1591,17 @@ function POSContent() {
           {/* Order header — compact */}
           <div className="px-3 py-1.5 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold">
-                Mesa {mesa}
-                <span className="text-[var(--text-3)] font-normal text-xs ml-2">{personas}p · {mesero.split(' ')[0]}</span>
+              <h2 className="text-base font-bold flex items-center gap-1">
+                Mesa
+                <input
+                  type="number"
+                  value={mesa}
+                  onChange={e => setMesa(Number(e.target.value) || 1)}
+                  min={1}
+                  max={999}
+                  className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-white font-bold text-base mx-1 py-0.5 focus:border-emerald-500 focus:outline-none"
+                />
+                <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {mesero.split(' ')[0]}</span>
               </h2>
               <span className="text-emerald-400 font-bold text-lg">{formatMXN(total)}</span>
             </div>
@@ -1862,19 +1870,23 @@ function POSContent() {
               {/* Category grid — scrollable, compact for tablet */}
               <div className="overflow-y-auto max-h-[180px] border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
                 <div className="grid grid-cols-4 md:grid-cols-5 gap-1 px-2 py-1.5">
-                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat) => (
+                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat, catIdx) => {
+                    const GROUP_COLORS = ['bg-emerald-600', 'bg-blue-600', 'bg-amber-500', 'bg-violet-600', 'bg-rose-500', 'bg-cyan-600', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-lime-600', 'bg-fuchsia-500']
+                    const catColor = (cat as { color?: string }).color || GROUP_COLORS[catIdx % GROUP_COLORS.length]
+                    return (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
                       className={`px-2 py-2 rounded-lg text-[11px] font-bold text-center transition-all min-h-[38px] leading-tight ${
                         selectedCategory === cat.id
-                          ? `${(cat as { color?: string }).color || 'bg-emerald-600'} text-white shadow-lg`
+                          ? `${catColor} text-white shadow-lg`
                           : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:scale-95'
                       }`}
                     >
                       {cat.name}
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -1895,7 +1907,7 @@ function POSContent() {
                           : 'border-[var(--line)] hover:border-[var(--accent)]/30'
                       }`}
                     >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : activeCategory.color || 'bg-emerald-600'}`} />
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || (['bg-emerald-600','bg-blue-600','bg-amber-500','bg-violet-600','bg-rose-500','bg-cyan-600','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500'][menuCategories.findIndex(c => c.id === activeCategory.id) % 10] || 'bg-emerald-600')}`} />
                       {isOOS && (
                         <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                           Agotado

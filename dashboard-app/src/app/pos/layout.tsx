@@ -163,14 +163,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+    <div className="h-screen flex items-center justify-center bg-slate-900 text-white" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
       <div className="text-center w-full max-w-xs mx-4">
-        <div className="mb-6">
+        <div className="mb-8">
+          {/* Restaurant logo placeholder — configurable per client */}
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/20 flex items-center justify-center">
+            <span className="text-3xl font-black text-emerald-400">F</span>
+          </div>
           <span className="text-white font-black text-2xl tracking-tight">
             fullsite
             <span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-1" />
           </span>
-          <p className="text-[var(--text-3)] text-sm mt-1">POS — Ingresa tu PIN</p>
+          <p className="text-slate-400 text-sm mt-2">Ingresa tu PIN para abrir</p>
         </div>
 
         <input
