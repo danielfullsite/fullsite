@@ -997,17 +997,35 @@ function POSContent() {
     } catch { /* */ }
   }, [])
 
-  // Role permissions
+  // Role permissions — granular system (50+ permissions per Wansoft parity)
+  const _perms = (() => {
+    try {
+      const { getPermissions } = require('@/lib/pos-permissions')
+      return getPermissions(staffRole)
+    } catch { return null }
+  })()
+  const can = (perm: string) => _perms ? (_perms as Record<string, boolean>)[perm] ?? true : true
+
+  // Section visibility (maps nav sections to granular permissions)
   const canSee = (section: string) => {
-    const perms: Record<string, string[]> = {
-      mesero: ['mesas', 'cocina', 'barra'],
-      cajero: ['mesas', 'cocina', 'barra', 'corte'],
-      cocina: ['cocina'],
-      barra: ['barra'],
-      gerente: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoría', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
-      admin: ['mesas', 'cocina', 'kds', 'barra', 'recetas', 'compras', 'inventario', 'auditoría', 'corte', 'qr', 'turno', 'historial', 'facturacion'],
+    const sectionMap: Record<string, string> = {
+      mesas: 'abrir_cuentas_restaurante',
+      cocina: 'registro_comanda',
+      kds: 'registro_comanda',
+      barra: 'registro_comanda',
+      recetas: 'control_existencias_pos',
+      compras: 'control_existencias_pos',
+      inventario: 'control_existencias_pos',
+      'auditoría': 'reportes',
+      corte: 'corte_turno',
+      qr: 'abrir_cuentas_restaurante',
+      turno: 'corte_turno',
+      historial: 'reportes',
+      facturacion: 'cancelar_facturas',
     }
-    return (perms[staffRole] || perms.admin).includes(section)
+    const perm = sectionMap[section]
+    if (!perm) return staffRole === 'admin' || staffRole === 'gerente'
+    return can(perm)
   }
 
   // Mobile view toggle
