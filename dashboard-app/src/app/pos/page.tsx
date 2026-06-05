@@ -1525,16 +1525,23 @@ function POSContent() {
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--line)]/50 overflow-x-auto">
-          <select value={mesa} onChange={(e) => {
-            const newMesa = Number(e.target.value)
-            if (orderItems.length > 0 && newMesa !== mesa) {
-              logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
-              showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
-            }
-            setMesa(newMesa)
-          }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
-            {Array.from({ length: 16 }, (_, i) => (<option key={i + 1} value={i + 1}>Mesa {i + 1}</option>))}
-          </select>
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-2 py-1 border border-slate-600 min-h-[40px]">
+            <span className="text-white text-sm font-medium">Mesa</span>
+            <input
+              type="number"
+              value={mesa}
+              onChange={(e) => {
+                const newMesa = Number(e.target.value) || 1
+                if (orderItems.length > 0 && newMesa !== mesa) {
+                  logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
+                  showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
+                }
+                setMesa(newMesa)
+              }}
+              min={1} max={999}
+              className="w-12 bg-transparent text-white text-sm font-bold text-center border-none outline-none"
+            />
+          </div>
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
             {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
