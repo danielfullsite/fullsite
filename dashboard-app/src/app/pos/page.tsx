@@ -1890,28 +1890,39 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category grid — full area, alphabetical, large touch targets */}
+              {/* Category grid — full area, alphabetical by COLUMNS, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-3 p-4">
-                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
-                    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                    .map((cat, catIdx) => {
+                  {(() => {
+                    const sorted = menuCategories
+                      .filter(cat => cat.items.some(i => i.price > 0))
+                      .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+                    // Reorder: column-first (read top→bottom, then next column)
+                    const cols = 4 // md:grid-cols-4
+                    const rows = Math.ceil(sorted.length / cols)
+                    const columnOrdered: typeof sorted = []
+                    for (let r = 0; r < rows; r++) {
+                      for (let c = 0; c < cols; c++) {
+                        const idx = c * rows + r
+                        if (idx < sorted.length) columnOrdered.push(sorted[idx])
+                      }
+                    }
                     const GROUP_COLORS = ['bg-emerald-600', 'bg-blue-600', 'bg-amber-500', 'bg-violet-600', 'bg-rose-500', 'bg-cyan-600', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-lime-600', 'bg-fuchsia-500']
-                    const catColor = (cat as { color?: string }).color || GROUP_COLORS[catIdx % GROUP_COLORS.length]
-                    const itemCount = cat.items.filter(i => i.price > 0).length
-                    return (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-4 py-4 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-1 ${
-                        `${catColor} opacity-60 text-white hover:opacity-90 active:scale-95`
-                      }`}
-                    >
-                      <span>{cat.name}</span>
-                      <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
-                    </button>
-                    )
-                  })}
+                    return columnOrdered.map((cat, catIdx) => {
+                      const catColor = (cat as { color?: string }).color || GROUP_COLORS[catIdx % GROUP_COLORS.length]
+                      const itemCount = cat.items.filter(i => i.price > 0).length
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.id)}
+                          className={`px-4 py-4 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-1 ${catColor} opacity-60 text-white hover:opacity-90 active:scale-95`}
+                        >
+                          <span>{cat.name}</span>
+                          <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
+                        </button>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
 
