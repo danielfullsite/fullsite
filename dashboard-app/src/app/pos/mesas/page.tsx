@@ -1,14 +1,109 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, GripVertical, Lock, Unlock, LayoutGrid, Map } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
+
+// ─── Floor Plan Zones ────────────────────────────────────────────────────────
+// Each zone has a name and the mesa numbers that belong to it.
+// Mesas within a zone are positioned on a relative grid.
+interface ZoneMesa {
+  number: number
+  gridRow: number
+  gridCol: number
+  width?: number   // span columns (default 1)
+  height?: number  // span rows (default 1)
+  shape?: 'square' | 'round' | 'rect-h' | 'rect-v'
+}
+
+interface FloorZone {
+  id: string
+  name: string
+  gridCols: number
+  gridRows: number
+  mesas: ZoneMesa[]
+  color: string     // accent color for zone header
+  bgColor: string   // background tint
+}
+
+// Default AMALAY layout — configurable per client via localStorage
+const DEFAULT_FLOOR_ZONES: FloorZone[] = [
+  {
+    id: 'salon',
+    name: 'Salón Principal',
+    gridCols: 4,
+    gridRows: 4,
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-500/5',
+    mesas: [
+      { number: 1, gridRow: 1, gridCol: 1, shape: 'round' },
+      { number: 2, gridRow: 1, gridCol: 2, shape: 'round' },
+      { number: 3, gridRow: 1, gridCol: 3, shape: 'round' },
+      { number: 4, gridRow: 1, gridCol: 4, shape: 'round' },
+      { number: 5, gridRow: 2, gridCol: 1, shape: 'square' },
+      { number: 6, gridRow: 2, gridCol: 2, shape: 'square' },
+      { number: 7, gridRow: 2, gridCol: 3, shape: 'square' },
+      { number: 8, gridRow: 2, gridCol: 4, shape: 'square' },
+      { number: 9, gridRow: 3, gridCol: 1, shape: 'square' },
+      { number: 10, gridRow: 3, gridCol: 2, shape: 'square' },
+      { number: 11, gridRow: 3, gridCol: 3, shape: 'square' },
+      { number: 12, gridRow: 3, gridCol: 4, shape: 'square' },
+    ],
+  },
+  {
+    id: 'terraza',
+    name: 'Terraza',
+    gridCols: 4,
+    gridRows: 2,
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/5',
+    mesas: [
+      { number: 13, gridRow: 1, gridCol: 1, shape: 'round' },
+      { number: 14, gridRow: 1, gridCol: 2, shape: 'round' },
+      { number: 15, gridRow: 1, gridCol: 3, shape: 'round' },
+      { number: 16, gridRow: 1, gridCol: 4, shape: 'round' },
+      { number: 20, gridRow: 2, gridCol: 1, shape: 'rect-h', width: 2 },
+      { number: 30, gridRow: 2, gridCol: 3, shape: 'rect-h', width: 2 },
+    ],
+  },
+  {
+    id: 'jardin',
+    name: 'Jardín / Eventos',
+    gridCols: 4,
+    gridRows: 2,
+    color: 'text-amber-400',
+    bgColor: 'bg-amber-500/5',
+    mesas: [
+      { number: 40, gridRow: 1, gridCol: 1, shape: 'rect-h', width: 2 },
+      { number: 50, gridRow: 1, gridCol: 3, shape: 'rect-h', width: 2 },
+      { number: 60, gridRow: 2, gridCol: 1, shape: 'rect-h', width: 2 },
+      { number: 70, gridRow: 2, gridCol: 3, shape: 'round' },
+      { number: 80, gridRow: 2, gridCol: 4, shape: 'round' },
+    ],
+  },
+]
+
+function getFloorZones(): FloorZone[] {
+  try {
+    const saved = localStorage.getItem(`pos_floor_${_cid()}`)
+    if (saved) return JSON.parse(saved)
+  } catch { /* use default */ }
+  return DEFAULT_FLOOR_ZONES
+}
+
+function saveFloorZones(zones: FloorZone[]) {
+  try { localStorage.setItem(`pos_floor_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Reserva {
   codigo_reserva: string
@@ -28,6 +123,8 @@ interface ActiveOrder {
   created_at: string
 }
 
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function MesasPage() {
   const router = useRouter()
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([])
@@ -35,82 +132,65 @@ export default function MesasPage() {
   const [loading, setLoading] = useState(true)
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
+  const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
 
-  // Get current mesero from URL or localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const m = params.get('mesero') || localStorage.getItem('pos_mesero') || ''
     setCurrentMesero(m)
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      // Fetch active orders (not closed/cancelled)
-      const ordersRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=50`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-      )
-      const orders: ActiveOrder[] = ordersRes.ok ? await ordersRes.json() : []
-      setActiveOrders(orders)
-
-      // Fetch today's reservations
-      const today = new Date().toISOString().split('T')[0]
-      const resRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/amalay_reservaciones?fecha=eq.${today}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
-      const res: Reserva[] = resRes.ok ? await resRes.json() : []
-      setReservas(res)
+      const [ordersRes, resRes] = await Promise.all([
+        fetch(
+          `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=50`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+        ),
+        fetch(
+          `${SUPABASE_URL}/rest/v1/amalay_reservaciones?fecha=eq.${new Date().toISOString().split('T')[0]}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+        ),
+      ])
+      setActiveOrders(ordersRes.ok ? await ordersRes.json() : [])
+      setReservas(resRes.ok ? await resRes.json() : [])
     } catch { /* */ }
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
-  // Build mesa states from active orders
-  const ordersByMesa = new Map<number, ActiveOrder>()
+  // Build mesa states
+  const ordersByMesa: globalThis.Map<number, ActiveOrder> = new globalThis.Map()
   for (const order of activeOrders) {
-    // Keep the most recent order per mesa
-    if (!ordersByMesa.has(order.mesa)) {
-      ordersByMesa.set(order.mesa, order)
-    }
+    if (!ordersByMesa.has(order.mesa)) ordersByMesa.set(order.mesa, order)
   }
 
-  const mesas: Mesa[] = MESAS_CONFIG.map(m => {
+  const mesaMap: globalThis.Map<number, Mesa> = new globalThis.Map()
+  for (const m of MESAS_CONFIG) {
     const order = ordersByMesa.get(m.number)
-    if (order) {
-      return {
-        ...m,
-        status: order.status === 'lista' ? 'cuenta' as const : 'ocupada' as const,
-        mesero: order.mesero,
-        personas: order.personas,
-        total: order.total,
-      }
-    }
-    return m
-  })
+    mesaMap.set(m.number, order ? {
+      ...m,
+      status: order.status === 'lista' ? 'cuenta' as const : 'ocupada' as const,
+      mesero: order.mesero,
+      personas: order.personas,
+      total: order.total,
+    } : m)
+  }
+
+  const mesas = Array.from(mesaMap.values())
 
   const statusColor: Record<string, string> = {
-    disponible: 'bg-emerald-900/50 border-emerald-600 hover:bg-emerald-800/60',
-    ocupada: 'bg-blue-900/50 border-blue-600 hover:bg-blue-800/60',
-    cuenta: 'bg-amber-900/50 border-amber-600 hover:bg-amber-800/60',
+    disponible: 'bg-emerald-900/40 border-emerald-600/60 hover:bg-emerald-800/50',
+    ocupada: 'bg-blue-900/40 border-blue-500/60 hover:bg-blue-800/50',
+    cuenta: 'bg-amber-900/40 border-amber-500/60 hover:bg-amber-800/50',
   }
-
-  const statusLabel: Record<string, string> = {
-    disponible: 'Disponible',
-    ocupada: 'Ocupada',
-    cuenta: 'Lista',
-  }
-
-  const statusDot: Record<string, string> = {
-    disponible: 'bg-emerald-400',
-    ocupada: 'bg-blue-400',
-    cuenta: 'bg-amber-400',
-  }
+  const statusLabel: Record<string, string> = { disponible: 'Disponible', ocupada: 'Ocupada', cuenta: 'Lista' }
+  const statusDot: Record<string, string> = { disponible: 'bg-emerald-400', ocupada: 'bg-blue-400', cuenta: 'bg-amber-400' }
 
   const counts = {
     disponible: mesas.filter(m => m.status === 'disponible').length,
@@ -122,20 +202,19 @@ export default function MesasPage() {
   const totalVentas = mesas.reduce((s, m) => s + (m.total || 0), 0)
   const ticketPromedio = totalPersonas > 0 ? totalVentas / totalPersonas : 0
 
-  // Timer: minutes since order created per mesa
+  // Timer
   const [, setTick] = useState(0)
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 30000) // refresh every 30s
+    const timer = setInterval(() => setTick(t => t + 1), 30000)
     return () => clearInterval(timer)
   }, [])
-
   const getMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
 
-  const ALERT_THRESHOLD = 90 // minutes
+  const ALERT_THRESHOLD = 90
   const WARNING_THRESHOLD = 60
   const alertMesas = activeOrders.filter(o => getMinutes(o.created_at) >= ALERT_THRESHOLD)
 
-  // ─── Merge Mesas ──────────────────────────────────────────────────────
+  // Merge mode
   const [mergeMode, setMergeMode] = useState(false)
   const [mergeSource, setMergeSource] = useState<number | null>(null)
   const [mergeTarget, setMergeTarget] = useState<number | null>(null)
@@ -151,21 +230,17 @@ export default function MesasPage() {
 
     setMerging(true)
     try {
-      // Get full source order with items
-      const srcRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeSource}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
-      const tgtRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeTarget}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
+      const [srcRes, tgtRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeSource}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeTarget}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
+      ])
       if (!srcRes.ok || !tgtRes.ok) { showToast('Error al cargar ordenes'); setMerging(false); return }
       const [srcOrder] = await srcRes.json()
       const [tgtOrder] = await tgtRes.json()
       if (!srcOrder || !tgtOrder) { showToast('No se encontraron ordenes'); setMerging(false); return }
 
-      // Merge items
       const srcItems = typeof srcOrder.items === 'string' ? JSON.parse(srcOrder.items) : (srcOrder.items || [])
       const tgtItems = typeof tgtOrder.items === 'string' ? JSON.parse(tgtOrder.items) : (tgtOrder.items || [])
       const mergedItems = [...tgtItems, ...srcItems]
@@ -174,7 +249,6 @@ export default function MesasPage() {
       const newIva = Number(tgtOrder.iva || 0) + Number(srcOrder.iva || 0)
       const newPersonas = (tgtOrder.personas || 0) + (srcOrder.personas || 0)
 
-      // Update target order with merged items
       await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${tgtOrder.id}`, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -185,8 +259,6 @@ export default function MesasPage() {
           notas: `Merge: mesa ${mergeSource} → mesa ${mergeTarget}. ${tgtOrder.notas || ''}`.trim(),
         }),
       })
-
-      // Cancel source order
       await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${srcOrder.id}`, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -199,33 +271,171 @@ export default function MesasPage() {
       })
 
       showToast(`Mesa ${mergeSource} fusionada con mesa ${mergeTarget}`)
-      setMergeMode(false)
-      setMergeSource(null)
-      setMergeTarget(null)
+      setMergeMode(false); setMergeSource(null); setMergeTarget(null)
       fetchData()
-    } catch {
-      showToast('Error al fusionar mesas')
-    }
+    } catch { showToast('Error al fusionar mesas') }
     setMerging(false)
   }
 
   const handleMesaClick = (mesaNum: number) => {
-    if (!mergeMode) {
-      router.push(`/pos?mesa=${mesaNum}`)
-      return
-    }
-    // Merge mode: select source, then target
-    if (!mergeSource) {
-      setMergeSource(mesaNum)
-    } else if (mesaNum !== mergeSource) {
-      setMergeTarget(mesaNum)
-    }
+    if (!mergeMode) { router.push(`/pos?mesa=${mesaNum}`); return }
+    if (!mergeSource) setMergeSource(mesaNum)
+    else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
   }
+
+  // ─── Mesa Card (shared between views) ─────────────────────────────────────
+  const MesaCard = ({ mesa, compact, shape }: { mesa: Mesa; compact?: boolean; shape?: string }) => {
+    const order = ordersByMesa.get(mesa.number)
+    const mins = order ? getMinutes(order.created_at) : 0
+    const isAlert = mins >= ALERT_THRESHOLD
+    const isWarning = mins >= WARNING_THRESHOLD && mins < ALERT_THRESHOLD
+
+    const shapeClass = shape === 'round' ? 'rounded-full' :
+                       shape === 'rect-h' ? 'rounded-2xl' :
+                       shape === 'rect-v' ? 'rounded-2xl' : 'rounded-2xl'
+
+    return (
+      <button
+        onClick={() => handleMesaClick(mesa.number)}
+        className={`border-2 p-3 transition-all active:scale-95 flex flex-col justify-between w-full h-full ${shapeClass} ${
+          mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/50' :
+          mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/50' :
+          statusColor[mesa.status]
+        }`}
+      >
+        <div className="flex items-start justify-between">
+          <span className={`${compact ? 'text-xl' : 'text-2xl'} font-bold`}>{mesa.number}</span>
+          {!compact && (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+              mesa.status === 'disponible' ? 'bg-emerald-600/30 text-emerald-300' :
+              mesa.status === 'ocupada' ? 'bg-blue-600/30 text-blue-300' :
+              'bg-amber-600/30 text-amber-300'
+            }`}>
+              {statusLabel[mesa.status]}
+            </span>
+          )}
+        </div>
+        {mesa.status !== 'disponible' ? (
+          <div className={compact ? 'mt-1' : 'mt-2'}>
+            {order && (
+              <div className={`flex items-center gap-1 mb-0.5 ${isAlert ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
+                <Clock size={10} />
+                <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
+                  {mins >= 60 ? `${Math.floor(mins/60)}h${mins%60}m` : `${mins}m`}
+                </span>
+                {isAlert && <AlertTriangle size={9} className="text-red-400" />}
+              </div>
+            )}
+            {!compact && <p className="text-[var(--text-4)] text-xs truncate">{mesa.mesero}</p>}
+            <div className="flex items-center justify-between mt-0.5">
+              <div className="flex items-center gap-1 text-[var(--text-3)] text-xs">
+                <Users size={11} />
+                <span className="font-semibold text-white">{mesa.personas}</span>
+              </div>
+              {mesa.total != null && (
+                <span className="text-white font-semibold text-xs">{formatMXN(mesa.total)}</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className={`text-[var(--text-3)] ${compact ? 'text-[10px]' : 'text-xs'} mt-1`}>
+            {mesa.capacity} lug.
+          </p>
+        )}
+      </button>
+    )
+  }
+
+  // ─── Planograma View ──────────────────────────────────────────────────────
+  const floorZones = getFloorZones()
+
+  const PlanogramaView = () => (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {floorZones.map(zone => {
+        const zoneMesas = zone.mesas
+          .map(zm => ({ ...zm, mesa: mesaMap.get(zm.number) }))
+          .filter(zm => zm.mesa)
+          .filter(zm => {
+            if (!soloMisMesas || !currentMesero) return true
+            return zm.mesa!.status === 'disponible' || zm.mesa!.mesero === currentMesero
+          })
+
+        if (zoneMesas.length === 0) return null
+
+        return (
+          <div key={zone.id} className={`${zone.bgColor} rounded-2xl border border-[var(--line)] p-5`}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className={`w-2 h-2 rounded-full ${zone.color.replace('text-', 'bg-')}`} />
+              <h3 className={`text-sm font-bold ${zone.color}`}>{zone.name}</h3>
+              <span className="text-[var(--text-4)] text-xs ml-auto">
+                {zoneMesas.filter(zm => zm.mesa!.status !== 'disponible').length}/{zoneMesas.length} ocupadas
+              </span>
+            </div>
+            <div
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `repeat(${zone.gridCols}, 1fr)`,
+                gridTemplateRows: `repeat(${zone.gridRows}, minmax(100px, auto))`,
+              }}
+            >
+              {zoneMesas.map(zm => (
+                <div
+                  key={zm.number}
+                  style={{
+                    gridRow: `${zm.gridRow} / span ${zm.height || 1}`,
+                    gridColumn: `${zm.gridCol} / span ${zm.width || 1}`,
+                  }}
+                >
+                  <MesaCard mesa={zm.mesa!} shape={zm.shape} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Unassigned mesas (in MESAS_CONFIG but not in any zone) */}
+      {(() => {
+        const assignedNumbers = new Set(floorZones.flatMap(z => z.mesas.map(m => m.number)))
+        const unassigned = mesas.filter(m => !assignedNumbers.has(m.number))
+        if (unassigned.length === 0) return null
+        return (
+          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 rounded-full bg-slate-400" />
+              <h3 className="text-sm font-bold text-slate-400">Sin zona asignada</h3>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {unassigned.map(mesa => (
+                <div key={mesa.number} className="min-h-[100px]">
+                  <MesaCard mesa={mesa} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+
+  // ─── Grid View (classic) ──────────────────────────────────────────────────
+  const GridView = () => (
+    <div className="grid grid-cols-4 gap-4 max-w-5xl mx-auto">
+      {mesas.filter(mesa => {
+        if (!soloMisMesas || !currentMesero) return true
+        return mesa.status === 'disponible' || mesa.mesero === currentMesero
+      }).map(mesa => (
+        <div key={mesa.number} className="min-h-[140px]">
+          <MesaCard mesa={mesa} />
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="h-screen flex flex-col text-white">
       <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
             <ArrowLeft size={20} />
           </Link>
@@ -242,6 +452,27 @@ export default function MesasPage() {
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
+
+          {/* View toggle */}
+          <div className="flex items-center bg-[var(--line)] rounded-lg p-0.5 ml-2">
+            <button
+              onClick={() => setViewMode('planograma')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'planograma' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
+              }`}
+            >
+              <Map size={13} /> Plano
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === 'grid' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
+              }`}
+            >
+              <LayoutGrid size={13} /> Grid
+            </button>
+          </div>
+
           {currentMesero && (
             <button
               onClick={() => setSoloMisMesas(!soloMisMesas)}
@@ -275,7 +506,7 @@ export default function MesasPage() {
         </div>
       </header>
 
-      {/* Alert banner for slow tables */}
+      {/* Alert banner */}
       {alertMesas.length > 0 && (
         <div className="mx-6 mt-3 flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-pulse">
           <AlertTriangle size={18} className="text-red-400 flex-shrink-0" />
@@ -293,73 +524,9 @@ export default function MesasPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-4 gap-4 max-w-5xl mx-auto">
-              {mesas.filter(mesa => {
-                if (!soloMisMesas || !currentMesero) return true
-                // Show: own occupied mesas + all available mesas
-                return mesa.status === 'disponible' || mesa.mesero === currentMesero
-              }).map(mesa => (
-                <button
-                  key={mesa.number}
-                  onClick={() => handleMesaClick(mesa.number)}
-                  className={`rounded-2xl border-2 p-5 transition-all active:scale-95 min-h-[160px] flex flex-col justify-between ${
-                    mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/50' :
-                    mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/50' :
-                    statusColor[mesa.status]
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-3xl font-bold">{mesa.number}</span>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      mesa.status === 'disponible' ? 'bg-emerald-600/30 text-emerald-300' :
-                      mesa.status === 'ocupada' ? 'bg-blue-600/30 text-blue-300' :
-                      'bg-amber-600/30 text-amber-300'
-                    }`}>
-                      {statusLabel[mesa.status]}
-                    </span>
-                  </div>
-                  <div className="mt-3">
-                    {mesa.status !== 'disponible' ? (() => {
-                      const order = ordersByMesa.get(mesa.number)
-                      const mins = order ? getMinutes(order.created_at) : 0
-                      const isAlert = mins >= ALERT_THRESHOLD
-                      const isWarning = mins >= WARNING_THRESHOLD && mins < ALERT_THRESHOLD
-                      return (
-                      <>
-                        {/* Timer */}
-                        <div className={`flex items-center gap-1 mb-1.5 ${isAlert ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
-                          <Clock size={12} />
-                          <span className={`text-xs font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
-                            {mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`}
-                          </span>
-                          {isAlert && <AlertTriangle size={10} className="text-red-400" />}
-                        </div>
-                        <p className="text-[var(--text-4)] text-sm truncate">{mesa.mesero}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <div className="flex items-center gap-1 text-[var(--text-3)] text-sm">
-                            <Users size={14} />
-                            <span className="font-semibold text-white">{mesa.personas}</span>
-                          </div>
-                          {mesa.total != null && (
-                            <span className="text-white font-semibold">{formatMXN(mesa.total)}</span>
-                          )}
-                        </div>
-                        {mesa.personas && mesa.personas > 0 && mesa.total ? (
-                          <p className="text-xs text-[var(--text-2)] mt-1">
-                            TP: <span className="text-emerald-400 font-semibold">{formatMXN(mesa.total / mesa.personas)}</span>/pers
-                          </p>
-                        ) : null}
-                      </>
-                      )
-                    })() : (
-                      <p className="text-[var(--text-2)] text-sm">{mesa.capacity} lugares</p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
+            {viewMode === 'planograma' ? <PlanogramaView /> : <GridView />}
 
-            {/* Reservaciones de hoy */}
+            {/* Reservaciones */}
             {reservas.length > 0 && (
               <div className="max-w-5xl mx-auto mt-6">
                 <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
@@ -387,7 +554,7 @@ export default function MesasPage() {
         )}
       </div>
 
-      {/* Merge mode instructions + confirm */}
+      {/* Merge footer */}
       {mergeMode && (
         <div className="px-6 py-3 bg-amber-900/30 border-t border-amber-700/40 flex items-center justify-between">
           <div className="text-sm">

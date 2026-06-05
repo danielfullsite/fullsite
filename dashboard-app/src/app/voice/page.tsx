@@ -24,6 +24,15 @@ export default function VoicePage() {
   const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
   const [supported, setSupported] = useState(true)
+  const [voiceEngine, setVoiceEngine] = useState<string>('')
+
+  // Check voice engine on mount
+  useEffect(() => {
+    fetch('/api/voice-tts')
+      .then(r => r.json())
+      .then(data => setVoiceEngine(data.engine || 'unknown'))
+      .catch(() => setVoiceEngine('browser_tts'))
+  }, [])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
@@ -532,6 +541,18 @@ export default function VoicePage() {
           }}>
             {STATUS_TEXT[state]}
           </p>
+
+          {/* Voice engine indicator */}
+          {voiceEngine && state === 'idle' && (
+            <p style={{
+              fontSize: 11,
+              color: voiceEngine === 'elevenlabs' ? '#10b981' : '#f59e0b',
+              marginTop: 6,
+              letterSpacing: '0.3px',
+            }}>
+              {voiceEngine === 'elevenlabs' ? 'ElevenLabs' : 'Voz del navegador'}
+            </p>
+          )}
 
           {/* Interim transcription */}
           {interim && (

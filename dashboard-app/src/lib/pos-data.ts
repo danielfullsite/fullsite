@@ -814,10 +814,12 @@ export const MESEROS = [
 
 export const IVA_RATE = 0.16
 
-// Sample mesas for the table map
-export const MESAS_CONFIG: Mesa[] = Array.from({ length: 16 }, (_, i) => ({
-  number: i + 1,
-  capacity: i < 4 ? 2 : i < 10 ? 4 : 6,
+// Mesa config — supports non-consecutive numbers (AMALAY uses 10, 20, 30, 40, 70, etc)
+// Default: common restaurant layout with sections
+const DEFAULT_MESA_NUMBERS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,40,50,60,70,80]
+export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
+  number: n,
+  capacity: n <= 4 ? 2 : n <= 10 ? 4 : 6,
   status: 'disponible' as const,
 }))
 

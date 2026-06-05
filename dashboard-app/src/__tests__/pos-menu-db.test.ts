@@ -175,8 +175,8 @@ describe('POS Constants', () => {
     }
   })
 
-  it('MESAS_CONFIG has 16 tables', () => {
-    expect(MESAS_CONFIG).toHaveLength(16)
+  it('MESAS_CONFIG has 23 tables', () => {
+    expect(MESAS_CONFIG).toHaveLength(23)
     for (const mesa of MESAS_CONFIG) {
       expect(mesa.number).toBeGreaterThan(0)
       expect(mesa.capacity).toBeGreaterThan(0)

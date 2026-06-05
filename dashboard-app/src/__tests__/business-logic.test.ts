@@ -405,9 +405,9 @@ describe('Real AMALAY scenarios', () => {
 
   it('Restaurant total capacity is reasonable for AMALAY', () => {
     const totalCapacity = MESAS_CONFIG.reduce((s, m) => s + m.capacity, 0)
-    // AMALAY is a medium-sized restaurant: 50-80 seats
+    // AMALAY has 23 mesas including non-consecutive (20,30,...,80): ~110 seats
     expect(totalCapacity).toBeGreaterThanOrEqual(50)
-    expect(totalCapacity).toBeLessThanOrEqual(100)
+    expect(totalCapacity).toBeLessThanOrEqual(150)
   })
 
   it('Beverage detection covers all menu drink categories', () => {

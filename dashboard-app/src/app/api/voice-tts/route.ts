@@ -6,6 +6,32 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'FGY2WhTYpPnrIDTdsKH5' // Laura — LatAm Spanish
 const MODEL_ID = 'eleven_multilingual_v2'
 
+// GET — health check for diagnostics
+export async function GET() {
+  const hasKey = ELEVENLABS_API_KEY.length > 0
+  if (!hasKey) {
+    return Response.json({ status: 'no_key', engine: 'browser_tts', message: 'ELEVENLABS_API_KEY no configurada en Vercel' })
+  }
+  // Quick check: validate key by fetching user info
+  try {
+    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+    })
+    if (res.ok) {
+      const user = await res.json()
+      return Response.json({
+        status: 'ok', engine: 'elevenlabs',
+        chars_remaining: user?.subscription?.character_count != null
+          ? user.subscription.character_limit - user.subscription.character_count
+          : 'unknown',
+      })
+    }
+    return Response.json({ status: 'key_invalid', engine: 'browser_tts', http: res.status })
+  } catch {
+    return Response.json({ status: 'error', engine: 'browser_tts' })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { text } = await request.json()
@@ -18,7 +44,6 @@ export async function POST(request: NextRequest) {
       console.log('[voice-tts] No ElevenLabs key found. Checked: ELEVENLABS_API_KEY, ELEVEN_LABS_API_KEY, ELEVENLABS')
       return new Response(null, { status: 204 })
     }
-    console.log('[voice-tts] ElevenLabs key found, length:', ELEVENLABS_API_KEY.length)
 
     // Stream audio from ElevenLabs
     const response = await fetch(

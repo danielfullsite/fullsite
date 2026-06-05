@@ -118,13 +118,13 @@ describe('IVA_RATE', () => {
 // ─── MESAS_CONFIG ─────────────────────────────────────────────────────────
 
 describe('MESAS_CONFIG', () => {
-  it('has 16 mesas', () => {
-    expect(MESAS_CONFIG).toHaveLength(16)
+  it('has 23 mesas (1-16 + 20,30,40,50,60,70,80)', () => {
+    expect(MESAS_CONFIG).toHaveLength(23)
   })
 
-  it('mesas are numbered 1-16', () => {
+  it('mesas include 1-16 plus non-consecutive (20,30,...,80)', () => {
     const numbers = MESAS_CONFIG.map(m => m.number)
-    expect(numbers).toEqual(Array.from({ length: 16 }, (_, i) => i + 1))
+    expect(numbers).toEqual([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,40,50,60,70,80])
   })
 
   it('all mesas start as disponible', () => {
@@ -153,8 +153,8 @@ describe('MESAS_CONFIG', () => {
 
   it('total restaurant capacity is correct', () => {
     const total = MESAS_CONFIG.reduce((s, m) => s + m.capacity, 0)
-    // 4*2 + 6*4 + 6*6 = 8 + 24 + 36 = 68
-    expect(total).toBe(68)
+    // 4*2 + 6*4 + 13*6 = 8 + 24 + 78 = 110
+    expect(total).toBe(110)
   })
 })
 

@@ -1892,23 +1892,25 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category grid — scrollable, compact for tablet */}
-              <div className="overflow-y-auto max-h-[180px] border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
-                <div className="grid grid-cols-4 md:grid-cols-5 gap-1 px-2 py-1.5">
-                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0)).map((cat, catIdx) => {
+              {/* Category grid — full area, alphabetical, large touch targets */}
+              <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-3 p-4">
+                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+                    .map((cat, catIdx) => {
                     const GROUP_COLORS = ['bg-emerald-600', 'bg-blue-600', 'bg-amber-500', 'bg-violet-600', 'bg-rose-500', 'bg-cyan-600', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-lime-600', 'bg-fuchsia-500']
                     const catColor = (cat as { color?: string }).color || GROUP_COLORS[catIdx % GROUP_COLORS.length]
+                    const itemCount = cat.items.filter(i => i.price > 0).length
                     return (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-2 py-2 rounded-lg text-[11px] font-bold text-center transition-all min-h-[38px] leading-tight ${
-                        selectedCategory === cat.id
-                          ? `${catColor} text-white shadow-lg ring-2 ring-white/30`
-                          : `${catColor} opacity-40 text-white hover:opacity-70 active:scale-95`
+                      className={`px-4 py-4 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-1 ${
+                        `${catColor} opacity-60 text-white hover:opacity-90 active:scale-95`
                       }`}
                     >
-                      {cat.name}
+                      <span>{cat.name}</span>
+                      <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
                     </button>
                     )
                   })}
@@ -1916,7 +1918,6 @@ function POSContent() {
               </div>
 
               {/* Menu items — centered modal overlay on category tap */}
-              <div className="flex-1 overflow-y-auto p-3" style={{display:'none'}} />
               {selectedCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
                   <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -1932,7 +1933,7 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative shadow-sm ${
+                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[110px] overflow-hidden relative shadow-sm ${
                         isOOS
                           ? 'border-red-500/30 opacity-50 cursor-not-allowed'
                           : (item as MenuItem & { promo?: boolean }).promo
@@ -1943,8 +1944,8 @@ function POSContent() {
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (() => { const gc = ['bg-emerald-600','bg-blue-600','bg-amber-500','bg-violet-600','bg-rose-500','bg-cyan-600','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']; return gc[menuCategories.findIndex(c => c.id === activeCategory.id) % gc.length] })()}`} />
                       {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
                       <div className="flex flex-col justify-between px-4 py-5 flex-1">
-                        <span className={`font-bold text-base leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
-                        <span className={`font-bold text-lg mt-2 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
+                        <span className={`font-bold text-lg leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
+                        <span className={`font-bold text-xl mt-2 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
                       </div>
                     </button>
                     )
@@ -1954,47 +1955,7 @@ function POSContent() {
                   </div>
                 </div>
               )}
-              {/* Legacy grid hidden — kept for search results */}
-              <div className="flex-1 overflow-y-auto p-3" style={{display: selectedCategory ? 'none' : undefined}}>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {activeCategory.items.filter(item => item.price > 0).map((item) => {
-                    const isOOS = outOfStockItems.has(item.id)
-                    return (
-                    <button
-                      key={item.id}
-                      onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setMobileView('order') }}
-                      className={`bg-[var(--surface)] hover:bg-[var(--surface-2)] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative shadow-sm ${
-                        isOOS
-                          ? 'border-red-500/30 opacity-50 cursor-not-allowed'
-                          : (item as MenuItem & { promo?: boolean }).promo
-                          ? 'border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20'
-                          : 'border-[var(--line)] hover:border-[var(--accent)]/30'
-                      }`}
-                    >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || (['bg-emerald-600','bg-blue-600','bg-amber-500','bg-violet-600','bg-rose-500','bg-cyan-600','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500'][menuCategories.findIndex(c => c.id === activeCategory.id) % 10] || 'bg-emerald-600')}`} />
-                      {isOOS && (
-                        <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                          Agotado
-                        </span>
-                      )}
-                      {!isOOS && (item as MenuItem & { promo?: boolean }).promo && (
-                        <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                          Promo
-                        </span>
-                      )}
-                      <div className="flex flex-col justify-between px-4 py-5 flex-1">
-                        <span className={`font-bold text-base leading-snug ${isOOS ? 'text-[var(--text-3)] line-through' : 'text-[var(--text-1)]'}`}>
-                          {item.name}
-                        </span>
-                        <span className={`font-bold text-lg mt-2 ${isOOS ? 'text-red-400' : 'text-[var(--accent)]'}`}>
-                          ${Math.round(item.price)}
-                        </span>
-                      </div>
-                    </button>
-                    )
-                  })}
-                </div>
-              </div>
+              {/* Legacy grid removed — items shown only in category modal */}
             </>
           )}
         </div>
