@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ArrowRight, ArrowLeft, Check, Store, Users, UtensilsCrossed, CreditCard, Rocket, Upload } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Check, Store, Users, UtensilsCrossed, CreditCard, Rocket, Upload, Monitor } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -36,6 +36,7 @@ interface PaymentMethod {
 
 const STEPS = [
   { id: 'info', label: 'Restaurante', icon: Store },
+  { id: 'pos', label: 'POS Actual', icon: Monitor },
   { id: 'staff', label: 'Equipo', icon: Users },
   { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
   { id: 'payments', label: 'Pagos', icon: CreditCard },
@@ -75,7 +76,13 @@ export default function OnboardingPage() {
     name: '', city: 'Monterrey', phone: '', email: '', password: '', tables: 10, timezone: 'America/Monterrey',
   })
 
-  // Step 2: Staff
+  // Step 2: POS connection
+  const [posSystem, setPosSystem] = useState('wansoft')
+  const [posUser, setPosUser] = useState('')
+  const [posPass, setPosPass] = useState('')
+  const [posSubsidiaryId, setPosSubsidiaryId] = useState('')
+
+  // Step 3: Staff
   const [staff, setStaff] = useState<StaffMember[]>([
     { name: '', pin: '', role: 'mesero' },
   ])
@@ -98,9 +105,10 @@ export default function OnboardingPage() {
 
   const canNext = () => {
     if (step === 0) return info.name.length > 0 && info.email.includes('@') && info.password.length >= 6
-    if (step === 1) return staff.some(s => s.name && s.pin)
-    if (step === 2) return menuItems.some(i => i.name && i.price)
-    if (step === 3) return payments.length > 0
+    if (step === 1) return true // POS step is optional
+    if (step === 2) return staff.some(s => s.name && s.pin)
+    if (step === 3) return menuItems.some(i => i.name && i.price)
+    if (step === 4) return payments.length > 0
     return true
   }
 
@@ -205,7 +213,7 @@ export default function OnboardingPage() {
         localStorage.setItem('fullsite_client_id', clientId)
       } catch {}
 
-      setStep(4) // Done!
+      setStep(5) // Done!
     } catch (err) {
       setError('Error guardando. Intenta de nuevo.')
       console.error(err)
@@ -296,8 +304,57 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 1: Staff */}
+          {/* Step 1: POS Connection */}
           {step === 1 && (
+            <div>
+              <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Tu POS actual</h2>
+              <p className="text-[var(--text-2)] mb-6">Si ya tienes un sistema POS, conectalo para importar tus datos automaticamente. Si no, salta este paso.</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Sistema POS</label>
+                  <select value={posSystem} onChange={e => setPosSystem(e.target.value)}
+                    className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1">
+                    <option value="wansoft">Wansoft</option>
+                    <option value="soft_restaurant">Soft Restaurant</option>
+                    <option value="square">Square</option>
+                    <option value="toast">Toast</option>
+                    <option value="aloha">Aloha / NCR</option>
+                    <option value="clip">Clip</option>
+                    <option value="otro">Otro</option>
+                    <option value="ninguno">No tengo POS</option>
+                  </select>
+                </div>
+                {posSystem !== 'ninguno' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Usuario</label>
+                        <input value={posUser} onChange={e => setPosUser(e.target.value)}
+                          placeholder="usuario@wansoft" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-[var(--text-2)] uppercase">Contraseña</label>
+                        <input type="password" value={posPass} onChange={e => setPosPass(e.target.value)}
+                          placeholder="••••••••" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                      </div>
+                    </div>
+                    {posSystem === 'wansoft' && (
+                      <div>
+                        <label className="text-xs font-semibold text-[var(--text-2)] uppercase">ID de sucursal (subsidiary ID)</label>
+                        <input value={posSubsidiaryId} onChange={e => setPosSubsidiaryId(e.target.value)}
+                          placeholder="Ej: 123" className="w-full border border-[var(--line)] rounded-xl px-4 py-3 text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                        <p className="text-xs text-[var(--text-3)] mt-1">Lo encuentras en Wansoft → Configuracion → Sucursal</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-[var(--text-3)] bg-emerald-500/5 border border-emerald-500/10 rounded-lg px-3 py-2">Tus credenciales se guardan encriptadas y solo se usan para sincronizar datos. Nunca las compartimos.</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Staff */}
+          {step === 2 && (
             <div>
               <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Tu equipo</h2>
               <p className="text-[var(--text-2)] mb-6">Agrega a tus meseros y cajeros. Cada uno tendra un PIN para entrar al POS.</p>
@@ -327,8 +384,9 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2: Menu */}
-          {step === 2 && (
+          {/* Step 3: Menu */}
+          {step === 3 && (
+
             <div>
               <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Tu menu</h2>
               <p className="text-[var(--text-2)] mb-6">Agrega categorias y platillos. Puedes editar todo despues en /admin/menu.</p>
@@ -423,8 +481,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Payments */}
-          {step === 3 && (
+          {/* Step 4: Payments */}
+          {step === 4 && (
             <div>
               <h2 className="text-2xl font-bold text-[var(--text-1)] mb-2">Métodos de pago</h2>
               <p className="text-[var(--text-2)] mb-6">Configura como cobras. Puedes editarlos despues en /admin/formas-pago.</p>
@@ -443,8 +501,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 4: Done */}
-          {step === 4 && (
+          {/* Step 5: Done */}
+          {step === 5 && (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Rocket size={36} className="text-emerald-600" />
@@ -471,14 +529,14 @@ export default function OnboardingPage() {
       </div>
 
       {/* Footer nav */}
-      {step < 4 && (
+      {step < 5 && (
         <div className="bg-[var(--surface)] border-t border-[var(--line)] px-6 py-4">
           <div className="max-w-xl mx-auto flex justify-between">
             <button onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}
               className="flex items-center gap-2 px-4 py-2.5 text-[var(--text-2)] disabled:opacity-30 text-sm font-medium">
               <ArrowLeft size={16} /> Atras
             </button>
-            {step < 3 ? (
+            {step < 4 ? (
               <button onClick={() => setStep(step + 1)} disabled={!canNext()}
                 className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 disabled:bg-[var(--line)] text-white disabled:text-[var(--text-3)] rounded-xl text-sm font-semibold">
                 Siguiente <ArrowRight size={16} />

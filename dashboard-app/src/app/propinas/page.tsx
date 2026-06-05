@@ -112,6 +112,12 @@ export default function PropinasPage() {
             <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
+      ) : totalPropinas === 0 && !isRealTipsData ? (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-12 text-center">
+          <HandCoins size={32} className="text-[var(--text-3)] mx-auto mb-4" />
+          <p className="text-[var(--text-2)] text-sm font-medium mb-1">Sin datos de propinas</p>
+          <p className="text-[var(--text-3)] text-xs">El scraper de propinas esta en proceso de calibracion. Los datos apareceran cuando Wansoft los reporte correctamente.</p>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
