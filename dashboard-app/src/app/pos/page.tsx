@@ -1908,8 +1908,47 @@ function POSContent() {
                 </div>
               </div>
 
-              {/* Menu items grid — BIG touch cards for tablet */}
-              <div className="flex-1 overflow-y-auto p-3">
+              {/* Menu items — centered modal overlay on category tap */}
+              <div className="flex-1 overflow-y-auto p-3" style={{display:'none'}} />
+              {selectedCategory && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
+                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{background: (() => { const c = ['#059669','#2563eb','#d97706','#7c3aed','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']; return c[menuCategories.findIndex(ct => ct.id === selectedCategory) % c.length] })()}}>
+                      <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
+                      <button onClick={() => setSelectedCategory('')} className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white text-xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                    </div>
+                    <div className="overflow-y-auto p-4 max-h-[65vh]">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {activeCategory.items.filter(item => item.price > 0).map((item) => {
+                    const isOOS = outOfStockItems.has(item.id)
+                    return (
+                    <button
+                      key={item.id}
+                      onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
+                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-2xl text-left transition-all flex min-h-[90px] overflow-hidden relative shadow-sm ${
+                        isOOS
+                          ? 'border-red-500/30 opacity-50 cursor-not-allowed'
+                          : (item as MenuItem & { promo?: boolean }).promo
+                          ? 'border-emerald-500/40 ring-1 ring-emerald-500/20'
+                          : 'border-[rgba(255,255,255,0.08)] hover:border-emerald-500/30'
+                      }`}
+                    >
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (() => { const gc = ['bg-emerald-600','bg-blue-600','bg-amber-500','bg-violet-600','bg-rose-500','bg-cyan-600','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']; return gc[menuCategories.findIndex(c => c.id === activeCategory.id) % gc.length] })()}`} />
+                      {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
+                      <div className="flex flex-col justify-between px-4 py-5 flex-1">
+                        <span className={`font-bold text-base leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
+                        <span className={`font-bold text-lg mt-2 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
+                      </div>
+                    </button>
+                    )
+                  })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Legacy grid hidden — kept for search results */}
+              <div className="flex-1 overflow-y-auto p-3" style={{display: selectedCategory ? 'none' : undefined}}>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {activeCategory.items.filter(item => item.price > 0).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
