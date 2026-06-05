@@ -33,28 +33,30 @@ sb_headers = {
 }
 
 # ── Categories from client config ───────────────────────────────────────────
+# ── Categories from client config (client-specific override > universal defaults) ──
 _cats = CLIENT.get("menu_categories") or {}
+# Signature items: the "hero" dish(es) each restaurant tracks (e.g. chilaquiles, paella, croquetas)
+SIGNATURE_KEYWORDS = _cats.get("signature", CLIENT.get("signature_items") or ["CHILAQUIL"])
 HH_KEYWORDS = _cats.get("hh", ["HALF", "H&H"])
-PAN_KEYWORDS = _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])
+PAN_KEYWORDS = _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT", "CONCHA", "MUFFIN", "BRIOCHE"])
 POSTRES_KEYWORDS = _cats.get("postres", [
     "BROWNIE", "CHEESECAKE", "FLAN", "PASTEL", "CAKE", "CHURRO", "TIRAMISU",
     "CREPAS", "CREPE", "GELATO", "HELADO", "NIEVE", "POSTRE", "MOUSSE",
-    "TARTA", "PIE", "FONDUE", "COULANT",
+    "TARTA", "PIE", "FONDUE", "COULANT", "CREMA CATALANA", "NATILLA",
 ])
-POSTRES_EXCLUDE = ["PANCAKE", "EGG AND PANCAKE", "PARADISE BUTTERMILK", "CLASSIC PANCAKE"]
+POSTRES_EXCLUDE = _cats.get("postres_exclude", ["PANCAKE", "EGG AND PANCAKE", "PARADISE BUTTERMILK"])
 PANADERIA_KEYWORDS = _cats.get("panaderia", [
     "CONCHA", "CRUNCHY MIX", "MUFFIN", "CUERNO", "DONA", "ROL DE CANELA",
     "GALLETA", "COOKIE", "POLVORON", "OREJA", "MANTECADA", "PAN DE",
     "CROISSANT MANTEQUILLA", "BRIOCHE",
 ])
-CHILAQUILES_KEYWORDS = _cats.get("chilaquiles", ["CHILAQUIL"])
 BEBIDA_GROUPS = CLIENT.get("bebida_groups") or [
     "COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS", "SMOOTHIES", "FRAPPES",
     "SIGNATURE", "TEA & TISANAS", "SODAS", "BEBIDAS OH",
+    "VINOS", "CERVEZAS", "COCKTAILS", "CAVA", "SANGRIA",
 ]
-# Groups to use for group-level matching (fallback if saucer keywords miss)
-POSTRES_GROUPS = ["DESSERTS", "ICE CREAM"]
-PANADERIA_GROUPS = ["BAKERY"]
+POSTRES_GROUPS = _cats.get("postres_groups", ["DESSERTS", "ICE CREAM", "POSTRES"])
+PANADERIA_GROUPS = _cats.get("panaderia_groups", ["BAKERY", "PANADERIA"])
 
 
 def sb_get(table, params):
@@ -281,7 +283,7 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
     # Category totals from saucers (keyword match + group-level enrichment)
     hh_items = filter_category(saucers, HH_KEYWORDS)
-    chilaquiles_items = filter_category(saucers, CHILAQUILES_KEYWORDS)
+    signature_items = filter_category(saucers, SIGNATURE_KEYWORDS)
     panaderia_items = filter_category(saucers, PANADERIA_KEYWORDS)
     postre_items = filter_category_ex(saucers, POSTRES_KEYWORDS, POSTRES_EXCLUDE)
 
@@ -332,11 +334,11 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 • Ticket promedio restaurante: ${ticket_avg:,.0f}
 • Personas por orden: {personas_por_orden}
 
-🥘 HALF & HALF
+🥘 H&H Combo
 {sum_qty(hh_items)} piezas
 
-🌶️ CHILAQUILES
-{sum_qty(chilaquiles_items)} piezas
+🌮 {SIGNATURE_KEYWORDS[0] if SIGNATURE_KEYWORDS else 'Signature'}
+{sum_qty(signature_items)} piezas
 
 🍞 PAN DULCE
 {sum_qty(panaderia_items)} piezas"""

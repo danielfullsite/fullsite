@@ -846,9 +846,13 @@ def ask_groq(question, wansoft_data, historical_data):
 
     # Block 0: If waiter × category data exists and question is about H&H/pan/postres/mesero, put FIRST
     waiter_cats = wd.pop("ventas_por_mesero_x_categoria", None)
-    cat_keywords = ["h&h", "half", "pan", "toast", "bagel", "postre", "dessert", "2da bebida",
+    # Build keyword list: universal + client-specific signature items
+    _sig_items = [s.lower() for s in (CLIENT.get("signature_items") or ["chilaquile", "h&h", "half"])]
+    cat_keywords = _sig_items + [
+                    "pan", "toast", "bagel", "postre", "dessert", "2da bebida",
                     "segunda bebida", "bebida", "bebidas por persona", "categoría", "categoria",
-                    "pizza", "chilaquile", "enchilada", "café", "cafe", "latte",
+                    "pizza", "enchilada", "café", "cafe", "latte", "paella", "croqueta",
+                    "tapa", "tapas", "vino", "pulpo", "solomillo", "arroz",
                     "mesero vendió", "mesero vendio", "vendió cada", "vendio cada",
                     "upselling", "up selling", "extras", "extra", "mesero que más", "mesero que menos",
                     "quién vendió", "quien vendio", "quién fue", "quien fue",
