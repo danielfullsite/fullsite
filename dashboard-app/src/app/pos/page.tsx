@@ -1897,8 +1897,8 @@ function POSContent() {
                       onClick={() => setSelectedCategory(cat.id)}
                       className={`px-2 py-2 rounded-lg text-[11px] font-bold text-center transition-all min-h-[38px] leading-tight ${
                         selectedCategory === cat.id
-                          ? `${catColor} text-white shadow-lg`
-                          : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)] active:scale-95'
+                          ? `${catColor} text-white shadow-lg ring-2 ring-white/30`
+                          : `${catColor} opacity-40 text-white hover:opacity-70 active:scale-95`
                       }`}
                     >
                       {cat.name}
