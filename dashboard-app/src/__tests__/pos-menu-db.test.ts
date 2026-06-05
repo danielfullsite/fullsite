@@ -243,8 +243,8 @@ describe('Menu data seed validation', () => {
     expect(americano!.price).toBeLessThan(200)
   })
 
-  it('promos category items have promo flag or reasonable prices', () => {
-    const cat = MENU_CATEGORIES.find(c => c.id === 'promos')!
+  it('chilaquiles category has items with valid prices', () => {
+    const cat = MENU_CATEGORIES.find(c => c.id === 'chilaquiles')!
     expect(cat.items.length).toBeGreaterThanOrEqual(3)
     for (const item of cat.items) {
       expect(item.price).toBeGreaterThan(0)

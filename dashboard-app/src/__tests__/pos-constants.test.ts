@@ -191,8 +191,8 @@ describe('STATION_CATEGORIES', () => {
     expect(STATION_CATEGORIES.caja).toContain('postres')
   })
 
-  it('promos go to cocina', () => {
-    expect(STATION_CATEGORIES.cocina).toContain('promos')
+  it('chilaquiles go to cocina', () => {
+    expect(STATION_CATEGORIES.cocina).toContain('chilaquiles')
   })
 })
 

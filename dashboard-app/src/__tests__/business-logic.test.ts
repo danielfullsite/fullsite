@@ -232,7 +232,7 @@ describe('Station assignment business rules', () => {
   })
 
   it('all food categories route to cocina', () => {
-    const foodCats = ['promos', 'chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis', 'pizzas', 'bowls', 'ceviche']
+    const foodCats = ['chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis', 'pizzas', 'bowls', 'ceviche']
     for (const cat of foodCats) {
       expect(CATEGORY_TO_STATION[cat]).toBe('cocina')
     }
@@ -353,14 +353,14 @@ describe('Real AMALAY scenarios', () => {
     expect(formatMXN(totals.total)).toMatch(/\$879\.28/)
   })
 
-  it('Combo Amalay + Cafe Americano', () => {
+  it('Chilaquiles + Cafe Americano', () => {
     const items = [
-      makeItem('promo1', 360, 1),
+      makeItem('c1a', 292, 1),
       makeItem('cf1', 48, 1),
     ]
     const totals = calcOrderTotals(items)
-    expect(totals.subtotal).toBe(408)
-    expect(totals.total).toBeCloseTo(408 * 1.16)
+    expect(totals.subtotal).toBe(340)
+    expect(totals.total).toBeCloseTo(340 * 1.16)
   })
 
   it('High-value mesa: 6 personas, full order with extras and tip', () => {

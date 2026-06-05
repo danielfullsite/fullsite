@@ -675,9 +675,7 @@ function POSContent() {
   const initialMesa = Number(searchParams.get('mesa')) || 1
 
   const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
-  const [selectedCategory, setSelectedCategory] = useState<string>(
-    MENU_CATEGORIES[0].id
-  )
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
   const [mesero, setMesero] = useState<string>(() => {

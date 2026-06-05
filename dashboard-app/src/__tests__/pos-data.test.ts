@@ -214,12 +214,9 @@ describe('MENU_CATEGORIES', () => {
     expect(uniqueIds.size).toBe(allIds.length)
   })
 
-  it('promos category marks items as promo', () => {
+  it('no promos/combo category in menu (removed per Eduardo)', () => {
     const promos = MENU_CATEGORIES.find(c => c.id === 'promos')
-    expect(promos).toBeDefined()
-    for (const item of promos!.items) {
-      expect(item.promo).toBe(true)
-    }
+    expect(promos).toBeUndefined()
   })
 
   it('market categories have $0 prices', () => {

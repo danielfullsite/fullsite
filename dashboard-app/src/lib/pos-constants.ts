@@ -33,7 +33,7 @@ export type StationName = 'cocina' | 'barra' | 'caja'
 // Category IDs (from MENU_CATEGORIES) routed to each station
 export const STATION_CATEGORIES: Record<StationName, string[]> = {
   cocina: [
-    'promos', 'chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis',
+    'chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis',
     'pizzas', 'bowls', 'ceviche',
   ],
   barra: [

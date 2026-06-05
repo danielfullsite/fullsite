@@ -162,8 +162,8 @@ describe('getStationForItem', () => {
     expect(getStationForItem('', 'Jugo de Naranja')).toBe('barra')
   })
 
-  it('routes promos to cocina', () => {
-    expect(getStationForItem('promos', 'Promo Familiar')).toBe('cocina')
+  it('routes chilaquiles to cocina', () => {
+    expect(getStationForItem('chilaquiles', 'Chilaquiles Verdes')).toBe('cocina')
   })
 
   it('routes croissants to cocina', () => {
