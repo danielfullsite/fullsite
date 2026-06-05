@@ -534,14 +534,10 @@ def main():
             except Exception as e:
                 print(f"[intraday] Payment methods error: {e}")
 
-            # Propinas - fetch from Wansoft kpis in Supabase
-            try:
-                kpis = requests.get(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_kpis",
-                    headers={"apikey": os.environ["SUPABASE_SERVICE_KEY"], "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"},
-                    params={"select": "propinas_total", "limit": "1"}, timeout=10).json()
-                if kpis and kpis[0].get("propinas_total"):
-                    update_data["propinas_total"] = kpis[0]["propinas_total"]
-            except: pass
+            # Propinas — DISABLED: wansoft_kpis has stale value $8587.99 that gets
+            # copied infinitely. Only wansoft_deep_scraper should write propinas_total
+            # when it gets REAL data from the SalesByUser endpoint.
+            # DO NOT copy from wansoft_kpis — it's a stale accumulator, not daily.
 
             # Ticket promedio — use ventas sin Market / personas
             ventas_total = consolidated.get("TotalSales", 0) or 0
