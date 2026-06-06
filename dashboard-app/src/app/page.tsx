@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -374,14 +374,32 @@ export default function DashboardPage() {
               return (
                 <div className="flex items-center gap-2">
                   <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
-                  <div className="relative">
-                    <button onClick={() => { const el = document.getElementById('day-picker') as HTMLInputElement; el?.showPicker() }} className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center hover:text-[var(--text-1)] cursor-pointer">
-                      {formatDate(viewDay.fecha)}
-                      {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
-                    </button>
-                    <input id="day-picker" type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={viewDay.fecha} min={recentData[0]?.fecha} max={recentData[recentData.length - 1]?.fecha} onChange={(e) => { const idx = recentData.findIndex(d => d.fecha === e.target.value); if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx) }} />
-                  </div>
+                  <span className="text-sm text-[var(--text-2)] font-medium">
+                    {formatDate(viewDay.fecha)}
+                    {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
+                  </span>
                   <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                  <div className="relative">
+                    <button
+                      onClick={() => { const el = document.getElementById('day-picker') as HTMLInputElement; el?.showPicker() }}
+                      className="w-9 h-9 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center transition-colors"
+                      title="Seleccionar fecha"
+                    >
+                      <CalendarDays size={16} className="text-[var(--text-2)]" />
+                    </button>
+                    <input
+                      id="day-picker"
+                      type="date"
+                      className="absolute top-0 left-0 w-0 h-0 opacity-0"
+                      value={viewDay.fecha}
+                      min={recentData[0]?.fecha}
+                      max={recentData[recentData.length - 1]?.fecha}
+                      onChange={(e) => {
+                        const idx = recentData.findIndex(d => d.fecha === e.target.value)
+                        if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)
+                      }}
+                    />
+                  </div>
                 </div>
               )
             }
