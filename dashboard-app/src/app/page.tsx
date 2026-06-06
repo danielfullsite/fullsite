@@ -256,12 +256,12 @@ export default function DashboardPage() {
       const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
       return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs semana anterior' }
     }
-    // mes — use monthOffset
-    const now = new Date()
-    const viewMonth = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
-    const viewMonthStr = viewMonth.toISOString().slice(0, 7)
-    const prevMonth = new Date(viewMonth); prevMonth.setMonth(prevMonth.getMonth() - 1)
-    const prevMonthStr = prevMonth.toISOString().slice(0, 7)
+    // mes — use monthOffset (avoid toISOString timezone issues)
+    const nowM = new Date()
+    const viewMonth = new Date(nowM.getFullYear(), nowM.getMonth() - monthOffset, 1)
+    const viewMonthStr = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth() + 1).padStart(2, '0')}`
+    const prevMonthD = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1)
+    const prevMonthStr = `${prevMonthD.getFullYear()}-${String(prevMonthD.getMonth() + 1).padStart(2, '0')}`
     const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === viewMonthStr)
     const lastMonthData = recentData.filter(d => d.fecha.slice(0, 7) === prevMonthStr)
     const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
