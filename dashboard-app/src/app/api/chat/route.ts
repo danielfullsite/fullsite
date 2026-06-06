@@ -78,13 +78,17 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
-    // 1. Recent daily data (use fetch to avoid SDK issues)
+    // 1. Recent daily data — OPTIMIZED: load detail columns only when needed
     const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
-    const histLimit = wantsHistory ? 90 : 30
+    const wantsDetail = ['mesero', 'quien', 'quién', 'platillo', 'grupo', 'categoria', 'categoría', 'pago', 'tarjeta', 'efectivo', 'desglose', 'detalle', 'top'].some(kw => q.includes(kw))
+    const histLimit = wantsHistory ? 90 : 14
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const selectCols = wantsDetail
+      ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
+      : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
     const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
+      `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     const recentDays = dailyRes.ok ? await dailyRes.json() : []
@@ -146,10 +150,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Waiter × platillo data (use fetch to avoid SDK hanging)
+    // 3. Waiter × platillo data — ONLY load when question is about waiters/rankings
     let waiterContext = ''
+    const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió'].some(kw => q.includes(kw))
 
     let wcParams = 'select=fecha,data&order=fecha.desc'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let waiterRows: Array<{ fecha: string; data: any }> = []
+    if (wantsMeseros) {
     if (dateFilter) {
       if (dateFilter.start === dateFilter.end) {
         wcParams += `&fecha=eq.${dateFilter.start}`
@@ -164,7 +172,7 @@ export async function POST(request: NextRequest) {
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
       cache: 'no-store',
     })
-    const waiterRows = wcRes.ok ? await wcRes.json() : []
+    waiterRows = wcRes.ok ? await wcRes.json() : []
 
     // If no results for specific date, fallback to most recent
     if (waiterRows.length === 0 && dateFilter) {
@@ -326,40 +334,56 @@ export async function POST(request: NextRequest) {
         console.error('[chat] Rankings error:', err)
       }
     }
+    } // end wantsMeseros
 
     // 3. Build daily context
     let dailyContext = 'No hay datos disponibles.'
     if (recentDays && recentDays.length > 0) {
       const lines = recentDays.map((d: Record<string, unknown>) => {
-        const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros) : [])
-        const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
-          .map((m: { nombre: string; total: number }) => `${m.nombre}:$${m.total}`).join(', ')
-
-        const grupos = Array.isArray(d.ventas_por_grupo) ? d.ventas_por_grupo : (typeof d.ventas_por_grupo === 'string' ? JSON.parse(d.ventas_por_grupo) : [])
-        const topG = grupos.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
-          .map((g: { nombre: string; total: number }) => `${g.nombre}:$${g.total}`).join(', ')
-
-        const platillos = Array.isArray(d.platillos_top) ? d.platillos_top : (typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : [])
-        const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
-
-        const descuentos = Number(d.descuentos) || 0
-
-        const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
-        const ventasDia = Number(d.ventas_dia) || 0
-        const pagoStr = pagos.map((p: { nombre: string; total: number }) => {
-          const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
-          return `${p.nombre}:$${mxn}`
-        }).join(', ')
-
         const dowNames = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
         const dow = dowNames[new Date(d.fecha + 'T12:00:00').getDay()]
+        const ventasDia = Number(d.ventas_dia) || 0
 
-        return `${d.fecha} (${dow}): Ventas $${ventasDia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
+        let line = `${d.fecha} (${dow}): Ventas $${ventasDia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}`
+
+        if (wantsDetail) {
+          const descuentos = Number(d.descuentos) || 0
+          if (descuentos > 0) line += `, Descuentos $${descuentos}`
+
+          const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros) : [])
+          if (meseros.length > 0) {
+            const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
+              .map((m: { nombre: string; total: number }) => `${m.nombre}:$${m.total}`).join(', ')
+            line += ` | Meseros: ${topM}`
+          }
+
+          const grupos = Array.isArray(d.ventas_por_grupo) ? d.ventas_por_grupo : (typeof d.ventas_por_grupo === 'string' ? JSON.parse(d.ventas_por_grupo) : [])
+          if (grupos.length > 0) {
+            const topG = grupos.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
+              .map((g: { nombre: string; total: number }) => `${g.nombre}:$${g.total}`).join(', ')
+            line += ` | Grupos: ${topG}`
+          }
+
+          const platillos = Array.isArray(d.platillos_top) ? d.platillos_top : (typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : [])
+          if (platillos.length > 0) {
+            const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
+            line += ` | Platillos: ${topP}`
+          }
+
+          const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
+          if (pagos.length > 0) {
+            const pagoStr = pagos.map((p: { nombre: string; total: number }) => {
+              const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
+              return `${p.nombre}:$${mxn}`
+            }).join(', ')
+            line += ` | Pagos: ${pagoStr}`
+          }
+        }
+
+        return line
       })
 
-      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días).
-CADA LÍNEA TIENE: fecha, Ventas, tickets, personas, TickProm, Descuentos, Pagos (tarjeta/efectivo/transferencia), Meseros (nombre:$venta), Grupos (categoría:$venta), Platillos (nombre:cantidad:$venta).
-BUSCA EN TODOS ESTOS CAMPOS antes de decir "no tengo".\n${lines.join('\n')}`
+      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días).\n${lines.join('\n')}`
 
       // Fetch hourly data for "hora pico" questions
       if (q.includes('hora') || q.includes('pico') || q.includes('horario')) {
