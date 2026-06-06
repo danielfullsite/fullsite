@@ -98,6 +98,39 @@ def main():
         print(f"    Response: {r.text[:300]}")
         consolidated = {}
 
+    # 2b. SalesByBranch (REPORTES → INGRESOS → VENTAS POR SUCURSAL)
+    print("\n[2b] SalesByBranch (Ventas por Sucursal):")
+    for endpoint in ["Reports/SalesByBranch", "Reports/SalesBySubsidiary", "Reports/IncomeByBranch", "Reports/GetIncomeReport"]:
+        try:
+            r = session.post(f"{WANSOFT_URL}/{endpoint}", data={
+                "subsidiaryId": SUBSIDIARY_ID, "startDate": target, "endDate": target,
+            }, timeout=10)
+            if r.status_code == 200 and len(r.text) > 100:
+                print(f"    FOUND: {endpoint}")
+                # Try JSON first
+                try:
+                    data = r.json()
+                    print(f"    JSON keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            print(f"    {k}: {v}")
+                    elif isinstance(data, list):
+                        for item in data[:5]:
+                            print(f"    {item}")
+                except:
+                    # HTML report
+                    parsed = parse_html_rows(r.text)
+                    print(f"    Headers: {parsed['headers']}")
+                    for row in parsed["rows"][:10]:
+                        print(f"    {row}")
+                    if parsed["total"]:
+                        print(f"    Total: {parsed['total']}")
+                break
+            else:
+                print(f"    {endpoint}: {r.status_code} ({len(r.text)} bytes) — not this one")
+        except Exception as e:
+            print(f"    {endpoint}: error {e}")
+
     # 3. SalesByTypeOfOrder
     print("\n[3] SalesByTypeOfOrder:")
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
