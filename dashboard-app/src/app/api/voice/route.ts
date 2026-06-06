@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // 1. Recent daily data — OPTIMIZED: load minimal data unless question requires detail
     const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
     const wantsDetail = ['mesero', 'quien', 'quién', 'platillo', 'grupo', 'categoria', 'categoría', 'pago', 'tarjeta', 'efectivo', 'desglose', 'detalle', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos', 'top', 'mejor', 'peor', 'mas vendido', 'más vendido', 'coffee', 'cafe', 'café', 'pancake', 'waffle', 'bowl', 'pizza', 'smoothie', 'frappe', 'jugo'].some(kw => q.includes(kw))
-    const histLimit = wantsHistory ? 90 : 7 // Only 7 days by default (was 30!)
+    const histLimit = 1000 // Load all historical data (light format unless wantsDetail)
     // Only fetch heavy JSONB columns when needed — saves ~80% tokens on simple questions
     const selectCols = wantsDetail
       ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
