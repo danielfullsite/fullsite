@@ -16,6 +16,7 @@ interface Ingredient {
   name: string
   unit: string
   cost_per_unit: number
+  yield_factor?: number
   supplier?: string
   category?: string
 }
@@ -42,7 +43,7 @@ export default function CostosPage() {
 
         // Fetch ingredients
         const ingRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_cid()}&cost_per_unit=gt.0&order=name.asc&limit=1000&select=id,name,unit,cost_per_unit,supplier,category`,
+          `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_cid()}&cost_per_unit=gt.0&order=name.asc&limit=1000&select=id,name,unit,cost_per_unit,yield_factor,supplier,category`,
           { headers }
         )
         const ings: Ingredient[] = ingRes.ok ? await ingRes.json() : []
@@ -70,6 +71,7 @@ export default function CostosPage() {
   const totalIngredients = ingredients.length
   const avgCost = totalIngredients > 0 ? ingredients.reduce((s, i) => s + Number(i.cost_per_unit), 0) / totalIngredients : 0
   const highCost = ingredients.filter(i => Number(i.cost_per_unit) > 500)
+  const withYield = ingredients.filter(i => Number(i.yield_factor) > 0 && Number(i.yield_factor) < 1)
   const increases = costChanges.filter(c => c.pct > 0)
   const decreases = costChanges.filter(c => c.pct < 0)
 
@@ -203,17 +205,34 @@ export default function CostosPage() {
                   </h4>
                 </div>
                 <div className="divide-y divide-[var(--line-soft)]">
-                  {ings.sort((a, b) => Number(b.cost_per_unit) - Number(a.cost_per_unit)).slice(0, 20).map(ing => (
+                  {ings.sort((a, b) => Number(b.cost_per_unit) - Number(a.cost_per_unit)).slice(0, 20).map(ing => {
+                    const yf = Number(ing.yield_factor) || 1
+                    const realCost = Number(ing.cost_per_unit) / yf
+                    const hasYield = yf > 0 && yf < 1
+                    return (
                     <div key={ing.id} className="flex items-center justify-between px-4 py-2.5">
                       <div>
                         <span className="text-sm text-[var(--text-1)]">{ing.name}</span>
                         {ing.supplier && <span className="text-xs text-[var(--text-3)] ml-2">{ing.supplier}</span>}
+                        {hasYield && <span className="text-[10px] text-amber-400 ml-2">merma {Math.round((1 - yf) * 100)}%</span>}
                       </div>
-                      <span className="text-sm font-semibold text-[var(--text-1)] tabular-nums">
-                        {formatCurrency(Number(ing.cost_per_unit))}<span className="text-xs text-[var(--text-3)] font-normal">/{ing.unit}</span>
-                      </span>
+                      <div className="text-right">
+                        {hasYield ? (
+                          <>
+                            <span className="text-sm font-semibold text-[var(--text-1)] tabular-nums">
+                              {formatCurrency(realCost)}<span className="text-xs text-[var(--text-3)] font-normal">/{ing.unit}</span>
+                            </span>
+                            <span className="text-[10px] text-[var(--text-3)] ml-1 line-through">{formatCurrency(Number(ing.cost_per_unit))}</span>
+                          </>
+                        ) : (
+                          <span className="text-sm font-semibold text-[var(--text-1)] tabular-nums">
+                            {formatCurrency(Number(ing.cost_per_unit))}<span className="text-xs text-[var(--text-3)] font-normal">/{ing.unit}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   {ings.length > 20 && (
                     <div className="px-4 py-2 text-xs text-[var(--text-3)]">
                       +{ings.length - 20} más

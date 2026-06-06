@@ -1187,7 +1187,9 @@ export async function getInventory(): Promise<InventoryItem[]> {
       ingredient_name: ingredient?.name ?? item.ingredient_id,
       ingredient_unit: ingredient?.unit ?? '',
       ingredient_category: ingredient?.category ?? '',
-      ingredient_cost: ingredient?.cost_per_unit ?? 0,
+      ingredient_cost: ingredient ? (ingredient.cost_per_unit / (ingredient.yield_factor || 1)) : 0,
+      ingredient_yield: ingredient?.yield_factor ?? 1,
+      ingredient_raw_cost: ingredient?.cost_per_unit ?? 0,
     }
   })
 }

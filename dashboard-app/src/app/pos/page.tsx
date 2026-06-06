@@ -1871,7 +1871,7 @@ function POSContent() {
                         <button
                           key={item.id}
                           onClick={() => { handleMenuItemTap(item, catId); setMobileView('order') }}
-                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-emerald-500/10 border border-[var(--line)] rounded-lg text-left transition-colors flex items-center min-h-[48px] overflow-hidden"
+                          className="w-full bg-[var(--surface-2)] hover:bg-[var(--line)] active:bg-emerald-500/10 border border-[var(--line)] rounded-xl text-left transition-colors flex items-center min-h-[64px] overflow-hidden"
                         >
                           <div className={`w-1.5 self-stretch flex-shrink-0 rounded-l-lg ${catColor}`} />
                           <div className="flex items-center justify-between flex-1 px-3 py-3">
