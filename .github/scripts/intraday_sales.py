@@ -138,7 +138,9 @@ def get_sales_by_saucer(session, start, end):
 
 
 def get_sales_by_order_type(session, start, end):
-    """Get sales by order type — includes ticket counts and personas."""
+    """Get sales by order type — includes ticket counts and personas.
+    Returns both total (all types) and restaurant-only counts.
+    The Wansoft app shows restaurant-only; we store both."""
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
         "subsidiaryId": SUBSIDIARY_ID, "startDate": start, "endDate": end,
     })
@@ -147,18 +149,38 @@ def get_sales_by_order_type(session, start, end):
     results = []
     total_tickets = 0
     total_personas = 0
+    rest_tickets = 0
+    rest_personas = 0
+    # Order types that count as "restaurant" (not market/delivery)
+    _rest_types = ["restaurante", "restaurant", "comedor", "mesa", "barra", "bar"]
+    _exclude_types = ["market", "tiendita", "llevar", "domicilio", "uber", "rappi", "didi", "delivery"]
     for row in rows:
         cols = [c.text.strip() for c in row.select("div")]
         if len(cols) >= 6:
             try:
+                order_type = cols[0]
                 tickets = int(cols[2])
                 personas = int(cols[3])
                 total_tickets += tickets
                 total_personas += personas
-                results.append({"type": cols[0], "tickets": tickets, "personas": personas})
+                results.append({"type": order_type, "tickets": tickets, "personas": personas})
+                # Classify: restaurant vs non-restaurant
+                ot_lower = order_type.lower()
+                is_excluded = any(ex in ot_lower for ex in _exclude_types)
+                if not is_excluded:
+                    rest_tickets += tickets
+                    rest_personas += personas
             except (ValueError, IndexError):
                 pass
-    return {"types": results, "total_tickets": total_tickets, "total_personas": total_personas}
+    # Log each type for debugging
+    for r_item in results:
+        print(f"[intraday] OrderType: {r_item['type']} → {r_item['tickets']} tickets, {r_item['personas']} personas")
+    print(f"[intraday] OrderTypes total: {total_tickets} tickets, {total_personas} personas | Restaurant-only: {rest_tickets} tickets, {rest_personas} personas")
+    return {
+        "types": results,
+        "total_tickets": total_tickets, "total_personas": total_personas,
+        "rest_tickets": rest_tickets, "rest_personas": rest_personas,
+    }
 
 
 # ── Category helpers ────────────────────────────────────────────────────────
@@ -468,19 +490,13 @@ def main():
             # Ventas brutas, netas, y descuentos
             if consolidated:
                 update_data["ventas_brutas"] = consolidated.get("TotalGrossSales", 0)
-                update_data["descuentos"] = consolidated.get("TotalDiscounts", 0)
+                update_data["descuentos"] = consolidated.get("TotalDiscount", 0) or consolidated.get("TotalDiscounts", 0)
                 update_data["ventas_dia"] = consolidated.get("TotalSales", 0)
 
-            # Tickets y personas — prefer consolidated (matches Wansoft app), fallback to order_types
-            if consolidated and consolidated.get("TotalTickets"):
-                update_data["tickets_count"] = int(consolidated["TotalTickets"])
-                update_data["personas_restaurant"] = int(consolidated.get("TotalPersons", 0))
-            elif consolidated and consolidated.get("Tickets"):
-                update_data["tickets_count"] = int(consolidated["Tickets"])
-                update_data["personas_restaurant"] = int(consolidated.get("Persons", consolidated.get("Personas", 0)))
-            elif order_types:
-                update_data["tickets_count"] = order_types.get("total_tickets", 0)
-                update_data["personas_restaurant"] = order_types.get("total_personas", 0)
+            # Tickets y personas — use RESTAURANT-ONLY counts (matches Wansoft app)
+            if order_types:
+                update_data["tickets_count"] = order_types.get("rest_tickets", 0) or order_types.get("total_tickets", 0)
+                update_data["personas_restaurant"] = order_types.get("rest_personas", 0) or order_types.get("total_personas", 0)
 
             # Ventas por grupo
             if groups:
