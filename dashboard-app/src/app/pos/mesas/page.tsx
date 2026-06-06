@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, GripVertical, Lock, Unlock, LayoutGrid, Map } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, Settings, RotateCcw, Check } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
@@ -133,6 +133,8 @@ export default function MesasPage() {
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
+  const [editMode, setEditMode] = useState(false)
+  const [floorZonesState, setFloorZonesState] = useState<FloorZone[]>(getFloorZones)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -347,7 +349,7 @@ export default function MesasPage() {
   }
 
   // ─── Planograma View ──────────────────────────────────────────────────────
-  const floorZones = getFloorZones()
+  const floorZones = floorZonesState
 
   const PlanogramaView = () => (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -366,7 +368,18 @@ export default function MesasPage() {
           <div key={zone.id} className={`${zone.bgColor} rounded-2xl border border-[var(--line)] p-5`}>
             <div className="flex items-center gap-2 mb-4">
               <div className={`w-2 h-2 rounded-full ${zone.color.replace('text-', 'bg-')}`} />
-              <h3 className={`text-sm font-bold ${zone.color}`}>{zone.name}</h3>
+              {editMode ? (
+                <input
+                  className={`text-sm font-bold ${zone.color} bg-transparent border-b border-dashed border-current outline-none w-40`}
+                  defaultValue={zone.name}
+                  onBlur={(e) => {
+                    const updated = floorZonesState.map(z => z.id === zone.id ? { ...z, name: e.target.value } : z)
+                    setFloorZonesState(updated)
+                  }}
+                />
+              ) : (
+                <h3 className={`text-sm font-bold ${zone.color}`}>{zone.name}</h3>
+              )}
               <span className="text-[var(--text-4)] text-xs ml-auto">
                 {zoneMesas.filter(zm => zm.mesa!.status !== 'disponible').length}/{zoneMesas.length} ocupadas
               </span>
@@ -493,6 +506,31 @@ export default function MesasPage() {
             {mergeMode ? <X size={14} /> : <Merge size={14} />}
             {mergeMode ? 'Cancelar' : 'Fusionar'}
           </button>
+          {viewMode === 'planograma' && (
+            editMode ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setFloorZonesState(DEFAULT_FLOOR_ZONES); saveFloorZones(DEFAULT_FLOOR_ZONES); showToast('Plano restaurado a default') }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]"
+                >
+                  <RotateCcw size={14} /> Reset
+                </button>
+                <button
+                  onClick={() => { saveFloorZones(floorZonesState); setEditMode(false); showToast('Plano guardado') }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-black"
+                >
+                  <Check size={14} /> Guardar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditMode(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]"
+              >
+                <Settings size={14} /> Editar plano
+              </button>
+            )
+          )}
         </div>
         <div className="flex items-center gap-6">
           {Object.entries(counts).map(([status, count]) => (
