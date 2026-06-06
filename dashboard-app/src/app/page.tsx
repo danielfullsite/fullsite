@@ -284,8 +284,8 @@ export default function DashboardPage() {
   const personasChange = periodData.prevPersonas > 0 ? percentChange(periodData.personas, periodData.prevPersonas) : 0
   const ticketPromChange = periodData.prevTp > 0 ? percentChange(periodData.tp, periodData.prevTp) : 0
 
-  const topMeseros = latestDay
-    ? aggregateMeseros([latestDay]).slice(0, 5)
+  const topMeseros = (period === 'dia' ? viewDay : latestDay)
+    ? aggregateMeseros([period === 'dia' ? viewDay! : latestDay!]).slice(0, 5)
     : []
   const topMeseroMax = topMeseros[0]?.total || 1
 
@@ -312,8 +312,9 @@ export default function DashboardPage() {
 
   // Quick insight line
   const quickInsight = (() => {
-    if (!latestDay || topMeseros.length === 0) return null
-    const ventas = latestDay.ventas_dia || 0
+    const day = period === 'dia' ? viewDay : latestDay
+    if (!day || topMeseros.length === 0) return null
+    const ventas = day.ventas_dia || 0
     const topMesero = topMeseros[0]
     const pct = ventas > 0 ? Math.round((topMesero.total / ventas) * 100) : 0
     const vsAvg = sameDOWAvg.ventas > 0 ? ((ventas / sameDOWAvg.ventas - 1) * 100).toFixed(0) : null

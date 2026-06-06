@@ -28,7 +28,6 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.97.1",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
