@@ -129,7 +129,11 @@ export function buildDailyContext(recentDays: DailyRow[]): string {
     const pagos = parseJsonArray<{ nombre: string; total: number }>(d.pago_métodos)
     const pagoStr = pagos.map((p) => `${p.nombre}:$${Math.round(p.total)}`).join(', ')
 
-    return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TickProm $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
+    const tickets = Number(d.tickets_count) || 0
+    const personas = Number(d.personas_restaurant) || 0
+    const tpOrden = tickets > 0 ? Math.round(Number(d.ventas_dia) / tickets) : 0
+    const tpPersona = personas > 0 ? Math.round(Number(d.ventas_dia) / personas) : 0
+    return `${d.fecha}: Ventas $${d.ventas_dia}, ${tickets} tickets, ${personas} personas, PromOrden $${tpOrden}, PromPersona $${tpPersona}${descuentos > 0 ? ', Descuentos $' + descuentos : ''}${pagoStr ? ' | Pagos: ' + pagoStr : ''} | Meseros: ${topM} | Grupos: ${topG}${topP ? ' | Platillos: ' + topP : ''}`
   })
 
   return `DATOS DIARIOS (últimos ${recentDays.length} días).

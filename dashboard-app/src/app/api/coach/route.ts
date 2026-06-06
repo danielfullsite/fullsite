@@ -94,7 +94,11 @@ export async function POST(request: NextRequest) {
       const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros as string) : [])
       const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
         .map((m: { nombre: string; total: number }) => `${m.nombre}:$${Math.round(m.total)}`).join(', ')
-      return `${d.fecha}: Ventas $${d.ventas_dia}, ${d.tickets_count || 0} tickets, ${d.personas_restaurant || 0} personas, TP $${Math.round(Number(d.ticket_promedio_restaurant) || 0)}, Propinas $${Math.round(Number(d.propinas_total) || 0)} | Meseros: ${topM}`
+      const tk = Number(d.tickets_count) || 0
+      const pr = Number(d.personas_restaurant) || 0
+      const tpO = tk > 0 ? Math.round(Number(d.ventas_dia) / tk) : 0
+      const tpP = pr > 0 ? Math.round(Number(d.ventas_dia) / pr) : 0
+      return `${d.fecha}: Ventas $${d.ventas_dia}, ${tk} tickets, ${pr} personas, PromOrden $${tpO}, PromPersona $${tpP}, Propinas $${Math.round(Number(d.propinas_total) || 0)} | Meseros: ${topM}`
     }).join('\n')
 
     // Compute same-DOW averages for today
@@ -107,7 +111,10 @@ export async function POST(request: NextRequest) {
     }).slice(0, 4)
 
     const avgVentas = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => s + Number(d.ventas_dia), 0) / sameDOW.length : 0
-    const avgTP = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => s + Number(d.ticket_promedio_restaurant || 0), 0) / sameDOW.length : 0
+    const avgTP = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => {
+      const v = Number(d.ventas_dia || 0); const t = Number(d.tickets_count || 0)
+      return s + (t > 0 ? v / t : 0)
+    }, 0) / sameDOW.length : 0
     const avgTickets = sameDOW.length > 0 ? sameDOW.reduce((s: number, d: Record<string, unknown>) => s + Number(d.tickets_count || 0), 0) / sameDOW.length : 0
 
     // Week totals
@@ -144,7 +151,7 @@ GENERA EXACTAMENTE 3 INSIGHTS en formato JSON array. Cada insight debe tener:
 CONTEXTO HOY (${dayNames[mxNow.getDay()]} ${today.fecha}):
 - Ventas hoy: $${today.ventas_dia} (promedio ${dayNames[todayDOW]}: $${Math.round(avgVentas)}, ${avgVentas > 0 ? ((Number(today.ventas_dia) / avgVentas - 1) * 100).toFixed(0) + '%' : 'sin data'})
 - Tickets hoy: ${today.tickets_count} (promedio: ${Math.round(avgTickets)})
-- TP hoy: $${Math.round(Number(today.ticket_promedio_restaurant) || 0)} (promedio: $${Math.round(avgTP)})
+- TP hoy: $${Number(today.tickets_count) > 0 ? Math.round(Number(today.ventas_dia) / Number(today.tickets_count)) : 0} (promedio: $${Math.round(avgTP)})
 - Ventas semana: $${Math.round(weekVentas)} (semana pasada: $${Math.round(prevWeekVentas)}, ${prevWeekVentas > 0 ? ((weekVentas / prevWeekVentas - 1) * 100).toFixed(0) + '%' : ''})
 - TP semana: $${Math.round(weekTP)} (semana pasada: $${Math.round(prevWeekTP)})
 
@@ -191,7 +198,7 @@ Responde SOLO con el JSON array, sin markdown ni texto adicional.`
         fecha: today.fecha,
         ventas: Number(today.ventas_dia),
         tickets: Number(today.tickets_count || 0),
-        tp: Math.round(Number(today.ticket_promedio_restaurant || 0)),
+        tp: Number(today.tickets_count) > 0 ? Math.round(Number(today.ventas_dia) / Number(today.tickets_count)) : 0,
         avgVentas: Math.round(avgVentas),
         avgTP: Math.round(avgTP),
         weekVentas: Math.round(weekVentas),
