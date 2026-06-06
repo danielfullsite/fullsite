@@ -148,7 +148,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        let recent = await getRecentDays(90)
+        let recent = await getRecentDays(1000) // Load all history for full navigation
         let latest = await getLatestDay()
 
         // Fallback: if no wansoft_daily data, build from pos_orders
@@ -387,7 +387,7 @@ export default function DashboardPage() {
               const label = `${weekStart.getDate()} ${MESES[weekStart.getMonth()].slice(0,3)} - ${weekEnd.getDate()} ${MESES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 12} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 130} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
                     {label}
                     {weekOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
@@ -402,7 +402,7 @@ export default function DashboardPage() {
               const label = `${MESES[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`
               return (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 24} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 36} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
                     {label}
                     {monthOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
