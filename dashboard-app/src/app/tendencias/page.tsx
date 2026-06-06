@@ -23,9 +23,12 @@ import type { WansoftDaily } from '@/lib/types'
 
 const DOW_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4']
 
+type TPPeriod = 'dia' | 'semana' | 'mes'
+
 export default function TendenciasPage() {
   const [allData, setAllData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
+  const [tpPeriod, setTpPeriod] = useState<TPPeriod>('mes')
 
   useEffect(() => {
     async function load() {
@@ -75,6 +78,39 @@ export default function TendenciasPage() {
       }))
       .sort((a, b) => a.month.localeCompare(b.month))
   }, [allData])
+
+  // Daily TP data (last 30 days)
+  const dailyTP = useMemo(() => {
+    return allData.slice(-30).map(d => ({
+      label: (() => { const dt = new Date(d.fecha + 'T12:00:00'); const dow = ['dom','lun','mar','mié','jue','vie','sáb'][dt.getDay()]; return `${dow} ${dt.getDate()}/${dt.getMonth()+1}` })(),
+      ticketPromedio: d.tickets_count > 0 ? Math.round(d.ventas_dia / d.tickets_count) : 0,
+      ticketPromedioPersona: d.personas_restaurant > 0 ? Math.round(d.ventas_dia / d.personas_restaurant) : 0,
+    }))
+  }, [allData])
+
+  // Weekly TP data
+  const weeklyTP = useMemo(() => {
+    const weeks: Record<string, { ventas: number; tickets: number; personas: number }> = {}
+    for (const d of allData) {
+      const dt = new Date(d.fecha + 'T12:00:00')
+      const weekStart = new Date(dt); weekStart.setDate(dt.getDate() - dt.getDay() + 1)
+      const key = weekStart.toISOString().slice(0, 10)
+      if (!weeks[key]) weeks[key] = { ventas: 0, tickets: 0, personas: 0 }
+      weeks[key].ventas += d.ventas_dia || 0
+      weeks[key].tickets += d.tickets_count || 0
+      weeks[key].personas += d.personas_restaurant || 0
+    }
+    return Object.entries(weeks)
+      .map(([key, w]) => ({
+        label: (() => { const dt = new Date(key + 'T12:00:00'); return `${dt.getDate()}/${dt.getMonth()+1}` })(),
+        ticketPromedio: w.tickets > 0 ? Math.round(w.ventas / w.tickets) : 0,
+        ticketPromedioPersona: w.personas > 0 ? Math.round(w.ventas / w.personas) : 0,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .slice(-20)
+  }, [allData])
+
+  const tpChartData = tpPeriod === 'dia' ? dailyTP : tpPeriod === 'semana' ? weeklyTP : monthlyAgg
 
   // Day of week aggregation
   const dowAgg = useMemo(() => {
@@ -476,15 +512,24 @@ export default function TendenciasPage() {
         </div>
       )}
 
-      {/* Monthly ticket promedio */}
+      {/* Ticket promedio por ORDEN — with period tabs */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
-          Ticket promedio mensual (restaurante)
-        </h3>
-        <p className="text-xs text-[var(--text-3)] mb-5">Evolución del ticket promedio</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Ticket promedio (por orden)</h3>
+            <p className="text-xs text-[var(--text-3)]">Ventas ÷ ordenes</p>
+          </div>
+          <div className="flex bg-[var(--line-soft)] rounded-lg p-0.5">
+            {(['dia', 'semana', 'mes'] as TPPeriod[]).map(p => (
+              <button key={p} onClick={() => setTpPeriod(p)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${tpPeriod === p ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)] hover:text-[var(--text-2)]'}`}>
+                {p === 'dia' ? 'Día' : p === 'semana' ? 'Semana' : 'Mes'}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="h-[200px] sm:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={monthlyAgg}>
+            <AreaChart data={tpChartData}>
               <defs>
                 <linearGradient id="colorTicketProm" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
@@ -529,15 +574,24 @@ export default function TendenciasPage() {
         </div>
       </div>
 
-      {/* Monthly ticket promedio POR PERSONA */}
+      {/* Ticket promedio POR PERSONA — with same period tabs */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
-          Ticket promedio mensual (por persona)
-        </h3>
-        <p className="text-xs text-[var(--text-3)] mb-5">Ventas ÷ personas — lo que gasta cada comensal</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Ticket promedio (por persona)</h3>
+            <p className="text-xs text-[var(--text-3)]">Ventas ÷ personas — lo que gasta cada comensal</p>
+          </div>
+          <div className="flex bg-[var(--line-soft)] rounded-lg p-0.5">
+            {(['dia', 'semana', 'mes'] as TPPeriod[]).map(p => (
+              <button key={p} onClick={() => setTpPeriod(p)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${tpPeriod === p ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)] hover:text-[var(--text-2)]'}`}>
+                {p === 'dia' ? 'Día' : p === 'semana' ? 'Semana' : 'Mes'}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="h-[200px] sm:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={monthlyAgg}>
+            <AreaChart data={tpChartData}>
               <defs>
                 <linearGradient id="colorTicketPersn" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
