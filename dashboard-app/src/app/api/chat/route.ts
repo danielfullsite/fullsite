@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '@/lib/supabase'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -67,8 +66,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
-    if (!apiKey || apiKey === 'PLACEHOLDER_NEEDS_REAL_KEY') {
+    const groqKey = process.env.GROQ_API_KEY || process.env.GROQ
+    if (!groqKey) {
       return Response.json(
         { response: 'Agrega ANTHROPIC_API_KEY a .env.local para activar el chat.' },
         { status: 200 }
@@ -571,24 +570,38 @@ ${waiterContext}
 
 ${dailyContext}`
 
-    const anthropic = new Anthropic({ apiKey })
-
-    const messages: Anthropic.MessageParam[] = [
+    // Groq API — free tier, Llama 3.3 70B, 300 tok/s
+    const groqMessages = [
+      { role: 'system', content: systemPrompt },
       ...history.slice(-8).map((h: { role: string; content: string }) => ({
-        role: h.role as 'user' | 'assistant',
+        role: h.role,
         content: h.content,
       })),
       { role: 'user', content: message },
     ]
 
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages,
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: groqMessages,
+        max_tokens: 4000,
+        temperature: 0.3,
+      }),
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (!groqRes.ok) {
+      const err = await groqRes.text()
+      console.error('[chat] Groq error:', groqRes.status, err)
+      return Response.json({ response: 'Error al procesar tu pregunta. Intenta de nuevo.' })
+    }
+
+    const groqData = await groqRes.json()
+    const text = groqData.choices?.[0]?.message?.content || ''
 
     // Hermes feedback: log if response contains "no tengo" for improvement
     if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {

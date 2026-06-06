@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 
 export async function POST(request: NextRequest) {
   try {
     const { client_id } = await request.json().catch(() => ({} as { client_id?: string }))
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
-    if (!apiKey || apiKey === 'PLACEHOLDER_NEEDS_REAL_KEY') {
+    const groqKey = process.env.GROQ_API_KEY || process.env.GROQ
+    if (!groqKey) {
       return Response.json({ insights: [] }, { status: 200 })
     }
 
@@ -170,15 +169,25 @@ REGLAS:
 
 Responde SOLO con el JSON array, sin markdown ni texto adicional.`
 
-    const anthropic = new Anthropic({ apiKey })
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: 'Dame los 3 insights más importantes para hoy.' }],
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Dame los 3 insights más importantes para hoy.' },
+        ],
+        max_tokens: 1500,
+        temperature: 0.3,
+      }),
     })
-
-    const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+    if (!groqRes.ok) {
+      console.error('[coach] Groq error:', groqRes.status)
+      return Response.json({ insights: [], today: {} })
+    }
+    const groqData = await groqRes.json()
+    const text = groqData.choices?.[0]?.message?.content || '[]'
 
     // Parse JSON from response
     let insights = []
