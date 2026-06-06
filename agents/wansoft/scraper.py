@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 
 WANSOFT_BASE = "https://wansoft.net/Wansoft.Web"
 LOGIN_URL = f"{WANSOFT_BASE}/"
-REPORT_URL = f"{WANSOFT_BASE}/Reports/SalesByWaiterByGroupReport"
+# Eduardo confirmed: REPORTES → INGRESOS → VENTAS POR SUCURSAL is the definitive report
+REPORT_URL = f"{WANSOFT_BASE}/Reports/SalesByBranch"
 
 DOWNLOADS_DIR = Path(__file__).parent / "downloads"
 ENV_FILE = Path(__file__).parent / ".env"
@@ -228,7 +229,7 @@ def scrape(target_date: str) -> Path:
         log("Login verificado")
 
         # ── Step 2: Navigate to report ───────────────────────────────────
-        log("Navegando a reporte Ventas por Mesero por Grupo...")
+        log("Navegando a reporte Ventas por Sucursal...")
         page.goto(REPORT_URL, wait_until="domcontentloaded", timeout=15000)
 
         # ── Step 3: Set date range ───────────────────────────────────────
