@@ -67,143 +67,112 @@ def scrape_day(session, date_str):
     except Exception as e:
         print(f"  [!] Consolidated failed: {e}")
 
-    # 2. SalesByBranch — contains order types, meseros, groups, payments, platillos
+    # 2. Individual endpoints (reliable, well-tested)
+    # Order Types: cols[2]=PERSONAS, cols[3]=ORDENES (verified by audit)
     try:
-        r = session.post(f"{WANSOFT_URL}/Reports/SalesByBranch", data={
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
             "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
-        }, timeout=20)
+        }, timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
-
-        # Parse all sections — each starts with headerReport
-        sections = []
-        current_section = {"headers": [], "rows": []}
-        for el in soup.select(".headerReport, .rowReport, .totalReport"):
-            cls = el.get("class", [])
-            if "headerReport" in cls:
-                if current_section["rows"]:
-                    sections.append(current_section)
-                current_section = {"headers": [c.text.strip() for c in el.select("div")], "rows": []}
-            else:
-                cols = [c.text.strip() for c in el.select("div")]
-                current_section["rows"].append(cols)
-        if current_section["rows"]:
-            sections.append(current_section)
-
-        _excl = [e.lower() for e in (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])]
-
-        for section in sections:
-            rows = section["rows"]
-            if not rows:
-                continue
-            first = rows[0]
-
-            # Detect section type by content pattern
-            if len(first) >= 6 and any(t in first[0] for t in ["Restaurant", "eCommerce", "Para llevar", "A domicilio", "Mostrador"]):
-                # ORDER TYPES: [Type, AvgTicket, Personas, Ordenes, Subtotal, Total]
-                total_ordenes = 0
-                total_personas = 0
-                for cols in rows:
-                    if len(cols) >= 4:
-                        try:
-                            personas = int(cols[2])
-                            ordenes = int(cols[3])
-                            total_personas += personas
-                            total_ordenes += ordenes
-                        except (ValueError, IndexError):
-                            pass
-                row["tickets_count"] = total_ordenes
-                row["personas_restaurant"] = total_personas
-                if total_personas > 0 and row.get("ventas_dia"):
-                    row["ticket_promedio_restaurant"] = round(row["ventas_dia"] / total_personas, 2)
-
-            elif len(first) >= 5 and any(c.endswith("%") or (parse_num(c) > 0 and parse_num(c) < 100 and "." in c) for c in first[-1:]):
-                # Could be meseros (5 cols: name, subtotal, iva, total, pct)
-                # or grupos (5 cols: name, subtotal, iva, total, pct)
-                # or platillos (5 cols: name, qty, subtotal, total, pct)
-                if len(first) == 5:
-                    # Check if col[1] is a small integer (qty) = platillos
-                    try:
-                        qty_test = int(first[1])
-                        if qty_test < 1000:
-                            # PLATILLOS: [name, qty, subtotal, total, pct]
-                            platillos = []
-                            for cols in rows:
-                                if len(cols) >= 4:
-                                    try:
-                                        name = cols[0]
-                                        qty = int(cols[1])
-                                        total = parse_num(cols[3])
-                                        if name and total > 0:
-                                            platillos.append({"nombre": name, "cantidad": qty, "total": total})
-                                    except (ValueError, IndexError):
-                                        pass
-                            if platillos:
-                                row["platillos_top"] = json.dumps(sorted(platillos, key=lambda x: -x["total"])[:30])
-                            continue
-                    except (ValueError, IndexError):
-                        pass
-
-                    # Check if first column looks like a person name (has spaces)
-                    if " " in first[0] or first[0].isupper():
-                        # Could be MESEROS or GRUPOS
-                        # Meseros have person names, grupos have category names in CAPS
-                        is_grupo = all(c[0].isupper() for c in [r[0] for r in rows[:3]] if c[0:1])
-                        has_ampersand = any("&" in r[0] for r in rows[:5])
-
-                        if has_ampersand or any(kw in first[0] for kw in ["COFFEE", "EGGS", "TOAST", "CHILAQ", "PANINI", "PIZZA", "DESSERT", "FRESH", "JUGO", "SMOOTH", "FRAPPE", "PANCAKE", "BOWL", "CROISSANT", "SIGNATURE", "EVERYDAY"]):
-                            # GRUPOS: [name, subtotal, iva, total, pct]
-                            grupos = []
-                            for cols in rows:
-                                if len(cols) >= 4:
-                                    try:
-                                        total = parse_num(cols[3])
-                                        if cols[0] and total > 0:
-                                            grupos.append({"nombre": cols[0], "total": total})
-                                    except (ValueError, IndexError):
-                                        pass
-                            if grupos:
-                                row["ventas_por_grupo"] = json.dumps(grupos)
-                        else:
-                            # MESEROS: [name, subtotal, iva, total, pct]
-                            meseros = []
-                            for cols in rows:
-                                if len(cols) >= 4:
-                                    name = cols[0]
-                                    if any(ex in name.lower() for ex in _excl):
-                                        continue
-                                    try:
-                                        total = parse_num(cols[3])
-                                        if total > 0:
-                                            meseros.append({"nombre": name, "total": total})
-                                    except (ValueError, IndexError):
-                                        pass
-                            if meseros:
-                                row["meseros"] = json.dumps(meseros)
-
-            elif len(first) == 3:
-                # PAYMENTS: [name, $amount, pct]
-                pagos = []
-                for cols in rows:
-                    if len(cols) >= 2:
-                        try:
-                            mxn = parse_num(cols[1])
-                            pct = parse_num(cols[2]) if len(cols) >= 3 else 0
-                            if cols[0] and mxn > 0:
-                                pagos.append({"nombre": cols[0], "total": round(mxn, 2), "pct": round(pct, 1)})
-                        except (ValueError, IndexError):
-                            pass
-                if pagos:
-                    row["pago_metodos"] = json.dumps(pagos)
-                    for p in pagos:
-                        nm = p["nombre"].lower()
-                        if "efectivo" in nm:
-                            row["efectivo"] = p["total"]
-                        elif "tarjeta" in nm or "crédito" in nm or "débito" in nm:
-                            row["tarjeta"] = row.get("tarjeta", 0) + p["total"]
-
+        total_ordenes = 0
+        total_personas = 0
+        for tr in soup.select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 4:
+                try:
+                    total_personas += int(cols[2])
+                    total_ordenes += int(cols[3])
+                except (ValueError, IndexError):
+                    pass
+        row["tickets_count"] = total_ordenes
+        row["personas_restaurant"] = total_personas
+        if total_personas > 0 and row.get("ventas_dia"):
+            row["ticket_promedio_restaurant"] = round(row["ventas_dia"] / total_personas, 2)
     except Exception as e:
-        print(f"  [!] SalesByBranch failed: {e}")
-        import traceback; traceback.print_exc()
+        print(f"  [!] OrderTypes failed: {e}")
+
+    # 3. Meseros
+    _excl = [e.lower() for e in (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])]
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesByUser", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
+        }, timeout=15)
+        meseros = []
+        for tr in BeautifulSoup(r.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 4:
+                name = cols[0]
+                if any(ex in name.lower() for ex in _excl):
+                    continue
+                total = parse_num(cols[3])
+                if total > 0:
+                    meseros.append({"nombre": name, "total": total})
+        if meseros:
+            row["meseros"] = json.dumps(meseros)
+    except Exception as e:
+        print(f"  [!] Meseros failed: {e}")
+
+    # 4. Groups
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesByGroup", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
+        }, timeout=15)
+        grupos = []
+        for tr in BeautifulSoup(r.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 4:
+                total = parse_num(cols[3])
+                if cols[0] and total > 0:
+                    grupos.append({"nombre": cols[0], "total": total})
+        if grupos:
+            row["ventas_por_grupo"] = json.dumps(grupos)
+    except Exception as e:
+        print(f"  [!] Groups failed: {e}")
+
+    # 5. Payments: cols[1]=$MXN, cols[2]=pct
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
+        }, timeout=15)
+        pagos = []
+        for tr in BeautifulSoup(r.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 2:
+                mxn = parse_num(cols[1])
+                pct = parse_num(cols[2]) if len(cols) >= 3 else 0
+                if cols[0] and mxn > 0:
+                    pagos.append({"nombre": cols[0], "total": round(mxn, 2), "pct": round(pct, 1)})
+        if pagos:
+            row["pago_metodos"] = json.dumps(pagos)
+            for p in pagos:
+                nm = p["nombre"].lower()
+                if "efectivo" in nm:
+                    row["efectivo"] = p["total"]
+                elif "tarjeta" in nm or "crédito" in nm or "débito" in nm:
+                    row["tarjeta"] = row.get("tarjeta", 0) + p["total"]
+    except Exception as e:
+        print(f"  [!] Payments failed: {e}")
+
+    # 6. Top platillos
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesBySaucer", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
+        }, timeout=15)
+        platillos = []
+        for tr in BeautifulSoup(r.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 4:
+                try:
+                    qty = int(cols[1])
+                    total = parse_num(cols[3])
+                    if cols[0] and total > 0:
+                        platillos.append({"nombre": cols[0], "cantidad": qty, "total": total})
+                except (ValueError, IndexError):
+                    pass
+        if platillos:
+            row["platillos_top"] = json.dumps(sorted(platillos, key=lambda x: -x["total"])[:30])
+    except Exception as e:
+        print(f"  [!] Platillos failed: {e}")
 
     return row
 
