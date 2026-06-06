@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
-    // 1. Recent daily data — OPTIMIZED: load detail columns only when needed
-    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
+    // 1. Recent daily data — OPTIMIZED: 14 days default, 90 for history questions
+    const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'febrero', 'enero', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
     const wantsDetail = ['mesero', 'quien', 'quién', 'platillo', 'grupo', 'categoria', 'categoría', 'pago', 'tarjeta', 'efectivo', 'desglose', 'detalle', 'top', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos', 'mejor', 'peor', 'mas vendido', 'más vendido', 'coffee', 'cafe', 'café', 'pancake', 'waffle', 'bowl', 'pizza', 'smoothie', 'frappe', 'jugo'].some(kw => q.includes(kw))
-    const histLimit = 1000 // Load all historical data (light format unless wantsDetail)
+    const histLimit = wantsHistory ? 90 : 14
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const selectCols = wantsDetail
