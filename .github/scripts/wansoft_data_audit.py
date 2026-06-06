@@ -131,6 +131,39 @@ def main():
         except Exception as e:
             print(f"    {endpoint}: error {e}")
 
+    # 2c. SalesByBranch MONTHLY query (to compare monthly totals)
+    print("\n[2c] SalesByBranch — FULL MONTH query:")
+    month_start = target[:8] + "01"
+    import calendar
+    y, m = int(target[:4]), int(target[5:7])
+    month_end = f"{y}-{m:02d}-{calendar.monthrange(y, m)[1]:02d}"
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/GetConsolidatedSales", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": month_start, "endDate": month_end,
+        }, timeout=15)
+        mc = r.json()
+        print(f"    Month range: {month_start} → {month_end}")
+        print(f"    TotalSales (month): {mc.get('TotalSales')}")
+        print(f"    TotalGrossSales (month): {mc.get('TotalGrossSales')}")
+        print(f"    TotalDiscount (month): {mc.get('TotalDiscount')}")
+        # Also get order types for the whole month
+        r2 = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": month_start, "endDate": month_end,
+        }, timeout=15)
+        mt_ordenes = 0
+        mt_personas = 0
+        for tr in BeautifulSoup(r2.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 4:
+                try:
+                    mt_personas += int(cols[2])
+                    mt_ordenes += int(cols[3])
+                except: pass
+        print(f"    Ordenes (month): {mt_ordenes}")
+        print(f"    Personas (month): {mt_personas}")
+    except Exception as e:
+        print(f"    Monthly query failed: {e}")
+
     # 3. SalesByTypeOfOrder
     print("\n[3] SalesByTypeOfOrder:")
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
