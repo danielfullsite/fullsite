@@ -50,50 +50,22 @@ def upsert_daily_report(
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        # From agg_meseros — only set if value exists and is not None
-        ventas = agg_meseros.get("total_dia")
-        if ventas is not None and ventas > 0:
-            row["ventas_dia"] = ventas
-
-        # NOTE: personas_restaurant, tickets_count, and ticket_promedio_restaurant
-        # are NOT written here. They come from intraday_sales.py which uses the
-        # Wansoft HTTP API (SalesByTypeOfOrder) — the same source as the Wansoft app.
-        # The XLSX "Reporte por Mesero" has different definitions for "personas"
-        # (sum of per-mesero personas vs total covers) which caused data mismatches.
-        # See: https://github.com/ramonfaurdaniel-png/fullsite/issues/data-accuracy
+        # ══════════════════════════════════════════════════════════════════
+        # CRITICAL: This XLSX parser ONLY writes meseros.
+        # ALL other fields come from intraday_sales.py (HTTP API).
+        #
+        # WHY: The XLSX "Reporte por Mesero" has different values:
+        # - ventas_dia: XLSX = subtotals sin IVA ($45K), API = TotalSales con IVA ($63K)
+        # - personas: XLSX = sum per-mesero (84), API = real covers (158)
+        # - platillos/grupos/pagos: not in XLSX at all
+        #
+        # The XLSX is ONLY useful for mesero names (properly formatted).
+        # If we write ventas_dia here, it overwrites the correct API value.
+        # ══════════════════════════════════════════════════════════════════
 
         meseros = agg_meseros.get("meseros_top")
         if meseros:
             row["meseros"] = json.dumps(meseros) if not isinstance(meseros, str) else meseros
-
-        # From agg_platillos
-        chil = agg_platillos.get("chilaquiles_total")
-        if chil is not None:
-            row["chilaquiles_total"] = chil
-
-        hh = agg_platillos.get("half_half_total")
-        if hh is not None:
-            row["half_half_total"] = hh
-
-        platillos = agg_platillos.get("platillos_top")
-        if platillos:
-            row["platillos_top"] = json.dumps(platillos) if not isinstance(platillos, str) else platillos
-
-        ventas_grupo = agg_platillos.get("ventas_por_grupo")
-        if ventas_grupo:
-            row["ventas_por_grupo"] = json.dumps(ventas_grupo) if not isinstance(ventas_grupo, str) else ventas_grupo
-
-        pago = agg_platillos.get("pago_metodos")
-        if pago:
-            row["pago_metodos"] = json.dumps(pago) if not isinstance(pago, str) else pago
-
-        ventas_brutas = agg_platillos.get("ventas_brutas") or agg_meseros.get("ventas_brutas")
-        if ventas_brutas is not None:
-            row["ventas_brutas"] = ventas_brutas
-
-        descuentos = agg_platillos.get("descuentos") or agg_meseros.get("descuentos")
-        if descuentos is not None:
-            row["descuentos"] = descuentos
 
         # Check if row for this date already exists
         check = requests.get(
