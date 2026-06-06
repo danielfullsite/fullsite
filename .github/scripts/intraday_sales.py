@@ -427,7 +427,11 @@ def main():
         order_types = get_sales_by_order_type(session, today_str, today_str)
         monthly_avg = get_monthly_ticket_avg()
 
-        print(f"[intraday] Data: consolidated OK, {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets")
+        # Log ALL consolidated keys for debugging data accuracy
+        print(f"[intraday] Consolidated keys: {list(consolidated.keys()) if isinstance(consolidated, dict) else type(consolidated)}")
+        print(f"[intraday] Consolidated: TotalSales={consolidated.get('TotalSales')}, GrossSales={consolidated.get('TotalGrossSales')}, Discounts={consolidated.get('TotalDiscounts')}, Tickets={consolidated.get('TotalTickets', 'N/A')}, Personas={consolidated.get('TotalPersons', 'N/A')}")
+        print(f"[intraday] OrderTypes breakdown: {order_types}")
+        print(f"[intraday] Data: {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets, {order_types['total_personas']} personas")
 
         # Save hourly sales to Supabase for historical analysis
         try:
@@ -466,8 +470,14 @@ def main():
                 update_data["descuentos"] = consolidated.get("TotalDiscounts", 0)
                 update_data["ventas_dia"] = consolidated.get("TotalSales", 0)
 
-            # Tickets y personas from order_types
-            if order_types:
+            # Tickets y personas — prefer consolidated (matches Wansoft app), fallback to order_types
+            if consolidated and consolidated.get("TotalTickets"):
+                update_data["tickets_count"] = int(consolidated["TotalTickets"])
+                update_data["personas_restaurant"] = int(consolidated.get("TotalPersons", 0))
+            elif consolidated and consolidated.get("Tickets"):
+                update_data["tickets_count"] = int(consolidated["Tickets"])
+                update_data["personas_restaurant"] = int(consolidated.get("Persons", consolidated.get("Personas", 0)))
+            elif order_types:
                 update_data["tickets_count"] = order_types.get("total_tickets", 0)
                 update_data["personas_restaurant"] = order_types.get("total_personas", 0)
 
