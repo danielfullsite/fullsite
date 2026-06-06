@@ -576,6 +576,30 @@ def main():
                 f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}",
                 headers=sb_h, json=update_data, timeout=10)
             print(f"[intraday] Updated wansoft_daily with {len(update_data)} fields")
+
+            # ── VALIDATION: read back and compare ──
+            try:
+                vr = requests.get(
+                    f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&select=ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta",
+                    headers={"apikey": os.environ["SUPABASE_SERVICE_KEY"], "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"},
+                    timeout=10)
+                if vr.ok and vr.json():
+                    db = vr.json()[0]
+                    mismatches = []
+                    checks = [
+                        ("ventas_dia", update_data.get("ventas_dia"), float(db.get("ventas_dia") or 0)),
+                        ("tickets_count", update_data.get("tickets_count"), int(db.get("tickets_count") or 0)),
+                        ("personas_restaurant", update_data.get("personas_restaurant"), int(db.get("personas_restaurant") or 0)),
+                    ]
+                    for field, expected, actual in checks:
+                        if expected is not None and abs(float(expected) - float(actual)) > 1:
+                            mismatches.append(f"{field}: wrote={expected} read={actual}")
+                    if mismatches:
+                        print(f"[intraday] VALIDATION FAILED: {mismatches}")
+                    else:
+                        print(f"[intraday] VALIDATION OK: ventas=${db.get('ventas_dia')}, tickets={db.get('tickets_count')}, personas={db.get('personas_restaurant')}")
+            except Exception as ve:
+                print(f"[intraday] Validation check failed: {ve}")
         except Exception as e:
             print(f"[intraday] wansoft_daily update failed (non-blocking): {e}")
 

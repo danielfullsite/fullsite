@@ -35,8 +35,7 @@ export async function POST(request: NextRequest) {
       return new Response('Mensaje requerido', { status: 400 })
     }
 
-    const groqKey = process.env.GROQ_API_KEY || process.env.GROQ
-    if (!groqKey) {
+    if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return new Response('Agrega GROQ_API_KEY para activar el agente de voz.', { status: 200 })
     }
 
@@ -421,69 +420,18 @@ ${waiterContext}
 
 ${dailyContext}`
 
-    // Groq API (OpenAI-compatible, free tier, 300 tok/s)
-    const groqMessages = [
-      { role: 'system' as const, content: systemPrompt },
-      ...history.slice(-6).map((h: { role: string; content: string }) => ({
-        role: h.role as 'user' | 'assistant',
-        content: h.content,
-      })),
-      { role: 'user' as const, content: message },
-    ]
-
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: groqMessages,
-        max_tokens: 300,
-        temperature: 0.3,
-        stream: true,
-      }),
-    })
-
-    if (!groqRes.ok) {
-      const err = await groqRes.text()
-      console.error('[voice] Groq error:', groqRes.status, err)
-      return new Response('Error al procesar. Intenta de nuevo.', { status: 500 })
-    }
-
-    // Stream Groq SSE response to client as plain text
-    const encoder = new TextEncoder()
-    const decoder = new TextDecoder()
-
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          const reader = groqRes.body!.getReader()
-          let buffer = ''
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-            for (const line of lines) {
-              if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                try {
-                  const json = JSON.parse(line.slice(6))
-                  const text = json.choices?.[0]?.delta?.content
-                  if (text) controller.enqueue(encoder.encode(text))
-                } catch { /* skip malformed */ }
-              }
-            }
-          }
-          controller.close()
-        } catch (err) {
-          console.error('[voice] Stream error:', err)
-          controller.enqueue(encoder.encode('Lo siento, hubo un error. Intenta de nuevo.'))
-          controller.close()
-        }
-      },
+    // Groq — free, 300 tok/s, with retry on rate limit
+    const { groqStream } = await import('@/lib/groq')
+    const readable = await groqStream({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-6).map((h: { role: string; content: string }) => ({
+          role: h.role as 'system' | 'user' | 'assistant',
+          content: h.content,
+        })),
+        { role: 'user', content: message },
+      ],
+      maxTokens: 300,
     })
 
     return new Response(readable, {

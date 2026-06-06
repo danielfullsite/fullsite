@@ -66,8 +66,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
     }
 
-    const groqKey = process.env.GROQ_API_KEY || process.env.GROQ
-    if (!groqKey) {
+    if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json(
         { response: 'Agrega ANTHROPIC_API_KEY a .env.local para activar el chat.' },
         { status: 200 }
@@ -570,38 +569,19 @@ ${waiterContext}
 
 ${dailyContext}`
 
-    // Groq API — free tier, Llama 3.3 70B, 300 tok/s
-    const groqMessages = [
-      { role: 'system', content: systemPrompt },
-      ...history.slice(-8).map((h: { role: string; content: string }) => ({
-        role: h.role,
-        content: h.content,
-      })),
-      { role: 'user', content: message },
-    ]
-
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: groqMessages,
-        max_tokens: 4000,
-        temperature: 0.3,
-      }),
+    // Groq — free, with retry on rate limit
+    const { groqChat } = await import('@/lib/groq')
+    const text = await groqChat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-8).map((h: { role: string; content: string }) => ({
+          role: h.role as 'system' | 'user' | 'assistant',
+          content: h.content,
+        })),
+        { role: 'user', content: message },
+      ],
+      maxTokens: 4000,
     })
-
-    if (!groqRes.ok) {
-      const err = await groqRes.text()
-      console.error('[chat] Groq error:', groqRes.status, err)
-      return Response.json({ response: 'Error al procesar tu pregunta. Intenta de nuevo.' })
-    }
-
-    const groqData = await groqRes.json()
-    const text = groqData.choices?.[0]?.message?.content || ''
 
     // Hermes feedback: log if response contains "no tengo" for improvement
     if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {

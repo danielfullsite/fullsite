@@ -4,8 +4,7 @@ export async function POST(request: NextRequest) {
   try {
     const { client_id } = await request.json().catch(() => ({} as { client_id?: string }))
 
-    const groqKey = process.env.GROQ_API_KEY || process.env.GROQ
-    if (!groqKey) {
+    if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json({ insights: [] }, { status: 200 })
     }
 
@@ -169,25 +168,14 @@ REGLAS:
 
 Responde SOLO con el JSON array, sin markdown ni texto adicional.`
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: 'Dame los 3 insights más importantes para hoy.' },
-        ],
-        max_tokens: 1500,
-        temperature: 0.3,
-      }),
+    const { groqChat } = await import('@/lib/groq')
+    const text = await groqChat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Dame los 3 insights más importantes para hoy.' },
+      ],
+      maxTokens: 1500,
     })
-    if (!groqRes.ok) {
-      console.error('[coach] Groq error:', groqRes.status)
-      return Response.json({ insights: [], today: {} })
-    }
-    const groqData = await groqRes.json()
-    const text = groqData.choices?.[0]?.message?.content || '[]'
 
     // Parse JSON from response
     let insights = []
