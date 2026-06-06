@@ -409,8 +409,9 @@ def main():
     today_str = now_mx.strftime("%Y-%m-%d")
 
     # Guard: skip if outside operating hours (before 9am or after 9pm MX)
+    # BUT allow manual triggers (workflow_dispatch) to run anytime
     mx_hour = now_mx.hour
-    if mx_hour < 9 or mx_hour >= 21:
+    if TRIGGER_TYPE != "workflow_dispatch" and (mx_hour < 9 or mx_hour >= 21):
         print(f"[intraday] Outside operating hours ({mx_hour}:00 MX) — skipping")
         return
 
