@@ -70,6 +70,7 @@ export default function TendenciasPage() {
         personas: data.personas,
         dias: data.dias,
         ticketPromedio: data.tickets > 0 ? Math.round(data.ventas / data.tickets) : 0,
+        ticketPromedioPersona: data.personas > 0 ? Math.round(data.ventas / data.personas) : 0,
         ventasDiarias: data.dias > 0 ? Math.round(data.ventas / data.dias) : 0,
       }))
       .sort((a, b) => a.month.localeCompare(b.month))
@@ -522,6 +523,59 @@ export default function TendenciasPage() {
                 fill="url(#colorTicketProm)"
                 dot={{ r: 3, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
                 activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: 'var(--text-3)' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Monthly ticket promedio POR PERSONA */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
+          Ticket promedio mensual (por persona)
+        </h3>
+        <p className="text-xs text-[var(--text-3)] mb-5">Ventas ÷ personas — lo que gasta cada comensal</p>
+        <div className="h-[200px] sm:h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={monthlyAgg}>
+              <defs>
+                <linearGradient id="colorTicketPersn" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v}`}
+                width={50}
+              />
+              <Tooltip
+                formatter={(value) => [formatCurrency(Number(value)), 'TP/Persona']}
+                contentStyle={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="ticketPromedioPersona"
+                stroke="#3b82f6"
+                strokeWidth={2.5}
+                fill="url(#colorTicketPersn)"
+                dot={{ r: 3, fill: '#3b82f6', stroke: 'var(--text-1)', strokeWidth: 2 }}
+                activeDot={{ r: 5, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--text-3)' }}
               />
             </AreaChart>
           </ResponsiveContainer>
