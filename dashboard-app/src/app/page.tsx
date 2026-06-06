@@ -126,6 +126,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('dia')
   const [selectedDayIdx, setSelectedDayIdx] = useState(0) // 0 = latest, 1 = yesterday, etc.
+  const [weekOffset, setWeekOffset] = useState(0) // 0 = current week, 1 = last week, etc.
+  const [monthOffset, setMonthOffset] = useState(0) // 0 = current month, 1 = last month, etc.
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
@@ -146,7 +148,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        let recent = await getRecentDays(30)
+        let recent = await getRecentDays(90)
         let latest = await getLatestDay()
 
         // Fallback: if no wansoft_daily data, build from pos_orders
@@ -231,42 +233,48 @@ export default function DashboardPage() {
       return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas: sameDOWAvg.ventas, prevTickets: sameDOWAvg.tickets, prevPersonas: sameDOWAvg.personas, prevTp: sameDOWAvg.tp, label: `vs prom. ${todayDOWName}` }
     }
     if (period === 'semana') {
-      const last7 = recentData.slice(0, 7)
-      const prev7 = recentData.slice(7, 14)
+      const now = new Date()
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - now.getDay() + 1 - weekOffset * 7)
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
+      const prevWeekStart = new Date(weekStart); prevWeekStart.setDate(prevWeekStart.getDate() - 7)
+      const prevWeekEnd = new Date(prevWeekStart); prevWeekEnd.setDate(prevWeekStart.getDate() + 6)
+      const fmt = (d: Date) => d.toISOString().slice(0, 10)
+      const thisWeek = recentData.filter(d => d.fecha >= fmt(weekStart) && d.fecha <= fmt(weekEnd))
+      const prevWeek = recentData.filter(d => d.fecha >= fmt(prevWeekStart) && d.fecha <= fmt(prevWeekEnd))
       const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
-      const ventas = sum(last7, 'ventas_dia')
-      const tickets = sum(last7, 'tickets_count')
-      const personas = sum(last7, 'personas_restaurant')
+      const ventas = sum(thisWeek, 'ventas_dia')
+      const tickets = sum(thisWeek, 'tickets_count')
+      const personas = sum(thisWeek, 'personas_restaurant')
       const tp = personas > 0 ? ventas / personas : 0
-      const propinas = sum(last7, 'propinas_total')
-      const descuentos = sum(last7, 'descuentos')
-      const brutas = sum(last7, 'ventas_brutas')
-      const prevVentas = sum(prev7, 'ventas_dia')
-      const prevTickets = sum(prev7, 'tickets_count')
-      const prevPersonas = sum(prev7, 'personas_restaurant')
+      const propinas = sum(thisWeek, 'propinas_total')
+      const descuentos = sum(thisWeek, 'descuentos')
+      const brutas = sum(thisWeek, 'ventas_brutas')
+      const prevVentas = sum(prevWeek, 'ventas_dia')
+      const prevTickets = sum(prevWeek, 'tickets_count')
+      const prevPersonas = sum(prevWeek, 'personas_restaurant')
       const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
       return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs semana anterior' }
     }
-    // mes
-    const thisMonth = recentData.filter(d => d.fecha.slice(0, 7) === (latestDay?.fecha || '').slice(0, 7))
-    const lastMonthStr = (() => {
-      if (!latestDay) return ''
-      const d = new Date(latestDay.fecha)
-      d.setMonth(d.getMonth() - 1)
-      return d.toISOString().slice(0, 7)
-    })()
-    const lastMonth = recentData.filter(d => d.fecha.slice(0, 7) === lastMonthStr)
+    // mes — use monthOffset
+    const now = new Date()
+    const viewMonth = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+    const viewMonthStr = viewMonth.toISOString().slice(0, 7)
+    const prevMonth = new Date(viewMonth); prevMonth.setMonth(prevMonth.getMonth() - 1)
+    const prevMonthStr = prevMonth.toISOString().slice(0, 7)
+    const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === viewMonthStr)
+    const lastMonthData = recentData.filter(d => d.fecha.slice(0, 7) === prevMonthStr)
     const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
-    const ventas = sum(thisMonth, 'ventas_dia')
-    const tickets = sum(thisMonth, 'tickets_count')
-    const personas = sum(thisMonth, 'personas_restaurant')
+    const ventas = sum(thisMonthData, 'ventas_dia')
+    const tickets = sum(thisMonthData, 'tickets_count')
+    const personas = sum(thisMonthData, 'personas_restaurant')
     const tp = personas > 0 ? ventas / personas : 0
-    const propinas = sum(thisMonth, 'propinas_total')
-    const descuentos = sum(thisMonth, 'descuentos')
-    const brutas = sum(thisMonth, 'ventas_brutas')
-    const prevVentas = sum(lastMonth, 'ventas_dia')
-    const prevTickets = sum(lastMonth, 'tickets_count')
-    const prevPersonas = sum(lastMonth, 'personas_restaurant')
+    const propinas = sum(thisMonthData, 'propinas_total')
+    const descuentos = sum(thisMonthData, 'descuentos')
+    const brutas = sum(thisMonthData, 'ventas_brutas')
+    const prevVentas = sum(lastMonthData, 'ventas_dia')
+    const prevTickets = sum(lastMonthData, 'tickets_count')
+    const prevPersonas = sum(lastMonthData, 'personas_restaurant')
     const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
     return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs mes anterior' }
   })()
@@ -352,52 +360,59 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
-          {period === 'dia' && viewDay && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))}
-                  disabled={selectedDayIdx >= recentData.length - 1}
-                  className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30 transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      const input = document.getElementById('day-picker') as HTMLInputElement
-                      if (input) input.showPicker()
-                    }}
-                    className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center hover:text-[var(--text-1)] transition-colors cursor-pointer"
-                  >
-                    {formatDate(viewDay.fecha)}
-                    {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
-                  </button>
-                  <input
-                    id="day-picker"
-                    type="date"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    value={viewDay.fecha}
-                    min={recentData[0]?.fecha}
-                    max={recentData[recentData.length - 1]?.fecha}
-                    onChange={(e) => {
-                      const target = e.target.value
-                      const idx = recentData.findIndex(d => d.fecha === target)
-                      if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)
-                    }}
-                  />
+          {/* Navigation arrows + date label for all periods */}
+          {(() => {
+            const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+            if (period === 'dia' && viewDay) {
+              return (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <div className="relative">
+                    <button onClick={() => { const el = document.getElementById('day-picker') as HTMLInputElement; el?.showPicker() }} className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center hover:text-[var(--text-1)] cursor-pointer">
+                      {formatDate(viewDay.fecha)}
+                      {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
+                    </button>
+                    <input id="day-picker" type="date" className="absolute inset-0 opacity-0 cursor-pointer" value={viewDay.fecha} min={recentData[0]?.fecha} max={recentData[recentData.length - 1]?.fecha} onChange={(e) => { const idx = recentData.findIndex(d => d.fecha === e.target.value); if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx) }} />
+                  </div>
+                  <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
                 </div>
-                <button
-                  onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))}
-                  disabled={selectedDayIdx <= 0}
-                  className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30 transition-colors"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-          )}
-          {period !== 'dia' && latestDay && (
-            <span className="text-sm text-[var(--text-3)]">{formatDate(latestDay.fecha)}</span>
-          )}
+              )
+            }
+            if (period === 'semana') {
+              const now = new Date()
+              const weekStart = new Date(now)
+              weekStart.setDate(now.getDate() - now.getDay() + 1 - weekOffset * 7)
+              const weekEnd = new Date(weekStart)
+              weekEnd.setDate(weekStart.getDate() + 6)
+              const label = `${weekStart.getDate()} ${MESES[weekStart.getMonth()].slice(0,3)} - ${weekEnd.getDate()} ${MESES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getFullYear()}`
+              return (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 12} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
+                    {label}
+                    {weekOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
+                  </span>
+                  <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                </div>
+              )
+            }
+            if (period === 'mes') {
+              const now = new Date()
+              const viewMonth = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+              const label = `${MESES[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`
+              return (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setMonthOffset(m => m + 1)} disabled={monthOffset >= 24} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+                  <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
+                    {label}
+                    {monthOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
+                  </span>
+                  <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
+                </div>
+              )
+            }
+            return null
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <button
