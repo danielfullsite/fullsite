@@ -189,8 +189,11 @@ export default function DashboardPage() {
     )
   }
 
-  // Selected day for navigation (0=latest, 1=yesterday, etc.)
-  const viewDay = period === 'dia' && recentData.length > 0 ? (recentData[selectedDayIdx] || latestDay) : latestDay
+  // Selected day for navigation (0=latest day, 1=yesterday, etc.)
+  // recentData is sorted ASC (oldest first), so latest = last element
+  const viewDay = period === 'dia' && recentData.length > 0
+    ? (recentData[recentData.length - 1 - selectedDayIdx] || latestDay)
+    : latestDay
 
   // Same DOW average (last 4 weeks) for "dia" comparison
   const sameDOWAvg = (() => {
