@@ -1,0 +1,33 @@
+name: Wansoft Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Start date (YYYY-MM-DD, default: 7 days ago)'
+        required: false
+      end_date:
+        description: 'End date (YYYY-MM-DD, default: yesterday)'
+        required: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+      TRIGGER_TYPE: ${{ github.event_name }}
+      START_DATE: ${{ github.event.inputs.start_date }}
+      END_DATE: ${{ github.event.inputs.end_date }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+      - name: Run Wansoft Backfill
+        working-directory: .github/scripts
+        run: python wansoft_backfill.py
