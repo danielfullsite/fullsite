@@ -63,6 +63,7 @@ const navSections = [
     label: 'Finanzas',
     items: [
       { href: '/ingresos', label: 'Ingresos', icon: Banknote },
+      { href: '/costos', label: 'Costos', icon: DollarSign },
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
       { href: '/nomina', label: 'Nómina', icon: UserCheck },
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
