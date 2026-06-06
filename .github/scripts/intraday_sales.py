@@ -139,47 +139,37 @@ def get_sales_by_saucer(session, start, end):
 
 def get_sales_by_order_type(session, start, end):
     """Get sales by order type — includes ticket counts and personas.
-    Returns both total (all types) and restaurant-only counts.
-    The Wansoft app shows restaurant-only; we store both."""
+    CRITICAL: Wansoft cols = [Type, AvgTicket, PERSONAS, ORDENES, Subtotal, Total]
+    cols[2] = personas (NOT tickets), cols[3] = ordenes/tickets (NOT personas)
+    Verified via audit 2026-06-06: Restaurant 122 personas, 58 ordenes = 2.1 pers/orden."""
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
         "subsidiaryId": SUBSIDIARY_ID, "startDate": start, "endDate": end,
     })
     soup = BeautifulSoup(r.text, "html.parser")
     rows = soup.select(".rowReport")
     results = []
-    total_tickets = 0
+    total_ordenes = 0
     total_personas = 0
-    rest_tickets = 0
-    rest_personas = 0
-    # Order types that count as "restaurant" (not market/delivery)
-    _rest_types = ["restaurante", "restaurant", "comedor", "mesa", "barra", "bar"]
-    _exclude_types = ["market", "tiendita", "llevar", "domicilio", "uber", "rappi", "didi", "delivery"]
     for row in rows:
         cols = [c.text.strip() for c in row.select("div")]
         if len(cols) >= 6:
             try:
                 order_type = cols[0]
-                tickets = int(cols[2])
-                personas = int(cols[3])
-                total_tickets += tickets
+                personas = int(cols[2])   # PERSONAS (was incorrectly read as tickets)
+                ordenes = int(cols[3])    # ORDENES (was incorrectly read as personas)
                 total_personas += personas
-                results.append({"type": order_type, "tickets": tickets, "personas": personas})
-                # Classify: restaurant vs non-restaurant
-                ot_lower = order_type.lower()
-                is_excluded = any(ex in ot_lower for ex in _exclude_types)
-                if not is_excluded:
-                    rest_tickets += tickets
-                    rest_personas += personas
+                total_ordenes += ordenes
+                results.append({"type": order_type, "ordenes": ordenes, "personas": personas})
             except (ValueError, IndexError):
                 pass
     # Log each type for debugging
     for r_item in results:
-        print(f"[intraday] OrderType: {r_item['type']} → {r_item['tickets']} tickets, {r_item['personas']} personas")
-    print(f"[intraday] OrderTypes total: {total_tickets} tickets, {total_personas} personas | Restaurant-only: {rest_tickets} tickets, {rest_personas} personas")
+        ppo = round(r_item['personas'] / r_item['ordenes'], 2) if r_item['ordenes'] > 0 else 0
+        print(f"[intraday] OrderType: {r_item['type']} → {r_item['ordenes']} ordenes, {r_item['personas']} personas ({ppo} pers/orden)")
+    print(f"[intraday] OrderTypes total: {total_ordenes} ordenes, {total_personas} personas")
     return {
         "types": results,
-        "total_tickets": total_tickets, "total_personas": total_personas,
-        "rest_tickets": rest_tickets, "rest_personas": rest_personas,
+        "total_ordenes": total_ordenes, "total_personas": total_personas,
     }
 
 
@@ -292,7 +282,7 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
 
     ventas_netas = consolidated.get("TotalSales", 0)
 
-    tickets = order_types.get("total_tickets", 0)
+    tickets = order_types.get("total_ordenes", 0)
     personas = order_types.get("total_personas", 0)
 
     # Exclude Market staff from restaurant metrics
@@ -454,7 +444,7 @@ def main():
         print(f"[intraday] Consolidated keys: {list(consolidated.keys()) if isinstance(consolidated, dict) else type(consolidated)}")
         print(f"[intraday] Consolidated: TotalSales={consolidated.get('TotalSales')}, GrossSales={consolidated.get('TotalGrossSales')}, Discounts={consolidated.get('TotalDiscounts')}, Tickets={consolidated.get('TotalTickets', 'N/A')}, Personas={consolidated.get('TotalPersons', 'N/A')}")
         print(f"[intraday] OrderTypes breakdown: {order_types}")
-        print(f"[intraday] Data: {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_tickets']} tickets, {order_types['total_personas']} personas")
+        print(f"[intraday] Data: {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
 
         # Save hourly sales to Supabase for historical analysis
         try:
@@ -495,8 +485,8 @@ def main():
 
             # Tickets y personas — use RESTAURANT-ONLY counts (matches Wansoft app)
             if order_types:
-                update_data["tickets_count"] = order_types.get("rest_tickets", 0) or order_types.get("total_tickets", 0)
-                update_data["personas_restaurant"] = order_types.get("rest_personas", 0) or order_types.get("total_personas", 0)
+                update_data["tickets_count"] = order_types.get("total_ordenes", 0)
+                update_data["personas_restaurant"] = order_types.get("total_personas", 0)
 
             # Ventas por grupo
             if groups:
@@ -532,26 +522,28 @@ def main():
                 pay_html = pay_resp.text
                 pay_soup = BeautifulSoup(pay_html, "html.parser")
                 pago_data = []
-                ventas_for_pago = update_data.get("ventas_dia") or (consolidated.get("TotalSales", 0) if consolidated else 0)
                 for row in pay_soup.select(".rowReport"):
                     cols = [c.text.strip() for c in row.select("div")]
+                    # Wansoft cols: [Name, $MXN_amount, Percentage]
+                    # e.g. ['Tarjeta de crédito', '$35,089.75', '55.2']
                     if len(cols) >= 2:
                         name = cols[0]
-                        # Try last column for total (Wansoft returns percentages, not MXN)
+                        # cols[1] = MXN amount (the REAL value)
+                        mxn = 0
                         pct = 0
-                        for c in reversed(cols[1:]):
+                        try:
+                            mxn = float(cols[1].replace(",","").replace("$","").replace("%",""))
+                        except ValueError:
+                            pass
+                        if len(cols) >= 3:
                             try:
-                                pct = float(c.replace(",","").replace("$","").replace("%",""))
-                                if pct > 0: break
+                                pct = float(cols[2].replace(",","").replace("$","").replace("%",""))
                             except ValueError:
-                                continue
-                        if name and pct > 0:
-                            # Convert % to MXN: if value < 100, it's a percentage
-                            mxn = round(ventas_for_pago * pct / 100, 2) if pct < 100 else pct
-                            pago_data.append({"nombre": name, "total": mxn, "pct": round(pct, 1)})
-                # Log raw for debugging
+                                pass
+                        if name and mxn > 0:
+                            pago_data.append({"nombre": name, "total": round(mxn, 2), "pct": round(pct, 1)})
                 if pago_data:
-                    print(f"[intraday] Pagos (MXN): {[p['nombre'] + ':$' + str(int(p['total'])) + '(' + str(p['pct']) + '%)' for p in pago_data]}")
+                    print(f"[intraday] Pagos: {[p['nombre'] + ':$' + str(int(p['total'])) + '(' + str(p['pct']) + '%)' for p in pago_data]}")
                 if pago_data:
                     update_data["pago_metodos"] = json.dumps(pago_data)
                     # Extract efectivo/tarjeta in MXN
@@ -589,7 +581,7 @@ def main():
 
         # Don't send report if no sales (restaurant closed or data not yet available)
         ventas = consolidated.get("TotalSales", 0)
-        if ventas == 0 and order_types["total_tickets"] == 0:
+        if ventas == 0 and order_types["total_ordenes"] == 0:
             print("[intraday] No sales data — skipping report")
             return
 
