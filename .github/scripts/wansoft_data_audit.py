@@ -138,22 +138,23 @@ def main():
     })
     order_types = parse_html_rows(r.text)
     print(f"    Headers: {order_types['headers']}")
-    total_tickets = 0
+    total_ordenes = 0
     total_personas = 0
     for row in order_types["rows"]:
         print(f"    Row: {row}")
         cols = row.get("cols", list(row.values()))
         if len(cols) >= 4:
             try:
-                tickets = int(cols[2] if isinstance(cols, list) else list(row.values())[2])
-                personas = int(cols[3] if isinstance(cols, list) else list(row.values())[3])
-                total_tickets += tickets
+                # cols[2]=PERSONAS, cols[3]=ORDENES (verified by audit 2026-06-06)
+                personas = int(cols[2] if isinstance(cols, list) else list(row.values())[2])
+                ordenes = int(cols[3] if isinstance(cols, list) else list(row.values())[3])
+                total_ordenes += ordenes
                 total_personas += personas
             except (ValueError, IndexError):
                 pass
     if order_types["total"]:
         print(f"    Total row: {order_types['total']}")
-    print(f"    Calculated: {total_tickets} tickets, {total_personas} personas")
+    print(f"    Calculated: {total_ordenes} ordenes, {total_personas} personas")
 
     # 4. SalesByUser (meseros)
     print("\n[4] SalesByUser (meseros):")
@@ -264,7 +265,7 @@ def main():
             ("TotalSales vs ventas_dia", ws_total_sales, db_ventas),
             ("TotalGrossSales vs ventas_brutas", ws_gross_sales, db_brutas),
             ("TotalDiscount vs descuentos", ws_discount, db_desc),
-            ("OrderType tickets vs tickets_count", total_tickets, db_tickets),
+            ("OrderType ordenes vs tickets_count", total_ordenes, db_tickets),
             ("OrderType personas vs personas_restaurant", total_personas, db_personas),
         ]
 
