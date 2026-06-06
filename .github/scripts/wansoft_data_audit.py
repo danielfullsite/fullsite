@@ -26,10 +26,13 @@ sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 def wansoft_login():
     """Login to Wansoft, return session."""
     s = requests.Session()
-    s.post(f"{WANSOFT_URL}/Account/Login", data={
+    s.get(f"{WANSOFT_URL}/", timeout=15)
+    resp = s.post(f"{WANSOFT_URL}/", data={
         "UserName": WANSOFT_USER, "Password": WANSOFT_PASS,
-        "SubsidiaryId": SUBSIDIARY_ID,
-    }, timeout=15)
+    }, allow_redirects=True, timeout=15)
+    if "Dashboard" not in resp.url:
+        raise Exception(f"Wansoft login failed. URL: {resp.url}")
+    print(f"    Login OK → {resp.url}")
     return s
 
 
@@ -85,10 +88,15 @@ def main():
     r = session.post(f"{WANSOFT_URL}/Reports/GetConsolidatedSales", data={
         "subsidiaryId": SUBSIDIARY_ID, "startDate": target, "endDate": target,
     })
-    consolidated = r.json()
-    print(f"    Keys: {list(consolidated.keys())}")
-    for k, v in consolidated.items():
-        print(f"    {k}: {v}")
+    try:
+        consolidated = r.json()
+        print(f"    Keys: {list(consolidated.keys())}")
+        for k, v in consolidated.items():
+            print(f"    {k}: {v}")
+    except Exception as e:
+        print(f"    ERROR parsing JSON: {e}")
+        print(f"    Response: {r.text[:300]}")
+        consolidated = {}
 
     # 3. SalesByTypeOfOrder
     print("\n[3] SalesByTypeOfOrder:")
