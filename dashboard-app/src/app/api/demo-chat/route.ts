@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { groqChat } from '@/lib/groq'
 
 const DEMO_CONTEXT = `Eres el bot de IA de Casa Montaña, un restaurante casual dining en Valle Oriente, Monterrey.
 Respondes preguntas sobre la operacion con datos FICTICIOS pero realistas.
@@ -70,20 +70,13 @@ export async function POST(request: NextRequest) {
     const { message } = await request.json()
     if (!message) return Response.json({ response: 'Escribe algo para preguntar.' })
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC
-    if (!apiKey) {
-      return Response.json({ response: 'Ayer cerraron con $68,450. 182 tickets, TP $439. Carlos fue top con $22,400.' })
-    }
-
-    const anthropic = new Anthropic({ apiKey })
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      system: DEMO_CONTEXT,
-      messages: [{ role: 'user', content: message }],
+    const text = await groqChat({
+      messages: [
+        { role: 'system', content: DEMO_CONTEXT },
+        { role: 'user', content: message },
+      ],
+      maxTokens: 300,
     })
-
-    const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
     return Response.json({ response: text || 'No pude procesar la pregunta.' })
   } catch {
     return Response.json({ response: 'Ayer cerraron con $68,450. Preguntame algo mas especifico.' })

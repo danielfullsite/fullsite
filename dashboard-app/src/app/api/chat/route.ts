@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json(
-        { response: 'Agrega ANTHROPIC_API_KEY a .env.local para activar el chat.' },
+        { response: 'Agrega GROQ_API_KEY para activar el chat.' },
         { status: 200 }
       )
     }
