@@ -31,10 +31,9 @@ export function formatDate(dateStr: string): string {
 
 export function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr + 'T12:00:00')
-  return date.toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  })
+  const dow = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][date.getDay()]
+  const dayMonth = date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+  return `${dow} ${dayMonth}`
 }
 
 export function percentChange(current: number | null | undefined, previous: number | null | undefined): number {

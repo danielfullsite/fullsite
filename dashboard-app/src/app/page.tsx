@@ -746,7 +746,10 @@ export default function DashboardPage() {
                   {formatPercent(vsLastWeek)} vs mismo día semana pasada
                 </p>
                 <p className="text-sm text-[var(--text-2)]">
-                  {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {sameDayLastWeek.fecha}
+                  {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {(() => {
+                    const d = new Date(sameDayLastWeek.fecha + 'T12:00:00')
+                    return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+                  })()}
                 </p>
               </div>
             </div>
