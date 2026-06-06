@@ -1890,26 +1890,13 @@ function POSContent() {
             </div>
           ) : (
             <>
-              {/* Category grid — full area, alphabetical by COLUMNS, large touch targets */}
+              {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-3 p-4">
-                  {(() => {
-                    const sorted = menuCategories
-                      .filter(cat => cat.items.some(i => i.price > 0))
-                      .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                    // Reorder: column-first (read top→bottom, then next column)
-                    const cols = 4 // md:grid-cols-4
-                    const rows = Math.ceil(sorted.length / cols)
-                    const columnOrdered: typeof sorted = []
-                    for (let r = 0; r < rows; r++) {
-                      for (let c = 0; c < cols; c++) {
-                        const idx = c * rows + r
-                        if (idx < sorted.length) columnOrdered.push(sorted[idx])
-                      }
-                    }
-                    const GROUP_COLORS = ['bg-emerald-600', 'bg-blue-600', 'bg-amber-500', 'bg-violet-600', 'bg-rose-500', 'bg-cyan-600', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-lime-600', 'bg-fuchsia-500']
-                    return columnOrdered.map((cat, catIdx) => {
-                      const catColor = (cat as { color?: string }).color || GROUP_COLORS[catIdx % GROUP_COLORS.length]
+                  {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+                    .map((cat) => {
+                      const catColor = (cat as { color?: string }).color || 'bg-slate-600'
                       const itemCount = cat.items.filter(i => i.price > 0).length
                       return (
                         <button
@@ -1921,8 +1908,7 @@ function POSContent() {
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
                         </button>
                       )
-                    })
-                  })()}
+                    })}
                 </div>
               </div>
 
@@ -1930,7 +1916,7 @@ function POSContent() {
               {selectedCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
                   <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{background: (() => { const c = ['#059669','#2563eb','#d97706','#7c3aed','#e11d48','#0891b2','#ea580c','#db2777','#0d9488','#4f46e5']; return c[menuCategories.findIndex(ct => ct.id === selectedCategory) % c.length] })()}}>
+                    <div className={`flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => setSelectedCategory('')} className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white text-xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
@@ -1950,7 +1936,7 @@ function POSContent() {
                           : 'border-[rgba(255,255,255,0.08)] hover:border-emerald-500/30'
                       }`}
                     >
-                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (() => { const gc = ['bg-emerald-600','bg-blue-600','bg-amber-500','bg-violet-600','bg-rose-500','bg-cyan-600','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']; return gc[menuCategories.findIndex(c => c.id === activeCategory.id) % gc.length] })()}`} />
+                      <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
                       {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
                       <div className="flex flex-col justify-between px-4 py-5 flex-1">
                         <span className={`font-bold text-lg leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
