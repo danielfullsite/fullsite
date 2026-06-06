@@ -164,6 +164,26 @@ def main():
     except Exception as e:
         print(f"    Monthly query failed: {e}")
 
+    # 2d. Try export endpoints for SalesByBranch
+    print("\n[2d] Probing SalesByBranch export endpoints:")
+    for ep in ["Reports/ExportSalesByBranch", "Reports/ExportSalesByBranchToExcel",
+                "Reports/ExportSalesByBranchToCsv", "Reports/ExportSalesByBranchToTxt",
+                "Reports/SalesByBranchExport", "Reports/SalesByBranchToExcel",
+                "Reports/DownloadSalesByBranch", "Reports/ExportIncomeReport",
+                "Reports/ExportIncomeByBranch"]:
+        try:
+            r = session.post(f"{WANSOFT_URL}/{ep}", data={
+                "subsidiaryId": SUBSIDIARY_ID, "startDate": target, "endDate": target,
+            }, timeout=8)
+            ct = r.headers.get("content-type", "")
+            if r.status_code == 200 and len(r.text) > 50 and ("excel" in ct or "csv" in ct or "octet" in ct or "|" in r.text[:200]):
+                print(f"    FOUND: {ep} ({len(r.content)} bytes, {ct})")
+                print(f"    Preview: {r.text[:300]}")
+            else:
+                print(f"    {ep}: {r.status_code} ({len(r.text)}b) — skip")
+        except Exception as e:
+            print(f"    {ep}: {e}")
+
     # 3. SalesByTypeOfOrder
     print("\n[3] SalesByTypeOfOrder:")
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder", data={
