@@ -112,32 +112,80 @@ try:
             if name and total > 0:
                 by_supplier[name] = total
 
-    # Check ingredient costs — flag any at $0 (not configured) or extreme values
+    # Get last week's cost snapshot from agent_results for comparison
+    prev_results = sb_get("agent_results", {
+        "agent_id": "eq.cost-variance",
+        "order": "fecha.desc",
+        "limit": "1",
+        "select": "data",
+    })
+    prev_costs = {}
+    if prev_results and prev_results[0].get("data"):
+        prev_data = prev_results[0]["data"]
+        if isinstance(prev_data, str):
+            prev_data = json.loads(prev_data)
+        # Build map from previous ingredient snapshot
+        for item in prev_data.get("ingredient_snapshot", []):
+            prev_costs[item["id"]] = float(item.get("cost", 0))
+
+    # Check ingredient costs — flag $0, high cost, and COST CHANGES vs last run
     zero_cost = []
     high_cost = []
+    cost_changes = []
 
     for ing in ingredients:
         cost = float(ing.get("cost_per_unit") or 0)
         name = ing.get("name", "")
         supplier = ing.get("supplier") or "Sin proveedor"
+        ing_id = ing.get("id", "")
 
         if cost == 0:
             zero_cost.append({"name": name, "supplier": supplier})
-        elif cost > 500:  # Per unit > $500 is suspicious for most ingredients
+        elif cost > 500:  # Per unit > $500 is suspicious
             high_cost.append({"name": name, "cost": cost, "unit": ing.get("unit", ""), "supplier": supplier})
+
+        # Compare vs previous snapshot
+        if ing_id in prev_costs and prev_costs[ing_id] > 0 and cost > 0:
+            prev = prev_costs[ing_id]
+            pct = ((cost - prev) / prev) * 100
+            if abs(pct) >= VARIANCE_THRESHOLD * 100:
+                cost_changes.append({
+                    "name": name,
+                    "prev": prev,
+                    "current": cost,
+                    "unit": ing.get("unit", ""),
+                    "pct": round(pct, 1),
+                    "supplier": supplier,
+                })
 
     # Build summary
     total_ingredients = len(ingredients)
     configured = total_ingredients - len(zero_cost)
 
-    print(f"[cost-variance] {total_ingredients} ingredients, {len(zero_cost)} at $0, {len(high_cost)} high cost")
+    # Sort cost changes by absolute % change
+    cost_changes.sort(key=lambda x: abs(x["pct"]), reverse=True)
 
-    if not zero_cost and not high_cost and not by_supplier:
+    print(f"[cost-variance] {total_ingredients} ingredients, {len(zero_cost)} at $0, {len(high_cost)} high cost, {len(cost_changes)} price changes")
+
+    if not zero_cost and not high_cost and not by_supplier and not cost_changes:
         output_sum = f"OK — {configured}/{total_ingredients} ingredientes con costo configurado. Sin alertas."
         print(f"[cost-variance] {output_sum}")
     else:
         lines = [f"COSTOS — Reporte {today_str}"]
         lines.append(f"Ingredientes: {configured}/{total_ingredients} con costo configurado")
+
+        # COST CHANGES — Eduardo's #1 request
+        if cost_changes:
+            increases = [c for c in cost_changes if c["pct"] > 0]
+            decreases = [c for c in cost_changes if c["pct"] < 0]
+            if increases:
+                lines.append(f"\nSUBIERON DE PRECIO ({len(increases)}):")
+                for c in increases[:8]:
+                    lines.append(f"  {c['name']}: ${c['prev']:.0f} -> ${c['current']:.0f}/{c['unit']} (+{c['pct']}%) [{c['supplier']}]")
+            if decreases:
+                lines.append(f"\nBAJARON DE PRECIO ({len(decreases)}):")
+                for c in decreases[:5]:
+                    lines.append(f"  {c['name']}: ${c['prev']:.0f} -> ${c['current']:.0f}/{c['unit']} ({c['pct']}%)")
 
         if by_supplier:
             lines.append(f"\nTop proveedores (gasto reciente):")
@@ -150,7 +198,7 @@ try:
             for z in zero_cost[:10]:
                 lines.append(f"  ! {z['name']} ({z['supplier']})")
             if len(zero_cost) > 10:
-                lines.append(f"  ... y {len(zero_cost) - 10} más")
+                lines.append(f"  ... y {len(zero_cost) - 10} mas")
 
         if high_cost:
             lines.append(f"\n{len(high_cost)} ingredientes con costo alto (verificar):")
@@ -159,22 +207,28 @@ try:
 
         msg = "\n".join(lines)
         send_telegram(msg)
-        output_sum = f"Reporte: {configured}/{total_ingredients} configurados, {len(zero_cost)} sin costo, {len(high_cost)} alto"
+        output_sum = f"Reporte: {configured}/{total_ingredients} configurados, {len(cost_changes)} cambios, {len(zero_cost)} sin costo"
 
-    # Save results
+    # Save results + ingredient snapshot for next comparison
+    ingredient_snapshot = [
+        {"id": ing["id"], "name": ing["name"], "cost": float(ing.get("cost_per_unit") or 0)}
+        for ing in ingredients if float(ing.get("cost_per_unit") or 0) > 0
+    ]
     sb_upsert("agent_results", {
         "agent_id": "cost-variance",
         "fecha": today_str,
-        "priority": "warning" if (zero_cost or high_cost) else "info",
+        "priority": "critical" if cost_changes else ("warning" if (zero_cost or high_cost) else "info"),
         "summary": output_sum,
         "data": json.dumps({
             "total_ingredients": total_ingredients,
             "configured": configured,
             "zero_cost_count": len(zero_cost),
             "high_cost_count": len(high_cost),
+            "cost_changes": cost_changes[:20],
             "top_suppliers": dict(sorted(by_supplier.items(), key=lambda x: -x[1])[:10]) if by_supplier else {},
             "zero_cost_items": zero_cost[:20],
             "high_cost_items": high_cost[:10],
+            "ingredient_snapshot": ingredient_snapshot,
         }),
     })
 
