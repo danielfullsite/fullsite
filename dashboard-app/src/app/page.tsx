@@ -292,16 +292,22 @@ export default function DashboardPage() {
   // Month progress
   const monthProgress = (() => {
     if (!latestDay) return null
-    const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === latestDay.fecha.slice(0, 7))
+    // Use selected month when in 'mes' period, otherwise use latest day's month
+    const now = new Date()
+    const targetMonth = period === 'mes'
+      ? new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+      : new Date((viewDay || latestDay).fecha + 'T12:00:00')
+    const targetPrefix = `${targetMonth.getFullYear()}-${String(targetMonth.getMonth() + 1).padStart(2, '0')}`
+    const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === targetPrefix)
     const monthVentas = thisMonthData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
-    const latestDate = new Date(latestDay.fecha + 'T12:00:00')
-    const daysInMonth = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate()
-    const dayOfMonth = latestDate.getDate()
+    const daysInMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate()
+    const dayOfMonth = thisMonthData.length
     const daysLeft = daysInMonth - dayOfMonth
     const dailyAvg = dayOfMonth > 0 ? monthVentas / dayOfMonth : 0
     const projected = monthVentas + (dailyAvg * daysLeft)
-    const monthName = latestDate.toLocaleDateString('es-MX', { month: 'long' })
-    return { monthVentas, projected, daysLeft, dayOfMonth, daysInMonth, monthName, dailyAvg }
+    const monthName = targetMonth.toLocaleDateString('es-MX', { month: 'long' })
+    const yearNum = targetMonth.getFullYear()
+    return { monthVentas, projected, daysLeft, dayOfMonth, daysInMonth, monthName, dailyAvg, yearNum }
   })()
 
   // Quick insight line
@@ -484,7 +490,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <Target size={16} className="text-[var(--accent-bright)]" />
               <span className="text-sm font-semibold text-[var(--text-1)]">
-                {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {new Date(latestDay!.fecha).getFullYear()}
+                {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {monthProgress.yearNum}
               </span>
             </div>
             <span className="text-xs text-[var(--text-3)]">
