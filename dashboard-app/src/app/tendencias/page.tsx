@@ -13,6 +13,8 @@ import {
   BarChart,
   Bar,
   Cell,
+  LineChart,
+  Line,
 } from 'recharts'
 import { TrendingUp, Calendar, Target, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
@@ -111,6 +113,91 @@ export default function TendenciasPage() {
   }, [allData])
 
   const tpChartData = tpPeriod === 'dia' ? dailyTP : tpPeriod === 'semana' ? weeklyTP : monthlyAgg
+
+  // Payment methods trending (monthly)
+  const paymentTrending = useMemo(() => {
+    const months: Record<string, { efectivo: number; tarjeta: number; otros: number }> = {}
+    for (const d of allData) {
+      const m = d.fecha.slice(0, 7)
+      if (!months[m]) months[m] = { efectivo: 0, tarjeta: 0, otros: 0 }
+      months[m].efectivo += d.efectivo || 0
+      months[m].tarjeta += d.tarjeta || 0
+      const ventas = d.ventas_dia || 0
+      months[m].otros += Math.max(0, ventas - (d.efectivo || 0) - (d.tarjeta || 0))
+    }
+    return Object.entries(months).sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({
+      label: new Date(m + '-15').toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+      Efectivo: Math.round(v.efectivo),
+      Tarjeta: Math.round(v.tarjeta),
+      Otros: Math.round(v.otros),
+    }))
+  }, [allData])
+
+  // Descuentos trending (monthly)
+  const descuentosTrending = useMemo(() => {
+    return monthlyAgg.map(m => ({
+      label: m.label,
+      descuentos: allData.filter(d => d.fecha.startsWith(m.month)).reduce((s, d) => s + (d.descuentos || 0), 0),
+      pctVentas: m.ventas > 0 ? Number(((allData.filter(d => d.fecha.startsWith(m.month)).reduce((s, d) => s + (d.descuentos || 0), 0) / m.ventas) * 100).toFixed(1)) : 0,
+    }))
+  }, [allData, monthlyAgg])
+
+  // YoY comparison
+  const yoyComparison = useMemo(() => {
+    const years = [...new Set(allData.map(d => d.fecha.slice(0, 4)))].sort()
+    const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    return MESES_SHORT.map((mes, i) => {
+      const row: Record<string, unknown> = { mes }
+      for (const yr of years) {
+        const prefix = `${yr}-${String(i + 1).padStart(2, '0')}`
+        const monthData = allData.filter(d => d.fecha.startsWith(prefix))
+        row[yr] = monthData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
+      }
+      return row
+    })
+  }, [allData])
+
+  const yoyYears = useMemo(() => [...new Set(allData.map(d => d.fecha.slice(0, 4)))].sort(), [allData])
+  const YOY_COLORS = ['#94a3b8', '#3b82f6', '#10b981', '#f59e0b']
+
+  // Top 5 platillos trending (last 3 months)
+  const topPlatillosTrending = useMemo(() => {
+    const last3 = monthlyAgg.slice(-3)
+    const allPlatillos: Record<string, number> = {}
+    for (const d of allData.filter(d => last3.some(m => d.fecha.startsWith(m.month)))) {
+      if (!d.platillos_top) continue
+      const plats = typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : d.platillos_top
+      if (!Array.isArray(plats)) continue
+      for (const p of plats) {
+        allPlatillos[p.nombre] = (allPlatillos[p.nombre] || 0) + (p.cantidad || 0)
+      }
+    }
+    const top5 = Object.entries(allPlatillos).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n]) => n)
+
+    return last3.map(m => {
+      const row: Record<string, unknown> = { label: m.label }
+      const monthData = allData.filter(d => d.fecha.startsWith(m.month))
+      for (const name of top5) {
+        let qty = 0
+        for (const d of monthData) {
+          if (!d.platillos_top) continue
+          const plats = typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : d.platillos_top
+          if (!Array.isArray(plats)) continue
+          const found = plats.find((p: { nombre: string }) => p.nombre === name)
+          if (found) qty += found.cantidad || 0
+        }
+        row[name] = qty
+      }
+      return row
+    })
+  }, [allData, monthlyAgg])
+
+  const top5Names = useMemo(() => {
+    if (topPlatillosTrending.length === 0) return []
+    return Object.keys(topPlatillosTrending[0]).filter(k => k !== 'label')
+  }, [topPlatillosTrending])
+
+  const PLAT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
   // Day of week aggregation
   const dowAgg = useMemo(() => {
@@ -635,6 +722,87 @@ export default function TendenciasPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* YoY Comparison — 2024 vs 2025 vs 2026 */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Comparativo anual</h3>
+        <p className="text-xs text-[var(--text-3)] mb-5">Ventas por mes — {yoyYears.join(' vs ')}</p>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={yoyComparison}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000000).toFixed(1)}M`} width={55} />
+              <Tooltip formatter={(v) => [formatCurrency(Number(v)), '']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Legend />
+              {yoyYears.map((yr, i) => (
+                <Bar key={yr} dataKey={yr} fill={YOY_COLORS[i % YOY_COLORS.length]} radius={[4, 4, 0, 0]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Payment methods trending */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Métodos de pago</h3>
+        <p className="text-xs text-[var(--text-3)] mb-5">Evolución mensual de efectivo vs tarjeta</p>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={paymentTrending}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={55} />
+              <Tooltip formatter={(v) => [formatCurrency(Number(v)), '']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Legend />
+              <Area type="monotone" dataKey="Tarjeta" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+              <Area type="monotone" dataKey="Efectivo" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
+              <Area type="monotone" dataKey="Otros" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Descuentos trending */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Descuentos y cortesías</h3>
+        <p className="text-xs text-[var(--text-3)] mb-5">Monto de descuentos por mes y % sobre ventas</p>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={descuentosTrending}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={55} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#ef4444' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} width={40} />
+              <Tooltip formatter={(v, name) => [name === 'pctVentas' ? `${v}%` : formatCurrency(Number(v)), name === 'pctVentas' ? '% sobre ventas' : 'Descuentos']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Bar yAxisId="left" dataKey="descuentos" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey="pctVentas" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Top 5 platillos trending */}
+      {topPlatillosTrending.length > 0 && top5Names.length > 0 && (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+          <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Top 5 platillos</h3>
+          <p className="text-xs text-[var(--text-3)] mb-5">Piezas vendidas — últimos 3 meses</p>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topPlatillosTrending}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} width={40} />
+                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+                <Legend />
+                {top5Names.map((name, i) => (
+                  <Bar key={name} dataKey={name} fill={PLAT_COLORS[i % PLAT_COLORS.length]} radius={[4, 4, 0, 0]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Day of week */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
