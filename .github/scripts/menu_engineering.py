@@ -148,6 +148,10 @@ def classify_bcg(categories, food_cost_data):
         "CEVICHE": 35,
         "ICE CREAM": 20,
         "SODA": 10, "TEA": 12,
+        # Spanish cuisine
+        "PAELLA": 35, "CROQUETA": 20, "TAPA": 25, "PULPO": 40,
+        "TORTILLA ESPAÑOLA": 22, "GAZPACHO": 18, "JAMON": 35,
+        "VINO": 30, "SANGRIA": 20, "CALAMARES": 28,
     }
 
     # Estimate margin (100% - food_cost%)

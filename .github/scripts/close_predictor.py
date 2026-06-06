@@ -216,10 +216,11 @@ def build_message(today_data, projected, comparisons, historical, current_hour):
     # Category boost suggestions
     today_groups = today_data.get("ventas_por_grupo") or []
     boosts = []
+    _cats = CLIENT.get("menu_categories") or {}
     for label, keywords in [
-        ("Postres", ["DESSERT", "BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"]),
-        ("Half & Half", ["HALF", "H&H"]),
-        ("Pan", ["TOAST", "BAGEL", "CROISSANT"]),
+        ("Postres", _cats.get("postres", ["DESSERT", "BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"])),
+        ("Especialidad", _cats.get("hh", ["HALF", "H&H"])),
+        ("Pan", _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])),
     ]:
         boost = estimate_category_boost(today_groups, historical, keywords, label)
         if boost and boost["gap"] > 100:
@@ -287,10 +288,11 @@ def main():
     # 4. Build structured data
     today_groups = today_data.get("ventas_por_grupo") or []
     boosts = []
+    _cats = CLIENT.get("menu_categories") or {}
     for label, keywords in [
-        ("Postres", ["DESSERT", "BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"]),
-        ("Half & Half", ["HALF", "H&H"]),
-        ("Pan", ["TOAST", "BAGEL", "CROISSANT"]),
+        ("Postres", _cats.get("postres", ["DESSERT", "BROWNIE", "CHEESECAKE", "CAKE", "PANCAKE"])),
+        ("Especialidad", _cats.get("hh", ["HALF", "H&H"])),
+        ("Pan", _cats.get("pan", ["TOAST", "BAGEL", "CROISSANT"])),
     ]:
         boost = estimate_category_boost(today_groups, historical, keywords, label)
         if boost and boost["gap"] > 100:

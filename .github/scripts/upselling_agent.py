@@ -36,6 +36,8 @@ sb_headers = {
     "Authorization": f"Bearer {SUPABASE_KEY}",
 }
 
+_cats = CLIENT.get("menu_categories") or {}
+
 # Grupos clave para upselling
 UPSELL_GROUPS = {
     "postres": ["DESSERTS", "BAKERY", "ICE CREAM"],
@@ -333,7 +335,8 @@ def build_message(upsell_insights, mesero_insights, bebida_insights, today_kpis)
     if any("postre" in i.get("msg", "").lower() for i in all_insights):
         actions.append("Sugerir postre al final de cada mesa")
     if any("h&h" in i.get("msg", "").lower() or "half" in i.get("msg", "").lower() for i in all_insights):
-        actions.append("Ofrecer H&H: chilaquiles mitad y mitad")
+        _sig = (_cats.get("hh") or ["H&H"])[0] if _cats else "H&H"
+        actions.append(f"Ofrecer especialidad: {_sig}")
     if any("pan" in i.get("msg", "").lower() for i in all_insights):
         actions.append("Sugerir canasta de pan con el cafe")
     if any("bebida" in i.get("msg", "").lower() for i in all_insights):
