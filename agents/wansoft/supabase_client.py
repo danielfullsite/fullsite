@@ -55,17 +55,12 @@ def upsert_daily_report(
         if ventas is not None and ventas > 0:
             row["ventas_dia"] = ventas
 
-        personas = agg_meseros.get("personas_dia")
-        if personas is not None:
-            row["personas_restaurant"] = personas
-
-        tp = agg_meseros.get("ticket_promedio")
-        if tp is not None:
-            row["ticket_promedio_restaurant"] = tp
-
-        tickets = agg_meseros.get("tickets_dia")
-        if tickets is not None:
-            row["tickets_count"] = tickets
+        # NOTE: personas_restaurant, tickets_count, and ticket_promedio_restaurant
+        # are NOT written here. They come from intraday_sales.py which uses the
+        # Wansoft HTTP API (SalesByTypeOfOrder) — the same source as the Wansoft app.
+        # The XLSX "Reporte por Mesero" has different definitions for "personas"
+        # (sum of per-mesero personas vs total covers) which caused data mismatches.
+        # See: https://github.com/ramonfaurdaniel-png/fullsite/issues/data-accuracy
 
         meseros = agg_meseros.get("meseros_top")
         if meseros:

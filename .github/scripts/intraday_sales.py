@@ -460,10 +460,11 @@ def main():
 
             update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
 
-            # Ventas brutas y descuentos
+            # Ventas brutas, netas, y descuentos
             if consolidated:
                 update_data["ventas_brutas"] = consolidated.get("TotalGrossSales", 0)
                 update_data["descuentos"] = consolidated.get("TotalDiscounts", 0)
+                update_data["ventas_dia"] = consolidated.get("TotalSales", 0)
 
             # Tickets y personas from order_types
             if order_types:
@@ -539,17 +540,12 @@ def main():
             # when it gets REAL data from the SalesByUser endpoint.
             # DO NOT copy from wansoft_kpis — it's a stale accumulator, not daily.
 
-            # Ticket promedio — use ventas sin Market / personas
+            # Ticket promedio — ventas / tickets (matches Wansoft app definition)
             ventas_total = consolidated.get("TotalSales", 0) or 0
-            market_v = 0
-            if users:
-                _mkt = [e.lower() for e in (CLIENT.get("staff_market") or [])]
-                market_v = sum(float(str(u.get("total", "0")).replace(",","").replace("$",""))
-                              for u in users if any(ex in u.get("mesero", "").lower() for ex in _mkt))
-            ventas_rest = ventas_total - market_v
+            tickets = update_data.get("tickets_count", 0)
             personas = update_data.get("personas_restaurant", 0)
-            if personas and personas > 0:
-                update_data["ticket_promedio_restaurant"] = round(ventas_rest / personas, 2)
+            if tickets and tickets > 0:
+                update_data["ticket_promedio_restaurant"] = round(ventas_total / tickets, 2)
 
             requests.patch(
                 f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}",
