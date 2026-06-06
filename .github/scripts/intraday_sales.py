@@ -515,23 +515,29 @@ def main():
                 pay_html = pay_resp.text
                 pay_soup = BeautifulSoup(pay_html, "html.parser")
                 pago_data = []
+                ventas_for_pago = update_data.get("ventas_dia") or (consolidated.get("TotalSales", 0) if consolidated else 0)
                 for row in pay_soup.select(".rowReport"):
                     cols = [c.text.strip() for c in row.select("div")]
                     if len(cols) >= 2:
                         name = cols[0]
-                        # Try last column for total (Wansoft varies between 2-4 cols)
-                        total = 0
+                        # Try last column for total (Wansoft returns percentages, not MXN)
+                        pct = 0
                         for c in reversed(cols[1:]):
                             try:
-                                total = float(c.replace(",","").replace("$","").replace("%",""))
-                                if total > 0: break
+                                pct = float(c.replace(",","").replace("$","").replace("%",""))
+                                if pct > 0: break
                             except ValueError:
                                 continue
-                        if name and total > 0:
-                            pago_data.append({"nombre": name, "total": total})
+                        if name and pct > 0:
+                            # Convert % to MXN: if value < 100, it's a percentage
+                            mxn = round(ventas_for_pago * pct / 100, 2) if pct < 100 else pct
+                            pago_data.append({"nombre": name, "total": mxn, "pct": round(pct, 1)})
+                # Log raw for debugging
+                if pago_data:
+                    print(f"[intraday] Pagos (MXN): {[p['nombre'] + ':$' + str(int(p['total'])) + '(' + str(p['pct']) + '%)' for p in pago_data]}")
                 if pago_data:
                     update_data["pago_metodos"] = json.dumps(pago_data)
-                    # Also extract efectivo/tarjeta for backwards compat
+                    # Extract efectivo/tarjeta in MXN
                     for p in pago_data:
                         nm = p["nombre"].lower()
                         if "efectivo" in nm:
