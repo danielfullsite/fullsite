@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity } from 'lucide-react'
+import { DollarSign, Ticket, Users, Receipt, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, FileBarChart, ClipboardList, Target, Settings, Eye, EyeOff, GripVertical, Bot, Clock, Zap, Activity, ChevronLeft, ChevronRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
@@ -125,6 +125,7 @@ export default function DashboardPage() {
   const [prevDay, setPrevDay] = useState<WansoftDaily | null>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('dia')
+  const [selectedDayIdx, setSelectedDayIdx] = useState(0) // 0 = latest, 1 = yesterday, etc.
   const [widgets, setWidgets] = useState<WidgetConfig>(getDefaultWidgets)
   const [showSettings, setShowSettings] = useState(false)
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
@@ -188,14 +189,17 @@ export default function DashboardPage() {
     )
   }
 
+  // Selected day for navigation (0=latest, 1=yesterday, etc.)
+  const viewDay = period === 'dia' && recentData.length > 0 ? (recentData[selectedDayIdx] || latestDay) : latestDay
+
   // Same DOW average (last 4 weeks) for "dia" comparison
   const sameDOWAvg = (() => {
-    if (!latestDay) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
-    const latestDate = new Date(latestDay.fecha + 'T12:00:00')
-    const dow = latestDate.getDay()
+    if (!viewDay) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
+    const viewDate = new Date(viewDay.fecha + 'T12:00:00')
+    const dow = viewDate.getDay()
     const sameDOW = recentData.filter(d => {
       const dt = new Date(d.fecha + 'T12:00:00')
-      return dt.getDay() === dow && d.fecha !== latestDay.fecha
+      return dt.getDay() === dow && d.fecha !== viewDay.fecha
     }).slice(0, 4)
     if (sameDOW.length === 0) return { ventas: 0, tickets: 0, personas: 0, tp: 0 }
     const avg = (key: keyof WansoftDaily) => sameDOW.reduce((s, d) => s + (Number(d[key]) || 0), 0) / sameDOW.length
@@ -208,20 +212,19 @@ export default function DashboardPage() {
   })()
 
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  const todayDOWName = latestDay ? dayNames[new Date(latestDay.fecha + 'T12:00:00').getDay()] : ''
+  const todayDOWName = viewDay ? dayNames[new Date(viewDay.fecha + 'T12:00:00').getDay()] : ''
 
   // Period-aware calculations
   const periodData = (() => {
     if (period === 'dia') {
-      const ventas = latestDay?.ventas_dia || 0
-      const tp = latestDay?.ticket_promedio_restaurant || 0
-      // Use Wansoft's TP to calculate restaurant-only tickets (matches what Wansoft shows)
-      // tickets_count includes ecommerce/market/apps — tp is restaurant-only
-      const tickets = tp > 0 ? Math.round(ventas / tp) : (latestDay?.tickets_count || 0)
-      const personas = latestDay?.personas_restaurant || 0
-      const propinas = latestDay?.propinas_total || 0
-      const descuentos = latestDay?.descuentos || 0
-      const brutas = latestDay?.ventas_brutas || 0
+      const day = viewDay
+      const ventas = day?.ventas_dia || 0
+      const tp = day?.ticket_promedio_restaurant || 0
+      const tickets = day?.tickets_count || 0
+      const personas = day?.personas_restaurant || 0
+      const propinas = day?.propinas_total || 0
+      const descuentos = day?.descuentos || 0
+      const brutas = day?.ventas_brutas || 0
       return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas: sameDOWAvg.ventas, prevTickets: sameDOWAvg.tickets, prevPersonas: sameDOWAvg.personas, prevTp: sameDOWAvg.tp, label: `vs prom. ${todayDOWName}` }
     }
     if (period === 'semana') {
@@ -340,21 +343,39 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Page header with period selector + settings */}
+      {/* Page header with period selector + day navigation + settings */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
-          {latestDay && (
-            <span className="text-sm text-[var(--text-3)]">
-              {formatDate(latestDay.fecha)}
-              {latestDay.updated_at && (
-                <span className="ml-2 text-xs text-[var(--text-4)]">
-                  · Actualizado {new Date(latestDay.updated_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+          {period === 'dia' && recentData.length > 0 && (() => {
+            const viewDay = recentData[selectedDayIdx] || latestDay
+            return viewDay ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))}
+                  disabled={selectedDayIdx >= recentData.length - 1}
+                  className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
+                  {formatDate(viewDay.fecha)}
+                  {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
                 </span>
-              )}
-            </span>
+                <button
+                  onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))}
+                  disabled={selectedDayIdx <= 0}
+                  className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            ) : null
+          })()}
+          {period !== 'dia' && latestDay && (
+            <span className="text-sm text-[var(--text-3)]">{formatDate(latestDay.fecha)}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
