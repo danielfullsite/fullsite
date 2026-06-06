@@ -344,11 +344,9 @@ export async function POST(request: NextRequest) {
         const dow = dowNames[new Date(d.fecha + 'T12:00:00').getDay()]
         const ventasDia = Number(d.ventas_dia) || 0
 
-        const tickets = Number(d.tickets_count) || 0
         const personas = Number(d.personas_restaurant) || 0
-        const tpTicket = tickets > 0 ? Math.round(ventasDia / tickets) : 0
-        const tpPersona = personas > 0 ? Math.round(ventasDia / personas) : 0
-        let line = `${d.fecha} (${dow}): Ventas $${ventasDia}, ${tickets} tickets, ${personas} personas, PromOrden $${tpTicket}, PromPersona $${tpPersona}`
+        const ticketPromedio = personas > 0 ? Math.round(ventasDia / personas) : 0
+        let line = `${d.fecha} (${dow}): Ventas $${ventasDia}, ${personas} personas, TicketPromedio $${ticketPromedio}`
 
         if (wantsDetail) {
           const descuentos = Number(d.descuentos) || 0
