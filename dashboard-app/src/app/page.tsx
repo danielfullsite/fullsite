@@ -758,14 +758,15 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Main chart — full width */}
+      {/* Main chart — last 30 days, highlights selected day */}
       {show('revenue_chart') && <div className="mb-6">
         <RevenueChart
-          data={recentData.map((d) => ({
+          data={recentData.slice(-30).map((d) => ({
             fecha: d.fecha,
             ventas_dia: d.ventas_dia,
           }))}
           title="Ventas últimos 30 días"
+          highlightDate={viewDay?.fecha}
         />
       </div>}
 

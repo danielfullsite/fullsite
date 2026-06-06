@@ -15,9 +15,10 @@ import { formatCurrency, formatShortDate } from '@/lib/format'
 interface RevenueChartProps {
   data: { fecha: string; ventas_dia: number }[]
   title?: string
+  highlightDate?: string
 }
 
-export default function RevenueChart({ data, title }: RevenueChartProps) {
+export default function RevenueChart({ data, title, highlightDate }: RevenueChartProps) {
   let trimmedData = [...data]
   while (trimmedData.length > 0 && trimmedData[trimmedData.length - 1].ventas_dia <= 0) {
     trimmedData.pop()
@@ -99,6 +100,21 @@ export default function RevenueChart({ data, title }: RevenueChartProps) {
               dot={false}
               activeDot={{ r: 6, fill: '#10b981', stroke: 'var(--text-1)', strokeWidth: 2 }}
             />
+            {highlightDate && (() => {
+              const hlLabel = formatShortDate(highlightDate)
+              const hlPoint = chartData.find(d => d.fecha === hlLabel)
+              if (!hlPoint) return null
+              return (
+                <ReferenceDot
+                  x={hlPoint.fecha}
+                  y={hlPoint.Ventas}
+                  r={8}
+                  fill="#10b981"
+                  stroke="#fff"
+                  strokeWidth={3}
+                />
+              )
+            })()}
           </AreaChart>
         </ResponsiveContainer>
       </div>
