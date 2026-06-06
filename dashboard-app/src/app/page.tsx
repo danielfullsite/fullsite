@@ -352,9 +352,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
-          {period === 'dia' && recentData.length > 0 && (() => {
-            const viewDay = recentData[selectedDayIdx] || latestDay
-            return viewDay ? (
+          {period === 'dia' && viewDay && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))}
@@ -363,10 +361,31 @@ export default function DashboardPage() {
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <span className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center">
-                  {formatDate(viewDay.fecha)}
-                  {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
-                </span>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      const input = document.getElementById('day-picker') as HTMLInputElement
+                      if (input) input.showPicker()
+                    }}
+                    className="text-sm text-[var(--text-2)] font-medium min-w-[200px] text-center hover:text-[var(--text-1)] transition-colors cursor-pointer"
+                  >
+                    {formatDate(viewDay.fecha)}
+                    {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
+                  </button>
+                  <input
+                    id="day-picker"
+                    type="date"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    value={viewDay.fecha}
+                    min={recentData[0]?.fecha}
+                    max={recentData[recentData.length - 1]?.fecha}
+                    onChange={(e) => {
+                      const target = e.target.value
+                      const idx = recentData.findIndex(d => d.fecha === target)
+                      if (idx >= 0) setSelectedDayIdx(recentData.length - 1 - idx)
+                    }}
+                  />
+                </div>
                 <button
                   onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))}
                   disabled={selectedDayIdx <= 0}
@@ -375,8 +394,7 @@ export default function DashboardPage() {
                   <ChevronRight size={16} />
                 </button>
               </div>
-            ) : null
-          })()}
+          )}
           {period !== 'dia' && latestDay && (
             <span className="text-sm text-[var(--text-3)]">{formatDate(latestDay.fecha)}</span>
           )}
