@@ -457,15 +457,18 @@ def main():
                 if len(cols) >= 5:
                     hours_data.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3], "pct": cols[4]})
             if hours_data:
-                sb_headers = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
-                              "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
-                              "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
+                _h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                      "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                      "Content-Type": "application/json", "Prefer": "return=minimal"}
+                # Delete existing row for today then insert
+                requests.delete(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly?fecha=eq.{today_str}&client_id=eq.{CLIENT['id']}",
+                    headers=_h, timeout=10)
                 requests.post(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly",
-                    headers=sb_headers,
+                    headers=_h,
                     json={"fecha": today_str, "client_id": CLIENT["id"], "data": json.dumps(hours_data),
                           "updated_at": datetime.now(timezone.utc).isoformat()},
                     timeout=10)
-                print(f"[intraday] Saved {len(hours_data)} hourly entries to Supabase")
+                print(f"[intraday] Saved {len(hours_data)} hourly entries")
         except Exception as e:
             print(f"[intraday] Hourly save failed (non-blocking): {e}")
 

@@ -174,6 +174,21 @@ def scrape_day(session, date_str):
     except Exception as e:
         print(f"  [!] Platillos failed: {e}")
 
+    # 7. Ventas por hora
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/SalesByHours", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": date_str, "endDate": date_str,
+        }, timeout=15)
+        hours_data = []
+        for tr in BeautifulSoup(r.text, "html.parser").select(".rowReport"):
+            cols = [c.text.strip() for c in tr.select("div")]
+            if len(cols) >= 5:
+                hours_data.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3], "pct": cols[4]})
+        if hours_data:
+            row["_hourly"] = hours_data  # saved separately
+    except Exception as e:
+        print(f"  [!] Hours failed: {e}")
+
     return row
 
 
@@ -221,9 +236,21 @@ def main():
         try:
             row = scrape_day(session, date_str)
 
+            # Extract hourly data before upsert (not part of wansoft_daily)
+            hourly = row.pop("_hourly", None)
+
             ventas = row.get("ventas_dia", 0)
             if ventas and ventas > 0:
                 ok = upsert_row(row)
+                # Save hourly data separately
+                if hourly and ok:
+                    try:
+                        _h = {**sb_headers, "Prefer": "return=minimal"}
+                        requests.delete(f"{SUPABASE_URL}/rest/v1/wansoft_hourly?fecha=eq.{date_str}&client_id=eq.{CLIENT_ID}", headers=_h, timeout=10)
+                        requests.post(f"{SUPABASE_URL}/rest/v1/wansoft_hourly", headers=_h,
+                            json={"fecha": date_str, "client_id": CLIENT_ID, "data": json.dumps(hourly),
+                                  "updated_at": datetime.now(timezone.utc).isoformat()}, timeout=10)
+                    except: pass
                 ordenes = row.get("tickets_count", "?")
                 personas = row.get("personas_restaurant", "?")
                 tp = row.get("ticket_promedio_restaurant", "?")
