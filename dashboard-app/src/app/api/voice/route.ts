@@ -320,7 +320,23 @@ export async function POST(request: NextRequest) {
         return line
       })
 
-      dailyContext = `DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
+      // Pre-calculate aggregates so the model doesn't have to sum
+      const nowV = new Date()
+      const mxNowV = new Date(nowV.getTime() - 6 * 60 * 60 * 1000 + nowV.getTimezoneOffset() * 60 * 1000)
+      const tmPrefix = mxNowV.toISOString().slice(0, 7)
+      const sumF = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
+      const tmData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(tmPrefix))
+      const tmV = sumF(tmData, 'ventas_dia')
+      const tmP = sumF(tmData, 'personas_restaurant')
+      const l7 = recentDays.slice(0, 7)
+      const l7V = sumF(l7 as Record<string, unknown>[], 'ventas_dia')
+      const l7P = sumF(l7 as Record<string, unknown>[], 'personas_restaurant')
+
+      dailyContext = `RESÚMENES (usa estos, NO sumes):
+MES (${tmPrefix}): Ventas $${Math.round(tmV)}, ${Math.round(tmP)} personas, TP $${tmP > 0 ? Math.round(tmV / tmP) : 0}, ${tmData.length} días
+SEMANA: Ventas $${Math.round(l7V)}, ${Math.round(l7P)} personas, TP $${l7P > 0 ? Math.round(l7V / l7P) : 0}
+
+DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
 
       // YoY comparison
       const wantsYoY = ['ano pasado', 'ano anterior', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año', 'crecimiento'].some(kw => q.includes(kw))

@@ -383,7 +383,36 @@ export async function POST(request: NextRequest) {
         return line
       })
 
-      dailyContext = `DATOS DIARIOS (últimos ${recentDays.length} días).\n${lines.join('\n')}`
+      // Pre-calculate period aggregates so the model doesn't have to sum
+      const now = new Date()
+      const mxNowChat = new Date(now.getTime() - 6 * 60 * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000)
+      const thisMonthPrefix = mxNowChat.toISOString().slice(0, 7)
+      const prevMonthDate = new Date(mxNowChat.getFullYear(), mxNowChat.getMonth() - 1, 1)
+      const prevMonthPrefix = prevMonthDate.toISOString().slice(0, 7)
+
+      const thisMonthData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(thisMonthPrefix))
+      const prevMonthData = recentDays.filter((d: Record<string, unknown>) => (d.fecha as string).startsWith(prevMonthPrefix))
+
+      const sumField = (arr: Record<string, unknown>[], key: string) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
+
+      const tmVentas = sumField(thisMonthData, 'ventas_dia')
+      const tmPersonas = sumField(thisMonthData, 'personas_restaurant')
+      const tmDias = thisMonthData.length
+      const pmVentas = sumField(prevMonthData, 'ventas_dia')
+      const pmPersonas = sumField(prevMonthData, 'personas_restaurant')
+
+      // Last 7 days
+      const last7 = recentDays.slice(0, 7)
+      const l7Ventas = sumField(last7 as Record<string, unknown>[], 'ventas_dia')
+      const l7Personas = sumField(last7 as Record<string, unknown>[], 'personas_restaurant')
+
+      const aggregates = `RESÚMENES PRE-CALCULADOS (usa estos para responder, NO sumes manualmente):
+MES ACTUAL (${thisMonthPrefix}): Ventas $${Math.round(tmVentas)}, ${Math.round(tmPersonas)} personas, ${tmDias} días, TicketPromedio $${tmPersonas > 0 ? Math.round(tmVentas / tmPersonas) : 0}, PromDiario $${tmDias > 0 ? Math.round(tmVentas / tmDias) : 0}
+MES ANTERIOR (${prevMonthPrefix}): Ventas $${Math.round(pmVentas)}, ${Math.round(pmPersonas)} personas, TicketPromedio $${pmPersonas > 0 ? Math.round(pmVentas / pmPersonas) : 0}
+ÚLTIMOS 7 DÍAS: Ventas $${Math.round(l7Ventas)}, ${Math.round(l7Personas)} personas, TicketPromedio $${l7Personas > 0 ? Math.round(l7Ventas / l7Personas) : 0}
+`
+
+      dailyContext = `${aggregates}\nDATOS DIARIOS (últimos ${recentDays.length} días).\n${lines.join('\n')}`
 
       // Fetch hourly data for "hora pico" questions
       if (q.includes('hora') || q.includes('pico') || q.includes('horario')) {
