@@ -161,6 +161,25 @@ def main():
                 except: pass
         print(f"    Ordenes (month): {mt_ordenes}")
         print(f"    Personas (month): {mt_personas}")
+        # SalesByBranch with monthly range — might have correct totals
+        r3 = session.post(f"{WANSOFT_URL}/Reports/SalesByBranch", data={
+            "subsidiaryId": SUBSIDIARY_ID, "startDate": month_start, "endDate": month_end,
+        }, timeout=20)
+        branch_soup = BeautifulSoup(r3.text, "html.parser")
+        branch_rows = branch_soup.select(".rowReport")
+        br_ordenes = 0
+        br_personas = 0
+        br_ventas = 0
+        for tr in branch_rows:
+            cols = [c.text.strip() for c in tr.select("div")]
+            # Order types have 6 cols: [Type, Avg, Personas, Ordenes, Subtotal, Total]
+            if len(cols) == 6 and any(t in cols[0] for t in ["Restaurant", "eCommerce", "Para llevar", "A domicilio", "Mostrador"]):
+                try:
+                    br_personas += int(cols[2])
+                    br_ordenes += int(cols[3])
+                    br_ventas += parse_num(cols[5])
+                except: pass
+        print(f"    SalesByBranch monthly — Ventas: ${br_ventas:,.0f}, Ordenes: {br_ordenes}, Personas: {br_personas}")
     except Exception as e:
         print(f"    Monthly query failed: {e}")
 
