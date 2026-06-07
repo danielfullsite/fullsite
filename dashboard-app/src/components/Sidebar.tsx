@@ -32,6 +32,7 @@ import {
   Building2,
   Mic,
   ShieldOff,
+  Ban,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -73,6 +74,8 @@ const navSections = [
     label: 'Operaciones',
     items: [
       { href: '/inventario', label: 'Inventario', icon: Package },
+      { href: '/caja', label: 'Caja', icon: Banknote },
+      { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
       { href: '/compras', label: 'Compras', icon: ShoppingCart },
