@@ -502,32 +502,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Month progress */}
+      {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm px-5 py-4">
-          <div className="flex items-center justify-between mb-2">
+        <div className="mb-6 bg-gradient-to-br from-[var(--surface)] to-[var(--surface-2)] rounded-2xl border border-[var(--line)] shadow-lg px-6 py-5">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Target size={16} className="text-[var(--accent-bright)]" />
-              <span className="text-sm font-semibold text-[var(--text-1)]">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Target size={16} className="text-emerald-500" />
+              </div>
+              <span className="text-base font-bold text-[var(--text-1)]">
                 {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {monthProgress.yearNum}
               </span>
             </div>
-            <span className="text-xs text-[var(--text-3)]">
-              Día {monthProgress.dayOfMonth} de {monthProgress.daysInMonth} · {monthProgress.daysLeft} días restantes
+            <span className="text-xs text-[var(--text-3)] bg-[var(--line-soft)] px-2.5 py-1 rounded-full">
+              Día {monthProgress.dayOfMonth} de {monthProgress.daysInMonth}
             </span>
           </div>
-          <div className="flex items-end gap-4 mb-2">
-            <div>
-              <span className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(monthProgress.monthVentas)}</span>
-            </div>
-            <div className="text-xs text-[var(--text-3)] pb-1">
-              Proyección: <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.projected)}</span>
-              {' · '}Prom. diario: <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span>
-            </div>
+          <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] mb-1">{formatCurrency(monthProgress.monthVentas)}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
+            <span>Proyección <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.projected)}</span></span>
+            <span>Prom. diario <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span></span>
+            <span>{monthProgress.daysLeft} días restantes</span>
           </div>
-          <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 overflow-hidden">
+          <div className="w-full bg-[var(--line-soft)] rounded-full h-3 overflow-hidden">
             <div
-              className="h-2.5 rounded-full bg-emerald-500 transition-all"
+              className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all shadow-sm"
               style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
             />
           </div>
@@ -567,7 +566,7 @@ export default function DashboardPage() {
           : null
 
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
             <KPICard
               label={period === 'dia' ? 'Ventas del día' : period === 'semana' ? 'Ventas semana' : 'Ventas del mes'}
               value={formatCurrency(periodData.ventas)}
@@ -579,7 +578,7 @@ export default function DashboardPage() {
               weekChange={wkVentas}
             />
             <KPICard
-              label="Tickets"
+              label="Ordenes"
               value={formatNumber(periodData.tickets)}
               delta={`${formatPercent(ticketsChange)} ${periodData.label}`}
               deltaType={ticketsChange >= 0 ? 'up' : 'down'}
@@ -647,18 +646,18 @@ export default function DashboardPage() {
       })()}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
-      {show('extra_kpis') && <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Propinas</p>
-          <p className="text-xl font-bold text-[var(--accent-bright)]">{formatCurrency(periodData.propinas)}</p>
+      {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
+          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Propinas</p>
+          <p className="text-lg sm:text-xl font-bold text-emerald-500">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Descuentos</p>
-          <p className="text-xl font-bold text-red-400">{formatCurrency(periodData.descuentos)}</p>
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
+          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Descuentos</p>
+          <p className="text-lg sm:text-xl font-bold text-red-400">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-5 py-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Ventas brutas</p>
-          <p className="text-xl font-bold text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
+          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Ventas brutas</p>
+          <p className="text-lg sm:text-xl font-bold text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
         </div>
       </div>}
 
