@@ -575,10 +575,33 @@ def main():
             if tickets and tickets > 0:
                 update_data["ticket_promedio_restaurant"] = round(ventas_total / tickets, 2)
 
-            requests.patch(
-                f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}",
+            # UPSERT: try PATCH first, if no rows affected try INSERT
+            update_data["client_slug"] = CLIENT["id"]
+            update_data["fecha"] = today_str
+            pr = requests.patch(
+                f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&client_slug=eq.{CLIENT['id']}",
                 headers=sb_h, json=update_data, timeout=10)
-            print(f"[intraday] Updated wansoft_daily with {len(update_data)} fields")
+            # Check if PATCH found a row — if not, INSERT
+            if pr.status_code == 200:
+                # Verify row exists
+                cr = requests.get(
+                    f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&client_slug=eq.{CLIENT['id']}&select=fecha",
+                    headers={"apikey": os.environ["SUPABASE_SERVICE_KEY"], "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"},
+                    timeout=10)
+                if cr.ok and not cr.json():
+                    # Row doesn't exist — INSERT
+                    requests.post(
+                        f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily",
+                        headers=sb_h, json=update_data, timeout=10)
+                    print(f"[intraday] INSERTED new wansoft_daily row for {today_str} ({len(update_data)} fields)")
+                else:
+                    print(f"[intraday] Updated wansoft_daily with {len(update_data)} fields")
+            else:
+                print(f"[intraday] PATCH failed ({pr.status_code}), trying INSERT...")
+                requests.post(
+                    f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily",
+                    headers=sb_h, json=update_data, timeout=10)
+                print(f"[intraday] INSERTED wansoft_daily for {today_str}")
 
             # ── VALIDATION: read back and compare ──
             try:
