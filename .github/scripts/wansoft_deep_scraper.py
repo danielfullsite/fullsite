@@ -678,16 +678,21 @@ def main():
         if r["type"] == "json": return r["data"]
         return []
 
+    # Use yesterday for labor/hours (same timing issue as tips)
+    labor_params = yesterday_params if now_mx.hour >= 22 or now_mx.hour < 9 else base_params
+    labor_fecha = labor_params["startDate"]
+    print(f"    [labor] Using {labor_fecha}")
+
     labor = scrape_endpoint(session, "AccessControl", "Staff/GetAccessControlReport",
-                            base_params, "wansoft_labor", transform_labor)
+                            labor_params, "wansoft_labor", transform_labor)
     if labor:
-        sb_upsert("wansoft_labor", {"client_id": CLIENT["id"], "fecha": today_str,
+        sb_upsert("wansoft_labor", {"client_id": CLIENT["id"], "fecha": labor_fecha,
                    "data": json.dumps(labor), "updated_at": datetime.now(timezone.utc).isoformat()})
         results["labor"] = len(labor)
 
     # Hours worked
     hours_worked = scrape_endpoint(session, "HoursWorked", "Staff/GetUserHoursWorkedReport",
-                                   base_params, None, transform_labor)
+                                   labor_params, None, transform_labor)
     if hours_worked:
         save_data("hours_worked", hours_worked)
         results["horas_trabajadas"] = len(hours_worked)
