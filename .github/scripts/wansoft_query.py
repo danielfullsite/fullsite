@@ -1192,18 +1192,30 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    # Groq first (FREE), Anthropic fallback
+    # Groq first (FREE, but 6K token limit — truncate context), Anthropic fallback
     answer = None
+    # Trim context for Groq: keep only essential blocks, max ~8K chars
+    groq_context = context
+    if len(context) > 8000:
+        # Keep first block (rankings) + last 2 blocks (core data + historico)
+        blocks = context.split("\n\n")
+        essential = []
+        for b in blocks:
+            bl = b.lower()
+            if any(kw in bl for kw in ["datos core", "histórico", "ranking", "pregunta"]):
+                essential.append(b)
+        groq_context = "\n\n".join(essential) if essential else context[:8000]
+        print(f"[wansoft-query] Trimmed context for Groq: {len(context)} → {len(groq_context)} chars")
     try:
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
             json={
                 "model": "llama-3.3-70b-versatile",
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": context},
+                    {"role": "system", "content": SYSTEM_PROMPT[:3000]},  # Trim system prompt too
+                    {"role": "user", "content": groq_context},
                 ],
-                "temperature": 0.2, "max_tokens": 4000,
+                "temperature": 0.2, "max_tokens": 2000,
             }, timeout=30)
         r.raise_for_status()
         answer = r.json()["choices"][0]["message"]["content"].strip()
