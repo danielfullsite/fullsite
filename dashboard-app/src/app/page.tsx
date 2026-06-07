@@ -362,9 +362,9 @@ export default function DashboardPage() {
   return (
     <>
       {/* Page header with period selector + day navigation + settings */}
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">
+      <div className="mb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {/* Navigation arrows + date label for all periods */}
@@ -439,26 +439,29 @@ export default function DashboardPage() {
             return null
           })()}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-              showSettings ? 'bg-[var(--surface)] text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
-            }`}
-            title="Personalizar dashboard"
-          >
-            <Settings size={18} />
-          </button>
+        {/* Row 2: settings + period tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                showSettings ? 'bg-[var(--surface)] text-white' : 'bg-[var(--line-soft)] text-[var(--text-2)] hover:bg-[var(--line)]'
+              }`}
+              title="Personalizar dashboard"
+            >
+              <Settings size={16} />
+            </button>
+          </div>
           <div className="flex bg-[var(--surface)] rounded-xl p-1 gap-1">
             {(['dia', 'semana', 'mes'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                   period === p ? 'bg-emerald-500 text-white shadow-lg' : 'text-[var(--text-3)] hover:text-white hover:bg-[var(--surface-2)]'
                 }`}
               >
-                {p === 'dia' ? 'Dia' : p === 'semana' ? 'Semana' : 'Mes'}
+                {p === 'dia' ? 'Día' : p === 'semana' ? 'Semana' : 'Mes'}
               </button>
             ))}
           </div>

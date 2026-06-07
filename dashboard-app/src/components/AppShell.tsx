@@ -72,19 +72,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)]">
+    <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)] overflow-x-hidden">
       <div className="hidden lg:block">
         <Sidebar />
       </div>
       <div className="lg:hidden">
         <Sidebar />
       </div>
-      <main className="min-h-screen overflow-auto lg:pt-0 relative" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
+      <main className="min-h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         {/* Notification bell — top right */}
         <div className="absolute right-4 lg:right-8 z-30 hidden lg:block" style={{ top: '1.25rem' }}>
           <NotificationBell />
         </div>
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto min-w-0">
           <PageTransition key={pathname}>
             {children}
           </PageTransition>
