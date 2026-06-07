@@ -77,11 +77,12 @@ def main():
     ot_html = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder",
                            data={"subsidiaryId": SUBSIDIARY, "startDate": today_str, "endDate": today_str}).text
     ot_rows = parse_rows(ot_html)
-    total_tickets = sum(int(r[2]) for r in ot_rows if len(r) >= 6 and r[2].isdigit())
-    total_personas = sum(int(r[3]) for r in ot_rows if len(r) >= 6 and r[3].isdigit())
+    # CRITICAL: cols[2]=PERSONAS, cols[3]=ORDENES (verified by audit 2026-06-06)
+    total_personas = sum(int(r[2]) for r in ot_rows if len(r) >= 6 and r[2].isdigit())
+    total_ordenes = sum(int(r[3]) for r in ot_rows if len(r) >= 6 and r[3].isdigit())
     ticket_promedio = today_sales / total_personas if total_personas > 0 else 0
 
-    print(f"[alerts] Today: ${today_sales:,.0f}, {total_tickets} tickets, {total_personas} personas, TP ${ticket_promedio:,.0f}")
+    print(f"[alerts] Today: ${today_sales:,.0f}, {total_ordenes} ordenes, {total_personas} personas, TP ${ticket_promedio:,.0f}")
 
     # 2. Get historical averages (same day of week, last 4 weeks)
     hist_dates = []

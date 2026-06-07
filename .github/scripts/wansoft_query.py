@@ -205,8 +205,9 @@ def fetch_all_wansoft_data(session, start, end):
 
     # 5. Sales by order type (tickets + personas)
     rows = wansoft_post(session, "Reports/SalesByTypeOfOrder", start, end)
-    data["por_tipo_orden"] = [{"tipo": r[0], "ticket_promedio": r[1], "tickets": r[2],
-                                "personas": r[3], "subtotal": r[4], "total": r[5]}
+    # CRITICAL: cols[2]=PERSONAS, cols[3]=ORDENES (verified by audit 2026-06-06)
+    data["por_tipo_orden"] = [{"tipo": r[0], "ticket_promedio": r[1], "personas": r[2],
+                                "ordenes": r[3], "subtotal": r[4], "total": r[5]}
                                for r in rows if len(r) >= 6]
 
     # 6. Sales by payment type (métodos de pago)
@@ -795,7 +796,8 @@ CÓMO INTERPRETAR:
 MAPA DE DATOS DISPONIBLES:
 Lo que SI tienes:
 - Ventas diarias (brutas, netas, por mesero, por grupo, por platillo) — DATOS REALES
-- Tickets, personas, ticket promedio — DATOS REALES
+- Ordenes (tickets_count), personas (personas_restaurant), ticket promedio POR PERSONA (ventas/personas) — DATOS REALES
+- IMPORTANTE: ticket_promedio_restaurant = ventas_dia / personas_restaurant = consumo por persona. NO dividir por ordenes.
 - Metodos de pago (conteo de transacciones + pesos) — DATOS REALES
 - Efectivo y tarjeta en PESOS (historico diario) — DATOS REALES
 - Mesero x categoria: H&H, Pan, Postres, 2da Bebida, bebidas por persona — DATOS REALES
