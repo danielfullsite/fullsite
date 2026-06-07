@@ -218,7 +218,10 @@ def main():
         sys.exit(1)
 
     results = {}
+    # Use yesterday for endpoints that return empty at midnight (SalesByUser, etc.)
+    yesterday_str = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
     base_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}
+    yesterday_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": yesterday_str, "endDate": yesterday_str}
     range_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": thirty_ago, "endDate": today_str}
     month_params = {"subsidiaryId": SUBSIDIARY_ID, "startDate": month_start, "endDate": today_str}
 
@@ -463,14 +466,18 @@ def main():
         if r["type"] == "json": return r["data"]
         return []
 
-    tips = scrape_endpoint(session, "SalesByUser+Tips", "Reports/SalesByUser", base_params,
+    # Use yesterday for tips — deep scraper runs at 11pm/5am when today's data may be empty
+    tips_params = yesterday_params if now_mx.hour >= 22 or now_mx.hour < 9 else base_params
+    print(f"    [tips] Using {'yesterday' if tips_params == yesterday_params else 'today'} ({tips_params['startDate']})")
+    tips = scrape_endpoint(session, "SalesByUser+Tips", "Reports/SalesByUser", tips_params,
                            "wansoft_tips", transform_tips)
     # Filter out empty/header-only results
     real_tips = [t for t in (tips or []) if t.get("mesero") and t.get("ventas", 0) > 0]
+    tips_fecha = tips_params["startDate"]  # Use the actual date we queried
     if real_tips:
         for t in real_tips:
             t["propina_promedio"] = round(t.get("propinas", 0) / t["tickets"], 2) if t.get("tickets", 0) > 0 else 0
-        sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": today_str,
+        sb_upsert("wansoft_tips", {"client_id": CLIENT["id"], "fecha": tips_fecha,
                    "data": json.dumps(real_tips), "updated_at": datetime.now(timezone.utc).isoformat()})
         results["propinas"] = len(real_tips)
         save_data("tips_raw", real_tips)
@@ -488,7 +495,7 @@ def main():
             try:
                 # Update propinas_total (numeric field — simple value)
                 r = requests.patch(
-                    f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                    f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{tips_fecha}",
                     headers={**sb_headers, "Prefer": "return=minimal"},
                     json={"propinas_total": round(total_propinas, 2)},
                     timeout=10
@@ -500,7 +507,7 @@ def main():
                 # Update propinas_meseros separately (JSONB field)
                 if propinas_meseros:
                     requests.patch(
-                        f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{today_str}",
+                        f"{SUPABASE_URL}/rest/v1/wansoft_daily?client_slug=eq.{CLIENT['id']}&fecha=eq.{tips_fecha}",
                         headers={**sb_headers, "Prefer": "return=minimal"},
                         json={"propinas_meseros": propinas_meseros},
                         timeout=10
