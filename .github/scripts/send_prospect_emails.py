@@ -132,8 +132,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Corre sobre tu POS actual</strong> &mdash;
-          no tienes que cambiar nada. Se conecta a Wansoft, Soft Restaurant o cualquier POS y agrega la capa de inteligencia.
+          <strong style="color:#059669;">POS completo + inteligencia</strong> &mdash;
+          punto de venta con comandero, KDS, inventario, facturacion CFDI, y 30 agentes de IA integrados. Todo en uno.
         </p>
       </td>
     </tr>
@@ -161,8 +161,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:10px;text-align:center;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
         <p style="margin:0;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Desde</p>
-        <p style="margin:4px 0;font-size:28px;font-weight:800;color:#1e293b;">$1,499/mes</p>
-        <p style="margin:0;font-size:13px;color:#64748b;">Inteligencia IA sobre tu POS actual</p>
+        <p style="margin:4px 0;font-size:28px;font-weight:800;color:#1e293b;">$4,999/mes</p>
+        <p style="margin:0;font-size:13px;color:#64748b;">POS completo + 30 agentes IA + soporte especializado</p>
       </td>
     </tr>
   </table>
@@ -212,7 +212,7 @@ def build_email_html(name: str, restaurant: str) -> str:
 
 
 def build_subject(restaurant: str) -> str:
-    return f"30 agentes de IA para {restaurant} — sin cambiar tu POS"
+    return f"El POS con 30 agentes de IA para {restaurant}"
 
 
 # ── Load prospects ──────────────────────────────────────────────────────────
