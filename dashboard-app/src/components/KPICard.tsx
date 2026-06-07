@@ -61,7 +61,7 @@ export default function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ scale: 1.02, y: -2 }}
-      className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-5 transition-shadow"
+      className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-3 sm:p-5 transition-shadow"
       style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}
     >
       {/* Bisel emerald superior */}
@@ -74,7 +74,7 @@ export default function KPICard({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: index * 0.06 + 0.1 }}
-            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${style.bg}`}
+            className={`w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${style.bg}`}
           >
             <Icon size={20} strokeWidth={1.8} className={style.icon} />
           </motion.div>
@@ -95,6 +95,7 @@ export default function KPICard({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3, delay: index * 0.06 + 0.2 }}
+                className="hidden sm:block"
               >
                 <Sparkline data={sparklineData} />
               </motion.div>
