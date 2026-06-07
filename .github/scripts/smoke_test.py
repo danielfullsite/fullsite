@@ -65,7 +65,13 @@ def check_supabase_data():
             latest = data[0]
             print(f"OK: wansoft_daily latest={latest['fecha']} ventas={latest.get('ventas_dia', 0)}")
             if latest.get('ventas_dia', 0) == 0:
-                warnings.append(f"wansoft_daily: latest day ({latest['fecha']}) has $0 ventas")
+                # Don't warn on Sundays (restaurant closed) or early morning
+                from datetime import datetime, timezone, timedelta
+                mx_now = datetime.now(timezone(timedelta(hours=-6)))
+                if mx_now.weekday() != 6 and mx_now.hour >= 11:  # Not Sunday and after 11am
+                    warnings.append(f"wansoft_daily: latest day ({latest['fecha']}) has $0 ventas")
+                else:
+                    print(f"OK: $0 ventas but it's {'Sunday' if mx_now.weekday() == 6 else 'early morning'} — normal")
     except Exception as e:
         failures.append(f"wansoft_daily check: {e}")
 
