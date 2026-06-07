@@ -208,13 +208,21 @@ PRIORIDAD: [Alta/Media/Baja]
 
 Máximo 20 líneas. Sin markdown. Directo al punto."""
 
-    r = requests.post("https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
-              "messages": [{"role": "user", "content": prompt}]},
-        timeout=30)
-    r.raise_for_status()
-    analysis = r.json()["content"][0]["text"].strip()
+    # Groq first (FREE), Anthropic fallback
+    try:
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {os.environ.get('GROQ_API_KEY', '')}", "Content-Type": "application/json"},
+            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.2, "max_tokens": 1500}, timeout=30)
+        r.raise_for_status()
+        analysis = r.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                  "messages": [{"role": "user", "content": prompt}]}, timeout=30)
+        r.raise_for_status()
+        analysis = r.json()["content"][0]["text"].strip()
 
     # 6. Send alert
     header = f"{'🔴' if any(a['prioridad'] == 'Alta' for a in alerts) else '🟡'} ALERTA FULLSITE — {today_str} {now_mx.strftime('%H:%M')}"

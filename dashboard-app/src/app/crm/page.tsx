@@ -209,7 +209,7 @@ export default function CRMPage() {
       <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--surface)] border border-[var(--line)]">
         {([
           { key: 'clientes' as Tab, label: 'Clientes', icon: Users },
-          { key: 'campanas' as Tab, label: 'Campanas', icon: Target },
+          { key: 'campanas' as Tab, label: 'Campañas', icon: Target },
           { key: 'mensajes' as Tab, label: 'Mensajes', icon: MessageCircle },
         ]).map(t => (
           <button
@@ -494,7 +494,7 @@ function CampanasTab({ clients, campaigns, setCampaigns, messages, setMessages }
   return (
     <>
       <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-[var(--text-3)]">{campaigns.length} campanas</p>
+        <p className="text-sm text-[var(--text-3)]">{campaigns.length} campañas</p>
         <button
           onClick={() => setShowWizard(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
@@ -507,7 +507,7 @@ function CampanasTab({ clients, campaigns, setCampaigns, messages, setMessages }
       {campaigns.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--line)] p-12 text-center">
           <Target size={40} className="mx-auto mb-3 text-[var(--text-4)]" />
-          <p className="text-[var(--text-2)] font-medium mb-1">Sin campanas</p>
+          <p className="text-[var(--text-2)] font-medium mb-1">Sin campañas</p>
           <p className="text-sm text-[var(--text-4)] mb-4">Crea tu primera campana de recuperacion para contactar clientes inactivos</p>
           <button
             onClick={() => setShowWizard(true)}

@@ -1192,19 +1192,22 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    # Groq first (FREE, but 6K token limit — truncate context), Anthropic fallback
+    # Groq first (FREE), Anthropic fallback
     answer = None
-    # Trim context for Groq: keep only essential blocks, max ~8K chars
+    # Trim context for Groq: max ~5K chars to stay under 6K token limit
     groq_context = context
-    if len(context) > 8000:
-        # Keep first block (rankings) + last 2 blocks (core data + historico)
+    if len(context) > 5000:
         blocks = context.split("\n\n")
+        # Priority: core data > historico > rankings. Skip inventory/costs/agents
         essential = []
+        total = 0
         for b in blocks:
             bl = b.lower()
             if any(kw in bl for kw in ["datos core", "histórico", "ranking", "pregunta"]):
-                essential.append(b)
-        groq_context = "\n\n".join(essential) if essential else context[:8000]
+                if total + len(b) < 5000:
+                    essential.append(b)
+                    total += len(b)
+        groq_context = "\n\n".join(essential) if essential else context[:5000]
         print(f"[wansoft-query] Trimmed context for Groq: {len(context)} → {len(groq_context)} chars")
     try:
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
