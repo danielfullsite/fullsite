@@ -34,6 +34,7 @@ import {
   ShieldOff,
   Ban,
   FileText,
+  Clock,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -78,6 +79,7 @@ const navSections = [
       { href: '/inventario', label: 'Inventario', icon: Package },
       { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
+      { href: '/acceso', label: 'Control Acceso', icon: Clock },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
       { href: '/food-cost', label: 'Food Cost', icon: PieChart },
       { href: '/compras', label: 'Compras', icon: ShoppingCart },
