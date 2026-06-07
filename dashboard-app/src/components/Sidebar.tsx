@@ -33,6 +33,7 @@ import {
   Mic,
   ShieldOff,
   Ban,
+  FileText,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -68,6 +69,7 @@ const navSections = [
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
       { href: '/nomina', label: 'Nómina', icon: UserCheck },
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
+      { href: '/facturas', label: 'Facturas Proveedores', icon: FileText },
     ],
   },
   {
