@@ -37,8 +37,9 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 # ── Hardcoded prospects (fallback if no CSV) ────────────────────────────────
 DEFAULT_PROSPECTS = [
-    # {"name": "Chef García", "restaurant": "La Buena Mesa", "email": "chef@labuena.mx"},
-    # Add prospects here or use CSV_PATH env var
+    {"name": "Equipo GIM", "restaurant": "Grupo GIM", "email": "info@grupogim.com.mx"},
+    {"name": "Equipo Estancia", "restaurant": "Grupo Estancia", "email": "atencion.clientes@grupoestancia.com"},
+    {"name": "Equipo Hunan", "restaurant": "Grupo Hunan", "email": "contacto@grupohunan.com"},
 ]
 
 
@@ -81,9 +82,13 @@ def build_email_html(name: str, restaurant: str) -> str:
   </p>
 
   <p style="margin:0 0 24px;font-size:16px;color:#475569;line-height:1.6;">
-    Estoy lanzando <strong>Fullsite</strong> en Monterrey y creo que le puede servir mucho a
-    <strong>{restaurant}</strong>. Es un POS con 30 agentes de IA que trabajan 24/7 para ti.
-    Te cuento lo mas relevante:
+    Soy Daniel Ramonfaur, 3ra generacion restaurantera y fundador de <strong>Fullsite</strong>.
+    Creci en restaurantes y construi lo que siempre nos hizo falta: un sistema con <strong>30 agentes de IA</strong>
+    que analizan tu operacion 24/7 y te dicen exactamente que hacer para vender mas.
+  </p>
+
+  <p style="margin:0 0 24px;font-size:16px;color:#475569;line-height:1.6;">
+    Creo que le puede servir mucho a <strong>{restaurant}</strong>. Te cuento lo mas relevante:
   </p>
 
   <!-- Feature list -->
@@ -91,8 +96,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;margin-bottom:8px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Food cost automatico</strong> &mdash;
-          costeo real por platillo, sin Excel. Sabes tu margen al centavo.
+          <strong style="color:#059669;">Preguntale a tu restaurante</strong> &mdash;
+          &ldquo;Como vamos hoy?&rdquo; y en 2 segundos te responde con voz: ventas, meseros, ticket promedio. Ningun POS tiene esto.
         </p>
       </td>
     </tr>
@@ -100,8 +105,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Anti-fraude inteligente</strong> &mdash;
-          detecta cancelaciones y descuentos sospechosos. Te avisa antes de que sea tarde.
+          <strong style="color:#059669;">Anti-fraude automatico</strong> &mdash;
+          detecta cancelaciones sospechosas, descuentos fuera de patron, y meseros con devoluciones anormales. Te alerta antes de que sea problema.
         </p>
       </td>
     </tr>
@@ -109,8 +114,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Briefing diario 7am</strong> &mdash;
-          te llega un resumen en Telegram con todo lo que necesitas saber de tu operacion.
+          <strong style="color:#059669;">Food cost + alertas de costos</strong> &mdash;
+          si un insumo sube de precio, te avisa. Costeo real por platillo con factor de merma incluido.
         </p>
       </td>
     </tr>
@@ -118,8 +123,17 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Bot 24/7</strong> &mdash;
-          preguntale cualquier cosa sobre tu restaurante por Telegram: ventas, meseros, platillos, lo que sea.
+          <strong style="color:#059669;">Prediccion de cierre + coaching</strong> &mdash;
+          a las 2pm te dice cuanto vas a facturar y que hacer para llegar a la meta. Briefing diario 7am por Telegram.
+        </p>
+      </td>
+    </tr>
+    <tr><td style="height:8px;"></td></tr>
+    <tr>
+      <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
+        <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
+          <strong style="color:#059669;">Corre sobre tu POS actual</strong> &mdash;
+          no tienes que cambiar nada. Se conecta a Wansoft, Soft Restaurant o cualquier POS y agrega la capa de inteligencia.
         </p>
       </td>
     </tr>
@@ -133,21 +147,25 @@ def build_email_html(name: str, restaurant: str) -> str:
           Caso real
         </p>
         <p style="margin:0;font-size:22px;font-weight:700;color:#10b981;">
-          Un restaurante ahorro $80,000/mes
+          881 dias de datos reales analizados
         </p>
         <p style="margin:6px 0 0;font-size:14px;color:#cbd5e1;">
-          detectando fraude + optimizando food cost + reduciendo merma
+          30 agentes IA &middot; anti-fraude &middot; food cost &middot; predicciones &middot; $0 costo de IA
         </p>
       </td>
     </tr>
   </table>
 
   <!-- Price -->
-  <p style="margin:0 0 28px;font-size:16px;color:#475569;line-height:1.6;text-align:center;">
-    <strong style="font-size:24px;color:#1e293b;">$4,999/mes</strong>
-    <br>
-    <span style="font-size:14px;color:#94a3b8;">Todo incluido &mdash; POS + 30 agentes + soporte</span>
-  </p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+    <tr>
+      <td style="padding:10px;text-align:center;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+        <p style="margin:0;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Desde</p>
+        <p style="margin:4px 0;font-size:28px;font-weight:800;color:#1e293b;">$1,499/mes</p>
+        <p style="margin:0;font-size:13px;color:#64748b;">Inteligencia IA sobre tu POS actual</p>
+      </td>
+    </tr>
+  </table>
 
   <!-- CTA buttons -->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -194,7 +212,7 @@ def build_email_html(name: str, restaurant: str) -> str:
 
 
 def build_subject(restaurant: str) -> str:
-    return f"Fullsite — POS + 30 agentes de IA para {restaurant}"
+    return f"30 agentes de IA para {restaurant} — sin cambiar tu POS"
 
 
 # ── Load prospects ──────────────────────────────────────────────────────────
