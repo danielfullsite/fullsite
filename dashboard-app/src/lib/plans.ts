@@ -2,23 +2,32 @@
  * Plan/Tier system — controls which modules, pages, and agents each tenant can access.
  *
  * Plans:
- *   - "antifraude": only anti-fraud agent + its report page
- *   - "fullsite_os": all agents + full dashboard + WhatsApp bot. No POS/payments/CFDI.
- *   - "fullsite_pos": everything (POS, payments, CFDI, all agents, full dashboard)
+ *   - "reporteador": IA layer on existing POS (no POS, no hardware)
+ *   - "fullsite_software": full software suite (POS + IA + dashboard, no hardware)
+ *   - "fullsite_completo": everything + hardware kit
  *
- * Default: "fullsite_pos" (preserves AMALAY's current access exactly)
+ * Pricing (annual, per sucursal):
+ *   - reporteador:       $17,999/año ($1,499/mes equiv, ahorra $0 vs monthly)
+ *   - fullsite_software:  $49,999/año ($4,166/mes equiv, ahorra $10K vs monthly $4,999×12)
+ *   - fullsite_completo:  $49,999/año + hardware kit $45,000 (one-time)
+ *
+ * Competitor: Wansoft = $1,500/mes software + $130K hardware = $148K first year
+ * Fullsite completo = $95K first year (36% cheaper)
  */
 
-export type PlanId = 'antifraude' | 'fullsite_os' | 'fullsite_pos'
+export type PlanId = 'reporteador' | 'fullsite_software' | 'fullsite_completo'
 
-export const PLAN_DEFAULT: PlanId = 'fullsite_pos'
+export const PLAN_DEFAULT: PlanId = 'fullsite_completo'
 
 export interface PlanDefinition {
   id: PlanId
   name: string
   description: string
-  pages: string[]       // page paths the plan can access (prefix match)
-  agents: string[]      // agent IDs that run for this plan ('*' = all)
+  priceMonthly: number    // MXN per sucursal
+  priceAnnual: number     // MXN per sucursal (discounted)
+  hardwareKit?: number    // MXN one-time (optional)
+  pages: string[]
+  agents: string[]
   features: {
     pos: boolean
     payments: boolean
@@ -27,50 +36,26 @@ export interface PlanDefinition {
     agents: boolean
     bot: boolean
     crm: boolean
+    hardware: boolean
   }
 }
 
 const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
-  antifraude: {
-    id: 'antifraude',
-    name: 'Anti-Fraude',
-    description: 'Solo agente de anti-fraude + reporte',
-    pages: [
-      '/',                    // dashboard (limited view)
-      '/agentes',             // agents list
-      '/agentes/antifraude',  // anti-fraud detail
-      '/ventas',              // ventas (needed for fraud context)
-      '/cortes',              // cortes (needed for fraud context)
-      '/login',
-    ],
-    agents: ['antifraud', 'config-validator', 'hermes'],
-    features: {
-      pos: false,
-      payments: false,
-      cfdi: false,
-      dashboard: true,
-      agents: true,
-      bot: false,
-      crm: false,
-    },
-  },
-
-  fullsite_os: {
-    id: 'fullsite_os',
-    name: 'Fullsite OS',
-    description: 'Todos los agentes + dashboard + bot. Sin POS.',
+  reporteador: {
+    id: 'reporteador',
+    name: 'Reporteador IA',
+    description: 'Inteligencia IA sobre tu POS actual — sin cambiar nada',
+    priceMonthly: 1499,
+    priceAnnual: 14999,
     pages: [
       '/',
-      '/roi', '/sucursales', '/ventas', '/cortes',
-      '/meseros', '/platillos', '/tendencias', '/propinas',
-      '/ingresos', '/estado-resultados', '/nomina',
-      '/inventario', '/auto86', '/food-cost', '/compras',
-      '/proveedores', '/ecommerce', '/reportes',
-      '/crm', '/mission-control', '/agentes',
-      '/coach', '/chat', '/voice',
+      '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas',
+      '/ingresos', '/costos', '/reportes', '/reportes/ingresos',
+      '/cancelaciones', '/caja', '/delivery', '/proveedores',
+      '/agentes', '/coach', '/chat',
       '/login', '/onboarding',
     ],
-    agents: ['*'], // all agents
+    agents: ['*'],
     features: {
       pos: false,
       payments: false,
@@ -78,16 +63,19 @@ const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       dashboard: true,
       agents: true,
       bot: true,
-      crm: true,
+      crm: false,
+      hardware: false,
     },
   },
 
-  fullsite_pos: {
-    id: 'fullsite_pos',
-    name: 'Fullsite POS',
-    description: 'Todo incluido: POS + agentes + dashboard + pagos + CFDI',
-    pages: ['*'], // all pages
-    agents: ['*'], // all agents
+  fullsite_software: {
+    id: 'fullsite_software',
+    name: 'Fullsite Software',
+    description: 'POS completo + 30 agentes IA + dashboard + soporte — sin hardware',
+    priceMonthly: 4999,
+    priceAnnual: 49999,
+    pages: ['*'],
+    agents: ['*'],
     features: {
       pos: true,
       payments: true,
@@ -96,6 +84,28 @@ const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       agents: true,
       bot: true,
       crm: true,
+      hardware: false,
+    },
+  },
+
+  fullsite_completo: {
+    id: 'fullsite_completo',
+    name: 'Fullsite Completo',
+    description: 'Todo incluido: POS + IA + hardware — llave en mano',
+    priceMonthly: 4999,
+    priceAnnual: 49999,
+    hardwareKit: 45000,
+    pages: ['*'],
+    agents: ['*'],
+    features: {
+      pos: true,
+      payments: true,
+      cfdi: true,
+      dashboard: true,
+      agents: true,
+      bot: true,
+      crm: true,
+      hardware: true,
     },
   },
 }
