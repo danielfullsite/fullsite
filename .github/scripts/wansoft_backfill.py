@@ -246,11 +246,16 @@ def main():
                 if hourly and ok:
                     try:
                         _h = {**sb_headers, "Prefer": "return=minimal"}
-                        requests.delete(f"{SUPABASE_URL}/rest/v1/wansoft_hourly?fecha=eq.{date_str}&client_id=eq.{CLIENT_ID}", headers=_h, timeout=10)
-                        requests.post(f"{SUPABASE_URL}/rest/v1/wansoft_hourly", headers=_h,
+                        dr = requests.delete(f"{SUPABASE_URL}/rest/v1/wansoft_hourly?fecha=eq.{date_str}&client_id=eq.{CLIENT_ID}", headers=_h, timeout=10)
+                        ir = requests.post(f"{SUPABASE_URL}/rest/v1/wansoft_hourly", headers=_h,
                             json={"fecha": date_str, "client_id": CLIENT_ID, "data": json.dumps(hourly),
                                   "updated_at": datetime.now(timezone.utc).isoformat()}, timeout=10)
-                    except: pass
+                        if ir.status_code >= 400:
+                            print(f"  [!] Hourly save failed: {ir.status_code} {ir.text[:200]}")
+                        else:
+                            print(f"  [h] Hourly saved ({len(hourly)} hours)")
+                    except Exception as e:
+                        print(f"  [!] Hourly error: {e}")
                 ordenes = row.get("tickets_count", "?")
                 personas = row.get("personas_restaurant", "?")
                 tp = row.get("ticket_promedio_restaurant", "?")
