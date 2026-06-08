@@ -379,18 +379,13 @@ export default function DashboardPage() {
                     {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
                   </span>
                   <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative">
-                    <button
-                      onClick={() => { const el = document.getElementById('day-picker') as HTMLInputElement; el?.showPicker() }}
-                      className="w-9 h-9 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center transition-colors"
-                      title="Seleccionar fecha"
-                    >
+                  <div className="relative w-9 h-9">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none">
                       <CalendarDays size={16} className="text-[var(--text-2)]" />
-                    </button>
+                    </div>
                     <input
-                      id="day-picker"
                       type="date"
-                      className="absolute top-0 left-0 w-0 h-0 opacity-0"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       value={viewDay.fecha}
                       min={recentData[0]?.fecha}
                       max={recentData[recentData.length - 1]?.fecha}
@@ -418,9 +413,9 @@ export default function DashboardPage() {
                     {weekOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
                   </span>
                   <button onClick={() => setWeekOffset(w => Math.max(w - 1, 0))} disabled={weekOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative">
-                    <button onClick={() => { const el = document.getElementById('week-picker') as HTMLInputElement; el?.showPicker() }} className="w-9 h-9 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center transition-colors"><CalendarDays size={16} className="text-[var(--text-2)]" /></button>
-                    <input id="week-picker" type="date" className="absolute top-0 left-0 w-0 h-0 opacity-0" onChange={(e) => {
+                  <div className="relative w-9 h-9">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
                       const picked = new Date(e.target.value + 'T12:00:00')
                       const today = new Date()
                       const diffDays = Math.round((today.getTime() - picked.getTime()) / (1000 * 60 * 60 * 24))
@@ -442,12 +437,12 @@ export default function DashboardPage() {
                     {monthOffset === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">ACTUAL</span>}
                   </span>
                   <button onClick={() => setMonthOffset(m => Math.max(m - 1, 0))} disabled={monthOffset <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
-                  <div className="relative">
-                    <button onClick={() => { const el = document.getElementById('month-picker') as HTMLInputElement; el?.showPicker() }} className="w-9 h-9 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center transition-colors"><CalendarDays size={16} className="text-[var(--text-2)]" /></button>
-                    <input id="month-picker" type="month" className="absolute top-0 left-0 w-0 h-0 opacity-0" onChange={(e) => {
-                      const [yr, mo] = e.target.value.split('-').map(Number)
+                  <div className="relative w-9 h-9">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--line-soft)] flex items-center justify-center pointer-events-none"><CalendarDays size={16} className="text-[var(--text-2)]" /></div>
+                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
+                      const picked = new Date(e.target.value + 'T12:00:00')
                       const now = new Date()
-                      setMonthOffset((now.getFullYear() - yr) * 12 + (now.getMonth() - (mo - 1)))
+                      setMonthOffset((now.getFullYear() - picked.getFullYear()) * 12 + (now.getMonth() - picked.getMonth()))
                     }} />
                   </div>
                 </div>
