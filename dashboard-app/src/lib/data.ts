@@ -43,7 +43,11 @@ function parseJsonbField<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[]
   if (typeof value === 'string') {
     try {
-      const parsed = JSON.parse(value)
+      let parsed: unknown = JSON.parse(value)
+      // Handle double-escaped JSON strings
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed) } catch { /* not double-escaped */ }
+      }
       return Array.isArray(parsed) ? parsed : []
     } catch {
       return []
@@ -201,7 +205,14 @@ export function aggregatePayments(
 function parseJsonb(val: unknown): unknown {
   if (!val) return null
   if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return val }
+    try {
+      let parsed = JSON.parse(val)
+      // Handle double-escaped JSON
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed) } catch { /* not double-escaped */ }
+      }
+      return parsed
+    } catch { return val }
   }
   return val
 }
