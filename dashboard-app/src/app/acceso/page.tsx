@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Clock, Users, LogIn, LogOut } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import EmptyState from '@/components/EmptyState'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -117,10 +118,13 @@ export default function AccesoPage() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-12 text-[var(--text-3)]">
-              <Clock size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Sin datos de acceso. Se llenan automáticamente cada noche.</p>
-            </div>
+            <EmptyState
+              icon={Clock}
+              title="Sin datos de acceso"
+              description="Los registros de entrada y salida se llenan automáticamente cada noche desde Wansoft."
+              iconColor="text-blue-500"
+              iconBg="bg-blue-500/10"
+            />
           )}
         </>
       )}

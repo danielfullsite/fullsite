@@ -188,7 +188,11 @@ export default function FoodCostPage() {
           </div>
         </div>
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-[var(--text-3)] text-sm">{items.length === 0 ? 'Sin datos de food cost. El scraper corre diario.' : 'Sin resultados'}</div>
+          <div className="p-8 text-center">
+            <PieChart size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">{items.length === 0 ? 'Sin datos de food cost' : 'Sin resultados'}</p>
+            <p className="text-xs text-[var(--text-3)]">{items.length === 0 ? 'El scraper corre diario y actualiza los costos automáticamente.' : 'Intenta con otro término de búsqueda.'}</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

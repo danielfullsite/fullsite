@@ -83,7 +83,11 @@ export default function ProveedoresPage() {
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
         {sorted.length === 0 ? (
-          <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de proveedores. El scraper corre diario.</div>
+          <div className="p-8 text-center">
+            <Truck size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">Sin datos de proveedores</p>
+            <p className="text-xs text-[var(--text-3)]">El scraper corre diario y actualiza los datos automáticamente.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

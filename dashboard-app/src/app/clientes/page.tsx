@@ -184,7 +184,11 @@ export default function ClientesPage() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="text-center py-8 text-[var(--text-3)] text-sm">{customers.length === 0 ? 'Sin clientes registrados. Agrega el primero.' : 'Sin resultados'}</p>
+          <div className="py-8 text-center">
+            <User size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">{customers.length === 0 ? 'Sin clientes registrados' : 'Sin resultados'}</p>
+            <p className="text-xs text-[var(--text-3)]">{customers.length === 0 ? 'Agrega el primero con el botón +.' : 'Intenta con otro término de búsqueda.'}</p>
+          </div>
         )}
       </div>
 

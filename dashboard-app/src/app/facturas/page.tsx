@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { Upload, FileText, CheckCircle, AlertTriangle, DollarSign } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import EmptyState from '@/components/EmptyState'
 import { formatCurrency } from '@/lib/format'
 
 interface CFDIData {
@@ -192,10 +193,13 @@ export default function FacturasPage() {
       ))}
 
       {files.length === 0 && (
-        <div className="text-center py-12 text-[var(--text-3)]">
-          <FileText size={32} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">Sube un XML de CFDI para ver los datos de la factura</p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="Sin facturas"
+          description="Sube un XML de CFDI para ver los datos de la factura: emisor, conceptos, totales e impuestos."
+          iconColor="text-purple-500"
+          iconBg="bg-purple-500/10"
+        />
       )}
     </>
   )

@@ -19,6 +19,7 @@ import {
 import { TrendingUp, Calendar, Target, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import EmptyState from '@/components/EmptyState'
 import { getMonthlyData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatPercent, percentChange, formatNumber } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
@@ -317,10 +318,11 @@ export default function TendenciasPage() {
     return (
       <>
         <PageHeader title="Tendencias" subtitle="Análisis de tendencias y comparativos" />
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-12 text-center">
-          <TrendingUp size={32} className="text-[var(--text-3)] mx-auto mb-4" />
-          <p className="text-[var(--text-2)] text-sm">Sin datos históricos. Las tendencias se generan con al menos 7 días de información.</p>
-        </div>
+        <EmptyState
+          icon={TrendingUp}
+          title="Sin datos históricos"
+          description="Las tendencias se generan con al menos 7 días de información. Los datos se actualizan automáticamente."
+        />
       </>
     )
   }

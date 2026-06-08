@@ -7,6 +7,7 @@ import { getRecentDays, aggregateMeseros } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 import PageHeader from '@/components/PageHeader'
+import EmptyState from '@/components/EmptyState'
 
 interface LocationStats {
   locationId: string
@@ -80,13 +81,11 @@ export default function SucursalesPage() {
     return (
       <>
         <PageHeader title="Sucursales" subtitle="Comparativo entre ubicaciones" />
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-            <Building2 size={24} className="text-emerald-500" />
-          </div>
-          <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Una sola ubicación</h3>
-          <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">Cuando tengas más de una sucursal, aquí verás el comparativo lado a lado: ventas, ticket promedio, top meseros y categorías por ubicación.</p>
-        </div>
+        <EmptyState
+          icon={Building2}
+          title="Una sola ubicación"
+          description="Cuando tengas más de una sucursal, aquí verás el comparativo lado a lado: ventas, ticket promedio, top meseros y categorías por ubicación."
+        />
       </>
     )
   }

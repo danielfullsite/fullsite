@@ -222,8 +222,10 @@ export default function UpsellingPage() {
       )}
 
       {!data && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
-          Sin datos de upselling. El agente corre automaticamente.
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4"><TrendingUp size={24} className="text-emerald-500" /></div>
+          <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Sin datos de upselling</h3>
+          <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">El agente de upselling se actualiza automáticamente. Los datos aparecerán aquí cuando estén disponibles.</p>
         </div>
       )}
     </>

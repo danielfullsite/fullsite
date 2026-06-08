@@ -12,7 +12,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
-import { ShoppingCart, Package, Receipt, TrendingUp } from 'lucide-react'
+import { ShoppingCart, ShoppingBag, Package, Receipt, TrendingUp } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getRecentDays } from '@/lib/data'
@@ -155,14 +155,10 @@ export default function EcommercePage() {
           </div>
 
           {ecommerceData.totalEcommerce === 0 ? (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
-              <p className="text-sm text-amber-400 font-medium">
-                Sin datos de eCommerce
-              </p>
-              <p className="text-xs text-amber-400 mt-1">
-                No se encontraron ventas de Rappi, Ubereats u otras plataformas en los métodos de pago.
-                Si tu restaurante usa delivery, verifica que los pagos se registren correctamente en Wansoft.
-              </p>
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center mb-6">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4"><ShoppingBag size={24} className="text-amber-500" /></div>
+              <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Sin datos de eCommerce</h3>
+              <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">No se encontraron ventas de Rappi, Ubereats u otras plataformas. Verifica que los pagos se registren correctamente en Wansoft.</p>
             </div>
           ) : (
             <>

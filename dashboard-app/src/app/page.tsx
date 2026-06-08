@@ -362,9 +362,9 @@ export default function DashboardPage() {
   return (
     <>
       {/* Page header with period selector + day navigation + settings */}
-      <div className="mb-6 space-y-3">
+      <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-1)]">
+          <h2 className="text-base sm:text-xl font-bold tracking-tight text-[var(--text-1)]">
             {period === 'dia' ? 'Resumen del día' : period === 'semana' ? 'Resumen semanal' : 'Resumen mensual'}
           </h2>
           {/* Navigation arrows + date label for all periods */}
@@ -515,38 +515,39 @@ export default function DashboardPage() {
 
       {/* Quick insight */}
       {show('insight') && quickInsight && (
-        <div className="mb-4 px-4 py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-          <p className="text-sm text-purple-400">
-            <span className="font-semibold">Hoy:</span> {quickInsight}
+        <div className="mb-3 sm:mb-4 px-3 sm:px-4 py-2 sm:py-2.5 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+          <p className="text-xs sm:text-sm text-purple-400">
+            <Zap size={12} className="inline mr-1 -mt-0.5" />
+            {quickInsight}
           </p>
         </div>
       )}
 
       {/* Month progress — premium card */}
       {show('month_progress') && monthProgress && monthProgress.monthVentas > 0 && (
-        <div className="mb-6 bg-gradient-to-br from-[var(--surface)] to-[var(--surface-2)] rounded-2xl border border-[var(--line)] shadow-lg px-6 py-5">
-          <div className="flex items-center justify-between mb-3">
+        <div className="mb-4 sm:mb-6 bg-gradient-to-br from-emerald-500/10 via-[var(--surface)] to-[var(--surface-2)] rounded-2xl border border-emerald-500/20 shadow-lg px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Target size={16} className="text-emerald-500" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                <Target size={14} className="text-emerald-500" />
               </div>
-              <span className="text-base font-bold text-[var(--text-1)]">
+              <span className="text-sm sm:text-base font-bold text-[var(--text-1)]">
                 {monthProgress.monthName.charAt(0).toUpperCase() + monthProgress.monthName.slice(1)} {monthProgress.yearNum}
               </span>
             </div>
-            <span className="text-xs text-[var(--text-3)] bg-[var(--line-soft)] px-2.5 py-1 rounded-full">
-              Día {monthProgress.dayOfMonth} de {monthProgress.daysInMonth}
+            <span className="text-[10px] sm:text-xs text-emerald-400 bg-emerald-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-semibold">
+              Día {monthProgress.dayOfMonth}/{monthProgress.daysInMonth}
             </span>
           </div>
-          <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] mb-1">{formatCurrency(monthProgress.monthVentas)}</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
-            <span>Proyección <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.projected)}</span></span>
-            <span>Prom. diario <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span></span>
-            <span>{monthProgress.daysLeft} días restantes</span>
+          <p className="text-2xl sm:text-4xl font-black text-[var(--text-1)] mb-1">{formatCurrency(monthProgress.monthVentas)}</p>
+          <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-[10px] sm:text-xs text-[var(--text-3)] mb-2 sm:mb-3">
+            <span>Proy. <span className="font-bold text-emerald-400">{formatCurrency(monthProgress.projected)}</span></span>
+            <span>Prom. <span className="font-semibold text-[var(--text-2)]">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>
+            <span className="hidden sm:inline">{monthProgress.daysLeft} días restantes</span>
           </div>
-          <div className="w-full bg-[var(--line-soft)] rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-[var(--line-soft)] rounded-full h-2.5 sm:h-3 overflow-hidden">
             <div
-              className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all shadow-sm"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all shadow-sm shadow-emerald-500/25"
               style={{ width: `${Math.min((monthProgress.dayOfMonth / monthProgress.daysInMonth) * 100, 100)}%` }}
             />
           </div>
@@ -666,25 +667,34 @@ export default function DashboardPage() {
       })()}
 
       {/* Extra KPI row — Propinas + Descuentos + Brutas */}
-      {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
-          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Propinas</p>
-          <p className="text-lg sm:text-xl font-bold text-emerald-500">{formatCurrency(periodData.propinas)}</p>
+      {show('extra_kpis') && <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <div className="bg-gradient-to-b from-emerald-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-emerald-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
+            <Award size={14} className="text-emerald-400" />
+          </div>
+          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Propinas</p>
+          <p className="text-base sm:text-xl font-black text-emerald-400">{formatCurrency(periodData.propinas)}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
-          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Descuentos</p>
-          <p className="text-lg sm:text-xl font-bold text-red-400">{formatCurrency(periodData.descuentos)}</p>
+        <div className="bg-gradient-to-b from-red-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-red-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
+          <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
+            <TrendingDown size={14} className="text-red-400" />
+          </div>
+          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Descuentos</p>
+          <p className="text-base sm:text-xl font-black text-red-400">{formatCurrency(periodData.descuentos)}</p>
         </div>
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] shadow-sm px-4 py-4 text-center">
-          <p className="text-[10px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-2">Ventas brutas</p>
-          <p className="text-lg sm:text-xl font-bold text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
+        <div className="bg-gradient-to-b from-blue-500/10 to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-2xl border border-blue-500/20 sm:border-[var(--line)] shadow-sm px-3 sm:px-4 py-3 sm:py-4 text-center">
+          <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
+            <DollarSign size={14} className="text-blue-400" />
+          </div>
+          <p className="text-[9px] sm:text-xs text-[var(--text-3)] font-semibold uppercase tracking-wider mb-1">Brutas</p>
+          <p className="text-base sm:text-xl font-black text-[var(--text-1)]">{formatCurrency(periodData.brutas)}</p>
         </div>
       </div>}
 
       {/* Agent Status Widget — real data from agent_runs */}
       {show('agent_status') && (
-        <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="mb-4 sm:mb-6 bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
               <Bot size={14} className="text-purple-400" />
             </div>
@@ -697,91 +707,112 @@ export default function DashboardPage() {
           {agentRuns.length === 0 ? (
             <p className="text-[var(--text-3)] text-sm">Cargando datos de agentes...</p>
           ) : (
-            <div className="space-y-1.5">
-              {agentRuns.slice(0, 8).map(run => {
-                const agentNames: Record<string, string> = {
-                  'anomaly-detector': 'Anomalias',
-                  'close-predictor': 'Predicción',
-                  'upselling': 'Upselling',
-                  'menu-engineering': 'Menu Eng.',
-                  'staffing-optimizer': 'Staffing',
-                  'antifraud-agent': 'Anti-fraude',
-                  'kitchen-quality': 'Cocina',
-                  'tips-analyzer': 'Propinas',
-                  'supplier-monitor': 'Proveedores',
-                  'waste-detector': 'Merma',
-                  'daily-briefing': 'Briefing',
-                  'weekly-amalay': 'Semanal',
-                  'reservas-pendientes': 'Reservas',
-                  'wansoft-staleness': 'Sync',
-                  'config-validator': 'Config',
-                  'intraday-sales': 'Intraday',
-                  'speed_of_service': 'Velocidad',
-                  'inventory_auto_order': 'Auto-orden',
-                  'pos_daily_aggregator': 'Agregador',
-                  'proactive-alerts': 'Alertas',
-                  'climate-events': 'Clima',
-                  'hermes': 'Hermes',
-                  'table-time': 'Mesas',
-                  'menu-gap': 'Menu Gap',
-                }
-                const name = agentNames[run.agent_id] || run.agent_id
-                const isError = run.status === 'error'
-                const mins = Math.floor((Date.now() - new Date(run.created_at).getTime()) / 60000)
-                const timeAgo = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
-                return (
-                  <div key={run.agent_id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-medium text-[var(--text-1)]">{name}</p>
-                        <span className="text-[10px] text-[var(--text-4)]">{timeAgo}</span>
+            (() => {
+              const agentNames: Record<string, string> = {
+                'anomaly-detector': 'Anomalias',
+                'close-predictor': 'Predicción',
+                'upselling': 'Upselling',
+                'menu-engineering': 'Menu Eng.',
+                'staffing-optimizer': 'Staffing',
+                'antifraud-agent': 'Anti-fraude',
+                'kitchen-quality': 'Cocina',
+                'tips-analyzer': 'Propinas',
+                'supplier-monitor': 'Proveedores',
+                'waste-detector': 'Merma',
+                'daily-briefing': 'Briefing',
+                'weekly-amalay': 'Semanal',
+                'reservas-pendientes': 'Reservas',
+                'wansoft-staleness': 'Sync',
+                'config-validator': 'Config',
+                'intraday-sales': 'Intraday',
+                'speed_of_service': 'Velocidad',
+                'inventory_auto_order': 'Auto-orden',
+                'pos_daily_aggregator': 'Agregador',
+                'proactive-alerts': 'Alertas',
+                'climate-events': 'Clima',
+                'hermes': 'Hermes',
+                'table-time': 'Mesas',
+                'menu-gap': 'Menu Gap',
+              }
+              return (
+                <>
+                {/* Mobile: horizontal scrollable chips */}
+                <div className="flex sm:hidden gap-1.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                  {agentRuns.slice(0, 12).map(run => {
+                    const name = agentNames[run.agent_id] || run.agent_id
+                    const isError = run.status === 'error'
+                    return (
+                      <div key={run.agent_id} className={`flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1.5 ${isError ? 'bg-red-500/10 border border-red-500/20' : 'bg-emerald-500/10 border border-emerald-500/20'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
+                        <span className="text-[10px] font-semibold text-[var(--text-2)] whitespace-nowrap">{name}</span>
                       </div>
-                      <p className="text-[10px] text-[var(--text-3)] truncate">{run.output_summary}</p>
-                    </div>
-                  </div>
-                )
-              })}
-              {agentRuns.length > 8 && (
-                <a href="/agentes" className="block text-center text-xs text-[var(--accent)] hover:text-[var(--accent-bright)] py-1">
-                  Ver los {agentRuns.length} agentes →
-                </a>
-              )}
-            </div>
+                    )
+                  })}
+                </div>
+                {/* Desktop: vertical list */}
+                <div className="hidden sm:block space-y-1.5">
+                  {agentRuns.slice(0, 8).map(run => {
+                    const name = agentNames[run.agent_id] || run.agent_id
+                    const isError = run.status === 'error'
+                    const mins = Math.floor((Date.now() - new Date(run.created_at).getTime()) / 60000)
+                    const timeAgo = mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h` : `${Math.floor(mins / 1440)}d`
+                    return (
+                      <div key={run.agent_id} className="flex items-center gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isError ? 'bg-red-500' : 'bg-emerald-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-medium text-[var(--text-1)]">{name}</p>
+                            <span className="text-[10px] text-[var(--text-4)]">{timeAgo}</span>
+                          </div>
+                          <p className="text-[10px] text-[var(--text-3)] truncate">{run.output_summary}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {agentRuns.length > 8 && (
+                  <a href="/agentes" className="block text-center text-xs text-[var(--accent)] hover:text-[var(--accent-bright)] py-1 mt-2">
+                    Ver los {agentRuns.length} agentes →
+                  </a>
+                )}
+                </>
+              )
+            })()
           )}
         </div>
       )}
 
       {/* Week comparison banner — like Wansoft */}
       {show('week_comparison') && vsLastWeek !== null && vsLastWeekAmount !== null && sameDayLastWeek && (
-        <div className={`mb-6 rounded-xl border p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/10 border-red-500/30'}`}>
+        <div className={`mb-4 sm:mb-6 rounded-xl border p-3 sm:p-4 ${vsLastWeek >= 0 ? 'bg-[var(--accent-soft)] border-[var(--accent-line)]' : 'bg-red-500/10 border-red-500/30'}`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {vsLastWeek >= 0
-                ? <TrendingUp size={20} className="text-[var(--accent-bright)]" />
-                : <TrendingDown size={20} className="text-red-600" />}
+                ? <TrendingUp size={18} className="text-[var(--accent-bright)] shrink-0" />
+                : <TrendingDown size={18} className="text-red-600 shrink-0" />}
               <div>
-                <p className={`font-bold text-lg ${vsLastWeek >= 0 ? 'text-[var(--accent-bright)]' : 'text-red-400'}`}>
-                  {formatPercent(vsLastWeek)} vs mismo día semana pasada
+                <p className={`font-bold text-sm sm:text-lg ${vsLastWeek >= 0 ? 'text-[var(--accent-bright)]' : 'text-red-400'}`}>
+                  {formatPercent(vsLastWeek)} vs semana pasada
                 </p>
-                <p className="text-sm text-[var(--text-2)]">
-                  {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)} · {(() => {
+                <p className="text-xs sm:text-sm text-[var(--text-2)]">
+                  {vsLastWeekAmount >= 0 ? '+' : ''}{formatCurrency(vsLastWeekAmount)}
+                  <span className="hidden sm:inline"> · {(() => {
                     const d = new Date(sameDayLastWeek.fecha + 'T12:00:00')
                     return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-                  })()}
+                  })()}</span>
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-[var(--text-2)]">Semana pasada</p>
-              <p className="font-semibold text-[var(--text-1)]">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
+              <p className="text-[10px] sm:text-sm text-[var(--text-2)]">7d atrás</p>
+              <p className="text-sm sm:text-base font-semibold text-[var(--text-1)]">{formatCurrency(sameDayLastWeek.ventas_dia)}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Main chart — last 30 days, highlights selected day */}
-      {show('revenue_chart') && <div className="mb-6">
+      {show('revenue_chart') && <div className="mb-4 sm:mb-6">
         <RevenueChart
           data={recentData.slice(-30).map((d) => ({
             fecha: d.fecha,
@@ -793,7 +824,7 @@ export default function DashboardPage() {
       </div>}
 
       {/* Two columns: Top meseros + Categories */}
-      {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {(show('top_meseros') || show('categories')) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Top meseros — R365 style with progress bars */}
         {show('top_meseros') && <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
@@ -984,27 +1015,27 @@ export default function DashboardPage() {
       )}
 
       {/* Quick actions row */}
-      {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {show('quick_actions') && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         {[
-          { href: '/ventas', label: 'Ver ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { href: '/meseros', label: 'Ver meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-500/10' },
-          { href: '/cortes', label: 'Ver cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-          { href: '/reportes', label: 'Generar reporte', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+          { href: '/ventas', label: 'Ventas', desc: 'Detalle diario', icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10', gradient: 'from-blue-500/15' },
+          { href: '/meseros', label: 'Meseros', desc: 'Rankings y KPIs', icon: Award, color: 'text-[var(--accent-bright)]', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500/15' },
+          { href: '/cortes', label: 'Cortes', desc: 'Cierres de caja', icon: ClipboardList, color: 'text-amber-400', bg: 'bg-amber-500/10', gradient: 'from-amber-500/15' },
+          { href: '/reportes', label: 'Reportes', desc: 'Exportar datos', icon: FileBarChart, color: 'text-purple-400', bg: 'bg-purple-500/10', gradient: 'from-purple-500/15' },
         ].map(action => {
           const ActionIcon = action.icon
           return (
             <Link
               key={action.href}
               href={action.href}
-              className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 hover:shadow-md hover:border-[var(--line)] transition-all group"
+              className={`bg-gradient-to-br ${action.gradient} to-[var(--surface)] sm:from-[var(--surface)] sm:to-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-3 sm:p-4 hover:shadow-md transition-all group`}
             >
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${action.bg}`}>
-                <ActionIcon size={18} className={action.color} />
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center mb-2 sm:mb-3 ${action.bg}`}>
+                <ActionIcon size={16} className={action.color} />
               </div>
-              <p className="text-sm font-semibold text-[var(--text-1)] mb-0.5">{action.label}</p>
+              <p className="text-xs sm:text-sm font-bold text-[var(--text-1)] mb-0.5">{action.label}</p>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-[var(--text-3)]">{action.desc}</p>
-                <ArrowRight size={14} className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors" />
+                <p className="text-[10px] sm:text-xs text-[var(--text-3)]">{action.desc}</p>
+                <ArrowRight size={12} className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors" />
               </div>
             </Link>
           )

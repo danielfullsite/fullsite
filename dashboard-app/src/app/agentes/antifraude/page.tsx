@@ -166,8 +166,10 @@ export default function AntiFraudePage() {
       )}
 
       {!data && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
-          Sin datos de anti-fraude. El agente corre automaticamente.
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mx-auto mb-4"><Shield size={24} className="text-red-500" /></div>
+          <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Sin datos de anti-fraude</h3>
+          <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">El agente de anti-fraude se actualiza automáticamente. Los datos aparecerán aquí cuando estén disponibles.</p>
         </div>
       )}
     </>

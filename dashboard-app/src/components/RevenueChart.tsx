@@ -34,22 +34,22 @@ export default function RevenueChart({ data, title, highlightDate }: RevenueChar
   const total = chartData.reduce((s, d) => s + d.Ventas, 0)
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--accent-line)] p-4 sm:p-6" style={{ background: 'var(--bento-card)', boxShadow: 'var(--shadow-mid)' }}>
       <div aria-hidden className="absolute inset-x-0 top-0 h-px pointer-events-none" style={{ background: 'var(--bento-bevel)' }} />
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--text-1)]">{title || 'Ventas'}</h3>
-          <p className="text-2xl font-bold text-[var(--text-1)] mt-1">{formatCurrency(total)}</p>
-          <p className="text-xs text-[var(--text-3)] mt-0.5">{chartData.length} dias</p>
+          <h3 className="text-xs sm:text-sm font-semibold text-[var(--text-1)]">{title || 'Ventas'}</h3>
+          <p className="text-xl sm:text-2xl font-black text-[var(--text-1)] mt-0.5 sm:mt-1">{formatCurrency(total)}</p>
+          <p className="text-[10px] sm:text-xs text-[var(--text-3)] mt-0.5">{chartData.length} días</p>
         </div>
-        <div className="flex gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-[var(--text-2)]">Max: {formatCurrency(maxVal)}</span>
+        <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 text-[10px] sm:text-xs">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-[var(--text-2)]">{formatCurrency(maxVal)}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-            <span className="text-[var(--text-2)]">Min: {formatCurrency(minVal)}</span>
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-400" />
+            <span className="text-[var(--text-2)]">{formatCurrency(minVal)}</span>
           </div>
         </div>
       </div>

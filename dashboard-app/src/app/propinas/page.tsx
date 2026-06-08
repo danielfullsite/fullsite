@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { HandCoins, Users, TrendingUp, CreditCard } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import EmptyState from '@/components/EmptyState'
 import { getRecentDays, aggregatePayments, getLatestDeep, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
@@ -113,11 +114,13 @@ export default function PropinasPage() {
           </div>
         </div>
       ) : totalPropinas === 0 && !isRealTipsData ? (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-12 text-center">
-          <HandCoins size={32} className="text-[var(--text-3)] mx-auto mb-4" />
-          <p className="text-[var(--text-2)] text-sm font-medium mb-1">Sin datos de propinas</p>
-          <p className="text-[var(--text-3)] text-xs">El scraper de propinas esta en proceso de calibracion. Los datos apareceran cuando Wansoft los reporte correctamente.</p>
-        </div>
+        <EmptyState
+          icon={HandCoins}
+          title="Sin datos de propinas"
+          description="Los datos de propinas aparecerán cuando Wansoft los reporte correctamente. El scraper se actualiza cada noche."
+          iconColor="text-blue-500"
+          iconBg="bg-blue-500/10"
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">

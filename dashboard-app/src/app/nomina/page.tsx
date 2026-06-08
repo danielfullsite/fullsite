@@ -148,7 +148,11 @@ export default function NominaPage() {
 
         {tab === 'propinas' && (
           tips.length === 0 ? (
-            <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de propinas. Se actualizan diario.</div>
+            <div className="p-8 text-center">
+              <DollarSign size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+              <p className="text-sm font-bold text-[var(--text-1)] mb-1">Sin datos de propinas</p>
+              <p className="text-xs text-[var(--text-3)]">Se actualizan diario desde Wansoft.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -175,7 +179,11 @@ export default function NominaPage() {
 
         {tab === 'asistencia' && (
           labor.length === 0 ? (
-            <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de asistencia. Se actualizan diario.</div>
+            <div className="p-8 text-center">
+              <Clock size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+              <p className="text-sm font-bold text-[var(--text-1)] mb-1">Sin datos de asistencia</p>
+              <p className="text-xs text-[var(--text-3)]">Se actualizan diario desde Wansoft.</p>
+            </div>
           ) : (
             <div>
               {shifts.length > 0 && (

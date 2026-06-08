@@ -93,7 +93,11 @@ export default function StaffingPage() {
           </h3>
         </div>
         {porDia.length === 0 ? (
-          <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin datos de staffing. El agente corre automaticamente.</div>
+          <div className="p-8 text-center">
+            <Users size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">Sin datos de staffing</p>
+            <p className="text-xs text-[var(--text-3)]">El agente corre automáticamente y actualiza los datos.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -171,8 +175,10 @@ export default function StaffingPage() {
       )}
 
       {!data && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center text-[var(--text-3)] text-sm">
-          Sin datos de staffing. El agente corre automaticamente.
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4"><Users size={24} className="text-amber-500" /></div>
+          <h3 className="text-base font-bold text-[var(--text-1)] mb-2">Sin datos de staffing</h3>
+          <p className="text-sm text-[var(--text-3)] max-w-md mx-auto">El agente de staffing se actualiza automáticamente. Los datos aparecerán aquí cuando estén disponibles.</p>
         </div>
       )}
     </>

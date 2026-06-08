@@ -136,13 +136,22 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
-      {/* Logo */}
-      <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]">
-        <Link href="/" className="flex items-center logo-hover">
-          <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
-            fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
-          </span>
-        </Link>
+      {/* Logo — with safe-area padding on mobile for iPhone notch */}
+      <div className="px-5 py-5 lg:border-b lg:border-[var(--line-soft)]" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 1.25rem))' }}>
+        <div className="flex items-center justify-between">
+          <Link href="/" className="flex items-center logo-hover" onClick={() => setMobileOpen(false)}>
+            <span className="text-[var(--text-1)] font-black text-xl tracking-tight">
+              fullsite<span className="inline-block w-2 h-2 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
+            </span>
+          </Link>
+          {/* Close button inside sidebar on mobile */}
+          <button
+            className="lg:hidden p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Navigation sections */}
@@ -179,8 +188,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-4 border-t border-[var(--line-soft)]">
+      {/* Footer — with safe-area padding on mobile for home indicator */}
+      <div className="px-4 py-4 border-t border-[var(--line-soft)]" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}>
         {/* Date + Theme toggle */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-xs text-[var(--text-3)]">
@@ -236,14 +245,16 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger / close */}
-      <button
-        className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
-        style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
+      {/* Mobile hamburger — only shows when sidebar is closed */}
+      {!mobileOpen && (
+        <button
+          className="fixed left-4 z-50 lg:hidden p-2 rounded-lg shadow-md border border-[var(--line)]"
+          style={{ background: 'var(--surface)', color: 'var(--text-1)', top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+          onClick={() => setMobileOpen(true)}
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {/* Mobile overlay */}
       {mobileOpen && (

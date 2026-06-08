@@ -129,7 +129,11 @@ export default function InventarioPage() {
             </div>
           </div>
           {filtered.length === 0 ? (
-            <div className="p-8 text-center text-[var(--text-3)] text-sm">{inventory.length === 0 ? 'Sin datos. El scraper corre diario a las 11pm.' : 'Sin resultados'}</div>
+            <div className="p-8 text-center">
+              <Package size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+              <p className="text-sm font-bold text-[var(--text-1)] mb-1">{inventory.length === 0 ? 'Sin datos de inventario' : 'Sin resultados'}</p>
+              <p className="text-xs text-[var(--text-3)]">{inventory.length === 0 ? 'El scraper corre diario a las 11pm.' : 'Intenta con otro término de búsqueda.'}</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
