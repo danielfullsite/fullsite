@@ -52,6 +52,18 @@ function checkRateLimit(userId: string): boolean {
   return true
 }
 
+// Parse JSONB that might be double-encoded (string of string)
+function parseJsonb(val: unknown): unknown[] {
+  if (Array.isArray(val)) return val
+  if (typeof val !== 'string') return []
+  try {
+    let parsed = JSON.parse(val)
+    // Double-encoded: JSON.parse returns another string
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed)
+    return Array.isArray(parsed) ? parsed : []
+  } catch { return [] }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting by IP (auth check removed — user is already logged into dashboard)
@@ -143,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Waiter × platillo data — ONLY load when question is about waiters/rankings
     let waiterContext = ''
-    const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió'].some(kw => q.includes(kw))
+    const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió', 'omar', 'brayan', 'julio', 'daniela', 'mauricio', 'oscar', 'alexis', 'hector', 'crack', 'manco', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos'].some(kw => q.includes(kw))
 
     let wcParams = 'select=fecha,data&order=fecha.desc'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,27 +355,27 @@ export async function POST(request: NextRequest) {
           const descuentos = Number(d.descuentos) || 0
           if (descuentos > 0) line += `, Descuentos $${descuentos}`
 
-          const meseros = Array.isArray(d.meseros) ? d.meseros : (typeof d.meseros === 'string' ? JSON.parse(d.meseros) : [])
+          const meseros = parseJsonb(d.meseros) as { nombre: string; total: number }[]
           if (meseros.length > 0) {
-            const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
+            const topM = meseros.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 10)
               .map((m: { nombre: string; total: number }) => `${m.nombre}:$${m.total}`).join(', ')
             line += ` | Meseros: ${topM}`
           }
 
-          const grupos = Array.isArray(d.ventas_por_grupo) ? d.ventas_por_grupo : (typeof d.ventas_por_grupo === 'string' ? JSON.parse(d.ventas_por_grupo) : [])
+          const grupos = parseJsonb(d.ventas_por_grupo) as { nombre: string; total: number }[]
           if (grupos.length > 0) {
             const topG = grupos.sort((a: { total: number }, b: { total: number }) => b.total - a.total).slice(0, 5)
               .map((g: { nombre: string; total: number }) => `${g.nombre}:$${g.total}`).join(', ')
             line += ` | Grupos: ${topG}`
           }
 
-          const platillos = Array.isArray(d.platillos_top) ? d.platillos_top : (typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : [])
+          const platillos = parseJsonb(d.platillos_top) as { nombre: string; cantidad: number; total: number }[]
           if (platillos.length > 0) {
-            const topP = platillos.slice(0, 5).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad}pzas/$${Math.round(p.total)}`).join(', ')
+            const topP = platillos.slice(0, 15).map((p: { nombre: string; cantidad: number; total: number }) => `${p.nombre}:${p.cantidad || 0}pzas/$${Math.round(p.total || 0)}`).join(', ')
             line += ` | Platillos: ${topP}`
           }
 
-          const pagos = Array.isArray(d.pago_métodos) ? d.pago_métodos : (typeof d.pago_métodos === 'string' ? JSON.parse(d.pago_métodos) : [])
+          const pagos = parseJsonb(d.pago_metodos || d['pago_métodos']) as { nombre: string; total: number }[]
           if (pagos.length > 0) {
             const pagoStr = pagos.map((p: { nombre: string; total: number }) => {
               const mxn = (p.total || 0) < 100 ? Math.round(((p.total || 0) / 100) * ventasDia) : Math.round(p.total || 0)
@@ -501,10 +513,13 @@ PERSONALIDAD:
 - Nunca digas "estimado usuario" ni "me permito informarle". Habla como le hablarías a un socio.
 
 REGLAS CRÍTICAS:
-1. SIEMPRE da números EXACTOS. Si los datos dicen "Omar Aguilera:$12533" → responde "$12,533".
-2. NUNCA digas "no tengo ese dato" — BUSCA en Meseros, Grupos, Platillos, Pagos, Resúmenes.
+1. SIEMPRE da números EXACTOS de los datos que tienes. Si los datos dicen "Omar Aguilera:$12533" → responde "$12,533".
+2. BUSCA A FONDO antes de decir que no tienes un dato. Revisa: Meseros, Grupos, Platillos, Pagos, Resúmenes, Rankings, Desglose por día. Los datos están ahí — encuéntralos.
 3. USA LOS RESÚMENES que están al inicio (MES ACTUAL, SEMANA, etc.) — ya están calculados.
-4. Si no encuentras un dato específico, da el más cercano: "del último día disponible..."
+4. Si no encuentras un dato para la fecha exacta, da el del último día disponible y dilo: "del lunes 8..."
+5. NUNCA inventes números que no estén en los datos. Si REALMENTE no existe después de buscar en todo el contexto, di qué sí tienes y ofrece eso.
+6. PROHIBIDO usar: "estimado", "aproximadamente", "típicamente", "generalmente", "en promedio del sector". Solo datos reales del restaurante.
+7. Todos los montos son en PESOS MEXICANOS. NUNCA digas dólares ni USD.
 
 EJEMPLOS DE RESPUESTAS CORRECTAS:
 Pregunta: "¿Quién fue el mejor mesero ayer?"
@@ -531,11 +546,11 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "qué hago ahorita" → staff brief de 5 min con acciones concretas + $ proyectado
 - "cuánto vende Fany" → buscar si existe en datos, explicar su rol si no es mesera
 - "descuentos" / "cortesías" → buscar en datos diarios campo "Descuentos $X"
-- "pronóstico" / "mañana" → proyectar basado en historial del mismo DOW + tendencia
-- "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos + margen
-- "por qué bajaron en abril/marzo/etc" → considerar factores externos: Semana Santa (abril), vacaciones (julio-agosto), Buen Fin (noviembre), temporada de calor (mayo-sep en MTY), competencia nueva, cierres viales. Si no hay dato exacto, menciona los factores más probables del sector.
-- "tarjeta" / "efectivo" / "método de pago" → buscar "Pagos:" en datos diarios. Si no hay datos de pagos para esa fecha, ESTIMA: "En restaurantes como AMALAY típicamente 55-65% tarjeta, 30-35% efectivo, 5-10% transferencia/apps." NO digas "no tengo".
-- "food cost" / "costo" / "margen" → estimar: café ~15% food cost, chilaquiles ~25%, postres ~30%. Si no hay dato exacto, dar estimado del sector.
+- "pronóstico" / "mañana" → usar promedio real del mismo día de la semana de las últimas 4 semanas. Decir "basado en los últimos 4 [día], el promedio es $X". NO inventar.
+- "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos de los datos reales
+- "por qué bajaron en abril/marzo/etc" → comparar datos reales de ese mes vs meses anteriores. Solo menciona lo que los datos muestran.
+- "tarjeta" / "efectivo" / "método de pago" → buscar "Pagos:" en datos diarios. Si no hay datos de pagos para esa fecha, di "no tengo desglose de pagos para esa fecha".
+- "food cost" / "costo" / "margen" → buscar en los datos disponibles. Si no hay food cost en el sistema, di "no tengo datos de food cost en el sistema todavía".
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
 - "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
