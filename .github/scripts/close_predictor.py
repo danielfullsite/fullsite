@@ -65,7 +65,17 @@ def sb_get(table, params):
 
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis():
-    """Fetch today's real-time data from wansoft_kpis."""
+    """Fetch today's data from wansoft_daily (preferred) or wansoft_kpis fallback."""
+    now_mx = datetime.now(MX_TZ)
+    today_str = now_mx.strftime("%Y-%m-%d")
+    rows = sb_get("wansoft_daily", {
+        "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,ventas_por_grupo,meseros,platillos_top",
+        "fecha": f"eq.{today_str}",
+        "limit": "1",
+    })
+    if rows:
+        return rows[0]
+    # Fallback to wansoft_kpis if today's daily not yet synced
     rows = sb_get("wansoft_kpis", {"select": "*", "limit": "1"})
     return rows[0] if rows else None
 
