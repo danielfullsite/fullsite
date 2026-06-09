@@ -225,14 +225,16 @@ export default function DashboardPage() {
     if (period === 'dia') {
       const day = viewDay
       const ventas = day?.ventas_dia || 0
-      // TP por persona (como Wansoft app muestra "Promedio por persona")
       const personas = day?.personas_restaurant || 0
-      const tp = personas > 0 ? Math.round(ventas / personas) : (day?.ticket_promedio_restaurant || 0)
       const tickets = day?.tickets_count || 0
+      // TP por persona (como Wansoft "Promedio por persona")
+      const tp = personas > 0 ? Math.round(ventas / personas) : (day?.ticket_promedio_restaurant || 0)
+      // TP por orden/mesa (como Wansoft "Promedio por orden")
+      const tpOrden = tickets > 0 ? Math.round(ventas / tickets) : (day?.ticket_promedio_restaurant || 0)
       const propinas = day?.propinas_total || 0
       const descuentos = day?.descuentos || 0
       const brutas = day?.ventas_brutas || 0
-      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas: sameDOWAvg.ventas, prevTickets: sameDOWAvg.tickets, prevPersonas: sameDOWAvg.personas, prevTp: sameDOWAvg.tp, label: `vs prom. ${todayDOWName}` }
+      return { ventas, tickets, personas, tp, tpOrden, propinas, descuentos, brutas, prevVentas: sameDOWAvg.ventas, prevTickets: sameDOWAvg.tickets, prevPersonas: sameDOWAvg.personas, prevTp: sameDOWAvg.tp, label: `vs prom. ${todayDOWName}` }
     }
     if (period === 'semana') {
       const now = new Date()
@@ -249,6 +251,7 @@ export default function DashboardPage() {
       const tickets = sum(thisWeek, 'tickets_count')
       const personas = sum(thisWeek, 'personas_restaurant')
       const tp = personas > 0 ? ventas / personas : 0
+      const tpOrden = tickets > 0 ? ventas / tickets : 0
       const propinas = sum(thisWeek, 'propinas_total')
       const descuentos = sum(thisWeek, 'descuentos')
       const brutas = sum(thisWeek, 'ventas_brutas')
@@ -256,7 +259,7 @@ export default function DashboardPage() {
       const prevTickets = sum(prevWeek, 'tickets_count')
       const prevPersonas = sum(prevWeek, 'personas_restaurant')
       const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
-      return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs semana anterior' }
+      return { ventas, tickets, personas, tp, tpOrden, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs semana anterior' }
     }
     // mes — use monthOffset (avoid toISOString timezone issues)
     const nowM = new Date()
@@ -271,6 +274,7 @@ export default function DashboardPage() {
     const tickets = sum(thisMonthData, 'tickets_count')
     const personas = sum(thisMonthData, 'personas_restaurant')
     const tp = personas > 0 ? ventas / personas : 0
+    const tpOrden = tickets > 0 ? ventas / tickets : 0
     const propinas = sum(thisMonthData, 'propinas_total')
     const descuentos = sum(thisMonthData, 'descuentos')
     const brutas = sum(thisMonthData, 'ventas_brutas')
@@ -278,7 +282,7 @@ export default function DashboardPage() {
     const prevTickets = sum(lastMonthData, 'tickets_count')
     const prevPersonas = sum(lastMonthData, 'personas_restaurant')
     const prevTp = prevPersonas > 0 ? prevVentas / prevPersonas : 0
-    return { ventas, tickets, personas, tp, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs mes anterior' }
+    return { ventas, tickets, personas, tp, tpOrden, propinas, descuentos, brutas, prevVentas, prevTickets, prevPersonas, prevTp, label: 'vs mes anterior' }
   })()
 
   const ventasChange = periodData.prevVentas > 0 ? percentChange(periodData.ventas, periodData.prevVentas) : 0
@@ -616,7 +620,7 @@ export default function DashboardPage() {
               weekChange={wkPersonas}
             />
             <KPICard
-              label="Ticket promedio"
+              label="Prom. por persona"
               value={formatCurrency(periodData.tp)}
               delta={`${formatPercent(ticketPromChange)} ${periodData.label}`}
               deltaType={ticketPromChange >= 0 ? 'up' : 'down'}
@@ -624,6 +628,7 @@ export default function DashboardPage() {
               accentClass="kpi-accent-purple"
               sparklineData={sparkTP}
               weekChange={wkTP}
+              subtitle={`Por orden: ${formatCurrency(periodData.tpOrden || 0)}`}
             />
           </div>
         )
