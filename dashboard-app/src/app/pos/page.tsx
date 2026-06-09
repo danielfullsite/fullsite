@@ -371,7 +371,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 interface DiscountModalProps {
   subtotal: number
   personas: number
-  onApply: (discount: number) => void
+  onApply: (discount: number, reason?: string) => void
   onCancel: () => void
 }
 
@@ -383,6 +383,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
   const [cortesiaPersonas, setCortesiaPersonas] = useState(1)
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
+  const [reason, setReason] = useState('')
 
   const maxCortesia = CORTESIA_POR_PERSONA * cortesiaPersonas
   const discountAmount = mode === 'percent'
@@ -475,6 +476,17 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
           </p>
         )}
 
+        {/* Reason for discount/cortesia */}
+        {discountAmount > 0 && (
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={mode === 'cortesia' ? 'Motivo de cortesía (ej. cliente frecuente)' : 'Motivo del descuento (opcional)'}
+            className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 mb-3"
+          />
+        )}
+
         {/* Manager PIN required */}
         {discountAmount > 0 && (
           <div className="mb-3">
@@ -501,7 +513,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
               if (discountAmount <= 0) return
               const manager = MANAGER_PINS[pin]
               if (!manager) { setPinError(true); return }
-              onApply(discountAmount)
+              onApply(discountAmount, reason || (mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p` : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`))
             }}
             disabled={discountAmount <= 0 || pin.length < 4}
             className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
@@ -1469,10 +1481,10 @@ function POSContent() {
     setSplitParejoN(0)
   }
 
-  const handleApplyDiscount = (amount: number) => {
+  const handleApplyDiscount = (amount: number, reason?: string) => {
     logAudit({
       order_id: orderId, action: 'discount_applied', actor: mesero, mesa,
-      details: { amount, subtotal },
+      details: { amount, subtotal, reason: reason || 'Sin motivo' },
     })
     setDiscount(amount)
     setShowDiscount(false)
