@@ -2582,11 +2582,68 @@ function POSContent() {
                 )
               })()}
               <button
-                onClick={() => handlePayment('Tarjeta de credito')}
-                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                onClick={async () => {
+                  // Try MP Point Smart first
+                  const mpToken = localStorage.getItem('mp_access_token')
+                  const mpDevice = localStorage.getItem('mp_device_id')
+                  if (mpToken && mpDevice) {
+                    showToast('Enviando cobro a terminal...')
+                    setSaving(true)
+                    try {
+                      const res = await fetch('/api/mp-point', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'payment',
+                          accessToken: mpToken,
+                          deviceId: mpDevice,
+                          amount: payTotal + propina,
+                          orderId: orderId,
+                        }),
+                      })
+                      const result = await res.json()
+                      if (result.success && result.data?.id) {
+                        // Poll for payment completion
+                        const intentId = result.data.id
+                        let attempts = 0
+                        const poll = setInterval(async () => {
+                          attempts++
+                          try {
+                            const statusRes = await fetch('/api/mp-point', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'status', accessToken: mpToken, paymentIntentId: intentId }),
+                            })
+                            const statusData = await statusRes.json()
+                            if (statusData.state === 'FINISHED') {
+                              clearInterval(poll)
+                              handlePayment('Tarjeta de credito')
+                            } else if (statusData.state === 'CANCELED' || statusData.state === 'ERROR' || attempts > 60) {
+                              clearInterval(poll)
+                              setSaving(false)
+                              showToast(statusData.state === 'CANCELED' ? 'Pago cancelado' : 'Error en terminal')
+                            }
+                          } catch { /* keep polling */ }
+                        }, 3000)
+                      } else {
+                        // MP failed, fall back to manual
+                        setSaving(false)
+                        handlePayment('Tarjeta de credito')
+                      }
+                    } catch {
+                      setSaving(false)
+                      handlePayment('Tarjeta de credito')
+                    }
+                  } else {
+                    // No MP terminal configured — manual
+                    handlePayment('Tarjeta de credito')
+                  }
+                }}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
               >
                 <CreditCard size={24} />
-                Tarjeta
+                {saving ? 'Esperando terminal...' : 'Tarjeta'}
               </button>
               <button
                 onClick={() => handlePayment('Transferencia electronica')}
