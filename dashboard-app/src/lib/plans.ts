@@ -110,7 +110,7 @@ const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
   },
 }
 
-/** Get plan definition by ID. Returns fullsite_pos if unknown. */
+/** Get plan definition by ID. Returns fullsite_completo if unknown. */
 export function getPlan(planId: string | undefined | null): PlanDefinition {
   if (planId && planId in PLAN_DEFINITIONS) {
     return PLAN_DEFINITIONS[planId as PlanId]
