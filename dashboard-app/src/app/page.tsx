@@ -212,7 +212,8 @@ export default function DashboardPage() {
       ventas: avg('ventas_dia'),
       tickets: avg('tickets_count'),
       personas: avg('personas_restaurant'),
-      tp: avg('ticket_promedio_restaurant'),
+      // TP por persona para comparar igual que el dato del dia
+      tp: avg('personas_restaurant') > 0 ? avg('ventas_dia') / avg('personas_restaurant') : avg('ticket_promedio_restaurant'),
     }
   })()
 
@@ -224,9 +225,10 @@ export default function DashboardPage() {
     if (period === 'dia') {
       const day = viewDay
       const ventas = day?.ventas_dia || 0
-      const tp = day?.ticket_promedio_restaurant || 0
-      const tickets = day?.tickets_count || 0
+      // TP por persona (como Wansoft app muestra "Promedio por persona")
       const personas = day?.personas_restaurant || 0
+      const tp = personas > 0 ? Math.round(ventas / personas) : (day?.ticket_promedio_restaurant || 0)
+      const tickets = day?.tickets_count || 0
       const propinas = day?.propinas_total || 0
       const descuentos = day?.descuentos || 0
       const brutas = day?.ventas_brutas || 0
