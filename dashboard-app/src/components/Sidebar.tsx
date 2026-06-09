@@ -72,6 +72,7 @@ const navSections = [
       { href: '/nomina', label: 'Nómina', icon: UserCheck },
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
       { href: '/facturas', label: 'Facturas Proveedores', icon: FileText },
+      { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
     ],
   },
   {
