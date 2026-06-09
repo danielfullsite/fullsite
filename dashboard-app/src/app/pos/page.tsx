@@ -381,6 +381,8 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
   const [mode, setMode] = useState<'percent' | 'fixed' | 'cortesia'>('percent')
   const [value, setValue] = useState('')
   const [cortesiaPersonas, setCortesiaPersonas] = useState(1)
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState(false)
 
   const maxCortesia = CORTESIA_POR_PERSONA * cortesiaPersonas
   const discountAmount = mode === 'percent'
@@ -468,9 +470,26 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
         )}
 
         {discountAmount > 0 && mode !== 'cortesia' && (
-          <p className="text-center text-[var(--text-3)] text-sm mb-4">
+          <p className="text-center text-[var(--text-3)] text-sm mb-3">
             Descuento: <span className="text-red-400 font-semibold">-{formatMXN(discountAmount)}</span>
           </p>
+        )}
+
+        {/* Manager PIN required */}
+        {discountAmount > 0 && (
+          <div className="mb-3">
+            <p className="text-xs text-[var(--text-3)] text-center mb-2">PIN de gerente para autorizar</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError(false) }}
+              placeholder="••••"
+              className={`w-full bg-[var(--line)] border ${pinError ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg text-center tracking-[0.3em] focus:outline-none focus:border-emerald-500 min-h-[48px]`}
+            />
+            {pinError && <p className="text-red-400 text-xs text-center mt-1">PIN incorrecto</p>}
+          </div>
         )}
 
         <div className="flex gap-3">
@@ -478,8 +497,13 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
             Cancelar
           </button>
           <button
-            onClick={() => onApply(discountAmount)}
-            disabled={discountAmount <= 0}
+            onClick={() => {
+              if (discountAmount <= 0) return
+              const manager = MANAGER_PINS[pin]
+              if (!manager) { setPinError(true); return }
+              onApply(discountAmount)
+            }}
+            disabled={discountAmount <= 0 || pin.length < 4}
             className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
           >
             {mode === 'cortesia' ? `Cortesía -${formatMXN(discountAmount)}` : `Aplicar -${formatMXN(discountAmount)}`}
@@ -1772,6 +1796,30 @@ function POSContent() {
                   className="flex-1 min-w-0 bg-[var(--line)]/60 border border-slate-600/50 rounded-md px-2 py-1 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
+              <button
+                onClick={() => { openCashDrawer(); showToast('Cajón abierto') }}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-700/50 hover:bg-slate-700 text-[var(--text-3)] text-xs transition-colors"
+                title="Abrir cajón"
+              >
+                <Banknote size={12} />
+              </button>
+              <button
+                onClick={() => {
+                  const reprintOrder: Order = {
+                    id: generateId(), items: activeItems, mesa: Number(mesa) || 0, mesero,
+                    subtotal: Number(subtotal), descuento: Number(discount), iva: Number(iva), total: Number(total), propina: 0,
+                    metodoPago: 'efectivo', status: 'cerrada',
+                    personas: Number(personas) || 2,
+                    createdAt: new Date(),
+                  }
+                  handlePrintTicket(reprintOrder)
+                }}
+                disabled={orderItems.length === 0}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-700/50 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] text-xs transition-colors"
+                title="Reimprimir ticket"
+              >
+                <Printer size={12} />
+              </button>
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
