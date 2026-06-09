@@ -66,13 +66,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
     }
 
-    if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
-      return Response.json(
-        { response: 'Agrega GROQ_API_KEY para activar el chat.' },
-        { status: 200 }
-      )
-    }
-
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
@@ -627,9 +620,9 @@ ${dailyContext}`
     return Response.json({ response: text })
   } catch (error) {
     console.error('Chat API error:', error)
-    return Response.json(
-      { response: 'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API esten configuradas en .env.local.' },
-      { status: 200 }
-    )
+    const msg = error instanceof Error && error.message.includes('GROQ_API_KEY')
+      ? 'Chat IA no disponible — falta configurar GROQ_API_KEY en el servidor.'
+      : 'Lo siento, hubo un error al procesar tu mensaje. Intenta de nuevo.'
+    return Response.json({ response: msg }, { status: 200 })
   }
 }

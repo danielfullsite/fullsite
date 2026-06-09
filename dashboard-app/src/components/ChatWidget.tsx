@@ -35,6 +35,17 @@ export default function ChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
+  // Close on Escape key
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    if (isOpen) {
+      document.addEventListener('keydown', handleKey)
+      return () => document.removeEventListener('keydown', handleKey)
+    }
+  }, [isOpen])
+
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading) return
 
@@ -108,10 +119,11 @@ export default function ChatWidget() {
           </div>
         </div>
         <button
-          onClick={() => setIsOpen(false)}
-          className="text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[var(--surface)]/10"
+          onClick={(e) => { e.stopPropagation(); setIsOpen(false) }}
+          className="text-white/70 hover:text-white transition-colors p-2.5 -mr-1.5 rounded-lg hover:bg-[var(--surface)]/10 active:bg-[var(--surface)]/20"
+          aria-label="Cerrar chat"
         >
-          <X size={18} />
+          <X size={20} />
         </button>
       </div>
 
