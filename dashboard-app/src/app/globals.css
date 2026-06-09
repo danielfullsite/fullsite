@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* ============ iOS PWA Native Feel ============ */
+/* Standalone mode (installed PWA) */
+@media all and (display-mode: standalone) {
+  /* No rubber-band bounce on iOS */
+  html { overscroll-behavior: none; }
+  /* No text selection on UI elements (buttons, labels) */
+  button, a, label, nav, header { -webkit-user-select: none; user-select: none; }
+  /* No tap highlight */
+  * { -webkit-tap-highlight-color: transparent; }
+  /* Safe area padding for notch */
+  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+}
+
 /* ============ Fullsite Design Tokens ============
  * DARK by default. Accent emerald #10b981.
  * Light mode with [data-theme="light"] on <html>.
