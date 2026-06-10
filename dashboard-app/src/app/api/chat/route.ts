@@ -339,6 +339,51 @@ export async function POST(request: NextRequest) {
     }
     } // end wantsMeseros
 
+    // 2b. Food cost data — load when question mentions cost, margin, insumo, food cost
+    let foodCostContext = ''
+    const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato'].some(kw => q.includes(kw))
+    if (wantsFoodCost) {
+      try {
+        const fcRes = await fetch(
+          `${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`,
+          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+        )
+        if (fcRes.ok) {
+          const fcRows = await fcRes.json()
+          if (fcRows.length > 0) {
+            const fcData = typeof fcRows[0].data === 'string' ? JSON.parse(fcRows[0].data) : fcRows[0].data
+            if (Array.isArray(fcData) && fcData.length > 0) {
+              const fcLines = fcData
+                .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.subtotal_venta || 0) - Number(a.subtotal_venta || 0))
+                .slice(0, 30)
+                .map((item: Record<string, unknown>) => {
+                  const nombre = item.platillo || item.nombre || 'Sin nombre'
+                  const grupo = item.grupo || ''
+                  const qty = Number(item.cantidad || 0)
+                  const ventaTotal = Number(item.subtotal_venta || 0)
+                  const costoReal = Number(item.costo_real || 0)
+                  const costoPct = Number(item.costo_real_pct || 0)
+                  const costoIdealPct = Number(item.costo_ideal_pct || 0)
+                  const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
+                  const costoUnit = qty > 0 ? Math.round(costoReal / qty) : 0
+                  return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}% real, ${costoIdealPct.toFixed(1)}% ideal), PrecioUnit $${precioUnit}, CostoUnit $${costoUnit}`
+                })
+
+              // Calculate overall food cost
+              const totalVentas = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.subtotal_venta || 0), 0)
+              const totalCosto = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.costo_real || 0), 0)
+              const overallPct = totalVentas > 0 ? ((totalCosto / totalVentas) * 100).toFixed(1) : '0'
+
+              foodCostContext = `\n\nDATOS DE FOOD COST (fecha: ${fcRows[0].fecha}, ${fcData.length} platillos):\nFOOD COST GENERAL: ${overallPct}% (Costo total $${Math.round(totalCosto)} / Ventas $${Math.round(totalVentas)})\n\nDETALLE POR PLATILLO (top 30 por venta):\n${fcLines.join('\n')}\n\nINSUMO MÁS CARO = platillo con mayor CostoUnit. INSUMO MÁS COMPRADO = platillo con mayor cantidad.`
+              console.log(`[chat] Food cost loaded: ${fcData.length} items, overall ${overallPct}%`)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[chat] Food cost error:', err)
+      }
+    }
+
     // 3. Build daily context
     let dailyContext = 'No hay datos disponibles.'
     if (recentDays && recentDays.length > 0) {
@@ -550,7 +595,10 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "combo" / "qué le sugiero" → recomendar basado en los platillos más vendidos de los datos reales
 - "por qué bajaron en abril/marzo/etc" → comparar datos reales de ese mes vs meses anteriores. Solo menciona lo que los datos muestran.
 - "tarjeta" / "efectivo" / "método de pago" → buscar "Pagos:" en datos diarios. Si no hay datos de pagos para esa fecha, di "no tengo desglose de pagos para esa fecha".
-- "food cost" / "costo" / "margen" → buscar en los datos disponibles. Si no hay food cost en el sistema, di "no tengo datos de food cost en el sistema todavía".
+- "food cost" / "costo" / "margen" / "insumo" / "ingrediente" → buscar en DATOS DE FOOD COST. Cada platillo tiene: cantidad vendida, venta total, costo real, costo %, precio unitario, costo unitario. Food cost general está al inicio de esa sección.
+- "insumo más comprado" → buscar el platillo con mayor "cantidad" en DATOS DE FOOD COST
+- "insumo más caro" → buscar el platillo con mayor "CostoUnit" en DATOS DE FOOD COST
+- "% food cost" / "costo de comida" → dar el FOOD COST GENERAL que está al inicio de la sección
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
 - "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
@@ -598,6 +646,7 @@ Brecha: Julio vende 2.4x más. Christopher necesita coaching en H&H y postres.
 Si lo hacen = +$5,000-6,000 hoy. Hazlo ahora.
 
 ${waiterContext}
+${foodCostContext}
 
 ${dailyContext}`
 
