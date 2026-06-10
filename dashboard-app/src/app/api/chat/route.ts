@@ -107,9 +107,13 @@ export async function POST(request: NextRequest) {
       wantsReservas ? fetch(`${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.asc&fecha=gte.${new Date().toISOString().split('T')[0]}&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 4: POS orders (conditional)
       wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 5: Recipes + insumos (conditional — for food cost, receta, ingrediente questions)
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 6: Insumos (conditional)
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
 
-    const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
+    const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
 
     // 2. Detect date from question
     const now = new Date()
@@ -352,6 +356,30 @@ export async function POST(request: NextRequest) {
           foodCostContext = `\n\nFOOD COST (${overallPct}% general, $${Math.round(totalCosto)}/$${Math.round(totalVentas)}):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
         }
       } catch { /* */ }
+    }
+
+    // Add recipes from Excel costeo
+    if (wantsFoodCost && Array.isArray(recipesRaw) && recipesRaw.length > 0) {
+      const recLines = recipesRaw
+        .filter((r) => Number(r.costo_total) > 0)
+        .map((r) => {
+          const ings = Array.isArray(r.ingredientes) ? r.ingredientes : (typeof r.ingredientes === 'string' ? JSON.parse(r.ingredientes as string) : [])
+          const topIngs = (ings as Record<string, unknown>[]).filter((i) => Number(i.total) > 0).slice(0, 5)
+            .map((i) => `${i.nombre}:$${Number(i.total).toFixed(1)}`).join(', ')
+          return `${r.nombre}: PV $${r.precio_venta}, Costo $${Number(r.costo_total).toFixed(0)} (${r.pct_costo}%) → ${topIngs}`
+        })
+      if (recLines.length > 0) {
+        foodCostContext += `\n\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos):\n${recLines.join('\n')}`
+      }
+    }
+
+    // Add top insumos
+    if (wantsFoodCost && Array.isArray(insumosRaw) && insumosRaw.length > 0) {
+      const insLines = insumosRaw
+        .sort((a, b) => Number(b.precio_limpio || 0) - Number(a.precio_limpio || 0))
+        .slice(0, 20)
+        .map((i) => `${i.nombre} (${i.categoria}): $${Number(i.precio_limpio).toFixed(0)}/${i.um} | ${i.proveedor} | merma ${i.merma_pct}%`)
+      foodCostContext += `\n\nINSUMOS MÁS CAROS (top 20 por precio limpio):\n${insLines.join('\n')}`
     }
 
     // 2c. Process reservaciones (from parallel fetch)
