@@ -32,6 +32,7 @@ interface FloorZone {
   mesas: ZoneMesa[]
   color: string     // accent color for zone header
   bgColor: string   // background tint
+  colSpan?: number  // width in the 12-col floor grid (default 12 = full row)
 }
 
 // Layout real AMALAY — del plano de mesas físico (foto 2026-06-10). Configurable por cliente via localStorage.
@@ -41,6 +42,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Entrada',
     gridCols: 4,
     gridRows: 2,
+    colSpan: 7,
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/5',
     mesas: [
@@ -56,6 +58,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Lámparas',
     gridCols: 3,
     gridRows: 2,
+    colSpan: 5,
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/5',
     mesas: [
@@ -71,6 +74,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Pasillo',
     gridCols: 1,
     gridRows: 2,
+    colSpan: 2,
     color: 'text-slate-400',
     bgColor: 'bg-slate-500/5',
     mesas: [
@@ -83,6 +87,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Terraza',
     gridCols: 3,
     gridRows: 3,
+    colSpan: 7,
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/5',
     mesas: [
@@ -101,6 +106,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Barra',
     gridCols: 1,
     gridRows: 3,
+    colSpan: 3,
     color: 'text-rose-400',
     bgColor: 'bg-rose-500/5',
     mesas: [
@@ -114,6 +120,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Toldo',
     gridCols: 3,
     gridRows: 2,
+    colSpan: 7,
     color: 'text-cyan-400',
     bgColor: 'bg-cyan-500/5',
     mesas: [
@@ -130,6 +137,7 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Privado',
     gridCols: 2,
     gridRows: 2,
+    colSpan: 5,
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/5',
     mesas: [
@@ -402,8 +410,14 @@ export default function MesasPage() {
   // ─── Planograma View ──────────────────────────────────────────────────────
   const floorZones = floorZonesState
 
+  const COL_SPAN_CLASS: Record<number, string> = {
+    1: 'lg:col-span-1', 2: 'lg:col-span-2', 3: 'lg:col-span-3', 4: 'lg:col-span-4',
+    5: 'lg:col-span-5', 6: 'lg:col-span-6', 7: 'lg:col-span-7', 8: 'lg:col-span-8',
+    9: 'lg:col-span-9', 10: 'lg:col-span-10', 11: 'lg:col-span-11', 12: 'lg:col-span-12',
+  }
+
   const PlanogramaView = () => (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl mx-auto">
       {floorZones.map(zone => {
         const zoneMesas = zone.mesas
           .map(zm => ({ ...zm, mesa: mesaMap.get(zm.number) }))
@@ -416,8 +430,8 @@ export default function MesasPage() {
         if (zoneMesas.length === 0) return null
 
         return (
-          <div key={zone.id} className={`${zone.bgColor} rounded-2xl border border-[var(--line)] p-5`}>
-            <div className="flex items-center gap-2 mb-4">
+          <div key={zone.id} className={`${zone.bgColor} rounded-2xl border border-[var(--line)] p-4 ${COL_SPAN_CLASS[zone.colSpan || 12]}`}>
+            <div className="flex items-center gap-2 mb-3">
               <div className={`w-2 h-2 rounded-full ${zone.color.replace('text-', 'bg-')}`} />
               {editMode ? (
                 <input
@@ -436,10 +450,10 @@ export default function MesasPage() {
               </span>
             </div>
             <div
-              className="grid gap-3"
+              className="grid gap-2.5"
               style={{
                 gridTemplateColumns: `repeat(${zone.gridCols}, 1fr)`,
-                gridTemplateRows: `repeat(${zone.gridRows}, minmax(100px, auto))`,
+                gridTemplateRows: `repeat(${zone.gridRows}, minmax(84px, auto))`,
               }}
             >
               {zoneMesas.map(zm => (
@@ -464,7 +478,7 @@ export default function MesasPage() {
         const unassigned = mesas.filter(m => !assignedNumbers.has(m.number))
         if (unassigned.length === 0) return null
         return (
-          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5">
+          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 lg:col-span-12">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-slate-400" />
               <h3 className="text-sm font-bold text-slate-400">Sin zona asignada</h3>
