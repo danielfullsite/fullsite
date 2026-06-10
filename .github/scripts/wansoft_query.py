@@ -352,7 +352,38 @@ def fetch_all_wansoft_data(session, start, end):
     except Exception:
         pass
 
-    # 16c. Food cost fallback — cascade: wansoft_food_cost → food_cost_real → food_cost_browser
+    # 16c. Food cost fallback — cascade: pos_recipes → wansoft_food_cost → food_cost_real → food_cost_browser
+    if "food_cost" not in data or not data["food_cost"]:
+        # Try pos_recipes first (Excel costeo with real ingredient costs)
+        try:
+            recipes = sb_get("pos_recipes", {
+                "select": "nombre,precio_venta,costo_total,pct_costo",
+                "client_id": f"eq.{CLIENT['id']}",
+                "costo_total": "gt.0",
+                "limit": "120",
+            })
+            if recipes:
+                data["food_cost"] = recipes
+                data["food_cost_source"] = "pos_recipes"
+                log(f"  food_cost: {len(recipes)} recipes from pos_recipes (Excel costeo)")
+        except:
+            pass
+
+    if "food_cost" not in data or not data["food_cost"]:
+        # Try pos_insumos (raw ingredient prices)
+        try:
+            insumos = sb_get("pos_insumos", {
+                "select": "nombre,categoria,proveedor,um,precio_limpio,merma_pct",
+                "client_id": f"eq.{CLIENT['id']}",
+                "order": "precio_limpio.desc",
+                "limit": "50",
+            })
+            if insumos:
+                data["insumos"] = insumos
+                log(f"  insumos: {len(insumos)} from pos_insumos")
+        except:
+            pass
+
     if "food_cost" not in data or not data["food_cost"]:
         for fc_source, fc_table, fc_params in [
             ("wansoft_food_cost", "wansoft_food_cost", {

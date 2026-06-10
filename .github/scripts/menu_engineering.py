@@ -60,7 +60,18 @@ def get_sales_data(days=30):
 
 
 def get_food_cost_data():
-    """Fetch food cost data if available."""
+    """Fetch food cost data — prefer pos_recipes (Excel costeo), fallback to wansoft_food_cost."""
+    try:
+        recipes = sb_get("pos_recipes", {
+            "select": "nombre,precio_venta,costo_total,pct_costo",
+            "client_id": f"eq.{CLIENT['id']}",
+            "costo_total": "gt.0",
+            "limit": "200",
+        })
+        if recipes:
+            return [{"source": "pos_recipes", "data": recipes}]
+    except:
+        pass
     try:
         return sb_get("wansoft_food_cost", {
             "select": "*",

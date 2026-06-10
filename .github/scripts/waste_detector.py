@@ -68,7 +68,18 @@ def get_suppliers_data(days=30):
 
 
 def get_food_cost_data(days=30):
-    """Fetch food cost data."""
+    """Fetch food cost data — prefer pos_recipes (Excel costeo), fallback to wansoft_food_cost."""
+    try:
+        recipes = sb_get("pos_recipes", {
+            "select": "nombre,precio_venta,costo_total,pct_costo,ingredientes",
+            "client_id": f"eq.{CLIENT['id']}",
+            "costo_total": "gt.0",
+            "limit": "200",
+        })
+        if recipes:
+            return [{"fecha": datetime.now(MX_TZ).strftime("%Y-%m-%d"), "data": recipes, "source": "pos_recipes"}]
+    except:
+        pass
     now_mx = datetime.now(MX_TZ)
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
     return sb_get("wansoft_food_cost", {

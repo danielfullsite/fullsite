@@ -65,7 +65,17 @@ def get_supplier_data():
 
 
 def get_food_cost_data():
-    """Fetch food cost data for consumption analysis."""
+    """Fetch food cost data — prefer pos_insumos (Excel with proveedores), fallback wansoft_food_cost."""
+    try:
+        insumos = sb_get("pos_insumos", {
+            "select": "nombre,categoria,proveedor,um,precio_limpio,merma_pct",
+            "client_id": f"eq.{CLIENT['id']}",
+            "limit": "400",
+        })
+        if insumos:
+            return [{"source": "pos_insumos", "data": insumos}]
+    except:
+        pass
     try:
         return sb_get("wansoft_food_cost", {
             "select": "*",
