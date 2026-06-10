@@ -498,10 +498,25 @@ export async function POST(request: NextRequest) {
       const l7Ventas = sumField(last7 as Record<string, unknown>[], 'ventas_dia')
       const l7Personas = sumField(last7 as Record<string, unknown>[], 'personas_restaurant')
 
+      // Pre-calculated mesero ranking last 7 days (so the LLM never sums jsonb manually)
+      const meseroTotals: Record<string, number> = {}
+      for (const d of last7 as Record<string, unknown>[]) {
+        for (const m of parseJsonb(d.meseros) as { nombre?: string; total?: number | string }[]) {
+          if (!m?.nombre) continue
+          meseroTotals[m.nombre] = (meseroTotals[m.nombre] || 0) + (Number(m.total) || 0)
+        }
+      }
+      const meseroRanking = Object.entries(meseroTotals)
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, t], i) => `${i + 1}. ${n}: $${Math.round(t)}`)
+        .join(' | ')
+
       const aggregates = `RESÚMENES PRE-CALCULADOS (usa estos para responder, NO sumes manualmente):
 MES ACTUAL (${thisMonthPrefix}): Ventas $${Math.round(tmVentas)}, ${Math.round(tmPersonas)} personas, ${tmDias} días, TicketPromedio $${tmPersonas > 0 ? Math.round(tmVentas / tmPersonas) : 0}, PromDiario $${tmDias > 0 ? Math.round(tmVentas / tmDias) : 0}
 MES ANTERIOR (${prevMonthPrefix}): Ventas $${Math.round(pmVentas)}, ${Math.round(pmPersonas)} personas, TicketPromedio $${pmPersonas > 0 ? Math.round(pmVentas / pmPersonas) : 0}
 ÚLTIMOS 7 DÍAS: Ventas $${Math.round(l7Ventas)}, ${Math.round(l7Personas)} personas, TicketPromedio $${l7Personas > 0 ? Math.round(l7Ventas / l7Personas) : 0}
+${meseroRanking ? `RANKING MESEROS ÚLTIMOS 7 DÍAS (pre-calculado — para "crack de la semana" o "quién vendió más" USA ESTE, no sumes tú): ${meseroRanking}` : ''}
+NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDays[recentDays.length - 1] as Record<string, unknown>)?.fecha} al ${(recentDays[0] as Record<string, unknown>)?.fecha}. Si mencionas el periodo, usa ESTAS fechas — NO inventes rangos más largos.
 `
 
       dailyContext = `${aggregates}\nDATOS DIARIOS (últimos ${recentDays.length} días).\n${lines.join('\n')}`
@@ -654,6 +669,8 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
 - "hoy" sin datos de hoy → NO digas "no tengo datos". Di "el restaurante aún no abre, te doy el último día:" y da los datos del día más reciente. SIEMPRE da datos, nunca dejes al usuario sin respuesta.
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
+- "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico o en Wansoft → Reportes → Corte de Caja". NO inventes montos.
+- "inventario" → NO hay datos de inventario. Di que se revisa en el módulo de inventario del POS o con cocina/almacén.
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
 
