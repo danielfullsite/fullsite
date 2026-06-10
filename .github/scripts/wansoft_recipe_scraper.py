@@ -59,34 +59,63 @@ def safe_float(val):
 
 # ── Fase 1: Discovery ───────────────────────────────────────────────────────
 
+def extract_urls(text):
+    """Extrae rutas AJAX relevantes de HTML/JS. Excluye assets estáticos."""
+    urls = set()
+    for m in re.finditer(r"""["'](/?(?:Wansoft\.Web/)?[A-Za-z0-9_]+/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)?)["']""", text):
+        u = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
+        if u.endswith((".js", ".css", ".png", ".gif")) or "ScriptsViews" in u or "Content/" in u or "Scripts/" in u:
+            continue
+        if any(k in u for k in ("Saucer", "Recipe", "Ingredient", "Product", "Complement", "Get", "Load", "Search")):
+            urls.add(u)
+    return urls
+
+
 def discover(session):
-    """Carga la página SaucerRecipe y descubre dropdown + endpoints AJAX."""
+    """Carga la página SaucerRecipe + su JS y descubre dropdown + endpoints AJAX."""
     r = session.get(f"{WANSOFT_URL}/Production/SaucerRecipe", timeout=30)
     html = r.text
     print(f"[Page] status={r.status_code} len={len(html)}")
 
     soup = BeautifulSoup(html, "html.parser")
 
-    # 1) Opciones server-rendered en el select
+    # 1) Opciones server-rendered en selects (ignorando el de sucursal)
     saucers = []
     for sel in soup.select("select"):
+        sel_id = (sel.get("id") or "") + (sel.get("name") or "")
+        if "subsidiary" in sel_id.lower():
+            continue
         opts = [(o.get("value", "").strip(), o.text.strip()) for o in sel.select("option")]
         opts = [(v, t) for v, t in opts if v and v != "0"]
         if len(opts) > len(saucers):
             saucers = opts
             print(f"[Select] id={sel.get('id')} name={sel.get('name')} → {len(opts)} options")
 
-    # 2) URLs AJAX en los <script> de la página
-    urls = set()
-    for m in re.finditer(r"""["'](/Wansoft\.Web/[A-Za-z0-9_/\.]+|[A-Za-z0-9_]+/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)?)["']""", html):
-        u = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
-        if any(k in u for k in ("Saucer", "Recipe", "Ingredient", "Product", "Complement")):
-            urls.add(u)
-    print(f"[Discovery] URLs candidatas en la página:")
+    # 2) URLs AJAX en la página
+    urls = extract_urls(html)
+
+    # 3) Bajar los JS de ScriptsViews referenciados (ahí vive la lógica AJAX real)
+    js_files = set(re.findall(r"""["']([^"']*ScriptsViews/[A-Za-z0-9_/\.]+\.js)["']""", html))
+    for js in sorted(js_files):
+        js_path = js.lstrip("/").replace("Wansoft.Web/", "")
+        try:
+            jr = session.get(f"{WANSOFT_URL}/{js_path}", timeout=30)
+            print(f"[JS] {js_path} status={jr.status_code} len={len(jr.text)}")
+            if jr.status_code == 200:
+                urls |= extract_urls(jr.text)
+                # Dump de llamadas ajax para debugging (url + data cercana)
+                for m in re.finditer(r"""(?:\$\.(?:ajax|post|get|getJSON)|url\s*:)""", jr.text):
+                    snippet = jr.text[m.start():m.start() + 220].replace("\n", " ")
+                    snippet = re.sub(r"\s+", " ", snippet)
+                    print(f"    [ajax] {snippet[:200]}")
+        except Exception as e:
+            print(f"    [!] {js_path}: {e}")
+
+    print(f"[Discovery] URLs candidatas:")
     for u in sorted(urls):
         print(f"    - {u}")
 
-    # 3) Inputs ocultos / config útil (subsidiary, tokens)
+    # 4) Inputs ocultos / config útil (subsidiary, tokens)
     hidden = {i.get("name") or i.get("id"): i.get("value", "") for i in soup.select("input[type=hidden]")}
     if hidden:
         print(f"[Hidden inputs] {json.dumps({k: v[:40] for k, v in hidden.items() if k}, ensure_ascii=False)}")
@@ -182,7 +211,14 @@ def find_recipe_endpoint(session, discovered_urls, sample_id):
                             if isinstance(v, list) and v:
                                 d = v
                                 break
-                    if isinstance(d, list) and len(d) >= 1:
+                    # Validación: JSON con dicts, o HTML con filas de 2+ columnas reales
+                    looks_real = False
+                    if isinstance(d, list) and d:
+                        if res["type"] == "json" and isinstance(d[0], dict):
+                            looks_real = True
+                        elif res["type"] == "html" and isinstance(d[0], list) and len(d[0]) >= 2 and "this." not in str(d[0]):
+                            looks_real = True
+                    if looks_real:
                         print(f"[Recipe endpoint] {method} {path} param={pname} → {len(d)} items ({res['type']})")
                         print(f"    Sample: {json.dumps(d[0], ensure_ascii=False, default=str)[:300]}")
                         return path, pname, method
