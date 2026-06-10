@@ -136,6 +136,28 @@ asyncio.run(dl())
         return None
 
 
+import re
+
+
+def _extract_hour(raw: str) -> int | None:
+    """Extract hour (0-23) from a Wansoft date/datetime string.
+    Handles '2026-06-09 14:32', '09/06/2026 02:45:33 p. m.', etc."""
+    if not raw:
+        return None
+    m = re.search(r"(\d{1,2}):(\d{2})", raw)
+    if not m:
+        return None
+    hour = int(m.group(1))
+    low = raw.lower().replace(" ", "").replace(".", "")
+    is_pm = "pm" in low
+    is_am = "am" in low
+    if is_pm and hour < 12:
+        hour += 12
+    elif is_am and hour == 12:
+        hour = 0
+    return hour if 0 <= hour <= 23 else None
+
+
 def parse_sale_detail(txt: str) -> list[dict]:
     """Parse pipe-delimited TXT into list of sale line items.
     Includes discount/courtesy columns for fraud detection."""
@@ -155,6 +177,7 @@ def parse_sale_detail(txt: str) -> list[dict]:
                 return header_map[name]
         return default
 
+    IDX_FECHA = col_idx(["FECHA", "FECHAHORA", "DATETIME"], 1)
     IDX_ORDEN = col_idx(["ORDEN", "FOLIO", "TICKET", "NUMORDEN"], 3)
     IDX_TIPO = col_idx(["TIPOORDEN", "TIPO_ORDEN", "TIPO"], 4)
     IDX_PERSONAS = col_idx(["PERSONAS", "COMENSALES"], 6)
@@ -201,6 +224,7 @@ def parse_sale_detail(txt: str) -> list[dict]:
                 return 0.0
 
         item = {
+            "hora": _extract_hour(safe_col(IDX_FECHA)),
             "orden": safe_col(IDX_ORDEN),
             "mesero": safe_col(IDX_MESERO),
             "grupo": safe_col(IDX_GRUPO),
@@ -223,6 +247,13 @@ def parse_sale_detail(txt: str) -> list[dict]:
             item["autorizador"] = safe_col(IDX_AUTORIZADOR)
 
         items.append(item)
+
+    # Log sample FECHA raw value (format discovery for hora pico)
+    for line in lines[1:3]:
+        cols = line.split("|")
+        if len(cols) > IDX_FECHA:
+            print(f"[ticket_detail] FECHA sample: '{cols[IDX_FECHA].strip()}' → hora={_extract_hour(cols[IDX_FECHA])}")
+            break
 
     # Log discount summary
     items_con_descuento = [i for i in items if i.get("descuento", 0) > 0]
@@ -342,6 +373,26 @@ def compute_waiter_categories(items: list[dict]) -> dict:
         if not is_excluded:
             rest_tickets += len(ordenes)
             rest_ventas += sum(i["total"] for i in items if i["mesero"] == mesero)
+
+    # Ventas por hora (hora pico) — one count per orden, order total counted once
+    hora_ordenes: dict = {}
+    for item in items:
+        h = item.get("hora")
+        if h is None:
+            continue
+        key = item["orden"]
+        if key not in hora_ordenes:
+            hora_ordenes[key] = {"hora": h, "total": item["total"]}
+    ventas_por_hora = defaultdict(lambda: {"ordenes": 0, "ventas": 0.0})
+    for od in hora_ordenes.values():
+        vph = ventas_por_hora[str(od["hora"])]
+        vph["ordenes"] += 1
+        vph["ventas"] += od["total"]
+    if ventas_por_hora:
+        result["__ventas_por_hora"] = {h: {"ordenes": v["ordenes"], "ventas": round(v["ventas"], 2)}
+                                       for h, v in sorted(ventas_por_hora.items(), key=lambda x: int(x[0]))}
+        pico = max(ventas_por_hora.items(), key=lambda x: x[1]["ventas"])
+        print(f"[ticket_detail] Hora pico: {pico[0]}:00 (${pico[1]['ventas']:,.0f}, {pico[1]['ordenes']} ordenes)")
 
     result["__restaurant_stats"] = {
         "tickets": rest_tickets,
