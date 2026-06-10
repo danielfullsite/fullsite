@@ -448,14 +448,26 @@ def main():
 
         # Save hourly sales to Supabase for historical analysis
         try:
-            hours_html = session.post(f"{WANSOFT_URL}/Reports/SalesByHours",
-                data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15).text
-            hours_soup = BeautifulSoup(hours_html, "html.parser")
             hours_data = []
-            for row in hours_soup.select(".rowReport"):
-                cols = [c.text.strip() for c in row.select("div")]
-                if len(cols) >= 5:
-                    hours_data.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3], "pct": cols[4]})
+            for hours_endpoint in ["SalesByHours", "SalesByHour", "SalesPerHour", "SalesByTime", "SalesBySchedule"]:
+                hours_resp = session.post(f"{WANSOFT_URL}/Reports/{hours_endpoint}",
+                    data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15)
+                hours_html = hours_resp.text
+                hours_soup = BeautifulSoup(hours_html, "html.parser")
+                candidate = []
+                for row in hours_soup.select(".rowReport"):
+                    cols = [c.text.strip() for c in row.select("div")]
+                    if len(cols) >= 4:
+                        candidate.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3],
+                                          "pct": cols[4] if len(cols) > 4 else ""})
+                print(f"[intraday] {hours_endpoint}: status={hours_resp.status_code}, rowReport={len(candidate)}")
+                # Garbage filter: real hourly rows start with a time-ish value (e.g. '09', '09:00', '9 AM')
+                import re as _re
+                candidate = [c for c in candidate if _re.match(r"^\d{1,2}([:.]\d{2})?(\s*(am|pm|a\. m\.|p\. m\.))?$", c["hora"].strip().lower())]
+                if candidate:
+                    hours_data = candidate
+                    print(f"[intraday] Hourly endpoint OK: {hours_endpoint} → {len(candidate)} filas, sample: {candidate[0]}")
+                    break
             if hours_data:
                 _h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
                       "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
