@@ -384,6 +384,59 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 2c. Reservaciones — load when question mentions reservas, eventos, fiestas
+    let reservasContext = ''
+    const wantsReservas = ['reserv', 'evento', 'fiesta', 'cumple', 'boda', 'terraza', 'jardin', 'jardín', 'paquete', 'pastel', 'invitados', 'personas reserv'].some(kw => q.includes(kw))
+    if (wantsReservas) {
+      try {
+        const resRes = await fetch(
+          `${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,horario_fin,guests,paquete,pastel,total,status,codigo_reserva&order=fecha.desc&limit=20`,
+          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+        )
+        if (resRes.ok) {
+          const reservas = await resRes.json()
+          if (reservas.length > 0) {
+            const lines = reservas.map((r: Record<string, unknown>) =>
+              `${r.fecha} ${r.horario_inicio || ''} | ${r.nombre} | ${r.guests} personas | ${r.espacio} | ${r.paquete || 'sin paquete'} | $${Math.round(Number(r.total) || 0)} | ${r.status} | ${r.codigo_reserva || ''}`
+            )
+            const futuras = reservas.filter((r: Record<string, unknown>) => String(r.fecha) >= new Date().toISOString().split('T')[0])
+            reservasContext = `\n\nRESERVACIONES (${reservas.length} total, ${futuras.length} futuras):\n${lines.join('\n')}`
+          }
+        }
+      } catch { /* optional */ }
+    }
+
+    // 2d. POS orders — load when question mentions órdenes, cancelaciones, tickets del POS
+    let ordersContext = ''
+    const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
+    if (wantsOrders) {
+      try {
+        const ordRes = await fetch(
+          `${sbUrl}/rest/v1/pos_orders?select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`,
+          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+        )
+        if (ordRes.ok) {
+          const orders = await ordRes.json()
+          if (orders.length > 0) {
+            const byStatus: Record<string, { count: number; total: number }> = {}
+            for (const o of orders) {
+              const s = String(o.status || 'unknown')
+              if (!byStatus[s]) byStatus[s] = { count: 0, total: 0 }
+              byStatus[s].count++
+              byStatus[s].total += Number(o.total) || 0
+            }
+            const statusLines = Object.entries(byStatus).map(([s, d]) => `  ${s}: ${d.count} órdenes, $${Math.round(d.total)}`)
+            const canceladas = orders.filter((o: Record<string, unknown>) => o.status === 'cancelada')
+            let cancelInfo = ''
+            if (canceladas.length > 0) {
+              cancelInfo = `\nÚLTIMAS CANCELADAS:\n${canceladas.slice(0, 5).map((o: Record<string, unknown>) => `  Mesa ${o.mesa} | ${o.mesero} | $${Math.round(Number(o.total) || 0)} | ${String(o.created_at).slice(0, 16)}`).join('\n')}`
+            }
+            ordersContext = `\n\nÓRDENES POS (últimas ${orders.length}):\n${statusLines.join('\n')}${cancelInfo}`
+          }
+        }
+      } catch { /* optional */ }
+    }
+
     // 3. Build daily context
     let dailyContext = 'No hay datos disponibles.'
     if (recentDays && recentDays.length > 0) {
@@ -599,6 +652,8 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "insumo más comprado" → buscar el platillo con mayor "cantidad" en DATOS DE FOOD COST
 - "insumo más caro" → buscar el platillo con mayor "CostoUnit" en DATOS DE FOOD COST
 - "% food cost" / "costo de comida" → dar el FOOD COST GENERAL que está al inicio de la sección
+- "reserva" / "evento" / "fiesta" / "terraza" → buscar en RESERVACIONES. Cada una tiene: nombre, fecha, espacio, guests, paquete, total, status.
+- "órdenes" / "cancelaciones" / "mesas abiertas" → buscar en ÓRDENES POS. Muestra resumen por status y detalle de canceladas.
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
 - "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
@@ -647,6 +702,8 @@ Si lo hacen = +$5,000-6,000 hoy. Hazlo ahora.
 
 ${waiterContext}
 ${foodCostContext}
+${reservasContext}
+${ordersContext}
 
 ${dailyContext}`
 
