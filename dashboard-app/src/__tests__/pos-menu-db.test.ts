@@ -175,8 +175,8 @@ describe('POS Constants', () => {
     }
   })
 
-  it('MESAS_CONFIG has 23 tables', () => {
-    expect(MESAS_CONFIG).toHaveLength(23)
+  it('MESAS_CONFIG has 33 tables (layout real AMALAY)', () => {
+    expect(MESAS_CONFIG).toHaveLength(33)
     for (const mesa of MESAS_CONFIG) {
       expect(mesa.number).toBeGreaterThan(0)
       expect(mesa.capacity).toBeGreaterThan(0)
@@ -184,10 +184,10 @@ describe('POS Constants', () => {
     }
   })
 
-  it('table capacities are reasonable (2-6)', () => {
+  it('table capacities are reasonable (2-8)', () => {
     for (const mesa of MESAS_CONFIG) {
       expect(mesa.capacity).toBeGreaterThanOrEqual(2)
-      expect(mesa.capacity).toBeLessThanOrEqual(6)
+      expect(mesa.capacity).toBeLessThanOrEqual(8)
     }
   })
 })

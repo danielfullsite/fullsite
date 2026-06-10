@@ -34,73 +34,124 @@ interface FloorZone {
   bgColor: string   // background tint
 }
 
-// Default AMALAY layout — configurable per client via localStorage
+// Layout real AMALAY — del plano de mesas físico (foto 2026-06-10). Configurable por cliente via localStorage.
 const DEFAULT_FLOOR_ZONES: FloorZone[] = [
   {
-    id: 'salon',
-    name: 'Salón Principal',
+    id: 'entrada',
+    name: 'Entrada',
     gridCols: 4,
-    gridRows: 4,
+    gridRows: 2,
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/5',
     mesas: [
-      { number: 1, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 2, gridRow: 1, gridCol: 2, shape: 'round' },
-      { number: 3, gridRow: 1, gridCol: 3, shape: 'round' },
-      { number: 4, gridRow: 1, gridCol: 4, shape: 'round' },
-      { number: 5, gridRow: 2, gridCol: 1, shape: 'square' },
-      { number: 6, gridRow: 2, gridCol: 2, shape: 'square' },
-      { number: 7, gridRow: 2, gridCol: 3, shape: 'square' },
-      { number: 8, gridRow: 2, gridCol: 4, shape: 'square' },
-      { number: 9, gridRow: 3, gridCol: 1, shape: 'square' },
-      { number: 10, gridRow: 3, gridCol: 2, shape: 'square' },
-      { number: 11, gridRow: 3, gridCol: 3, shape: 'square' },
-      { number: 12, gridRow: 3, gridCol: 4, shape: 'square' },
+      { number: 45, gridRow: 1, gridCol: 1, shape: 'round' },
+      { number: 1, gridRow: 1, gridCol: 2, shape: 'round' },
+      { number: 2, gridRow: 1, gridCol: 3, shape: 'round' },
+      { number: 3, gridRow: 1, gridCol: 4, shape: 'round' },
+      { number: 4, gridRow: 2, gridCol: 3, shape: 'round' },
+    ],
+  },
+  {
+    id: 'lamparas',
+    name: 'Lámparas',
+    gridCols: 3,
+    gridRows: 2,
+    color: 'text-amber-400',
+    bgColor: 'bg-amber-500/5',
+    mesas: [
+      { number: 5, gridRow: 1, gridCol: 1, shape: 'rect-h' },
+      { number: 6, gridRow: 1, gridCol: 2, shape: 'rect-h' },
+      { number: 7, gridRow: 1, gridCol: 3, shape: 'rect-h' },
+      { number: 9, gridRow: 2, gridCol: 1, shape: 'round' },
+      { number: 8, gridRow: 2, gridCol: 2, shape: 'round' },
+    ],
+  },
+  {
+    id: 'pasillo',
+    name: 'Pasillo',
+    gridCols: 1,
+    gridRows: 2,
+    color: 'text-slate-400',
+    bgColor: 'bg-slate-500/5',
+    mesas: [
+      { number: 44, gridRow: 1, gridCol: 1, shape: 'round' },
+      { number: 43, gridRow: 2, gridCol: 1, shape: 'round' },
     ],
   },
   {
     id: 'terraza',
     name: 'Terraza',
-    gridCols: 4,
-    gridRows: 2,
+    gridCols: 3,
+    gridRows: 3,
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/5',
     mesas: [
-      { number: 13, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 14, gridRow: 1, gridCol: 2, shape: 'round' },
-      { number: 15, gridRow: 1, gridCol: 3, shape: 'round' },
-      { number: 16, gridRow: 1, gridCol: 4, shape: 'round' },
-      { number: 20, gridRow: 2, gridCol: 1, shape: 'rect-h', width: 2 },
-      { number: 30, gridRow: 2, gridCol: 3, shape: 'rect-h', width: 2 },
+      { number: 21, gridRow: 1, gridCol: 1, shape: 'round' },
+      { number: 20, gridRow: 1, gridCol: 2, shape: 'round' },
+      { number: 32, gridRow: 2, gridCol: 1, shape: 'round' },
+      { number: 31, gridRow: 2, gridCol: 2, shape: 'round' },
+      { number: 30, gridRow: 2, gridCol: 3, shape: 'round' },
+      { number: 42, gridRow: 3, gridCol: 1, shape: 'rect-h' },
+      { number: 41, gridRow: 3, gridCol: 2, shape: 'rect-h' },
+      { number: 40, gridRow: 3, gridCol: 3, shape: 'rect-h' },
     ],
   },
   {
-    id: 'jardin',
-    name: 'Jardín / Eventos',
-    gridCols: 4,
-    gridRows: 2,
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/5',
+    id: 'barra',
+    name: 'Barra',
+    gridCols: 1,
+    gridRows: 3,
+    color: 'text-rose-400',
+    bgColor: 'bg-rose-500/5',
     mesas: [
-      { number: 40, gridRow: 1, gridCol: 1, shape: 'rect-h', width: 2 },
-      { number: 50, gridRow: 1, gridCol: 3, shape: 'rect-h', width: 2 },
-      { number: 60, gridRow: 2, gridCol: 1, shape: 'rect-h', width: 2 },
-      { number: 70, gridRow: 2, gridCol: 3, shape: 'round' },
-      { number: 80, gridRow: 2, gridCol: 4, shape: 'round' },
+      { number: 10, gridRow: 1, gridCol: 1, shape: 'square' },
+      { number: 11, gridRow: 2, gridCol: 1, shape: 'square' },
+      { number: 12, gridRow: 3, gridCol: 1, shape: 'square' },
+    ],
+  },
+  {
+    id: 'toldo',
+    name: 'Toldo',
+    gridCols: 3,
+    gridRows: 2,
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-500/5',
+    mesas: [
+      { number: 50, gridRow: 1, gridCol: 1, shape: 'rect-h' },
+      { number: 53, gridRow: 1, gridCol: 2, shape: 'rect-h' },
+      { number: 55, gridRow: 1, gridCol: 3, shape: 'rect-h' },
+      { number: 54, gridRow: 2, gridCol: 1, shape: 'rect-h' },
+      { number: 52, gridRow: 2, gridCol: 2, shape: 'rect-h' },
+      { number: 51, gridRow: 2, gridCol: 3, shape: 'rect-h' },
+    ],
+  },
+  {
+    id: 'privado',
+    name: 'Privado',
+    gridCols: 2,
+    gridRows: 2,
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500/5',
+    mesas: [
+      { number: 61, gridRow: 1, gridCol: 1, shape: 'rect-h' },
+      { number: 63, gridRow: 1, gridCol: 2, shape: 'rect-h' },
+      { number: 60, gridRow: 2, gridCol: 1, shape: 'rect-h' },
+      { number: 62, gridRow: 2, gridCol: 2, shape: 'rect-h' },
     ],
   },
 ]
 
+// v2: layout real AMALAY (2026-06-10) — key bump invalida layouts guardados con el plano placeholder
 function getFloorZones(): FloorZone[] {
   try {
-    const saved = localStorage.getItem(`pos_floor_${_cid()}`)
+    const saved = localStorage.getItem(`pos_floor_v2_${_cid()}`)
     if (saved) return JSON.parse(saved)
   } catch { /* use default */ }
   return DEFAULT_FLOOR_ZONES
 }
 
 function saveFloorZones(zones: FloorZone[]) {
-  try { localStorage.setItem(`pos_floor_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
+  try { localStorage.setItem(`pos_floor_v2_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────

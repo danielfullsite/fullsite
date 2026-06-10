@@ -118,13 +118,17 @@ describe('IVA_RATE', () => {
 // ─── MESAS_CONFIG ─────────────────────────────────────────────────────────
 
 describe('MESAS_CONFIG', () => {
-  it('has 23 mesas (1-16 + 20,30,40,50,60,70,80)', () => {
-    expect(MESAS_CONFIG).toHaveLength(23)
+  it('has 33 mesas (layout real AMALAY)', () => {
+    expect(MESAS_CONFIG).toHaveLength(33)
   })
 
-  it('mesas include 1-16 plus non-consecutive (20,30,...,80)', () => {
+  it('mesas match the real floor plan numbers', () => {
     const numbers = MESAS_CONFIG.map(m => m.number)
-    expect(numbers).toEqual([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,40,50,60,70,80])
+    expect(numbers).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+      20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
+      50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
+    ])
   })
 
   it('all mesas start as disponible', () => {
@@ -133,28 +137,33 @@ describe('MESAS_CONFIG', () => {
     }
   })
 
-  it('mesas 1-4 have capacity 2 (couples)', () => {
-    for (let i = 0; i < 4; i++) {
-      expect(MESAS_CONFIG[i].capacity).toBe(2)
+  it('mesa 30 (redonda grande terraza) has capacity 8', () => {
+    expect(MESAS_CONFIG.find(m => m.number === 30)?.capacity).toBe(8)
+  })
+
+  it('rectangulares grandes (5,6,40,41,42) have capacity 6', () => {
+    for (const n of [5, 6, 40, 41, 42]) {
+      expect(MESAS_CONFIG.find(m => m.number === n)?.capacity).toBe(6)
     }
   })
 
-  it('mesas 5-10 have capacity 4', () => {
-    for (let i = 4; i < 10; i++) {
-      expect(MESAS_CONFIG[i].capacity).toBe(4)
+  it('barra (10-12) and pasillo (43,44) have capacity 2', () => {
+    for (const n of [10, 11, 12, 43, 44]) {
+      expect(MESAS_CONFIG.find(m => m.number === n)?.capacity).toBe(2)
     }
   })
 
-  it('mesas 11-16 have capacity 6', () => {
-    for (let i = 10; i < 16; i++) {
-      expect(MESAS_CONFIG[i].capacity).toBe(6)
+  it('remaining mesas default to capacity 4', () => {
+    const special = new Set([30, 5, 6, 40, 41, 42, 10, 11, 12, 43, 44])
+    for (const mesa of MESAS_CONFIG) {
+      if (!special.has(mesa.number)) expect(mesa.capacity).toBe(4)
     }
   })
 
   it('total restaurant capacity is correct', () => {
     const total = MESAS_CONFIG.reduce((s, m) => s + m.capacity, 0)
-    // 4*2 + 6*4 + 13*6 = 8 + 24 + 78 = 110
-    expect(total).toBe(110)
+    // 8 (mesa 30) + 5*6 (rect grandes) + 5*2 (barra+pasillo) + 22*4 = 8+30+10+88 = 136
+    expect(total).toBe(136)
   })
 })
 

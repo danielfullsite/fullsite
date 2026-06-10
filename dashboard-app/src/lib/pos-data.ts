@@ -811,12 +811,23 @@ export const MESEROS = [
 
 export const IVA_RATE = 0.16
 
-// Mesa config — supports non-consecutive numbers (AMALAY uses 10, 20, 30, 40, 70, etc)
-// Default: common restaurant layout with sections
-const DEFAULT_MESA_NUMBERS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,20,30,40,50,60,70,80]
+// Mesa config — layout real AMALAY (plano físico, foto 2026-06-10)
+// Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),
+// barra (10-12), toldo (50-55), privado (60-63)
+const DEFAULT_MESA_NUMBERS = [
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+  20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
+  50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
+]
+const MESA_CAPACITY: Record<number, number> = {
+  30: 8,                          // redonda grande terraza
+  5: 6, 6: 6, 40: 6, 41: 6, 42: 6, // rectangulares grandes
+  10: 2, 11: 2, 12: 2,            // barra
+  43: 2, 44: 2,                   // pasillo
+}
 export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
   number: n,
-  capacity: n <= 4 ? 2 : n <= 10 ? 4 : 6,
+  capacity: MESA_CAPACITY[n] ?? 4,
   status: 'disponible' as const,
 }))
 
