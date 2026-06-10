@@ -25,6 +25,18 @@ interface OrderFromDB {
   closed_at: string | null
 }
 
+async function getCardCommissionPct(): Promise<number> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${getClientId()}&active=eq.true&type=eq.card&select=commission_pct`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res.ok) return 0
+    const rows: { commission_pct: number | string }[] = await res.json()
+    return rows.reduce((max, r) => Math.max(max, Number(r.commission_pct) || 0), 0)
+  } catch { return 0 }
+}
+
 async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc&limit=200`,
@@ -45,14 +57,18 @@ export default function CortePage() {
     return mxDate.toISOString().split('T')[0]
   })
 
+  const [cardPct, setCardPct] = useState(0)
+
   const fetchData = async () => {
     setLoading(true)
-    const [o, a] = await Promise.all([
+    const [o, a, pct] = await Promise.all([
       getOrders(selectedDate),
       getAuditLog(200),
+      getCardCommissionPct(),
     ])
     setOrders(o)
     setAuditLog(a)
+    setCardPct(pct)
     setLoading(false)
   }
 
@@ -124,8 +140,15 @@ export default function CortePage() {
       e.action === 'item_cancelled' || e.action === 'order_cancelled'
     )
 
+    // Comisión estimada sobre lo cobrado con tarjeta (incluye propina — la terminal cobra comisión sobre el monto completo)
+    const totalTarjeta = Object.entries(byPayment)
+      .filter(([m]) => m.toLowerCase().includes('tarjeta'))
+      .reduce((s, [, v]) => s + v, 0)
+    const comisionTarjeta = totalTarjeta * cardPct / 100
+
     return {
       totalVentas, totalSubtotal, totalIva, totalDescuentos, totalPropinas,
+      totalTarjeta, comisionTarjeta,
       totalPersonas, ticketPromedio,
       ordenesCerradas: closed.length,
       ordenesAbiertas: all.filter(o => o.status === 'enviada' || o.status === 'abierta').length,
@@ -134,7 +157,7 @@ export default function CortePage() {
       byMesero: Object.entries(byMesero).sort((a, b) => b[1].ventas - a[1].ventas),
       cancellations: cancellations.length,
     }
-  }, [orders, auditLog])
+  }, [orders, auditLog, cardPct])
 
   return (
     <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
@@ -234,6 +257,18 @@ export default function CortePage() {
                   <span className="text-[var(--text-3)]">Total cobrado (ventas + propinas)</span>
                   <span className="text-white font-semibold">{formatMXN(stats.totalVentas + stats.totalPropinas)}</span>
                 </div>
+                {stats.comisionTarjeta > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">Comisión tarjeta est. ({cardPct}%)</span>
+                      <span className="text-red-400 font-medium">-{formatMXN(stats.comisionTarjeta)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[var(--text-3)]">Neto estimado después de comisión</span>
+                      <span className="text-white font-semibold">{formatMXN(stats.totalVentas + stats.totalPropinas - stats.comisionTarjeta)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

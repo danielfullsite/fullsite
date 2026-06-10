@@ -1368,6 +1368,7 @@ function POSContent() {
       createdAt: new Date(),
     }
     await printPreTicket(order)
+    logAudit({ order_id: orderId, action: 'preticket_printed', actor: mesero, mesa, details: { total, personas, items: activeItems.length } })
     showToast('Pre-cuenta impresa')
   }
 
@@ -1423,7 +1424,8 @@ function POSContent() {
       iva: payIva,
       total: payTotal,
       descuento: payDiscount,
-      propina: splitPayingCuenta === 0 || splitPayingCuenta === (splitMode === 'parejo' ? splitParejoN : splitCount) ? (propina > 0 ? propina : undefined) : undefined,
+      // Cada cuenta del split es su propia orden en BD — registra la propina capturada en ESTA cuenta
+      propina: propina > 0 ? propina : undefined,
       metodoPago: method,
       notas: splitPayingCuenta > 0
         ? `Cuenta ${splitPayingCuenta} de ${splitMode === 'parejo' ? splitParejoN : splitCount} (${splitMode === 'parejo' ? 'parejo' : 'split'})`

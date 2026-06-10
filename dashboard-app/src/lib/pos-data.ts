@@ -980,6 +980,7 @@ export type AuditAction =
   | 'discount_removed'
   | 'status_changed'
   | 'payment_processed'
+  | 'preticket_printed'
   | 'merma_registered'
 
 export interface AuditEvent {
