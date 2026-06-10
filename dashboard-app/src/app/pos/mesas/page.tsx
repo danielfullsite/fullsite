@@ -120,9 +120,9 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
       { number: 50, gridRow: 1, gridCol: 1, shape: 'rect-h' },
       { number: 53, gridRow: 1, gridCol: 2, shape: 'rect-h' },
       { number: 55, gridRow: 1, gridCol: 3, shape: 'rect-h' },
-      { number: 54, gridRow: 2, gridCol: 1, shape: 'rect-h' },
+      { number: 51, gridRow: 2, gridCol: 1, shape: 'rect-h' },
       { number: 52, gridRow: 2, gridCol: 2, shape: 'rect-h' },
-      { number: 51, gridRow: 2, gridCol: 3, shape: 'rect-h' },
+      { number: 54, gridRow: 2, gridCol: 3, shape: 'rect-h' },
     ],
   },
   {
