@@ -152,6 +152,23 @@ def discover_page(session, page):
             "js_files": sorted(js_files), "endpoints": clean}
 
 
+def get_sidebar_links(session):
+    """Extrae TODOS los links del menú lateral desde una página conocida."""
+    r = session.get(f"{WANSOFT_URL}/Production/SaucerRecipe", timeout=30)
+    links = set()
+    for m in re.finditer(r"""href\s*=\s*["'](/?(?:Wansoft\.Web/)?[A-Za-z][A-Za-z0-9_]*/[A-Za-z0-9_]+)["']""", r.text):
+        u = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
+        if u.endswith((".js", ".css", ".png", ".ico")) or any(
+            k in u for k in ("Content/", "Scripts/", "ScriptsViews", "Account/", "javascript")
+        ):
+            continue
+        links.add(u)
+    print(f"[Sidebar] {len(links)} links encontrados:")
+    for u in sorted(links):
+        print(f"    - {u}")
+    return sorted(links)
+
+
 def main():
     start = time.time()
     print("=" * 60)
@@ -159,15 +176,22 @@ def main():
     print("=" * 60)
 
     session = wansoft_session()
+
+    # Páginas reales desde el sidebar + las hardcodeadas
+    sidebar = get_sidebar_links(session)
+    pages = sidebar + [p for p in PAGES if p not in sidebar]
+
     full_map = {}
-    for page in PAGES:
+    for page in pages:
         result = discover_page(session, page)
         full_map[page] = result
         n = len(result.get("endpoints", []))
+        if result["status"] != "ok" or (n == 0 and result.get("title") == "Error"):
+            continue  # no ensuciar el log con páginas muertas
         print(f"\n[{page}] status={result['status']} title={result.get('title','')!r} len={result.get('len',0)} endpoints={n}")
         for ep in result.get("endpoints", []):
             print(f"    {ep['method']} {ep['url']}  params={ep['params']}")
-        time.sleep(0.3)
+        time.sleep(0.2)
 
     # Guardar mapa completo en wansoft_data
     row = {
@@ -185,7 +209,7 @@ def main():
 
     total = sum(len(v.get("endpoints", [])) for v in full_map.values())
     ok_pages = sum(1 for v in full_map.values() if v["status"] == "ok")
-    print(f"\n[DONE] {ok_pages}/{len(PAGES)} páginas OK, {total} endpoints descubiertos en {int(time.time()-start)}s")
+    print(f"\n[DONE] {ok_pages}/{len(pages)} páginas OK, {total} endpoints descubiertos en {int(time.time()-start)}s")
 
 
 if __name__ == "__main__":
