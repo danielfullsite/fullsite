@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Wansoft Recipe Scraper — extrae TODAS las recetas de platillos
-desde Production/SaucerRecipe (Inventario / Configuración / Receta de platillos).
+Wansoft Recipe Scraper — extrae TODAS las recetas de platillos.
 
-Fase 1 (discovery): carga la página, encuentra el dropdown de platillos y
-los endpoints AJAX que usa (lista de platillos + ingredientes por platillo).
-Fase 2 (scrape): pide la receta de cada platillo y guarda en wansoft_recipes.
+Endpoints reales (descubiertos via ScriptsViews/Production/SaucerRecipe.js):
+  - Menu/GetSaucerAndComplementaryListBySubsidiary  POST {subsidiaryId} → lista de platillos
+  - Production/GetSaucerRecipe  POST {subsidiaryId, saucerId, sizeId} → ingredientes
+  - Inventory/GetRecipeProductsBySubsidiary  POST {subsidiaryId} → catálogo de insumos
+  - Inventory/GetUnitsOfMeasureBySubsidiary  POST {subsidiaryId} → unidades de medida
 
+Guarda recetas en wansoft_recipes y catálogos en wansoft_data.
 Run on-demand via GitHub Actions (workflow_dispatch).
 """
 
 import os
-import re
 import json
 import time
 import requests
@@ -57,195 +58,93 @@ def safe_float(val):
         return None
 
 
-# ── Fase 1: Discovery ───────────────────────────────────────────────────────
-
-def extract_urls(text):
-    """Extrae rutas AJAX relevantes de HTML/JS. Excluye assets estáticos."""
-    urls = set()
-    for m in re.finditer(r"""["'](/?(?:Wansoft\.Web/)?[A-Za-z0-9_]+/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)?)["']""", text):
-        u = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
-        if u.endswith((".js", ".css", ".png", ".gif")) or "ScriptsViews" in u or "Content/" in u or "Scripts/" in u:
-            continue
-        if any(k in u for k in ("Saucer", "Recipe", "Ingredient", "Product", "Complement", "Get", "Load", "Search")):
-            urls.add(u)
-    return urls
-
-
-def discover(session):
-    """Carga la página SaucerRecipe + su JS y descubre dropdown + endpoints AJAX."""
-    r = session.get(f"{WANSOFT_URL}/Production/SaucerRecipe", timeout=30)
-    html = r.text
-    print(f"[Page] status={r.status_code} len={len(html)}")
-
-    soup = BeautifulSoup(html, "html.parser")
-
-    # 1) Opciones server-rendered en selects (ignorando el de sucursal)
-    saucers = []
-    for sel in soup.select("select"):
-        sel_id = (sel.get("id") or "") + (sel.get("name") or "")
-        if "subsidiary" in sel_id.lower():
-            continue
-        opts = [(o.get("value", "").strip(), o.text.strip()) for o in sel.select("option")]
-        opts = [(v, t) for v, t in opts if v and v != "0"]
-        if len(opts) > len(saucers):
-            saucers = opts
-            print(f"[Select] id={sel.get('id')} name={sel.get('name')} → {len(opts)} options")
-
-    # 2) URLs AJAX en la página
-    urls = extract_urls(html)
-
-    # 3) Bajar los JS de ScriptsViews referenciados (ahí vive la lógica AJAX real)
-    js_files = set(re.findall(r"""["']([^"']*ScriptsViews/[A-Za-z0-9_/\.]+\.js)["']""", html))
-    for js in sorted(js_files):
-        js_path = js.lstrip("/").replace("Wansoft.Web/", "")
-        try:
-            jr = session.get(f"{WANSOFT_URL}/{js_path}", timeout=30)
-            print(f"[JS] {js_path} status={jr.status_code} len={len(jr.text)}")
-            if jr.status_code == 200:
-                urls |= extract_urls(jr.text)
-                # Dump de llamadas ajax para debugging (url + data cercana)
-                for m in re.finditer(r"""(?:\$\.(?:ajax|post|get|getJSON)|url\s*:)""", jr.text):
-                    snippet = jr.text[m.start():m.start() + 220].replace("\n", " ")
-                    snippet = re.sub(r"\s+", " ", snippet)
-                    print(f"    [ajax] {snippet[:200]}")
-        except Exception as e:
-            print(f"    [!] {js_path}: {e}")
-
-    print(f"[Discovery] URLs candidatas:")
-    for u in sorted(urls):
-        print(f"    - {u}")
-
-    # 4) Inputs ocultos / config útil (subsidiary, tokens)
-    hidden = {i.get("name") or i.get("id"): i.get("value", "") for i in soup.select("input[type=hidden]")}
-    if hidden:
-        print(f"[Hidden inputs] {json.dumps({k: v[:40] for k, v in hidden.items() if k}, ensure_ascii=False)}")
-
-    return saucers, sorted(urls), html
-
-
-def try_endpoint(session, path, params, method="POST"):
-    """Llama un endpoint y regresa JSON o filas HTML si hay datos reales."""
+def post_json(session, path, data):
+    """POST a un endpoint AJAX de Wansoft, regresa JSON o None."""
     try:
-        url = f"{WANSOFT_URL}/{path}"
-        r = session.post(url, data=params, timeout=30) if method == "POST" else session.get(url, params=params, timeout=30)
+        r = session.post(f"{WANSOFT_URL}/{path}", data=data, timeout=30)
         if r.status_code != 200:
+            print(f"    [!] {path}: status={r.status_code}")
             return None
         try:
-            data = r.json()
-            if data and data != [] and data != {}:
-                return {"type": "json", "data": data}
+            return r.json()
         except ValueError:
-            pass
-        soup = BeautifulSoup(r.text, "html.parser")
-        rows = []
-        for tr in soup.select("table tr"):
-            cols = [td.text.strip() for td in tr.select("td")]
-            if cols and any(cols):
-                rows.append(cols)
-        if not rows:
-            for row in soup.select(".rowReport"):
-                cols = [c.text.strip() for c in row.select("div")]
+            # Algunos endpoints regresan HTML con tabla
+            soup = BeautifulSoup(r.text, "html.parser")
+            rows = []
+            for tr in soup.select("table tr"):
+                cols = [td.text.strip() for td in tr.select("td")]
                 if cols and any(cols):
                     rows.append(cols)
-        if rows:
-            return {"type": "html", "data": rows}
+            return rows or None
     except Exception as e:
         print(f"    [!] {path}: {e}")
-    return None
+        return None
 
 
-def get_saucer_list(session, saucers_from_page, discovered_urls):
-    """Consigue la lista (id, nombre) de platillos."""
-    if saucers_from_page:
-        print(f"[Saucers] {len(saucers_from_page)} desde el select de la página")
-        return saucers_from_page
-
-    candidates = [u for u in discovered_urls if "Saucer" in u and "Recipe" not in u]
-    candidates += [
-        "Production/GetSaucers", "Production/GetAllSaucers",
-        "Production/SaucerRecipe/GetSaucers", "Menu/GetSaucers",
-        "Menu/GetSaucersBySubsidiary", "Catalogs/GetSaucers",
-    ]
-    for path in candidates:
-        for method in ("POST", "GET"):
-            res = try_endpoint(session, path, {"subsidiaryId": SUBSIDIARY_ID}, method)
-            if res and res["type"] == "json" and isinstance(res["data"], list) and len(res["data"]) > 5:
-                items = res["data"]
-                # Detectar keys de id y nombre
-                first = items[0]
-                if isinstance(first, dict):
-                    id_key = next((k for k in first if k.lower() in ("id", "saucerid", "value")), None)
-                    name_key = next((k for k in first if k.lower() in ("name", "nombre", "text", "description")), None)
-                    if id_key and name_key:
-                        out = [(str(i[id_key]), str(i[name_key])) for i in items]
-                        print(f"[Saucers] {len(out)} desde {method} {path}")
-                        return out
-    return []
-
-
-RECIPE_PARAM_NAMES = ["saucerId", "SaucerId", "id", "Id", "saucer", "idSaucer"]
-
-
-def find_recipe_endpoint(session, discovered_urls, sample_id):
-    """Encuentra el endpoint+param que regresa los ingredientes de un platillo."""
-    candidates = [u for u in discovered_urls if any(k in u for k in ("Recipe", "Ingredient"))]
-    candidates += [
-        "Production/GetSaucerRecipe", "Production/GetRecipeBySaucer",
-        "Production/SaucerRecipe/GetRecipe", "Production/SaucerRecipe/GetIngredients",
-        "Production/GetIngredientsBySaucer", "Production/GetRecipe",
-    ]
-    seen = set()
-    for path in candidates:
-        if path in seen or path == "Production/SaucerRecipe":
-            continue
-        seen.add(path)
-        for pname in RECIPE_PARAM_NAMES:
-            for method in ("POST", "GET"):
-                params = {pname: sample_id, "subsidiaryId": SUBSIDIARY_ID}
-                res = try_endpoint(session, path, params, method)
-                if res and res["data"]:
-                    # Validar que parece receta (lista con contenido)
-                    d = res["data"]
-                    if isinstance(d, dict):
-                        for k, v in d.items():
-                            if isinstance(v, list) and v:
-                                d = v
-                                break
-                    # Validación: JSON con dicts, o HTML con filas de 2+ columnas reales
-                    looks_real = False
-                    if isinstance(d, list) and d:
-                        if res["type"] == "json" and isinstance(d[0], dict):
-                            looks_real = True
-                        elif res["type"] == "html" and isinstance(d[0], list) and len(d[0]) >= 2 and "this." not in str(d[0]):
-                            looks_real = True
-                    if looks_real:
-                        print(f"[Recipe endpoint] {method} {path} param={pname} → {len(d)} items ({res['type']})")
-                        print(f"    Sample: {json.dumps(d[0], ensure_ascii=False, default=str)[:300]}")
-                        return path, pname, method
-    return None, None, None
-
-
-def fetch_recipe(session, path, pname, method, saucer_id):
-    res = try_endpoint(session, path, {pname: saucer_id, "subsidiaryId": SUBSIDIARY_ID}, method)
-    if not res:
+def pick_keys(item, id_names, name_names):
+    """Encuentra keys de id/nombre en un dict (case-insensitive)."""
+    if not isinstance(item, dict):
         return None, None
-    data = res["data"]
+    keys = {k.lower(): k for k in item}
+    id_key = next((keys[n] for n in id_names if n in keys), None)
+    name_key = next((keys[n] for n in name_names if n in keys), None)
+    return id_key, name_key
+
+
+# ── Saucer list ─────────────────────────────────────────────────────────────
+
+def get_saucers(session):
+    data = post_json(session, "Menu/GetSaucerAndComplementaryListBySubsidiary",
+                     {"subsidiaryId": SUBSIDIARY_ID})
+    if not data:
+        return []
+    if isinstance(data, dict):
+        for v in data.values():
+            if isinstance(v, list) and v:
+                data = v
+                break
+    if not isinstance(data, list) or not data:
+        return []
+    print(f"[Saucers raw] {len(data)} items. Sample: {json.dumps(data[0], ensure_ascii=False, default=str)[:300]}")
+    id_key, name_key = pick_keys(data[0],
+                                 ("id", "saucerid", "value", "saucer_id"),
+                                 ("name", "nombre", "text", "description", "saucername"))
+    if not id_key or not name_key:
+        print(f"    [!] No identifiqué keys id/nombre. Keys: {list(data[0].keys()) if isinstance(data[0], dict) else type(data[0])}")
+        return []
+    return [(str(i[id_key]), str(i[name_key]).strip(), i) for i in data if isinstance(i, dict)]
+
+
+# ── Recipe per saucer ───────────────────────────────────────────────────────
+
+def get_recipe(session, saucer_id, size_id=0):
+    data = post_json(session, "Production/GetSaucerRecipe", {
+        "subsidiaryId": SUBSIDIARY_ID,
+        "saucerId": saucer_id,
+        "sizeId": size_id,
+    })
+    if not data:
+        return None, None
     raw = data
     if isinstance(data, dict):
-        for k, v in data.items():
+        for v in data.values():
             if isinstance(v, list):
                 data = v
                 break
-    return data, raw
+    if isinstance(data, list) and data:
+        return data, raw
+    return None, raw
 
 
-def sb_upsert_recipe(saucer_id, name, ingredients, raw):
+def sb_upsert_recipe(saucer_id, name, ingredients, raw, extra):
     budget = None
-    if isinstance(raw, dict):
-        for k in raw:
+    for source in (raw if isinstance(raw, dict) else {}, extra if isinstance(extra, dict) else {}):
+        for k in source:
             if "cost" in k.lower() or "costo" in k.lower():
-                budget = safe_float(raw[k])
+                budget = safe_float(source[k])
                 break
+        if budget is not None:
+            break
     row = {
         "client_id": CLIENT["id"],
         "saucer_id": str(saucer_id),
@@ -262,6 +161,38 @@ def sb_upsert_recipe(saucer_id, name, ingredients, raw):
     if not r.ok:
         print(f"    [!] Supabase: {r.status_code} {r.text[:150]}")
     return r.ok
+
+
+# ── Catálogos (insumos + unidades) → wansoft_data ───────────────────────────
+
+def save_catalog(session, path, data_key):
+    data = post_json(session, path, {"subsidiaryId": SUBSIDIARY_ID})
+    if not data:
+        print(f"[Catalog] {data_key}: sin datos")
+        return 0
+    items = data
+    if isinstance(items, dict):
+        for v in items.values():
+            if isinstance(v, list) and v:
+                items = v
+                break
+    n = len(items) if isinstance(items, list) else 1
+    print(f"[Catalog] {data_key}: {n} items. Sample: {json.dumps(items[0] if isinstance(items, list) else items, ensure_ascii=False, default=str)[:200]}")
+    row = {
+        "client_id": CLIENT["id"],
+        "fecha": datetime.now(timezone.utc).date().isoformat(),
+        "data_key": data_key,
+        "data": json.dumps(items, ensure_ascii=False, default=str),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    r = requests.post(
+        f"{SUPABASE_URL}/rest/v1/wansoft_data?on_conflict=client_id,fecha,data_key",
+        headers=sb_headers, json=row, timeout=15,
+    )
+    if not r.ok:
+        print(f"    [!] Supabase wansoft_data: {r.status_code} {r.text[:150]}")
+        return 0
+    return n
 
 
 def telegram(msg):
@@ -292,46 +223,41 @@ def main():
     print("=" * 60)
 
     session = wansoft_session()
+    # Visitar la página primero (algunos endpoints requieren la sesión "activada")
+    session.get(f"{WANSOFT_URL}/Production/SaucerRecipe", timeout=30)
 
-    saucers_page, urls, _html = discover(session)
-    saucers = get_saucer_list(session, saucers_page, urls)
+    # Catálogos
+    n_products = save_catalog(session, "Inventory/GetRecipeProductsBySubsidiary", "recipe_products")
+    n_units = save_catalog(session, "Inventory/GetUnitsOfMeasureBySubsidiary", "units_of_measure")
+
+    # Platillos
+    saucers = get_saucers(session)
     if not saucers:
-        msg = "Recipe scraper: no encontré la lista de platillos. Revisa logs de discovery."
+        msg = "Recipe scraper: Menu/GetSaucerAndComplementaryListBySubsidiary no regresó platillos."
         print(f"[FAIL] {msg}")
         telegram(f"⚠️ {msg}")
         log_run("error", "no saucer list", int((time.time() - start) * 1000))
         return
-
-    print(f"\n[Total] {len(saucers)} platillos. Buscando endpoint de receta...")
-    path, pname, method = None, None, None
-    for sid, sname in saucers[:5]:
-        path, pname, method = find_recipe_endpoint(session, urls, sid)
-        if path:
-            break
-    if not path:
-        msg = f"Recipe scraper: encontré {len(saucers)} platillos pero ningún endpoint de ingredientes respondió. URLs descubiertas: {', '.join(urls[:10])}"
-        print(f"[FAIL] {msg}")
-        telegram(f"⚠️ {msg}")
-        log_run("error", "no recipe endpoint", int((time.time() - start) * 1000))
-        return
+    print(f"\n[Total] {len(saucers)} platillos")
 
     ok, empty, fail = 0, 0, 0
-    for i, (sid, sname) in enumerate(saucers):
-        ingredients, raw = fetch_recipe(session, path, pname, method, sid)
+    for i, (sid, sname, extra) in enumerate(saucers):
+        ingredients, raw = get_recipe(session, sid)
         if ingredients:
-            if sb_upsert_recipe(sid, sname, ingredients, raw):
+            if sb_upsert_recipe(sid, sname, ingredients, raw, extra):
                 ok += 1
-                n = len(ingredients) if isinstance(ingredients, list) else "?"
-                print(f"  [{i+1}/{len(saucers)}] {sname}: {n} ingredientes")
+                if ok <= 3:
+                    print(f"    Sample ingrediente: {json.dumps(ingredients[0], ensure_ascii=False, default=str)[:250]}")
+                print(f"  [{i+1}/{len(saucers)}] {sname}: {len(ingredients)} ingredientes")
             else:
                 fail += 1
         else:
             empty += 1
-            print(f"  [{i+1}/{len(saucers)}] {sname}: sin receta")
-        time.sleep(0.3)
+        time.sleep(0.25)
 
     dur = int((time.time() - start) * 1000)
-    summary = f"Recetas Wansoft: {ok} guardadas, {empty} sin receta, {fail} errores (de {len(saucers)} platillos)"
+    summary = (f"Recetas Wansoft: {ok} guardadas, {empty} sin receta, {fail} errores "
+               f"(de {len(saucers)} platillos). Catálogos: {n_products} insumos, {n_units} unidades.")
     print(f"\n[DONE] {summary}")
     telegram(f"📖 {summary}")
     log_run("success" if ok > 0 else "error", summary, dur)
