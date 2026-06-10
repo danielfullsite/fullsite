@@ -52,10 +52,13 @@ export async function groqChat(options: GroqOptions): Promise<string> {
       return data.choices?.[0]?.message?.content || ''
     }
 
-    // Rate limit — wait and retry
+    // Rate limit — wait and retry (cap at 5s to avoid Vercel timeout)
     if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') || '2')
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after') || '2'), 5)
       console.warn(`[groq] Rate limited, waiting ${retryAfter}s (attempt ${attempt + 1}/3)`)
+      if (retryAfter > 5) {
+        throw new Error('Groq daily limit reached. Intenta de nuevo más tarde.')
+      }
       await new Promise(r => setTimeout(r, retryAfter * 1000))
       continue
     }
