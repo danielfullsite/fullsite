@@ -85,38 +85,71 @@ def wansoft_session():
 
 
 AJAX_RE = re.compile(
-    r"""url\s*:\s*GetRootUrl\(\)\s*\+\s*['"]([^'"]+)['"]\s*,\s*(?:type\s*:\s*['"](\w+)['"]\s*,\s*)?(?:data\s*:\s*(\{.*?\})\s*,)?""",
+    r"""url\s*:\s*GetRootUrl\(\)\s*\+\s*['"]([^'"]+)['"]\s*,?\s*(?:type\s*:\s*['"](\w+)['"]\s*,\s*)?(?:data\s*:\s*(\{.*?\})\s*,)?""",
     re.DOTALL,
 )
+# urls sin GetRootUrl: url: '/Wansoft.Web/Reports/GetX' o url: 'Reports/GetX'
+AJAX_RE2 = re.compile(
+    r"""url\s*:\s*['"](/?(?:Wansoft\.Web/)?[A-Za-z][A-Za-z0-9_]*/[A-Za-z0-9_]+)['"]""",
+)
+
+
+def extract_endpoints(text, source):
+    endpoints = []
+    for m in AJAX_RE.finditer(text):
+        url, method, data = m.group(1), m.group(2) or "POST", m.group(3) or ""
+        params = sorted(set(re.findall(r"(\w+)\s*:", data)))
+        endpoints.append({"url": url, "method": method, "params": params, "js": source})
+    for m in AJAX_RE2.finditer(text):
+        url = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
+        if not any(e["url"].lstrip("/") == url for e in endpoints):
+            endpoints.append({"url": url, "method": "?", "params": [], "js": source})
+    # Forms con action (los Export usan form post)
+    for m in re.finditer(r"""action\s*=\s*["'](/?(?:Wansoft\.Web/)?[A-Za-z][A-Za-z0-9_]*/[A-Za-z0-9_]+)["']""", text):
+        url = m.group(1).lstrip("/").replace("Wansoft.Web/", "")
+        if not any(e["url"].lstrip("/") == url for e in endpoints):
+            endpoints.append({"url": url, "method": "FORM", "params": [], "js": source})
+    return endpoints
 
 
 def discover_page(session, page):
     """GET la página, baja sus JS de ScriptsViews y extrae llamadas ajax."""
     try:
-        r = session.get(f"{WANSOFT_URL}/{page}", timeout=30)
+        r = session.get(f"{WANSOFT_URL}/{page}", timeout=30, allow_redirects=True)
     except Exception as e:
         return {"status": "error", "error": str(e)}
     if r.status_code != 200:
         return {"status": f"http_{r.status_code}"}
-    # Página inexistente redirige a login/dashboard o regresa 404 custom
-    if "UserName" in r.text and "Password" in r.text and len(r.text) < 50000:
-        return {"status": "redirect_login"}
+    final_path = r.url.split("Wansoft.Web/")[-1].split("?")[0].rstrip("/")
+    if final_path.lower() != page.lower():
+        return {"status": f"redirect→{final_path}"}
+
+    title_m = re.search(r"<title>(.*?)</title>", r.text, re.DOTALL)
+    title = (title_m.group(1).strip() if title_m else "")[:60]
 
     js_files = set(re.findall(r"""["']([^"']*ScriptsViews/[A-Za-z0-9_/\.]+\.js)["']""", r.text))
-    endpoints = []
+    # Inline scripts de la página también
+    endpoints = extract_endpoints(r.text, "(inline)")
     for js in sorted(js_files):
         js_path = js.lstrip("/").replace("Wansoft.Web/", "")
+        if "Shared/" in js_path:  # Layout.js solo trae ActivateSession
+            continue
         try:
             jr = session.get(f"{WANSOFT_URL}/{js_path}", timeout=30)
-            if jr.status_code != 200:
-                continue
-            for m in AJAX_RE.finditer(jr.text):
-                url, method, data = m.group(1), m.group(2) or "POST", m.group(3) or ""
-                params = sorted(set(re.findall(r"(\w+)\s*:", data)))
-                endpoints.append({"url": url, "method": method, "params": params, "js": js_path})
+            if jr.status_code == 200:
+                endpoints.extend(extract_endpoints(jr.text, js_path))
         except Exception as e:
             print(f"    [!] {js_path}: {e}")
-    return {"status": "ok", "js_files": sorted(js_files), "endpoints": endpoints}
+    # Dedupe + filtrar ruido
+    seen, clean = set(), []
+    for e in endpoints:
+        u = e["url"].lstrip("/")
+        if u in seen or u.endswith((".js", ".css")) or "ActivateSession" in u or "ScriptsViews" in u:
+            continue
+        seen.add(u)
+        clean.append(e)
+    return {"status": "ok", "title": title, "len": len(r.text),
+            "js_files": sorted(js_files), "endpoints": clean}
 
 
 def main():
@@ -131,7 +164,7 @@ def main():
         result = discover_page(session, page)
         full_map[page] = result
         n = len(result.get("endpoints", []))
-        print(f"\n[{page}] status={result['status']} endpoints={n}")
+        print(f"\n[{page}] status={result['status']} title={result.get('title','')!r} len={result.get('len',0)} endpoints={n}")
         for ep in result.get("endpoints", []):
             print(f"    {ep['method']} {ep['url']}  params={ep['params']}")
         time.sleep(0.3)
