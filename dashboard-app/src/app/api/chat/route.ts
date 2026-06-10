@@ -83,18 +83,33 @@ export async function POST(request: NextRequest) {
 
     // 1. Recent daily data — OPTIMIZED: 14 days default, 90 for history questions
     const wantsHistory = ['historial', 'historia', 'abril', 'marzo', 'febrero', 'enero', 'tendencia', 'mejorado', 'semana', 'mes', 'comparar', 'compara', 'mejor día', 'peor día', 'patrón', 'últimos', 'año pasado', 'año anterior', 'yoy', 'vs 2025', 'vs año'].some(kw => q.includes(kw))
-    const wantsDetail = true // Always load full detail — no reason to skimp on data
+    const wantsDetail = true // Always load full detail
     const histLimit = wantsHistory ? 90 : 14
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const selectCols = wantsDetail
-      ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
-      : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
-    const dailyRes = await fetch(
-      `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-    )
-    const recentDays = dailyRes.ok ? await dailyRes.json() : []
+    const sbHeaders = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    const selectCols = 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top'
+
+    // ── PARALLEL DATA LOADING ── All queries run at once to stay under Vercel 10s limit
+    const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió', 'omar', 'brayan', 'julio', 'daniela', 'mauricio', 'oscar', 'alexis', 'hector', 'crack', 'manco', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos'].some(kw => q.includes(kw))
+    const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato'].some(kw => q.includes(kw))
+    const wantsReservas = ['reserv', 'proxim', 'próxim', 'evento', 'fiesta', 'cumple', 'boda', 'terraza', 'jardin', 'jardín', 'paquete', 'pastel', 'invitados'].some(kw => q.includes(kw))
+    const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
+
+    const fetches: Promise<unknown>[] = [
+      // 0: Daily data (always)
+      fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      // 1: Waiter categories (conditional)
+      wantsMeseros ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 2: Food cost (conditional)
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 3: Reservaciones (conditional)
+      wantsReservas ? fetch(`${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.desc&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 4: POS orders (conditional)
+      wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+    ]
+
+    const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
 
     // 2. Detect date from question
     const now = new Date()
@@ -153,39 +168,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Waiter × platillo data — ONLY load when question is about waiters/rankings
+    // 3. Waiter × platillo data — process results from parallel fetch
     let waiterContext = ''
-    const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió', 'omar', 'brayan', 'julio', 'daniela', 'mauricio', 'oscar', 'alexis', 'hector', 'crack', 'manco', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos'].some(kw => q.includes(kw))
-
-    let wcParams = 'select=fecha,data&order=fecha.desc'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let waiterRows: Array<{ fecha: string; data: any }> = []
+    let waiterRows = (waiterRowsRaw || []) as Array<{ fecha: string; data: any }>
     if (wantsMeseros) {
-    if (dateFilter) {
-      if (dateFilter.start === dateFilter.end) {
-        wcParams += `&fecha=eq.${dateFilter.start}`
-      } else {
-        wcParams += `&and=(fecha.gte.${dateFilter.start},fecha.lte.${dateFilter.end})`
-      }
-    } else {
-      wcParams += '&limit=7'
-    }
-
-    const wcRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
-      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
-      cache: 'no-store',
-    })
-    waiterRows = wcRes.ok ? await wcRes.json() : []
-
-    // If no results for specific date, fallback to most recent
-    if (waiterRows.length === 0 && dateFilter) {
-      const fallbackRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=1`, {
-        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
-        cache: 'no-store',
-      })
-      const fallbackRows = fallbackRes.ok ? await fallbackRes.json() : []
-      if (fallbackRows.length > 0) waiterRows.push(...fallbackRows)
-    }
 
     if (waiterRows && waiterRows.length > 0) {
       // Detect if question mentions a specific mesero
@@ -339,102 +326,59 @@ export async function POST(request: NextRequest) {
     }
     } // end wantsMeseros
 
-    // 2b. Food cost data — load when question mentions cost, margin, insumo, food cost
+    // 2b. Process food cost (from parallel fetch)
     let foodCostContext = ''
-    const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato'].some(kw => q.includes(kw))
-    if (wantsFoodCost) {
+    if (wantsFoodCost && Array.isArray(fcRowsRaw) && fcRowsRaw.length > 0) {
       try {
-        const fcRes = await fetch(
-          `${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-        )
-        if (fcRes.ok) {
-          const fcRows = await fcRes.json()
-          if (fcRows.length > 0) {
-            const fcData = typeof fcRows[0].data === 'string' ? JSON.parse(fcRows[0].data) : fcRows[0].data
-            if (Array.isArray(fcData) && fcData.length > 0) {
-              const fcLines = fcData
-                .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.subtotal_venta || 0) - Number(a.subtotal_venta || 0))
-                .slice(0, 30)
-                .map((item: Record<string, unknown>) => {
-                  const nombre = item.platillo || item.nombre || 'Sin nombre'
-                  const grupo = item.grupo || ''
-                  const qty = Number(item.cantidad || 0)
-                  const ventaTotal = Number(item.subtotal_venta || 0)
-                  const costoReal = Number(item.costo_real || 0)
-                  const costoPct = Number(item.costo_real_pct || 0)
-                  const costoIdealPct = Number(item.costo_ideal_pct || 0)
-                  const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
-                  const costoUnit = qty > 0 ? Math.round(costoReal / qty) : 0
-                  return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}% real, ${costoIdealPct.toFixed(1)}% ideal), PrecioUnit $${precioUnit}, CostoUnit $${costoUnit}`
-                })
-
-              // Calculate overall food cost
-              const totalVentas = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.subtotal_venta || 0), 0)
-              const totalCosto = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.costo_real || 0), 0)
-              const overallPct = totalVentas > 0 ? ((totalCosto / totalVentas) * 100).toFixed(1) : '0'
-
-              foodCostContext = `\n\nDATOS DE FOOD COST (fecha: ${fcRows[0].fecha}, ${fcData.length} platillos):\nFOOD COST GENERAL: ${overallPct}% (Costo total $${Math.round(totalCosto)} / Ventas $${Math.round(totalVentas)})\n\nDETALLE POR PLATILLO (top 30 por venta):\n${fcLines.join('\n')}\n\nINSUMO MÁS CARO = platillo con mayor CostoUnit. INSUMO MÁS COMPRADO = platillo con mayor cantidad.`
-              console.log(`[chat] Food cost loaded: ${fcData.length} items, overall ${overallPct}%`)
-            }
-          }
+        const fcData = typeof fcRowsRaw[0].data === 'string' ? JSON.parse(fcRowsRaw[0].data as string) : fcRowsRaw[0].data
+        if (Array.isArray(fcData) && fcData.length > 0) {
+          const fcLines = fcData
+            .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.subtotal_venta || 0) - Number(a.subtotal_venta || 0))
+            .slice(0, 20)
+            .map((item: Record<string, unknown>) => {
+              const nombre = item.platillo || item.nombre || 'Sin nombre'
+              const grupo = item.grupo || ''
+              const qty = Number(item.cantidad || 0)
+              const ventaTotal = Number(item.subtotal_venta || 0)
+              const costoReal = Number(item.costo_real || 0)
+              const costoPct = Number(item.costo_real_pct || 0)
+              const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
+              const costoUnit = qty > 0 ? Math.round(costoReal / qty) : 0
+              return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}%), PU $${precioUnit}, CU $${costoUnit}`
+            })
+          const totalVentas = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.subtotal_venta || 0), 0)
+          const totalCosto = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.costo_real || 0), 0)
+          const overallPct = totalVentas > 0 ? ((totalCosto / totalVentas) * 100).toFixed(1) : '0'
+          foodCostContext = `\n\nFOOD COST (${overallPct}% general, $${Math.round(totalCosto)}/$${Math.round(totalVentas)}):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
         }
-      } catch (err) {
-        console.error('[chat] Food cost error:', err)
-      }
+      } catch { /* */ }
     }
 
-    // 2c. Reservaciones — load when question mentions reservas, eventos, fiestas
+    // 2c. Process reservaciones (from parallel fetch)
     let reservasContext = ''
-    const wantsReservas = ['reserv', 'proxim', 'próxim', 'evento', 'fiesta', 'cumple', 'boda', 'terraza', 'jardin', 'jardín', 'paquete', 'pastel', 'invitados'].some(kw => q.includes(kw))
-    if (wantsReservas) {
-      try {
-        const resRes = await fetch(
-          `${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,horario_fin,guests,paquete,pastel,total,status,codigo_reserva&order=fecha.desc&limit=20`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-        )
-        if (resRes.ok) {
-          const reservas = await resRes.json()
-          if (reservas.length > 0) {
-            const lines = reservas.map((r: Record<string, unknown>) =>
-              `${r.fecha} ${r.horario_inicio || ''} | ${r.nombre} | ${r.guests} personas | ${r.espacio} | ${r.paquete || 'sin paquete'} | $${Math.round(Number(r.total) || 0)} | ${r.status} | ${r.codigo_reserva || ''}`
-            )
-            const futuras = reservas.filter((r: Record<string, unknown>) => String(r.fecha) >= new Date().toISOString().split('T')[0])
-            reservasContext = `\n\nRESERVACIONES (${reservas.length} total, ${futuras.length} futuras):\n${lines.join('\n')}`
-          }
-        }
-      } catch { /* optional */ }
+    if (wantsReservas && Array.isArray(reservasRaw) && reservasRaw.length > 0) {
+      const lines = reservasRaw.map((r) => `${r.fecha} ${r.horario_inicio || ''} | ${r.nombre} | ${r.guests} personas | ${r.espacio} | ${r.paquete || ''} | $${Math.round(Number(r.total) || 0)} | ${r.status}`)
+      const futuras = reservasRaw.filter((r) => String(r.fecha) >= new Date().toISOString().split('T')[0])
+      reservasContext = `\n\nRESERVACIONES (${reservasRaw.length} total, ${futuras.length} futuras):\n${lines.join('\n')}`
     }
 
-    // 2d. POS orders — load when question mentions órdenes, cancelaciones, tickets del POS
+    // 2d. Process POS orders (from parallel fetch)
     let ordersContext = ''
-    const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
-    if (wantsOrders) {
-      try {
-        const ordRes = await fetch(
-          `${sbUrl}/rest/v1/pos_orders?select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-        )
-        if (ordRes.ok) {
-          const orders = await ordRes.json()
-          if (orders.length > 0) {
-            const byStatus: Record<string, { count: number; total: number }> = {}
-            for (const o of orders) {
-              const s = String(o.status || 'unknown')
-              if (!byStatus[s]) byStatus[s] = { count: 0, total: 0 }
-              byStatus[s].count++
-              byStatus[s].total += Number(o.total) || 0
-            }
-            const statusLines = Object.entries(byStatus).map(([s, d]) => `  ${s}: ${d.count} órdenes, $${Math.round(d.total)}`)
-            const canceladas = orders.filter((o: Record<string, unknown>) => o.status === 'cancelada')
-            let cancelInfo = ''
-            if (canceladas.length > 0) {
-              cancelInfo = `\nÚLTIMAS CANCELADAS:\n${canceladas.slice(0, 5).map((o: Record<string, unknown>) => `  Mesa ${o.mesa} | ${o.mesero} | $${Math.round(Number(o.total) || 0)} | ${String(o.created_at).slice(0, 16)}`).join('\n')}`
-            }
-            ordersContext = `\n\nÓRDENES POS (últimas ${orders.length}):\n${statusLines.join('\n')}${cancelInfo}`
-          }
-        }
-      } catch { /* optional */ }
+    if (wantsOrders && Array.isArray(ordersRaw) && ordersRaw.length > 0) {
+      const byStatus: Record<string, { count: number; total: number }> = {}
+      for (const o of ordersRaw) {
+        const s = String(o.status || 'unknown')
+        if (!byStatus[s]) byStatus[s] = { count: 0, total: 0 }
+        byStatus[s].count++
+        byStatus[s].total += Number(o.total) || 0
+      }
+      const statusLines = Object.entries(byStatus).map(([s, d]) => `  ${s}: ${d.count} órdenes, $${Math.round(d.total)}`)
+      const canceladas = ordersRaw.filter((o) => o.status === 'cancelada')
+      let cancelInfo = ''
+      if (canceladas.length > 0) {
+        cancelInfo = `\nCANCELADAS:\n${canceladas.slice(0, 5).map((o) => `  Mesa ${o.mesa} | ${o.mesero} | $${Math.round(Number(o.total) || 0)}`).join('\n')}`
+      }
+      ordersContext = `\n\nÓRDENES POS (${ordersRaw.length}):\n${statusLines.join('\n')}${cancelInfo}`
     }
 
     // 3. Build daily context
@@ -571,8 +515,8 @@ MES ANTERIOR (${prevMonthPrefix}): Ventas $${Math.round(pmVentas)}, ${Math.round
               for (const row of recentDays) {
                 const m = (row.fecha as string).slice(0, 7)
                 if (!currMonthly[m]) currMonthly[m] = { ventas: 0, tickets: 0, dias: 0 }
-                currMonthly[m].ventas += row.ventas_dia || 0
-                currMonthly[m].tickets += row.tickets_count || 0
+                currMonthly[m].ventas += Number(row.ventas_dia) || 0
+                currMonthly[m].tickets += Number(row.tickets_count) || 0
                 currMonthly[m].dias += 1
               }
               const yoyLines = [`\nCOMPARATIVO AÑO ANTERIOR (${currentYear} vs ${prevYear}):`]
