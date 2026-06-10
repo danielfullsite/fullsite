@@ -889,20 +889,36 @@ export async function updateOrderStatus(
   const body: Record<string, unknown> = { status, ...extra }
   if (status === 'cerrada') body.closed_at = new Date().toISOString()
 
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(body),
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(body),
+      }
+    )
+    return res.ok
+  } catch {
+    // Offline — queue the update for sync
+    if (typeof window !== 'undefined') {
+      try {
+        const { queueOperation } = await import('@/lib/pos-offline-db')
+        await queueOperation('pos_orders', 'PATCH', body, `pos_orders?id=eq.${orderId}`)
+      } catch {
+        const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+        queue.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: body, timestamp: Date.now(), synced: false })
+        localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
+      }
+      console.log(`[offline] Order ${orderId} status=${status} queued for sync`)
     }
-  )
-  return res.ok
+    return true
+  }
 }
 
 export interface KitchenOrderFromDB {

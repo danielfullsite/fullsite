@@ -119,11 +119,32 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setAttempts(0)
           sessionStorage.setItem('pos_staff', JSON.stringify(member))
           sessionStorage.setItem('pos_last_activity', Date.now().toString())
+          // Cache PIN for offline auth
+          try {
+            const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
+            cached[pin] = { ...member, cached_at: Date.now() }
+            localStorage.setItem('pos_pin_cache', JSON.stringify(cached))
+          } catch { /* ignore */ }
           setChecking(false)
           return
         }
       }
-    } catch { /* DB not available, try fallback */ }
+    } catch {
+      // DB not available — check cached PINs
+      try {
+        const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
+        if (cached[pin]) {
+          const member = { id: cached[pin].id, name: cached[pin].name, role: cached[pin].role }
+          setStaff(member)
+          setUnlocked(true)
+          setAttempts(0)
+          sessionStorage.setItem('pos_staff', JSON.stringify(member))
+          sessionStorage.setItem('pos_last_activity', Date.now().toString())
+          setChecking(false)
+          return
+        }
+      } catch { /* ignore */ }
+    }
 
     // Fallback PIN
     if (pin === FALLBACK_PIN) {
