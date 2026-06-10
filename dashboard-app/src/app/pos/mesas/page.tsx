@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, Settings, RotateCcw, Check } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
@@ -12,163 +12,99 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
-// ─── Floor Plan Zones ────────────────────────────────────────────────────────
-// Each zone has a name and the mesa numbers that belong to it.
-// Mesas within a zone are positioned on a relative grid.
-interface ZoneMesa {
+// ─── Plano arquitectónico AMALAY ─────────────────────────────────────────────
+// Réplica del "PLANO DE MESAS DE RESTAURANTE" físico (foto 2026-06-10).
+// Cada mesa tiene posición (x,y en % del canvas), forma y sillas dibujadas.
+
+type TableShape = 'round' | 'round-lg' | 'square' | 'rect-h'
+
+interface FloorTable {
   number: number
-  gridRow: number
-  gridCol: number
-  width?: number   // span columns (default 1)
-  height?: number  // span rows (default 1)
-  shape?: 'square' | 'round' | 'rect-h' | 'rect-v'
+  x: number  // % desde la izquierda (centro de la mesa)
+  y: number  // % desde arriba (centro de la mesa)
+  shape: TableShape
 }
 
-interface FloorZone {
-  id: string
-  name: string
-  gridCols: number
-  gridRows: number
-  mesas: ZoneMesa[]
-  color: string     // accent color for zone header
-  bgColor: string   // background tint
-  originRow?: number // position of the zone within the master floor grid
-  originCol?: number
+const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
+  round: { w: 54, h: 54 },
+  'round-lg': { w: 72, h: 72 },
+  square: { w: 56, h: 52 },
+  'rect-h': { w: 88, h: 50 },
 }
 
-// Layout real AMALAY — del plano de mesas físico (foto 2026-06-10). Configurable por cliente via localStorage.
-const DEFAULT_FLOOR_ZONES: FloorZone[] = [
-  {
-    id: 'entrada',
-    name: 'Entrada',
-    gridCols: 4,
-    gridRows: 2,
-    originRow: 1,
-    originCol: 1,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/5',
-    mesas: [
-      { number: 45, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 1, gridRow: 1, gridCol: 2, shape: 'round' },
-      { number: 2, gridRow: 1, gridCol: 3, shape: 'round' },
-      { number: 3, gridRow: 1, gridCol: 4, shape: 'round' },
-      { number: 4, gridRow: 2, gridCol: 3, shape: 'round' },
-    ],
-  },
-  {
-    id: 'lamparas',
-    name: 'Lámparas',
-    gridCols: 3,
-    gridRows: 2,
-    originRow: 1,
-    originCol: 6,
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/5',
-    mesas: [
-      { number: 5, gridRow: 1, gridCol: 1, shape: 'rect-h' },
-      { number: 6, gridRow: 1, gridCol: 2, shape: 'rect-h' },
-      { number: 7, gridRow: 1, gridCol: 3, shape: 'rect-h' },
-      { number: 9, gridRow: 2, gridCol: 1, shape: 'round' },
-      { number: 8, gridRow: 2, gridCol: 2, shape: 'round' },
-    ],
-  },
-  {
-    id: 'pasillo',
-    name: 'Pasillo',
-    gridCols: 1,
-    gridRows: 3,
-    originRow: 3,
-    originCol: 1,
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-500/5',
-    mesas: [
-      { number: 44, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 43, gridRow: 3, gridCol: 1, shape: 'round' },
-    ],
-  },
-  {
-    id: 'terraza',
-    name: 'Terraza',
-    gridCols: 3,
-    gridRows: 3,
-    originRow: 3,
-    originCol: 2,
-    color: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/5',
-    mesas: [
-      { number: 21, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 20, gridRow: 1, gridCol: 2, shape: 'round' },
-      { number: 32, gridRow: 2, gridCol: 1, shape: 'round' },
-      { number: 31, gridRow: 2, gridCol: 2, shape: 'round' },
-      { number: 30, gridRow: 2, gridCol: 3, shape: 'round' },
-      { number: 42, gridRow: 3, gridCol: 1, shape: 'rect-h' },
-      { number: 41, gridRow: 3, gridCol: 2, shape: 'rect-h' },
-      { number: 40, gridRow: 3, gridCol: 3, shape: 'rect-h' },
-    ],
-  },
-  {
-    id: 'barra',
-    name: 'Barra',
-    gridCols: 1,
-    gridRows: 3,
-    originRow: 3,
-    originCol: 6,
-    color: 'text-rose-400',
-    bgColor: 'bg-rose-500/5',
-    mesas: [
-      { number: 10, gridRow: 1, gridCol: 1, shape: 'square' },
-      { number: 11, gridRow: 2, gridCol: 1, shape: 'square' },
-      { number: 12, gridRow: 3, gridCol: 1, shape: 'square' },
-    ],
-  },
-  {
-    id: 'toldo',
-    name: 'Toldo',
-    gridCols: 3,
-    gridRows: 2,
-    originRow: 6,
-    originCol: 1,
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/5',
-    mesas: [
-      { number: 50, gridRow: 1, gridCol: 1, shape: 'rect-h' },
-      { number: 53, gridRow: 1, gridCol: 2, shape: 'rect-h' },
-      { number: 55, gridRow: 1, gridCol: 3, shape: 'rect-h' },
-      { number: 51, gridRow: 2, gridCol: 1, shape: 'rect-h' },
-      { number: 52, gridRow: 2, gridCol: 2, shape: 'rect-h' },
-      { number: 54, gridRow: 2, gridCol: 3, shape: 'rect-h' },
-    ],
-  },
-  {
-    id: 'privado',
-    name: 'Privado',
-    gridCols: 2,
-    gridRows: 2,
-    originRow: 6,
-    originCol: 6,
-    color: 'text-purple-400',
-    bgColor: 'bg-purple-500/5',
-    mesas: [
-      { number: 61, gridRow: 1, gridCol: 1, shape: 'rect-h' },
-      { number: 63, gridRow: 1, gridCol: 2, shape: 'rect-h' },
-      { number: 60, gridRow: 2, gridCol: 1, shape: 'rect-h' },
-      { number: 62, gridRow: 2, gridCol: 2, shape: 'rect-h' },
-    ],
-  },
+// Posiciones calcadas del plano físico
+const FLOOR_TABLES: FloorTable[] = [
+  // ── Fila superior: 45 | divisor | 1 2 3 (ENTRADA) · 5 6 7 (LÁMPARAS)
+  { number: 45, x: 9, y: 9, shape: 'round' },
+  { number: 1, x: 22, y: 9, shape: 'round' },
+  { number: 2, x: 30, y: 9, shape: 'round' },
+  { number: 3, x: 38, y: 9, shape: 'round' },
+  { number: 5, x: 56, y: 9, shape: 'rect-h' },
+  { number: 6, x: 65, y: 9, shape: 'rect-h' },
+  { number: 7, x: 74, y: 9, shape: 'rect-h' },
+  // ── Segunda fila: 4 (entrada) · 9 8 (lámparas)
+  { number: 4, x: 31, y: 22, shape: 'round' },
+  { number: 9, x: 60, y: 22, shape: 'round' },
+  { number: 8, x: 69, y: 22, shape: 'round' },
+  // ── Pasillo (columna izquierda)
+  { number: 44, x: 9, y: 35, shape: 'round' },
+  { number: 43, x: 9, y: 58, shape: 'round' },
+  // ── Terraza
+  { number: 21, x: 27, y: 35, shape: 'square' },
+  { number: 20, x: 37, y: 35, shape: 'round' },
+  { number: 32, x: 26, y: 47, shape: 'round' },
+  { number: 31, x: 35, y: 47, shape: 'round' },
+  { number: 30, x: 45, y: 47, shape: 'round-lg' },
+  { number: 42, x: 27, y: 59, shape: 'rect-h' },
+  { number: 41, x: 36.5, y: 59, shape: 'rect-h' },
+  { number: 40, x: 46, y: 59, shape: 'rect-h' },
+  // ── Barra (columna)
+  { number: 10, x: 57, y: 34, shape: 'square' },
+  { number: 11, x: 57, y: 46, shape: 'square' },
+  { number: 12, x: 57, y: 58, shape: 'square' },
+  // ── Toldo (exterior, abajo izquierda)
+  { number: 50, x: 12, y: 78, shape: 'rect-h' },
+  { number: 53, x: 24, y: 78, shape: 'rect-h' },
+  { number: 55, x: 36, y: 78, shape: 'rect-h' },
+  { number: 51, x: 12, y: 91, shape: 'rect-h' },
+  { number: 52, x: 24, y: 91, shape: 'rect-h' },
+  { number: 54, x: 36, y: 91, shape: 'rect-h' },
+  // ── Privado (exterior, abajo derecha)
+  { number: 61, x: 68, y: 78, shape: 'rect-h' },
+  { number: 63, x: 80, y: 78, shape: 'rect-h' },
+  { number: 60, x: 68, y: 91, shape: 'rect-h' },
+  { number: 62, x: 80, y: 91, shape: 'rect-h' },
 ]
 
-// v3: mapa unificado con posiciones de zona (originRow/originCol) — key bump invalida layouts previos
-function getFloorZones(): FloorZone[] {
-  try {
-    const saved = localStorage.getItem(`pos_floor_v3_${_cid()}`)
-    if (saved) return JSON.parse(saved)
-  } catch { /* use default */ }
-  return DEFAULT_FLOOR_ZONES
-}
+interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
 
-function saveFloorZones(zones: FloorZone[]) {
-  try { localStorage.setItem(`pos_floor_v3_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
-}
+const FLOOR_LABELS: FloorLabel[] = [
+  { text: 'ENTRADA', x: 30, y: 16 },
+  { text: 'LÁMPARAS', x: 65, y: 16 },
+  { text: 'PASILLO', x: 3, y: 46, vertical: true },
+  { text: 'TERRAZA', x: 35, y: 41 },
+  { text: 'BARRA', x: 64, y: 41 },
+  { text: 'TOLDO', x: 24, y: 70 },
+  { text: 'PRIVADO', x: 56, y: 84, vertical: true },
+]
+
+// Paredes / muros del plano (verde = muro terraza, vino = barra física)
+interface FloorWall { x: number; y: number; w: number; h: number; color: 'green' | 'maroon' }
+
+const FLOOR_WALLS: FloorWall[] = [
+  // Divisor verde junto a mesa 45 (entrada)
+  { x: 15.5, y: 3.5, w: 0.7, h: 11, color: 'green' },
+  // Muro terraza: vertical izquierdo (superior), horizontal superior, bloque vino esquina, vertical derecho
+  { x: 19.5, y: 28.5, w: 0.7, h: 14, color: 'green' },
+  { x: 19.5, y: 28.5, w: 23, h: 1.2, color: 'green' },
+  { x: 42.5, y: 27.8, w: 7.5, h: 2.6, color: 'maroon' },
+  { x: 50.5, y: 30.5, w: 0.7, h: 33, color: 'green' },
+  // Muro terraza: vertical izquierdo (inferior, junto a 42)
+  { x: 19.5, y: 52, w: 0.7, h: 12, color: 'green' },
+  // Barra física en L (vino) con texto vertical
+  { x: 71, y: 31, w: 14, h: 4, color: 'maroon' },
+  { x: 71, y: 31, w: 4.5, h: 30, color: 'maroon' },
+]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -200,8 +136,6 @@ export default function MesasPage() {
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
-  const [editMode, setEditMode] = useState(false)
-  const [floorZonesState, setFloorZonesState] = useState<FloorZone[]>(getFloorZones)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -415,96 +349,145 @@ export default function MesasPage() {
     )
   }
 
-  // ─── Planograma View ──────────────────────────────────────────────────────
-  const floorZones = floorZonesState
+  // ─── Planograma View (plano arquitectónico) ───────────────────────────────
 
-  // Un solo canvas tipo plano arquitectonico: las zonas son "habitaciones"
-  // posicionadas en un grid maestro, igual que el plano fisico del restaurante.
-  const MASTER_COLS = 8
-  const masterRows = Math.max(...floorZones.map(z => (z.originRow || 1) + z.gridRows - 1))
+  // Sillas alrededor de una mesa, según forma y capacidad
+  const Chairs = ({ shape, capacity, status }: { shape: TableShape; capacity: number; status: string }) => {
+    const { w, h } = TABLE_SIZE[shape]
+    const chairClass = `absolute w-[13px] h-[13px] rounded-full ${
+      status === 'ocupada' ? 'bg-blue-500/70' :
+      status === 'cuenta' ? 'bg-amber-500/70' : 'bg-slate-500/60'
+    }`
+    const chairs: { left: number; top: number }[] = []
 
-  const PlanogramaView = () => (
-    <div className="overflow-x-auto pb-2">
-      <div className="bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl p-5 max-w-7xl mx-auto min-w-[880px]">
-        <div
-          className="grid gap-2"
-          style={{
-            gridTemplateColumns: `repeat(${MASTER_COLS}, 1fr)`,
-            gridTemplateRows: `repeat(${masterRows}, minmax(92px, auto))`,
-          }}
-        >
-          {floorZones.map(zone => {
-            const oR = zone.originRow || 1
-            const oC = zone.originCol || 1
-            const zoneMesas = zone.mesas
-              .map(zm => ({ ...zm, mesa: mesaMap.get(zm.number) }))
-              .filter(zm => zm.mesa)
-              .filter(zm => {
-                if (!soloMisMesas || !currentMesero) return true
-                return zm.mesa!.status === 'disponible' || zm.mesa!.mesero === currentMesero
-              })
-            const ocupadas = zoneMesas.filter(zm => zm.mesa!.status !== 'disponible').length
+    if (shape === 'rect-h') {
+      // Mitad arriba, mitad abajo
+      const top = Math.ceil(capacity / 2)
+      const bottom = capacity - top
+      for (let i = 0; i < top; i++) chairs.push({ left: ((i + 0.5) / top) * w - 6.5, top: -17 })
+      for (let i = 0; i < bottom; i++) chairs.push({ left: ((i + 0.5) / bottom) * w - 6.5, top: h + 4 })
+    } else if (shape === 'square') {
+      // Una por lado
+      const sides = [
+        { left: w / 2 - 6.5, top: -17 }, { left: w / 2 - 6.5, top: h + 4 },
+        { left: -17, top: h / 2 - 6.5 }, { left: w + 4, top: h / 2 - 6.5 },
+      ]
+      for (let i = 0; i < Math.min(capacity, 4); i++) chairs.push(sides[i])
+    } else {
+      // Redondas: distribuidas en círculo (4 → diagonales como en el plano)
+      const r = w / 2 + 10
+      const offset = capacity === 4 ? Math.PI / 4 : -Math.PI / 2
+      for (let i = 0; i < capacity; i++) {
+        const angle = offset + (i * 2 * Math.PI) / capacity
+        chairs.push({ left: w / 2 + r * Math.cos(angle) - 6.5, top: h / 2 + r * Math.sin(angle) - 6.5 })
+      }
+    }
 
-            return (
-              <Fragment key={zone.id}>
-                {/* Zone room background + legend label */}
-                <div
-                  className={`${zone.bgColor} border border-[var(--line)] rounded-2xl relative`}
-                  style={{
-                    gridRow: `${oR} / span ${zone.gridRows}`,
-                    gridColumn: `${oC} / span ${zone.gridCols}`,
-                  }}
-                >
-                  <div className="absolute -top-2.5 left-4 z-20 flex items-center gap-1.5 bg-[var(--surface)] px-2 rounded-full">
-                    {editMode ? (
-                      <input
-                        className={`text-[11px] font-bold uppercase tracking-widest ${zone.color} bg-transparent border-b border-dashed border-current outline-none w-24`}
-                        defaultValue={zone.name}
-                        onBlur={(e) => {
-                          const updated = floorZonesState.map(z => z.id === zone.id ? { ...z, name: e.target.value } : z)
-                          setFloorZonesState(updated)
-                        }}
-                      />
-                    ) : (
-                      <span className={`text-[11px] font-bold uppercase tracking-widest ${zone.color}`}>{zone.name}</span>
-                    )}
-                    <span className="text-[var(--text-4)] text-[10px]">{ocupadas}/{zoneMesas.length}</span>
-                  </div>
-                  {/* Watermark name (visible in empty areas, like the printed plan) */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-                    <span className={`font-bold uppercase ${zone.color} opacity-[0.08] ${
-                      zone.gridCols === 1 && zone.gridRows > 1 ? '[writing-mode:vertical-rl] text-3xl tracking-[0.3em]' : 'text-3xl tracking-[0.3em]'
-                    }`}>
-                      {zone.name}
-                    </span>
-                  </div>
-                </div>
-                {/* Mesas of this zone, placed on the master grid */}
-                {zoneMesas.map(zm => (
-                  <div
-                    key={zm.number}
-                    className="relative z-10 p-1.5"
-                    style={{
-                      gridRow: `${oR + zm.gridRow - 1} / span ${zm.height || 1}`,
-                      gridColumn: `${oC + zm.gridCol - 1} / span ${zm.width || 1}`,
-                    }}
-                  >
-                    <MesaCard mesa={zm.mesa!} shape={zm.shape} compact />
-                  </div>
-                ))}
-              </Fragment>
-            )
-          })}
+    return (
+      <>
+        {chairs.map((c, i) => (
+          <div key={i} className={chairClass} style={{ left: c.left, top: c.top }} />
+        ))}
+      </>
+    )
+  }
+
+  const FloorTableNode = ({ ft }: { ft: FloorTable }) => {
+    const mesa = mesaMap.get(ft.number)
+    if (!mesa) return null
+    const order = ordersByMesa.get(mesa.number)
+    const mins = order ? getMinutes(order.created_at) : 0
+    const isAlert = mins >= ALERT_THRESHOLD
+    const isWarning = mins >= WARNING_THRESHOLD && mins < ALERT_THRESHOLD
+    const { w, h } = TABLE_SIZE[ft.shape]
+    const dimmed = soloMisMesas && currentMesero && mesa.status !== 'disponible' && mesa.mesero !== currentMesero
+
+    return (
+      <div
+        className={`absolute ${dimmed ? 'opacity-20 pointer-events-none' : ''}`}
+        style={{ left: `${ft.x}%`, top: `${ft.y}%`, transform: 'translate(-50%, -50%)' }}
+      >
+        <div className="relative" style={{ width: w, height: h }}>
+          <Chairs shape={ft.shape} capacity={mesa.capacity} status={mesa.status} />
+          <button
+            onClick={() => handleMesaClick(mesa.number)}
+            title={`Mesa ${mesa.number} · ${statusLabel[mesa.status]} · ${mesa.capacity} lugares${mesa.mesero ? ` · ${mesa.mesero}` : ''}`}
+            className={`relative z-10 w-full h-full border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
+              ft.shape === 'round' || ft.shape === 'round-lg' ? 'rounded-full' : 'rounded-lg'
+            } ${
+              mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/60' :
+              mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/60' :
+              statusColor[mesa.status]
+            }`}
+          >
+            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-xl' : 'text-base'}`}>{mesa.number}</span>
+            {order && (
+              <span className={`text-[9px] font-mono font-bold leading-tight mt-0.5 ${
+                isAlert ? 'text-red-400 animate-pulse' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'
+              }`}>
+                {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}` : `${mins}m`}
+              </span>
+            )}
+          </button>
+          {/* Total debajo de la mesa ocupada */}
+          {order && mesa.total != null && mesa.total > 0 && (
+            <span className="absolute left-1/2 -translate-x-1/2 z-20 text-[9px] font-semibold text-white bg-black/60 px-1.5 py-px rounded-full whitespace-nowrap" style={{ top: h + 18 }}>
+              {formatMXN(mesa.total)}
+            </span>
+          )}
         </div>
       </div>
+    )
+  }
 
-      {/* Unassigned mesas (in MESAS_CONFIG but not in any zone) */}
-      {(() => {
-        const assignedNumbers = new Set(floorZones.flatMap(z => z.mesas.map(m => m.number)))
-        const unassigned = mesas.filter(m => !assignedNumbers.has(m.number))
-        if (unassigned.length === 0) return null
-        return (
-          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 max-w-7xl mx-auto mt-4">
+  const PlanogramaView = () => {
+    const floorNumbers = new Set(FLOOR_TABLES.map(t => t.number))
+    const unassigned = mesas.filter(m => !floorNumbers.has(m.number))
+    return (
+      <div className="overflow-x-auto pb-2">
+        <div className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl max-w-6xl mx-auto min-w-[940px]" style={{ aspectRatio: '10 / 8.2' }}>
+          {/* Paredes / muros */}
+          {FLOOR_WALLS.map((wall, i) => (
+            <div
+              key={i}
+              className={`absolute ${wall.color === 'green' ? 'bg-emerald-700/50' : 'bg-rose-900/70'} rounded-sm`}
+              style={{ left: `${wall.x}%`, top: `${wall.y}%`, width: `${wall.w}%`, height: `${wall.h}%` }}
+            />
+          ))}
+          {/* Texto BARRA vertical sobre la barra física */}
+          <span
+            className="absolute text-white/80 font-bold text-xs tracking-[0.35em] [writing-mode:vertical-rl] pointer-events-none"
+            style={{ left: '72.2%', top: '38%' }}
+          >
+            BARRA
+          </span>
+          {/* Etiquetas de zona */}
+          {FLOOR_LABELS.map(label => (
+            <span
+              key={label.text}
+              className={`absolute font-bold uppercase text-[var(--text-4)] opacity-60 pointer-events-none tracking-[0.25em] ${
+                label.vertical ? '[writing-mode:vertical-rl] text-lg' : 'text-lg'
+              }`}
+              style={{ left: `${label.x}%`, top: `${label.y}%`, transform: `translate(-50%, -50%)${label.vertical ? ' rotate(180deg)' : ''}` }}
+            >
+              {label.text}
+            </span>
+          ))}
+          {/* Divisor interior / exterior (toldo + privado) */}
+          <div className="absolute left-[3%] right-[3%] border-t-2 border-dashed border-[var(--line)]" style={{ top: '67%' }} />
+          {/* Marca AMALAY */}
+          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '80%', top: '62%' }}>
+            AMALAY
+          </span>
+          {/* Mesas con sillas */}
+          {FLOOR_TABLES.map(ft => (
+            <FloorTableNode key={ft.number} ft={ft} />
+          ))}
+        </div>
+
+        {/* Mesas fuera del plano (otros clientes / extras) */}
+        {unassigned.length > 0 && (
+          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 max-w-6xl mx-auto mt-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-slate-400" />
               <h3 className="text-sm font-bold text-slate-400">Sin zona asignada</h3>
@@ -517,10 +500,10 @@ export default function MesasPage() {
               ))}
             </div>
           </div>
-        )
-      })()}
-    </div>
-  )
+        )}
+      </div>
+    )
+  }
 
   // ─── Grid View (classic) ──────────────────────────────────────────────────
   const GridView = () => (
@@ -597,31 +580,6 @@ export default function MesasPage() {
             {mergeMode ? <X size={14} /> : <Merge size={14} />}
             {mergeMode ? 'Cancelar' : 'Fusionar'}
           </button>
-          {viewMode === 'planograma' && (
-            editMode ? (
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => { setFloorZonesState(DEFAULT_FLOOR_ZONES); saveFloorZones(DEFAULT_FLOOR_ZONES); showToast('Plano restaurado a default') }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]"
-                >
-                  <RotateCcw size={14} /> Reset
-                </button>
-                <button
-                  onClick={() => { saveFloorZones(floorZonesState); setEditMode(false); showToast('Plano guardado') }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-black"
-                >
-                  <Check size={14} /> Guardar
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setEditMode(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-slate-600 text-[var(--text-3)]"
-              >
-                <Settings size={14} /> Editar plano
-              </button>
-            )
-          )}
         </div>
         <div className="flex items-center gap-6">
           {Object.entries(counts).map(([status, count]) => (

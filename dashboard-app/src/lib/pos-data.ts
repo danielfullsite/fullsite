@@ -819,11 +819,11 @@ const DEFAULT_MESA_NUMBERS = [
   20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
   50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
 ]
+// Capacidades segun las sillas dibujadas en el plano fisico
 const MESA_CAPACITY: Record<number, number> = {
-  30: 8,                          // redonda grande terraza
-  5: 6, 6: 6, 40: 6, 41: 6, 42: 6, // rectangulares grandes
-  10: 2, 11: 2, 12: 2,            // barra
-  43: 2, 44: 2,                   // pasillo
+  30: 8,                // redonda grande terraza (8 sillas)
+  40: 6, 41: 6, 42: 6,  // rectangulares grandes terraza (6 sillas)
+  // resto: 4 sillas
 }
 export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
   number: n,
