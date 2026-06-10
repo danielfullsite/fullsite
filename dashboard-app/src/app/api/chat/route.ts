@@ -331,35 +331,51 @@ export async function POST(request: NextRequest) {
     } // end wantsMeseros
 
     // 2b. Process food cost (from parallel fetch)
+    // Recipe map from Excel costeo = SOURCE OF TRUTH for unit costs
     let foodCostContext = ''
+    const normName = (s: string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+    const recipeMap = new Map<string, { costo: number; precio: number; pct: number }>()
+    if (Array.isArray(recipesRaw)) {
+      for (const r of recipesRaw) {
+        const costo = Number(r.costo_total)
+        if (costo > 0) recipeMap.set(normName(String(r.nombre || '')), { costo, precio: Number(r.precio_venta) || 0, pct: Number(r.pct_costo) || 0 })
+      }
+    }
+
     if (wantsFoodCost && Array.isArray(fcRowsRaw) && fcRowsRaw.length > 0) {
       try {
         const fcData = typeof fcRowsRaw[0].data === 'string' ? JSON.parse(fcRowsRaw[0].data as string) : fcRowsRaw[0].data
         if (Array.isArray(fcData) && fcData.length > 0) {
+          let totalVentas = 0
+          let totalCosto = 0
           const fcLines = fcData
             .sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(b.subtotal_venta || 0) - Number(a.subtotal_venta || 0))
             .slice(0, 20)
             .map((item: Record<string, unknown>) => {
-              const nombre = item.platillo || item.nombre || 'Sin nombre'
+              const nombre = String(item.platillo || item.nombre || 'Sin nombre')
               const grupo = item.grupo || ''
               const qty = Number(item.cantidad || 0)
               const ventaTotal = Number(item.subtotal_venta || 0)
-              const costoReal = Number(item.costo_real || 0)
-              const costoPct = Number(item.costo_real_pct || 0)
+              // Prefer Excel recipe cost (real) over stale scraped costo_real
+              const recipe = recipeMap.get(normName(nombre))
+              const costoReal = recipe && qty > 0 ? qty * recipe.costo : Number(item.costo_real || 0)
+              const costoPct = ventaTotal > 0 ? (costoReal / ventaTotal) * 100 : Number(item.costo_real_pct || 0)
+              totalVentas += ventaTotal
+              totalCosto += costoReal
               const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
-              const costoUnit = qty > 0 ? Math.round(costoReal / qty) : 0
-              return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}%), PU $${precioUnit}, CU $${costoUnit}`
+              const costoUnit = recipe ? Math.round(recipe.costo) : (qty > 0 ? Math.round(costoReal / qty) : 0)
+              return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}%), PU $${precioUnit}, CU $${costoUnit}${recipe ? ' [receta real]' : ''}`
             })
-          const totalVentas = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.subtotal_venta || 0), 0)
-          const totalCosto = fcData.reduce((s: number, i: Record<string, unknown>) => s + Number(i.costo_real || 0), 0)
           const overallPct = totalVentas > 0 ? ((totalCosto / totalVentas) * 100).toFixed(1) : '0'
-          foodCostContext = `\n\nFOOD COST (${overallPct}% general, $${Math.round(totalCosto)}/$${Math.round(totalVentas)}):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
+          foodCostContext = `\n\nMIX DE VENTAS POR PLATILLO (top vendidos, costo según receta real cuando existe — ${overallPct}% sobre estos platillos):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
         }
       } catch { /* */ }
     }
 
     // Add recipes from Excel costeo
     if (wantsFoodCost && Array.isArray(recipesRaw) && recipesRaw.length > 0) {
+      const conPrecio = recipesRaw.filter((r) => Number(r.precio_venta) > 0 && Number(r.pct_costo) > 0 && Number(r.pct_costo) < 100)
+      const avgPct = conPrecio.length > 0 ? (conPrecio.reduce((s, r) => s + Number(r.pct_costo), 0) / conPrecio.length).toFixed(1) : '0'
       const recLines = recipesRaw
         .filter((r) => Number(r.costo_total) > 0)
         .map((r) => {
@@ -369,7 +385,7 @@ export async function POST(request: NextRequest) {
           return `${r.nombre}: PV $${r.precio_venta}, Costo $${Number(r.costo_total).toFixed(0)} (${r.pct_costo}%) → ${topIngs}`
         })
       if (recLines.length > 0) {
-        foodCostContext += `\n\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos):\n${recLines.join('\n')}`
+        foodCostContext += `\n\nFOOD COST TEÓRICO PROMEDIO: ${avgPct}% (sobre ${conPrecio.length} platillos del costeo real con precio). Esta es la fuente correcta para "food cost general".\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos — costos REALES del costeo, fuente de verdad):\n${recLines.join('\n')}\nNOTA: platillos con PV $0 son extras/modificadores sin precio propio — no usarlos para promedios.`
       }
     }
 
