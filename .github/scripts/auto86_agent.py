@@ -107,7 +107,8 @@ try:
         print(f"[auto86] {output_sum}")
     else:
         # 4. Fetch recipes to find affected menu items
-        recipes = sb_get("pos_recipes", {
+        # pos_recipes_old = relational recipes (menu_item_id → ingredient_id); pos_recipes = Excel costeo
+        recipes = sb_get("pos_recipes_old", {
             "client_id": f"eq.{cid}",
             "select": "menu_item_id,menu_item_name,ingredient_id,quantity",
             "limit": "2500",

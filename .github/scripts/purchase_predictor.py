@@ -118,7 +118,8 @@ try:
                 category_counts[name] += 1
 
     # 3. Get all recipes (ingredient per menu item)
-    recipes = sb_get("pos_recipes", {
+    # pos_recipes_old = relational recipes (menu_item_id → ingredient_id); pos_recipes = Excel costeo
+    recipes = sb_get("pos_recipes_old", {
         "client_id": f"eq.{cid}",
         "select": "menu_item_id,menu_item_name,ingredient_id,quantity,unit",
         "limit": "2500",

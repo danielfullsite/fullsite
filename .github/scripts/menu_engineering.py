@@ -129,13 +129,15 @@ def classify_bcg(categories, food_cost_data):
     if food_cost_data:
         fc = food_cost_data[0]
         # food_cost table may have category-level costs
-        fc_items = fc.get("items") or fc.get("categories") or []
+        fc_items = fc.get("items") or fc.get("categories") or fc.get("data") or []
         if isinstance(fc_items, str):
             fc_items = json.loads(fc_items)
         for item in fc_items:
             name = item.get("nombre", item.get("category", "")).strip()
-            cost_pct = float(item.get("cost_pct", item.get("food_cost_pct", 0)) or 0)
-            if name and cost_pct > 0:
+            # pos_recipes uses pct_costo; only platillos with precio real
+            cost_pct = float(item.get("pct_costo") or item.get("cost_pct") or item.get("food_cost_pct") or 0)
+            precio = float(item.get("precio_venta", 1) or 0)
+            if name and 0 < cost_pct < 100 and precio > 0:
                 food_costs[name.upper()] = cost_pct
 
     # Calculate median popularity (total_30d) as threshold

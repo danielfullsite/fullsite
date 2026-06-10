@@ -141,9 +141,12 @@ def analyze_food_cost(food_cost_data, daily_data):
     high_cost_items = []
 
     for item in data:
-        costo = item.get("costo", 0) or item.get("cost", 0) or 0
-        venta = item.get("venta", 0) or item.get("sale", 0) or item.get("ventas", 0) or 0
+        # pos_recipes uses costo_total/precio_venta; wansoft_food_cost uses costo/venta
+        costo = float(item.get("costo_total") or item.get("costo") or item.get("cost") or 0)
+        venta = float(item.get("precio_venta") or item.get("venta") or item.get("sale") or item.get("ventas") or 0)
         nombre = item.get("nombre") or item.get("name") or item.get("platillo") or ""
+        if venta <= 0:
+            continue  # extras/modificadores sin precio — no contaminar promedios
 
         total_cost += costo
         total_ventas += venta

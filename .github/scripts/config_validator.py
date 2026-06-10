@@ -122,10 +122,10 @@ def main():
     try:
         recipes = sb_get("pos_recipes", {
             "client_id": f"eq.{CLIENT['id']}",
-            "select": "menu_item",
+            "select": "nombre",
             "limit": "1000",
         })
-        items_with_recipe = set(r.get("menu_item", "").upper() for r in recipes if r.get("menu_item"))
+        items_with_recipe = set(r.get("nombre", "").upper() for r in recipes if r.get("nombre"))
         print(f"  Items with recipes: {len(items_with_recipe)}")
     except Exception as e:
         print(f"  Error: {e}")

@@ -811,7 +811,7 @@ REGLA CRÍTICA: Si preguntan CUALQUIER COSA sobre el restaurante — costos, inv
 - Si el mesero aparece en CUALQUIER dato: NO digas que no tienes info de ese mesero.
 - Propinas: busca en propinas_meseros, propinas_total. Si no aparece, di "Las propinas no están en este reporte. Revisa el corte de caja del día en Wansoft."
 - Efectivo/tarjeta: busca en metodos_pago, pago_metodos. Si hay datos historicos, usa esos.
-- Food cost / costo de receta: busca en food_cost o food_cost_supabase. Tiene datos reales de 306 platillos con: platillo, cantidad, subtotal_venta, costo_ideal, costo_ideal_pct, costo_real, costo_real_pct. Si el platillo buscado no aparece, di que no esta en el reporte de costos.
+- Food cost / costo de receta: busca en food_cost (fuente: pos_recipes = costeo REAL del Excel, campos: nombre, precio_venta, costo_total, pct_costo). REGLAS: (1) platillos con precio_venta=0 son extras/modificadores — NO usarlos para promedios; (2) el food cost general/teorico es el promedio de pct_costo de platillos con precio_venta>0 y pct_costo entre 0 y 100 (~27.6%); (3) si pct_costo>100 el platillo pierde dinero — menciónalo como alerta, no como promedio. Si el platillo buscado no aparece, di que no está en el costeo.
 
 CÓMO INTERPRETAR:
 - "cómo vamos" / "qué onda" → hoy vs promedio del mismo DOW
@@ -1025,11 +1025,21 @@ def ask_groq(question, wansoft_data, historical_data):
         "propinas_meseros": wd.get("propinas_meseros"),
         "propinas_total": wd.get("propinas_total"),
     }
-    # Add food cost if available
+    # Add food cost if available — prioritize recipes matching the question so
+    # the bot never says "no está en el costeo" for a dish we DO have
+    def _fc_slice(items, limit=40):
+        def _name(it):
+            return str(it.get("nombre") or it.get("platillo") or "").lower()
+        matching = [it for it in items if any(t in _name(it) for t in search_terms)]
+        rest = [it for it in items if it not in matching]
+        # Priced dishes first (extras with precio 0 last)
+        rest.sort(key=lambda it: -float(it.get("precio_venta") or it.get("subtotal_venta") or 0))
+        return (matching + rest)[:limit]
+
     if wd.get("food_cost"):
-        core["food_cost"] = wd["food_cost"][:30]
+        core["food_cost"] = _fc_slice(wd["food_cost"])
     elif wd.get("food_cost_supabase"):
-        core["food_cost"] = wd["food_cost_supabase"][:30]
+        core["food_cost"] = _fc_slice(wd["food_cost_supabase"])
     blocks.append(f"DATOS CORE ({date_range}):\n" + json.dumps(core, ensure_ascii=False, indent=1))
 
     # Block 3: Detail data (descuentos, cancelaciones, etc.)
