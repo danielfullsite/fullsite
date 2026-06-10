@@ -12,7 +12,7 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const GROQ_MODEL = 'llama-3.3-70b-versatile'
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
+const ANTHROPIC_MODEL = 'claude-fable-5'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
