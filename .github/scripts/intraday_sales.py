@@ -446,43 +446,43 @@ def main():
         print(f"[intraday] OrderTypes breakdown: {order_types}")
         print(f"[intraday] Data: {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
 
-        # Save hourly sales to Supabase for historical analysis
+        # Hora pico via snapshots acumulativos: Wansoft NO tiene endpoint de
+        # ventas por hora (SalesByHours/SalesByHour/etc = 200 pero 0 filas,
+        # verificado 2026-06-10). Cada run guarda {hora, ventas, tickets}
+        # acumulados; la curva del día se arma por diferencias entre snapshots.
         try:
-            hours_data = []
-            for hours_endpoint in ["SalesByHours", "SalesByHour", "SalesPerHour", "SalesByTime", "SalesBySchedule"]:
-                hours_resp = session.post(f"{WANSOFT_URL}/Reports/{hours_endpoint}",
-                    data={"subsidiaryId": SUBSIDIARY_ID, "startDate": today_str, "endDate": today_str}, timeout=15)
-                hours_html = hours_resp.text
-                hours_soup = BeautifulSoup(hours_html, "html.parser")
-                candidate = []
-                for row in hours_soup.select(".rowReport"):
-                    cols = [c.text.strip() for c in row.select("div")]
-                    if len(cols) >= 4:
-                        candidate.append({"hora": cols[0], "subtotal": cols[1], "iva": cols[2], "total": cols[3],
-                                          "pct": cols[4] if len(cols) > 4 else ""})
-                print(f"[intraday] {hours_endpoint}: status={hours_resp.status_code}, rowReport={len(candidate)}")
-                # Garbage filter: real hourly rows start with a time-ish value (e.g. '09', '09:00', '9 AM')
-                import re as _re
-                candidate = [c for c in candidate if _re.match(r"^\d{1,2}([:.]\d{2})?(\s*(am|pm|a\. m\.|p\. m\.))?$", c["hora"].strip().lower())]
-                if candidate:
-                    hours_data = candidate
-                    print(f"[intraday] Hourly endpoint OK: {hours_endpoint} → {len(candidate)} filas, sample: {candidate[0]}")
-                    break
-            if hours_data:
-                _h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
-                      "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
-                      "Content-Type": "application/json", "Prefer": "return=minimal"}
-                # Delete existing row for today then insert
-                requests.delete(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly?fecha=eq.{today_str}&client_id=eq.{CLIENT['id']}",
-                    headers=_h, timeout=10)
-                requests.post(f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly",
-                    headers=_h,
-                    json={"fecha": today_str, "client_id": CLIENT["id"], "data": json.dumps(hours_data),
-                          "updated_at": datetime.now(timezone.utc).isoformat()},
-                    timeout=10)
-                print(f"[intraday] Saved {len(hours_data)} hourly entries")
+            snap = {
+                "hora": now_mx.strftime("%H:%M"),
+                "ventas": consolidated.get("TotalSales", 0) or 0,
+                "tickets": order_types.get("total_ordenes", 0) if order_types else 0,
+                "personas": order_types.get("total_personas", 0) if order_types else 0,
+            }
+            _h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                  "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                  "Content-Type": "application/json", "Prefer": "return=minimal"}
+            _base = f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_hourly"
+            existing = requests.get(f"{_base}?fecha=eq.{today_str}&client_id=eq.{CLIENT['id']}&select=data",
+                                    headers=_h, timeout=10)
+            snaps = []
+            if existing.ok and existing.json():
+                prev = existing.json()[0].get("data")
+                if isinstance(prev, str):
+                    prev = json.loads(prev)
+                snaps = prev if isinstance(prev, list) else []
+                snaps = [s for s in snaps if s.get("hora") != snap["hora"]]
+            snaps.append(snap)
+            snaps.sort(key=lambda s: s.get("hora", ""))
+            if existing.ok and existing.json():
+                requests.patch(f"{_base}?fecha=eq.{today_str}&client_id=eq.{CLIENT['id']}",
+                    headers=_h, json={"data": json.dumps(snaps),
+                                      "updated_at": datetime.now(timezone.utc).isoformat()}, timeout=10)
+            else:
+                requests.post(_base, headers=_h,
+                    json={"fecha": today_str, "client_id": CLIENT["id"], "data": json.dumps(snaps),
+                          "updated_at": datetime.now(timezone.utc).isoformat()}, timeout=10)
+            print(f"[intraday] Snapshot guardado: {snap} ({len(snaps)} snapshots hoy)")
         except Exception as e:
-            print(f"[intraday] Hourly save failed (non-blocking): {e}")
+            print(f"[intraday] Hourly snapshot failed (non-blocking): {e}")
 
         # Save ALL fields to wansoft_daily so dashboard pages work
         try:
