@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, Settings, RotateCcw, Check } from 'lucide-react'
@@ -32,7 +32,8 @@ interface FloorZone {
   mesas: ZoneMesa[]
   color: string     // accent color for zone header
   bgColor: string   // background tint
-  colSpan?: number  // width in the 12-col floor grid (default 12 = full row)
+  originRow?: number // position of the zone within the master floor grid
+  originCol?: number
 }
 
 // Layout real AMALAY — del plano de mesas físico (foto 2026-06-10). Configurable por cliente via localStorage.
@@ -42,7 +43,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Entrada',
     gridCols: 4,
     gridRows: 2,
-    colSpan: 7,
+    originRow: 1,
+    originCol: 1,
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/5',
     mesas: [
@@ -58,7 +60,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Lámparas',
     gridCols: 3,
     gridRows: 2,
-    colSpan: 5,
+    originRow: 1,
+    originCol: 6,
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/5',
     mesas: [
@@ -73,13 +76,14 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     id: 'pasillo',
     name: 'Pasillo',
     gridCols: 1,
-    gridRows: 2,
-    colSpan: 2,
+    gridRows: 3,
+    originRow: 3,
+    originCol: 1,
     color: 'text-slate-400',
     bgColor: 'bg-slate-500/5',
     mesas: [
       { number: 44, gridRow: 1, gridCol: 1, shape: 'round' },
-      { number: 43, gridRow: 2, gridCol: 1, shape: 'round' },
+      { number: 43, gridRow: 3, gridCol: 1, shape: 'round' },
     ],
   },
   {
@@ -87,7 +91,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Terraza',
     gridCols: 3,
     gridRows: 3,
-    colSpan: 7,
+    originRow: 3,
+    originCol: 2,
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/5',
     mesas: [
@@ -106,7 +111,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Barra',
     gridCols: 1,
     gridRows: 3,
-    colSpan: 3,
+    originRow: 3,
+    originCol: 6,
     color: 'text-rose-400',
     bgColor: 'bg-rose-500/5',
     mesas: [
@@ -120,7 +126,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Toldo',
     gridCols: 3,
     gridRows: 2,
-    colSpan: 7,
+    originRow: 6,
+    originCol: 1,
     color: 'text-cyan-400',
     bgColor: 'bg-cyan-500/5',
     mesas: [
@@ -137,7 +144,8 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
     name: 'Privado',
     gridCols: 2,
     gridRows: 2,
-    colSpan: 5,
+    originRow: 6,
+    originCol: 6,
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/5',
     mesas: [
@@ -149,17 +157,17 @@ const DEFAULT_FLOOR_ZONES: FloorZone[] = [
   },
 ]
 
-// v2: layout real AMALAY (2026-06-10) — key bump invalida layouts guardados con el plano placeholder
+// v3: mapa unificado con posiciones de zona (originRow/originCol) — key bump invalida layouts previos
 function getFloorZones(): FloorZone[] {
   try {
-    const saved = localStorage.getItem(`pos_floor_v2_${_cid()}`)
+    const saved = localStorage.getItem(`pos_floor_v3_${_cid()}`)
     if (saved) return JSON.parse(saved)
   } catch { /* use default */ }
   return DEFAULT_FLOOR_ZONES
 }
 
 function saveFloorZones(zones: FloorZone[]) {
-  try { localStorage.setItem(`pos_floor_v2_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
+  try { localStorage.setItem(`pos_floor_v3_${_cid()}`, JSON.stringify(zones)) } catch { /* */ }
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -410,67 +418,85 @@ export default function MesasPage() {
   // ─── Planograma View ──────────────────────────────────────────────────────
   const floorZones = floorZonesState
 
-  const COL_SPAN_CLASS: Record<number, string> = {
-    1: 'lg:col-span-1', 2: 'lg:col-span-2', 3: 'lg:col-span-3', 4: 'lg:col-span-4',
-    5: 'lg:col-span-5', 6: 'lg:col-span-6', 7: 'lg:col-span-7', 8: 'lg:col-span-8',
-    9: 'lg:col-span-9', 10: 'lg:col-span-10', 11: 'lg:col-span-11', 12: 'lg:col-span-12',
-  }
+  // Un solo canvas tipo plano arquitectonico: las zonas son "habitaciones"
+  // posicionadas en un grid maestro, igual que el plano fisico del restaurante.
+  const MASTER_COLS = 8
+  const masterRows = Math.max(...floorZones.map(z => (z.originRow || 1) + z.gridRows - 1))
 
   const PlanogramaView = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl mx-auto">
-      {floorZones.map(zone => {
-        const zoneMesas = zone.mesas
-          .map(zm => ({ ...zm, mesa: mesaMap.get(zm.number) }))
-          .filter(zm => zm.mesa)
-          .filter(zm => {
-            if (!soloMisMesas || !currentMesero) return true
-            return zm.mesa!.status === 'disponible' || zm.mesa!.mesero === currentMesero
-          })
+    <div className="overflow-x-auto pb-2">
+      <div className="bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl p-5 max-w-7xl mx-auto min-w-[880px]">
+        <div
+          className="grid gap-2"
+          style={{
+            gridTemplateColumns: `repeat(${MASTER_COLS}, 1fr)`,
+            gridTemplateRows: `repeat(${masterRows}, minmax(92px, auto))`,
+          }}
+        >
+          {floorZones.map(zone => {
+            const oR = zone.originRow || 1
+            const oC = zone.originCol || 1
+            const zoneMesas = zone.mesas
+              .map(zm => ({ ...zm, mesa: mesaMap.get(zm.number) }))
+              .filter(zm => zm.mesa)
+              .filter(zm => {
+                if (!soloMisMesas || !currentMesero) return true
+                return zm.mesa!.status === 'disponible' || zm.mesa!.mesero === currentMesero
+              })
+            const ocupadas = zoneMesas.filter(zm => zm.mesa!.status !== 'disponible').length
 
-        if (zoneMesas.length === 0) return null
-
-        return (
-          <div key={zone.id} className={`${zone.bgColor} rounded-2xl border border-[var(--line)] p-4 ${COL_SPAN_CLASS[zone.colSpan || 12]}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-2 h-2 rounded-full ${zone.color.replace('text-', 'bg-')}`} />
-              {editMode ? (
-                <input
-                  className={`text-sm font-bold ${zone.color} bg-transparent border-b border-dashed border-current outline-none w-40`}
-                  defaultValue={zone.name}
-                  onBlur={(e) => {
-                    const updated = floorZonesState.map(z => z.id === zone.id ? { ...z, name: e.target.value } : z)
-                    setFloorZonesState(updated)
-                  }}
-                />
-              ) : (
-                <h3 className={`text-sm font-bold ${zone.color}`}>{zone.name}</h3>
-              )}
-              <span className="text-[var(--text-4)] text-xs ml-auto">
-                {zoneMesas.filter(zm => zm.mesa!.status !== 'disponible').length}/{zoneMesas.length} ocupadas
-              </span>
-            </div>
-            <div
-              className="grid gap-2.5"
-              style={{
-                gridTemplateColumns: `repeat(${zone.gridCols}, 1fr)`,
-                gridTemplateRows: `repeat(${zone.gridRows}, minmax(84px, auto))`,
-              }}
-            >
-              {zoneMesas.map(zm => (
+            return (
+              <Fragment key={zone.id}>
+                {/* Zone room background + legend label */}
                 <div
-                  key={zm.number}
+                  className={`${zone.bgColor} border border-[var(--line)] rounded-2xl relative`}
                   style={{
-                    gridRow: `${zm.gridRow} / span ${zm.height || 1}`,
-                    gridColumn: `${zm.gridCol} / span ${zm.width || 1}`,
+                    gridRow: `${oR} / span ${zone.gridRows}`,
+                    gridColumn: `${oC} / span ${zone.gridCols}`,
                   }}
                 >
-                  <MesaCard mesa={zm.mesa!} shape={zm.shape} />
+                  <div className="absolute -top-2.5 left-4 z-20 flex items-center gap-1.5 bg-[var(--surface)] px-2 rounded-full">
+                    {editMode ? (
+                      <input
+                        className={`text-[11px] font-bold uppercase tracking-widest ${zone.color} bg-transparent border-b border-dashed border-current outline-none w-24`}
+                        defaultValue={zone.name}
+                        onBlur={(e) => {
+                          const updated = floorZonesState.map(z => z.id === zone.id ? { ...z, name: e.target.value } : z)
+                          setFloorZonesState(updated)
+                        }}
+                      />
+                    ) : (
+                      <span className={`text-[11px] font-bold uppercase tracking-widest ${zone.color}`}>{zone.name}</span>
+                    )}
+                    <span className="text-[var(--text-4)] text-[10px]">{ocupadas}/{zoneMesas.length}</span>
+                  </div>
+                  {/* Watermark name (visible in empty areas, like the printed plan) */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+                    <span className={`font-bold uppercase ${zone.color} opacity-[0.08] ${
+                      zone.gridCols === 1 && zone.gridRows > 1 ? '[writing-mode:vertical-rl] text-3xl tracking-[0.3em]' : 'text-3xl tracking-[0.3em]'
+                    }`}>
+                      {zone.name}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
+                {/* Mesas of this zone, placed on the master grid */}
+                {zoneMesas.map(zm => (
+                  <div
+                    key={zm.number}
+                    className="relative z-10 p-1.5"
+                    style={{
+                      gridRow: `${oR + zm.gridRow - 1} / span ${zm.height || 1}`,
+                      gridColumn: `${oC + zm.gridCol - 1} / span ${zm.width || 1}`,
+                    }}
+                  >
+                    <MesaCard mesa={zm.mesa!} shape={zm.shape} compact />
+                  </div>
+                ))}
+              </Fragment>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Unassigned mesas (in MESAS_CONFIG but not in any zone) */}
       {(() => {
@@ -478,7 +504,7 @@ export default function MesasPage() {
         const unassigned = mesas.filter(m => !assignedNumbers.has(m.number))
         if (unassigned.length === 0) return null
         return (
-          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 lg:col-span-12">
+          <div className="bg-slate-500/5 rounded-2xl border border-[var(--line)] p-5 max-w-7xl mx-auto mt-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-slate-400" />
               <h3 className="text-sm font-bold text-slate-400">Sin zona asignada</h3>
