@@ -524,7 +524,7 @@ MES ANTERIOR (${prevMonthPrefix}): Ventas $${Math.round(pmVentas)}, ${Math.round
                 return ''
               }).filter(Boolean)
               if (hourlyLines.length > 0) {
-                dailyContext += `\n\nVENTAS POR HORA:\n${hourlyLines.join('\n')}`
+                dailyContext += `\n\nVENTAS POR HORA (snapshots ACUMULADOS del día — la venta de una franja = diferencia entre snapshots consecutivos; la hora pico es la franja con mayor diferencia):\n${hourlyLines.join('\n')}`
               }
             }
           }
