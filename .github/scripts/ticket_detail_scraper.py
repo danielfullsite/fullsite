@@ -31,17 +31,49 @@ CATEGORIES = {
 BEBIDA_GROUPS = set(CLIENT.get("bebida_groups") or ["COFFEE HOT/ICE", "FRESH DRINKS", "JUGOS"])
 
 
+def wansoft_http_login(s: requests.Session, wuser: str, wpass: str) -> requests.Response:
+    """Login HTTP a Wansoft. Incluye hidden inputs del form (CSRF token post-Clip).
+    Lanza Exception con diagnóstico (sin secretos) si falla."""
+    from bs4 import BeautifulSoup
+    page = s.get(f"{WANSOFT_URL}/", timeout=20)
+    soup = BeautifulSoup(page.text, "html.parser")
+    form = soup.find("form")
+    data = {}
+    action = f"{WANSOFT_URL}/"
+    user_field, pass_field = "UserName", "Password"
+    if form:
+        if form.get("action"):
+            from urllib.parse import urljoin
+            action = urljoin(page.url, form["action"])
+        for inp in form.find_all("input"):
+            name = inp.get("name")
+            if not name:
+                continue
+            itype = (inp.get("type") or "").lower()
+            if itype == "password":
+                pass_field = name
+            elif itype in ("text", "email") or "user" in name.lower():
+                user_field = name
+            elif itype == "hidden":
+                data[name] = inp.get("value", "")
+    data[user_field] = wuser
+    data[pass_field] = wpass
+    r = s.post(action, data=data, allow_redirects=True, timeout=20)
+    if "Dashboard" not in r.url:
+        field_names = [i.get("name") for i in form.find_all("input")] if form else []
+        raise Exception(f"Login failed — landed on {r.url} | form action: {action} | fields: {field_names}")
+    return r
+
+
 def download_sale_detail(target_date: str) -> str | None:
     """Download sale detail TXT from Wansoft via HTTP (no Playwright needed!)."""
     sub_id, wuser, wpass = get_wansoft_creds(CLIENT)
     s = requests.Session()
-    s.get(f"{WANSOFT_URL}/")
-    r = s.post(f"{WANSOFT_URL}/", data={
-        "UserName": wuser,
-        "Password": wpass,
-    }, allow_redirects=True)
-    if "Dashboard" not in r.url:
-        raise Exception("Login failed")
+    try:
+        wansoft_http_login(s, wuser, wpass)
+    except Exception as e:
+        print(f"[scraper] HTTP login error: {e}")
+        return None  # main() cae a Playwright
 
     # The SaleDetail page exports a pipe-delimited TXT
     r = s.get(f"{WANSOFT_URL}/Reports/SaleDetail", params={
