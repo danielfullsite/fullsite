@@ -358,16 +358,20 @@ export async function POST(request: NextRequest) {
               const ventaTotal = Number(item.subtotal_venta || 0)
               // Prefer Excel recipe cost (real) over stale scraped costo_real
               const recipe = recipeMap.get(normName(nombre))
-              const costoReal = recipe && qty > 0 ? qty * recipe.costo : Number(item.costo_real || 0)
-              const costoPct = ventaTotal > 0 ? (costoReal / ventaTotal) * 100 : Number(item.costo_real_pct || 0)
+              // SOLO recetas reales (pos_recipes/Excel). El costo_real scrapeado de Wansoft está stale y da márgenes falsos.
+              const costoReal = recipe && qty > 0 ? qty * recipe.costo : 0
+              const costoPct = ventaTotal > 0 ? (costoReal / ventaTotal) * 100 : 0
+              const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
+              if (costoReal <= 0) {
+                return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, PU $${precioUnit} [SIN COSTEO — no hay receta; NO afirmes costo ni margen de este platillo, di que falta costearlo]`
+              }
               totalVentas += ventaTotal
               totalCosto += costoReal
-              const precioUnit = qty > 0 ? Math.round(ventaTotal / qty) : 0
               const costoUnit = recipe ? Math.round(recipe.costo) : (qty > 0 ? Math.round(costoReal / qty) : 0)
               return `${nombre} (${grupo}): ${qty}pzas, Venta $${Math.round(ventaTotal)}, Costo $${Math.round(costoReal)} (${costoPct.toFixed(1)}%), PU $${precioUnit}, CU $${costoUnit}${recipe ? ' [receta real]' : ''}`
             })
           const overallPct = totalVentas > 0 ? ((totalCosto / totalVentas) * 100).toFixed(1) : '0'
-          foodCostContext = `\n\nMIX DE VENTAS POR PLATILLO (top vendidos, costo según receta real cuando existe — ${overallPct}% sobre estos platillos):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
+          foodCostContext = `\n\nMIX DE VENTAS POR PLATILLO (top vendidos, costo según receta real cuando existe — ${overallPct}% sobre los platillos CON costeo; los marcados SIN COSTEO no entran al promedio):\n${fcLines.join('\n')}\nINSUMO MÁS CARO=mayor CU. MÁS COMPRADO=mayor cantidad.`
         }
       } catch { /* */ }
     }
