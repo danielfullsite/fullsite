@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       // 2: Food cost (conditional)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/wansoft_food_cost?select=fecha,data&order=fecha.desc&limit=1`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 3: Reservaciones (conditional)
-      wantsReservas ? fetch(`${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.desc&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsReservas ? fetch(`${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.asc&fecha=gte.${new Date().toISOString().split('T')[0]}&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 4: POS orders (conditional)
       wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
@@ -358,8 +358,9 @@ export async function POST(request: NextRequest) {
     let reservasContext = ''
     if (wantsReservas && Array.isArray(reservasRaw) && reservasRaw.length > 0) {
       const lines = reservasRaw.map((r) => `${r.fecha} ${r.horario_inicio || ''} | ${r.nombre} | ${r.guests} personas | ${r.espacio} | ${r.paquete || ''} | $${Math.round(Number(r.total) || 0)} | ${r.status}`)
-      const futuras = reservasRaw.filter((r) => String(r.fecha) >= new Date().toISOString().split('T')[0])
-      reservasContext = `\n\nRESERVACIONES (${reservasRaw.length} total, ${futuras.length} futuras):\n${lines.join('\n')}`
+      reservasContext = `\n\nRESERVACIONES PRÓXIMAS (${reservasRaw.length}):\n${lines.join('\n')}\n\nSi preguntan por "próxima reservación", da la primera de esta lista.`
+    } else if (wantsReservas) {
+      reservasContext = '\n\nRESERVACIONES: No hay reservaciones futuras registradas.'
     }
 
     // 2d. Process POS orders (from parallel fetch)
@@ -601,7 +602,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "compara X vs Y" (días) → buscar ambos días en datos diarios y comparar TODAS las métricas
 - "año pasado" / "vs 2025" / "crecimiento" / "yoy" → usar COMPARATIVO AÑO ANTERIOR. Dar % cambio por mes + ticket promedio.
 - "qué le dirías a Monica/dueño/gerente" → dar resumen ejecutivo con 3 puntos + acciones
-- "hoy" sin datos de hoy → decir "el restaurante aún no abre o no hay datos de hoy, te doy el último día disponible"
+- "hoy" sin datos de hoy → NO digas "no tengo datos". Di "el restaurante aún no abre, te doy el último día:" y da los datos del día más reciente. SIEMPRE da datos, nunca dejes al usuario sin respuesta.
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
