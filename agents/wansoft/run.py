@@ -56,11 +56,19 @@ def main():
     try:
         from scraper import scrape
         xlsx_path = scrape(target_date)
-    except SystemExit:
-        log("Scraper fallo (ver logs arriba)")
-        sys.exit(EXIT_SCRAPE)
-    except Exception as e:
-        log(f"Error en scraper: {e}")
+    except (SystemExit, Exception) as e:
+        log(f"Scraper fallo: {e or 'ver logs arriba'}")
+        log("Fallback: construyendo reporte desde Supabase (wansoft_daily)...")
+        try:
+            from fallback_report import build_fallback_message
+            from sender import send_telegram
+            fb_msg = build_fallback_message(target_date, report_type)
+            if fb_msg and send_telegram(fb_msg):
+                log("=== Pipeline completado (modo fallback Supabase) ===")
+                sys.exit(EXIT_OK)
+            log("Fallback sin datos o envio fallo")
+        except Exception as fe:
+            log(f"Fallback fallo: {fe}")
         sys.exit(EXIT_SCRAPE)
     log(f"XLSX: {xlsx_path}")
 
