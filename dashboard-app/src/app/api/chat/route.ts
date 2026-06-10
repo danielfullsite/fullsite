@@ -341,6 +341,35 @@ export async function POST(request: NextRequest) {
         if (costo > 0) recipeMap.set(normName(String(r.nombre || '')), { costo, precio: Number(r.precio_venta) || 0, pct: Number(r.pct_costo) || 0 })
       }
     }
+    // Alias map: nombre en POS/Wansoft → nombre de la receta en el Excel de costeo (typos y variantes)
+    const RECIPE_ALIASES: Record<string, string> = {
+      'AMALAY SALMON SPECIAL TOAST': 'AMALAY SALMON SPECIAL',
+      'EGG AND PANCAKE COMBO': 'EGG & PANCAKE COMBO',
+      'SALMON BAGEL': 'BAGEL DE SALMON CURADO',
+      'GARDEN OMELET': 'GARDEN OMELLET',
+      "MUMMA'S BREAKFAST CROSSAINT": "MUMMA'S BREKFAST CROISSANT",
+      'TAQUITOS AMALAY': 'TACOS DE RIB EYE',
+      'RIBEYE SMASH BURGER': 'SMASH BURGUER',
+      'MISS BENEDICT KETO-PANELA WALLANDER': 'MISS KETO PANELA WALLANDER',
+      'PIZZA PEPERONI': 'PIZZA PEPPERONI',
+      'TURKEY  SWISS CROISSANT': 'TURKEY & SWISS',
+      'PASTA BOLOGESE': 'PASTA BOLOGNESA',
+      'ACAI LOVE BOWL': 'ACAI LOVE',
+      'ACAI B KIND BOWL': 'ACAI B KIND',
+      'BLUEBERRY CHEESECAKE': 'BLUEBERRY´S CHEESECAKE',
+      'MINI TOAST TOWER': 'TORRE DE MINI TOAST',
+      'CROQUE MONSIEUR': 'CROQUE MONSIUR',
+      'TURKEY PANINI': 'TURKEY PANNINI',
+      'COMBO GRILLED CHEESE  SAND. + TOMATO BASIL SOUP': 'COMBO GRILLED CHEESE SANDWICH + TOMATOE BASIL SOUP',
+      'PROSCIUTTO  CHESSE PANINI': 'PROSCIUTTO & CHESSE PANNINI',
+      'PIZZA PROSCIUTO': 'PIZZA DE PROCCIUTO',
+      'PARADISE BUTTERMILK BLUEBERRY PANCAKES': 'BLUEBERRY PANCAKES',
+      'BENEDICT OMELET': 'CLASSIC BENEDICT OMELLET',
+    }
+    for (const [alias, canonical] of Object.entries(RECIPE_ALIASES)) {
+      const target = recipeMap.get(normName(canonical))
+      if (target && !recipeMap.has(normName(alias))) recipeMap.set(normName(alias), target)
+    }
 
     if (wantsFoodCost && Array.isArray(fcRowsRaw) && fcRowsRaw.length > 0) {
       try {
@@ -380,13 +409,21 @@ export async function POST(request: NextRequest) {
     if (wantsFoodCost && Array.isArray(recipesRaw) && recipesRaw.length > 0) {
       const conPrecio = recipesRaw.filter((r) => Number(r.precio_venta) > 0 && Number(r.pct_costo) > 0 && Number(r.pct_costo) < 100)
       const avgPct = conPrecio.length > 0 ? (conPrecio.reduce((s, r) => s + Number(r.pct_costo), 0) / conPrecio.length).toFixed(1) : '0'
+      // Reverse alias map: nombre de receta → alias con el que aparece en el POS/ventas
+      const aliasesByCanonical = new Map<string, string[]>()
+      for (const [alias, canonical] of Object.entries(RECIPE_ALIASES)) {
+        const key = normName(canonical)
+        aliasesByCanonical.set(key, [...(aliasesByCanonical.get(key) || []), alias.replace(/\s+/g, ' ').trim()])
+      }
       const recLines = recipesRaw
         .filter((r) => Number(r.costo_total) > 0)
         .map((r) => {
           const ings = Array.isArray(r.ingredientes) ? r.ingredientes : (typeof r.ingredientes === 'string' ? JSON.parse(r.ingredientes as string) : [])
           const topIngs = (ings as Record<string, unknown>[]).filter((i) => Number(i.total) > 0).slice(0, 5)
             .map((i) => `${i.nombre}:$${Number(i.total).toFixed(1)}`).join(', ')
-          return `${r.nombre}: PV $${r.precio_venta}, Costo $${Number(r.costo_total).toFixed(0)} (${r.pct_costo}%) → ${topIngs}`
+          const aliases = aliasesByCanonical.get(normName(String(r.nombre || '')))
+          const aliasNote = aliases ? ` [en el POS se vende como: ${aliases.join(', ')}]` : ''
+          return `${r.nombre}${aliasNote}: PV $${r.precio_venta}, Costo $${Number(r.costo_total).toFixed(0)} (${r.pct_costo}%) → ${topIngs}`
         })
       if (recLines.length > 0) {
         foodCostContext += `\n\nFOOD COST TEÓRICO PROMEDIO: ${avgPct}% (sobre ${conPrecio.length} platillos del costeo real con precio). Esta es la fuente correcta para "food cost general".\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos — costos REALES del costeo, fuente de verdad):\n${recLines.join('\n')}\nNOTA: platillos con PV $0 son extras/modificadores sin precio propio — no usarlos para promedios.`
