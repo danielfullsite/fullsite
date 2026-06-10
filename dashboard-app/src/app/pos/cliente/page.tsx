@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { formatMXN } from '@/lib/pos-data'
+import { formatMXN, getClientId } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -40,7 +40,7 @@ export default function ClienteDisplay() {
     const fetchLatest = async () => {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=1`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         )
         if (res.ok) {

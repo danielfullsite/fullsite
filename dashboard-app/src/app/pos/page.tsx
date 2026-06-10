@@ -976,7 +976,7 @@ function POSContent() {
     const loadMesaOrder = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (cancelled) return // mesa changed while fetching
@@ -1071,7 +1071,7 @@ function POSContent() {
     const checkReady = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?status=eq.lista&select=id&limit=50`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=eq.lista&select=id&limit=50`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (res.ok) {

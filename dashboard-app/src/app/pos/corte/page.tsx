@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, X } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, MANAGER_PINS, type AuditLogEntry } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, MANAGER_PINS, type AuditLogEntry } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -18,6 +18,7 @@ interface OrderFromDB {
   iva: number
   total: number
   descuento: number
+  propina: number | null
   metodo_pago: string | null
   items: string
   created_at: string
@@ -26,7 +27,7 @@ interface OrderFromDB {
 
 async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc&limit=200`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc&limit=200`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -96,23 +97,26 @@ export default function CortePage() {
     const totalSubtotal = closed.reduce((s, o) => s + o.subtotal, 0)
     const totalIva = closed.reduce((s, o) => s + o.iva, 0)
     const totalDescuentos = closed.reduce((s, o) => s + o.descuento, 0)
+    const totalPropinas = closed.reduce((s, o) => s + (Number(o.propina) || 0), 0)
     const totalPersonas = closed.reduce((s, o) => s + o.personas, 0)
     const ticketPromedio = closed.length > 0 ? totalVentas / closed.length : 0
 
     // Payment methods
+    // Incluye propina: lo cobrado por método debe cuadrar contra caja/terminal (la propina con tarjeta entra por la terminal)
     const byPayment: Record<string, number> = {}
     for (const o of closed) {
       const method = o.metodo_pago || 'sin metodo'
-      byPayment[method] = (byPayment[method] || 0) + o.total
+      byPayment[method] = (byPayment[method] || 0) + o.total + (Number(o.propina) || 0)
     }
 
     // By mesero
-    const byMesero: Record<string, { ventas: number; ordenes: number; personas: number }> = {}
+    const byMesero: Record<string, { ventas: number; ordenes: number; personas: number; propinas: number }> = {}
     for (const o of closed) {
-      if (!byMesero[o.mesero]) byMesero[o.mesero] = { ventas: 0, ordenes: 0, personas: 0 }
+      if (!byMesero[o.mesero]) byMesero[o.mesero] = { ventas: 0, ordenes: 0, personas: 0, propinas: 0 }
       byMesero[o.mesero].ventas += o.total
       byMesero[o.mesero].ordenes += 1
       byMesero[o.mesero].personas += o.personas
+      byMesero[o.mesero].propinas += Number(o.propina) || 0
     }
 
     // Cancellations from audit log
@@ -121,7 +125,7 @@ export default function CortePage() {
     )
 
     return {
-      totalVentas, totalSubtotal, totalIva, totalDescuentos,
+      totalVentas, totalSubtotal, totalIva, totalDescuentos, totalPropinas,
       totalPersonas, ticketPromedio,
       ordenesCerradas: closed.length,
       ordenesAbiertas: all.filter(o => o.status === 'enviada' || o.status === 'abierta').length,
@@ -222,6 +226,14 @@ export default function CortePage() {
                   <span className="text-white font-bold">Total</span>
                   <span className="text-emerald-400 font-bold text-lg">{formatMXN(stats.totalVentas)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-amber-400">Propinas (no incluidas en ventas)</span>
+                  <span className="text-amber-400 font-medium">{formatMXN(stats.totalPropinas)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-3)]">Total cobrado (ventas + propinas)</span>
+                  <span className="text-white font-semibold">{formatMXN(stats.totalVentas + stats.totalPropinas)}</span>
+                </div>
               </div>
             </div>
 
@@ -265,6 +277,7 @@ export default function CortePage() {
                         <th className="text-left px-3 py-2">#</th>
                         <th className="text-left px-3 py-2">Mesero</th>
                         <th className="text-right px-3 py-2">Ventas</th>
+                        <th className="text-right px-3 py-2">Propinas</th>
                         <th className="text-right px-3 py-2">Ordenes</th>
                         <th className="text-right px-3 py-2">Personas</th>
                         <th className="text-right px-3 py-2">Ticket prom</th>
@@ -276,6 +289,7 @@ export default function CortePage() {
                           <td className="px-3 py-2.5 text-[var(--text-2)]">{i + 1}</td>
                           <td className="px-3 py-2.5 text-white font-medium">{mesero}</td>
                           <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold">{formatMXN(data.ventas)}</td>
+                          <td className="px-3 py-2.5 text-right text-amber-400">{formatMXN(data.propinas)}</td>
                           <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.ordenes}</td>
                           <td className="px-3 py-2.5 text-right text-[var(--text-4)]">{data.personas}</td>
                           <td className="px-3 py-2.5 text-right text-white">{formatMXN(data.personas > 0 ? data.ventas / data.personas : 0)}</td>

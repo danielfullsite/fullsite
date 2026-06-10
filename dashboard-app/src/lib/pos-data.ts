@@ -256,6 +256,11 @@ function _getClientId(): string {
   } catch { return 'amalay' }
 }
 
+/** Public accessor for pages that query Supabase directly (e.g. corte). */
+export function getClientId(): string {
+  return _getClientId()
+}
+
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
     const [catRes, itemsRes] = await Promise.all([
@@ -399,7 +404,7 @@ export interface Order {
   mesa: number
   mesero: string
   personas: number
-  status: 'abierta' | 'enviada' | 'cerrada' | 'cancelada'
+  status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada'
   items: OrderItem[]
   subtotal: number
   iva: number

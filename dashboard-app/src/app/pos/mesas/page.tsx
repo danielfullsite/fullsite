@@ -146,7 +146,7 @@ export default function MesasPage() {
     try {
       const [ordersRes, resRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=50`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         ),
         fetch(
@@ -233,9 +233,9 @@ export default function MesasPage() {
     setMerging(true)
     try {
       const [srcRes, tgtRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeSource}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeSource}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
-        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?mesa=eq.${mergeTarget}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeTarget}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
       ])
       if (!srcRes.ok || !tgtRes.ok) { showToast('Error al cargar ordenes'); setMerging(false); return }

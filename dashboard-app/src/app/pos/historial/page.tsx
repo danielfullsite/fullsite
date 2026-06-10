@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Search, RefreshCw, FileText, ChevronDown, ChevronRight, Printer } from 'lucide-react'
-import { formatMXN } from '@/lib/pos-data'
+import { formatMXN, getClientId } from '@/lib/pos-data'
 import { printTicketCSS } from '@/lib/printer'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -37,7 +37,7 @@ export default function HistorialPage() {
   const fetchOrders = async () => {
     setLoading(true)
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
+      `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${selectedDate}T00:00:00&created_at=lte.${selectedDate}T23:59:59&order=created_at.desc&limit=200`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     )
     if (res.ok) {
