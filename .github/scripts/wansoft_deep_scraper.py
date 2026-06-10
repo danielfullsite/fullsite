@@ -45,7 +45,7 @@ def wansoft_session():
         "UserName": WANSOFT_USER,
         "Password": WANSOFT_PASS,
     }, allow_redirects=True)
-    if "Dashboard" not in resp.url:
+    if "Dashboard" not in resp.url and "MyDocumentsList" not in resp.url:
         raise Exception(f"Wansoft login failed. URL: {resp.url}")
     return s
 

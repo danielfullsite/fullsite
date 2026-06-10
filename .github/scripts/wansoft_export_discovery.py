@@ -88,7 +88,7 @@ def login():
     s.get(f"{WANSOFT_URL}/")
     r = s.post(f"{WANSOFT_URL}/", data={"UserName": WANSOFT_USER, "Password": WANSOFT_PASS},
                allow_redirects=True)
-    if "Dashboard" not in r.url:
+    if "Dashboard" not in r.url and "MyDocumentsList" not in r.url:
         raise Exception(f"Login failed: {r.url}")
     return s
 

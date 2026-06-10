@@ -162,7 +162,7 @@ async def run():
         await page.click('input[type="submit"]')
         await asyncio.sleep(3)
 
-        if "Dashboard" not in page.url:
+        if "Dashboard" not in page.url and "MyDocumentsList" not in page.url:
             print(f"[!] Login failed: {page.url}")
             await browser.close()
             return

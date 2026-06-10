@@ -59,7 +59,7 @@ def wansoft_http_login(s: requests.Session, wuser: str, wpass: str) -> requests.
     data[user_field] = wuser
     data[pass_field] = wpass
     r = s.post(action, data=data, allow_redirects=True, timeout=20)
-    if "Dashboard" not in r.url:
+    if "Dashboard" not in r.url and "MyDocumentsList" not in r.url:
         field_names = [i.get("name") for i in form.find_all("input")] if form else []
         raise Exception(f"Login failed — landed on {r.url} | form action: {action} | fields: {field_names}")
     return r
