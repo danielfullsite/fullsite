@@ -44,16 +44,25 @@ const securityHeaders = [
   },
 ];
 
-const nextConfig: NextConfig = {
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: securityHeaders,
+// CAPACITOR_OFFLINE=1 → static export para empaquetar el bundle dentro
+// de la app nativa (POS offline). headers() no aplica en export.
+const isCapacitorOffline = process.env.CAPACITOR_OFFLINE === '1';
+
+const nextConfig: NextConfig = isCapacitorOffline
+  ? {
+      output: 'export',
+      images: { unoptimized: true },
+    }
+  : {
+      async headers() {
+        return [
+          {
+            source: '/(.*)',
+            headers: securityHeaders,
+          },
+        ];
       },
-    ];
-  },
-};
+    };
 
 export default withSentryConfig(nextConfig, {
   silent: true,

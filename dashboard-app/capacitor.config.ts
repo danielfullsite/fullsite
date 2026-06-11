@@ -4,12 +4,16 @@ const config: CapacitorConfig = {
   appId: 'mx.fullsite.app',
   appName: 'Fullsite',
   webDir: 'out',
-  server: {
-    // In production, load from the deployed URL (hybrid approach)
-    // This way the app always gets the latest version without App Store update
-    url: 'https://app.fullsite.mx',
-    cleartext: false,
-  },
+  // CAPACITOR_OFFLINE=1 → bundle local empaquetado (POS offline-first).
+  // Sin la variable → carga remota desde app.fullsite.mx (siempre actualizada).
+  ...(process.env.CAPACITOR_OFFLINE === '1'
+    ? {}
+    : {
+        server: {
+          url: 'https://app.fullsite.mx',
+          cleartext: false,
+        },
+      }),
   ios: {
     contentInset: 'automatic',
     backgroundColor: '#0a0a0b',

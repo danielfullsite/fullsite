@@ -23,6 +23,7 @@ import {
   type Ingredient,
   type ModificadorAgregar,
 } from '@/lib/pos-data'
+import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
@@ -2604,7 +2605,7 @@ function POSContent() {
                     showToast('Enviando cobro a terminal...')
                     setSaving(true)
                     try {
-                      const res = await fetch('/api/mp-point', {
+                      const res = await fetch(apiUrl('/api/mp-point'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2623,7 +2624,7 @@ function POSContent() {
                         const poll = setInterval(async () => {
                           attempts++
                           try {
-                            const statusRes = await fetch('/api/mp-point', {
+                            const statusRes = await fetch(apiUrl('/api/mp-point'), {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ action: 'status', accessToken: mpToken, paymentIntentId: intentId }),
