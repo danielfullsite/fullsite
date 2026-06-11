@@ -19,6 +19,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
+  // Build offline empaquetado (terminales POS): arrancar directo en /pos.
+  // El gate de PIN del POS funciona sin internet; el login de Supabase no.
+  const isOfflineBuild = process.env.NEXT_PUBLIC_CAPACITOR_OFFLINE === '1'
+  useEffect(() => {
+    if (isOfflineBuild && pathname === '/') {
+      router.replace('/pos')
+    }
+  }, [isOfflineBuild, pathname, router])
+
   const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
   const isPosRoute = pathname.startsWith('/pos')
   const isDemoRoute = pathname.startsWith('/demo')
@@ -30,7 +39,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading) {
       if (!user && !isPublicPage) {
-        router.push('/login')
+        // En build offline no hay login de Supabase: todo va al POS (gate de PIN propio)
+        router.push(isOfflineBuild ? '/pos' : '/login')
       } else if (isDemoUser && !isDemoRoute) {
         // Demo user trying to access real dashboard → redirect to demo
         router.push('/demo/dashboard')
@@ -38,7 +48,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setShowContent(true)
       }
     }
-  }, [loading, user, pathname, router, isPublicPage, isDemoUser, isDemoRoute])
+  }, [loading, user, pathname, router, isPublicPage, isDemoUser, isDemoRoute, isOfflineBuild])
 
   // POS pages: full screen, dark theme, no sidebar
   if (isPosRoute) {

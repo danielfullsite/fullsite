@@ -41,7 +41,7 @@ for path in "${EXCLUDED[@]}"; do
 done
 
 echo "→ next build (CAPACITOR_OFFLINE=1, output: export)"
-CAPACITOR_OFFLINE=1 npx next build
+CAPACITOR_OFFLINE=1 NEXT_PUBLIC_CAPACITOR_OFFLINE=1 npx next build
 
 echo "→ cap sync ios"
 CAPACITOR_OFFLINE=1 npx cap sync ios
