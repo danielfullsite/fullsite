@@ -382,7 +382,13 @@ export default function DashboardPage() {
                   <button onClick={() => setSelectedDayIdx(i => Math.min(i + 1, recentData.length - 1))} disabled={selectedDayIdx >= recentData.length - 1} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
                   <span className="text-sm text-[var(--text-2)] font-medium">
                     {formatDate(viewDay.fecha)}
-                    {selectedDayIdx === 0 && <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>}
+                    {(() => {
+                      const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+                      const fecha = String(viewDay.fecha).slice(0, 10)
+                      if (fecha === mxToday) return <span className="text-[var(--accent)] ml-1 text-xs font-bold">HOY</span>
+                      if (selectedDayIdx === 0) return <span className="text-[var(--text-3)] ml-1 text-xs font-bold">ÚLTIMO CIERRE</span>
+                      return null
+                    })()}
                   </span>
                   <button onClick={() => setSelectedDayIdx(i => Math.max(i - 1, 0))} disabled={selectedDayIdx <= 0} className="w-8 h-8 rounded-lg bg-[var(--line-soft)] hover:bg-[var(--line)] flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
                   <div className="relative w-9 h-9">
