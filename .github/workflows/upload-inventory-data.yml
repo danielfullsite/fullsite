@@ -1,0 +1,40 @@
+name: Upload Inventory Data
+
+on:
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Upload inventory_parsed + proveedores_catalog
+        run: |
+          python3 -c "
+          import json, os, requests
+
+          url = os.environ['SUPABASE_URL'].rstrip('/')
+          key = os.environ['SUPABASE_SERVICE_KEY']
+          h = {'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal'}
+
+          # Upload inventory_parsed
+          with open('.github/scripts/inventory_parsed.json') as f:
+              items = json.load(f)
+          print(f'Inventory items: {len(items)}')
+
+          row = {'client_id': 'amalay', 'data_key': 'inventory_parsed', 'fecha': '2026-06-11', 'data': json.dumps(items, ensure_ascii=False)}
+          r = requests.post(f'{url}/rest/v1/wansoft_data', headers=h, json=row)
+          print(f'inventory_parsed POST: {r.status_code}')
+          if r.status_code >= 300:
+              r2 = requests.patch(f'{url}/rest/v1/wansoft_data?client_id=eq.amalay&data_key=eq.inventory_parsed&fecha=eq.2026-06-11', headers=h, json={'data': row['data']})
+              print(f'inventory_parsed PATCH: {r2.status_code}')
+          "
