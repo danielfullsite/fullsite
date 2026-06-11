@@ -91,8 +91,51 @@ function inferCategoria(nombre: string): string {
   return 'Otro'
 }
 
+// Receta de subproducto scrapeada de Wansoft (Production/GetSubProductRecipe)
+interface WansoftSubRecipe {
+  name: string
+  ingredientes: SubproductoIngrediente[]
+}
+
+// Convierte ingredientes crudos de Wansoft a nuestro formato, costeando con inventario
+function parseSubRecipes(parsed: unknown, inventory: InventoryItem[]): Map<string, WansoftSubRecipe> {
+  const map = new Map<string, WansoftSubRecipe>()
+  if (!Array.isArray(parsed)) return map
+  const invByCode = new Map<string, InventoryItem>()
+  for (const item of inventory) {
+    if (item.codigo && !invByCode.has(item.codigo)) invByCode.set(item.codigo, item)
+  }
+  for (const r of parsed as Record<string, unknown>[]) {
+    const name = String(r.name || '').trim()
+    const rawIngs = Array.isArray(r.ingredients) ? r.ingredients as Record<string, unknown>[] : []
+    if (!name || rawIngs.length === 0) continue
+    const ingredientes: SubproductoIngrediente[] = rawIngs.map(ing => {
+      const codigo = String(ing.InternalCode || '')
+      const cantidad = Number(ing.Quantity) || 0
+      let costo = Number(ing.Cost) || 0
+      if (!costo) {
+        const inv = invByCode.get(codigo)
+        if (inv) costo = inv.costo_promedio * cantidad
+      }
+      return {
+        codigo,
+        producto: String(ing.RawMaterialName || ''),
+        cantidad,
+        unidad: String(ing.UnitOfMeasureDescription || ''),
+        costo,
+      }
+    })
+    map.set(name.toUpperCase(), { name, ingredientes })
+  }
+  return map
+}
+
 // Construye subproductos a partir del inventario Wansoft (departamentos SUBS%)
-function buildWansoftSubs(inventory: InventoryItem[]): Subproducto[] {
+// + recetas scrapeadas (subproduct_recipes)
+function buildWansoftSubs(
+  inventory: InventoryItem[],
+  recipes: Map<string, WansoftSubRecipe>,
+): Subproducto[] {
   const map = new Map<string, Subproducto>()
   for (const item of inventory) {
     if (!item.departamento.toUpperCase().startsWith('SUBS')) continue
@@ -123,6 +166,33 @@ function buildWansoftSubs(inventory: InventoryItem[]): Subproducto[] {
         stock_val: item.inv_final_val,
       })
     }
+  }
+  // Adjuntar recetas por nombre
+  const usedRecipes = new Set<string>()
+  for (const sp of map.values()) {
+    const rec = recipes.get(sp.nombre.toUpperCase())
+    if (rec) {
+      sp.ingredientes = rec.ingredientes
+      const recipeCost = rec.ingredientes.reduce((s, i) => s + i.costo, 0)
+      if (recipeCost > 0) sp.costo_total = recipeCost
+      usedRecipes.add(sp.nombre.toUpperCase())
+    }
+  }
+  // Recetas de Wansoft sin item de inventario SUBS (ej. productos MARCA PROPIA)
+  for (const [key, rec] of recipes) {
+    if (usedRecipes.has(key)) continue
+    const recipeCost = rec.ingredientes.reduce((s, i) => s + i.costo, 0)
+    map.set(`rec_${key}`, {
+      id: `wsr_${key}`,
+      nombre: rec.name,
+      categoria: inferCategoria(rec.name),
+      ingredientes: rec.ingredientes,
+      rendimiento_qty: 1,
+      rendimiento_unit: 'PZ',
+      costo_total: recipeCost,
+      costo_unitario: recipeCost,
+      wansoft: true,
+    })
   }
   return Array.from(map.values())
 }
@@ -170,8 +240,11 @@ export default function SubproductosPage() {
           }
         }
 
-        // Load inventory for ingredient search
-        const invResult = await getWansoftDataLatest('inventory_parsed')
+        // Load inventory + recetas de subproductos Wansoft en paralelo
+        const [invResult, recResult] = await Promise.all([
+          getWansoftDataLatest('inventory_parsed'),
+          getWansoftDataLatest('subproduct_recipes'),
+        ])
         if (invResult) {
           const parsed = deepParse(invResult.data)
           const arr = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>)?.items
@@ -187,7 +260,10 @@ export default function SubproductosPage() {
               costo_promedio: Number(r.costo_promedio) || 0,
             }))
             setInventory(inv)
-            setWansoftSubs(buildWansoftSubs(inv))
+            const recipes = recResult
+              ? parseSubRecipes(deepParse(recResult.data), inv)
+              : new Map<string, WansoftSubRecipe>()
+            setWansoftSubs(buildWansoftSubs(inv, recipes))
           }
         }
       } catch (e) {
@@ -828,8 +904,8 @@ export default function SubproductosPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {sp.ingredientes.map(ing => (
-                            <tr key={ing.codigo} className="border-b border-[var(--accent-line)]/50">
+                          {sp.ingredientes.map((ing, idx) => (
+                            <tr key={`${ing.codigo}-${idx}`} className="border-b border-[var(--accent-line)]/50">
                               <td className="px-3 py-2 text-[var(--text-1)] font-medium">{ing.producto}</td>
                               <td className="px-3 py-2 text-[var(--text-4)] font-mono text-xs">{ing.codigo}</td>
                               <td className="px-3 py-2 text-right font-mono text-xs tnum text-[var(--text-2)]">{ing.cantidad}</td>
