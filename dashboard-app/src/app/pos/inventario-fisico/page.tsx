@@ -83,10 +83,10 @@ export default function InventarioFisicoPage() {
             body: JSON.stringify({
               client_id: _cid(),
               ingredient_id: item.ingredient_id,
-              type: 'conteo_fisico',
+              movement_type: 'adjustment',
               quantity: diff,
+              actor: 'almacén',
               notes: `Conteo físico: sistema ${item.stock.toFixed(2)} → físico ${(item.physical || 0).toFixed(2)} (diff: ${diff > 0 ? '+' : ''}${diff.toFixed(2)})`,
-              reference: `conteo-${new Date().toISOString().split('T')[0]}`,
             }),
           })
         }

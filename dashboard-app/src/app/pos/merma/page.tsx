@@ -103,10 +103,10 @@ export default function MermaPage() {
           body: JSON.stringify({
             client_id: _cid(),
             ingredient_id: entry.ingredient_id,
-            type: 'merma',
+            movement_type: 'waste',
             quantity: -entry.quantity,
-            notes: entry.motivo,
-            reference: `merma-${today}`,
+            actor: 'almacén',
+            notes: `Merma ${today}: ${entry.motivo}`,
           }),
         })
 

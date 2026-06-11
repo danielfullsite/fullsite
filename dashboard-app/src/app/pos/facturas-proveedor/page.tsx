@@ -91,19 +91,21 @@ export default function FacturasProveedorPage() {
     setSaving(true)
     try {
       const today = new Date().toISOString().split('T')[0]
-      // Save factura
-      await fetch(`${SUPABASE_URL}/rest/v1/pos_facturas_proveedor`, {
+      // Save factura (tabla canónica pos_facturas — misma que /pos/compras)
+      await fetch(`${SUPABASE_URL}/rest/v1/pos_facturas`, {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
+          id: `FACT-${Date.now()}`,
           client_id: _cid(),
-          fecha: today,
-          proveedor,
-          num_factura: numFactura,
-          items: JSON.stringify(items),
+          supplier: proveedor,
+          folio: numFactura || null,
+          subtotal: totalFactura,
+          iva: 0,
           total: totalFactura,
-          status: 'registrada',
-          alertas: alerts.length,
+          status: 'capturada',
+          captured_by: 'almacén',
+          notes: `${items.length} insumos${alerts.length ? `, ${alerts.length} alertas de precio` : ''} — ${today}`,
         }),
       })
 
@@ -126,10 +128,10 @@ export default function FacturasProveedorPage() {
           body: JSON.stringify({
             client_id: _cid(),
             ingredient_id: item.ingredient_id,
-            type: 'compra',
+            movement_type: 'restock',
             quantity: item.quantity,
-            notes: `Factura ${numFactura} — ${proveedor}`,
-            reference: numFactura || `factura-${today}`,
+            actor: 'almacén',
+            notes: `Factura ${numFactura || today} — ${proveedor}`,
           }),
         })
 
