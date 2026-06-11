@@ -223,9 +223,16 @@ def get_token(session, page):
     r = session.get(f"{WANSOFT_URL}/{page}", timeout=30)
     if r.status_code != 200:
         return None, None
-    m = re.search(r'name="__RequestVerificationToken"\s+value="([^"]+)"', r.text)
-    token = m.group(1) if m else None
-    return token, r
+    # Try multiple patterns for the token
+    for pattern in [
+        r'name="__RequestVerificationToken"\s+value="([^"]+)"',
+        r'value="([^"]+)"\s+name="__RequestVerificationToken"',
+        r'__RequestVerificationToken["\s:]+([A-Za-z0-9_\-]+)',
+    ]:
+        m = re.search(pattern, r.text)
+        if m:
+            return m.group(1), r
+    return None, r
 
 
 def export_with_token(session, page, export_endpoint, extra_data=None):
@@ -305,86 +312,43 @@ def main():
         if result:
             save_data(f"inv_statement_{wh_name.split('.')[0].strip()}", result)
 
-    # 2. Export Physical Inventory vs System
-    print("\n[2] Export Physical Inventory vs System...")
-    for wh in wh_list:
-        wh_id = wh.get("Value", "")
-        wh_name = wh.get("Text", "")
-        if not wh_id or "ELIMINADO" in wh_name.upper():
-            continue
-        print(f"  Warehouse: {wh_name}")
-        result = export_with_token(session, "Inventory/PhysicalInventoryVsSystem",
-                                    "Inventory/ExportPhysicalInventoryVsSystemReport", {
-                                        "subsidiaryId": SUBSIDIARY_ID,
-                                        "warehouseId": wh_id,
-                                    })
-        if result:
-            save_data(f"inv_fisico_vs_sistema_{wh_name.split('.')[0].strip()}", result)
+    # 2-7: Export all other reports — each gets token from ITS OWN page
+    exports = [
+        ("Inventory/PhysicalInventoryVsSystem", "Inventory/ExportPhysicalInventoryVsSystemReport",
+         "inv_fisico_vs_sistema", {"subsidiaryId": SUBSIDIARY_ID}, True),
+        ("Inventory/Transfer", "Inventory/ExportTransfer",
+         "inv_transferencias", {"subsidiaryId": SUBSIDIARY_ID, "startDate": MONTH_AGO, "endDate": TODAY}, False),
+        ("Inventory/BatchAdjustment", "Inventory/ExportBatchAdjustment",
+         "inv_ajustes_lote", {"subsidiaryId": SUBSIDIARY_ID, "startDate": MONTH_AGO, "endDate": TODAY}, False),
+        ("Inventory/MassiveInventoryOutput", "Inventory/ExportMassiveInventoryOutput",
+         "inv_salida_masiva", {"subsidiaryId": SUBSIDIARY_ID, "startDate": MONTH_AGO, "endDate": TODAY}, False),
+        ("Account/MyDocumentsList", "Account/ExportMyDocumentsList",
+         "inv_facturas_wansoft", {}, False),
+    ]
 
-    # 3. Reporte de existencias (InventoryControl / StockControl)
-    print("\n[3] Reporte de existencias...")
-    # Try known URL variations
-    for url in ["Inventory/InventoryControl", "Inventory/StockControl"]:
-        for export_url in [f"{url.rsplit('/',1)[0]}/ExportInventoryControl",
-                           f"{url.rsplit('/',1)[0]}/ExportStockControl",
-                           f"{url.rsplit('/',1)[0]}/ExportInventoryReport"]:
-            result = export_with_token(session, url, export_url, {
-                "subsidiaryId": SUBSIDIARY_ID,
-            })
-            if result:
-                save_data("inv_existencias", result)
-                break
+    for i, (page, export_ep, data_key, extra, per_warehouse) in enumerate(exports, 2):
+        print(f"\n[{i}] {data_key}...")
+
+        if per_warehouse:
+            for wh in wh_list:
+                wh_id = wh.get("Value", "")
+                wh_name = wh.get("Text", "")
+                if not wh_id or "ELIMINADO" in wh_name.upper():
+                    continue
+                print(f"  Warehouse: {wh_name}")
+                params = {**extra, "warehouseId": wh_id}
+                result = export_with_token(session, page, export_ep, params)
+                if result:
+                    save_data(f"{data_key}_{wh_name.split('.')[0].strip()}", result)
         else:
-            continue
-        break
-
-    # 4. Transferencias
-    print("\n[4] Transferencias...")
-    for export_url in ["Inventory/ExportTransfer", "Inventory/ExportTransfers"]:
-        result = export_with_token(session, "Inventory/Transfer", export_url, {
-            "subsidiaryId": SUBSIDIARY_ID,
-            "startDate": MONTH_AGO,
-            "endDate": TODAY,
-        })
-        if result:
-            save_data("inv_transferencias", result)
-            break
-
-    # 5. Ajustes por lote
-    print("\n[5] Ajustes por lote...")
-    for export_url in ["Inventory/ExportBatchAdjustment", "Inventory/ExportBatchAdjustments"]:
-        result = export_with_token(session, "Inventory/BatchAdjustment", export_url, {
-            "subsidiaryId": SUBSIDIARY_ID,
-            "startDate": MONTH_AGO,
-            "endDate": TODAY,
-        })
-        if result:
-            save_data("inv_ajustes_lote", result)
-            break
-
-    # 6. Salida masiva
-    print("\n[6] Salida masiva...")
-    for export_url in ["Inventory/ExportMassiveInventoryOutput", "Inventory/ExportBulkInventoryOutput"]:
-        result = export_with_token(session, "Inventory/MassiveInventoryOutput", export_url, {
-            "subsidiaryId": SUBSIDIARY_ID,
-            "startDate": MONTH_AGO,
-            "endDate": TODAY,
-        })
-        if result:
-            save_data("inv_salida_masiva", result)
-            break
-
-    # 7. Facturas Wansoft
-    print("\n[7] Facturas Wansoft...")
-    result = export_with_token(session, "Account/MyDocumentsList",
-                                "Account/ExportMyDocumentsList", {})
-    if result:
-        save_data("inv_facturas_wansoft", result)
-    else:
-        # Try scraping the HTML table
-        data = scrape_page(session, "Account/MyDocumentsList", "Facturas")
-        if data:
-            save_data("inv_facturas_wansoft", data)
+            result = export_with_token(session, page, export_ep, extra)
+            if result:
+                save_data(data_key, result)
+            else:
+                # Fallback: try scraping HTML table
+                data = scrape_page(session, page, data_key)
+                if data:
+                    save_data(data_key, data)
 
     print(f"\n[DONE]")
 
