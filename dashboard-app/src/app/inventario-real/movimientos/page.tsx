@@ -184,6 +184,64 @@ function parseWansoftMovement(row: Record<string, unknown>): Movement | null {
   }
 }
 
+interface PurchaseSnapshot {
+  fecha: string
+  map: Map<string, { qty: number; cost: number }>
+}
+
+// purchases_by_product is a rolling cumulative report — diff consecutive
+// snapshots to reconstruct the purchases (entradas) of each day.
+function parsePurchaseSnapshots(rows: Record<string, unknown>[]): Movement[] {
+  const snaps: PurchaseSnapshot[] = []
+  for (const row of rows) {
+    const data = deepParse(row.data) as Record<string, unknown> | null
+    const result = Array.isArray(data?.Result) ? data.Result : Array.isArray(data) ? data : null
+    if (!result || !row.fecha) continue
+    const map = new Map<string, { qty: number; cost: number }>()
+    for (const p of result as Record<string, unknown>[]) {
+      const name = (p.ProductName as string) || ''
+      if (!name) continue
+      map.set(name, { qty: Number(p.Quantity) || 0, cost: Number(p.Cost) || 0 })
+    }
+    snaps.push({ fecha: row.fecha as string, map })
+  }
+  snaps.sort((a, b) => a.fecha.localeCompare(b.fecha))
+
+  const movements: Movement[] = []
+  for (let i = 1; i < snaps.length; i++) {
+    const prev = snaps[i - 1]
+    const curr = snaps[i]
+    const items: MovementItem[] = []
+    curr.map.forEach((v, name) => {
+      const p = prev.map.get(name)
+      const dQty = v.qty - (p?.qty || 0)
+      const dCost = v.cost - (p?.cost || 0)
+      if (dQty > 0.001 && dCost > 0.01) {
+        items.push({
+          producto: name,
+          cantidad: Math.round(dQty * 100) / 100,
+          costo_unitario: Math.round((dCost / dQty) * 100) / 100,
+          costo_total: Math.round(dCost * 100) / 100,
+        })
+      }
+    })
+    if (items.length === 0) continue
+    const total = items.reduce((s, it) => s + (it.costo_total || 0), 0)
+    movements.push({
+      id: `wpurch_${curr.fecha}`,
+      type: 'entrada',
+      date: curr.fecha,
+      description: `Compras Wansoft (${items.length} producto${items.length === 1 ? '' : 's'})`,
+      items: items.sort((a, b) => (b.costo_total || 0) - (a.costo_total || 0)),
+      total: Math.round(total * 100) / 100,
+      user: 'Wansoft',
+      source: 'wansoft_data',
+      raw_key: 'purchases_by_product',
+    })
+  }
+  return movements
+}
+
 function parsePosMovement(row: Record<string, unknown>): Movement {
   return {
     id: `pos_${row.id}`,
@@ -247,9 +305,16 @@ export default function MovimientosPage() {
         `client_id=eq.${clientId}&order=created_at.desc&limit=200`
       )
 
-      const [entryRows, transferRows, wasteRows, countRows, posRows] = await Promise.all([
+      // Fetch Wansoft purchases snapshots (rolling report → daily deltas)
+      const purchasesPromise = sbFetchRows(
+        'wansoft_data',
+        `select=fecha,data&client_id=eq.${clientId}&data_key=eq.purchases_by_product&order=fecha.desc&limit=15`
+      )
+
+      const [entryRows, transferRows, wasteRows, countRows, posRows, purchaseRows] = await Promise.all([
         ...wansoftPromises,
         posPromise,
+        purchasesPromise,
       ])
 
       const allWansoft = [...entryRows, ...transferRows, ...wasteRows, ...countRows]
@@ -258,8 +323,9 @@ export default function MovimientosPage() {
         .filter((m): m is Movement => m !== null)
 
       const posMovements = posRows.map(parsePosMovement)
+      const purchaseMovements = parsePurchaseSnapshots(purchaseRows)
 
-      const combined = [...wansoftMovements, ...posMovements]
+      const combined = [...wansoftMovements, ...posMovements, ...purchaseMovements]
         .sort((a, b) => b.date.localeCompare(a.date))
 
       setMovements(combined)

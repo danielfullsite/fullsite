@@ -41,6 +41,12 @@ interface Subproducto {
   rendimiento_unit: string
   costo_total: number
   costo_unitario: number
+  // Solo para subproductos importados de Wansoft (inventory_parsed)
+  wansoft?: boolean
+  codigo?: string
+  departamento?: string
+  stock_qty?: number
+  stock_val?: number
 }
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -75,11 +81,58 @@ function deepParse(val: unknown): unknown {
   return val
 }
 
+function inferCategoria(nombre: string): string {
+  const n = nombre.toUpperCase()
+  if (n.includes('SALSA') || n.includes('PURE') || n.includes('PESTO')) return 'Salsa'
+  if (n.includes('MASA') || n.includes('PAN ') || n.startsWith('PAN') || n.includes('ROL') || n.includes('CROISSANT') || n.includes('CRUFFIN') || n.includes('CONCHA')) return 'Masa'
+  if (n.includes('BASE') || n.includes('MEZCLA') || n.includes('MIX')) return 'Base'
+  if (n.includes('CONSOME') || n.includes('CALDO') || n.includes('FONDO')) return 'Caldo'
+  if (n.includes('ADEREZO') || n.includes('VINAGRETA') || n.includes('GLASS') || n.includes('JARABE')) return 'Aderezo'
+  return 'Otro'
+}
+
+// Construye subproductos a partir del inventario Wansoft (departamentos SUBS%)
+function buildWansoftSubs(inventory: InventoryItem[]): Subproducto[] {
+  const map = new Map<string, Subproducto>()
+  for (const item of inventory) {
+    if (!item.departamento.toUpperCase().startsWith('SUBS')) continue
+    if (!item.producto) continue
+    const key = item.codigo || item.producto
+    const prev = map.get(key)
+    if (prev) {
+      prev.stock_qty = (prev.stock_qty || 0) + item.inv_final_qty
+      prev.stock_val = (prev.stock_val || 0) + item.inv_final_val
+      if (!prev.costo_unitario && item.costo_promedio) {
+        prev.costo_unitario = item.costo_promedio
+        prev.costo_total = item.costo_promedio
+      }
+    } else {
+      map.set(key, {
+        id: `ws_${key}`,
+        nombre: item.producto,
+        categoria: inferCategoria(item.producto),
+        ingredientes: [],
+        rendimiento_qty: 1,
+        rendimiento_unit: 'PZ',
+        costo_total: item.costo_promedio,
+        costo_unitario: item.costo_promedio,
+        wansoft: true,
+        codigo: item.codigo,
+        departamento: item.departamento,
+        stock_qty: item.inv_final_qty,
+        stock_val: item.inv_final_val,
+      })
+    }
+  }
+  return Array.from(map.values())
+}
+
 // ── Component ───────────────────────────────────────────────────────
 
 export default function SubproductosPage() {
   // ── State ─────────────────────────────────────────────────────────
   const [subproductos, setSubproductos] = useState<Subproducto[]>([])
+  const [wansoftSubs, setWansoftSubs] = useState<Subproducto[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -123,7 +176,7 @@ export default function SubproductosPage() {
           const parsed = deepParse(invResult.data)
           const arr = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>)?.items
           if (Array.isArray(arr)) {
-            setInventory(arr.map((r: Record<string, unknown>) => ({
+            const inv = arr.map((r: Record<string, unknown>) => ({
               almacen: String(r.almacen || ''),
               codigo: String(r.codigo || ''),
               producto: String(r.producto || ''),
@@ -132,7 +185,9 @@ export default function SubproductosPage() {
               inv_final_qty: Number(r.inv_final_qty) || 0,
               inv_final_val: Number(r.inv_final_val) || 0,
               costo_promedio: Number(r.costo_promedio) || 0,
-            })))
+            }))
+            setInventory(inv)
+            setWansoftSubs(buildWansoftSubs(inv))
           }
         }
       } catch (e) {
@@ -291,9 +346,16 @@ export default function SubproductosPage() {
       .slice(0, 15)
   }, [ingredientSearch, inventory])
 
+  // ── Combined list: manuales + importados de Wansoft ──────────────
+  const allSubproductos = useMemo(() => {
+    // Si un manual tiene el mismo nombre que uno de Wansoft, gana el manual
+    const manualNames = new Set(subproductos.map(s => s.nombre.toUpperCase()))
+    return [...subproductos, ...wansoftSubs.filter(w => !manualNames.has(w.nombre.toUpperCase()))]
+  }, [subproductos, wansoftSubs])
+
   // ── Filtered subproductos list ────────────────────────────────────
   const filteredSubproductos = useMemo(() => {
-    let list = subproductos
+    let list = allSubproductos
     if (filterCategoria !== 'Todas') {
       list = list.filter(s => s.categoria === filterCategoria)
     }
@@ -302,21 +364,22 @@ export default function SubproductosPage() {
       list = list.filter(s => s.nombre.toLowerCase().includes(q))
     }
     return list.sort((a, b) => a.nombre.localeCompare(b.nombre))
-  }, [subproductos, filterCategoria, searchQuery])
+  }, [allSubproductos, filterCategoria, searchQuery])
 
   // ── KPIs ──────────────────────────────────────────────────────────
-  const kpiTotal = subproductos.length
-  const kpiCostoPromedio = kpiTotal > 0
-    ? subproductos.reduce((s, sp) => s + sp.costo_unitario, 0) / kpiTotal
+  const kpiTotal = allSubproductos.length
+  const conCosto = allSubproductos.filter(sp => sp.costo_unitario > 0)
+  const kpiCostoPromedio = conCosto.length > 0
+    ? conCosto.reduce((s, sp) => s + sp.costo_unitario, 0) / conCosto.length
     : 0
   const kpiMasUsado = useMemo(() => {
-    // Placeholder: in a full system you'd cross-reference with dish recipes
-    if (subproductos.length === 0) return 'N/A'
-    return subproductos.reduce((best, sp) =>
+    const withIng = allSubproductos.filter(sp => sp.ingredientes.length > 0)
+    if (withIng.length === 0) return 'N/A'
+    return withIng.reduce((best, sp) =>
       sp.ingredientes.length > best.ingredientes.length ? sp : best
-    , subproductos[0]).nombre
-  }, [subproductos])
-  const kpiSinReceta = subproductos.filter(s => s.ingredientes.length === 0).length
+    , withIng[0]).nombre
+  }, [allSubproductos])
+  const kpiSinReceta = allSubproductos.filter(s => s.ingredientes.length === 0).length
 
   // ── Render ────────────────────────────────────────────────────────
 
@@ -646,12 +709,12 @@ export default function SubproductosPage() {
         <div className="rounded-2xl border border-[var(--accent-line)] p-12 text-center" style={{ background: 'var(--bento-card)' }}>
           <Soup size={40} className="mx-auto text-[var(--text-4)] mb-3" />
           <p className="text-[var(--text-3)]">
-            {subproductos.length === 0
+            {allSubproductos.length === 0
               ? 'No hay subproductos registrados.'
               : 'No hay subproductos que coincidan con el filtro.'}
           </p>
           <p className="text-[var(--text-4)] text-sm mt-1">
-            {subproductos.length === 0
+            {allSubproductos.length === 0
               ? 'Crea tu primera receta intermedia con el boton de arriba.'
               : 'Prueba con otro termino de busqueda o categoria.'}
           </p>
@@ -679,10 +742,25 @@ export default function SubproductosPage() {
                       }`}>
                         {sp.categoria}
                       </span>
+                      {sp.wansoft && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
+                          Wansoft
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-xs text-[var(--text-3)]">
-                      <span>{sp.ingredientes.length} ingredientes</span>
-                      <span>Rinde {sp.rendimiento_qty} {sp.rendimiento_unit}</span>
+                      {sp.wansoft ? (
+                        <>
+                          <span className="font-mono">{sp.codigo}</span>
+                          <span>{sp.departamento}</span>
+                          <span>Stock: {Math.round((sp.stock_qty || 0) * 100) / 100}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{sp.ingredientes.length} ingredientes</span>
+                          <span>Rinde {sp.rendimiento_qty} {sp.rendimiento_unit}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -707,10 +785,37 @@ export default function SubproductosPage() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div className="border-t border-[var(--accent-line)] px-5 py-4">
+                    {/* Wansoft sub: stock detail */}
+                    {sp.wansoft && (
+                      <div className="rounded-xl bg-[var(--surface-2)] border border-[var(--accent-line)] p-4 mb-4">
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-4)] mb-1">Stock actual</p>
+                            <p className="text-base font-bold font-mono text-[var(--text-1)] tnum">{Math.round((sp.stock_qty || 0) * 100) / 100}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-4)] mb-1">Valor en inventario</p>
+                            <p className="text-base font-bold font-mono text-[var(--text-1)] tnum">{formatCurrency(sp.stock_val || 0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-4)] mb-1">Costo promedio</p>
+                            <p className="text-base font-bold font-mono text-emerald-400 tnum">{formatCurrency(sp.costo_unitario)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {sp.wansoft && sp.ingredientes.length === 0 && (
+                      <p className="text-xs text-[var(--text-4)] mb-2">
+                        Receta importada de Wansoft sin ingredientes detallados. Puedes crear un subproducto manual con el mismo nombre para definir su receta.
+                      </p>
+                    )}
                     {/* Ingredients table */}
+                    {!(sp.wansoft && sp.ingredientes.length === 0) && (
                     <h5 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--text-3)] mb-3">
                       Ingredientes
                     </h5>
+                    )}
+                    {!(sp.wansoft && sp.ingredientes.length === 0) && (
                     <div className="rounded-xl border border-[var(--accent-line)] overflow-hidden mb-4">
                       <table className="w-full text-sm">
                         <thead>
@@ -743,8 +848,10 @@ export default function SubproductosPage() {
                         </tbody>
                       </table>
                     </div>
+                    )}
 
                     {/* Cost breakdown */}
+                    {!sp.wansoft && (
                     <div className="rounded-xl bg-[var(--surface-2)] border border-[var(--accent-line)] p-4 mb-4">
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
@@ -763,8 +870,10 @@ export default function SubproductosPage() {
                         </div>
                       </div>
                     </div>
+                    )}
 
                     {/* Action buttons */}
+                    {!sp.wansoft && (
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => openEdit(sp)}
@@ -781,6 +890,7 @@ export default function SubproductosPage() {
                         <Trash2 size={13} /> Eliminar
                       </button>
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -790,7 +900,7 @@ export default function SubproductosPage() {
       )}
 
       {/* ── Category breakdown chart ── */}
-      {subproductos.length > 0 && (
+      {allSubproductos.length > 0 && (
         <div className="rounded-2xl border border-[var(--accent-line)] p-5" style={{ background: 'var(--bento-card)' }}>
           <h3 className="text-sm font-bold text-[var(--text-1)] mb-4 flex items-center gap-2">
             <BarChart3 size={16} className="text-blue-400" />
@@ -799,7 +909,7 @@ export default function SubproductosPage() {
           <div className="space-y-2.5">
             {(() => {
               const catMap = new Map<string, { count: number; costoTotal: number }>()
-              subproductos.forEach(sp => {
+              allSubproductos.forEach(sp => {
                 const prev = catMap.get(sp.categoria) || { count: 0, costoTotal: 0 }
                 catMap.set(sp.categoria, { count: prev.count + 1, costoTotal: prev.costoTotal + sp.costo_total })
               })

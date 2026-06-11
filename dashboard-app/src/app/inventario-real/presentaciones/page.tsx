@@ -86,26 +86,68 @@ export default function PresentacionesPage() {
         const clientId = getActiveClientSlug()
         const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.product_presentations&order=fecha.desc&limit=1&select=data`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
+        const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+        const [res, catRes] = await Promise.all([
+          fetch(
+            `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.product_presentations&order=fecha.desc&limit=1&select=data`,
+            { headers }
+          ),
+          fetch(
+            `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.products_catalog&order=fecha.desc&limit=1&select=data`,
+            { headers }
+          ),
+        ])
+
+        let saved: ProductPresentations[] = []
         if (res.ok) {
           const rows = await res.json()
           if (rows.length > 0) {
-            const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data
+            let raw = rows[0].data
+            for (let i = 0; i < 3 && typeof raw === 'string'; i++) {
+              try { raw = JSON.parse(raw) } catch { break }
+            }
             if (Array.isArray(raw)) {
-              setProducts(raw.map((p: ProductPresentations) => ({
+              saved = raw.map((p: ProductPresentations) => ({
                 ...p,
                 product_id: p.product_id || uid(),
                 presentations: (p.presentations || []).map((pr: Presentation) => ({
                   ...pr,
                   id: pr.id || uid(),
                 })),
-              })))
+              }))
             }
           }
         }
+
+        // Catálogo de productos Wansoft: Text = "NOMBRE (CODIGO)"
+        let catalog: ProductPresentations[] = []
+        if (catRes.ok) {
+          const rows = await catRes.json()
+          if (rows.length > 0) {
+            let raw = rows[0].data
+            for (let i = 0; i < 3 && typeof raw === 'string'; i++) {
+              try { raw = JSON.parse(raw) } catch { break }
+            }
+            const list = Array.isArray((raw as Record<string, unknown>)?.products)
+              ? (raw as { products: Array<{ Text?: string; Value?: string }> }).products
+              : Array.isArray(raw) ? raw as Array<{ Text?: string; Value?: string }> : []
+            const savedNames = new Set(saved.map(p => p.product_name.toUpperCase()))
+            catalog = list
+              .filter(p => p.Text && p.Value)
+              .map(p => {
+                const m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(p.Text!)
+                return {
+                  product_id: `cat_${p.Value}`,
+                  product_name: m ? m[1].trim() : p.Text!.trim(),
+                  base_unit: 'PZ',
+                  presentations: [],
+                }
+              })
+              .filter(p => p.product_name && !savedNames.has(p.product_name.toUpperCase()))
+          }
+        }
+
+        setProducts([...saved, ...catalog])
       } catch (e) {
         console.error('[presentaciones] Error loading:', e)
       }
@@ -120,10 +162,12 @@ export default function PresentacionesPage() {
     setSaveMsg(null)
     try {
       const clientId = getActiveClientSlug()
+      // Solo persistir productos manuales o de catálogo que ya tengan presentaciones
+      const toPersist = data.filter(p => !p.product_id.startsWith('cat_') || p.presentations.length > 0)
       const ok = await sbPost('wansoft_data', clientId, {
         data_key: 'product_presentations',
         fecha: todayISO(),
-        data: data,
+        data: toPersist,
       }, { upsert: true })
       if (ok) {
         setSaveMsg({ type: 'success', text: 'Presentaciones guardadas' })

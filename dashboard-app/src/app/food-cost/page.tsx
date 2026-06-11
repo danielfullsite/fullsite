@@ -95,13 +95,18 @@ export default function FoodCostPage() {
         // -------------------------------------------------------
         // SOURCE 1 (primary): wansoft_recipes — 574 real recipes
         // -------------------------------------------------------
-        const [recipesRes, menuRes] = await Promise.all([
+        const [recipesRes, menuRes, posRecipesRes] = await Promise.all([
           fetch(
             `${SB_URL}/rest/v1/wansoft_recipes?client_id=eq.amalay&select=saucer_id,saucer_name,budget_cost,ingredients`,
             { headers }
           ),
           fetch(
             `${SB_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price`,
+            { headers }
+          ),
+          // Excel de costeo real (fuente de verdad de precios de venta)
+          fetch(
+            `${SB_URL}/rest/v1/pos_recipes?select=nombre,precio_venta&precio_venta=gt.0`,
             { headers }
           ),
         ])
@@ -118,21 +123,30 @@ export default function FoodCostPage() {
           const menuItems: Array<{ name: string; price: number }> = menuRes.ok ? await menuRes.json() : []
           const menuMap = new Map<string, number>()
           for (const m of menuItems) {
-            menuMap.set(norm(m.name), Number(m.price) || 0)
+            if (Number(m.price) > 0) menuMap.set(norm(m.name), Number(m.price))
           }
 
-          // Find best menu price match for a recipe name
+          // Excel de costeo (pos_recipes) — precios reales de venta
+          const posRecipes: Array<{ nombre: string; precio_venta: number }> = posRecipesRes.ok ? await posRecipesRes.json() : []
+          const excelMap = new Map<string, number>()
+          for (const r of posRecipes) {
+            if (Number(r.precio_venta) > 0) excelMap.set(norm(r.nombre), Number(r.precio_venta))
+          }
+
+          // Find best price match: exacto menú → exacto Excel → fuzzy Excel → fuzzy menú
           const findPrice = (recipeName: string): number => {
             const nr = norm(recipeName)
-            // Exact match first
             if (menuMap.has(nr)) return menuMap.get(nr)!
-            // Fuzzy match
+            if (excelMap.has(nr)) return excelMap.get(nr)!
             let bestPrice = 0
+            excelMap.forEach((price, name) => {
+              if (!bestPrice && fuzzyMatch(nr, name)) bestPrice = price
+            })
+            if (bestPrice) return bestPrice
             menuMap.forEach((price, menuName) => {
               if (!bestPrice && fuzzyMatch(nr, menuName)) bestPrice = price
             })
-            if (bestPrice) return bestPrice
-            return 0
+            return bestPrice
           }
 
           const costItems: CostItem[] = []
@@ -159,8 +173,9 @@ export default function FoodCostPage() {
             const precio = findPrice(recipe.saucer_name)
             const margen = precio > 0 ? Math.round((1 - costoTotal / precio) * 1000) / 10 : 0
 
-            // Sanity check: if margin < -200%, the match is probably wrong — treat as unmatched
-            const validMatch = precio > 0 && margen > -200
+            // Sanity check: si el margen es < -100%, el match es casi seguro incorrecto
+            // (ej. producto de market matcheado con un platillo) — tratar como sin precio
+            const validMatch = precio > 0 && margen > -100
 
             costItems.push({
               platillo: recipe.saucer_name,
