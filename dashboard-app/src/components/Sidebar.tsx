@@ -79,6 +79,9 @@ const navSections = [
     label: 'Operaciones',
     items: [
       { href: '/inventario-real', label: 'Inventario', icon: Package },
+      { href: '/inventario-real/toma-fisica', label: 'Toma Física', icon: ClipboardList },
+      { href: '/inventario-real/reorden', label: 'Punto Reorden', icon: Package },
+      { href: '/inventario-real/entradas', label: 'Entradas', icon: Package },
       { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/acceso', label: 'Control Acceso', icon: Clock },
