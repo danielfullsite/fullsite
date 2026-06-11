@@ -218,11 +218,125 @@ def scrape_page(session, page, label):
     return []
 
 
+def get_token(session, page):
+    """GET a page and extract __RequestVerificationToken."""
+    r = session.get(f"{WANSOFT_URL}/{page}", timeout=30)
+    if r.status_code != 200:
+        return None, None
+    m = re.search(r'name="__RequestVerificationToken"\s+value="([^"]+)"', r.text)
+    token = m.group(1) if m else None
+    return token, r
+
+
+def export_with_token(session, page, export_endpoint, extra_data=None):
+    """GET page for token, then POST export with that token."""
+    token, page_r = get_token(session, page)
+    if not token:
+        print(f"  [!] No token found on {page}")
+        # Try without token
+        token = ""
+
+    data = {"__RequestVerificationToken": token}
+    if extra_data:
+        data.update(extra_data)
+
+    r = session.post(f"{WANSOFT_URL}/{export_endpoint}", data=data, timeout=60)
+    ctype = r.headers.get("Content-Type", "")
+    print(f"  POST {export_endpoint}: status={r.status_code} ctype={ctype} len={len(r.content)}")
+
+    if "text/html" not in ctype and len(r.content) > 50:
+        # Got a file export
+        print(f"  → EXPORT SUCCESS! Preview: {r.text[:300]!r}")
+        return r.text
+    elif r.status_code == 200 and len(r.text) > 1000:
+        # HTML response — try to extract tables
+        tables = extract_table(r.text)
+        grids = extract_jqgrid(r.text)
+        all_data = tables + grids
+        if all_data:
+            print(f"  → Found {len(all_data)} rows from POST")
+            return all_data
+        # Try JSON
+        try:
+            j = r.json()
+            print(f"  → JSON response: {str(j)[:200]}")
+            return j
+        except:
+            pass
+        print(f"  → HTML but no extractable data")
+    return None
+
+
 def main():
     print("=" * 60)
     print(f"WANSOFT INVENTORY SCRAPE — {CLIENT['id']} — {TODAY}")
     print("=" * 60)
 
+    session = wansoft_session()
+
+    # === TARGETED EXPORTS with tokens ===
+
+    # 1. Export Inventory Statement (per warehouse)
+    print("\n[1] Export Inventory Statement...")
+    warehouses_r = session.post(f"{WANSOFT_URL}/Inventory/GetWarehousesBySubsidiarySortedByName",
+                                 json={"subsidiaryId": SUBSIDIARY_ID}, timeout=30)
+    wh_list = []
+    try:
+        wh_data = warehouses_r.json()
+        wh_list = wh_data if isinstance(wh_data, list) else wh_data.get("warehouses", wh_data.get("Result", []))
+    except:
+        pass
+
+    for wh in wh_list:
+        wh_id = wh.get("Value", "")
+        wh_name = wh.get("Text", "")
+        if not wh_id or "ELIMINADO" in wh_name.upper():
+            continue
+        print(f"\n  Warehouse: {wh_name}")
+        result = export_with_token(session, "Inventory/InventoryStatement",
+                                    "Inventory/ExportInventoryStatement", {
+                                        "subsidiaryId": SUBSIDIARY_ID,
+                                        "warehouseId": wh_id,
+                                        "startDate": MONTH_AGO,
+                                        "endDate": TODAY,
+                                        "InternalCode": "",
+                                        "ProductName": "",
+                                    })
+        if result:
+            save_data(f"inv_statement_{wh_name.split('.')[0].strip()}", result)
+
+    # 2. Export Physical Inventory vs System
+    print("\n[2] Export Physical Inventory vs System...")
+    result = export_with_token(session, "Inventory/PhysicalInventoryVsSystem",
+                                "Inventory/ExportPhysicalInventoryVsSystemReport", {
+                                    "subsidiaryId": SUBSIDIARY_ID,
+                                })
+    if result:
+        save_data("inv_physical_vs_system", result)
+
+    # 3. Transferencias
+    print("\n[3] Transferencias...")
+    data = scrape_page(session, "Inventory/Transfer", "Transferencias")
+    if data:
+        save_data("inv_transfers", data)
+
+    # 4. Ajustes por lote
+    print("\n[4] Ajustes por lote...")
+    data = scrape_page(session, "Inventory/BatchAdjustment", "Ajustes por Lote")
+    if data:
+        save_data("inv_batch_adjustments", data)
+
+    # 5. Facturas Wansoft
+    print("\n[5] Facturas Wansoft...")
+    data = scrape_page(session, "Account/MyDocumentsList", "Facturas")
+    if data:
+        save_data("inv_facturas_wansoft", data)
+
+    print(f"\n[DONE]")
+
+
+def main_old():
+    """OLD main — kept for reference."""
     session = wansoft_session()
 
     # First: discover real URLs from sidebar
