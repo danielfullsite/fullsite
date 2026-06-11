@@ -64,7 +64,7 @@ export default function InventoryAlerts({ onItemOutOfStock, compact = false }: I
 
       // Fetch recipes to calculate orders remaining
       const recRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_recipes?select=menu_item_id,menu_item_name,ingredient_id,quantity&client_id=eq.${_cid()}`,
+        `${SUPABASE_URL}/rest/v1/pos_recipes_old?select=menu_item_id,menu_item_name,ingredient_id,quantity&client_id=eq.${_cid()}&limit=5000`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
       )
       const recipes = recRes.ok ? await recRes.json() : []

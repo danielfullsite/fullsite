@@ -1179,7 +1179,7 @@ export async function getIngredients(): Promise<Ingredient[]> {
 
 export async function getRecipes(): Promise<RecipeRow[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.${_getClientId()}&order=menu_item_name.asc&limit=2000`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&order=menu_item_name.asc&limit=5000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1188,7 +1188,7 @@ export async function getRecipes(): Promise<RecipeRow[]> {
 
 export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.${_getClientId()}&menu_item_id=eq.${encodeURIComponent(menuItemId)}&limit=50`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&menu_item_id=eq.${encodeURIComponent(menuItemId)}&limit=50`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1196,7 +1196,7 @@ export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]>
 }
 
 export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name: string; ingredient_id: string; quantity: number; unit: string }): Promise<boolean> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -1209,7 +1209,7 @@ export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name:
 
 export async function deleteRecipeRow(id: number): Promise<boolean> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes?id=eq.${id}`,
+    `${SUPABASE_URL}/rest/v1/pos_recipes_old?id=eq.${id}`,
     { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   return res.ok

@@ -140,7 +140,7 @@ export default function ProduccionPage() {
         const [invResult, recipesResult, logsResult] = await Promise.all([
           getWansoftDataLatest('inventory_parsed'),
           // Fetch pos_recipes with ingredient details
-          fetch(`${SUPABASE_URL}/rest/v1/pos_recipes?client_id=eq.${clientId}&select=menu_item_id,menu_item_name,ingredient_id,quantity&limit=2000`, {
+          fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${clientId}&select=menu_item_id,menu_item_name,ingredient_id,quantity&limit=5000`, {
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           }).then(r => r.ok ? r.json() : []).catch(() => []),
           // Fetch production logs
