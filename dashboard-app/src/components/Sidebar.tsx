@@ -36,6 +36,19 @@ import {
   FileText,
   Clock,
   Bike,
+  ScanBarcode,
+  ArrowDownUp,
+  RotateCcw,
+  Undo2,
+  FlaskConical,
+  Factory,
+  Layers,
+  ArrowLeftRight,
+  Activity,
+  Coins,
+  Wallet,
+  Heart,
+  Map,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -73,18 +86,13 @@ const navSections = [
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
       { href: '/facturas', label: 'Facturas Proveedores', icon: FileText },
       { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
+      { href: '/egresos', label: 'Egresos', icon: Wallet },
     ],
   },
   {
     label: 'Operaciones',
     items: [
       { href: '/inventario-real', label: 'Inventario', icon: Package },
-      { href: '/inventario-real/toma-fisica', label: 'Toma Física', icon: ClipboardList },
-      { href: '/inventario-real/reorden', label: 'Punto Reorden', icon: Package },
-      { href: '/inventario-real/entradas', label: 'Entradas', icon: Package },
-      { href: '/inventario-real/transferencias', label: 'Transferencias', icon: Package },
-      { href: '/inventario-real/merma', label: 'Merma', icon: Package },
-      { href: '/inventario-real/orden-compra', label: 'Orden Compra', icon: ShoppingCart },
       { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/acceso', label: 'Control Acceso', icon: Clock },
@@ -99,9 +107,45 @@ const navSections = [
     ],
   },
   {
+    label: 'Inv. Entradas',
+    items: [
+      { href: '/inventario-real/entradas', label: 'Entradas', icon: Package },
+      { href: '/inventario-real/entradas-factura', label: 'Con Factura', icon: FileText },
+      { href: '/inventario-real/devoluciones', label: 'Devoluciones', icon: Undo2 },
+      { href: '/inventario-real/barcode', label: 'Código Barras', icon: ScanBarcode },
+    ],
+  },
+  {
+    label: 'Inv. Control',
+    items: [
+      { href: '/inventario-real/reorden', label: 'Punto Reorden', icon: ArrowDownUp },
+      { href: '/inventario-real/conversiones', label: 'Conversiones', icon: ArrowLeftRight },
+      { href: '/inventario-real/presentaciones', label: 'Presentaciones', icon: Layers },
+      { href: '/inventario-real/subproductos', label: 'Subproductos', icon: FlaskConical },
+    ],
+  },
+  {
+    label: 'Inv. Auditoría',
+    items: [
+      { href: '/inventario-real/toma-fisica', label: 'Toma Física', icon: ClipboardList },
+      { href: '/inventario-real/merma', label: 'Merma', icon: RotateCcw },
+      { href: '/inventario-real/movimientos', label: 'Movimientos', icon: Activity },
+      { href: '/inventario-real/costos', label: 'Costos Inv.', icon: Coins },
+    ],
+  },
+  {
+    label: 'Inv. Compras',
+    items: [
+      { href: '/inventario-real/orden-compra', label: 'Orden Compra', icon: ShoppingCart },
+      { href: '/inventario-real/produccion', label: 'Producción', icon: Factory },
+      { href: '/inventario-real/transferencias', label: 'Transferencias', icon: Truck },
+    ],
+  },
+  {
     label: 'POS',
     items: [
       { href: '/pos', label: 'Punto de Venta', icon: Monitor },
+      { href: '/pos/plano', label: 'Plano', icon: Map },
     ],
   },
   {
@@ -119,6 +163,7 @@ const navSections = [
     label: 'Herramientas',
     items: [
       { href: '/crm', label: 'CRM', icon: Users },
+      { href: '/lealtad', label: 'Lealtad', icon: Heart },
       { href: '/mission-control', label: 'Mission Control', icon: Bot },
       { href: '/agentes', label: 'Agentes IA', icon: Bot },
       { href: '/coach', label: 'Coach', icon: Sparkles },
