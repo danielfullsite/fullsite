@@ -66,8 +66,88 @@ def _find_resumen_sheet(wb: openpyxl.Workbook):
     )
 
 
+# ── Formato nuevo (2026-06-11) ───────────────────────────────────────────────
+# Wansoft reemplazó SalesByBranch por ConsolidatedSalesMasterReport.
+# El XLSX nuevo concentra todo en el sheet "Resumen de Ventas" con secciones
+# horizontales: Ventas por hora / platillo / grupo / tipo de pago / usuario...
+
+def _find_new_resumen_ws(wb: openpyxl.Workbook):
+    for name in wb.sheetnames:
+        if name.strip().lower() == "resumen de ventas":
+            return wb[name]
+    raise ValueError(
+        f"No se encontro sheet 'Resumen de Ventas'. Sheets: {wb.sheetnames}"
+    )
+
+
+def _find_section_header(ws, header_text: str, max_row: int = 15):
+    """Localiza la celda cuyo valor exacto es header_text. Returns (row, col) o None."""
+    target = header_text.strip().lower()
+    for row in ws.iter_rows(min_row=1, max_row=max_row):
+        for c in row:
+            if isinstance(c.value, str) and c.value.strip().lower() == target:
+                return c.row, c.column
+    return None
+
+
+def _parse_usuario_section(wb: openpyxl.Workbook):
+    """Sección 'Ventas por usuario' del formato nuevo → mismas keys que legacy."""
+    ws = _find_new_resumen_ws(wb)
+    pos = _find_section_header(ws, "Usuario")
+    if pos is None:
+        raise ValueError("No se encontro seccion 'Ventas por usuario' (header 'Usuario')")
+    hrow, hcol = pos
+
+    headers = {}
+    for row in ws.iter_rows(min_row=hrow, max_row=hrow, min_col=hcol, max_col=hcol + 10):
+        for i, c in enumerate(row):
+            if c.value is not None:
+                headers[str(c.value).strip().lower()] = i
+
+    def col(name):
+        if name not in headers:
+            raise ValueError(
+                f"Columna '{name}' no encontrada en seccion usuario. Headers: {list(headers)}"
+            )
+        return headers[name]
+
+    i_total = col("total")          # con IVA — cuadra con la app de Wansoft
+    i_personas = col("no. personas")
+    i_promedio = col("promedio por persona")
+
+    rows = []
+    for row in ws.iter_rows(
+        min_row=hrow + 1, min_col=hcol, max_col=hcol + 10, values_only=True
+    ):
+        usuario = row[0]
+        if usuario is None or str(usuario).strip() == "":
+            break  # fin de la sección
+        u = str(usuario).strip()
+        if u.lower() in ("total", "totales", "gran total"):
+            continue
+        total_val = row[i_total]
+        personas_val = row[i_personas]
+        if total_val is None or personas_val is None:
+            continue
+        rows.append({
+            "mesero": u,
+            "total": float(total_val),
+            "personas": int(float(personas_val)),
+            "promedio": float(row[i_promedio] or 0),
+        })
+    return rows
+
+
 def _parse_sheet(wb: openpyxl.Workbook):
-    """Parse resumen sheet. Returns list of dicts."""
+    """Parse mesero rows — intenta formato legacy, luego el nuevo."""
+    try:
+        return _parse_sheet_legacy(wb)
+    except ValueError:
+        return _parse_usuario_section(wb)
+
+
+def _parse_sheet_legacy(wb: openpyxl.Workbook):
+    """Parse resumen sheet (formato viejo SalesByBranch). Returns list of dicts."""
     ws = _find_resumen_sheet(wb)
 
     # Find header row — look for cell containing "Mesero" as header
@@ -276,8 +356,54 @@ def _find_detalle_sheet(wb: openpyxl.Workbook):
     return wb[wb.sheetnames[0]]
 
 
+def _parse_platillos_section(wb: openpyxl.Workbook):
+    """Sección 'Ventas por platillo / artículo' del formato nuevo.
+
+    El export nuevo NO trae desglose platillo×mesero — mesero queda "".
+    """
+    ws = _find_new_resumen_ws(wb)
+    pos = _find_section_header(ws, "Nombre Platillo/Artículo")
+    if pos is None:
+        raise ValueError("No se encontro seccion 'Ventas por platillo / artículo'")
+    hrow, hcol = pos
+
+    headers = {}
+    for row in ws.iter_rows(min_row=hrow, max_row=hrow, min_col=hcol, max_col=hcol + 5):
+        for i, c in enumerate(row):
+            if c.value is not None:
+                headers[str(c.value).strip().lower()] = i
+    if "grupo" not in headers or "cantidad" not in headers:
+        raise ValueError(f"Headers inesperados en seccion platillos: {list(headers)}")
+
+    rows = []
+    for row in ws.iter_rows(
+        min_row=hrow + 1, min_col=hcol, max_col=hcol + 5, values_only=True
+    ):
+        nombre = row[0]
+        if nombre is None or str(nombre).strip() == "":
+            break
+        cantidad = row[headers["cantidad"]]
+        if cantidad is None:
+            continue
+        rows.append({
+            "mesero": "",
+            "grupo": str(row[headers["grupo"]] or "").strip().upper(),
+            "platillo": str(nombre).strip().upper(),
+            "cantidad": int(float(cantidad)),
+        })
+    return rows
+
+
 def _parse_detalle_sheet(wb: openpyxl.Workbook):
-    """Parse granular platillo sheet. Returns list of row dicts."""
+    """Parse platillo rows — intenta formato legacy, luego el nuevo."""
+    try:
+        return _parse_detalle_legacy(wb)
+    except ValueError:
+        return _parse_platillos_section(wb)
+
+
+def _parse_detalle_legacy(wb: openpyxl.Workbook):
+    """Parse granular platillo sheet (formato viejo). Returns list of row dicts."""
     ws = _find_detalle_sheet(wb)
 
     # Find header row with Mesero + Platillo + Cantidad
@@ -415,23 +541,31 @@ def format_platillos_message(xlsx_path: str, report_type: str = "cierre") -> str
     lines.append(f"🥗 *H&H Combo:* {hh_total} vendidos")
     lines.append(f"🌮 *Chilaquiles:* {chilaquiles_total} vendidos")
 
-    # Pan dulce por mesero
-    lines.append("")
-    lines.append("🥐 *Pan dulce por mesero:*")
-    bakery_items = [(_short_name(m), c) for m, c in bakery_sorted]
-    for line in _wrap_mesero_line(bakery_items):
-        lines.append(line)
     bakery_total = sum(c for _, c in bakery_sorted)
-    lines.append(f"Total: {bakery_total} piezas")
-
-    # Postres por mesero
-    lines.append("")
-    lines.append("🍰 *Postres por mesero:*")
-    postres_items = [(_short_name(m), c) for m, c in postres_sorted]
-    for line in _wrap_mesero_line(postres_items):
-        lines.append(line)
     postres_total = sum(c for _, c in postres_sorted)
-    lines.append(f"Total: {postres_total} piezas")
+    has_mesero = any(r["mesero"] for r in rows)
+
+    if has_mesero:
+        # Pan dulce por mesero
+        lines.append("")
+        lines.append("🥐 *Pan dulce por mesero:*")
+        bakery_items = [(_short_name(m), c) for m, c in bakery_sorted]
+        for line in _wrap_mesero_line(bakery_items):
+            lines.append(line)
+        lines.append(f"Total: {bakery_total} piezas")
+
+        # Postres por mesero
+        lines.append("")
+        lines.append("🍰 *Postres por mesero:*")
+        postres_items = [(_short_name(m), c) for m, c in postres_sorted]
+        for line in _wrap_mesero_line(postres_items):
+            lines.append(line)
+        lines.append(f"Total: {postres_total} piezas")
+    else:
+        # Formato nuevo: Wansoft ya no desglosa platillo×mesero
+        lines.append("")
+        lines.append(f"🥐 *Pan dulce:* {bakery_total} piezas")
+        lines.append(f"🍰 *Postres:* {postres_total} piezas")
 
     lines.append("")
     lines.append("_by Fullsite ✨_")

@@ -420,10 +420,12 @@ def main():
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
 
-    # Guard: skip if outside operating hours (before 9am or after 9pm MX)
-    # BUT allow manual triggers (workflow_dispatch) to run anytime
+    # Guard: skip if outside operating hours (before 9am MX)
+    # BUT allow manual triggers (workflow_dispatch) to run anytime.
+    # Hasta medianoche permitido: el cron de cierre (8pm) suele dispararse tarde
+    # (9-10pm) y el guard de 21h lo saltaba — así se congeló 2026-06-10 en $58,090.
     mx_hour = now_mx.hour
-    if TRIGGER_TYPE != "workflow_dispatch" and (mx_hour < 9 or mx_hour >= 21):
+    if TRIGGER_TYPE != "workflow_dispatch" and mx_hour < 9:
         print(f"[intraday] Outside operating hours ({mx_hour}:00 MX) — skipping")
         return
 
