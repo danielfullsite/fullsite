@@ -2,6 +2,26 @@ import { NextRequest } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+// Solo dueños reales pueden exportar backups (NO demo)
+const BACKUP_ADMINS = new Set(['ramonfaur.daniel@gmail.com', 'monica@fullsite.mx'])
+
+/** Valida el Bearer token contra Supabase Auth y exige email de admin */
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return false
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: authHeader },
+    })
+    if (!res.ok) return false
+    const user = await res.json()
+    return BACKUP_ADMINS.has(String(user?.email || '').toLowerCase())
+  } catch {
+    return false
+  }
+}
 
 const BACKUP_TABLES = [
   'pos_orders',
@@ -30,6 +50,10 @@ async function fetchTable(table: string): Promise<unknown[]> {
 }
 
 export async function GET(request: NextRequest) {
+  if (!(await isAuthorized(request))) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const format = searchParams.get('format') || 'json'
   const table = searchParams.get('table')
