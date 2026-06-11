@@ -71,10 +71,31 @@ export default function AdminMenuPage() {
 
   const load = useCallback(async () => {
     if (!CLIENT_ID) return; setLoading(true)
-    const { data: cats } = await supabase.from('pos_menu_categories').select('*').eq('client_id', CLIENT_ID).order('sort_order')
-    const { data: menuItems } = await supabase.from('pos_menu_items').select('*').eq('client_id', CLIENT_ID).order('sort_order')
-    setCategories(cats || [])
-    setItems(menuItems || [])
+    try {
+      // Try Supabase client first, fallback to REST
+      const { data: cats, error: catsErr } = await supabase.from('pos_menu_categories').select('*').eq('client_id', CLIENT_ID).order('sort_order')
+      const { data: menuItems, error: itemsErr } = await supabase.from('pos_menu_items').select('*').eq('client_id', CLIENT_ID).order('sort_order')
+      if (!catsErr && !itemsErr) {
+        setCategories(cats || [])
+        setItems(menuItems || [])
+      } else {
+        // Fallback to REST API
+        const [catsRest, itemsRest] = await Promise.all([
+          api(`pos_menu_categories?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+          api(`pos_menu_items?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+        ])
+        setCategories(catsRest || [])
+        setItems(itemsRest || [])
+      }
+    } catch {
+      // Last resort REST
+      const [catsRest, itemsRest] = await Promise.all([
+        api(`pos_menu_categories?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+        api(`pos_menu_items?client_id=eq.${CLIENT_ID}&order=sort_order.asc`),
+      ])
+      setCategories(catsRest || [])
+      setItems(itemsRest || [])
+    }
     setLoading(false)
   }, [CLIENT_ID, supabase])
 
