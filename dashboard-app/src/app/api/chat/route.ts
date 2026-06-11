@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // ── PARALLEL DATA LOADING ── All queries run at once to stay under Vercel 10s limit
     const wantsMeseros = ['mesero', 'quien', 'quién', 'ranking', 'top', 'mejor', 'peor', 'h&h', 'half', 'bebida', 'postre', 'pan', 'toast', 'propina', 'vendio', 'vendió', 'omar', 'brayan', 'julio', 'daniela', 'mauricio', 'oscar', 'alexis', 'hector', 'crack', 'manco', 'chilaquil', 'cuantos', 'cuántos', 'vendieron', 'vendimos'].some(kw => q.includes(kw))
-    const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato'].some(kw => q.includes(kw))
+    const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato', 'cuesta', 'kilo', 'gramo', 'lleva', 'platillo', 'proveedor', 'merma', 'porcion', 'porción'].some(kw => q.includes(kw))
     const wantsReservas = ['reserv', 'proxim', 'próxim', 'evento', 'fiesta', 'cumple', 'boda', 'terraza', 'jardin', 'jardín', 'paquete', 'pastel', 'invitados'].some(kw => q.includes(kw))
     const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
 
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       // 5: Recipes + insumos (conditional — for food cost, receta, ingrediente questions)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 6: Insumos (conditional)
-      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=500`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
 
     const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
@@ -451,13 +451,19 @@ export async function POST(request: NextRequest) {
           const topIngs = (ings as Record<string, unknown>[]).filter((i) => Number(i.total) > 0)
             .map((i) => {
               const porcion = Number(i.porcion)
-              const um = String(i.um || '').toUpperCase()
+              const um = String(i.um || '').toUpperCase().replace(/\./g, '')
               const costoUm = Number(i.costo_um)
-              // KILO/KG → mostrar en gramos para que el modelo responda "cuántos gramos lleva X"
-              const cant = porcion > 0
-                ? (um === 'KILO' || um === 'KG' ? `${Math.round(porcion * 1000)}g` : `${porcion} ${um}`)
-                : ''
-              const unitario = costoUm > 0 ? ` a $${costoUm}/${um === 'KILO' ? 'KG' : um}` : ''
+              // Normalizar a unidades legibles: KG→gramos, LT→ml, GR ya es gramos
+              let cant = ''
+              if (porcion > 0) {
+                if (um === 'KILO' || um === 'KG') cant = `${Math.round(porcion * 1000)}g`
+                else if (um === 'LT' || um === 'LITRO') cant = porcion < 1 ? `${Math.round(porcion * 1000)}ml` : `${porcion}L`
+                else if (um === 'GR') cant = `${porcion}g`
+                else if (um === 'PZ' || um === 'PZA' || um === 'PIEZA') cant = `${porcion} pz`
+                else cant = `${porcion}${um ? ` ${um}` : ' un.'}`
+              }
+              const umLabel = um === 'KILO' || um === 'KG' ? 'KG' : um === 'LITRO' || um === 'LT' ? 'LT' : um === 'PZA' || um === 'PIEZA' ? 'PZ' : (um || 'un.')
+              const unitario = costoUm > 0 ? ` a $${costoUm}/${umLabel}` : ''
               return `${i.nombre}${cant ? ` ${cant}` : ''}${unitario}:$${Number(i.total).toFixed(1)}`
             }).join(', ')
           const aliases = aliasesByCanonical.get(normName(String(r.nombre || '')))
@@ -469,13 +475,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Add top insumos
+    // Add ALL insumos con precio (compacto) — para "cuánto cuesta el kilo de X", proveedores, mermas
     if (wantsFoodCost && Array.isArray(insumosRaw) && insumosRaw.length > 0) {
-      const insLines = insumosRaw
+      const conPrecioIns = insumosRaw.filter((i) => Number(i.precio_limpio) > 0)
+      const sinPrecioIns = insumosRaw.length - conPrecioIns.length
+      const insLines = conPrecioIns
         .sort((a, b) => Number(b.precio_limpio || 0) - Number(a.precio_limpio || 0))
-        .slice(0, 20)
-        .map((i) => `${i.nombre} (${i.categoria}): $${Number(i.precio_limpio).toFixed(0)}/${i.um} | ${i.proveedor} | merma ${i.merma_pct}%`)
-      foodCostContext += `\n\nINSUMOS MÁS CAROS (top 20 por precio limpio):\n${insLines.join('\n')}`
+        .map((i) => {
+          const merma = Number(i.merma_pct) > 0 ? ` merma ${i.merma_pct}%` : ''
+          return `${i.nombre}: $${Number(i.precio_limpio).toFixed(0)}/${i.um} | ${i.proveedor || 's/proveedor'}${merma}`
+        })
+      foodCostContext += `\n\nLISTA COMPLETA DE INSUMOS (${conPrecioIns.length} con precio limpio, ordenados del más caro al más barato; formato: NOMBRE: $precio/unidad | proveedor | merma):\n${insLines.join('\n')}`
+      if (sinPrecioIns > 0) foodCostContext += `\n(${sinPrecioIns} insumos más existen pero no tienen precio capturado — si preguntan por uno que no está en la lista, dilo.)`
     }
 
     // 2c. Process reservaciones (from parallel fetch)
