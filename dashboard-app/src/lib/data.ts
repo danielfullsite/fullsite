@@ -100,7 +100,7 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
     meseros: parseJsonbField(row.meseros),
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
-    pago_métodos: parseJsonbField(row.pago_métodos),
+    pago_métodos: parseJsonbField(row.pago_metodos ?? row.pago_métodos),
   }
 }
 
