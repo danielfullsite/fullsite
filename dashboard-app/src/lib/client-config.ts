@@ -33,7 +33,7 @@ export interface ClientConfig {
   meseros: string[]
   features: ClientFeatures
   iva_rate: number
-  data_source: 'supabase' | 'demo'
+  data_source: 'supabase' | 'demo' | 'wansoft' | 'fullsite'
   logo_url?: string
   // Wansoft integration
   wansoft_subsidiary_id?: string

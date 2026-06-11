@@ -116,6 +116,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const config = await fetchClientConfig(cid)
     setClientConfig(config)
 
+    // Set data source switch (wansoft or fullsite)
+    const ds = config?.data_source
+    if (ds === 'fullsite') {
+      try { localStorage.setItem('fullsite_data_source', 'fullsite') } catch {}
+    } else {
+      try { localStorage.setItem('fullsite_data_source', 'wansoft') } catch {}
+    }
+
     // Fetch locations for this client
     try {
       const { data: locs } = await supabase

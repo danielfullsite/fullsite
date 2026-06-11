@@ -13,6 +13,33 @@ export function getActiveClientSlug(): string {
   return 'amalay'
 }
 
+/**
+ * Data Source Switch — controls whether dashboard reads from Wansoft or Fullsite POS.
+ * Stored in clients.data_source: 'wansoft' | 'fullsite' | 'supabase' (legacy = wansoft)
+ * Cached in localStorage after first fetch.
+ */
+export type DataSource = 'wansoft' | 'fullsite'
+
+export function getDataSource(): DataSource {
+  if (typeof window === 'undefined') return 'wansoft'
+  try {
+    const cached = localStorage.getItem('fullsite_data_source')
+    if (cached === 'fullsite') return 'fullsite'
+  } catch { /* */ }
+  return 'wansoft'
+}
+
+export function setDataSource(source: DataSource) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('fullsite_data_source', source)
+  }
+}
+
+/** Check if this client uses Fullsite POS as primary (not Wansoft) */
+export function isFullsitePOS(): boolean {
+  return getDataSource() === 'fullsite'
+}
+
 async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
   try {
@@ -105,6 +132,12 @@ function locationFilter(locationId?: string | null): string {
 }
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
+  // If data source is Fullsite POS, try pos_orders first
+  if (isFullsitePOS()) {
+    const posData = await getDashboardFromPosOrders(days, clientSlug)
+    if (posData.length > 0) return posData
+  }
+  // Default: read from wansoft_daily (works for Wansoft clients + fallback)
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const filtered = dedupeByFecha(data).slice(0, days)
   return filtered.reverse().map(parseRow)
