@@ -93,7 +93,14 @@ jobs:
           if [ -n "${{ github.event.inputs.target_date }}" ]; then
             echo "target=${{ github.event.inputs.target_date }}" >> "$GITHUB_OUTPUT"
           else
-            echo "target=$(TZ=America/Mexico_City date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            # GitHub cron delays can push a "cierre" run past midnight MX.
+            # A cierre executing between 00:00-11:59 MX reports YESTERDAY's business day.
+            HOUR_MX=$(TZ=America/Mexico_City date +%H)
+            if [ "${{ steps.params.outputs.type }}" = "cierre" ] && [ "$HOUR_MX" -lt 12 ]; then
+              echo "target=$(TZ=America/Mexico_City date -d 'yesterday' +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            else
+              echo "target=$(TZ=America/Mexico_City date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Run mesero report pipeline
