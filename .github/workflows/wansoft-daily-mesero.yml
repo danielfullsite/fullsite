@@ -115,5 +115,6 @@ jobs:
           path: |
             agents/wansoft/downloads/ERROR_*.png
             agents/wansoft/downloads/page_dump_*.html
+            agents/wansoft/downloads/*.xlsx
           retention-days: 7
           if-no-files-found: ignore
