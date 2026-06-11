@@ -130,31 +130,60 @@ def main():
         else:
             save_wansoft_data("products_catalog", products)
 
-    # 3. Get inventory statement
-    print("\n[3] Inventory statement...")
-    inv = post_json(session, "Inventory/GetInventoryStatementBySubsidiary", {"subsidiaryId": SUBSIDIARY_ID})
-    if inv:
-        ilist = inv if isinstance(inv, list) else inv.get("Result", inv)
-        if isinstance(ilist, list):
-            print(f"  Found {len(ilist)} inventory rows")
-            for i in ilist[:3]:
-                print(f"    - {i}")
-            save_wansoft_data("inventory_state", ilist)
+    # 3. Get inventory statement per warehouse
+    print("\n[3] Inventory statement per warehouse...")
+    wh_list = warehouses if isinstance(warehouses, list) else (warehouses.get("warehouses", warehouses.get("Result", [])) if isinstance(warehouses, dict) else [])
+    all_inventory = []
+    for wh in wh_list:
+        wh_id = wh.get("Value", "") if isinstance(wh, dict) else ""
+        wh_name = wh.get("Text", "") if isinstance(wh, dict) else ""
+        if not wh_id or "ELIMINADO" in wh_name.upper():
+            continue
+        print(f"  Warehouse: {wh_name} (ID: {wh_id})")
+        # Try ExportInventoryStatement — more data
+        inv = post_json(session, "Inventory/GetInventoryStatementBySubsidiary", {
+            "subsidiaryId": SUBSIDIARY_ID,
+            "warehouseId": wh_id,
+        })
+        if inv:
+            ilist = inv if isinstance(inv, list) else inv.get("Result", inv.get("Data", []))
+            if isinstance(ilist, list):
+                for item in ilist:
+                    if isinstance(item, dict):
+                        item["_warehouse"] = wh_name
+                        item["_warehouseId"] = wh_id
+                all_inventory.extend(ilist if isinstance(ilist, list) else [])
+                print(f"    → {len(ilist) if isinstance(ilist, list) else '?'} items")
+            else:
+                print(f"    → unexpected: {type(ilist)}")
         else:
-            save_wansoft_data("inventory_state", inv)
+            print(f"    → null response")
 
-    # 4. Get reorder points
-    print("\n[4] Reorder points...")
-    reorder = post_json(session, "Inventory/GetReOrderListByWareHouse", {})
-    if reorder:
-        rlist = reorder if isinstance(reorder, list) else reorder.get("Result", reorder)
-        if isinstance(rlist, list):
-            print(f"  Found {len(rlist)} reorder rules")
-            for r in rlist[:3]:
-                print(f"    - {r}")
-            save_wansoft_data("reorder_points", rlist)
-        else:
-            save_wansoft_data("reorder_points", reorder)
+    if all_inventory:
+        print(f"  Total inventory: {len(all_inventory)} items across {len(wh_list)} warehouses")
+        save_wansoft_data("inventory_state", all_inventory)
+
+    # 4. Get reorder points per warehouse
+    print("\n[4] Reorder points per warehouse...")
+    all_reorder = []
+    for wh in wh_list:
+        wh_id = wh.get("Value", "") if isinstance(wh, dict) else ""
+        wh_name = wh.get("Text", "") if isinstance(wh, dict) else ""
+        if not wh_id or "ELIMINADO" in wh_name.upper():
+            continue
+        reorder = post_json(session, "Inventory/GetReOrderListByWareHouse", {"warehouseId": wh_id})
+        if reorder:
+            rlist = reorder if isinstance(reorder, list) else reorder.get("Result", reorder.get("Data", []))
+            if isinstance(rlist, list):
+                for item in rlist:
+                    if isinstance(item, dict):
+                        item["_warehouse"] = wh_name
+                all_reorder.extend(rlist if isinstance(rlist, list) else [])
+                print(f"  {wh_name}: {len(rlist) if isinstance(rlist, list) else '?'} rules")
+
+    if all_reorder:
+        print(f"  Total reorder rules: {len(all_reorder)}")
+        save_wansoft_data("reorder_points", all_reorder)
 
     # 5. E-commerce menu status
     print("\n[5] E-commerce menu status...")
