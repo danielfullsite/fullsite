@@ -87,8 +87,8 @@ try:
 
     # 1. Fetch inventory_parsed from wansoft_data
     inv_rows = sb_get("wansoft_data", {
-        "client_slug": f"eq.{cid}",
-        "data_type": "eq.inventory_parsed",
+        "client_id": f"eq.{cid}",
+        "data_key": "eq.inventory_parsed",
         "select": "data",
         "order": "updated_at.desc",
         "limit": "1",
@@ -105,8 +105,8 @@ try:
 
     # 2. Fetch reorder_config from wansoft_data
     reorder_rows = sb_get("wansoft_data", {
-        "client_slug": f"eq.{cid}",
-        "data_type": "eq.reorder_config",
+        "client_id": f"eq.{cid}",
+        "data_key": "eq.reorder_points",
         "select": "data",
         "order": "updated_at.desc",
         "limit": "1",
