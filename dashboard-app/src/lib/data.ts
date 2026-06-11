@@ -41,17 +41,12 @@ async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
 function parseJsonbField<T>(value: unknown): T[] {
   if (!value) return []
   if (Array.isArray(value)) return value as T[]
-  if (typeof value === 'string') {
-    try {
-      let parsed: unknown = JSON.parse(value)
-      // Handle double-escaped JSON strings
-      if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed) } catch { /* not double-escaped */ }
-      }
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
+  const parsed = parseJsonb(value)
+  if (Array.isArray(parsed)) return parsed as T[]
+  // If it's an object with a Result array (Wansoft pattern)
+  if (parsed && typeof parsed === 'object' && 'Result' in (parsed as Record<string, unknown>)) {
+    const result = (parsed as Record<string, unknown>).Result
+    if (Array.isArray(result)) return result as T[]
   }
   return []
 }
@@ -204,17 +199,14 @@ export function aggregatePayments(
 
 function parseJsonb(val: unknown): unknown {
   if (!val) return null
-  if (typeof val === 'string') {
-    try {
-      let parsed = JSON.parse(val)
-      // Handle double-escaped JSON
-      if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed) } catch { /* not double-escaped */ }
-      }
-      return parsed
-    } catch { return val }
+  if (typeof val !== 'string') return val
+  let current: unknown = val
+  // Keep parsing until it's no longer a string (handles triple+ escaping)
+  for (let i = 0; i < 5; i++) {
+    if (typeof current !== 'string') break
+    try { current = JSON.parse(current) } catch { break }
   }
-  return val
+  return current
 }
 
 export async function getDeepTable(table: string, limit: number = 30) {
@@ -277,14 +269,7 @@ export function aggregateGrupos(
 export async function getWansoftDataLatest(dataKey: string, clientId: string = getActiveClientSlug()) {
   const data = await sbFetch('wansoft_data', `select=fecha,data&client_id=eq.${clientId}&data_key=eq.${dataKey}&order=fecha.desc&limit=1`) as Record<string, unknown>[]
   if (data.length === 0) return null
-  let raw = data[0].data
-  if (typeof raw === 'string') {
-    try { raw = JSON.parse(raw as string) } catch {}
-  }
-  if (typeof raw === 'string') {
-    try { raw = JSON.parse(raw as string) } catch {}
-  }
-  return { fecha: data[0].fecha as string, data: raw }
+  return { fecha: data[0].fecha as string, data: parseJsonb(data[0].data) }
 }
 
 // ── Google Reviews ──────────────────────────────────────────────────
