@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map } from 'lucide-react'
@@ -136,6 +136,22 @@ export default function MesasPage() {
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
+
+  // Escala del plano: se ajusta al ancho disponible (tablet/celular) sin scroll horizontal
+  const PLANO_BASE_W = 940
+  const PLANO_BASE_H = 940 * 0.82
+  const planoWrapRef = useRef<HTMLDivElement>(null)
+  const [planoScale, setPlanoScale] = useState(1)
+  useEffect(() => {
+    // Leer el ref al momento del evento: la vista interna se re-monta en cada render
+    const update = () => {
+      const el = planoWrapRef.current
+      if (el) setPlanoScale(Math.min(1, el.clientWidth / PLANO_BASE_W))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [viewMode, loading, PLANO_BASE_W])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -444,8 +460,13 @@ export default function MesasPage() {
     const floorNumbers = new Set(FLOOR_TABLES.map(t => t.number))
     const unassigned = mesas.filter(m => !floorNumbers.has(m.number))
     return (
-      <div className="overflow-x-auto pb-2">
-        <div className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl max-w-6xl mx-auto min-w-[940px]" style={{ aspectRatio: '10 / 8.2' }}>
+      <div className="pb-2">
+        {/* Wrapper que mide el ancho disponible; el plano se escala para caber sin scroll */}
+        <div ref={planoWrapRef} className="max-w-6xl mx-auto" style={{ height: PLANO_BASE_H * planoScale }}>
+        <div
+          className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl"
+          style={{ width: PLANO_BASE_W, height: PLANO_BASE_H, transform: `scale(${planoScale})`, transformOrigin: 'top left' }}
+        >
           {/* Paredes / muros */}
           {FLOOR_WALLS.map((wall, i) => (
             <div
@@ -484,6 +505,7 @@ export default function MesasPage() {
             <FloorTableNode key={ft.number} ft={ft} />
           ))}
         </div>
+        </div>
 
         {/* Mesas fuera del plano (otros clientes / extras) */}
         {unassigned.length > 0 && (
@@ -521,14 +543,14 @@ export default function MesasPage() {
 
   return (
     <div className="h-screen flex flex-col text-white">
-      <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 lg:px-6 py-3 lg:py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
-          <div>
-            <h1 className="text-xl font-bold">Mesas</h1>
-            <p className="text-[var(--text-3)] text-sm">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold leading-tight">Mesas</h1>
+            <p className="text-[var(--text-3)] text-xs lg:text-sm whitespace-nowrap">
               {activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
               {activeOrders.length > 0 && (() => {
                 const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
@@ -581,7 +603,7 @@ export default function MesasPage() {
             {mergeMode ? 'Cancelar' : 'Fusionar'}
           </button>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-6">
           {Object.entries(counts).map(([status, count]) => (
             <div key={status} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${statusDot[status]}`} />

@@ -24,6 +24,7 @@ export default function BarraPage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [stationFilter, setStationFilter] = useState<'todo' | StationName>('barra')
+  const [offline, setOffline] = useState(false)
 
   const prevCountRef = { current: 0 }
 
@@ -40,13 +41,19 @@ export default function BarraPage() {
   }
 
   const fetchOrders = async () => {
-    const allOrders = await getKitchenOrders()
-    // Store all orders — filtering happens at render time based on stationFilter
-    const newEnviadas = allOrders.filter(o => o.status === 'enviada').length
-    if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
-    prevCountRef.current = newEnviadas
-    setOrders(allOrders)
-    setLoading(false)
+    try {
+      const allOrders = await getKitchenOrders()
+      // Store all orders — filtering happens at render time based on stationFilter
+      const newEnviadas = allOrders.filter(o => o.status === 'enviada').length
+      if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
+      prevCountRef.current = newEnviadas
+      setOrders(allOrders)
+    } catch {
+      // Nunca dejar el spinner colgado (p. ej. sin red)
+    } finally {
+      setLoading(false)
+      setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
+    }
   }
 
   useEffect(() => {
@@ -124,6 +131,13 @@ export default function BarraPage() {
           </div>
         </div>
       </header>
+
+      {/* Offline banner */}
+      {offline && (
+        <div className="px-6 py-2 bg-amber-900/40 border-b border-amber-600/40 text-amber-300 text-sm font-medium flex-shrink-0">
+          Sin conexión — mostrando órdenes guardadas en este dispositivo. Se sincroniza al volver el internet.
+        </div>
+      )}
 
       {/* Station filter tabs */}
       <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">

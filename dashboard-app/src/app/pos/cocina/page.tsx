@@ -34,6 +34,7 @@ export default function CocinaPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [offline, setOffline] = useState(false)
 
   // Recipe detail modal
   const [recipeDetail, setRecipeDetail] = useState<RecipeDetail | null>(null)
@@ -98,6 +99,17 @@ export default function CocinaPage() {
   }
 
   const fetchOrders = async () => {
+    try {
+      await fetchOrdersInner()
+    } catch {
+      // Nunca dejar el spinner colgado (p. ej. sin red)
+    } finally {
+      setLoading(false)
+      setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
+    }
+  }
+
+  const fetchOrdersInner = async () => {
     const data = await getKitchenOrders()
 
     // Auto-archive orders older than 4 hours (stuck in enviada/preparando)
@@ -152,7 +164,6 @@ export default function CocinaPage() {
     }
     prevOrderCountRef.current = newEnviadas
     setOrders(fresh)
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -356,6 +367,13 @@ export default function CocinaPage() {
           </div>
         </div>
       </header>
+
+      {/* Offline banner */}
+      {offline && (
+        <div className="px-6 py-2 bg-amber-900/40 border-b border-amber-600/40 text-amber-300 text-sm font-medium flex-shrink-0">
+          Sin conexión — mostrando órdenes guardadas en este dispositivo. Se sincroniza al volver el internet.
+        </div>
+      )}
 
       {/* Station filter tabs */}
       <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">

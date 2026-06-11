@@ -884,7 +884,8 @@ export async function saveOrder(order: Order): Promise<boolean> {
       try {
         const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
         await queueOperation('pos_orders', 'POST', { id: order.id, ...orderData })
-        await cacheOrder({ id: order.id, ...orderData })
+        // created_at local para que el KDS offline pueda mostrar tiempos
+        await cacheOrder({ id: order.id, created_at: new Date().toISOString(), ...orderData })
       } catch {
         // Fallback to localStorage if IndexedDB fails
         const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
@@ -924,8 +925,11 @@ export async function updateOrderStatus(
     // Offline — queue the update for sync
     if (typeof window !== 'undefined') {
       try {
-        const { queueOperation } = await import('@/lib/pos-offline-db')
+        const { queueOperation, getCachedOrders, cacheOrder } = await import('@/lib/pos-offline-db')
         await queueOperation('pos_orders', 'PATCH', body, `pos_orders?id=eq.${orderId}`)
+        // Reflejar el cambio en la caché local para que el KDS offline lo muestre
+        const cached = (await getCachedOrders()).find(o => o.id === orderId)
+        if (cached) await cacheOrder({ ...cached, ...body })
       } catch {
         const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
         queue.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: body, timestamp: Date.now(), synced: false })
@@ -953,18 +957,34 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
   today.setHours(today.getHours() - 12) // Last 12 hours
   const cutoff = today.toISOString()
 
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
-    {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-      },
-      cache: 'no-store',
+  let orders: KitchenOrderFromDB[]
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        cache: 'no-store',
+      }
+    )
+    if (!res.ok) return []
+    orders = await res.json()
+  } catch {
+    // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
+    if (typeof window === 'undefined') return []
+    try {
+      const { getCachedOrders } = await import('@/lib/pos-offline-db')
+      const cached = await getCachedOrders()
+      orders = cached.filter(o =>
+        ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
+        String(o.created_at || o.updated_at || '') >= cutoff
+      ) as unknown as KitchenOrderFromDB[]
+    } catch {
+      return []
     }
-  )
-  if (!res.ok) return []
-  const orders: KitchenOrderFromDB[] = await res.json()
+  }
 
   // Deduplicate by mesa+mesero+items (same order sent twice)
   const seen = new Set<string>()
