@@ -307,30 +307,84 @@ def main():
 
     # 2. Export Physical Inventory vs System
     print("\n[2] Export Physical Inventory vs System...")
-    result = export_with_token(session, "Inventory/PhysicalInventoryVsSystem",
-                                "Inventory/ExportPhysicalInventoryVsSystemReport", {
-                                    "subsidiaryId": SUBSIDIARY_ID,
-                                })
+    for wh in wh_list:
+        wh_id = wh.get("Value", "")
+        wh_name = wh.get("Text", "")
+        if not wh_id or "ELIMINADO" in wh_name.upper():
+            continue
+        print(f"  Warehouse: {wh_name}")
+        result = export_with_token(session, "Inventory/PhysicalInventoryVsSystem",
+                                    "Inventory/ExportPhysicalInventoryVsSystemReport", {
+                                        "subsidiaryId": SUBSIDIARY_ID,
+                                        "warehouseId": wh_id,
+                                    })
+        if result:
+            save_data(f"inv_fisico_vs_sistema_{wh_name.split('.')[0].strip()}", result)
+
+    # 3. Reporte de existencias (InventoryControl / StockControl)
+    print("\n[3] Reporte de existencias...")
+    # Try known URL variations
+    for url in ["Inventory/InventoryControl", "Inventory/StockControl"]:
+        for export_url in [f"{url.rsplit('/',1)[0]}/ExportInventoryControl",
+                           f"{url.rsplit('/',1)[0]}/ExportStockControl",
+                           f"{url.rsplit('/',1)[0]}/ExportInventoryReport"]:
+            result = export_with_token(session, url, export_url, {
+                "subsidiaryId": SUBSIDIARY_ID,
+            })
+            if result:
+                save_data("inv_existencias", result)
+                break
+        else:
+            continue
+        break
+
+    # 4. Transferencias
+    print("\n[4] Transferencias...")
+    for export_url in ["Inventory/ExportTransfer", "Inventory/ExportTransfers"]:
+        result = export_with_token(session, "Inventory/Transfer", export_url, {
+            "subsidiaryId": SUBSIDIARY_ID,
+            "startDate": MONTH_AGO,
+            "endDate": TODAY,
+        })
+        if result:
+            save_data("inv_transferencias", result)
+            break
+
+    # 5. Ajustes por lote
+    print("\n[5] Ajustes por lote...")
+    for export_url in ["Inventory/ExportBatchAdjustment", "Inventory/ExportBatchAdjustments"]:
+        result = export_with_token(session, "Inventory/BatchAdjustment", export_url, {
+            "subsidiaryId": SUBSIDIARY_ID,
+            "startDate": MONTH_AGO,
+            "endDate": TODAY,
+        })
+        if result:
+            save_data("inv_ajustes_lote", result)
+            break
+
+    # 6. Salida masiva
+    print("\n[6] Salida masiva...")
+    for export_url in ["Inventory/ExportMassiveInventoryOutput", "Inventory/ExportBulkInventoryOutput"]:
+        result = export_with_token(session, "Inventory/MassiveInventoryOutput", export_url, {
+            "subsidiaryId": SUBSIDIARY_ID,
+            "startDate": MONTH_AGO,
+            "endDate": TODAY,
+        })
+        if result:
+            save_data("inv_salida_masiva", result)
+            break
+
+    # 7. Facturas Wansoft
+    print("\n[7] Facturas Wansoft...")
+    result = export_with_token(session, "Account/MyDocumentsList",
+                                "Account/ExportMyDocumentsList", {})
     if result:
-        save_data("inv_physical_vs_system", result)
-
-    # 3. Transferencias
-    print("\n[3] Transferencias...")
-    data = scrape_page(session, "Inventory/Transfer", "Transferencias")
-    if data:
-        save_data("inv_transfers", data)
-
-    # 4. Ajustes por lote
-    print("\n[4] Ajustes por lote...")
-    data = scrape_page(session, "Inventory/BatchAdjustment", "Ajustes por Lote")
-    if data:
-        save_data("inv_batch_adjustments", data)
-
-    # 5. Facturas Wansoft
-    print("\n[5] Facturas Wansoft...")
-    data = scrape_page(session, "Account/MyDocumentsList", "Facturas")
-    if data:
-        save_data("inv_facturas_wansoft", data)
+        save_data("inv_facturas_wansoft", result)
+    else:
+        # Try scraping the HTML table
+        data = scrape_page(session, "Account/MyDocumentsList", "Facturas")
+        if data:
+            save_data("inv_facturas_wansoft", data)
 
     print(f"\n[DONE]")
 
