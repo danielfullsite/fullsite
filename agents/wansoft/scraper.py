@@ -14,7 +14,9 @@ from dotenv import load_dotenv
 WANSOFT_BASE = "https://wansoft.net/Wansoft.Web"
 LOGIN_URL = f"{WANSOFT_BASE}/"
 # Eduardo confirmed: REPORTES → INGRESOS → VENTAS POR SUCURSAL is the definitive report
-REPORT_URL = f"{WANSOFT_BASE}/Reports/SalesByBranch"
+# 2026-06-11: Wansoft movió "Ventas por sucursal" de Reports/SalesByBranch
+# a Reports/ConsolidatedSalesMasterReport (misma página, mismos IDs).
+REPORT_URL = f"{WANSOFT_BASE}/Reports/ConsolidatedSalesMasterReport"
 
 DOWNLOADS_DIR = Path(__file__).parent / "downloads"
 ENV_FILE = Path(__file__).parent / ".env"
