@@ -15,6 +15,11 @@ interface CostItem {
   precio: number
   margen_pct: number
   matched: boolean          // true if we found a menu price
+  sospechoso?: {            // probable capture error in Wansoft recipe
+    ingrediente: string
+    costo: number
+    pct: number             // % of total recipe cost
+  }
 }
 
 type SortKey = 'platillo' | 'margen_pct' | 'precio' | 'costo' | 'ingredientes'
@@ -159,16 +164,34 @@ export default function FoodCostPage() {
             // Sum cost from ingredients: ProductBudgetedCost is already the TOTAL cost per ingredient (not per unit)
             let costoTotal = 0
             let validIngredients = 0
+            let maxIngCost = 0
+            let maxIngName = ''
             for (const ing of ingredients) {
               const qty = Number(ing?.Quantity) || 0
               const budgetCost = Number(ing?.ProductBudgetedCost) || 0
               if (qty > 0 && budgetCost > 0) {
                 costoTotal += budgetCost  // NOT qty * budgetCost — Wansoft already calculates the total
                 validIngredients++
+                if (budgetCost > maxIngCost) {
+                  maxIngCost = budgetCost
+                  maxIngName = String(ing?.ProductName || '')
+                }
               } else if (qty > 0) {
                 validIngredients++ // count even if cost is 0
               }
             }
+
+            // Receta sospechosa: un solo ingrediente concentra >=60% del costo
+            // y cuesta >=$50 con >=2 ingredientes — casi siempre error de captura
+            // en Wansoft (unidad/cantidad mal, ej. MOZARELA en litros a $187/porción)
+            const sospechoso =
+              validIngredients >= 2 && maxIngCost >= 50 && maxIngCost / costoTotal >= 0.6
+                ? {
+                    ingrediente: maxIngName,
+                    costo: Math.round(maxIngCost * 100) / 100,
+                    pct: Math.round((maxIngCost / costoTotal) * 100),
+                  }
+                : undefined
 
             const precio = findPrice(recipe.saucer_name)
             const margen = precio > 0 ? Math.round((1 - costoTotal / precio) * 1000) / 10 : 0
@@ -184,6 +207,7 @@ export default function FoodCostPage() {
               precio: validMatch ? precio : 0,
               margen_pct: validMatch ? margen : 0,
               matched: validMatch,
+              sospechoso,
             })
           }
 
@@ -267,6 +291,7 @@ export default function FoodCostPage() {
   const stars = withPrice.filter(i => i.margen_pct > 70)
   const losers = withPrice.filter(i => i.margen_pct < 30 && i.margen_pct > 0)
   const noPrice = items.filter(i => !i.matched)
+  const suspicious = items.filter(i => i.sospechoso).sort((a, b) => b.costo - a.costo)
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc)
@@ -330,6 +355,45 @@ export default function FoodCostPage() {
           <p className="text-2xl font-bold text-amber-600">{noPrice.length}</p>
         </div>
       </div>
+
+      {/* Recetas con costo sospechoso (error de captura en Wansoft) */}
+      {suspicious.length > 0 && (
+        <div className="bg-amber-500/5 rounded-xl border border-amber-500/30 shadow-sm mb-6">
+          <div className="p-4 border-b border-amber-500/20 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-500" />
+            <h3 className="text-sm font-bold text-[var(--text-1)]">
+              {suspicious.length} receta{suspicious.length === 1 ? '' : 's'} con costo sospechoso
+            </h3>
+            <span className="text-xs text-[var(--text-3)]">
+              probable error de captura en la receta (unidad o cantidad) — corregir en el catalogo de recetas
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-amber-500/20 text-[var(--text-2)]">
+                  <th className="text-left px-4 py-2 font-medium">Platillo</th>
+                  <th className="text-right px-4 py-2 font-medium">Costo receta</th>
+                  <th className="text-left px-4 py-2 font-medium">Ingrediente culpable</th>
+                  <th className="text-right px-4 py-2 font-medium">Costo ingrediente</th>
+                  <th className="text-right px-4 py-2 font-medium">% del costo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suspicious.map((item, i) => (
+                  <tr key={i} className="border-b border-amber-500/10">
+                    <td className="px-4 py-2 font-medium text-[var(--text-1)]">{item.platillo}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(item.costo)}</td>
+                    <td className="px-4 py-2 text-amber-600 font-medium">{item.sospechoso!.ingrediente}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-amber-600 font-bold">{formatCurrency(item.sospechoso!.costo)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-[var(--text-2)]">{item.sospechoso!.pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
@@ -397,6 +461,14 @@ export default function FoodCostPage() {
                         {!item.matched && (
                           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600">
                             sin precio
+                          </span>
+                        )}
+                        {item.sospechoso && (
+                          <span
+                            className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-500"
+                            title={`${item.sospechoso.ingrediente}: ${formatCurrency(item.sospechoso.costo)} (${item.sospechoso.pct}% del costo)`}
+                          >
+                            costo sospechoso
                           </span>
                         )}
                       </td>
