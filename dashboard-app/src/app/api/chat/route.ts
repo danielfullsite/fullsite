@@ -447,7 +447,8 @@ export async function POST(request: NextRequest) {
         .filter((r) => Number(r.costo_total) > 0)
         .map((r) => {
           const ings = Array.isArray(r.ingredientes) ? r.ingredientes : (typeof r.ingredientes === 'string' ? JSON.parse(r.ingredientes as string) : [])
-          const topIngs = (ings as Record<string, unknown>[]).filter((i) => Number(i.total) > 0).slice(0, 5)
+          // Todos los ingredientes con costo > 0 (los $0 son basura del parseo del Excel)
+          const topIngs = (ings as Record<string, unknown>[]).filter((i) => Number(i.total) > 0)
             .map((i) => {
               const porcion = Number(i.porcion)
               const um = String(i.um || '').toUpperCase()
@@ -464,7 +465,7 @@ export async function POST(request: NextRequest) {
           return `${r.nombre}${aliasNote}: PV $${r.precio_venta}, Costo $${Number(r.costo_total).toFixed(0)} (${r.pct_costo}%) → ${topIngs}`
         })
       if (recLines.length > 0) {
-        foodCostContext += `\n\nFOOD COST TEÓRICO PROMEDIO: ${avgPct}% (sobre ${conPrecio.length} platillos del costeo real con precio). Esta es la fuente correcta para "food cost general".\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos — costos REALES del costeo, fuente de verdad):\n${recLines.join('\n')}\nFormato de cada ingrediente: NOMBRE cantidad a $precio/unidad:$costo_en_el_platillo. Ej. "RIB EYE 180g a $295/KG:$53.1" = el platillo lleva 180 gramos de rib eye, el kilo cuesta $295 y esa porción cuesta $53.10. SÍ tienes gramajes y costos por kilo — úsalos.\nNOTA: platillos con PV $0 son extras/modificadores sin precio propio — no usarlos para promedios.`
+        foodCostContext += `\n\nFOOD COST TEÓRICO PROMEDIO: ${avgPct}% (sobre ${conPrecio.length} platillos del costeo real con precio). Esta es la fuente correcta para "food cost general".\nRECETAS CON DESGLOSE DE INGREDIENTES (${recLines.length} platillos — costos REALES del costeo, fuente de verdad):\n${recLines.join('\n')}\nFormato de cada ingrediente: NOMBRE cantidad a $precio/unidad:$costo_en_el_platillo. Ej. "RIB EYE 180g a $295/KG:$53.1" = el platillo lleva 180 gramos de rib eye, el kilo cuesta $295 y esa porción cuesta $53.10. SÍ tienes gramajes y costos por kilo — úsalos. Cuando pidan una receta, lista TODOS los ingredientes que aparecen con su gramaje y costo, sin omitir ninguno.\nNOTA: platillos con PV $0 son extras/modificadores sin precio propio — no usarlos para promedios.`
       }
     }
 
