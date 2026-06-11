@@ -131,14 +131,14 @@ export default function FoodCostPage() {
             const rawIngredients = deepParse(recipe.ingredients)
             const ingredients = Array.isArray(rawIngredients) ? rawIngredients : []
 
-            // Sum cost from ingredients: Quantity * ProductBudgetedCost
+            // Sum cost from ingredients: ProductBudgetedCost is already the TOTAL cost per ingredient (not per unit)
             let costoTotal = 0
             let validIngredients = 0
             for (const ing of ingredients) {
               const qty = Number(ing?.Quantity) || 0
               const budgetCost = Number(ing?.ProductBudgetedCost) || 0
               if (qty > 0 && budgetCost > 0) {
-                costoTotal += qty * budgetCost
+                costoTotal += budgetCost  // NOT qty * budgetCost — Wansoft already calculates the total
                 validIngredients++
               } else if (qty > 0) {
                 validIngredients++ // count even if cost is 0
