@@ -7,7 +7,7 @@ import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
-  MANAGER_PINS, RECIPE_ALIASES, formatMXN,
+  verifyManagerPin, RECIPE_ALIASES, formatMXN,
   type KitchenOrderFromDB, type RecipeDetail,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
@@ -178,7 +178,7 @@ export default function CocinaPage() {
     if (!cancelTarget) return
     if (!cancelReason) { setCancelError('Selecciona un motivo'); return }
     if (!cancelPin) { setCancelError('Ingresa PIN de gerente'); return }
-    const manager = MANAGER_PINS[cancelPin]
+    const manager = await verifyManagerPin(cancelPin)
     if (!manager) { setCancelError('PIN invalido'); return }
 
     // 1. Get the order and mark item as cancelled

@@ -7,7 +7,7 @@ import {
   MENU_CATEGORIES,
   MESEROS,
   IVA_RATE,
-  MANAGER_PINS,
+  verifyManagerPin,
   RECIPE_ALIASES,
   formatMXN,
   generateId,
@@ -510,9 +510,9 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
             Cancelar
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (discountAmount <= 0) return
-              const manager = MANAGER_PINS[pin]
+              const manager = await verifyManagerPin(pin)
               if (!manager) { setPinError(true); return }
               onApply(discountAmount, reason || (mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p` : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`))
             }}
@@ -549,10 +549,10 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
     'Otro',
   ]
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!reason) { setError('Selecciona un motivo'); return }
     if (!pin) { setError('Ingresa PIN de gerente'); return }
-    const manager = MANAGER_PINS[pin]
+    const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
     onConfirm(reason, manager)
   }
@@ -638,10 +638,10 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!reason.trim()) { setError('Escribe el motivo'); return }
     if (!pin) { setError('Ingresa PIN de gerente'); return }
-    const manager = MANAGER_PINS[pin]
+    const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
     onConfirm(reason, manager)
   }

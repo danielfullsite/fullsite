@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign } from 'lucide-react'
-import { formatMXN, MANAGER_PINS, logAudit } from '@/lib/pos-data'
+import { formatMXN, verifyManagerPin, logAudit } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -63,6 +63,7 @@ export default function CierreCajaWizard({
   const [monedas, setMonedas] = useState<Record<number, number>>({})
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState('')
+  const [managerName, setManagerName] = useState('')
   const [notas, setNotas] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -127,11 +128,12 @@ export default function CierreCajaWizard({
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
-    const manager = MANAGER_PINS[pin]
+    const manager = await verifyManagerPin(pin)
     if (!manager) {
       setPinError('PIN invalido')
       return
     }
+    setManagerName(manager)
     setPinError('')
     setSaving(true)
 
@@ -237,7 +239,7 @@ export default function CierreCajaWizard({
       <div class="diff">Diferencia: ${diferencia >= 0 ? '+' : ''}${formatMXN(diferencia)}</div>
       ${notas ? `<p>Notas: ${notas}</p>` : ''}
       <div class="line"></div>
-      <p style="text-align:center;font-size:10px">Cerrado por: ${MANAGER_PINS[pin] || '---'}</p>
+      <p style="text-align:center;font-size:10px">Cerrado por: ${managerName || '---'}</p>
       </body></html>
     `)
     printWindow.document.close()

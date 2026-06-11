@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, X } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, MANAGER_PINS, type AuditLogEntry } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, type AuditLogEntry } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -81,7 +81,7 @@ export default function CortePage() {
   const handleReopen = async () => {
     if (!reopenTarget) return
     if (!reopenPin) { setReopenError('Ingresa PIN'); return }
-    const manager = MANAGER_PINS[reopenPin]
+    const manager = await verifyManagerPin(reopenPin)
     if (!manager) { setReopenError('PIN invalido'); return }
 
     const ok = await reopenOrder(reopenTarget.id)

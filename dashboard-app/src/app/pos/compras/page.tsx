@@ -12,7 +12,7 @@ import {
   receiveOrderItems, restockFromPurchaseOrder,
   getFacturas, createFactura, updateFacturaStatus,
   getSuggestedPurchaseItems, getSuppliers,
-  MANAGER_PINS, generateId, formatMXN, logAudit,
+  generateId, formatMXN, logAudit,
   type PurchaseOrder, type PurchaseOrderItem, type Factura,
 } from '@/lib/pos-data'
 import { IVA_RATE } from '@/lib/pos-constants'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Clock, LogIn, LogOut, Coffee, Users, TrendingUp, DollarSign, Timer } from 'lucide-react'
-import { formatMXN, MANAGER_PINS, logAudit } from '@/lib/pos-data'
+import { formatMXN, verifyManagerPin, logAudit } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -59,9 +59,8 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
   }, [fetchShifts])
 
   const handleClockIn = async () => {
-    const staffName = MANAGER_PINS[pin]
+    const staffName = await verifyManagerPin(pin)
     if (!staffName) {
-      // Check if it's a mesero PIN (from env or staff list)
       setPinError('PIN no reconocido')
       return
     }

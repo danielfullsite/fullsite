@@ -1098,19 +1098,43 @@ export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntr
   return res.json()
 }
 
-// Manager PINs for approval — loaded from env to keep secrets out of source code
-// Format: "PIN:Name,PIN:Name,PIN:Name"  e.g. "1234:Eduardo,5678:Monica,9012:Daniel"
-function parseManagerPins(): Record<string, string> {
-  const raw = process.env.NEXT_PUBLIC_MANAGER_PINS || ''
-  if (!raw) return {}
-  const pins: Record<string, string> = {}
-  for (const entry of raw.split(',')) {
-    const [pin, name] = entry.split(':')
-    if (pin && name) pins[pin.trim()] = name.trim()
-  }
-  return pins
+// Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
+// Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
+// contra /api/pos/pin con manager=true (pos_staff admin/gerente + env server-only).
+// Cachea éxitos en localStorage para fallback offline.
+export async function verifyManagerPin(pin: string): Promise<string | null> {
+  if (!pin) return null
+  try {
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+    })
+    if (res.ok) {
+      const { staff } = await res.json()
+      if (staff?.name) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+          cached[pin] = { name: staff.name, cached_at: Date.now() }
+          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
+        } catch { /* ignore */ }
+        return staff.name as string
+      }
+      return null
+    }
+    if (res.status === 401 || res.status === 400) return null
+  } catch { /* offline → fallback al cache */ }
+  // Fallback offline: PINs validados previamente (máx 7 días)
+  try {
+    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+    const entry = cached[pin]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 7 * 24 * 60 * 60 * 1000) {
+      return entry.name as string
+    }
+  } catch { /* ignore */ }
+  return null
 }
-export const MANAGER_PINS: Record<string, string> = parseManagerPins()
 
 // ─── INVENTORY & RECIPES ────────────────────────────────────────────────────
 

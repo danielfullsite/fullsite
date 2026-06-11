@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users } from 'lucide-react'
-import { formatMXN, logAudit, MANAGER_PINS } from '@/lib/pos-data'
+import { formatMXN, logAudit } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Demasiados intentos' }, { status: 429 })
     }
 
-    const { pin, client_id } = await request.json()
+    const { pin, client_id, manager } = await request.json()
     if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
@@ -36,8 +36,10 @@ export async function POST(request: NextRequest) {
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // manager=true: solo roles con autoridad (cancelaciones, descuentos, reabrir órdenes, cortes)
+    const roleFilter = manager === true ? '&role=in.(admin,gerente)' : ''
     const res = await fetch(
-      `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
+      `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
     )
     if (res.ok) {
@@ -51,6 +53,17 @@ export async function POST(request: NextRequest) {
     const fallback = process.env.POS_FALLBACK_PIN
     if (fallback && pin === fallback) {
       return Response.json({ staff: { id: 'admin', name: 'Admin', role: 'admin' } })
+    }
+
+    // MANAGER_PINS server-only (formato "pin:Nombre,pin:Nombre") — reemplaza NEXT_PUBLIC_MANAGER_PINS
+    if (manager === true) {
+      const raw = process.env.MANAGER_PINS || ''
+      for (const entry of raw.split(',')) {
+        const [p, name] = entry.split(':')
+        if (p && name && p.trim() === pin) {
+          return Response.json({ staff: { id: 'manager', name: name.trim(), role: 'gerente' } })
+        }
+      }
     }
 
     return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
