@@ -107,8 +107,8 @@ jobs:
         working-directory: agents/wansoft
         run: python run.py ${{ steps.date.outputs.target }} --type=${{ steps.params.outputs.type }}
 
-      - name: Upload debug artifacts on failure
-        if: failure()
+      - name: Upload debug artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wansoft-debug-${{ steps.date.outputs.target }}-${{ steps.params.outputs.type }}
