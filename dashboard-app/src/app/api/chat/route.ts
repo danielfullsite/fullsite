@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
     const wantsDetail = true // Always load full detail
     const histLimit = wantsHistory ? 90 : 14
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // Service key (server-side only): sobrevive el endurecimiento RLS anon→authenticated
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const sbHeaders = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     const selectCols = 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_metodos,platillos_top'
 
