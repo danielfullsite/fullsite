@@ -15,7 +15,7 @@ import os
 import sys
 import json
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_wansoft_creds
@@ -140,11 +140,59 @@ def main():
         if not wh_id or "ELIMINADO" in wh_name.upper():
             continue
         print(f"  Warehouse: {wh_name} (ID: {wh_id})")
-        # Try ExportInventoryStatement — more data
+        # Try multiple approaches
+        # 1. GetInventoryStatementBySubsidiary with warehouse
         inv = post_json(session, "Inventory/GetInventoryStatementBySubsidiary", {
             "subsidiaryId": SUBSIDIARY_ID,
             "warehouseId": wh_id,
         })
+        # 2. If null, try ExportInventoryStatement (form POST with dates)
+        if not inv:
+            week_ago = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+            inv = post_json(session, "Inventory/ExportInventoryStatement", {
+                "subsidiaryId": SUBSIDIARY_ID,
+                "warehouseId": wh_id,
+                "startDate": week_ago,
+                "endDate": TODAY,
+                "InternalCode": "",
+                "ProductName": "",
+            })
+        # 3. If still null, try form POST to the page itself
+        if not inv:
+            try:
+                page_r = session.get(f"{WANSOFT_URL}/Inventory/InventoryStatement", timeout=30)
+                import re
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(page_r.text, "html.parser")
+                form = soup.select_one("form")
+                if form:
+                    data = {}
+                    for inp in form.select("input"):
+                        if inp.get("name"):
+                            data[inp["name"]] = inp.get("value", "")
+                    for sel in form.select("select"):
+                        if sel.get("name"):
+                            if "subsidiary" in sel["name"].lower():
+                                data[sel["name"]] = str(SUBSIDIARY_ID)
+                            elif "warehouse" in sel["name"].lower():
+                                data[sel["name"]] = wh_id
+                    week_ago = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+                    for k in list(data):
+                        kl = k.lower()
+                        if "start" in kl and "date" in kl: data[k] = week_ago
+                        elif "end" in kl and "date" in kl: data[k] = TODAY
+                    action = (form.get("action") or "/Inventory/InventoryStatement").lstrip("/").replace("Wansoft.Web/", "")
+                    pr = session.post(f"{WANSOFT_URL}/{action}", data=data, timeout=40)
+                    ctype = pr.headers.get("Content-Type", "")
+                    if "text/html" not in ctype and len(pr.content) > 100:
+                        # Export file (CSV/TXT)
+                        inv = {"_export": True, "_content_type": ctype, "_data": pr.text[:50000]}
+                        print(f"    → EXPORT! ctype={ctype} len={len(pr.content)}")
+                    elif len(pr.text) > 5000:
+                        inv = {"_html_len": len(pr.text)}
+                        print(f"    → HTML response len={len(pr.text)}")
+            except Exception as e:
+                print(f"    → form attempt failed: {e}")
         if inv:
             ilist = inv if isinstance(inv, list) else inv.get("Result", inv.get("Data", []))
             if isinstance(ilist, list):
