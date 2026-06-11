@@ -14,6 +14,16 @@ const quickQuestions = [
   '¿Cómo vamos vs la semana pasada?',
 ]
 
+// Renderiza **texto** como negritas (el LLM responde con markdown básico)
+function renderBold(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : part
+  )
+}
+
 export default function ChatWidget() {
   const { clientId } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
@@ -186,7 +196,7 @@ export default function ChatWidget() {
                     : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
                 }`}
               >
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <div className="whitespace-pre-wrap">{renderBold(msg.content)}</div>
               </div>
             </div>
           </div>
