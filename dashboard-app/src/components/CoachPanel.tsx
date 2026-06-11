@@ -1,97 +1,184 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Sparkles, TrendingUp, TrendingDown, AlertTriangle, Calendar, Target, RefreshCw } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import {
+  Sparkles, TrendingUp, TrendingDown, AlertTriangle, Calendar,
+  Target, RefreshCw, Users, DollarSign, Award, Utensils, CreditCard,
+} from 'lucide-react'
+import { getRecentDays, aggregateMeseros, aggregatePayments } from '@/lib/data'
+import { formatCurrency } from '@/lib/format'
+import type { WansoftDaily } from '@/lib/types'
 
-interface CoachInsight {
-  type: 'daily' | 'weekly' | 'alert'
+interface Insight {
+  type: 'daily' | 'weekly' | 'alert' | 'tip'
+  icon: React.ElementType
+  iconBg: string
+  iconColor: string
   title: string
   body: string
-  priority: 'high' | 'medium' | 'low'
   metric: string
+  metricColor: string
 }
 
-interface CoachData {
-  insights: CoachInsight[]
-  today?: {
-    fecha: string
-    ventas: number
-    tickets: number
-    tp: number
-    avgVentas: number
-    avgTP: number
-    weekVentas: number
-    prevWeekVentas: number
-  }
-}
+const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
 
-function InsightIcon({ type, priority }: { type: string; priority: string }) {
-  if (type === 'alert') {
-    return (
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-        priority === 'high' ? 'bg-red-50' : 'bg-amber-50'
-      }`}>
-        <AlertTriangle size={16} className={priority === 'high' ? 'text-red-500' : 'text-amber-500'} />
-      </div>
-    )
-  }
-  if (type === 'weekly') {
-    return (
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-50">
-        <TrendingUp size={16} className="text-blue-500" />
-      </div>
-    )
-  }
-  return (
-    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50">
-      <Target size={16} className="text-emerald-500" />
-    </div>
-  )
-}
+function generateInsights(data: WansoftDaily[]): { insights: Insight[]; summary: { avgVentas: number; avgTicket: number; totalVentas: number; days: number } | null } {
+  if (data.length < 3) return { insights: [], summary: null }
 
-function MetricBadge({ metric, priority }: { metric: string; priority: string }) {
-  const isNegative = metric.startsWith('-')
-  const colorClass = priority === 'high'
-    ? (isNegative ? 'bg-red-100 text-red-700' : 'bg-red-100 text-red-700')
-    : priority === 'medium'
-      ? 'bg-amber-100 text-amber-700'
-      : 'bg-emerald-100 text-emerald-700'
+  const insights: Insight[] = []
 
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${colorClass}`}>
-      {metric}
-    </span>
-  )
-}
+  // Basic aggregates
+  const totalVentas = data.reduce((s, d) => s + d.ventas_dia, 0)
+  const avgVentas = totalVentas / data.length
+  const totalTickets = data.reduce((s, d) => s + d.tickets_count, 0)
+  const avgTicket = totalTickets > 0 ? totalVentas / totalTickets : 0
+  const totalPropinas = data.reduce((s, d) => s + d.propinas_total, 0)
 
-function TypeLabel({ type }: { type: string }) {
-  const labels: Record<string, { text: string; color: string }> = {
-    daily: { text: 'HOY', color: 'text-emerald-600' },
-    weekly: { text: 'SEMANA', color: 'text-blue-600' },
-    alert: { text: 'ALERTA', color: 'text-red-600' },
+  // --- Week-over-week trend ---
+  const sorted = [...data].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const lastWeek = sorted.slice(-7)
+  const prevWeek = sorted.slice(-14, -7)
+  if (lastWeek.length >= 5 && prevWeek.length >= 5) {
+    const lastTotal = lastWeek.reduce((s, d) => s + d.ventas_dia, 0)
+    const prevTotal = prevWeek.reduce((s, d) => s + d.ventas_dia, 0)
+    if (prevTotal > 0) {
+      const pct = ((lastTotal - prevTotal) / prevTotal) * 100
+      const isUp = pct >= 0
+      insights.push({
+        type: isUp ? 'weekly' : 'alert',
+        icon: isUp ? TrendingUp : TrendingDown,
+        iconBg: isUp ? 'bg-emerald-500/15' : 'bg-red-500/15',
+        iconColor: isUp ? 'text-emerald-400' : 'text-red-400',
+        title: isUp
+          ? `Ventas subieron ${Math.abs(pct).toFixed(1)}% vs semana pasada`
+          : `Ventas bajaron ${Math.abs(pct).toFixed(1)}% vs semana pasada`,
+        body: isUp
+          ? `Esta semana: ${formatCurrency(lastTotal)} vs ${formatCurrency(prevTotal)} la semana anterior. Buen ritmo.`
+          : `Esta semana: ${formatCurrency(lastTotal)} vs ${formatCurrency(prevTotal)} la semana anterior. Revisa que paso.`,
+        metric: `${isUp ? '+' : ''}${pct.toFixed(1)}%`,
+        metricColor: isUp ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400',
+      })
+    }
   }
-  const { text, color } = labels[type] || labels.daily
-  return <span className={`text-[10px] font-bold tracking-wider ${color}`}>{text}</span>
+
+  // --- Best and worst day of the week ---
+  const byDow: Record<number, { total: number; count: number }> = {}
+  for (const d of data) {
+    const dow = new Date(d.fecha + 'T12:00:00').getDay()
+    if (!byDow[dow]) byDow[dow] = { total: 0, count: 0 }
+    byDow[dow].total += d.ventas_dia
+    byDow[dow].count++
+  }
+  const dowEntries = Object.entries(byDow)
+    .map(([k, v]) => ({ dow: Number(k), avg: v.total / v.count }))
+    .sort((a, b) => b.avg - a.avg)
+
+  if (dowEntries.length >= 3) {
+    const best = dowEntries[0]
+    const worst = dowEntries[dowEntries.length - 1]
+    const bestName = DAY_NAMES[best.dow].charAt(0).toUpperCase() + DAY_NAMES[best.dow].slice(1)
+    const worstName = DAY_NAMES[worst.dow].charAt(0).toUpperCase() + DAY_NAMES[worst.dow].slice(1)
+
+    insights.push({
+      type: 'tip',
+      icon: Calendar,
+      iconBg: 'bg-blue-500/15',
+      iconColor: 'text-blue-400',
+      title: `${bestName} es tu mejor dia — ${formatCurrency(best.avg)} promedio`,
+      body: `${worstName} es el mas debil con ${formatCurrency(worst.avg)} promedio. Diferencia de ${formatCurrency(best.avg - worst.avg)} entre ambos.`,
+      metric: formatCurrency(best.avg),
+      metricColor: 'bg-blue-500/20 text-blue-400',
+    })
+  }
+
+  // --- Top mesero ---
+  const meseros = aggregateMeseros(data)
+  if (meseros.length >= 2) {
+    const top = meseros[0]
+    const pctOfTotal = totalVentas > 0 ? ((top.total / totalVentas) * 100).toFixed(0) : '0'
+    insights.push({
+      type: 'daily',
+      icon: Award,
+      iconBg: 'bg-violet-500/15',
+      iconColor: 'text-violet-400',
+      title: `${top.nombre} genera ${pctOfTotal}% de las ventas`,
+      body: `Total: ${formatCurrency(top.total)} en ${top.dias} dias. Promedio diario: ${formatCurrency(top.promedio)}. Segundo lugar: ${meseros[1].nombre} con ${formatCurrency(meseros[1].total)}.`,
+      metric: `${pctOfTotal}%`,
+      metricColor: 'bg-violet-500/20 text-violet-400',
+    })
+  }
+
+  // --- Ticket promedio trend ---
+  if (avgTicket > 0) {
+    const lastWeekTickets = lastWeek.reduce((s, d) => s + d.tickets_count, 0)
+    const lastWeekVentas = lastWeek.reduce((s, d) => s + d.ventas_dia, 0)
+    const lastWeekTP = lastWeekTickets > 0 ? lastWeekVentas / lastWeekTickets : 0
+    insights.push({
+      type: 'daily',
+      icon: Utensils,
+      iconBg: 'bg-amber-500/15',
+      iconColor: 'text-amber-400',
+      title: `Ticket promedio: ${formatCurrency(avgTicket)}`,
+      body: lastWeekTP > 0
+        ? `Ultimos 7 dias: ${formatCurrency(lastWeekTP)}. ${lastWeekTP > avgTicket ? 'Subiendo vs el promedio de 30 dias.' : 'Bajando vs el promedio de 30 dias.'}`
+        : `Basado en ${totalTickets.toLocaleString()} tickets en ${data.length} dias.`,
+      metric: formatCurrency(avgTicket),
+      metricColor: 'bg-amber-500/20 text-amber-400',
+    })
+  }
+
+  // --- Payment methods insight ---
+  const payments = aggregatePayments(data)
+  if (payments.length >= 2) {
+    const payTotal = payments.reduce((s, p) => s + p.total, 0)
+    const topMethod = payments[0]
+    const topPct = payTotal > 0 ? ((topMethod.total / payTotal) * 100).toFixed(1) : '0'
+    const secondMethod = payments[1]
+    const secondPct = payTotal > 0 ? ((secondMethod.total / payTotal) * 100).toFixed(1) : '0'
+    insights.push({
+      type: 'tip',
+      icon: CreditCard,
+      iconBg: 'bg-cyan-500/15',
+      iconColor: 'text-cyan-400',
+      title: `${topMethod.nombre} domina con ${topPct}% de cobros`,
+      body: `${topMethod.nombre}: ${formatCurrency(topMethod.total)} (${topPct}%). ${secondMethod.nombre}: ${formatCurrency(secondMethod.total)} (${secondPct}%).`,
+      metric: `${topPct}%`,
+      metricColor: 'bg-cyan-500/20 text-cyan-400',
+    })
+  }
+
+  // --- Propinas insight ---
+  if (totalPropinas > 0 && totalVentas > 0) {
+    const propinaPct = (totalPropinas / totalVentas) * 100
+    insights.push({
+      type: propinaPct < 5 ? 'alert' : 'daily',
+      icon: Users,
+      iconBg: propinaPct < 5 ? 'bg-orange-500/15' : 'bg-emerald-500/15',
+      iconColor: propinaPct < 5 ? 'text-orange-400' : 'text-emerald-400',
+      title: `Propinas: ${propinaPct.toFixed(1)}% sobre ventas`,
+      body: `Total propinas: ${formatCurrency(totalPropinas)} sobre ${formatCurrency(totalVentas)} en ventas. ${propinaPct < 5 ? 'Abajo del 5% — considera incentivar al equipo.' : 'Buen nivel de propinas.'}`,
+      metric: `${propinaPct.toFixed(1)}%`,
+      metricColor: propinaPct < 5 ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400',
+    })
+  }
+
+  return {
+    insights: insights.slice(0, 6),
+    summary: { avgVentas, avgTicket, totalVentas, days: data.length },
+  }
 }
 
 export default function CoachPanel() {
-  const [data, setData] = useState<CoachData | null>(null)
+  const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
-  async function loadInsights() {
+  async function loadData() {
     try {
-      const res = await fetch('/api/coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const json = await res.json()
-      setData(json)
-      setError(false)
-    } catch {
-      setError(true)
+      const days = await getRecentDays(30)
+      setData(days)
+    } catch (err) {
+      console.error('Coach: error loading data', err)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -99,13 +186,20 @@ export default function CoachPanel() {
   }
 
   useEffect(() => {
-    loadInsights()
+    loadData()
   }, [])
 
   function handleRefresh() {
     setRefreshing(true)
-    loadInsights()
+    loadData()
   }
+
+  const { insights, summary } = useMemo(() => generateInsights(data), [data])
+
+  // Latest date in data
+  const latestDate = data.length > 0
+    ? [...data].sort((a, b) => b.fecha.localeCompare(a.fecha))[0].fecha
+    : null
 
   if (loading) {
     return (
@@ -114,7 +208,7 @@ export default function CoachPanel() {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
             <Sparkles size={14} className="text-white" />
           </div>
-          <h3 className="text-sm font-semibold text-[var(--text-1)]">Coach</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-1)]">Analizando datos...</h3>
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -129,7 +223,7 @@ export default function CoachPanel() {
     )
   }
 
-  if (error || !data || data.insights.length === 0) {
+  if (insights.length === 0) {
     return (
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6">
         <div className="flex items-center gap-2 mb-3">
@@ -138,103 +232,91 @@ export default function CoachPanel() {
           </div>
           <h3 className="text-sm font-semibold text-[var(--text-1)]">Coach</h3>
         </div>
-        <p className="text-sm text-[var(--text-3)]">Sin datos suficientes para generar insights.</p>
+        <p className="text-sm text-[var(--text-3)]">Se necesitan al menos 3 dias con datos de ventas para generar insights.</p>
       </div>
     )
   }
 
-  const weekChange = data.today && data.today.prevWeekVentas > 0
-    ? ((data.today.weekVentas / data.today.prevWeekVentas - 1) * 100).toFixed(0)
-    : null
-  const ventasVsAvg = data.today && data.today.avgVentas > 0
-    ? ((data.today.ventas / data.today.avgVentas - 1) * 100).toFixed(0)
-    : null
-
   return (
-    <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="px-6 pt-5 pb-4 border-b border-[var(--line-soft)]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-              <Sparkles size={15} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-[var(--text-1)]">Coach</h3>
-              <p className="text-[11px] text-[var(--text-3)]">Insights basados en tus datos</p>
-            </div>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="p-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors text-[var(--text-3)] hover:text-[var(--text-2)] disabled:opacity-50"
-            title="Actualizar insights"
-          >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-        </div>
-
-        {/* Quick stats bar */}
-        {data.today && (
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-50">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-[var(--text-3)]">Hoy</span>
-              <span className="text-xs font-bold text-[var(--text-1)]">
-                ${data.today.ventas.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
-              </span>
-              {ventasVsAvg && (
-                <span className={`text-[10px] font-bold ${Number(ventasVsAvg) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {Number(ventasVsAvg) >= 0 ? '+' : ''}{ventasVsAvg}%
-                </span>
-              )}
-            </div>
-            <div className="w-px h-3 bg-[var(--line)]" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-[var(--text-3)]">Semana</span>
-              <span className="text-xs font-bold text-[var(--text-1)]">
-                ${data.today.weekVentas.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
-              </span>
-              {weekChange && (
-                <span className={`text-[10px] font-bold ${Number(weekChange) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {Number(weekChange) >= 0 ? '+' : ''}{weekChange}%
-                </span>
-              )}
-            </div>
-            <div className="w-px h-3 bg-[var(--line)]" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-[var(--text-3)]">TP</span>
-              <span className="text-xs font-bold text-[var(--text-1)]">${data.today.tp}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Insights */}
-      <div className="divide-y divide-slate-50">
-        {data.insights.map((insight, i) => (
-          <div key={i} className="px-6 py-4 hover:bg-[var(--surface-2)]/50 transition-colors">
-            <div className="flex items-start gap-3">
-              <InsightIcon type={insight.type} priority={insight.priority} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <TypeLabel type={insight.type} />
-                  <MetricBadge metric={insight.metric} priority={insight.priority} />
-                </div>
-                <p className="text-sm font-semibold text-[var(--text-1)] mb-1">{insight.title}</p>
-                <p className="text-xs text-[var(--text-2)] leading-relaxed">{insight.body}</p>
+    <div className="space-y-6">
+      {/* Summary bar */}
+      {summary && (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <Sparkles size={15} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[var(--text-1)]">Resumen de {summary.days} dias</h3>
+                <p className="text-[11px] text-[var(--text-3)]">Insights basados en datos reales</p>
               </div>
             </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-1.5 rounded-md hover:bg-[var(--surface-2)] transition-colors text-[var(--text-3)] hover:text-[var(--text-2)] disabled:opacity-50"
+              title="Actualizar insights"
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            </button>
           </div>
-        ))}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-1">Ventas totales</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(summary.totalVentas)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-1">Promedio diario</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(summary.avgVentas)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-1">Ticket promedio</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">{formatCurrency(summary.avgTicket)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--text-3)] uppercase tracking-wider mb-1">Dias con datos</p>
+              <p className="text-lg font-bold text-[var(--text-1)]">{summary.days}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Insight cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {insights.map((insight, i) => {
+          const Icon = insight.icon
+          return (
+            <div
+              key={i}
+              className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${insight.iconBg}`}>
+                  <Icon size={18} className={insight.iconColor} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${insight.metricColor}`}>
+                      {insight.metric}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--text-1)] mb-1">{insight.title}</p>
+                  <p className="text-xs text-[var(--text-2)] leading-relaxed">{insight.body}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 bg-[var(--surface-2)]/50 border-t border-[var(--line-soft)]">
-        <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-3)]">
+      {latestDate && (
+        <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-3)] px-1">
           <Calendar size={10} />
-          <span>Actualizado con datos hasta {data.today?.fecha || 'hoy'}</span>
+          <span>Datos hasta {latestDate}</span>
         </div>
-      </div>
+      )}
     </div>
   )
 }
