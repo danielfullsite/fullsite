@@ -13,6 +13,12 @@
   body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 }
 
+/* Capacitor native app (WebView no es display-mode: standalone) */
+html.capacitor { overscroll-behavior: none; }
+html.capacitor button, html.capacitor a, html.capacitor label, html.capacitor nav, html.capacitor header { -webkit-user-select: none; user-select: none; }
+html.capacitor * { -webkit-tap-highlight-color: transparent; }
+html.capacitor body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
 /* ============ Fullsite Design Tokens ============
  * DARK by default. Accent emerald #10b981.
  * Light mode with [data-theme="light"] on <html>.

@@ -205,6 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Auto-logout: clear tokens when browser/tab closes
   // sessionStorage survives reloads but dies on tab close
   useEffect(() => {
+    // En la app nativa (Capacitor) cada arranque en frío es "tab nueva" —
+    // no borrar el token o pediría login en cada apertura de la app
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+    if (cap?.isNativePlatform?.()) return
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     let storageKey = ''
     try { storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token` } catch {}
