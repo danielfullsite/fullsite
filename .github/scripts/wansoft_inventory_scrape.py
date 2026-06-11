@@ -225,16 +225,64 @@ def main():
 
     session = wansoft_session()
 
+    # First: discover real URLs from sidebar
+    print("\n[0] Discovering sidebar links...")
+    r = session.get(f"{WANSOFT_URL}/Inventory/InventoryStatement", timeout=30)
+    sidebar_links = set()
+    for m in re.finditer(r'href\s*=\s*["\']/?(?:Wansoft\.Web/)?([A-Za-z][A-Za-z0-9_]*/[A-Za-z0-9_]+)["\']', r.text):
+        u = m.group(1)
+        if not any(x in u for x in ('Content/', 'Scripts/', 'Account/LogOff', '.js', '.css')):
+            sidebar_links.add(u)
+    print(f"  Found {len(sidebar_links)} sidebar links")
+    for u in sorted(sidebar_links):
+        print(f"    - {u}")
+
+    # Known pages + anything from sidebar with Inventory/Production/Purchasing
     pages = [
+        # Entradas y salidas
         ("Inventory/InputOutput", "Entradas y Salidas"),
+        ("Inventory/InputOutputWithInvoice", "Con Facturas"),
+        ("Inventory/Transfer", "Transferencias"),
+        ("Inventory/Transfers", "Transferencias2"),
+        ("Inventory/Returns", "Devoluciones"),
+        ("Inventory/Return", "Devoluciones2"),
+        ("Inventory/InputOutputBarcode", "Con Codigo de Barras"),
+        ("Inventory/BatchAdjustment", "Ajustes por Lote"),
+        ("Inventory/BatchAdjustments", "Ajustes por Lote2"),
+        ("Inventory/SubproductsInProcess", "Subproductos en Proceso"),
+        ("Inventory/BulkInventoryLoad", "Carga Masiva"),
+        ("Inventory/MassiveInventoryLoad", "Carga Masiva2"),
+        ("Inventory/BulkInventoryOutput", "Salida Masiva"),
+        ("Inventory/MassiveInventoryOutput", "Salida Masiva2"),
+        # Auditoría
         ("Inventory/InventoryAudit", "Auditoría"),
+        ("Inventory/Audit", "Auditoría2"),
+        # Control
         ("Inventory/InventoryControl", "Control de Inventarios"),
+        ("Inventory/Control", "Control2"),
+        ("Inventory/StockControl", "Stock Control"),
+        # Producción
         ("Production/ProductionAndCosts", "Producción y Costos"),
+        ("Production/Costs", "Costos"),
+        ("Production/SaucerRecipe", "Recetas"),
+        # Compras
         ("Purchasing/PurchaseOrderBrowser", "Órdenes de Compra"),
-        ("Account/MyDocumentsList", "Facturas Wansoft"),
-        ("Inventory/InventoryStatement", "Estado de Cuenta Inventario"),
+        ("Purchasing/PurchaseOrder", "Orden de Compra"),
+        ("Purchasing/Suppliers", "Proveedores"),
+        # Estado de cuenta + físico
+        ("Inventory/InventoryStatement", "Estado de Cuenta"),
         ("Inventory/PhysicalInventoryVsSystem", "Físico vs Sistema"),
+        ("Inventory/ReorderPoint", "Punto de Reorden"),
+        # Facturas
+        ("Account/MyDocumentsList", "Facturas Wansoft"),
     ]
+
+    # Add sidebar links we haven't tried
+    tried = {p[0].lower() for p in pages}
+    for link in sorted(sidebar_links):
+        if link.lower() not in tried and any(k in link for k in ('Inventory', 'Production', 'Purchasing')):
+            pages.append((link, f"Sidebar: {link}"))
+
 
     for page, label in pages:
         data = scrape_page(session, page, label)
