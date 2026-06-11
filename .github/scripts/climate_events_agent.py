@@ -586,8 +586,10 @@ def main():
     summary = f"{weather_desc}, {len(events_today)} eventos hoy"
 
     try:
-        requests.post(
+        r = requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_results",
+            # on_conflict requerido: la unique key es (client_id, agent_id, fecha), no la PK
+            params={"on_conflict": "client_id,agent_id,fecha"},
             headers={**sb_headers, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"},
             json={
                 "client_id": CLIENT["id"],
@@ -599,7 +601,10 @@ def main():
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
         )
-        print(f"[climate] Saved to agent_results")
+        if r.ok:
+            print(f"[climate] Saved to agent_results")
+        else:
+            print(f"[climate] agent_results upsert failed: {r.status_code} {r.text[:200]}")
     except Exception as e:
         print(f"[climate] Error saving to DB: {e}")
 
