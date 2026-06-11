@@ -1168,7 +1168,7 @@ export interface InventoryMovement {
 
 export async function getIngredients(): Promise<Ingredient[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=1000`,
+    `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&order=name.asc&limit=2000`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -1221,11 +1221,11 @@ export async function getInventory(): Promise<InventoryItem[]> {
   // Get inventory + join ingredient info client-side
   const [invRes, ingRes] = await Promise.all([
     fetch(
-      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&order=ingredient_id.asc&limit=500`,
+      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&order=ingredient_id.asc&limit=2000`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     ),
     fetch(
-      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&limit=500`,
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${_getClientId()}&active=eq.true&limit=2000`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     ),
   ])
