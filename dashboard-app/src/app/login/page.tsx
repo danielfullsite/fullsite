@@ -44,6 +44,8 @@ export default function LoginPage() {
           token_type: data.token_type,
           user: data.user,
         }))
+        // Cookie para el middleware server-side (mismo token; expira con él)
+        document.cookie = `fs-at=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; secure; samesite=lax`
         // Check if demo user → redirect to demo dashboard
         const clientId = data.user?.user_metadata?.client_id
         window.location.href = clientId === 'demo' ? '/demo/dashboard' : '/'

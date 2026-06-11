@@ -15,6 +15,7 @@ EXCLUDED=(
   "src/app/demo/[...slug]"
   "src/app/menu/[mesa]"
   "src/app/encuesta/[id]"
+  "src/proxy.ts"
 )
 
 STASH=".capacitor-excluded"

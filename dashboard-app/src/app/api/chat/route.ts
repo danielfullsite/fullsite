@@ -29,6 +29,28 @@ async function getAuthUser() {
   return user
 }
 
+// Sesión vía cookie fs-at (login del dashboard) o header Authorization.
+// Devuelve el user id si el token es válido, null si no hay sesión.
+async function getSessionUserId(request: NextRequest): Promise<string | null> {
+  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const token = request.cookies.get('fs-at')?.value || bearer
+  if (!token) {
+    // Fallback: cookies sb-* de @supabase/ssr (si algún cliente las usa)
+    const user = await getAuthUser()
+    return user?.id || null
+  }
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    const user = await res.json()
+    return user?.id || null
+  } catch {
+    return null
+  }
+}
+
 // Simple rate limiting — max 20 requests per minute per user
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 let lastCleanup = Date.now()
@@ -66,9 +88,14 @@ function parseJsonb(val: unknown): unknown[] {
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting by IP (auth check removed — user is already logged into dashboard)
-    const ip = request.headers.get('x-forwarded-for') || 'unknown'
-    if (!checkRateLimit(ip)) {
+    // Auth: solo usuarios con sesión válida de Supabase
+    const userId = await getSessionUserId(request)
+    if (!userId) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Rate limiting por usuario
+    if (!checkRateLimit(userId)) {
       return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 200 })
     }
 

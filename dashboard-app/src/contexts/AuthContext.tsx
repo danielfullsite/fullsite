@@ -5,38 +5,10 @@ import { createClient } from '@/lib/supabase-browser'
 import type { User } from '@supabase/supabase-js'
 import { getClientConfig, getClientIdFromEmail, fetchClientConfig, type ClientConfig } from '@/lib/client-config'
 
-// Dashboard roles — controls page visibility
-// dueño: sees EVERYTHING
-// gerente: operations + agents + inventario, NOT financials
-// capitan: operations + POS + inventario/merma, NOT financials/agents
-// cajero: POS + cortes + propinas, NOT financials/agents/admin
-// mesero: POS only (own tables)
-export type DashboardRole = 'dueño' | 'gerente' | 'capitan' | 'cajero' | 'mesero' | 'staff'
+import { canAccessPage, resolveRole, ROLE_MAP, type DashboardRole } from '@/lib/roles'
 
-// Role-based page access
-const FINANCIAL_PAGES = ['/estado-resultados', '/nomina', '/ingresos', '/proveedores', '/food-cost', '/roi']
-const AGENT_PAGES = ['/agentes', '/coach', '/chat']
-const OPERATIONS_PAGES = ['/', '/ventas', '/cortes', '/meseros', '/platillos', '/tendencias', '/propinas', '/inventario', '/auto86', '/ecommerce', '/reportes', '/sucursales']
-const POS_PAGES = ['/pos']
-const CAPITAN_PAGES = [...OPERATIONS_PAGES, ...POS_PAGES, '/admin']
-const CAJERO_PAGES = ['/pos', '/cortes', '/propinas', '/ventas']
-
-export function canAccessPage(role: DashboardRole, path: string): boolean {
-  if (role === 'dueño') return true
-  if (role === 'gerente') return !FINANCIAL_PAGES.some(p => path.startsWith(p))
-  if (role === 'capitan') return CAPITAN_PAGES.some(p => path === p || path.startsWith(p + '/')) || path === '/'
-  if (role === 'cajero') return CAJERO_PAGES.some(p => path === p || path.startsWith(p + '/')) || path === '/'
-  if (role === 'mesero' || role === 'staff') return POS_PAGES.some(p => path.startsWith(p))
-  return false
-}
-
-// Map emails to roles (in production, move to Supabase table)
-const ROLE_MAP: Record<string, DashboardRole> = {
-  'ramonfaur.daniel@gmail.com': 'dueño',
-  'monica@fullsite.mx': 'dueño',
-  'demo@fullsite.mx': 'dueño',
-  // Add more users here or migrate to DB
-}
+// Re-export para compatibilidad (Sidebar, tests importan desde aquí)
+export { canAccessPage, type DashboardRole }
 
 export interface ClientLocation {
   id: string
@@ -88,16 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Priority 1: user_metadata.client_id (set at signup, instant)
     const metaClientId = userMeta?.client_id as string | undefined
 
-    // Priority 2: client_users table (DB lookup)
+    // Priority 2: client_users table (DB lookup) — también es la fuente de verdad del rol
     let dbClientId: string | null = null
     try {
       const { data: clientUser } = await supabase
         .from('client_users')
-        .select('client_id')
+        .select('client_id, role')
         .eq('user_id', userId)
         .limit(1)
         .single()
-      dbClientId = (clientUser as { client_id: string } | null)?.client_id || null
+      const cu = clientUser as { client_id: string; role: string | null } | null
+      dbClientId = cu?.client_id || null
+      setRole(resolveRole(cu?.role || null, userEmail))
     } catch { /* table might not exist for new installs */ }
 
     // Priority 3: email-to-client mapping
@@ -187,6 +161,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         if (currentUser) {
+          // Mantener fresco el cookie del middleware (p. ej. en TOKEN_REFRESHED)
+          if (session?.access_token) {
+            try {
+              document.cookie = `fs-at=${session.access_token}; path=/; max-age=${session.expires_in || 3600}; secure; samesite=lax`
+            } catch { /* SSR */ }
+          }
           setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
           await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata)
         } else {
@@ -232,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const hostname = new URL(supabaseUrl).hostname.split('.')[0]
       localStorage.removeItem(`sb-${hostname}-auth-token`)
     } catch { /* */ }
+    try { document.cookie = 'fs-at=; path=/; max-age=0' } catch { /* */ }
     setUser(null)
     setClientId(null)
     setClientConfig(null)
