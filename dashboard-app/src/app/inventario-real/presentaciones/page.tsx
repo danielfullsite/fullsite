@@ -23,6 +23,13 @@ interface ProductPresentations {
   presentations: Presentation[]
 }
 
+// Catálogo plano de presentaciones de Wansoft (Inventory/Presentations)
+interface WansoftPresentation {
+  id: string
+  clave: string
+  presentacion: string
+}
+
 // ── Constants ───────────────────────────────────────────────────────
 
 const UNITS = [
@@ -63,6 +70,8 @@ export default function PresentacionesPage() {
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [search, setSearch] = useState('')
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const [wsCatalog, setWsCatalog] = useState<WansoftPresentation[]>([])
+  const [catSearch, setCatSearch] = useState('')
 
   // New product form
   const [newProductName, setNewProductName] = useState('')
@@ -87,13 +96,17 @@ export default function PresentacionesPage() {
         const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-        const [res, catRes] = await Promise.all([
+        const [res, catRes, presCatRes] = await Promise.all([
           fetch(
             `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.product_presentations&order=fecha.desc&limit=1&select=data`,
             { headers }
           ),
           fetch(
             `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.products_catalog&order=fecha.desc&limit=1&select=data`,
+            { headers }
+          ),
+          fetch(
+            `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.presentations_catalog&order=fecha.desc&limit=1&select=data`,
             { headers }
           ),
         ])
@@ -144,6 +157,28 @@ export default function PresentacionesPage() {
                 }
               })
               .filter(p => p.product_name && !savedNames.has(p.product_name.toUpperCase()))
+          }
+        }
+
+        // Catálogo plano de presentaciones Wansoft: {id, cell: [clave, presentacion, ...]}
+        if (presCatRes.ok) {
+          const rows = await presCatRes.json()
+          if (rows.length > 0) {
+            let raw = rows[0].data
+            for (let i = 0; i < 3 && typeof raw === 'string'; i++) {
+              try { raw = JSON.parse(raw) } catch { break }
+            }
+            if (Array.isArray(raw)) {
+              const items = (raw as Array<{ id?: unknown; cell?: unknown[] }>)
+                .filter(r => Array.isArray(r.cell) && r.cell.length >= 2)
+                .map(r => ({
+                  id: String(r.id ?? ''),
+                  clave: String(r.cell![0] ?? ''),
+                  presentacion: String(r.cell![1] ?? ''),
+                }))
+                .filter(r => r.clave || r.presentacion)
+              setWsCatalog(items)
+            }
           }
         }
 
@@ -654,6 +689,55 @@ export default function PresentacionesPage() {
           )}
         </div>
       </div>
+
+      {/* ── Catálogo Wansoft de presentaciones ── */}
+      {wsCatalog.length > 0 && (
+        <div className="rounded-2xl border border-[var(--accent-line)] overflow-hidden" style={{ background: 'var(--bento-card)' }}>
+          <div className="px-5 py-4 border-b border-[var(--accent-line)] flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
+              <Layers size={16} className="text-cyan-400" />
+              Catalogo de presentaciones Wansoft
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold border bg-cyan-500/15 text-cyan-400 border-cyan-500/30">
+                {wsCatalog.length}
+              </span>
+            </h3>
+            <div className="relative w-56">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
+              <input
+                type="text"
+                placeholder="Filtrar catalogo..."
+                value={catSearch}
+                onChange={e => setCatSearch(e.target.value)}
+                className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--accent-line)] pl-8 pr-3 text-xs text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0" style={{ background: 'var(--bento-card)' }}>
+                <tr className="border-b border-[var(--accent-line)]">
+                  <th className="px-5 py-2.5 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Clave</th>
+                  <th className="px-5 py-2.5 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Presentacion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wsCatalog
+                  .filter(p => {
+                    if (!catSearch.trim()) return true
+                    const q = catSearch.toLowerCase()
+                    return p.clave.toLowerCase().includes(q) || p.presentacion.toLowerCase().includes(q)
+                  })
+                  .map(p => (
+                    <tr key={p.id} className="border-b border-[var(--accent-line)]/50 hover:bg-[var(--surface-2)] transition-colors">
+                      <td className="px-5 py-2 font-mono text-xs text-[var(--text-2)]">{p.clave}</td>
+                      <td className="px-5 py-2 text-xs text-[var(--text-1)]">{p.presentacion}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Save indicator ── */}
       {saving && (
