@@ -2,14 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { registerServiceWorker } from '@/lib/service-worker'
+import { apiUrl } from '@/lib/api-base'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// Fallback PIN for when DB is not available (override via env)
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
-const FALLBACK_PIN = process.env.NEXT_PUBLIC_POS_FALLBACK_PIN || '2835'
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
@@ -104,67 +100,55 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(true)
     setError(false)
 
+    const unlock = (member: StaffMember) => {
+      setStaff(member)
+      setUnlocked(true)
+      setAttempts(0)
+      sessionStorage.setItem('pos_staff', JSON.stringify(member))
+      sessionStorage.setItem('pos_last_activity', Date.now().toString())
+      setChecking(false)
+    }
+
     try {
-      // Try staff table first
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_staff?pin=eq.${pin}&active=eq.true&client_id=eq.${_cid()}&limit=1`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
+      // Validación server-side (service key) — el cliente ya no lee pos_staff
+      const res = await fetch(apiUrl('/api/pos/pin'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, client_id: _cid() }),
+      })
       if (res.ok) {
-        const rows = await res.json()
-        if (rows.length > 0) {
-          const member = { id: rows[0].id, name: rows[0].name, role: rows[0].role }
-          setStaff(member)
-          setUnlocked(true)
-          setAttempts(0)
-          sessionStorage.setItem('pos_staff', JSON.stringify(member))
-          sessionStorage.setItem('pos_last_activity', Date.now().toString())
+        const { staff: member } = await res.json()
+        if (member?.id) {
           // Cache PIN for offline auth
           try {
             const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
             cached[pin] = { ...member, cached_at: Date.now() }
             localStorage.setItem('pos_pin_cache', JSON.stringify(cached))
           } catch { /* ignore */ }
-          setChecking(false)
+          unlock(member)
           return
         }
       }
     } catch {
-      // DB not available — check cached PINs
+      // Sin red (modo offline) — check cached PINs
       try {
         const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
         if (cached[pin]) {
-          const member = { id: cached[pin].id, name: cached[pin].name, role: cached[pin].role }
-          setStaff(member)
-          setUnlocked(true)
-          setAttempts(0)
-          sessionStorage.setItem('pos_staff', JSON.stringify(member))
-          sessionStorage.setItem('pos_last_activity', Date.now().toString())
-          setChecking(false)
+          unlock({ id: cached[pin].id, name: cached[pin].name, role: cached[pin].role })
           return
         }
       } catch { /* ignore */ }
     }
 
-    // Fallback PIN
-    if (pin === FALLBACK_PIN) {
-      const member = { id: 'admin', name: 'Admin', role: 'admin' }
-      setStaff(member)
-      setUnlocked(true)
-      setAttempts(0)
-      sessionStorage.setItem('pos_staff', JSON.stringify(member))
-      sessionStorage.setItem('pos_last_activity', Date.now().toString())
-    } else {
-      const newAttempts = attempts + 1
-      setAttempts(newAttempts)
-      setError(true)
-      setPin('')
-      if (newAttempts >= MAX_ATTEMPTS) {
-        setLockedUntil(Date.now() + LOCKOUT_MS)
-        setTimeout(() => { setLockedUntil(0); setAttempts(0) }, LOCKOUT_MS)
-      }
-      setTimeout(() => setError(false), 1500)
+    const newAttempts = attempts + 1
+    setAttempts(newAttempts)
+    setError(true)
+    setPin('')
+    if (newAttempts >= MAX_ATTEMPTS) {
+      setLockedUntil(Date.now() + LOCKOUT_MS)
+      setTimeout(() => { setLockedUntil(0); setAttempts(0) }, LOCKOUT_MS)
     }
+    setTimeout(() => setError(false), 1500)
     setChecking(false)
   }
 
