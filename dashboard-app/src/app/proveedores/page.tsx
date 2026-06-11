@@ -1,66 +1,41 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Truck, DollarSign, ShoppingCart, BarChart3 } from 'lucide-react'
-import { getWansoftData } from '@/lib/data'
+import { Truck, DollarSign, ShoppingCart, BarChart3, Search, Phone, Mail } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 
-interface SupplierItem {
-  proveedor: string
-  total: number
-  num_productos: number
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-/** Parse double-escaped JSON string from wansoft_data */
-function deepParse(val: unknown): unknown {
-  if (typeof val !== 'string') return val
-  try {
-    const parsed = JSON.parse(val)
-    if (typeof parsed === 'string') return deepParse(parsed)
-    return parsed
-  } catch {
-    return val
-  }
+interface Supplier {
+  id: string
+  name: string
+  rfc: string
+  phone: string
+  email: string
+  giro: string
+  clave_wansoft: string
+  payment_terms: number
 }
 
 export default function ProveedoresPage() {
-  const [suppliers, setSuppliers] = useState<SupplierItem[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
-  const [fecha, setFecha] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     async function load() {
       try {
-        const row = await getWansoftData('purchases_by_product')
-        if (row?.data) {
-          const parsed = deepParse(row.data)
-          // Data shape: { Result: [{BuyerName, ProductName, Cost, Quantity, ...}] }
-          let items: Array<{ BuyerName?: string; Cost?: number; ProductName?: string }> = []
-          if (parsed && typeof parsed === 'object' && 'Result' in (parsed as Record<string, unknown>)) {
-            items = (parsed as { Result: typeof items }).Result || []
-          } else if (Array.isArray(parsed)) {
-            items = parsed
-          }
-
-          // Group by BuyerName (proveedor)
-          const map: Record<string, { total: number; productos: number }> = {}
-          for (const item of items) {
-            const name = item.BuyerName || 'Sin proveedor'
-            if (!map[name]) map[name] = { total: 0, productos: 0 }
-            map[name].total += item.Cost || 0
-            map[name].productos += 1
-          }
-
-          const result = Object.entries(map)
-            .map(([proveedor, data]) => ({ proveedor, total: data.total, num_productos: data.productos }))
-            .filter(s => s.total > 0)
-            .sort((a, b) => b.total - a.total)
-
-          setSuppliers(result)
-          setFecha(row.fecha || '')
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/pos_suppliers?client_id=eq.amalay&select=id,name,rfc,phone,email,giro,clave_wansoft,payment_terms&order=name.asc&limit=500`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setSuppliers(data)
         }
       } catch (err) {
-        console.error('Error loading proveedores:', err)
+        console.error('Error loading suppliers:', err)
       } finally {
         setLoading(false)
       }
@@ -68,9 +43,15 @@ export default function ProveedoresPage() {
     load()
   }, [])
 
-  const totalSpend = suppliers.reduce((s, sup) => s + sup.total, 0)
-  const topSupplier = suppliers[0]
-  const topPct = totalSpend > 0 && topSupplier ? Math.round((topSupplier.total / totalSpend) * 100) : 0
+  const filtered = suppliers.filter(s => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return s.name?.toLowerCase().includes(q) || s.rfc?.toLowerCase().includes(q) || s.giro?.toLowerCase().includes(q) || s.clave_wansoft?.toLowerCase().includes(q)
+  })
+
+  const giros = [...new Set(suppliers.map(s => s.giro).filter(Boolean))].sort()
+  const conEmail = suppliers.filter(s => s.email && s.email.includes('@')).length
+  const conTelefono = suppliers.filter(s => s.phone && s.phone.length > 5).length
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -80,35 +61,44 @@ export default function ProveedoresPage() {
     <>
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Proveedores</h2>
-        <p className="text-sm text-[var(--text-3)]">Gasto por proveedor {fecha && `· ${fecha}`}</p>
+        <p className="text-sm text-[var(--text-3)]">{suppliers.length} proveedores registrados · {giros.length} categorías</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><Truck size={16} className="text-blue-500" /><span className="text-xs text-[var(--text-2)] font-medium">Proveedores</span></div>
+          <div className="flex items-center gap-2 mb-2"><Truck size={16} className="text-blue-500" /><span className="text-xs text-[var(--text-2)] font-medium">Total proveedores</span></div>
           <p className="text-2xl font-bold text-[var(--text-1)]">{suppliers.length}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-500" /><span className="text-xs text-[var(--text-2)] font-medium">Gasto total</span></div>
-          <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(totalSpend)}</p>
+          <div className="flex items-center gap-2 mb-2"><Mail size={16} className="text-emerald-500" /><span className="text-xs text-[var(--text-2)] font-medium">Con email</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{conEmail}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><ShoppingCart size={16} className="text-emerald-500" /><span className="text-xs text-[var(--text-2)] font-medium">Top proveedor</span></div>
-          <p className="text-lg font-bold text-[var(--text-1)] truncate">{topSupplier?.proveedor || '--'}</p>
+          <div className="flex items-center gap-2 mb-2"><Phone size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Con teléfono</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{conTelefono}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Concentración</span></div>
-          <p className="text-2xl font-bold text-amber-400">{topPct}%</p>
-          <p className="text-xs text-[var(--text-3)]">del gasto en 1 proveedor</p>
+          <div className="flex items-center gap-2 mb-2"><BarChart3 size={16} className="text-purple-500" /><span className="text-xs text-[var(--text-2)] font-medium">Categorías</span></div>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{giros.length}</p>
         </div>
       </div>
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
-        {suppliers.length === 0 ? (
+        <div className="p-4 border-b border-[var(--line-soft)]">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
+            <input
+              type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar proveedor, RFC, categoría..."
+              className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--line)] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 bg-transparent text-[var(--text-1)]"
+            />
+          </div>
+        </div>
+        {filtered.length === 0 ? (
           <div className="p-8 text-center">
             <Truck size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
-            <p className="text-sm font-bold text-[var(--text-1)] mb-1">Sin datos de proveedores</p>
-            <p className="text-xs text-[var(--text-3)]">El scraper corre diario y actualiza los datos automáticamente.</p>
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">{suppliers.length === 0 ? 'Sin proveedores' : 'Sin resultados'}</p>
+            <p className="text-xs text-[var(--text-3)]">{suppliers.length === 0 ? 'Sube el Excel de proveedores.' : 'Intenta con otro término.'}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -116,31 +106,33 @@ export default function ProveedoresPage() {
               <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
                 <th className="text-left px-4 py-3 font-medium">#</th>
                 <th className="text-left px-4 py-3 font-medium">Proveedor</th>
-                <th className="text-right px-4 py-3 font-medium">Productos</th>
-                <th className="text-right px-4 py-3 font-medium">Total</th>
-                <th className="text-right px-4 py-3 font-medium">% del gasto</th>
-                <th className="px-4 py-3 font-medium w-40"></th>
+                <th className="text-left px-4 py-3 font-medium">RFC</th>
+                <th className="text-left px-4 py-3 font-medium">Categoría</th>
+                <th className="text-left px-4 py-3 font-medium">Teléfono</th>
+                <th className="text-left px-4 py-3 font-medium">Email</th>
+                <th className="text-right px-4 py-3 font-medium">Crédito</th>
               </tr></thead>
-              <tbody>{suppliers.map((sup, i) => {
-                const pct = totalSpend > 0 ? (sup.total / totalSpend) * 100 : 0
-                return (
-                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
-                    <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{sup.proveedor}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{sup.num_productos}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-1)]">{formatCurrency(sup.total)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{pct.toFixed(1)}%</td>
-                    <td className="px-4 py-3">
-                      <div className="w-full bg-[var(--surface-2)] rounded-full h-2">
-                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(pct, 100)}%` }} />
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}</tbody>
+              <tbody>{filtered.map((sup, i) => (
+                <tr key={sup.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]">
+                  <td className="px-4 py-3 text-[var(--text-3)]">{i + 1}</td>
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">{sup.name}</td>
+                  <td className="px-4 py-3 text-[var(--text-2)] font-mono text-xs">{sup.rfc || '—'}</td>
+                  <td className="px-4 py-3">
+                    {sup.giro ? (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400">{sup.giro}</span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--text-2)]">{sup.phone || '—'}</td>
+                  <td className="px-4 py-3 text-[var(--text-2)] text-xs">{sup.email || '—'}</td>
+                  <td className="px-4 py-3 text-right text-[var(--text-2)]">{sup.payment_terms > 0 ? `${sup.payment_terms}d` : '—'}</td>
+                </tr>
+              ))}</tbody>
             </table>
           </div>
         )}
+        <div className="px-4 py-3 border-t border-[var(--line-soft)] text-xs text-[var(--text-3)]">
+          {filtered.length} de {suppliers.length} proveedores
+        </div>
       </div>
     </>
   )
