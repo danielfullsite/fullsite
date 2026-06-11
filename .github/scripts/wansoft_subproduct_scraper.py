@@ -216,19 +216,51 @@ PRESENTATION_CANDIDATES = [
 ]
 
 
+def dump_js_context(session, js_path, needle):
+    """Imprime el contexto alrededor de un endpoint en el JS para ver sus params."""
+    try:
+        r = session.get(f"{WANSOFT_URL}/{js_path}", timeout=30)
+        idx = r.text.lower().find(needle.lower())
+        if idx >= 0:
+            print(f"[js-context] {js_path} @ {needle}:\n{r.text[max(0, idx-400):idx+600]}")
+    except Exception as e:
+        print(f"[js-context] {js_path}: {e}")
+
+
+def normalize_grid_rows(data):
+    """jqGrid regresa {total, page, records, rows: [{id, cell: [...]}]}."""
+    if isinstance(data, dict) and isinstance(data.get("rows"), list):
+        out = []
+        for row in data["rows"]:
+            if isinstance(row, dict) and isinstance(row.get("cell"), list):
+                out.append({"id": row.get("id"), "cell": row["cell"]})
+            else:
+                out.append(row)
+        return out
+    return unwrap_list(data)
+
+
 def get_presentations(session, discovered):
     candidates = [e for e in discovered if "presentation" in e.lower() and "get" in e.lower()] \
         + PRESENTATION_CANDIDATES
+    jqgrid = {"page": 1, "rows": 2000, "sidx": "", "sord": "asc", "_search": "false",
+              "nd": str(int(time.time() * 1000))}
     seen = set()
     for ep in candidates:
         if ep in seen:
             continue
         seen.add(ep)
-        for payload in ({"subsidiaryId": SUBSIDIARY_ID}, {}):
-            data = unwrap_list(post_json(session, ep, payload))
+        for payload in (
+            {**jqgrid, "subsidiaryId": SUBSIDIARY_ID},
+            jqgrid,
+            {"subsidiaryId": SUBSIDIARY_ID},
+            {},
+        ):
+            data = normalize_grid_rows(post_json(session, ep, payload))
             if data:
                 print(f"[Presentations] via {ep}: {len(data)} items. Sample: {json.dumps(data[0], ensure_ascii=False, default=str)[:250]}")
                 return data, ep
+    dump_js_context(session, "ScriptsViews/Inventory/Presentations.js", "GetPresentationList")
 
     # fallback: tabla en el HTML de la página
     r = session.get(f"{WANSOFT_URL}/Inventory/Presentations", timeout=30)
