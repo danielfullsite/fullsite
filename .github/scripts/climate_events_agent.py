@@ -103,6 +103,27 @@ EXTERNAL_FACTORS = {
     "nortes": {"months": [11, 12, 1, 2], "impact": "Frentes fríos (nortes). Bebidas calientes suben. Tráfico normal si no llueve."},
 }
 
+# ── Mundial 2026 (11 jun – 19 jul) ───────────────────────────────────────
+# Partidos de MÉXICO: el tráfico se muere 2h antes y durante el partido.
+# Ej: 2026-06-11 México vs Sudáfrica 1pm — AMALAY vacío en pleno brunch.
+WORLD_CUP_MEXICO_MATCHES = {
+    "2026-06-11": ("México vs Sudáfrica", "13:00", "Estadio Ciudad de México"),
+    "2026-06-18": ("México vs Corea del Sur", "19:00", "Estadio Guadalajara"),
+    "2026-06-24": ("México vs Chequia", "19:00", "Estadio Ciudad de México"),
+}
+# Partidos en el ESTADIO BBVA (Monterrey): ciudad llena de turistas,
+# congestión vial lado oriente, Fan Fest en Fundidora.
+WORLD_CUP_BBVA_MATCHES = {
+    "2026-06-14": ("Suecia vs Túnez", "20:00"),
+    "2026-06-20": ("Japón vs Túnez", "22:00"),
+    "2026-06-24": ("Sudáfrica vs Corea del Sur", "19:00"),
+    "2026-06-29": ("Dieciseisavos: 1F vs 2C", "19:00"),
+}
+WORLD_CUP_START = "2026-06-11"
+WORLD_CUP_END = "2026-07-19"
+# Si México avanza, juega dieciseisavos ~29-30 jun, octavos ~3-4 jul, etc.
+WORLD_CUP_KNOCKOUT_NOTE = "México puede tener partido de eliminación directa esta semana — confirma fecha/hora y ajusta staff."
+
 # Competition tracking — known nearby restaurants/cafés
 # Add as you learn about them
 COMPETITION_NOTES = {
@@ -278,6 +299,30 @@ def get_events_for_date(fecha_str):
     if fecha_str in SEMANA_SANTA:
         name, impact, tip = SEMANA_SANTA[fecha_str]
         events.append({"type": "semana_santa", "name": name, "impact": impact, "tip": tip})
+
+    # Mundial 2026
+    if fecha_str in WORLD_CUP_MEXICO_MATCHES:
+        name, hora, sede = WORLD_CUP_MEXICO_MATCHES[fecha_str]
+        hora_num = int(hora.split(":")[0])
+        en_brunch = 11 <= hora_num <= 16
+        tip = f"Partido de MÉXICO {hora} ({sede}). El tráfico se muere 2h antes y durante el juego."
+        if en_brunch:
+            tip += " CAE EN HORARIO DE BRUNCH — espera día muy flojo (como el 11 jun). Reduce perecederos y staff, o pon pantalla + promo de partido."
+        else:
+            tip += " Es en la tarde/noche: el brunch puede salvarse, pero la tarde baja."
+        events.append({"type": "mundial", "name": f"⚽ {name} ({hora})", "impact": "muy alto", "tip": tip})
+
+    if fecha_str in WORLD_CUP_BBVA_MATCHES:
+        name, hora = WORLD_CUP_BBVA_MATCHES[fecha_str]
+        events.append({
+            "type": "mundial", "name": f"⚽ Mundial en BBVA: {name} ({hora})", "impact": "alto",
+            "tip": "Partido EN MONTERREY — turistas extranjeros en la ciudad, tráfico pesado al oriente, Fan Fest en Fundidora. Oportunidad: menú en inglés, abrir más temprano.",
+        })
+
+    if WORLD_CUP_START <= fecha_str <= WORLD_CUP_END:
+        # Fase eliminatoria: México podría jugar sin fecha fija conocida aquí
+        if fecha_str >= "2026-06-28" and fecha_str not in WORLD_CUP_MEXICO_MATCHES and dow in (5, 6):
+            events.append({"type": "mundial", "name": "Mundial: fase eliminatoria", "impact": "medio", "tip": WORLD_CUP_KNOCKOUT_NOTE})
 
     # External factors
     for key, info in EXTERNAL_FACTORS.items():
