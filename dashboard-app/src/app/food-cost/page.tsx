@@ -50,19 +50,30 @@ function norm(s: string): string {
     .trim()
 }
 
-/** Simple fuzzy match: check if normalized names are equal or one contains the other */
+/** Strict fuzzy match: exact, or significant word overlap (≥60% of words shared) */
 function fuzzyMatch(a: string, b: string): boolean {
   const na = norm(a)
   const nb = norm(b)
   if (na === nb) return true
-  if (na.includes(nb) || nb.includes(na)) return true
-  // Also try without common suffixes
-  const stripSuffix = (s: string) => s.replace(/\b(servido|chico|grande|regular|medium|small|large)\b/g, '').trim()
-  const sa = stripSuffix(na)
-  const sb = stripSuffix(nb)
+
+  // Strip common modifiers
+  const strip = (s: string) => s.replace(/\b(servido|chico|grande|regular|medium|small|large|ml|gr|kg|pz|lt|500g|240|473|1000|bote|botella|copa|frasco|galon)\b/g, '').replace(/\s+/g, ' ').trim()
+  const sa = strip(na)
+  const sb = strip(nb)
   if (sa === sb && sa.length > 3) return true
-  if (sa.includes(sb) || sb.includes(sa)) return true
-  return false
+
+  // Word-overlap: at least 60% of shorter name's words must appear in longer
+  const stopWords = new Set(['de', 'la', 'el', 'con', 'en', 'y', 'a', 'por', 'del', 'al', 'los', 'las', 'un', 'una'])
+  const wordsA = sa.split(' ').filter(w => w.length > 1 && !stopWords.has(w))
+  const wordsB = sb.split(' ').filter(w => w.length > 1 && !stopWords.has(w))
+  if (wordsA.length === 0 || wordsB.length === 0) return false
+  const [shorter, longer] = wordsA.length <= wordsB.length ? [wordsA, wordsB] : [wordsB, wordsA]
+  const longerStr = longer.join(' ')
+  const matched = shorter.filter(w => longerStr.includes(w)).length
+  const ratio = matched / shorter.length
+  // Need ≥60% word overlap AND at least 2 meaningful matching words (or 1 if short name has only 1 word)
+  const minMatched = shorter.length === 1 ? 1 : 2
+  return ratio >= 0.6 && matched >= minMatched
 }
 
 /* ------------------------------------------------------------------ */
@@ -148,13 +159,16 @@ export default function FoodCostPage() {
             const precio = findPrice(recipe.saucer_name)
             const margen = precio > 0 ? Math.round((1 - costoTotal / precio) * 1000) / 10 : 0
 
+            // Sanity check: if margin < -200%, the match is probably wrong — treat as unmatched
+            const validMatch = precio > 0 && margen > -200
+
             costItems.push({
               platillo: recipe.saucer_name,
               ingredientes: ingredients.length,
               costo: Math.round(costoTotal * 100) / 100,
-              precio,
-              margen_pct: margen,
-              matched: precio > 0,
+              precio: validMatch ? precio : 0,
+              margen_pct: validMatch ? margen : 0,
+              matched: validMatch,
             })
           }
 
