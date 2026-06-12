@@ -521,25 +521,50 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 interface DiscountModalProps {
   subtotal: number
   personas: number
+  items: OrderItem[]
   onApply: (discount: number, reason?: string) => void
   onCancel: () => void
 }
 
 const CORTESIA_POR_PERSONA = 480
 
-function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalProps) {
-  const [mode, setMode] = useState<'percent' | 'fixed' | 'cortesia'>('percent')
+function DiscountModal({ subtotal, personas, items, onApply, onCancel }: DiscountModalProps) {
+  const [mode, setMode] = useState<'percent' | 'fixed' | 'cortesia' | '2x1'>('percent')
   const [value, setValue] = useState('')
   const [cortesiaPersonas, setCortesiaPersonas] = useState(1)
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
   const [reason, setReason] = useState('')
 
+  // ── 2x1 (estilo Wansoft: aplicar sobre partidas seleccionadas) ──
+  const promoItems = items.filter(i => !isTiempoItem(i))
+  const [promoSelected, setPromoSelected] = useState<Set<string>>(new Set())
+  const togglePromoItem = (id: string) => {
+    setPromoSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  // Expandir unidades seleccionadas, ordenar desc, cada 2ª unidad (la más barata del par) gratis
+  const promoUnits: number[] = []
+  for (const it of promoItems) {
+    if (!promoSelected.has(it.id)) continue
+    const unitPrice = it.precio + it.precioExtra
+    for (let u = 0; u < it.cantidad; u++) promoUnits.push(unitPrice)
+  }
+  promoUnits.sort((a, b) => b - a)
+  const promoPairs = Math.floor(promoUnits.length / 2)
+  const promoDiscount = promoUnits.filter((_, idx) => idx % 2 === 1).reduce((s, p) => s + p, 0)
+
   const maxCortesia = CORTESIA_POR_PERSONA * cortesiaPersonas
   const discountAmount = mode === 'percent'
     ? subtotal * (Math.min(100, Math.max(0, Number(value) || 0)) / 100)
     : mode === 'fixed'
     ? Math.min(subtotal, Math.max(0, Number(value) || 0))
+    : mode === '2x1'
+    ? Math.min(subtotal, promoDiscount)
     : Math.min(subtotal, maxCortesia)
 
   return (
@@ -579,9 +604,56 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
           >
             Cortesía
           </button>
+          <button
+            onClick={() => setMode('2x1')}
+            className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors min-h-[48px] ${
+              mode === '2x1' ? 'bg-amber-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
+            }`}
+          >
+            2 x 1
+          </button>
         </div>
 
-        {mode !== 'cortesia' ? (
+        {mode === '2x1' ? (
+          <div className="mb-3">
+            <p className="text-center text-sm text-[var(--text-3)] mb-2">
+              Selecciona los platillos que aplican — el más barato de cada par va gratis
+            </p>
+            <div className="max-h-56 overflow-y-auto space-y-1.5 mb-2">
+              {promoItems.map(it => {
+                const checked = promoSelected.has(it.id)
+                return (
+                  <label
+                    key={it.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
+                      checked ? 'bg-amber-900/40 border border-amber-700/60' : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
+                    }`}
+                  >
+                    <input type="checkbox" checked={checked} onChange={() => togglePromoItem(it.id)} className="sr-only" />
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      checked ? 'bg-amber-500 border-amber-500' : 'border-[var(--line-soft)]0'
+                    }`}>
+                      {checked && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="flex-1 text-sm text-white">{it.cantidad}x {it.nombre}</span>
+                    <span className="text-xs text-[var(--text-3)]">{formatMXN((it.precio + it.precioExtra) * it.cantidad)}</span>
+                  </label>
+                )
+              })}
+            </div>
+            {promoUnits.length > 0 && (
+              <p className="text-center text-sm">
+                <span className="text-[var(--text-3)]">{promoPairs} {promoPairs === 1 ? 'par' : 'pares'}</span>
+                {promoUnits.length % 2 === 1 && <span className="text-amber-400"> · 1 unidad sin par</span>}
+                {promoDiscount > 0 && <span className="text-amber-400 font-semibold"> · Gratis: -{formatMXN(promoDiscount)}</span>}
+              </p>
+            )}
+          </div>
+        ) : mode !== 'cortesia' ? (
           <input
             type="number"
             inputMode="decimal"
@@ -620,7 +692,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
           </div>
         )}
 
-        {discountAmount > 0 && mode !== 'cortesia' && (
+        {discountAmount > 0 && mode !== 'cortesia' && mode !== '2x1' && (
           <p className="text-center text-[var(--text-3)] text-sm mb-3">
             Descuento: <span className="text-red-400 font-semibold">-{formatMXN(discountAmount)}</span>
           </p>
@@ -663,12 +735,16 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
               if (discountAmount <= 0) return
               const manager = await verifyManagerPin(pin)
               if (!manager) { setPinError(true); return }
-              onApply(discountAmount, reason || (mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p` : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`))
+              onApply(discountAmount, reason || (
+                mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p`
+                : mode === '2x1' ? `Promo 2x1 (${promoPairs} ${promoPairs === 1 ? 'par' : 'pares'})`
+                : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`
+              ))
             }}
             disabled={discountAmount <= 0 || pin.length < 4}
-            className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
+            className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : mode === '2x1' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
           >
-            {mode === 'cortesia' ? `Cortesía -${formatMXN(discountAmount)}` : `Aplicar -${formatMXN(discountAmount)}`}
+            {mode === 'cortesia' ? `Cortesía -${formatMXN(discountAmount)}` : mode === '2x1' ? `2x1 -${formatMXN(discountAmount)}` : `Aplicar -${formatMXN(discountAmount)}`}
           </button>
         </div>
       </div>
@@ -2388,6 +2464,7 @@ function POSContent() {
         <DiscountModal
           subtotal={subtotal}
           personas={personas}
+          items={activeItems}
           onApply={handleApplyDiscount}
           onCancel={() => setShowDiscount(false)}
         />
