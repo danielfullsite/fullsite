@@ -14,8 +14,35 @@ function isPublic(pathname: string): boolean {
   )
 }
 
+// Orígenes del POS empaquetado (Capacitor) — necesitan CORS para llamar /api offline-first
+const CAPACITOR_ORIGINS = ['capacitor://localhost', 'ionic://localhost', 'https://localhost', 'http://localhost']
+
+function corsHeaders(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  }
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // CORS para /api desde la app nativa (capacitor://localhost). Same-origin no se afecta.
+  if (pathname.startsWith('/api')) {
+    const origin = req.headers.get('origin') || ''
+    const allowed = CAPACITOR_ORIGINS.includes(origin)
+    if (req.method === 'OPTIONS' && allowed) {
+      return new NextResponse(null, { status: 204, headers: corsHeaders(origin) })
+    }
+    const res = NextResponse.next()
+    if (allowed) for (const [k, v] of Object.entries(corsHeaders(origin))) res.headers.set(k, v)
+    return res
+  }
+
   if (isPublic(pathname)) return NextResponse.next()
 
   const token = req.cookies.get('fs-at')?.value
@@ -55,6 +82,6 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Solo páginas: excluir API, estáticos y archivos con extensión
-  matcher: ['/((?!api|_next|favicon.ico|.*\\..*).*)'],
+  // Páginas + /api (para CORS); excluir estáticos y archivos con extensión
+  matcher: ['/((?!_next|favicon.ico|.*\\..*).*)'],
 }
