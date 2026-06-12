@@ -14,6 +14,7 @@ import {
   saveOrder,
   logAudit,
   deductIngredientsForOrder,
+  deductMarketStockForOrder,
   getRecipes,
   getIngredients,
   getModifiersForCategory,
@@ -1799,6 +1800,23 @@ function POSContent() {
         order_id: payId, action: 'payment_processed', actor: mesero, mesa,
         details: { method: metodoLabel, pagos, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
+      // Market: descuenta stock al COBRAR (retail 1:1, items mkt-*).
+      // Split parejo: todas las cuentas repiten los mismos items → solo cuenta 1 descuenta.
+      // Split por items: cada cuenta descuenta lo suyo (sin dobles).
+      const shouldDeductMarket = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
+      if (shouldDeductMarket) {
+        const mkt = await deductMarketStockForOrder(payingItems, payId, mesero)
+        if (mkt.deductions.length > 0) {
+          logAudit({
+            order_id: payId, action: 'payment_processed', actor: 'Sistema',
+            details: { market_deductions: mkt.deductions, market_alerts: mkt.alerts },
+          })
+        }
+        if (mkt.alerts.length > 0) {
+          showToast(`Stock Market bajo: ${mkt.alerts[0]}${mkt.alerts.length > 1 ? ` (+${mkt.alerts.length - 1})` : ''}`)
+        }
+      }
+
       // Shadow mode (Fullsite OS): pago capturado, fire-and-forget
       publishEvent('payments.payment.captured.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
         ticketId: payId, total: payTotal, subtotal: paySubtotal, iva: payIva,
@@ -2035,6 +2053,7 @@ function POSContent() {
                 { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
                 { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
                 { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
+                { href: '/pos/inventario-market', icon: Package, label: 'Inventario Market', section: 'inventario' },
                 { href: '/pos/auditoría', icon: FileText, label: 'Auditoria', section: 'auditoría' },
                 { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
                 { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },

@@ -1142,6 +1142,7 @@ export type AuditAction =
   | 'payment_processed'
   | 'preticket_printed'
   | 'merma_registered'
+  | 'inventory_adjusted'
   | 'tiempo_fired'
   | 'silla_changed'
   | 'delivery_created'
@@ -1545,6 +1546,226 @@ export async function getInventoryMovements(limit = 50): Promise<InventoryMoveme
   )
   if (!res.ok) return []
   return res.json()
+}
+
+// ─── MARKET INVENTORY (retail 1:1 — categorías mkt-*) ───────────────────────
+// El Market no usa recetas: vender 1 unidad descuenta 1 unidad de stock.
+// Tablas: pos_market_stock (por menu_item_id) + pos_market_movements (audit).
+
+export const MARKET_CATEGORY_PREFIX = 'mkt-'
+
+export interface MarketStockRow {
+  id: number
+  menu_item_id: string
+  stock: number
+  reorder_point: number
+  reorder_quantity: number
+  last_restock: string | null
+  updated_at: string
+  // joined desde pos_menu_items
+  item_name?: string
+  item_price?: number
+  item_barcode?: string
+  category_id?: string
+}
+
+export interface MarketMovement {
+  id: number
+  menu_item_id: string
+  movement_type: string  // 'venta' | 'entrada' | 'merma' | 'ajuste'
+  quantity: number
+  order_id: string | null
+  actor: string | null
+  notes: string | null
+  created_at: string
+  item_name?: string
+}
+
+export interface MarketMenuItemLite {
+  id: string
+  name: string
+  price: number
+  barcode: string | null
+  category_id: string
+}
+
+/** Lógica pura de descuento Market (testeable): agrega cantidades por item,
+ *  floor en 0 (nunca stock negativo), alerta si cae al punto de reorden. */
+export function computeMarketDeductions(
+  items: { menuItemId: string; cantidad: number }[],
+  marketIds: Set<string>,
+  stockMap: Map<string, { stock: number; reorder_point: number }>,
+): { menu_item_id: string; cantidad: number; newStock: number; alert: boolean; faltante: number }[] {
+  const totals = new Map<string, number>()
+  for (const it of items) {
+    if (!marketIds.has(it.menuItemId)) continue
+    totals.set(it.menuItemId, (totals.get(it.menuItemId) ?? 0) + it.cantidad)
+  }
+  const out: { menu_item_id: string; cantidad: number; newStock: number; alert: boolean; faltante: number }[] = []
+  for (const [id, cantidad] of totals) {
+    const row = stockMap.get(id) ?? { stock: 0, reorder_point: 0 }
+    const newStock = Math.max(0, row.stock - cantidad)
+    out.push({
+      menu_item_id: id,
+      cantidad,
+      newStock,
+      alert: newStock <= row.reorder_point,
+      faltante: Math.max(0, cantidad - row.stock),
+    })
+  }
+  return out
+}
+
+export async function getMarketMenuItems(): Promise<MarketMenuItemLite[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&category_id=like.${MARKET_CATEGORY_PREFIX}*&active=eq.true&select=id,name,price,barcode,category_id&order=name.asc&limit=2000`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  const rows = await res.json()
+  return rows.map((r: { id: string; name: string; price: number; barcode: string | null; category_id: string }) => ({
+    ...r, price: Number(r.price),
+  }))
+}
+
+export async function getMarketStock(): Promise<MarketStockRow[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_market_stock?client_id=eq.${_getClientId()}&limit=2000`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+/** Upsert de stock por menu item (crea la fila si no existe). */
+export async function upsertMarketStock(
+  menuItemId: string,
+  fields: { stock?: number; reorder_point?: number; reorder_quantity?: number; last_restock?: string },
+): Promise<boolean> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_market_stock?on_conflict=client_id,menu_item_id`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        client_id: _getClientId(), menu_item_id: menuItemId,
+        ...fields, updated_at: new Date().toISOString(),
+      }),
+    }
+  )
+  return res.ok
+}
+
+export async function logMarketMovement(movement: {
+  menu_item_id: string; movement_type: string; quantity: number;
+  order_id?: string; actor?: string; notes?: string;
+}): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_market_movements`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ client_id: _getClientId(), ...movement }),
+  })
+  return res.ok
+}
+
+export async function getMarketMovements(limit = 50): Promise<MarketMovement[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_market_movements?client_id=eq.${_getClientId()}&order=created_at.desc&limit=${limit}`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+/** Entrada / merma / ajuste manual: actualiza stock y deja audit trail. */
+export async function registerMarketMovement(
+  menuItemId: string,
+  type: 'entrada' | 'merma' | 'ajuste',
+  quantity: number,  // entrada: +n | merma: n (se registra -n) | ajuste: stock final deseado
+  actor: string,
+  notes?: string,
+): Promise<{ ok: boolean; newStock: number }> {
+  const rows = await getMarketStock()
+  const current = rows.find(r => r.menu_item_id === menuItemId)
+  const stock = current?.stock ?? 0
+  let newStock: number
+  let delta: number
+  if (type === 'entrada') { delta = Math.abs(quantity); newStock = stock + delta }
+  else if (type === 'merma') { delta = -Math.abs(quantity); newStock = Math.max(0, stock + delta) }
+  else { newStock = Math.max(0, quantity); delta = newStock - stock }
+
+  const ok = await upsertMarketStock(menuItemId, {
+    stock: newStock,
+    ...(type === 'entrada' ? { last_restock: new Date().toISOString() } : {}),
+  })
+  if (ok) {
+    await logMarketMovement({ menu_item_id: menuItemId, movement_type: type, quantity: delta, actor, notes })
+  }
+  return { ok, newStock }
+}
+
+/** Descuento automático al vender items Market (espejo de deductIngredientsForOrder). */
+export async function deductMarketStockForOrder(
+  items: OrderItem[],
+  orderId: string,
+  actor: string,
+): Promise<{ success: boolean; deductions: { item: string; cantidad: number; newStock: number }[]; alerts: string[] }> {
+  try {
+    const ids = [...new Set(items.map(i => i.menuItemId).filter(Boolean))]
+    if (ids.length === 0) return { success: true, deductions: [], alerts: [] }
+
+    // 1. ¿Cuáles items de la orden son Market?
+    const itemsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&id=in.(${ids.join(',')})&category_id=like.${MARKET_CATEGORY_PREFIX}*&select=id,name`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!itemsRes.ok) return { success: false, deductions: [], alerts: [] }
+    const marketItems: { id: string; name: string }[] = await itemsRes.json()
+    if (marketItems.length === 0) return { success: true, deductions: [], alerts: [] }
+    const nameById = new Map(marketItems.map(m => [m.id, m.name]))
+
+    // 2. Stock actual de esos items
+    const stockRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_market_stock?client_id=eq.${_getClientId()}&menu_item_id=in.(${marketItems.map(m => m.id).join(',')})`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    const stockRows: MarketStockRow[] = stockRes.ok ? await stockRes.json() : []
+    const stockMap = new Map(stockRows.map(r => [r.menu_item_id, { stock: r.stock, reorder_point: r.reorder_point }]))
+
+    // 3. Descontar + audit
+    const computed = computeMarketDeductions(
+      items.map(i => ({ menuItemId: i.menuItemId, cantidad: i.cantidad })),
+      new Set(marketItems.map(m => m.id)),
+      stockMap,
+    )
+    const deductions: { item: string; cantidad: number; newStock: number }[] = []
+    const alerts: string[] = []
+    for (const d of computed) {
+      const name = nameById.get(d.menu_item_id) ?? d.menu_item_id
+      await upsertMarketStock(d.menu_item_id, { stock: d.newStock })
+      await logMarketMovement({
+        menu_item_id: d.menu_item_id,
+        movement_type: 'venta',
+        quantity: -d.cantidad,
+        order_id: orderId,
+        actor,
+        notes: d.faltante > 0 ? `stock insuficiente (faltaban ${d.faltante})` : undefined,
+      })
+      deductions.push({ item: name, cantidad: d.cantidad, newStock: d.newStock })
+      if (d.alert) alerts.push(`${name}: ${d.newStock} pzas (punto de reorden)`)
+    }
+    return { success: true, deductions, alerts }
+  } catch (err) {
+    console.warn('[deductMarketStockForOrder] Failed:', err)
+    return { success: false, deductions: [], alerts: [] }
+  }
 }
 
 // ─── PURCHASE ORDERS & FACTURAS ─────────────────────────────────────────────
