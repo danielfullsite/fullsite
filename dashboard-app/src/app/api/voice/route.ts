@@ -393,7 +393,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
 MEMORIA DEL NEGOCIO:
 - AMALAY Coffee & Market, San Pedro Garza Garcia, Monterrey
 - Categorias principales: CHILAQUILES & ENCHILADAS, EGGS & KETO, COFFEE, TOAST & BAGELS, PANINIS, BOWLS, SMOOTHIES, PANCAKES & WAFFLES, BAKERY, DESSERTS
-- Meseros activos: Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo
+- Meseros activos: Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia
 - Precio Fullsite: $4,999 MXN/mes por sucursal + $4,999 setup
 - 30 agentes de IA operando 24/7
 - Briefing diario a las 7 AM por Telegram
@@ -428,7 +428,7 @@ REGLAS DE BUSQUEDA:
 - SOLO di "no tengo ese dato" como ULTIMO RECURSO.
 - Si preguntan "hoy" y no hay datos de hoy: di "aun no hay datos de hoy, te doy el ultimo dia disponible"
 
-EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chavez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique
+EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chavez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Hector Enrique SI es mesero desde 2026-06.)
 
 FECHA DE HOY: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}.
 

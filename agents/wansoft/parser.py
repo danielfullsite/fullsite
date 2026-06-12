@@ -13,9 +13,14 @@ EXCLUDE_MESEROS = {
     "APLICACIONES",
     "MESERO EVENTO",
     "Oscar Ricardo",   # Supervisor caja Take Away (no atiende mesa)
-    "Hector Enrique",  # Cajero, confirmado por Mónica 2026-05-10
+    # "Hector Enrique" REMOVIDO 2026-06-12: ya es mesero (reporte Wansoft lo
+    # confirma con 22 personas / $8,971 ese día; validado con Daniel).
     "Rodrigo Chávez",   # Cajero, confirmado por Mónica 2026-05-11
-    "Fany Elizabeth",   # Cajera, confirmada por Mónica 2026-05-11
+    "Fany Elizabeth",   # Cajera/Market, confirmada por Mónica 2026-05-11
+    # Staff del Market (no son meseros — distorsionan el ranking del restaurante):
+    "Ericka Tamara",
+    "Frida Vianney",
+    "Jorge Antonio",
 }
 
 

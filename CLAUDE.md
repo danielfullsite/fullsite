@@ -100,7 +100,7 @@ Tarjeta de crédito, Tarjeta de débito, Efectivo, Transferencia electrónica, U
 
 ### Meseros activos
 
-Omar Aguilera, Hector Enrique Rodriguez Lopez, Brayan Berlanga Solis, Daniela Edith Rico Segura, Julio Cesar Hernández Hernández, Mauricio Rodriguez Rodriguez, Oscar Rios Alvarado, Alexis Alejandro Ocampo Vera, MESERO EVENTO
+Omar Aguilera, Hector Enrique Rodriguez Lopez, Brayan Berlanga Solis, Daniela Edith Rico Segura, Julio Cesar Hernández Hernández, Mauricio Rodriguez Rodriguez, Oscar Rios Alvarado, Alexis Alejandro Ocampo Vera, Aldo Ruiz Ramirez, Mariana Carolina Salas Alva, Mario García Ramírez, MESERO EVENTO
 
 ### Otras tablas
 

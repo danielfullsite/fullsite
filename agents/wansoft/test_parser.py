@@ -111,7 +111,9 @@ def test_format_message():
     sys.path.insert(0, str(Path(__file__).parent))
     from parser import format_message
 
-    msg = format_message(str(xlsx))
+    result = format_message(str(xlsx))
+    # format_message returns (msg, parsed_data) since Supabase persistence
+    msg = result[0] if isinstance(result, tuple) else result
     print("=== MESERO OUTPUT ===")
     print(msg)
     print("=== END ===\n")
@@ -127,8 +129,8 @@ def test_format_message():
     if "MESERO EVENTO" in msg:
         errors.append("MESERO EVENTO should be filtered out")
 
-    if "Hector Enrique" in msg:
-        errors.append("Hector Enrique should be filtered out (cajero)")
+    if "Hector Enrique" not in msg:
+        errors.append("Hector Enrique should be INCLUDED (es mesero desde 2026-06)")
 
     lines = msg.splitlines()
     medal_lines = [l for l in lines if l.startswith(("🥇", "🥈", "🥉"))]
@@ -146,12 +148,12 @@ def test_format_message():
 
     if "Total día:" not in msg:
         errors.append("Missing 'Total día:' line")
-    # Filtered: 207 - 28 (Hector Enrique) = 179 personas
-    if "179 personas" not in msg:
-        errors.append("Expected 179 personas in total line")
-    # General avg: $84,564 / 179 = ~$472
-    if "$472" not in msg:
-        errors.append("Expected general avg ~$472")
+    # Filtered: only APLICACIONES (0p) + MESERO EVENTO (12p) out → 207 personas
+    if "207 personas" not in msg:
+        errors.append("Expected 207 personas in total line")
+    # General avg: $96,396 / 207 = ~$466
+    if "$466" not in msg:
+        errors.append("Expected general avg ~$466")
 
     return errors
 
@@ -162,7 +164,8 @@ def test_format_platillos():
     sys.path.insert(0, str(Path(__file__).parent))
     from parser import format_platillos_message
 
-    msg = format_platillos_message(xlsx_path)
+    result = format_platillos_message(xlsx_path)
+    msg = result[0] if isinstance(result, tuple) else result
     print("=== PLATILLOS OUTPUT ===")
     print(msg)
     print("=== END ===\n")
@@ -203,18 +206,19 @@ def test_format_platillos():
         errors.append("APLICACIONES should be excluded from per-mesero bakery")
 
     bakery_total_line = [l for l in msg.splitlines() if "piezas" in l]
-    # Bakery: Omar 5, Brayan 4, Oscar 2 = 11 (Hector excluded)
+    # Bakery: Omar 5, Brayan 4, Oscar 2, Hector 2 = 13 (Hector ya es mesero)
     if bakery_total_line:
-        if "11 piezas" not in bakery_total_line[0]:
-            errors.append(f"Bakery total expected 11, got: {bakery_total_line[0]}")
+        if "13 piezas" not in bakery_total_line[0]:
+            errors.append(f"Bakery total expected 13, got: {bakery_total_line[0]}")
 
-    # Postres: Brayan 2, Oscar 1 = 3 (Hector excluded)
+    # Postres: Brayan 2, Oscar 1, Hector 3 = 6 (Hector ya es mesero)
     if len(bakery_total_line) >= 2:
-        if "3 piezas" not in bakery_total_line[1]:
-            errors.append(f"Postres total expected 3, got: {bakery_total_line[1]}")
+        if "6 piezas" not in bakery_total_line[1]:
+            errors.append(f"Postres total expected 6, got: {bakery_total_line[1]}")
 
     # Avance mode
-    avance_msg = format_platillos_message(xlsx_path, report_type="avance")
+    avance_result = format_platillos_message(xlsx_path, report_type="avance")
+    avance_msg = avance_result[0] if isinstance(avance_result, tuple) else avance_result
     if "(3pm)" not in avance_msg:
         errors.append("Avance header should contain '(3pm)'")
 

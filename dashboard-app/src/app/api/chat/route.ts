@@ -778,7 +778,7 @@ FORMATO DE DATOS (lee esto para saber dónde buscar):
 6. DESGLOSE POR DÍA = solo H&H/Pan/Postres/2da Bebida (upselling).
 7. VENTAS POR HORA: si preguntan "hora pico" o "a qué hora vendemos más", busca en VENTAS POR HORA.
 
-EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique
+EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Héctor Enrique SÍ es mesero desde 2026-06.)
 
 FORMATO: $ sin decimales. Respuestas cortas y claras. Sin markdown pesado.
 

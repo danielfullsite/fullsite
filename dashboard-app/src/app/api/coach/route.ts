@@ -159,7 +159,7 @@ DATOS DIARIOS (30 días):
 ${dailySummary}
 
 REGLAS:
-- EXCLUYE de rankings: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio, Hector Enrique
+- EXCLUYE de rankings: Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Héctor Enrique SÍ es mesero desde 2026-06.)
 - Montos en MXN con $ sin decimales
 - No inventes datos. Si no hay suficiente data para un insight, usa lo que tengas.
 - El insight "daily" debe ser algo que el dueño pueda actuar HOY.

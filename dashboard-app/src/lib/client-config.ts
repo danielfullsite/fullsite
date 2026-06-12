@@ -121,7 +121,7 @@ function getClientConfigFallback(clientId: string): ClientConfig {
       city: 'Monterrey, NL',
       type: 'Brunch & Café',
       mesas: 16,
-      meseros: ['Omar Aguilera', 'Hector Enrique Rodriguez Lopez', 'Brayan Berlanga Solis', 'Daniela Edith Rico Segura', 'Julio Cesar Hernández Hernández', 'Mauricio Rodriguez Rodriguez', 'Oscar Rios Alvarado', 'Alexis Alejandro Ocampo Vera'],
+      meseros: ['Omar Aguilera', 'Hector Enrique Rodriguez Lopez', 'Brayan Berlanga Solis', 'Daniela Edith Rico Segura', 'Julio Cesar Hernández Hernández', 'Mauricio Rodriguez Rodriguez', 'Oscar Rios Alvarado', 'Alexis Alejandro Ocampo Vera', 'Aldo Ruiz Ramirez', 'Mariana Carolina Salas Alva', 'Mario García Ramírez'],
     },
     demo: {
       display_name: 'Casa Montaña',
