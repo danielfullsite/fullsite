@@ -1,7 +1,19 @@
 import type { WansoftDaily } from './types'
+import { supabase } from './supabase'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+/** RLS: wansoft_daily/agent_runs are authenticated-only since rls_tighten_policies.sql.
+ *  Use the logged-in session token as Bearer (anon key alone sees 0 rows). */
+async function getAuthToken(): Promise<string> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || SUPABASE_KEY
+  } catch {
+    return SUPABASE_KEY
+  }
+}
 
 /** Get the current client slug from AuthContext (stored in localStorage after login). Falls back to 'amalay' for backward compat. */
 export function getActiveClientSlug(): string {
@@ -43,10 +55,11 @@ export function isFullsitePOS(): boolean {
 async function sbFetch(table: string, params: string = ''): Promise<unknown[]> {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`
   try {
+    const token = await getAuthToken()
     const res = await fetch(url, {
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Authorization': `Bearer ${token}`,
       },
     })
     if (!res.ok) {
@@ -101,6 +114,7 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
     pago_métodos: parseJsonbField(row.pago_metodos ?? row.pago_métodos),
+    updated_at: (row.updated_at as string) || undefined,
   }
 }
 

@@ -178,6 +178,15 @@ export default function DashboardPage() {
       }
     }
     load()
+    // Auto-refresh: every 5 min + when the tab regains focus, so the
+    // dashboard never shows stale data without the user knowing.
+    const interval = setInterval(load, 5 * 60 * 1000)
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [])
 
   if (loading) {
@@ -491,6 +500,31 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Data freshness: warn when showing a past day as the default view, show sync time for today */}
+      {period === 'dia' && viewDay && (() => {
+        const mxToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+        const fecha = String(viewDay.fecha).slice(0, 10)
+        const syncTime = viewDay.updated_at
+          ? new Date(viewDay.updated_at).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit' })
+          : null
+        if (fecha !== mxToday && selectedDayIdx === 0) {
+          return (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
+              <span className="font-bold">⚠ Sin sincronización de hoy todavía.</span>
+              <span>Mostrando el último día con datos: {formatDate(fecha)}{syncTime ? ` (actualizado ${syncTime})` : ''}.</span>
+            </div>
+          )
+        }
+        if (fecha === mxToday && syncTime) {
+          return (
+            <div className="mb-4 text-xs text-[var(--text-3)] font-medium">
+              Datos de Wansoft actualizados a las {syncTime} — se sincronizan cada 30 min, pueden diferir de la app de Wansoft en tiempo real.
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* Settings panel — toggle widgets */}
       {showSettings && (

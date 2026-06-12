@@ -173,6 +173,27 @@ def get_sales_by_order_type(session, start, end):
     }
 
 
+def get_monitoring_info(session):
+    """Get OPEN (pending) orders from the Wansoft dashboard monitor.
+    The Wansoft app's '# Órdenes' = closed orders (SalesByTypeOfOrder) + OPEN orders.
+    Without this, our counts undercount vs the app (verified 2026-06-12:
+    app showed 80 órdenes / 125 personas while closed-only was 57/113)."""
+    try:
+        r = session.post(f"{WANSOFT_URL}/Reports/GetMonitoringInfo",
+                         params={"subsidiaryId": SUBSIDIARY_ID}, timeout=15)
+        result = (r.json() or {}).get("Result") or {}
+        abiertas = int(result.get("PendingOrdersCounter") or 0)
+        monto = float(result.get("PendingOrdersAmount") or 0)
+        # PendingOrders is an XML string: <Orden ... personas="2" ... />
+        import re as _re
+        personas = sum(int(p) for p in _re.findall(r'personas="(\d+)"', result.get("PendingOrders") or ""))
+        print(f"[intraday] Open orders: {abiertas} ordenes, {personas} personas, ${monto:,.2f}")
+        return {"abiertas": abiertas, "personas_abiertas": personas, "monto_abierto": monto}
+    except Exception as e:
+        print(f"[intraday] GetMonitoringInfo failed (non-blocking): {e}")
+        return {"abiertas": 0, "personas_abiertas": 0, "monto_abierto": 0}
+
+
 # ── Category helpers ────────────────────────────────────────────────────────
 def filter_category(saucers, keywords):
     """Filter saucers by keyword match."""
@@ -440,6 +461,12 @@ def main():
         groups = get_sales_by_group(session, today_str, today_str)
         saucers = get_sales_by_saucer(session, today_str, today_str)
         order_types = get_sales_by_order_type(session, today_str, today_str)
+        monitoring = get_monitoring_info(session)
+        # Match the Wansoft app's counting: closed orders + OPEN orders.
+        # At cierre (10pm+) open ≈ 0, so daily history stays consistent.
+        order_types["total_ordenes"] += monitoring["abiertas"]
+        order_types["total_personas"] += monitoring["personas_abiertas"]
+        print(f"[intraday] Totals incl. open: {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
         monthly_avg = get_monthly_ticket_avg()
 
         # Log ALL consolidated keys for debugging data accuracy
@@ -500,7 +527,7 @@ def main():
                 update_data["descuentos"] = consolidated.get("TotalDiscount", 0) or consolidated.get("TotalDiscounts", 0)
                 update_data["ventas_dia"] = consolidated.get("TotalSales", 0)
 
-            # Tickets y personas — use RESTAURANT-ONLY counts (matches Wansoft app)
+            # Tickets y personas — closed + open orders (matches Wansoft app's "# Órdenes")
             if order_types:
                 update_data["tickets_count"] = order_types.get("total_ordenes", 0)
                 update_data["personas_restaurant"] = order_types.get("total_personas", 0)
@@ -595,8 +622,10 @@ def main():
             pr = requests.patch(
                 f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&client_slug=eq.{CLIENT['id']}",
                 headers=sb_h, json=update_data, timeout=10)
+            # PostgREST returns 204 (No Content) on successful PATCH with
+            # return=minimal — 204 is SUCCESS, not failure.
             # Check if PATCH found a row — if not, INSERT
-            if pr.status_code == 200:
+            if pr.status_code in (200, 204):
                 # Verify row exists
                 cr = requests.get(
                     f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_daily?fecha=eq.{today_str}&client_slug=eq.{CLIENT['id']}&select=fecha",

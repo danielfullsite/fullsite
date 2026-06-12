@@ -86,8 +86,9 @@ def scrape_day(session, date_str):
                     pass
         row["tickets_count"] = total_ordenes
         row["personas_restaurant"] = total_personas
-        if total_personas > 0 and row.get("ventas_dia"):
-            row["ticket_promedio_restaurant"] = round(row["ventas_dia"] / total_personas, 2)
+        # ventas / órdenes — same formula as intraday_sales.py and the Wansoft app
+        if total_ordenes > 0 and row.get("ventas_dia"):
+            row["ticket_promedio_restaurant"] = round(row["ventas_dia"] / total_ordenes, 2)
     except Exception as e:
         print(f"  [!] OrderTypes failed: {e}")
 
