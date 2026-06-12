@@ -1,10 +1,155 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Upload, FileText, CheckCircle, AlertTriangle, DollarSign } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Upload, FileText, CheckCircle, AlertTriangle, DollarSign, Inbox, Loader2, Mail, Check, RotateCcw } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
 import EmptyState from '@/components/EmptyState'
 import { formatCurrency } from '@/lib/format'
+
+interface CfdiRequest {
+  id: string
+  order_id: string | null
+  total: number | null
+  rfc: string
+  razon_social: string
+  regimen_fiscal: string
+  uso_cfdi: string
+  codigo_postal: string
+  email: string
+  status: string
+  folio_fiscal: string | null
+  requested_by: string | null
+  created_at: string
+}
+
+function CfdiRequestsSection() {
+  const [requests, setRequests] = useState<CfdiRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState('')
+  const [folioDraft, setFolioDraft] = useState<Record<string, string>>({})
+  const [showAll, setShowAll] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/factura')
+      const data = await res.json()
+      if (data.ok) setRequests(data.requests)
+    } catch { /* noop */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const updateStatus = async (id: string, status: string, folio?: string) => {
+    setSavingId(id)
+    try {
+      const res = await fetch('/api/factura', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status, ...(folio !== undefined ? { folio_fiscal: folio } : {}) }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status, folio_fiscal: folio !== undefined ? folio : r.folio_fiscal } : r))
+      }
+    } catch { /* noop */ }
+    setSavingId('')
+  }
+
+  const pendientes = requests.filter(r => r.status === 'pendiente')
+  const visible = showAll ? requests : pendientes
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Inbox size={16} className="text-amber-500" />
+          <h2 className="text-sm font-bold text-[var(--text-1)]">Solicitudes de clientes (QR del ticket)</h2>
+          {pendientes.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[11px] font-bold">{pendientes.length} pendiente{pendientes.length === 1 ? '' : 's'}</span>
+          )}
+        </div>
+        {requests.length > pendientes.length && (
+          <button onClick={() => setShowAll(s => !s)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors">
+            {showAll ? 'Solo pendientes' : `Ver todas (${requests.length})`}
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-[var(--text-3)] px-1 py-4">
+          <Loader2 size={14} className="animate-spin" /> Cargando solicitudes...
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] px-4 py-4 text-sm text-[var(--text-3)]">
+          {requests.length === 0 ? 'Sin solicitudes de factura todavía. Llegan cuando un cliente escanea el QR de su ticket.' : 'Sin solicitudes pendientes.'}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map(r => (
+            <div key={r.id} className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-[var(--text-1)] truncate">{r.razon_social}</p>
+                    {r.status === 'facturada' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-[10px] font-bold uppercase">Facturada</span>
+                    ) : r.status === 'error' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 text-[10px] font-bold uppercase">Error</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-bold uppercase">Pendiente</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--text-3)] mt-0.5">
+                    RFC: <span className="font-medium text-[var(--text-2)]">{r.rfc}</span> · Régimen {r.regimen_fiscal} · Uso {r.uso_cfdi} · CP {r.codigo_postal}
+                  </p>
+                  <p className="text-xs text-[var(--text-3)] mt-0.5 flex items-center gap-1">
+                    <Mail size={11} /> {r.email}
+                    {r.order_id && <span> · Orden {r.order_id}</span>}
+                    <span> · {new Date(r.created_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  </p>
+                  {r.folio_fiscal && <p className="text-[10px] text-[var(--text-3)] mt-0.5">Folio fiscal: {r.folio_fiscal}</p>}
+                </div>
+                <div className="flex items-center gap-3">
+                  {r.total != null && <p className="text-lg font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(r.total)}</p>}
+                  {r.status === 'pendiente' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={folioDraft[r.id] || ''}
+                        onChange={e => setFolioDraft(prev => ({ ...prev, [r.id]: e.target.value }))}
+                        placeholder="Folio fiscal (opcional)"
+                        className="w-44 bg-[var(--bg)] border border-[var(--line)] rounded-lg px-3 py-2 text-xs text-[var(--text-1)] placeholder-[var(--text-3)] focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        onClick={() => updateStatus(r.id, 'facturada', folioDraft[r.id]?.trim() || '')}
+                        disabled={savingId === r.id}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                      >
+                        {savingId === r.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        Facturada
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => updateStatus(r.id, 'pendiente')}
+                      disabled={savingId === r.id}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg)] border border-[var(--line)] hover:border-[var(--text-3)] text-[var(--text-2)] rounded-lg text-xs font-medium transition-colors"
+                      title="Regresar a pendiente"
+                    >
+                      {savingId === r.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                      Reabrir
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface CFDIData {
   uuid: string
@@ -104,7 +249,12 @@ export default function FacturasPage() {
 
   return (
     <>
-      <PageHeader title="Facturas de Proveedores" subtitle="Sube XMLs de CFDI para registrar compras y actualizar costos" />
+      <PageHeader title="Facturas" subtitle="Solicitudes de clientes y XMLs de CFDI de proveedores" />
+
+      {/* Solicitudes de factura de clientes (pos_cfdi_requests) */}
+      <CfdiRequestsSection />
+
+      <h2 className="text-sm font-bold text-[var(--text-1)] mb-3">Facturas de proveedores</h2>
 
       {/* Drop zone */}
       <div

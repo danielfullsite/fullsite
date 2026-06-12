@@ -4,6 +4,63 @@
 
 const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/
 
+function sbHeaders() {
+  const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  return {
+    apikey: sbKey,
+    Authorization: `Bearer ${sbKey}`,
+    'Content-Type': 'application/json',
+  }
+}
+
+// Lista de solicitudes para el admin (/facturas). La página está detrás de auth.
+export async function GET() {
+  try {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const res = await fetch(
+      `${sbUrl}/rest/v1/pos_cfdi_requests?client_id=eq.amalay&order=created_at.desc&limit=200`,
+      { headers: sbHeaders(), cache: 'no-store' }
+    )
+    if (!res.ok) {
+      console.error('[factura] list failed:', res.status, (await res.text()).slice(0, 300))
+      return Response.json({ ok: false, error: 'No se pudieron cargar las solicitudes' }, { status: 500 })
+    }
+    return Response.json({ ok: true, requests: await res.json() })
+  } catch {
+    return Response.json({ ok: false, error: 'Error inesperado' }, { status: 500 })
+  }
+}
+
+// Actualiza status de una solicitud (pendiente → facturada / error).
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json()
+    const id = String(body.id || '')
+    const status = String(body.status || '')
+    if (!id) return Response.json({ ok: false, error: 'Falta id' }, { status: 400 })
+    if (!['pendiente', 'facturada', 'error'].includes(status)) {
+      return Response.json({ ok: false, error: 'Status inválido' }, { status: 400 })
+    }
+
+    const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+    if (body.folio_fiscal !== undefined) patch.folio_fiscal = String(body.folio_fiscal).trim().slice(0, 64) || null
+    if (body.error_msg !== undefined) patch.error_msg = String(body.error_msg).trim().slice(0, 300) || null
+
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const res = await fetch(
+      `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&client_id=eq.amalay`,
+      { method: 'PATCH', headers: { ...sbHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify(patch) }
+    )
+    if (!res.ok) {
+      console.error('[factura] patch failed:', res.status, (await res.text()).slice(0, 300))
+      return Response.json({ ok: false, error: 'No se pudo actualizar' }, { status: 500 })
+    }
+    return Response.json({ ok: true })
+  } catch {
+    return Response.json({ ok: false, error: 'Error inesperado' }, { status: 500 })
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
