@@ -24,6 +24,23 @@ html.capacitor input, html.capacitor select, html.capacitor textarea { font-size
 /* POS: el header pegado al top necesita su propio safe-area (no usa AppShell) */
 html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
 
+/* ============ POS modo kiosko (tablet) ============
+ * Sin bounce/pull-to-refresh, sin double-tap zoom, sin long-press callout.
+ * Inputs siguen permitiendo selección de texto. */
+.pos-kiosk {
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.pos-kiosk input, .pos-kiosk textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Sin overflow:hidden — subpáginas /pos/* (turno, ordenes) sí scrollean */
+body:has(.pos-kiosk) {
+  overscroll-behavior: none;
+}
+
 /* ============ Fullsite Design Tokens ============
  * DARK by default. Accent emerald #10b981.
  * Light mode with [data-theme="light"] on <html>.

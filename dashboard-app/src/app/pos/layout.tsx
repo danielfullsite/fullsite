@@ -153,8 +153,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <div style={{
-      background:'#0a0a0f', color:'#fff', minHeight:'100vh',
+    <div className="pos-kiosk" style={{
+      background:'#0a0a0f', color:'#fff', minHeight:'100dvh',
       colorScheme:'dark',
       // Force all CSS variables to dark values for POS
       // @ts-expect-error CSS custom properties
@@ -168,7 +168,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="h-screen flex items-center justify-center bg-slate-900 text-white" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
+    <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-8">
           {/* Restaurant logo — /logos/{clientId}.png per client */}
