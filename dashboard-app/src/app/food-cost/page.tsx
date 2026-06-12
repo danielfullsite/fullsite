@@ -30,15 +30,6 @@ type SortKey = 'platillo' | 'margen_pct' | 'precio' | 'costo' | 'ingredientes'
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-const headers = {
-  apikey: SB_KEY,
-  Authorization: `Bearer ${SB_KEY}`,
-  'Content-Type': 'application/json',
-}
-
 /** Deep-parse double-escaped JSON strings */
 function deepParse(val: unknown): unknown {
   if (typeof val === 'string') {
@@ -133,40 +124,22 @@ export default function FoodCostPage() {
     async function load() {
       try {
         // -------------------------------------------------------
-        // SOURCE 1 (primary): wansoft_recipes — 574 real recipes
+        // SOURCE 1 (primary): /api/food-cost — server-side con service key
+        // (wansoft_recipes/menu_config/data no tienen anon SELECT: costos sensibles)
         // -------------------------------------------------------
-        const [recipesRes, menuRes, posRecipesRes, menuConfigRes] = await Promise.all([
-          fetch(
-            `${SB_URL}/rest/v1/wansoft_recipes?client_id=eq.amalay&select=saucer_id,saucer_name,budget_cost,ingredients`,
-            { headers }
-          ),
-          fetch(
-            `${SB_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price,category_id`,
-            { headers }
-          ),
-          // Excel de costeo real (fuente de verdad de precios de venta)
-          fetch(
-            `${SB_URL}/rest/v1/pos_recipes?select=nombre,precio_venta&precio_venta=gt.0`,
-            { headers }
-          ),
-          // Ventas reales por platillo Wansoft — precio promedio cobrado (total/qty).
-          // El scrape no siempre trae saucers, por eso pedimos varios snapshots.
-          fetch(
-            `${SB_URL}/rest/v1/wansoft_menu_config?client_id=eq.amalay&select=fecha,saucers&order=fecha.desc&limit=10`,
-            { headers }
-          ),
-        ])
+        const apiRes = await fetch('/api/food-cost', { cache: 'no-store' })
+        const api = apiRes.ok ? await apiRes.json() : null
 
-        if (recipesRes.ok) {
+        if (api && Array.isArray(api.recipes) && api.recipes.length > 0) {
           const recipes: Array<{
             saucer_id: string
             saucer_name: string
             budget_cost: number | null
             ingredients: unknown
-          }> = await recipesRes.json()
+          }> = api.recipes
 
           // Build menu price lookup — items mkt-* son Market, NO entran al lookup de cocina
-          const menuItems: Array<{ name: string; price: number; category_id: string | null }> = menuRes.ok ? await menuRes.json() : []
+          const menuItems: Array<{ name: string; price: number; category_id: string | null }> = api.menuItems || []
           const menuMap = new Map<string, number>()
           const mktNames = new Set<string>()
           for (const m of menuItems) {
@@ -178,7 +151,7 @@ export default function FoodCostPage() {
           }
 
           // Excel de costeo (pos_recipes) — precios reales de venta
-          const posRecipes: Array<{ nombre: string; precio_venta: number }> = posRecipesRes.ok ? await posRecipesRes.json() : []
+          const posRecipes: Array<{ nombre: string; precio_venta: number }> = api.posRecipes || []
           const excelMap = new Map<string, number>()
           for (const r of posRecipes) {
             if (Number(r.precio_venta) > 0) excelMap.set(norm(r.nombre), Number(r.precio_venta))
@@ -186,18 +159,16 @@ export default function FoodCostPage() {
 
           // Precio promedio real cobrado por platillo (wansoft_menu_config.saucers)
           const saucerMap = new Map<string, number>()
-          if (menuConfigRes.ok) {
-            const snapshots: Array<{ fecha: string; saucers: unknown }> = await menuConfigRes.json()
-            for (const snap of snapshots) {
-              const saucers = deepParse(snap.saucers)
-              if (Array.isArray(saucers) && saucers.length > 0) {
-                for (const s of saucers) {
-                  const qty = Number(s?.qty) || 0
-                  const total = Number(s?.total) || 0
-                  if (qty > 0 && total > 0) saucerMap.set(norm(String(s.name || '')), total / qty)
-                }
-                break // primer snapshot con datos
+          const snapshots: Array<{ fecha: string; saucers: unknown }> = api.menuConfig || []
+          for (const snap of snapshots) {
+            const saucers = deepParse(snap.saucers)
+            if (Array.isArray(saucers) && saucers.length > 0) {
+              for (const s of saucers) {
+                const qty = Number(s?.qty) || 0
+                const total = Number(s?.total) || 0
+                if (qty > 0 && total > 0) saucerMap.set(norm(String(s.name || '')), total / qty)
               }
+              break // primer snapshot con datos
             }
           }
 
@@ -306,12 +277,8 @@ export default function FoodCostPage() {
         // -------------------------------------------------------
         // SOURCE 2 (fallback): costeo_por_platillo (Eduardo Excel)
         // -------------------------------------------------------
-        const fallbackRes = await fetch(
-          `${SB_URL}/rest/v1/wansoft_data?tipo=eq.costeo_por_platillo&order=fecha.desc&limit=1&select=data,fecha`,
-          { headers }
-        )
-        if (fallbackRes.ok) {
-          const rows = await fallbackRes.json()
+        {
+          const rows = api?.costeo || []
           if (rows?.[0]?.data) {
             const rawData = deepParse(rows[0].data)
             const data = Array.isArray(rawData) ? rawData : []
