@@ -2740,16 +2740,30 @@ function POSAlerts({ role }: { role: string }) {
         if (role === 'admin' || role === 'gerente') {
           try {
             const invRes = await fetch(
-              `${sbUrl}/rest/v1/pos_inventory?stock=lt.5&stock=gt.0&client_id=eq.${_cid()}&limit=5`,
+              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock&stock=lt.5&stock=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=5`,
               { headers }
             )
             if (invRes.ok) {
-              const lowStock = await invRes.json()
-              for (const item of lowStock) {
+              const lowStock: { ingredient_id: string; stock: number }[] = await invRes.json()
+              if (lowStock.length > 0) {
+                // Resolver nombres de insumos (pos_inventory solo guarda el ID)
+                const names: Record<string, string> = {}
+                try {
+                  const ids = lowStock.map(i => i.ingredient_id).join(',')
+                  const nRes = await fetch(
+                    `${sbUrl}/rest/v1/pos_ingredients?select=id,name&id=in.(${ids})&client_id=eq.${_cid()}`,
+                    { headers }
+                  )
+                  if (nRes.ok) for (const n of await nRes.json()) names[String(n.id)] = n.name
+                } catch { /* ignore */ }
+                const label = (i: { ingredient_id: string; stock: number }) =>
+                  `${names[String(i.ingredient_id)] || `#${i.ingredient_id}`} (${(Math.round(i.stock * 100) / 100).toLocaleString('es-MX')})`
+                const shown = lowStock.slice(0, 2).map(label).join(', ')
+                const extra = lowStock.length > 2 ? ` y ${lowStock.length - 2} más` : ''
                 newAlerts.push({
-                  id: `inv-${item.ingredient_id}`,
+                  id: 'inv-low',
                   type: 'warning',
-                  message: `⚠️ ${item.ingredient_id} — quedan ${item.stock} unidades`,
+                  message: `⚠️ Stock bajo: ${shown}${extra}`,
                   dismissible: true,
                 })
               }
