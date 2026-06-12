@@ -26,14 +26,19 @@
 - [ ] Verifica que las 5 estén en la misma red que la terminal (ping desde la terminal).
 - [ ] Mándame las IPs → yo lleno `printers.json` y compilo el bridge `.exe`.
 
-**Mapeo final** (ya soportado por el código, no requiere cambios):
+**Mapeo final** (ya soportado por el código, no requiere cambios — solo `printers.json`):
 
-| Impresora | Estación | Imprime |
+| Impresora física | Estación en `printers.json` | Imprime |
 |---|---|---|
-| Cocina 1 + 2 | `cocina` | Comandas comida (fan-out a ambas) |
+| Cocina 1 + 2 | `cocina` (fan-out a ambas) | Comandas comida |
 | Barra | `barra` | Comandas bebidas |
-| Caja | tickets | Tickets de cobro, pre-cuentas, QR factura + **cajón RJ11** |
-| Entrada | `caja`/MARKET | Comandas Market (toast, bakery, mkt-*) |
+| Caja | `tickets` (**default**) | Tickets de cobro, pre-cuentas, QR factura + **cajón RJ11** |
+| Entrada | `caja` | Comandas Market (toast, bakery, mkt-*) |
+
+> Son **5 impresoras físicas** (Mónica 2026-06-12). El truco: el POS manda
+> comandas Market con `station: "caja"`, pero tickets de cobro/precuenta/cajón
+> van sin estación → caen al `default` (`tickets`). Entrada y Caja quedan en
+> impresoras distintas sin tocar código. Ver `fullsite-os/tools/print-bridge/printers.example.json`.
 
 ### 0.2 Instalar el print bridge en la terminal Windows
 - [ ] Copiar el `.exe` y `printers.json` a `C:\fullsite\`.
