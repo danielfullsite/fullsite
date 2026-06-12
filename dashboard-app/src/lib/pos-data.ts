@@ -1143,6 +1143,10 @@ export type AuditAction =
   | 'merma_registered'
   | 'tiempo_fired'
   | 'silla_changed'
+  | 'delivery_created'
+  | 'delivery_assigned'
+  | 'delivery_status_changed'
+  | 'delivery_closed'
 
 export interface AuditEvent {
   client_id?: string

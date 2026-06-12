@@ -66,6 +66,7 @@ import {
   Package,
   ShoppingCart,
   Wine,
+  Bike,
   Receipt,
   QrCode,
   Menu,
@@ -1310,6 +1311,7 @@ function POSContent() {
       turno: 'corte_turno',
       historial: 'reportes',
       facturacion: 'cancelar_facturas',
+      delivery: 'registro_comanda',
     }
     const perm = sectionMap[section]
     if (!perm) return staffRole === 'admin' || staffRole === 'gerente'
@@ -1974,6 +1976,7 @@ function POSContent() {
                 { href: '/pos/cocina', icon: ChefHat, label: 'Cocina', section: 'cocina' },
                 { href: '/pos/kds', icon: Monitor, label: 'KDS Tablet', section: 'kds' },
                 { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
+                { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
                 { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
                 { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
                 { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
