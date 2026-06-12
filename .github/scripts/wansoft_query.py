@@ -210,6 +210,27 @@ def fetch_all_wansoft_data(session, start, end):
                                 "ordenes": r[3], "subtotal": r[4], "total": r[5]}
                                for r in rows if len(r) >= 6]
 
+    # 5b. OPEN orders (GetMonitoringInfo) — the Wansoft app's "# Órdenes" counts
+    # closed + OPEN. SalesByTypeOfOrder is closed-only, so for "today" questions
+    # we add live pending orders (same fix as intraday_sales.py, 2026-06-12).
+    today_mx = datetime.now(MX_TZ).strftime("%Y-%m-%d")
+    if str(end) >= today_mx:
+        try:
+            r = session.post(f"{WANSOFT_URL}/Reports/GetMonitoringInfo",
+                             params={"subsidiaryId": SUBSIDIARY}, timeout=15)
+            result = (r.json() or {}).get("Result") or {}
+            abiertas = int(result.get("PendingOrdersCounter") or 0)
+            monto = float(result.get("PendingOrdersAmount") or 0)
+            personas_abiertas = sum(int(p) for p in re.findall(r'personas="(\d+)"', result.get("PendingOrders") or ""))
+            data["ordenes_abiertas_ahora"] = {
+                "ordenes": abiertas, "personas": personas_abiertas, "monto_mxn": monto,
+                "nota": ("La app de Wansoft cuenta ordenes/personas CERRADAS + ABIERTAS. "
+                         "Para totales de HOY suma estas abiertas a por_tipo_orden."),
+            }
+            print(f"[wansoft-query] Open orders now: {abiertas} ordenes, {personas_abiertas} personas")
+        except Exception as e:
+            print(f"[wansoft-query] GetMonitoringInfo failed (non-blocking): {e}")
+
     # 6. Sales by payment type (métodos de pago)
     rows = wansoft_post(session, "Reports/SalesByPaymentType", start, end)
     data["metodos_pago"] = [{"metodo": r[0], "subtotal": r[1], "iva": r[2], "total": r[3], "pct": r[4]}
@@ -827,8 +848,13 @@ CÓMO INTERPRETAR:
 MAPA DE DATOS DISPONIBLES:
 Lo que SI tienes:
 - Ventas diarias (brutas, netas, por mesero, por grupo, por platillo) — DATOS REALES
-- Ordenes (tickets_count), personas (personas_restaurant), ticket promedio POR PERSONA (ventas/personas) — DATOS REALES
-- IMPORTANTE: ticket_promedio_restaurant = ventas_dia / personas_restaurant = consumo por persona. NO dividir por ordenes.
+- Ordenes (tickets_count), personas (personas_restaurant), ticket promedio — DATOS REALES
+- IMPORTANTE fórmulas (mismas que la app de Wansoft y el dashboard):
+  * Promedio POR ORDEN = ventas / ordenes ← este es "ticket promedio" / ticket_promedio_restaurant
+  * Promedio POR PERSONA = ventas / personas (solo si piden explícitamente "por persona")
+- IMPORTANTE conteo de HOY: la app de Wansoft cuenta ordenes/personas CERRADAS + ABIERTAS.
+  Si existe "ordenes_abiertas_ahora" en los datos, súmalo a los totales de por_tipo_orden
+  para ordenes y personas de hoy (y su monto a las ventas en curso).
 - Metodos de pago (conteo de transacciones + pesos) — DATOS REALES
 - Efectivo y tarjeta en PESOS (historico diario) — DATOS REALES
 - Mesero x categoria: H&H, Pan, Postres, 2da Bebida, bebidas por persona — DATOS REALES
@@ -1233,52 +1259,56 @@ def ask_groq(question, wansoft_data, historical_data):
 
     context += f"PREGUNTA: {question}"
 
-    # Groq first (FREE), Anthropic fallback
+    # Claude Haiku FIRST (sees the FULL context — Groq's 5K trim dropped the
+    # DATOS CORE block entirely on 2026-06-12 and the bot told Monica
+    # "Aún no hay datos de hoy" with the data right there). Groq is fallback only.
     answer = None
-    # Trim context for Groq: max ~5K chars to stay under 6K token limit
-    groq_context = context
-    if len(context) > 5000:
-        blocks = context.split("\n\n")
-        # Priority: core data > historico > rankings. Skip inventory/costs/agents
-        essential = []
-        total = 0
-        for b in blocks:
-            bl = b.lower()
-            if any(kw in bl for kw in ["datos core", "histórico", "ranking", "pregunta"]):
-                if total + len(b) < 5000:
-                    essential.append(b)
-                    total += len(b)
-        groq_context = "\n\n".join(essential) if essential else context[:5000]
-        print(f"[wansoft-query] Trimmed context for Groq: {len(context)} → {len(groq_context)} chars")
     try:
-        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        if not ANTHROPIC_API_KEY:
+            raise Exception("no ANTHROPIC_API_KEY")
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT[:3000]},  # Trim system prompt too
-                    {"role": "user", "content": groq_context},
-                ],
-                "temperature": 0.2, "max_tokens": 2000,
-            }, timeout=30)
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 4000,
+                "system": SYSTEM_PROMPT,
+                "messages": [{"role": "user", "content": context}],
+            }, timeout=90)
         r.raise_for_status()
-        answer = r.json()["choices"][0]["message"]["content"].strip()
-        print("[wansoft-query] Answered via Groq")
+        answer = r.json()["content"][0]["text"].strip()
+        print("[wansoft-query] Answered via Anthropic (Haiku, full context)")
     except Exception as e1:
-        print(f"[wansoft-query] Groq failed: {e1}, trying Anthropic...")
+        print(f"[wansoft-query] Anthropic failed: {e1}, trying Groq fallback...")
+        # Trim context for Groq: max ~5K chars to stay under 6K token limit.
+        # NOTE: blocks bigger than 5K get dropped whole — fallback quality is degraded.
+        groq_context = context
+        if len(context) > 5000:
+            ctx_blocks = context.split("\n\n")
+            essential = []
+            total = 0
+            for b in ctx_blocks:
+                bl = b.lower()
+                if any(kw in bl for kw in ["datos core", "histórico", "ranking", "pregunta"]):
+                    if total + len(b) < 5000:
+                        essential.append(b)
+                        total += len(b)
+            groq_context = "\n\n".join(essential) if essential else context[:5000]
+            print(f"[wansoft-query] Trimmed context for Groq: {len(context)} → {len(groq_context)} chars")
         try:
-            r = requests.post("https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
-                         "Content-Type": "application/json"},
+            r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
                 json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 4000,
-                    "system": SYSTEM_PROMPT,
-                    "messages": [{"role": "user", "content": context}],
-                }, timeout=90)
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT[:3000]},  # Trim system prompt too
+                        {"role": "user", "content": groq_context},
+                    ],
+                    "temperature": 0.2, "max_tokens": 2000,
+                }, timeout=30)
             r.raise_for_status()
-            answer = r.json()["content"][0]["text"].strip()
-            print("[wansoft-query] Answered via Anthropic (fallback)")
+            answer = r.json()["choices"][0]["message"]["content"].strip()
+            print("[wansoft-query] Answered via Groq (fallback)")
         except Exception as e2:
             print(f"[wansoft-query] Both failed: {e2}")
             answer = "Estamos con intermitencia. Intenta de nuevo en 5 minutos."
