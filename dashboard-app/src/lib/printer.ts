@@ -5,7 +5,7 @@
 
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
-import { getStationForItem, STATION_LABELS, type StationName } from './pos-constants'
+import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -13,7 +13,7 @@ export function printTicketCSS(order: Order) {
   const win = window.open('', '_blank', 'width=300,height=600')
   if (!win) return
 
-  const items = order.items || []
+  const items = (order.items || []).filter(i => !isTiempoItem(i))
   const now = order.closedAt ? new Date(order.closedAt) : new Date()
   const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -129,7 +129,7 @@ export function printPreTicketCSS(order: Order) {
   const win = window.open('', '_blank', 'width=300,height=600')
   if (!win) return
 
-  const items = order.items || []
+  const items = (order.items || []).filter(i => !isTiempoItem(i))
   const now = new Date()
   const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -221,7 +221,7 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
   cmds.push(...textToBytes('--------------------------------\n'))
 
   // Items
-  for (const item of order.items) {
+  for (const item of order.items.filter(i => !isTiempoItem(i))) {
     const name = `${item.cantidad}x ${item.nombre}`
     const price = formatMXN(item.subtotal)
     const spaces = Math.max(1, 32 - name.length - price.length)
@@ -320,7 +320,7 @@ function buildESCPOS(order: Order): Uint8Array {
   cmds.push(...textToBytes('--------------------------------\n'))
 
   // Items
-  for (const item of order.items) {
+  for (const item of order.items.filter(i => !isTiempoItem(i))) {
     const name = `${item.cantidad}x ${item.nombre}`
     const price = formatMXN(item.subtotal)
     const spaces = Math.max(1, 32 - name.length - price.length)
@@ -770,10 +770,24 @@ function getCategoryIdForItem(item: OrderItem): string {
  */
 export function splitOrderByStation(order: Order): Record<StationName, OrderItem[]> {
   const result: Record<StationName, OrderItem[]> = { cocina: [], barra: [], caja: [] }
+  const stations: StationName[] = ['cocina', 'barra', 'caja']
   for (const item of order.items) {
+    // Separadores de tiempo (Wansoft): van a TODAS las estaciones para que
+    // cada una sepa qué partidas son de qué tiempo
+    if (isTiempoItem(item)) {
+      for (const s of stations) result[s].push(item)
+      continue
+    }
     const catId = getCategoryIdForItem(item)
     const station = getStationForItem(catId, item.nombre)
     result[station].push(item)
+  }
+  // Limpiar: quitar separadores colgantes (sin platillos después) y
+  // estaciones que solo tienen separadores
+  for (const s of stations) {
+    const items = result[s]
+    while (items.length > 0 && isTiempoItem(items[items.length - 1])) items.pop()
+    if (items.every(i => isTiempoItem(i))) result[s] = []
   }
   return result
 }
@@ -811,8 +825,18 @@ async function printStationTicketBluetooth(order: Order, station: StationName, i
   cmds.push(ESC, 0x45, 0x01)
 
   for (const item of items) {
+    // Separador de tiempo (Wansoft): línea centrada e invertida "XX TIEMPO: N XX"
+    if (isTiempoItem(item)) {
+      cmds.push(ESC, 0x61, 0x01) // center
+      cmds.push(GS, 0x42, 0x01) // inverted (white on black)
+      cmds.push(...textToBytes(` ${item.nombre} \n`))
+      cmds.push(GS, 0x42, 0x00)
+      cmds.push(ESC, 0x61, 0x00) // back to left
+      continue
+    }
     cmds.push(GS, 0x21, 0x01)
-    cmds.push(...textToBytes(`${item.cantidad}x ${item.nombre}\n`))
+    const sillaTag = item.silla && item.silla > 0 ? ` [S${item.silla}]` : ''
+    cmds.push(...textToBytes(`${item.cantidad}x ${item.nombre}${sillaTag}\n`))
     cmds.push(GS, 0x21, 0x00)
     if (item.modificadores && item.modificadores.length > 0) {
       cmds.push(...textToBytes(`  >> ${item.modificadores.join(', ')}\n`))
@@ -858,12 +882,17 @@ function printStationTicketCSS(order: Order, station: StationName, items: OrderI
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
   const label = STATION_LABELS[station]
 
-  const itemRows = items.map(i => `
+  const itemRows = items.map(i => {
+    if (isTiempoItem(i)) {
+      return `<div style="font-size:12px;font-weight:bold;text-align:center;background:#000;color:#fff;padding:2px 0;margin:6px 0">${i.nombre}</div>`
+    }
+    const sillaTag = i.silla && i.silla > 0 ? ` [S${i.silla}]` : ''
+    return `
     <div style="font-size:14px;font-weight:bold;margin:4px 0">
-      ${i.cantidad}x ${i.nombre}
+      ${i.cantidad}x ${i.nombre}${sillaTag}
       ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${i.modificadores.join(', ')}</div>` : ''}
     </div>
-  `).join('')
+  `}).join('')
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
