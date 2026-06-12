@@ -35,10 +35,12 @@ export const STATION_CATEGORIES: Record<StationName, string[]> = {
   cocina: [
     'chilaquiles', 'eggs', 'croissants', 'pancakes', 'paninis',
     'pizzas', 'bowls', 'ceviche',
+    // Grupos Wansoft (AMALAY): comida → cocina
+    'promos', 'keto', 'kids', 'soups', 'munchies', 'extras', 'envios',
   ],
   barra: [
     'coffee', 'signature', 'jugos', 'fresh', 'smoothies', 'frappes',
-    'sodas', 'tea', 'alcohol',
+    'sodas', 'tea', 'alcohol', 'activaciones',
   ],
   caja: [
     'toast', 'bakery', 'postres', 'mkt-cafe',
