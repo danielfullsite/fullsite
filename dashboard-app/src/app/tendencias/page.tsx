@@ -32,6 +32,7 @@ export default function TendenciasPage() {
   const [allData, setAllData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
   const [tpPeriod, setTpPeriod] = useState<TPPeriod>('mes')
+  const [dowSelected, setDowSelected] = useState(5) // viernes por default (pedido de Mónica)
 
   useEffect(() => {
     async function load() {
@@ -227,6 +228,38 @@ export default function TendenciasPage() {
       }
     })
   }, [allData])
+
+  // Same day-of-week comparison: viernes vs viernes, sábado vs sábado, etc.
+  const sameDowTrend = useMemo(() => {
+    const rows = allData
+      .filter(d => new Date(d.fecha + 'T12:00:00').getDay() === dowSelected && (d.ventas_dia || 0) > 0)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .slice(-12)
+    return rows.map(d => {
+      const dt = new Date(d.fecha + 'T12:00:00')
+      return {
+        fecha: d.fecha,
+        label: `${dt.getDate()}/${dt.getMonth() + 1}`,
+        ventas: Math.round(d.ventas_dia || 0),
+        personas: d.personas_restaurant || 0,
+        ticketPromedio: d.tickets_count > 0 ? Math.round((d.ventas_dia || 0) / d.tickets_count) : 0,
+      }
+    })
+  }, [allData, dowSelected])
+
+  const sameDowStats = useMemo(() => {
+    if (sameDowTrend.length === 0) return null
+    const last = sameDowTrend[sameDowTrend.length - 1]
+    const prev = sameDowTrend.length >= 2 ? sameDowTrend[sameDowTrend.length - 2] : null
+    const avg = sameDowTrend.reduce((s, d) => s + d.ventas, 0) / sameDowTrend.length
+    return {
+      last,
+      prev,
+      avg: Math.round(avg),
+      vsPrev: prev ? percentChange(last.ventas, prev.ventas) : 0,
+      vsAvg: avg > 0 ? percentChange(last.ventas, avg) : 0,
+    }
+  }, [sameDowTrend])
 
   // Weekday vs Weekend TP breakdown
   const tpWeekdayWeekend = useMemo(() => {
@@ -857,6 +890,72 @@ export default function TendenciasPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* Mismo día semana a semana — viernes vs viernes */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-1)]">Mismo día, semana a semana</h3>
+            <p className="text-xs text-[var(--text-3)]">Compara los {['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'][dowSelected]} entre sí — últimas {sameDowTrend.length} fechas</p>
+          </div>
+          <div className="flex bg-[var(--line-soft)] rounded-lg p-0.5">
+            {[1, 2, 3, 4, 5, 6, 0].map(dow => (
+              <button
+                key={dow}
+                onClick={() => setDowSelected(dow)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dowSelected === dow ? 'bg-[var(--surface)] text-[var(--text-1)] shadow-sm' : 'text-[var(--text-3)] hover:text-[var(--text-2)]'}`}
+              >
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dow]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {sameDowStats && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--surface-2)] border border-[var(--line-soft)] text-[var(--text-2)]">
+              Último ({sameDowStats.last.label}): {formatCurrency(sameDowStats.last.ventas)}
+            </span>
+            {sameDowStats.prev && (
+              <span className={`inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-semibold ${sameDowStats.vsPrev >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {sameDowStats.vsPrev >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                {formatPercent(sameDowStats.vsPrev)} vs anterior ({sameDowStats.prev.label})
+              </span>
+            )}
+            <span className={`inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-semibold ${sameDowStats.vsAvg >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+              {sameDowStats.vsAvg >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+              {formatPercent(sameDowStats.vsAvg)} vs promedio ({formatCurrency(sameDowStats.avg)})
+            </span>
+          </div>
+        )}
+
+        {sameDowTrend.length === 0 ? (
+          <p className="text-sm text-[var(--text-3)] py-8 text-center">Sin datos para este día de la semana.</p>
+        ) : (
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sameDowTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} width={50} />
+                <Tooltip
+                  formatter={(v, name) => name === 'ventas' ? [formatCurrency(Number(v)), 'Ventas'] : [String(v), String(name)]}
+                  labelFormatter={(label, payload) => {
+                    const p = payload?.[0]?.payload
+                    return p ? `${p.fecha} — ${p.personas} personas, TP ${formatCurrency(p.ticketPromedio)}` : label
+                  }}
+                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
+                />
+                <Bar dataKey="ventas" radius={[6, 6, 0, 0]} barSize={28}>
+                  {sameDowTrend.map((d, i) => (
+                    <Cell key={i} fill={i === sameDowTrend.length - 1 ? '#10b981' : DOW_COLORS[dowSelected % DOW_COLORS.length]} fillOpacity={i === sameDowTrend.length - 1 ? 1 : 0.55} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       {/* Day of week */}
