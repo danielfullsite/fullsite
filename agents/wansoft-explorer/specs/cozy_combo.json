@@ -1,7 +1,7 @@
 {
   "saucer": "COZY COMBO (SOPA/PANNINI)",
   "analog": null,
-  "_status": "PENDIENTE confirmar: ¿es grilled cheese + sopa de tomate? Fuente: COSTEO GENERICO AMALAY 30052024.xlsx (COMBO GRILLED CHEESE SANDWICH + TOMATOE BASIL SOUP). GRANA PADANO no existe en inventario -> QUESO PARMESANO.",
+  "_status": "NO CAPTURAR (2026-06-12). Mónica: el cliente ELIGE el panini. El combo se costea vía modificadores: C/ MED SOPA DE TOMATE (ya tiene receta) + C/ MED CHICKEN/TURKEY PANNINI (specs mod_med_*.json). La receta del platillo queda VACÍA a propósito. Este spec era el concepto viejo de grilled cheese — se conserva solo como referencia.",
   "ingredients": [
     {"product": "SUB TOMATO BASIL SOUP", "unit": "Kilogramo", "quantity": 0.17},
     {"product": "SUB PAN CAMPESINO (MASA MADRE)", "unit": "Pieza", "quantity": 2},

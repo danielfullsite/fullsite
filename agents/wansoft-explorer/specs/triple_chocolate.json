@@ -1,7 +1,7 @@
 {
   "saucer": "AMALAY TRIPLE CHOCOLATE",
   "analog": "DARK CHOCOLATE BROWNIE",
-  "_status": "PENDIENTE confirmar: ¿el pastel sale en 8 rebanadas? (0.125). Fuente: COSTEO GENERICO (PASTEL TRIPLE CHOCOLATE). PASTEL CUMPLEAÑOS AMALAY $800 usa el SUB completo (1.0); la rebanada cuesta $189.",
+  "_status": "PENDIENTE 2026-06-12. Mónica: 'hay 2 tamaños' de pastel, pero en inventario solo existe SUB PASTEL CUMPLEAÑOS CHOCOLATE (PAN030). Falta confirmar: ¿de cuál tamaño sale la rebanada del menú y en cuántas rebanadas sale ese pastel? (ajustar quantity = 1/N). NO aplicar hasta tener eso.",
   "ingredients": [
     {"product": "SUB PASTEL CUMPLEAÑOS CHOCOLATE", "unit": "Pieza", "quantity": 0.125},
     {"product": "FRESAS FRESCAS", "unit": "Kilogramo", "quantity": 0.03},

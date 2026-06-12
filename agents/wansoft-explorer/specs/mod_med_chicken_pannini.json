@@ -1,0 +1,18 @@
+{
+  "saucer": "C/ MED CHICKEN PANNINI",
+  "analog": "1/2 CHICKEN PANINI",
+  "_status": "CAPTURADA 2026-06-12 (verificada, costo $40.28). Modificador del COZY COMBO. Clon exacto de 1/2 CHICKEN PANINI (saucerId 889).",
+  "ingredients": [
+    {"product": "SUB PAN PARA PANINI (BRIOCHE)", "unit": "Pieza", "quantity": 1},
+    {"product": "SUB ADERESO CLASSIC RUBENS", "unit": "Kilogramo", "quantity": 0.06},
+    {"product": "ARUGULA", "unit": "Kilogramo", "quantity": 0.01},
+    {"product": "TOMATE GUAJE", "unit": "Kilogramo", "quantity": 0.03},
+    {"product": "AGUACATE", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "QUESO GOUDA", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "SUB LECHUGAS MIXTAS", "unit": "Kilogramo", "quantity": 0.015},
+    {"product": "TOMATE CHERRY", "unit": "Kilogramo", "quantity": 0.01},
+    {"product": "SUB VINAGRETA DE CHAMPAÑA", "unit": "Kilogramo", "quantity": 0.02},
+    {"product": "COL MORADA", "unit": "Kilogramo", "quantity": 0.01},
+    {"product": "PECHUGA DE POLLO", "unit": "Kilogramo", "quantity": 0.07}
+  ]
+}

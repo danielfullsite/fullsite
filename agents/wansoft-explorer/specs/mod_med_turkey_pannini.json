@@ -1,0 +1,19 @@
+{
+  "saucer": "C/ MED TURKEY PANNINI",
+  "analog": "1//2 TURKEY PANINI",
+  "_status": "CAPTURADA 2026-06-12 (verificada, costo $76.49). Modificador del COZY COMBO. Clon exacto de 1//2 TURKEY PANINI (saucerId 558).",
+  "ingredients": [
+    {"product": "FLOR COMESTIBLE", "unit": "Pieza", "quantity": 1},
+    {"product": "COL MORADA", "unit": "Kilogramo", "quantity": 0.01},
+    {"product": "TOMATE CHERRY", "unit": "Kilogramo", "quantity": 0.01},
+    {"product": "TOMATE GUAJE", "unit": "Kilogramo", "quantity": 0.05},
+    {"product": "SUB LECHUGAS MIXTAS", "unit": "Kilogramo", "quantity": 0.03},
+    {"product": "ACEITE OLIVA", "unit": "Kilogramo", "quantity": 0.017},
+    {"product": "ARUGULA", "unit": "Kilogramo", "quantity": 0.02},
+    {"product": "SUB VINAGRETA DE CHAMPAÑA", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "AGUACATE", "unit": "Kilogramo", "quantity": 0.05},
+    {"product": "QUESO GOUDA", "unit": "Kilogramo", "quantity": 0.06},
+    {"product": "PECHUGA DE PAVO", "unit": "Kilogramo", "quantity": 0.085},
+    {"product": "SUB ADERESO CLASSIC RUBENS", "unit": "Kilogramo", "quantity": 0.05}
+  ]
+}
