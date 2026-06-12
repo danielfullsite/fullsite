@@ -2,26 +2,29 @@ name: Purchase Predictor
 
 on:
   schedule:
-    # Daily at 5pm MX (23:00 UTC) — before next-day purchasing window
-    - cron: '0 23 * * *'
+    # Monday 7am MX = 13:00 UTC Mon
+    - cron: '0 13 * * 1'
   workflow_dispatch:
+    inputs:
+      client_id:
+        default: 'amalay'
+
+env:
+  CLIENT_ID: ${{ github.event.inputs.client_id || 'amalay' }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+  TRIGGER_TYPE: ${{ github.event_name }}
 
 jobs:
   predict:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install requests pytz
-      - name: Run Purchase Predictor
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SUPABASE_AGENT_KEY: ${{ secrets.SUPABASE_AGENT_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
-          TRIGGER_TYPE: ${{ github.event_name }}
-        run: python .github/scripts/purchase_predictor.py
+      - run: pip install requests
+      - run: python .github/scripts/purchase_predictor.py

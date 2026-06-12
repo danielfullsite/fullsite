@@ -15,6 +15,8 @@ interface CostItem {
   precio: number
   margen_pct: number
   matched: boolean          // true if we found a menu price
+  market: boolean           // producto de Market (retail) — excluido de KPIs de cocina
+  precioPromedio?: boolean  // precio derivado de ventas reales (total/qty), no de lista
   sospechoso?: {            // probable capture error in Wansoft recipe
     ingrediente: string
     costo: number
@@ -55,6 +57,38 @@ function norm(s: string): string {
     .trim()
 }
 
+/**
+ * Marcas y palabras clave de productos Market (retail) en AMALAY.
+ * Derivado de las categorías mkt-* de pos_menu_items. Los productos Market
+ * NO son platillos de cocina y distorsionan el food cost (regla fija).
+ */
+const MARKET_BRANDS = [
+  // proteína / suplementos
+  'garden of life', 'habits', 'birdman', 'fitmingo', 'vital proteins', 'olly',
+  'natural vitality', 'nat vit', 'calm gummies', 'force factor', 'natrol',
+  'nature made', 'pedialyte', 'nuun', 'ultima -', 'colageno', 'creatina mono',
+  // snacks / dulces
+  'smarty', 'jicama', 'sa nutri', 'sanutri', 'churritos', 'guayabate', 'nubits',
+  'vamara', 'duraznero', 'manglo', 'healthy crunch', 'healty crunch', 'amaranth',
+  'charris', 'obleas', 'nucelli', 'brule', 'okko', 'rx bar', 'raw rev', 'yooju',
+  'binny brun', 'kind breakfast', 'la casa del jugo', 'mix enchilado',
+  'mango enchilado', 'mango seco', 'pasa chocolate', 'cacahuate', 'papas desh',
+  'flor de jamaica enchilada', 'rollitos', 'superfoods', 'granola amalay',
+  'granola keto', 'semillas',
+  // bebidas retail
+  'kombucha', 'velvet', 'miel infinita', 'cafe grano', 'cafe molido', 'raices',
+  // la nona
+  'la nona', 'lanona', 'doraditas', 'gorditas keto',
+  // rojamaica
+  'rojamaica',
+  // belleza
+  'mali ', 'hand body lotion', 'hand & body', 'hand wash', 'renew', 'melaleuca',
+  'bronceador', 'tanning',
+  // accesorios / libros
+  'libro', 'libreta', 'totebag', 'taza', 'termo', 'vela', 'velita', 'gift card',
+  'tarjeta de regalo', 'ramekin', 'planta chica', 'planta grande', 'jarra infusora',
+]
+
 /** Strict fuzzy match: exact, or significant word overlap (≥60% of words shared) */
 function fuzzyMatch(a: string, b: string): boolean {
   const na = norm(a)
@@ -93,6 +127,7 @@ export default function FoodCostPage() {
   const [sortAsc, setSortAsc] = useState(true)
   const [source, setSource] = useState('')
   const [error, setError] = useState('')
+  const [showMarket, setShowMarket] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -100,18 +135,24 @@ export default function FoodCostPage() {
         // -------------------------------------------------------
         // SOURCE 1 (primary): wansoft_recipes — 574 real recipes
         // -------------------------------------------------------
-        const [recipesRes, menuRes, posRecipesRes] = await Promise.all([
+        const [recipesRes, menuRes, posRecipesRes, menuConfigRes] = await Promise.all([
           fetch(
             `${SB_URL}/rest/v1/wansoft_recipes?client_id=eq.amalay&select=saucer_id,saucer_name,budget_cost,ingredients`,
             { headers }
           ),
           fetch(
-            `${SB_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price`,
+            `${SB_URL}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price,category_id`,
             { headers }
           ),
           // Excel de costeo real (fuente de verdad de precios de venta)
           fetch(
             `${SB_URL}/rest/v1/pos_recipes?select=nombre,precio_venta&precio_venta=gt.0`,
+            { headers }
+          ),
+          // Ventas reales por platillo Wansoft — precio promedio cobrado (total/qty).
+          // El scrape no siempre trae saucers, por eso pedimos varios snapshots.
+          fetch(
+            `${SB_URL}/rest/v1/wansoft_menu_config?client_id=eq.amalay&select=fecha,saucers&order=fecha.desc&limit=10`,
             { headers }
           ),
         ])
@@ -124,11 +165,16 @@ export default function FoodCostPage() {
             ingredients: unknown
           }> = await recipesRes.json()
 
-          // Build menu price lookup
-          const menuItems: Array<{ name: string; price: number }> = menuRes.ok ? await menuRes.json() : []
+          // Build menu price lookup — items mkt-* son Market, NO entran al lookup de cocina
+          const menuItems: Array<{ name: string; price: number; category_id: string | null }> = menuRes.ok ? await menuRes.json() : []
           const menuMap = new Map<string, number>()
+          const mktNames = new Set<string>()
           for (const m of menuItems) {
-            if (Number(m.price) > 0) menuMap.set(norm(m.name), Number(m.price))
+            if (String(m.category_id || '').startsWith('mkt-')) {
+              mktNames.add(norm(m.name))
+            } else if (Number(m.price) > 0) {
+              menuMap.set(norm(m.name), Number(m.price))
+            }
           }
 
           // Excel de costeo (pos_recipes) — precios reales de venta
@@ -138,20 +184,52 @@ export default function FoodCostPage() {
             if (Number(r.precio_venta) > 0) excelMap.set(norm(r.nombre), Number(r.precio_venta))
           }
 
-          // Find best price match: exacto menú → exacto Excel → fuzzy Excel → fuzzy menú
-          const findPrice = (recipeName: string): number => {
+          // Precio promedio real cobrado por platillo (wansoft_menu_config.saucers)
+          const saucerMap = new Map<string, number>()
+          if (menuConfigRes.ok) {
+            const snapshots: Array<{ fecha: string; saucers: unknown }> = await menuConfigRes.json()
+            for (const snap of snapshots) {
+              const saucers = deepParse(snap.saucers)
+              if (Array.isArray(saucers) && saucers.length > 0) {
+                for (const s of saucers) {
+                  const qty = Number(s?.qty) || 0
+                  const total = Number(s?.total) || 0
+                  if (qty > 0 && total > 0) saucerMap.set(norm(String(s.name || '')), total / qty)
+                }
+                break // primer snapshot con datos
+              }
+            }
+          }
+
+          // Detección Market: nombre exacto/fuzzy de items mkt-*, o marca conocida.
+          // Match exacto con el menú de cocina gana siempre (ej. "Healthy Crunchy Mix"
+          // es un platillo de bakery, distinto al snack Market "Healthy Crunch Mix 300g").
+          const isMarket = (recipeName: string): boolean => {
             const nr = norm(recipeName)
-            if (menuMap.has(nr)) return menuMap.get(nr)!
-            if (excelMap.has(nr)) return excelMap.get(nr)!
+            if (menuMap.has(nr)) return false
+            if (mktNames.has(nr)) return true
+            if (MARKET_BRANDS.some(b => nr.includes(norm(b)))) return true
+            for (const mn of mktNames) {
+              if (fuzzyMatch(nr, mn)) return true
+            }
+            return false
+          }
+
+          // Find best price match: exacto menú → exacto Excel → promedio real → fuzzy Excel → fuzzy menú
+          const findPrice = (recipeName: string): { price: number; promedio: boolean } => {
+            const nr = norm(recipeName)
+            if (menuMap.has(nr)) return { price: menuMap.get(nr)!, promedio: false }
+            if (excelMap.has(nr)) return { price: excelMap.get(nr)!, promedio: false }
+            if (saucerMap.has(nr)) return { price: saucerMap.get(nr)!, promedio: true }
             let bestPrice = 0
             excelMap.forEach((price, name) => {
               if (!bestPrice && fuzzyMatch(nr, name)) bestPrice = price
             })
-            if (bestPrice) return bestPrice
+            if (bestPrice) return { price: bestPrice, promedio: false }
             menuMap.forEach((price, menuName) => {
               if (!bestPrice && fuzzyMatch(nr, menuName)) bestPrice = price
             })
-            return bestPrice
+            return { price: bestPrice, promedio: false }
           }
 
           const costItems: CostItem[] = []
@@ -193,7 +271,8 @@ export default function FoodCostPage() {
                   }
                 : undefined
 
-            const precio = findPrice(recipe.saucer_name)
+            const market = isMarket(recipe.saucer_name)
+            const { price: precio, promedio } = findPrice(recipe.saucer_name)
             const margen = precio > 0 ? Math.round((1 - costoTotal / precio) * 1000) / 10 : 0
 
             // Sanity check: si el margen es < -100%, el match es casi seguro incorrecto
@@ -207,14 +286,18 @@ export default function FoodCostPage() {
               precio: validMatch ? precio : 0,
               margen_pct: validMatch ? margen : 0,
               matched: validMatch,
+              market,
+              precioPromedio: validMatch && promedio,
               sospechoso,
             })
           }
 
           if (costItems.length > 0) {
             setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
-            const matchedCount = costItems.filter(i => i.matched).length
-            setSource(`wansoft_recipes · ${costItems.length} recetas · ${matchedCount} con precio`)
+            const cocina = costItems.filter(i => !i.market)
+            const matchedCount = cocina.filter(i => i.matched).length
+            const mktCount = costItems.length - cocina.length
+            setSource(`wansoft_recipes · ${cocina.length} recetas cocina · ${matchedCount} con precio · ${mktCount} Market excluidas`)
             setLoading(false)
             return
           }
@@ -250,6 +333,7 @@ export default function FoodCostPage() {
                   precio: precioUnit,
                   margen_pct: margen,
                   matched: true,
+                  market: false,
                 }
               }).filter((p: CostItem) => p.platillo && p.precio > 0 && p.margen_pct > -100)
               setItems(costItems)
@@ -274,6 +358,7 @@ export default function FoodCostPage() {
   /* ---- Filter & sort ---- */
   const filtered = useMemo(() => {
     return items
+      .filter(i => showMarket || !i.market)
       .filter(i => !search || i.platillo.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
         const va = a[sortKey]
@@ -283,15 +368,17 @@ export default function FoodCostPage() {
         }
         return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number)
       })
-  }, [items, search, sortKey, sortAsc])
+  }, [items, search, sortKey, sortAsc, showMarket])
 
-  /* ---- KPIs ---- */
-  const withPrice = items.filter(i => i.matched)
+  /* ---- KPIs (solo cocina — Market siempre excluido de métricas) ---- */
+  const cocina = items.filter(i => !i.market)
+  const marketItems = items.filter(i => i.market)
+  const withPrice = cocina.filter(i => i.matched)
   const avgMargin = withPrice.length > 0 ? withPrice.reduce((s, i) => s + i.margen_pct, 0) / withPrice.length : 0
   const stars = withPrice.filter(i => i.margen_pct > 70)
   const losers = withPrice.filter(i => i.margen_pct < 30 && i.margen_pct > 0)
-  const noPrice = items.filter(i => !i.matched)
-  const suspicious = items.filter(i => i.sospechoso).sort((a, b) => b.costo - a.costo)
+  const noPrice = cocina.filter(i => !i.matched)
+  const suspicious = cocina.filter(i => i.sospechoso).sort((a, b) => b.costo - a.costo)
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc)
@@ -322,8 +409,8 @@ export default function FoodCostPage() {
             <ChefHat size={16} className="text-blue-500" />
             <span className="text-xs text-[var(--text-2)] font-medium">Recetas</span>
           </div>
-          <p className="text-2xl font-bold text-[var(--text-1)]">{items.length}</p>
-          <p className="text-xs text-[var(--text-3)] mt-1">{withPrice.length} con precio</p>
+          <p className="text-2xl font-bold text-[var(--text-1)]">{cocina.length}</p>
+          <p className="text-xs text-[var(--text-3)] mt-1">{withPrice.length} con precio · {marketItems.length} Market excluidas</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -397,8 +484,8 @@ export default function FoodCostPage() {
 
       {/* Table */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
-        <div className="p-4 border-b border-[var(--line-soft)]">
-          <div className="relative">
+        <div className="p-4 border-b border-[var(--line-soft)] flex items-center gap-4">
+          <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
             <input
               type="text"
@@ -408,6 +495,17 @@ export default function FoodCostPage() {
               className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--line)] rounded-lg bg-[var(--surface)] text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
           </div>
+          {marketItems.length > 0 && (
+            <label className="flex items-center gap-2 text-xs text-[var(--text-2)] cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showMarket}
+                onChange={e => setShowMarket(e.target.checked)}
+                className="accent-emerald-500"
+              />
+              Mostrar Market ({marketItems.length})
+            </label>
+          )}
         </div>
 
         {error || filtered.length === 0 ? (
@@ -458,9 +556,22 @@ export default function FoodCostPage() {
                     >
                       <td className="px-4 py-3 font-medium text-[var(--text-1)]">
                         {item.platillo}
+                        {item.market && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-500">
+                            market
+                          </span>
+                        )}
                         {!item.matched && (
                           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600">
                             sin precio
+                          </span>
+                        )}
+                        {item.precioPromedio && (
+                          <span
+                            className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-500"
+                            title="Precio promedio cobrado (ventas reales Wansoft), no precio de lista"
+                          >
+                            precio prom.
                           </span>
                         )}
                         {item.sospechoso && (
