@@ -98,6 +98,12 @@ const DLE = 0x10
 // ─── CASH DRAWER ────────────────────────────────────────────────────────────
 
 export async function openCashDrawer(): Promise<boolean> {
+  // 1) Bridge local (terminal Windows con impresora de caja + cajón RJ-11)
+  if (await bridgeDrawer()) {
+    console.log('[printer] Cash drawer opened (bridge)')
+    return true
+  }
+  // 2) Bluetooth
   if (!btCharacteristic) {
     console.warn('[printer] No BT connection, cannot open cash drawer')
     return false
@@ -121,6 +127,86 @@ export async function openCashDrawer(): Promise<boolean> {
 function textToBytes(text: string): number[] {
   const encoder = new TextEncoder()
   return Array.from(encoder.encode(text))
+}
+
+// ─── PRINT BRIDGE (servicio local en la terminal Windows) ──────────────────
+// fullsite-os/tools/print-bridge — escucha en 127.0.0.1:7717 y entrega bytes
+// ESC/POS a impresoras USB/red. Localhost está exento de mixed-content, así
+// que el POS en HTTPS puede llamarlo. Primera opción de impresión; si no
+// responde se cae a Bluetooth y luego a CSS.
+
+const BRIDGE_URL = 'http://127.0.0.1:7717'
+const BRIDGE_HEALTH_TTL_MS = 30_000
+
+let bridgeAvailable: boolean | null = null
+let bridgeLastCheck = 0
+
+async function isBridgeAvailable(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  const now = Date.now()
+  if (bridgeAvailable !== null && now - bridgeLastCheck < BRIDGE_HEALTH_TTL_MS) {
+    return bridgeAvailable
+  }
+  bridgeLastCheck = now
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 800)
+    const res = await fetch(`${BRIDGE_URL}/health`, { signal: ctrl.signal })
+    clearTimeout(t)
+    bridgeAvailable = res.ok
+  } catch {
+    bridgeAvailable = false
+  }
+  if (bridgeAvailable) console.log('[printer] Print bridge detectado en', BRIDGE_URL)
+  return bridgeAvailable
+}
+
+function bytesToBase64(data: Uint8Array): string {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < data.length; i += CHUNK) {
+    bin += String.fromCharCode(...data.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+/** Imprime vía bridge. Devuelve false si el bridge no está o falla (→ fallback). */
+async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<boolean> {
+  if (!(await isBridgeAvailable())) return false
+  try {
+    const res = await fetch(`${BRIDGE_URL}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...(station ? { station } : {}), data: bytesToBase64(bytes) }),
+    })
+    if (!res.ok) {
+      console.warn(`[printer] Bridge /print HTTP ${res.status}`)
+      return false
+    }
+    console.log(`[printer] Bridge imprimió ${bytes.length} bytes${station ? ` (${station})` : ''}`)
+    return true
+  } catch (e) {
+    console.warn('[printer] Bridge print falló:', e)
+    bridgeAvailable = false
+    return false
+  }
+}
+
+/** Kick de cajón vía bridge. Devuelve false si no está disponible. */
+async function bridgeDrawer(): Promise<boolean> {
+  if (!(await isBridgeAvailable())) return false
+  try {
+    const res = await fetch(`${BRIDGE_URL}/drawer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    return res.ok
+  } catch (e) {
+    console.warn('[printer] Bridge drawer falló:', e)
+    bridgeAvailable = false
+    return false
+  }
 }
 
 // ─── PRE-TICKET (precuenta — antes de cobrar) ──────────────────────────────
@@ -191,9 +277,7 @@ export function printPreTicketCSS(order: Order) {
   win.document.close()
 }
 
-export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
-  if (!btCharacteristic) throw new Error('Impresora no conectada')
-
+function buildPreTicketBytes(order: Order): Uint8Array {
   const cmds: number[] = []
   const now = new Date()
   const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -258,7 +342,13 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
   cmds.push(LF, LF, LF, LF)
   cmds.push(GS, 0x56, 0x00)
 
-  const data = new Uint8Array(cmds)
+  return new Uint8Array(cmds)
+}
+
+export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
+  if (!btCharacteristic) throw new Error('Impresora no conectada')
+
+  const data = buildPreTicketBytes(order)
   const CHUNK_SIZE = 128
   for (let i = 0; i < data.length; i += CHUNK_SIZE) {
     const chunk = data.slice(i, i + CHUNK_SIZE)
@@ -273,6 +363,9 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
 }
 
 export async function printPreTicket(order: Order) {
+  // 1) Bridge local
+  if (await bridgePrint(buildPreTicketBytes(order))) return
+  // 2) Bluetooth
   if (isBluetoothConnected() && btCharacteristic) {
     try {
       await printPreTicketBluetooth(order)
@@ -281,6 +374,7 @@ export async function printPreTicket(order: Order) {
       console.warn('[printer] Bluetooth pre-ticket failed, CSS fallback:', e)
     }
   }
+  // 3) CSS
   printPreTicketCSS(order)
 }
 
@@ -702,6 +796,9 @@ export async function printKitchenTicket(order: Order) {
 }
 
 export async function printTicket(order: Order) {
+  // 1) Bridge local (impresora de caja en la terminal Windows)
+  if (await bridgePrint(buildESCPOS(order))) return
+  // 2) Bluetooth
   if (isBluetoothConnected() && btCharacteristic) {
     try {
       await printTicketBluetooth(order)
@@ -796,10 +893,7 @@ export function splitOrderByStation(order: Order): Record<StationName, OrderItem
  * Print a kitchen ticket for a specific station via Bluetooth ESC/POS.
  * Uses station-specific printer if connected, otherwise falls back to default.
  */
-async function printStationTicketBluetooth(order: Order, station: StationName, items: OrderItem[]): Promise<boolean> {
-  const char = getCharForStation(station)
-  if (!char) throw new Error('Impresora no conectada')
-
+function buildStationTicketBytes(order: Order, station: StationName, items: OrderItem[]): Uint8Array {
   const cmds: number[] = []
   const now = new Date()
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -856,7 +950,18 @@ async function printStationTicketBluetooth(order: Order, station: StationName, i
   cmds.push(LF, LF, LF, LF)
   cmds.push(GS, 0x56, 0x00)
 
-  const data = new Uint8Array(cmds)
+  return new Uint8Array(cmds)
+}
+
+/**
+ * Print a kitchen ticket for a specific station via Bluetooth ESC/POS.
+ * Uses station-specific printer if connected, otherwise falls back to default.
+ */
+async function printStationTicketBluetooth(order: Order, station: StationName, items: OrderItem[]): Promise<boolean> {
+  const char = getCharForStation(station)
+  if (!char) throw new Error('Impresora no conectada')
+
+  const data = buildStationTicketBytes(order, station, items)
 
   const CHUNK_SIZE = 128
   for (let i = 0; i < data.length; i += CHUNK_SIZE) {
@@ -940,7 +1045,13 @@ export async function printByStation(order: Order) {
       await new Promise(r => setTimeout(r, 200))
     }
 
-    // Try station-specific printer first, then default
+    // 1) Bridge local: rutea por nombre de estación (cocina/barra/caja)
+    if (await bridgePrint(buildStationTicketBytes(order, station, items), station)) {
+      printed = true
+      continue
+    }
+
+    // 2) Bluetooth: station-specific printer first, then default
     const char = getCharForStation(station)
     if (char) {
       try {

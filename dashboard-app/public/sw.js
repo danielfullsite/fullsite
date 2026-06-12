@@ -82,6 +82,10 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension and other non-http
   if (!url.protocol.startsWith('http')) return
 
+  // Print bridge local (127.0.0.1:7717): nunca interceptar —
+  // printer.ts maneja su propia detección y fallback (BT/CSS)
+  if (url.port === '7717') return
+
   // Never cache auth or payment endpoints
   if (NEVER_CACHE_PATTERNS.some((p) => p.test(url.pathname))) return
 
