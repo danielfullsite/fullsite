@@ -88,30 +88,20 @@ function FacturaForm() {
     setError('')
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/cfdi_requests`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({
-            order_id: orderId || null,
-            total: total ? parseFloat(total) : null,
-            fecha_venta: fecha || null,
-            rfc: form.rfc.trim().toUpperCase(),
-            razon_social: form.razon_social.trim(),
-            regimen_fiscal: form.regimen_fiscal,
-            codigo_postal: form.codigo_postal.trim(),
-            email: form.email.trim().toLowerCase(),
-            uso_cfdi: form.uso_cfdi,
-            status: 'pendiente',
-          }),
-        }
-      )
+      const res = await fetch('/api/factura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId || null,
+          total: total ? parseFloat(total) : null,
+          rfc: form.rfc.trim().toUpperCase(),
+          razon_social: form.razon_social.trim(),
+          regimen_fiscal: form.regimen_fiscal,
+          codigo_postal: form.codigo_postal.trim(),
+          email: form.email.trim().toLowerCase(),
+          uso_cfdi: form.uso_cfdi,
+        }),
+      })
 
       if (!res.ok) throw new Error('Error al enviar')
       setSuccess(true)
