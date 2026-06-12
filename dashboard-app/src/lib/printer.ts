@@ -103,8 +103,8 @@ export async function openCashDrawer(): Promise<boolean> {
     console.log('[printer] Cash drawer opened (bridge)')
     return true
   }
-  // 2) Bluetooth
-  if (!btCharacteristic) {
+  // 2) Bluetooth (reconecta si la impresora se durmió)
+  if (!(await ensureConnected('default')) || !btCharacteristic) {
     console.warn('[printer] No BT connection, cannot open cash drawer')
     return false
   }
@@ -346,7 +346,7 @@ function buildPreTicketBytes(order: Order): Uint8Array {
 }
 
 export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
-  if (!btCharacteristic) throw new Error('Impresora no conectada')
+  if (!(await ensureConnected('default')) || !btCharacteristic) throw new Error('Impresora no conectada')
 
   const data = buildPreTicketBytes(order)
   const CHUNK_SIZE = 128
@@ -365,8 +365,8 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
 export async function printPreTicket(order: Order) {
   // 1) Bridge local
   if (await bridgePrint(buildPreTicketBytes(order))) return
-  // 2) Bluetooth
-  if (isBluetoothConnected() && btCharacteristic) {
+  // 2) Bluetooth (reconecta si la impresora se durmió)
+  if (await ensureConnected('default')) {
     try {
       await printPreTicketBluetooth(order)
       return
@@ -726,6 +726,8 @@ export async function connectBluetoothPrinter(): Promise<string> {
   try {
     const conn = await connectPrinterDevice()
     printers.set('default', conn)
+    attachAutoReconnect('default', conn)
+    startKeepAlive()
     syncLegacyRefs()
     return conn.name
   } catch (e) {
@@ -740,6 +742,8 @@ export async function connectStationPrinter(station: StationName): Promise<strin
   try {
     const conn = await connectPrinterDevice()
     printers.set(station, conn)
+    attachAutoReconnect(station, conn)
+    startKeepAlive()
     console.log(`[printer] Station ${station} → ${conn.name}`)
     savePrinterAssignments()
     return conn.name
@@ -778,16 +782,89 @@ export async function disconnectAllPrinters() {
   savePrinterAssignments()
 }
 
-/** Get the characteristic for a station (falls back to default) */
+// ─── RECONEXIÓN AUTOMÁTICA + KEEP-ALIVE ────────────────────────────────────
+// Las impresoras BLE baratas (SEAFON y clones) se duermen tras unos segundos
+// sin tráfico y cortan la conexión GATT. Tres defensas:
+// 1. Keep-alive: DLE EOT 1 (status en tiempo real, no imprime) cada 25s
+// 2. Auto-reconexión al evento gattserverdisconnected (con backoff)
+// 3. ensureConnected() antes de cada impresión
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getCharForStation(station?: StationName): any | null {
-  if (station) {
-    const stationConn = printers.get(station)
-    if (stationConn?.device?.gatt?.connected) return stationConn.characteristic
+async function rediscoverCharacteristic(device: any): Promise<any | null> {
+  const server = await device.gatt.connect()
+  const services = await server.getPrimaryServices()
+  for (const service of services) {
+    const chars = await service.getCharacteristics()
+    for (const char of chars) {
+      if (char.properties.write || char.properties.writeWithoutResponse) return char
+    }
+  }
+  return null
+}
+
+/** Reconecta un slot si la conexión GATT se cayó. No requiere gesto de usuario
+ *  porque ya tenemos el BluetoothDevice del pairing original. */
+async function ensureConnected(slot: PrinterSlot): Promise<boolean> {
+  const conn = printers.get(slot)
+  if (!conn) return false
+  if (conn.device?.isUsb) return !!conn.device?.gatt?.connected // USB: no hay re-claim sin gesto
+  if (conn.device?.gatt?.connected) return true
+  try {
+    const char = await rediscoverCharacteristic(conn.device)
+    if (!char) return false
+    conn.characteristic = char
+    syncLegacyRefs()
+    console.log(`[printer] Reconectada ${conn.name} (${slot})`)
+    return true
+  } catch (e) {
+    console.warn(`[printer] Reconexión fallida (${slot}):`, e)
+    return false
+  }
+}
+
+function attachAutoReconnect(slot: PrinterSlot, conn: PrinterConnection) {
+  const device = conn.device
+  if (!device || device.isUsb || typeof device.addEventListener !== 'function') return
+  device.addEventListener('gattserverdisconnected', async () => {
+    // Si el slot ya fue reasignado o desconectado a propósito, no reintentar
+    if (printers.get(slot) !== conn) return
+    console.warn(`[printer] ${conn.name} se desconectó — reintentando...`)
+    for (let i = 0; i < 5; i++) {
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)))
+      if (printers.get(slot) !== conn) return
+      if (await ensureConnected(slot)) return
+    }
+    console.warn(`[printer] ${conn.name}: no se pudo reconectar tras 5 intentos`)
+  })
+}
+
+const KEEPALIVE_MS = 25_000
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let keepAliveTimer: any = null
+
+function startKeepAlive() {
+  if (keepAliveTimer) return
+  keepAliveTimer = setInterval(async () => {
+    for (const [, conn] of printers) {
+      if (conn.device?.isUsb || !conn.device?.gatt?.connected) continue
+      try {
+        // DLE EOT 1 — consulta de status en tiempo real, no imprime nada
+        await conn.characteristic.writeValueWithoutResponse(new Uint8Array([DLE, 0x04, 0x01]))
+      } catch { /* la auto-reconexión se encarga */ }
+    }
+  }, KEEPALIVE_MS)
+}
+
+/** Get the characteristic for a station (falls back to default), reconnecting if needed */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getCharForStation(station?: StationName): Promise<any | null> {
+  if (station && await ensureConnected(station)) {
+    return printers.get(station)!.characteristic
   }
   // Fallback to default printer
-  const def = printers.get('default')
-  if (def?.device?.gatt?.connected) return def.characteristic
+  if (await ensureConnected('default')) {
+    return printers.get('default')!.characteristic
+  }
   return null
 }
 
@@ -807,7 +884,7 @@ export function getSavedPrinterAssignments(): Record<string, string> {
 }
 
 export async function printTicketBluetooth(order: Order): Promise<boolean> {
-  if (!btCharacteristic) {
+  if (!(await ensureConnected('default')) || !btCharacteristic) {
     throw new Error('Impresora no conectada')
   }
 
@@ -838,7 +915,7 @@ export async function printTicketBluetooth(order: Order): Promise<boolean> {
 // ─── KITCHEN TICKET VIA BLUETOOTH ───────────────────────────────────────────
 
 export async function printKitchenTicketBluetooth(order: Order): Promise<boolean> {
-  if (!btCharacteristic) {
+  if (!(await ensureConnected('default')) || !btCharacteristic) {
     throw new Error('Impresora no conectada')
   }
 
@@ -910,7 +987,7 @@ export async function printKitchenTicketBluetooth(order: Order): Promise<boolean
 // ─── SMART PRINT: uses Bluetooth if connected, CSS fallback ─────────────────
 
 export async function printKitchenTicket(order: Order) {
-  if (isBluetoothConnected() && btCharacteristic) {
+  if (await ensureConnected('default')) {
     try {
       await printKitchenTicketBluetooth(order)
       return
@@ -924,8 +1001,8 @@ export async function printKitchenTicket(order: Order) {
 export async function printTicket(order: Order) {
   // 1) Bridge local (impresora de caja en la terminal Windows)
   if (await bridgePrint(buildESCPOS(order))) return
-  // 2) Bluetooth
-  if (isBluetoothConnected() && btCharacteristic) {
+  // 2) Bluetooth (reconecta si la impresora se durmió)
+  if (await ensureConnected('default')) {
     try {
       await printTicketBluetooth(order)
       return
@@ -1084,7 +1161,7 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
  * Uses station-specific printer if connected, otherwise falls back to default.
  */
 async function printStationTicketBluetooth(order: Order, station: StationName, items: OrderItem[]): Promise<boolean> {
-  const char = getCharForStation(station)
+  const char = await getCharForStation(station)
   if (!char) throw new Error('Impresora no conectada')
 
   const data = buildStationTicketBytes(order, station, items)
@@ -1177,8 +1254,8 @@ export async function printByStation(order: Order) {
       continue
     }
 
-    // 2) Bluetooth: station-specific printer first, then default
-    const char = getCharForStation(station)
+    // 2) Bluetooth: station-specific printer first, then default (con reconexión)
+    const char = await getCharForStation(station)
     if (char) {
       try {
         console.log(`[printer] Attempting Bluetooth print for ${station} (printer: ${getStationPrinterName(station) || getBluetoothPrinterName()})...`)
