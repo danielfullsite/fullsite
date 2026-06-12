@@ -15,7 +15,8 @@ const config: CapacitorConfig = {
         },
       }),
   ios: {
-    contentInset: 'automatic',
+    // 'never': el CSS maneja safe-areas con env(); 'automatic' duplicaba el inset top en páginas con scroll
+    contentInset: 'never',
     backgroundColor: '#0a0a0b',
     preferredContentMode: 'mobile',
     scheme: 'Fullsite',
