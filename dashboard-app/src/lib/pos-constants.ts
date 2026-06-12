@@ -26,6 +26,31 @@ export function isBebida(name: string): boolean {
   return BEBIDA_KEYWORDS.some(kw => lower.includes(kw))
 }
 
+// ─── CATEGORY COLORS (safelist) ─────────────────────────────────────────────
+// Los colores de categorías viven en Supabase (pos_menu_categories.color), pero
+// Tailwind solo compila clases que aparecen literalmente en el código fuente.
+// Esta lista garantiza que todas las clases usadas en la BD existan en el CSS.
+export const CATEGORY_COLOR_SAFELIST = [
+  'bg-rose-700', 'bg-rose-600', 'bg-rose-500',
+  'bg-red-600',
+  'bg-orange-600', 'bg-orange-500',
+  'bg-amber-700', 'bg-amber-500',
+  'bg-yellow-600', 'bg-yellow-500', 'bg-yellow-400',
+  'bg-lime-600',
+  'bg-green-700', 'bg-green-500',
+  'bg-emerald-600',
+  'bg-teal-600',
+  'bg-cyan-500',
+  'bg-sky-600', 'bg-sky-400',
+  'bg-blue-500',
+  'bg-indigo-600', 'bg-indigo-500',
+  'bg-violet-700',
+  'bg-purple-700', 'bg-purple-600',
+  'bg-fuchsia-600', 'bg-fuchsia-500',
+  'bg-pink-500',
+  'bg-slate-600',
+]
+
 // ─── STATION ROUTING ────────────────────────────────────────────────────────
 
 export type StationName = 'cocina' | 'barra' | 'caja'

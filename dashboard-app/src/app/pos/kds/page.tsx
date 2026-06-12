@@ -32,6 +32,7 @@ interface ParsedItem {
   modificadores?: string[]
   notas?: string
   cancelled?: boolean
+  station?: string  // 'cocina' | 'barra' | 'caja' — fijada por el POS al agregar (por categoría)
 }
 
 type Station = 'caliente' | 'fria' | 'panaderia' | 'barra'
@@ -42,8 +43,19 @@ const STATION_KEYWORDS: Record<string, string[]> = {
   panaderia: ['croissant', 'concha', 'bakery', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
 }
 
-function getStation(itemName: string): string {
-  const name = itemName.toLowerCase()
+function getStation(item: ParsedItem): string {
+  // Estación explícita del POS (ruteo por categoría) — fuente de verdad
+  if (item.station === 'barra') return 'barra'
+  if (item.station === 'caja') return 'panaderia'
+  const name = (item.nombre || item.name || '').toLowerCase()
+  if (item.station === 'cocina') {
+    // Dentro de cocina, separar fría/panadería por keywords; nunca barra
+    for (const st of ['fria', 'panaderia']) {
+      if (STATION_KEYWORDS[st].some(kw => name.includes(kw))) return st
+    }
+    return 'caliente'
+  }
+  // Órdenes viejas sin station: clasificación por nombre (legacy)
   for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
     if (keywords.some(kw => name.includes(kw))) return station
   }
@@ -159,7 +171,7 @@ export default function KDSPage() {
     .filter(o => {
       // all items shown for this station
       const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
-      return items.some(item => !item.cancelled && getStation(item.nombre || item.name || '') === station)
+      return items.some(item => !item.cancelled && getStation(item) === station)
     })
     .sort((a, b) => {
       const p: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
@@ -174,7 +186,7 @@ export default function KDSPage() {
     const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
     for (const item of items) {
       if (item.cancelled) continue
-      const s = getStation(item.nombre || item.name || '')
+      const s = getStation(item)
       const qty = item.cantidad || item.quantity || 1
       stationCounts[s] += qty
     }
@@ -265,7 +277,7 @@ export default function KDSPage() {
                 .filter(({ item }) => {
                   if (item.cancelled) return false
                   // all items shown for this station
-                  return getStation(item.nombre || item.name || '') === station
+                  return getStation(item) === station
                 })
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
               const totalCount = activeItemsWithIndex.length

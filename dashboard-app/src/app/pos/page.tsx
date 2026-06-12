@@ -30,7 +30,7 @@ import {
   type PaymentMethodDB,
   type PagoForma,
 } from '@/lib/pos-data'
-import { TIEMPO_ITEM_ID, isTiempoItem } from '@/lib/pos-constants'
+import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem } from '@/lib/pos-constants'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -1429,7 +1429,7 @@ function POSContent() {
     let menuItem: MenuItem | null = null
     for (const cat of menuCategories) {
       const found = cat.items.find(i => i.id === orderItem.menuItemId)
-      if (found) { menuItem = found; break }
+      if (found) { menuItem = found; setModifierCategoryId(cat.id); break }
     }
     if (menuItem) {
       setEditingOrderItem(orderItem)
@@ -1461,6 +1461,10 @@ function POSContent() {
   const handleModifierConfirm = useCallback((orderItem: OrderItem) => {
     setOrderItems(prev => {
       const existingIndex = prev.findIndex(oi => oi.id === orderItem.id)
+      // Estación de ruteo: se fija al agregar (categoría real de BD); al editar se preserva
+      const station = existingIndex >= 0
+        ? prev[existingIndex].station ?? getStationForItem(modifierCategoryId, orderItem.nombre)
+        : getStationForItem(modifierCategoryId, orderItem.nombre)
       if (existingIndex >= 0) {
         const old = prev[existingIndex]
         logAudit({
@@ -1472,7 +1476,7 @@ function POSContent() {
           },
         })
         const next = [...prev]
-        next[existingIndex] = orderItem
+        next[existingIndex] = { ...orderItem, station }
         return next
       }
       logAudit({
@@ -1485,13 +1489,13 @@ function POSContent() {
         qty: orderItem.cantidad, precio: orderItem.precio, mesa, clientId: getClientId(),
       })
       // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
-      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual }]
+      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual, station }]
     })
     setFlashItemId(orderItem.id)
     setTimeout(() => setFlashItemId(null), 500)
     setModifierItem(null)
     setEditingOrderItem(null)
-  }, [orderId, mesero, mesa, sillaActual])
+  }, [orderId, mesero, mesa, sillaActual, modifierCategoryId])
 
   const handleModifierCancel = useCallback(() => {
     setModifierItem(null)
@@ -2429,7 +2433,7 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3 p-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2 p-3">
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
@@ -2439,7 +2443,7 @@ function POSContent() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-4 py-4 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-1 ${catColor} opacity-60 text-white hover:opacity-90 active:scale-95`}
+                          className={`px-2 py-2 rounded-xl text-[13px] font-bold text-center transition-all min-h-[60px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-70 text-white hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>

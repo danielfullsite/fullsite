@@ -1085,8 +1085,9 @@ export function splitOrderByStation(order: Order): Record<StationName, OrderItem
       for (const s of stations) result[s].push(item)
       continue
     }
-    const catId = getCategoryIdForItem(item)
-    const station = getStationForItem(catId, item.nombre)
+    // Estación explícita del item (fijada por el POS al agregar, por categoría de BD)
+    // — el lookup por MENU_CATEGORIES estático falla con el catálogo Wansoft importado
+    const station = item.station ?? getStationForItem(getCategoryIdForItem(item), item.nombre)
     result[station].push(item)
   }
   // Limpiar: quitar separadores colgantes (sin platillos después) y

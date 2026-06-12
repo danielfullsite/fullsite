@@ -169,6 +169,7 @@ export interface OrderItem {
   precioExtra: number      // sum of extra modifiers
   subtotal: number         // (precio + precioExtra) * cantidad
   silla?: number           // seat/person number (1, 2, 3...)
+  station?: 'cocina' | 'barra' | 'caja'  // estación de ruteo, fijada al agregar (por categoría)
 }
 
 // Keep legacy alias for any other pages that import the old shape
