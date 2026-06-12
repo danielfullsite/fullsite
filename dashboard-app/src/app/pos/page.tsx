@@ -19,15 +19,19 @@ import {
   getModifiersForCategory,
   getMenuCategoriesFromDB,
   getModifiersForCategoryFromDB,
+  getModifierGroupsForItem,
   getPaymentMethodsFromDB,
   getActiveTurno,
+  getClientId,
   type RecipeRow,
   type Ingredient,
   type ModificadorAgregar,
+  type ModifierGroupDef,
   type PaymentMethodDB,
   type PagoForma,
 } from '@/lib/pos-data'
 import { TIEMPO_ITEM_ID, isTiempoItem } from '@/lib/pos-constants'
+import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
@@ -126,7 +130,65 @@ interface ModifierModalProps {
 }
 
 function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onConfirm, onCancel }: ModifierModalProps) {
-  const { quitarOptions: defaultQuitar, agregarOptions } = getModifiersForCategory(categoryId)
+  const { quitarOptions: defaultQuitar, agregarOptions: legacyAgregar } = getModifiersForCategory(categoryId)
+
+  // ── Grupos multinivel (Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
+  const [modGroups, setModGroups] = useState<ModifierGroupDef[]>([])
+  const [groupChecked, setGroupChecked] = useState<Map<string, Set<string>>>(() => {
+    // Restore selections when editing: match existing modifier strings to options later
+    return new Map()
+  })
+  useEffect(() => {
+    let alive = true
+    getModifierGroupsForItem(item.id, categoryId).then(groups => {
+      if (!alive || groups.length === 0) return
+      setModGroups(groups)
+      if (existingOrder) {
+        // Re-marcar opciones ya elegidas (strings "Nombre +$50" → nombre)
+        const existing = new Set(existingOrder.modificadores.map(m => m.replace(/ \+\$[\d.]+$/, '')))
+        const restored = new Map<string, Set<string>>()
+        for (const g of groups) {
+          const sel = new Set(g.options.filter(o => existing.has(o.name)).map(o => o.name))
+          if (sel.size > 0) restored.set(g.id, sel)
+        }
+        setGroupChecked(restored)
+      }
+    })
+    return () => { alive = false }
+  }, [item.id, categoryId, existingOrder])
+
+  const hasGroups = modGroups.length > 0
+  // Con grupos configurados, el legacy "Agregar" se oculta (los grupos lo reemplazan)
+  const agregarOptions = hasGroups ? [] : legacyAgregar
+
+  const toggleGroupOption = (group: ModifierGroupDef, optName: string) => {
+    setGroupChecked(prev => {
+      const next = new Map(prev)
+      const sel = new Set(next.get(group.id) || [])
+      if (sel.has(optName)) {
+        sel.delete(optName)
+      } else {
+        if (group.maxSelections === 1 && sel.size === 1) sel.clear() // radio behavior
+        else if (group.maxSelections !== null && sel.size >= group.maxSelections) return prev // max reached
+        sel.add(optName)
+      }
+      next.set(group.id, sel)
+      return next
+    })
+  }
+
+  const groupsPrecioExtra = modGroups.reduce((sum, g) => {
+    const sel = groupChecked.get(g.id)
+    if (!sel) return sum
+    return sum + g.options.filter(o => sel.has(o.name)).reduce((s, o) => s + o.price, 0)
+  }, 0)
+
+  // Grupos con mínimo no cumplido (bloquean confirmar)
+  const unmetGroups = modGroups.filter(g => {
+    const count = groupChecked.get(g.id)?.size || 0
+    const min = g.required ? Math.max(1, g.minSelections) : g.minSelections
+    return count < min
+  })
 
   // Dynamic "quitar" options from recipe ingredients (food only)
   const quitarOptions = recipeIngredients.length > 0
@@ -166,13 +228,21 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 
   const precioExtra = agregarOptions
     .filter(m => agregarChecked.has(m.name))
-    .reduce((sum, m) => sum + m.price, 0)
+    .reduce((sum, m) => sum + m.price, 0) + groupsPrecioExtra
 
   const subtotal = (item.price + precioExtra) * cantidad
 
   const buildModificadores = (): string[] => {
     const mods: string[] = []
     quitarChecked.forEach(m => mods.push(m))
+    // Grupos multinivel — en orden de nivel
+    for (const g of modGroups) {
+      const sel = groupChecked.get(g.id)
+      if (!sel) continue
+      for (const o of g.options) {
+        if (sel.has(o.name)) mods.push(o.price > 0 ? `${o.name} +$${o.price}` : o.name)
+      }
+    }
     agregarChecked.forEach(name => {
       const mod = agregarOptions.find(m => m.name === name)
       if (mod) {
@@ -255,6 +325,74 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               ))}
             </div>
           </div>}
+
+          {/* Grupos multinivel (Wansoft) */}
+          {modGroups.map(group => {
+            const sel = groupChecked.get(group.id) || new Set<string>()
+            const min = group.required ? Math.max(1, group.minSelections) : group.minSelections
+            const maxReached = group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
+            const unmet = sel.size < min
+            return (
+              <div key={group.id}>
+                <h4 className="text-sm font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-[var(--text-3)]">Nivel {group.level}: {group.name}</span>
+                  {min > 0 ? (
+                    <span className={`text-[11px] normal-case font-bold px-2 py-0.5 rounded-full ${unmet ? 'bg-red-900/50 text-red-300 border border-red-700/60' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/50'}`}>
+                      Obligatorio{min > 1 ? ` (mín ${min})` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] normal-case font-medium px-2 py-0.5 rounded-full bg-[var(--line)]/60 text-[var(--text-3)]">Opcional</span>
+                  )}
+                  {group.maxSelections !== null && (
+                    <span className={`text-[11px] normal-case font-medium px-2 py-0.5 rounded-full ${maxReached ? 'bg-amber-900/40 text-amber-300 border border-amber-700/50' : 'bg-[var(--line)]/60 text-[var(--text-3)]'}`}>
+                      Máx {group.maxSelections}{group.maxSelections > 1 ? ` (${sel.size}/${group.maxSelections})` : ''}
+                    </span>
+                  )}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {group.options.map(opt => {
+                    const checked = sel.has(opt.name)
+                    const blocked = !checked && group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
+                    return (
+                      <label
+                        key={opt.name}
+                        className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors min-h-[44px] ${
+                          checked
+                            ? 'bg-emerald-900/40 border border-emerald-700/60 cursor-pointer'
+                            : blocked
+                            ? 'bg-[var(--line)]/30 border border-slate-700/40 opacity-40 cursor-not-allowed'
+                            : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)] cursor-pointer'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={blocked}
+                          onChange={() => toggleGroupOption(group, opt.name)}
+                          className="sr-only"
+                        />
+                        <div className={`w-5 h-5 ${group.maxSelections === 1 ? 'rounded-full' : 'rounded'} border-2 flex items-center justify-center flex-shrink-0 ${
+                          checked ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--line-soft)]0'
+                        }`}>
+                          {checked && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1 flex items-center justify-between">
+                          <span className="text-sm text-white">{opt.name}</span>
+                          <span className={`text-xs font-medium ${opt.price > 0 ? 'text-emerald-400' : 'text-[var(--text-3)]'}`}>
+                            {opt.price > 0 ? `+${formatMXN(opt.price)}` : 'Gratis'}
+                          </span>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
 
           {/* Agregar section */}
           {agregarOptions.length > 0 && <div>
@@ -365,9 +503,12 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-[2] py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors min-h-[48px]"
+            disabled={unmetGroups.length > 0}
+            className="flex-[2] py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold transition-colors min-h-[48px]"
           >
-            {existingOrder ? 'Actualizar' : 'Agregar'} {formatMXN(subtotal)}
+            {unmetGroups.length > 0
+              ? `Elige ${unmetGroups[0].name}`
+              : <>{existingOrder ? 'Actualizar' : 'Agregar'} {formatMXN(subtotal)}</>}
           </button>
         </div>
       </div>
@@ -1237,6 +1378,11 @@ function POSContent() {
         order_id: orderId, action: 'item_added', actor: mesero, mesa,
         details: { item: orderItem.nombre, cantidad: orderItem.cantidad, precio: orderItem.precio, modificadores: orderItem.modificadores, silla: orderItem.silla ?? sillaActual },
       })
+      // Shadow mode (Fullsite OS): evento append-only en paralelo, fire-and-forget
+      publishEvent('orders.item.added.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+        ticketId: orderId, itemId: orderItem.id, productId: orderItem.nombre,
+        qty: orderItem.cantidad, precio: orderItem.precio, mesa, clientId: getClientId(),
+      })
       // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
       return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual }]
     })
@@ -1260,6 +1406,15 @@ function POSContent() {
       reason,
       approved_by: managerName,
     })
+    // Shadow mode: evento SENSIBLE — la BD lo rechaza sin audit.approvedBy
+    publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+      ticketId: orderId, itemId: cancellingItem.id, productId: cancellingItem.nombre,
+      qty: cancellingItem.cantidad, inventoryImpact: true, mesa, clientId: getClientId(),
+    }, {
+      requestedBy: mesero, approvedBy: managerName, reason,
+      before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal },
+      after: { qty: 0, cancelled: true },
+    })
     setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
     setCancellingItem(null)
     showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
@@ -1274,6 +1429,17 @@ function POSContent() {
       reason,
       approved_by: managerName,
     })
+    // Shadow mode: anulación = un evento sensible por cada línea de la orden
+    for (const i of orderItems) {
+      publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+        ticketId: orderId, itemId: i.id, productId: i.nombre,
+        qty: i.cantidad, inventoryImpact: true, mesa, clientId: getClientId(), voidOrder: true,
+      }, {
+        requestedBy: mesero, approvedBy: managerName, reason: `ANULACIÓN ORDEN: ${reason}`,
+        before: { qty: i.cantidad, subtotal: i.subtotal },
+        after: { qty: 0, cancelled: true },
+      })
+    }
     // Mark order as cancelled in database (if it was already saved)
     if (loadedOrderId) {
       try {

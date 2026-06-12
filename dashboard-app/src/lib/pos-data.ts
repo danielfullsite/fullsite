@@ -328,6 +328,76 @@ export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: num
   } catch { return null }
 }
 
+// ── Modificadores multinivel (estilo Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
+
+export interface ModifierGroupDef {
+  id: string
+  name: string
+  /** Nivel Wansoft (1, 2, 3...) — define orden de render */
+  level: number
+  minSelections: number
+  /** null = sin límite */
+  maxSelections: number | null
+  required: boolean
+  options: ModificadorAgregar[]
+}
+
+/**
+ * Grupos de modificadores multinivel para un producto.
+ * Asignación por item (pos_item_modifier_groups) + por categoría (pos_category_modifiers).
+ * Devuelve [] si no hay grupos configurados — el modal cae al sistema legacy.
+ */
+export async function getModifierGroupsForItem(itemId: string, categoryId: string): Promise<ModifierGroupDef[]> {
+  try {
+    const cid = _getClientId()
+    const [itemAssignRes, catAssignRes] = await Promise.all([
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&item_id=eq.${encodeURIComponent(itemId)}&select=group_id`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&category_id=eq.${encodeURIComponent(categoryId)}&select=modifier_group_id`, { headers: _SB_HEADERS, cache: 'no-store' }),
+    ])
+
+    const groupIds = new Set<string>()
+    if (itemAssignRes.ok) {
+      for (const a of await itemAssignRes.json() as { group_id: string }[]) groupIds.add(a.group_id)
+    }
+    if (catAssignRes.ok) {
+      for (const a of await catAssignRes.json() as { modifier_group_id: string }[]) groupIds.add(a.modifier_group_id)
+    }
+    groupIds.delete('quitar') // legacy group, manejado aparte
+    if (groupIds.size === 0) return []
+
+    const idList = [...groupIds].map(encodeURIComponent).join(',')
+    const [groupsRes, optsRes] = await Promise.all([
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&id=in.(${idList})&order=level.asc,sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&group_id=in.(${idList})&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+    ])
+    if (!groupsRes.ok || !optsRes.ok) return []
+
+    const groups: { id: string; name: string; level: number; min_selections: number; max_selections: number | null; required: boolean }[] = await groupsRes.json()
+    const opts: { group_id: string; name: string; price: number }[] = await optsRes.json()
+
+    const optsByGroup = new Map<string, ModificadorAgregar[]>()
+    for (const o of opts) {
+      const arr = optsByGroup.get(o.group_id) || []
+      arr.push({ name: o.name, price: Number(o.price) })
+      optsByGroup.set(o.group_id, arr)
+    }
+
+    return groups
+      .map(g => ({
+        id: g.id,
+        name: g.name,
+        level: Number(g.level) || 1,
+        minSelections: Number(g.min_selections) || 0,
+        maxSelections: g.max_selections === null ? null : Number(g.max_selections),
+        required: Boolean(g.required),
+        options: optsByGroup.get(g.id) || [],
+      }))
+      .filter(g => g.options.length > 0)
+  } catch {
+    return []
+  }
+}
+
 export async function getModifiersForCategoryFromDB(categoryId: string): Promise<{
   quitarOptions: string[]
   agregarOptions: ModificadorAgregar[]
