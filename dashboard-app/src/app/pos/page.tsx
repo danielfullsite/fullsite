@@ -523,7 +523,7 @@ interface DiscountModalProps {
   subtotal: number
   personas: number
   items: OrderItem[]
-  onApply: (discount: number, reason?: string) => void
+  onApply: (discount: number, reason: string | undefined, approvedBy: string) => void
   onCancel: () => void
 }
 
@@ -740,7 +740,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                 mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p`
                 : mode === '2x1' ? `Promo 2x1 (${promoPairs} ${promoPairs === 1 ? 'par' : 'pares'})`
                 : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`
-              ))
+              ), manager)
             }}
             disabled={discountAmount <= 0 || pin.length < 4}
             className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : mode === '2x1' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
@@ -1772,6 +1772,13 @@ function POSContent() {
         order_id: payId, action: 'payment_processed', actor: mesero, mesa,
         details: { method: metodoLabel, pagos, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
+      // Shadow mode (Fullsite OS): pago capturado, fire-and-forget
+      publishEvent('payments.payment.captured.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+        ticketId: payId, total: payTotal, subtotal: paySubtotal, iva: payIva,
+        descuento: payDiscount, propina, metodo: metodoLabel, pagos,
+        cuenta: splitPayingCuenta || 'full', mesa, clientId: getClientId(),
+        turnoId: turnoId || null,
+      })
 
       // Print ticket for THIS cuenta
       handlePrintTicket(order)
@@ -1814,10 +1821,20 @@ function POSContent() {
     setSplitParejoN(0)
   }
 
-  const handleApplyDiscount = (amount: number, reason?: string) => {
+  const handleApplyDiscount = (amount: number, reason: string | undefined, approvedBy: string) => {
     logAudit({
       order_id: orderId, action: 'discount_applied', actor: mesero, mesa,
       details: { amount, subtotal, reason: reason || 'Sin motivo' },
+      approved_by: approvedBy,
+    })
+    // Shadow mode: evento SENSIBLE — el modal ya exige PIN de gerente,
+    // approvedBy es el gerente que lo autorizó.
+    publishEvent('orders.discount.applied.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+      ticketId: orderId, amount, mesa, clientId: getClientId(),
+    }, {
+      requestedBy: mesero, approvedBy, reason: reason || 'Sin motivo',
+      before: { subtotal, descuento: 0 },
+      after: { subtotal: subtotal - amount, descuento: amount },
     })
     setDiscount(amount)
     setShowDiscount(false)
