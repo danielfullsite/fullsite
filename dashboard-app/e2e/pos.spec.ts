@@ -20,7 +20,11 @@ test.describe('POS -- Punto de Venta', () => {
 })
 
 test.describe('POS Sub-pages', () => {
-  const subPages = ['/pos/cocina', '/pos/qr', '/pos/facturacion']
+  const subPages = [
+    '/pos/cocina', '/pos/barra', '/pos/kds', '/pos/qr', '/pos/facturacion',
+    '/pos/mesas', '/pos/historial', '/pos/turno', '/pos/auditoria',
+    '/pos/inventario', '/pos/recetas', '/pos/compras', '/pos/delivery',
+  ]
 
   for (const path of subPages) {
     test(`${path} loads without error`, async ({ page }) => {
@@ -34,4 +38,16 @@ test.describe('POS Sub-pages', () => {
       await expect(body).toBeVisible()
     })
   }
+})
+
+test.describe('POS Corte — gate de PIN', () => {
+  test('/pos/corte exige PIN de gerente antes de mostrar datos', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/pos/corte', { timeout: 30_000 })
+    await page.waitForLoadState('domcontentloaded')
+    // Sin sessionStorage corte_access, debe mostrar el gate (input password)
+    await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 15_000 })
+    // Y NO debe mostrar montos del corte
+    await expect(page.locator('text=Total ventas')).toHaveCount(0)
+  })
 })

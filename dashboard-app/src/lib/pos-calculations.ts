@@ -86,6 +86,73 @@ export function calcSplitPayment(
   return calcOrderTotals(payingItems, effectiveDiscount)
 }
 
+// ─── Split N-way (parejo / por items con descuento prorrateado) ────────────
+
+export const round2 = (n: number) => Math.round(n * 100) / 100
+
+export interface SplitPaymentTotals {
+  subtotal: number
+  discount: number
+  subtotalAfterDiscount: number
+  iva: number
+  total: number
+}
+
+/**
+ * Split parejo: cada cuenta paga total/N redondeado a centavos;
+ * la última cuenta paga el remanente exacto para que la suma cierre.
+ */
+export function calcSplitParejo(
+  items: Pick<OrderItem, 'subtotal'>[],
+  discount: number,
+  n: number,
+  cuenta: number, // 1..n
+): SplitPaymentTotals {
+  const fullSubtotal = items.reduce((s, i) => s + i.subtotal, 0)
+  const fullAfterDisc = Math.max(0, fullSubtotal - discount)
+  const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+  const isLast = cuenta === n
+  const each = (full: number) => isLast
+    ? round2(full - round2(full / n) * (n - 1))
+    : round2(full / n)
+  const subtotal = each(fullSubtotal)
+  const disc = each(discount)
+  const subtotalAfterDiscount = Math.max(0, subtotal - disc)
+  return {
+    subtotal,
+    discount: disc,
+    subtotalAfterDiscount,
+    iva: subtotalAfterDiscount * IVA_RATE,
+    total: each(fullTotal),
+  }
+}
+
+/**
+ * Split por items: la cuenta paga sus items asignados; el descuento global
+ * se prorratea según la fracción del subtotal que representa la cuenta.
+ */
+export function calcSplitItems(
+  items: Pick<OrderItem, 'id' | 'subtotal'>[],
+  assignments: Record<string, number>,
+  cuenta: number, // 1..n
+  discount: number,
+): SplitPaymentTotals & { payingItems: Pick<OrderItem, 'id' | 'subtotal'>[] } {
+  const payingItems = items.filter(i => (assignments[i.id] || 1) === cuenta)
+  const subtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
+  const fullSubtotal = items.reduce((s, i) => s + i.subtotal, 0)
+  const disc = fullSubtotal > 0 ? round2(discount * (subtotal / fullSubtotal)) : 0
+  const subtotalAfterDiscount = Math.max(0, subtotal - disc)
+  const iva = subtotalAfterDiscount * IVA_RATE
+  return {
+    payingItems,
+    subtotal,
+    discount: disc,
+    subtotalAfterDiscount,
+    iva,
+    total: subtotalAfterDiscount + iva,
+  }
+}
+
 // ─── Propinas (tips) ───────────────────────────────────────────────────────
 
 /** Calculate tip from a percentage of the total. Result is rounded to nearest peso. */

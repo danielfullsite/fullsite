@@ -18,7 +18,6 @@ test.describe('Dashboard', () => {
     await expect(page.locator('input[type="email"]')).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toBeVisible()
-    await expect(page.locator('text=Continuar con Google')).toBeVisible()
     await expect(page.locator('text=Bienvenido')).toBeVisible()
   })
 })

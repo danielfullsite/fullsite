@@ -31,6 +31,7 @@ import {
   type PagoForma,
 } from '@/lib/pos-data'
 import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem } from '@/lib/pos-constants'
+import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
@@ -1733,20 +1734,19 @@ function POSContent() {
     let payTotal: number
 
     if (splitMode === 'parejo' && splitPayingCuenta > 0) {
-      // Parejo: equal split — each person pays total / N
-      const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
-      const fullDiscount = discount
-      const fullAfterDisc = Math.max(0, fullSubtotal - fullDiscount)
-      const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
-      paySubtotal = fullSubtotal / splitParejoN
-      payDiscount = fullDiscount / splitParejoN
-      payTotal = fullTotal / splitParejoN
+      // Parejo: equal split — each person pays total / N.
+      // Centavos: cuentas 1..N-1 pagan round(total/N); la última paga el remanente exacto.
+      const r = calcSplitParejo(activeItems, discount, splitParejoN, splitPayingCuenta)
+      paySubtotal = r.subtotal
+      payDiscount = r.discount
+      payTotal = r.total
     } else if (splitPayingCuenta > 0) {
-      payingItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === splitPayingCuenta)
-      paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-      payDiscount = 0
-      const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
-      payTotal = paySubtotalAfterDiscount + paySubtotalAfterDiscount * IVA_RATE
+      // Split por items: el descuento global se prorratea según la parte del subtotal
+      const r = calcSplitItems(activeItems, splitAssignments, splitPayingCuenta, discount)
+      payingItems = r.payingItems as typeof activeItems
+      paySubtotal = r.subtotal
+      payDiscount = r.discount
+      payTotal = r.total
     } else {
       paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
       payDiscount = discount
@@ -2997,18 +2997,16 @@ function POSContent() {
               let payTotal: number
 
               if (splitMode === 'parejo' && splitPayingCuenta > 0) {
-                const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
-                const fullAfterDisc = Math.max(0, fullSubtotal - discount)
-                const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
-                paySubtotal = fullSubtotal / splitParejoN
-                payDiscountLocal = discount / splitParejoN
-                payTotal = fullTotal / splitParejoN
+                const r = calcSplitParejo(activeItems, discount, splitParejoN, splitPayingCuenta)
+                paySubtotal = r.subtotal
+                payDiscountLocal = r.discount
+                payTotal = r.total
               } else if (splitPayingCuenta > 0) {
-                payingItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === splitPayingCuenta)
-                paySubtotal = payingItems.reduce((s, i) => s + i.subtotal, 0)
-                payDiscountLocal = 0
-                const sub = Math.max(0, paySubtotal - payDiscountLocal)
-                payTotal = sub + sub * IVA_RATE
+                const r = calcSplitItems(activeItems, splitAssignments, splitPayingCuenta, discount)
+                payingItems = r.payingItems as typeof activeItems
+                paySubtotal = r.subtotal
+                payDiscountLocal = r.discount
+                payTotal = r.total
               } else {
                 paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
                 payDiscountLocal = discount

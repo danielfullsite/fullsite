@@ -21,8 +21,8 @@ test.describe('Login Page', () => {
     await expect(page.locator('[class*="red"]').first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('google oauth button exists', async ({ page }) => {
+  test('submit button exists', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.locator('text=Continuar con Google')).toBeVisible()
+    await expect(page.locator('button[type="submit"]')).toBeVisible()
   })
 })

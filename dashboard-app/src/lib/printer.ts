@@ -128,12 +128,7 @@ export async function openCashDrawer(): Promise<boolean> {
   }
   try {
     // ESC p 0 25 250 — kick drawer pin 2 (standard RJ-11 connection)
-    const cmd = new Uint8Array([ESC, 0x70, 0x00, 0x19, 0xFA])
-    if (btCharacteristic.properties.writeWithoutResponse) {
-      await btCharacteristic.writeValueWithoutResponse(cmd)
-    } else {
-      await btCharacteristic.writeValueWithResponse(cmd)
-    }
+    await writeToPrinter(btCharacteristic, new Uint8Array([ESC, 0x70, 0x00, 0x19, 0xFA]))
     console.log('[printer] Cash drawer opened')
     return true
   } catch (e) {
@@ -177,6 +172,32 @@ async function isBridgeAvailable(): Promise<boolean> {
   }
   if (bridgeAvailable) console.log('[printer] Print bridge detectado en', BRIDGE_URL)
   return bridgeAvailable
+}
+
+// ── Escritura serializada a impresora ───────────────────────────────────────
+// ESC/POS es sensible al orden de bytes: dos impresiones concurrentes (o un
+// keep-alive a media impresión) intercalarían chunks y corromperían el ticket.
+// Toda escritura BT/USB pasa por esta cola global.
+let printChain: Promise<void> = Promise.resolve()
+const BT_CHUNK_SIZE = 128
+
+// Exportada para tests (serialización de escrituras concurrentes).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function writeToPrinter(char: any, data: Uint8Array): Promise<void> {
+  const run = async () => {
+    for (let i = 0; i < data.length; i += BT_CHUNK_SIZE) {
+      const chunk = data.slice(i, i + BT_CHUNK_SIZE)
+      if (char.properties.writeWithoutResponse) {
+        await char.writeValueWithoutResponse(chunk)
+      } else {
+        await char.writeValueWithResponse(chunk)
+      }
+      await new Promise(r => setTimeout(r, 50))
+    }
+  }
+  const p = printChain.then(run, run)
+  printChain = p.then(() => undefined, () => undefined)
+  return p
 }
 
 function bytesToBase64(data: Uint8Array): string {
@@ -362,16 +383,7 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
   if (!(await ensureConnected('default')) || !btCharacteristic) throw new Error('Impresora no conectada')
 
   const data = buildPreTicketBytes(order)
-  const CHUNK_SIZE = 128
-  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-    const chunk = data.slice(i, i + CHUNK_SIZE)
-    if (btCharacteristic.properties.writeWithoutResponse) {
-      await btCharacteristic.writeValueWithoutResponse(chunk)
-    } else {
-      await btCharacteristic.writeValueWithResponse(chunk)
-    }
-    await new Promise(r => setTimeout(r, 50))
-  }
+  await writeToPrinter(btCharacteristic, data)
   return true
 }
 
@@ -855,8 +867,9 @@ function startKeepAlive() {
     for (const [, conn] of printers) {
       if (conn.device?.isUsb || !conn.device?.gatt?.connected) continue
       try {
-        // DLE EOT 1 — consulta de status en tiempo real, no imprime nada
-        await conn.characteristic.writeValueWithoutResponse(new Uint8Array([DLE, 0x04, 0x01]))
+        // DLE EOT 1 — consulta de status en tiempo real, no imprime nada.
+        // Pasa por la cola para nunca caer a media impresión.
+        await writeToPrinter(conn.characteristic, new Uint8Array([DLE, 0x04, 0x01]))
       } catch { /* la auto-reconexión se encarga */ }
     }
   }, KEEPALIVE_MS)
@@ -898,18 +911,7 @@ export async function printTicketBluetooth(order: Order): Promise<boolean> {
   try {
     const data = buildESCPOS(order)
 
-    // Send in chunks (BLE has ~20 byte MTU typically, but most printers handle 128-512)
-    const CHUNK_SIZE = 128
-    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-      const chunk = data.slice(i, i + CHUNK_SIZE)
-      if (btCharacteristic.properties.writeWithoutResponse) {
-        await btCharacteristic.writeValueWithoutResponse(chunk)
-      } else {
-        await btCharacteristic.writeValueWithResponse(chunk)
-      }
-      // Small delay between chunks
-      await new Promise(r => setTimeout(r, 50))
-    }
+    await writeToPrinter(btCharacteristic, data)
 
     console.log(`[printer] Printed ${data.length} bytes`)
     return true
@@ -974,16 +976,7 @@ export async function printKitchenTicketBluetooth(order: Order): Promise<boolean
   const data = new Uint8Array(cmds)
 
   try {
-    const CHUNK_SIZE = 128
-    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-      const chunk = data.slice(i, i + CHUNK_SIZE)
-      if (btCharacteristic.properties.writeWithoutResponse) {
-        await btCharacteristic.writeValueWithoutResponse(chunk)
-      } else {
-        await btCharacteristic.writeValueWithResponse(chunk)
-      }
-      await new Promise(r => setTimeout(r, 50))
-    }
+    await writeToPrinter(btCharacteristic, data)
     return true
   } catch (e) {
     console.error('[printer] Kitchen print failed:', e)
@@ -1173,17 +1166,7 @@ async function printStationTicketBluetooth(order: Order, station: StationName, i
   if (!char) throw new Error('Impresora no conectada')
 
   const data = buildStationTicketBytes(order, station, items)
-
-  const CHUNK_SIZE = 128
-  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-    const chunk = data.slice(i, i + CHUNK_SIZE)
-    if (char.properties.writeWithoutResponse) {
-      await char.writeValueWithoutResponse(chunk)
-    } else {
-      await char.writeValueWithResponse(chunk)
-    }
-    await new Promise(r => setTimeout(r, 50))
-  }
+  await writeToPrinter(char, data)
   return true
 }
 

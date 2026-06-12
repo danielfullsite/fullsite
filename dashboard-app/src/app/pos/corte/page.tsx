@@ -108,7 +108,27 @@ export default function CortePage() {
     setReopenError('')
   }
 
-  useEffect(() => { fetchData() }, [selectedDate])
+  // ── Gate de acceso: el corte expone ventas/propinas/arqueo — requiere PIN de gerente ──
+  const [accessGranted, setAccessGranted] = useState(() =>
+    typeof window !== 'undefined' && sessionStorage.getItem('corte_access') === '1'
+  )
+  const [accessPin, setAccessPin] = useState('')
+  const [accessError, setAccessError] = useState('')
+  const [accessChecking, setAccessChecking] = useState(false)
+
+  const handleAccess = async () => {
+    if (!accessPin || accessChecking) return
+    setAccessChecking(true)
+    setAccessError('')
+    const manager = await verifyManagerPin(accessPin)
+    setAccessChecking(false)
+    if (!manager) { setAccessError('PIN inválido'); setAccessPin(''); return }
+    sessionStorage.setItem('corte_access', '1')
+    logAudit({ order_id: 'corte', action: 'status_changed', actor: manager, details: { type: 'corte_viewed', date: selectedDate } })
+    setAccessGranted(true)
+  }
+
+  useEffect(() => { if (accessGranted) fetchData() }, [selectedDate, accessGranted])
 
   const stats = useMemo(() => {
     const closed = orders.filter(o => o.status === 'cerrada')
@@ -202,6 +222,37 @@ export default function CortePage() {
       cancellations: cancellations.length,
     }
   }, [orders, auditLog, cardPct])
+
+  if (!accessGranted) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--surface)] text-white p-4">
+        <div className="bg-[var(--surface-2)] border border-slate-700 rounded-2xl p-8 w-full max-w-sm text-center">
+          <ShieldAlert size={40} className="mx-auto mb-4 text-amber-400" />
+          <h1 className="text-lg font-bold mb-1">Corte de turno</h1>
+          <p className="text-sm text-slate-400 mb-6">Acceso solo con PIN de gerente</p>
+          <input
+            type="password"
+            inputMode="numeric"
+            autoFocus
+            value={accessPin}
+            onChange={e => { setAccessPin(e.target.value); setAccessError('') }}
+            onKeyDown={e => { if (e.key === 'Enter') handleAccess() }}
+            placeholder="PIN"
+            className="w-full bg-[var(--surface)] border border-slate-600 rounded-xl px-4 py-3 text-center text-2xl tracking-[0.5em] mb-3 focus:outline-none focus:border-emerald-500"
+          />
+          {accessError && <p className="text-red-400 text-sm mb-3">{accessError}</p>}
+          <button
+            onClick={handleAccess}
+            disabled={accessChecking || !accessPin}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-bold py-3 rounded-xl transition-colors"
+          >
+            {accessChecking ? 'Verificando...' : 'Entrar'}
+          </button>
+          <Link href="/pos" className="block mt-4 text-sm text-slate-400 hover:text-white">Volver al POS</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-screen flex flex-col text-white bg-[var(--surface)]">

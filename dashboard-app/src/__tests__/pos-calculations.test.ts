@@ -500,3 +500,118 @@ describe('Real-world scenarios', () => {
     expect(totalConPropina(c1Totals.total, 0)).toBeCloseTo(c1Totals.total)
   })
 })
+
+// ─── calcSplitParejo (split parejo N-way, cierre de centavos) ───────────────
+
+import { calcSplitParejo, calcSplitItems, round2 } from '@/lib/pos-calculations'
+
+describe('calcSplitParejo', () => {
+  it('splits an even total exactly', () => {
+    const items = [makeItem('a', 100, 2)] // subtotal 200
+    const r1 = calcSplitParejo(items, 0, 2, 1)
+    const r2 = calcSplitParejo(items, 0, 2, 2)
+    expect(r1.subtotal).toBe(100)
+    expect(r2.subtotal).toBe(100)
+    expect(r1.total).toBeCloseTo(116)
+    expect(r2.total).toBeCloseTo(116)
+  })
+
+  it('closes centavos on the last cuenta (total/3 with repeating decimals)', () => {
+    const items = [makeItem('a', 100, 1)] // subtotal 100, total 116
+    const n = 3
+    const rs = [1, 2, 3].map(c => calcSplitParejo(items, 0, n, c))
+    // Cuentas 1-2 pay round2(116/3) = 38.67; last pays remainder 38.66
+    expect(rs[0].total).toBe(38.67)
+    expect(rs[1].total).toBe(38.67)
+    expect(rs[2].total).toBe(38.66)
+    const sum = rs.reduce((s, r) => s + r.total, 0)
+    expect(round2(sum)).toBe(116)
+  })
+
+  it('sum of N cuentas always equals full total (fuzz over odd amounts)', () => {
+    const amounts = [99.99, 123.45, 287.31, 1.01, 777.77]
+    for (const amount of amounts) {
+      for (const n of [2, 3, 4, 5, 7]) {
+        const items = [makeItem('a', amount, 1)]
+        const fullAfter = Math.max(0, amount)
+        const fullTotal = round2(fullAfter + fullAfter * IVA_RATE)
+        const sum = round2(
+          Array.from({ length: n }, (_, i) => calcSplitParejo(items, 0, n, i + 1).total)
+            .reduce((s, t) => s + t, 0)
+        )
+        expect(sum).toBeCloseTo(fullTotal, 2)
+      }
+    }
+  })
+
+  it('splits discount evenly and sums back to full discount', () => {
+    const items = [makeItem('a', 300, 1)]
+    const discount = 50
+    const rs = [1, 2, 3].map(c => calcSplitParejo(items, discount, 3, c))
+    const discSum = round2(rs.reduce((s, r) => s + r.discount, 0))
+    expect(discSum).toBe(50)
+    // Full total: (300-50)*1.16 = 290 → cuentas suman 290
+    const totalSum = round2(rs.reduce((s, r) => s + r.total, 0))
+    expect(totalSum).toBe(290)
+  })
+
+  it('n=1 (sin split real) paga el total completo', () => {
+    const items = [makeItem('a', 250, 1)]
+    const r = calcSplitParejo(items, 0, 1, 1)
+    expect(r.total).toBeCloseTo(290)
+  })
+})
+
+// ─── calcSplitItems (split por items, descuento prorrateado) ────────────────
+
+describe('calcSplitItems', () => {
+  it('assigns unassigned items to cuenta 1 by default', () => {
+    const items = [makeItem('a', 200, 1), makeItem('b', 300, 1)]
+    const r = calcSplitItems(items, { b: 2 }, 1, 0)
+    expect(r.payingItems.map(i => i.id)).toEqual(['a'])
+    expect(r.subtotal).toBe(200)
+  })
+
+  it('prorates global discount by subtotal share', () => {
+    // a=200 (40%), b=300 (60%), discount=100
+    const items = [makeItem('a', 200, 1), makeItem('b', 300, 1)]
+    const r1 = calcSplitItems(items, { b: 2 }, 1, 100)
+    const r2 = calcSplitItems(items, { b: 2 }, 2, 100)
+    expect(r1.discount).toBe(40)
+    expect(r2.discount).toBe(60)
+    // Totals: (200-40)*1.16 + (300-60)*1.16 = 185.60 + 278.40 = 464 = (500-100)*1.16
+    expect(round2(r1.total + r2.total)).toBe(464)
+  })
+
+  it('discount proration sums to full discount across cuentas', () => {
+    const items = [makeItem('a', 99.5, 1), makeItem('b', 151.25, 1), makeItem('c', 48, 1)]
+    const assignments = { a: 1, b: 2, c: 3 }
+    const discount = 33.33
+    const ds = [1, 2, 3].map(c => calcSplitItems(items, assignments, c, discount).discount)
+    const sum = round2(ds.reduce((s, d) => s + d, 0))
+    // Puede diferir por 1 centavo de redondeo como máximo
+    expect(Math.abs(sum - discount)).toBeLessThanOrEqual(0.01)
+  })
+
+  it('handles zero subtotal without dividing by zero', () => {
+    const items: { id: string; subtotal: number }[] = []
+    const r = calcSplitItems(items, {}, 1, 50)
+    expect(r.discount).toBe(0)
+    expect(r.total).toBe(0)
+  })
+
+  it('cuenta with no assigned items pays $0', () => {
+    const items = [makeItem('a', 200, 1)]
+    const r = calcSplitItems(items, { a: 1 }, 2, 0)
+    expect(r.payingItems).toHaveLength(0)
+    expect(r.total).toBe(0)
+  })
+
+  it('discount never exceeds cuenta subtotal (clamped at 0)', () => {
+    const items = [makeItem('a', 10, 1), makeItem('b', 990, 1)]
+    // Descuento gigante: prorrateo de cuenta 1 = 10, after-discount clamped >= 0
+    const r = calcSplitItems(items, { b: 2 }, 1, 1000)
+    expect(r.subtotalAfterDiscount).toBeGreaterThanOrEqual(0)
+    expect(r.total).toBeGreaterThanOrEqual(0)
+  })
+})
