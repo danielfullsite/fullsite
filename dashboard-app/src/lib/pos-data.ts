@@ -402,6 +402,8 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
 export interface Order {
   id: string
   mesa: number
+  /** Cuenta por nombre (sin mesa, estilo Wansoft "#SR RAUL") — mesa queda en 0 */
+  clienteNombre?: string
   mesero: string
   personas: number
   status: 'abierta' | 'enviada' | 'preparando' | 'lista' | 'entregada' | 'cerrada' | 'cancelada'
@@ -848,6 +850,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
   const orderData: Record<string, unknown> = {
     client_id: _getClientId(),
     mesa: order.mesa,
+    customer_name: order.clienteNombre ?? null,
     mesero: order.mesero,
     personas: order.personas,
     status: order.status,

@@ -68,6 +68,7 @@ import {
   Settings,
   Loader2,
   Smartphone,
+  Lock,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -709,12 +710,15 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
 
 function POSContent() {
   const searchParams = useSearchParams()
-  const initialMesa = Number(searchParams.get('mesa')) || 1
+  const initialCuenta = searchParams.get('cuenta') || ''
+  // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
+  const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
 
   const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
+  const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -976,8 +980,12 @@ function POSContent() {
     let cancelled = false
     const loadMesaOrder = async () => {
       try {
+        // Cuenta por nombre: busca por customer_name; mesa: busca por número
+        const filter = clienteNombre
+          ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
+          : `mesa=eq.${mesa}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (cancelled) return // mesa changed while fetching
@@ -998,7 +1006,7 @@ function POSContent() {
     }
     if (orderItems.length === 0) loadMesaOrder()
     return () => { cancelled = true }
-  }, [mesa])
+  }, [mesa, clienteNombre])
 
   // Order-level notes
   const [orderNotes, setOrderNotes] = useState('')
@@ -1309,6 +1317,7 @@ function POSContent() {
     const order: Order = {
       id: orderId,
       mesa,
+      clienteNombre: clienteNombre || undefined,
       mesero,
       personas,
       status: 'enviada',
@@ -1357,6 +1366,7 @@ function POSContent() {
     const order: Order = {
       id: orderId,
       mesa,
+      clienteNombre: clienteNombre || undefined,
       mesero,
       personas,
       status: 'enviada',
@@ -1417,6 +1427,7 @@ function POSContent() {
     const order: Order = {
       id: payId,
       mesa,
+      clienteNombre: clienteNombre || undefined,
       mesero,
       personas: splitPayingCuenta > 0 ? Math.ceil(personas / (splitMode === 'parejo' ? splitParejoN : splitCount)) : personas,
       status: 'cerrada',
@@ -1558,6 +1569,20 @@ function POSContent() {
               <Clock size={14} />
               <span className="text-xs font-mono">{clock}</span>
             </div>
+            <button
+              onClick={() => {
+                // Bloquear: regresa a la pantalla de PIN sin perder la orden en BD
+                try {
+                  sessionStorage.removeItem('pos_staff')
+                  sessionStorage.removeItem('pos_last_activity')
+                } catch { /* */ }
+                window.location.reload()
+              }}
+              title="Bloquear pantalla"
+              className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-red-900/40 flex items-center justify-center transition-colors"
+            >
+              <Lock size={14} />
+            </button>
           </div>
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
@@ -1566,6 +1591,7 @@ function POSContent() {
             <span className="text-white text-sm font-medium">Mesa</span>
             <input
               type="number"
+              disabled={!!clienteNombre}
               value={mesa}
               onChange={(e) => {
                 const newMesa = Number(e.target.value) || 1
@@ -1577,6 +1603,22 @@ function POSContent() {
               }}
               min={1} max={999}
               className="w-12 bg-transparent text-white text-sm font-bold text-center border-none outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-2 py-1 border border-slate-600 min-h-[40px]">
+            <span className="text-teal-400 text-sm font-medium">#</span>
+            <input
+              type="text"
+              value={clienteNombre}
+              onChange={(e) => {
+                const name = e.target.value.toUpperCase()
+                setClienteNombre(name)
+                if (name && mesa !== 0) setMesa(0)
+                if (!name && mesa === 0) setMesa(1)
+              }}
+              placeholder="Cliente"
+              maxLength={30}
+              className="w-24 bg-transparent text-teal-300 text-sm font-bold border-none outline-none placeholder:text-[var(--text-4)] placeholder:font-normal"
             />
           </div>
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">

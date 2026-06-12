@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map } from 'lucide-react'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
@@ -118,7 +118,10 @@ interface Reserva {
 }
 
 interface ActiveOrder {
+  id: string
   mesa: number
+  customer_name: string | null
+  order_number: number | null
   mesero: string
   personas: number
   total: number
@@ -136,6 +139,26 @@ export default function MesasPage() {
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
+  const [staffName, setStaffName] = useState<string>('')
+  const [turnoNum, setTurnoNum] = useState<number | null>(null)
+  const [showNewCuenta, setShowNewCuenta] = useState(false)
+  const [newCuentaName, setNewCuentaName] = useState('')
+
+  // Staff + turno (estilo Wansoft: "Usuario: X · Turno: N")
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('pos_staff')
+      if (saved) setStaffName(JSON.parse(saved).name || '')
+    } catch { /* */ }
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    fetch(
+      `${SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_cid()}&opened_at=gte.${today.toISOString()}&select=id`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    )
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: unknown[]) => { if (rows.length > 0) setTurnoNum(rows.length) })
+      .catch(() => { /* */ })
+  }, [])
 
   // Escala del plano: se ajusta al ancho disponible (tablet/celular) sin scroll horizontal
   const PLANO_BASE_W = 940
@@ -183,9 +206,13 @@ export default function MesasPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
+  // Cuentas por nombre (sin mesa, estilo Wansoft "#SR RAUL")
+  const namedOrders = activeOrders.filter(o => o.customer_name && (!o.mesa || o.mesa === 0))
+
   // Build mesa states
   const ordersByMesa: globalThis.Map<number, ActiveOrder> = new globalThis.Map()
   for (const order of activeOrders) {
+    if (order.customer_name && (!order.mesa || order.mesa === 0)) continue
     if (!ordersByMesa.has(order.mesa)) ordersByMesa.set(order.mesa, order)
   }
 
@@ -228,6 +255,8 @@ export default function MesasPage() {
     return () => clearInterval(timer)
   }, [])
   const getMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000)
+  const formatHoraAbrir = (createdAt: string) =>
+    new Date(createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 
   const ALERT_THRESHOLD = 90
   const WARNING_THRESHOLD = 60
@@ -346,6 +375,12 @@ export default function MesasPage() {
               </div>
             )}
             {!compact && <p className="text-[var(--text-4)] text-xs truncate">{mesa.mesero}</p>}
+            {!compact && order && (
+              <div className="flex items-center justify-between text-[10px] text-[var(--text-3)]">
+                <span>Abrió {formatHoraAbrir(order.created_at)}</span>
+                {order.order_number != null && <span className="font-mono">#{order.order_number}</span>}
+              </div>
+            )}
             <div className="flex items-center justify-between mt-0.5">
               <div className="flex items-center gap-1 text-[var(--text-3)] text-xs">
                 <Users size={11} />
@@ -551,11 +586,15 @@ export default function MesasPage() {
           <div className="min-w-0">
             <h1 className="text-xl font-bold leading-tight">Mesas</h1>
             <p className="text-[var(--text-3)] text-xs lg:text-sm whitespace-nowrap">
-              {activeOrders.length} ordenes · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
+              {(staffName || currentMesero) && <span className="text-emerald-400">{staffName || currentMesero}</span>}
+              {turnoNum != null && <span> · Turno {turnoNum}</span>}
+              {(staffName || currentMesero || turnoNum != null) && ' · '}
+              MESA(S): {counts.ocupada + counts.cuenta}{namedOrders.length > 0 && ` · CUENTAS: ${namedOrders.length}`} · {totalPersonas} personas · TP {formatMXN(ticketPromedio)}
               {activeOrders.length > 0 && (() => {
                 const avgMins = Math.round(activeOrders.reduce((s, o) => s + getMinutes(o.created_at), 0) / activeOrders.length)
                 return <span className={avgMins > 60 ? 'text-amber-400' : ''}> · Prom: {avgMins}m</span>
               })()}
+              <span className="hidden lg:inline"> · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
           <button onClick={fetchData} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
@@ -602,6 +641,25 @@ export default function MesasPage() {
             {mergeMode ? <X size={14} /> : <Merge size={14} />}
             {mergeMode ? 'Cancelar' : 'Fusionar'}
           </button>
+          <button
+            onClick={() => { setNewCuentaName(''); setShowNewCuenta(true) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 border border-teal-600/40 transition-colors"
+          >
+            <UserPlus size={14} /> Cuenta
+          </button>
+          <button
+            onClick={() => {
+              try {
+                sessionStorage.removeItem('pos_staff')
+                sessionStorage.removeItem('pos_last_activity')
+              } catch { /* */ }
+              window.location.reload()
+            }}
+            title="Bloquear pantalla"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--line)] hover:bg-red-900/40 text-[var(--text-3)] transition-colors"
+          >
+            <LockIcon size={14} /> Bloquear
+          </button>
         </div>
         <div className="hidden md:flex items-center gap-6">
           {Object.entries(counts).map(([status, count]) => (
@@ -634,6 +692,45 @@ export default function MesasPage() {
         ) : (
           <>
             {viewMode === 'planograma' ? <PlanogramaView /> : <GridView />}
+
+            {/* Cuentas por nombre (sin mesa, estilo Wansoft) */}
+            {namedOrders.length > 0 && (
+              <div className="max-w-5xl mx-auto mt-6">
+                <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+                  <UserPlus size={18} className="text-teal-400" />
+                  Cuentas por nombre ({namedOrders.length})
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {namedOrders.map(o => {
+                    const mins = getMinutes(o.created_at)
+                    const isAlert = mins >= ALERT_THRESHOLD
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => router.push(`/pos?cuenta=${encodeURIComponent(o.customer_name || '')}`)}
+                        className="bg-teal-900/40 border-2 border-teal-600/60 hover:bg-teal-800/50 rounded-2xl p-3 text-left transition-all active:scale-95"
+                      >
+                        <div className="flex items-start justify-between">
+                          <span className="font-bold text-teal-200 uppercase truncate">#{o.customer_name}</span>
+                          {o.order_number != null && <span className="text-[10px] font-mono text-teal-400/70">#{o.order_number}</span>}
+                        </div>
+                        <div className={`flex items-center gap-1 mt-1 ${isAlert ? 'text-red-400' : 'text-teal-300/70'}`}>
+                          <Clock size={10} />
+                          <span className={`text-[10px] font-mono font-bold ${isAlert ? 'animate-pulse' : ''}`}>
+                            {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}m` : `${mins}m`}
+                          </span>
+                          {isAlert && <AlertTriangle size={9} className="text-red-400" />}
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[var(--text-3)] text-xs truncate">{o.mesero}</span>
+                          <span className="text-white font-semibold text-xs">{formatMXN(o.total || 0)}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Reservaciones */}
             {reservas.length > 0 && (
@@ -684,6 +781,40 @@ export default function MesasPage() {
               {merging ? 'Fusionando...' : `Fusionar mesa ${mergeSource} → ${mergeTarget}`}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Modal nueva cuenta por nombre */}
+      {showNewCuenta && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-6" onClick={() => setShowNewCuenta(false)}>
+          <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-white font-bold text-lg mb-1 flex items-center gap-2">
+              <UserPlus size={18} className="text-teal-400" /> Cuenta por nombre
+            </h3>
+            <p className="text-[var(--text-3)] text-sm mb-4">Sin mesa — para llevar, barra o cliente frecuente</p>
+            <input
+              type="text"
+              value={newCuentaName}
+              onChange={e => setNewCuentaName(e.target.value.toUpperCase())}
+              onKeyDown={e => { if (e.key === 'Enter' && newCuentaName.trim()) router.push(`/pos?cuenta=${encodeURIComponent(newCuentaName.trim())}`) }}
+              placeholder="NOMBRE DEL CLIENTE"
+              autoFocus
+              maxLength={30}
+              className="w-full bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-teal-500 mb-4 placeholder:font-normal placeholder:text-[var(--text-4)]"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowNewCuenta(false)} className="flex-1 py-3 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-medium">
+                Cancelar
+              </button>
+              <button
+                onClick={() => { if (newCuentaName.trim()) router.push(`/pos?cuenta=${encodeURIComponent(newCuentaName.trim())}`) }}
+                disabled={!newCuentaName.trim()}
+                className="flex-1 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white font-bold"
+              >
+                Abrir cuenta
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
