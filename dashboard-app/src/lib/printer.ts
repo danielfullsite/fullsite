@@ -523,6 +523,10 @@ export function isBluetoothAvailable(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator
 }
 
+export function isUsbAvailable(): boolean {
+  return typeof navigator !== 'undefined' && 'usb' in navigator
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getNavigatorBluetooth = (): any => (navigator as any).bluetooth
 
@@ -593,6 +597,128 @@ async function connectPrinterDevice(): Promise<PrinterConnection> {
   }
 
   throw new Error('No se encontró característica de escritura en la impresora')
+}
+
+// ─── WebUSB (impresoras térmicas USB, ej. SEAFON 58mm) ────────────────────
+// Devuelve un PrinterConnection con la MISMA forma que el de Bluetooth:
+// - characteristic.writeValueWithoutResponse(data) → usbDevice.transferOut(ep, data)
+// - device.gatt.connected → usbDevice.opened
+// Así todo el pipeline de impresión existente funciona sin cambios.
+
+async function connectUsbPrinterDevice(): Promise<PrinterConnection> {
+  if (!isUsbAvailable()) {
+    throw new Error('WebUSB no disponible en este navegador')
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const usb: any = (navigator as any).usb
+
+  // Filtro por clase 7 (printer); fallback sin filtros si el chooser no muestra nada
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let usbDevice: any
+  try {
+    usbDevice = await usb.requestDevice({ filters: [{ classCode: 7 }] })
+  } catch {
+    usbDevice = await usb.requestDevice({ filters: [] })
+  }
+  if (!usbDevice) throw new Error('No se seleccionó impresora USB')
+
+  await usbDevice.open()
+  if (usbDevice.configuration === null) {
+    await usbDevice.selectConfiguration(1)
+  }
+
+  // Buscar interface con endpoint bulk OUT (preferir clase 7 = printer)
+  let ifaceNum = -1
+  let epOut = -1
+  let altSetting = 0
+  const candidates: { iface: number; alt: number; ep: number; isPrinter: boolean }[] = []
+  for (const iface of usbDevice.configuration.interfaces) {
+    for (const alt of iface.alternates) {
+      for (const ep of alt.endpoints) {
+        if (ep.direction === 'out' && ep.type === 'bulk') {
+          candidates.push({
+            iface: iface.interfaceNumber,
+            alt: alt.alternateSetting,
+            ep: ep.endpointNumber,
+            isPrinter: alt.interfaceClass === 7,
+          })
+        }
+      }
+    }
+  }
+  const chosen = candidates.find(c => c.isPrinter) ?? candidates[0]
+  if (!chosen) {
+    await usbDevice.close()
+    throw new Error('La impresora USB no tiene endpoint de escritura (bulk OUT)')
+  }
+  ifaceNum = chosen.iface
+  epOut = chosen.ep
+  altSetting = chosen.alt
+
+  await usbDevice.claimInterface(ifaceNum)
+  if (altSetting !== 0) {
+    try { await usbDevice.selectAlternateInterface(ifaceNum, altSetting) } catch { /* opcional */ }
+  }
+
+  const name =
+    usbDevice.productName ||
+    `USB ${usbDevice.vendorId?.toString(16)}:${usbDevice.productId?.toString(16)}` ||
+    'Impresora USB'
+
+  const write = async (data: BufferSource) => {
+    const result = await usbDevice.transferOut(epOut, data)
+    if (result.status !== 'ok') {
+      throw new Error(`Error al escribir a impresora USB (${result.status})`)
+    }
+  }
+
+  // Adapter con la forma del par device/characteristic de Web Bluetooth
+  const characteristic = {
+    uuid: `usb-ep-${epOut}`,
+    properties: { write: true, writeWithoutResponse: true },
+    writeValueWithoutResponse: write,
+    writeValueWithResponse: write,
+  }
+  const device = {
+    name,
+    isUsb: true,
+    gatt: {
+      get connected() { return !!usbDevice.opened },
+      disconnect: () => { usbDevice.close().catch(() => {}) },
+    },
+  }
+
+  console.log(`[printer] Connected USB ${name}, iface ${ifaceNum}, ep OUT ${epOut}`)
+  return { device, characteristic, name }
+}
+
+/** Connect the default (main POS) printer via USB */
+export async function connectUsbPrinter(): Promise<string> {
+  try {
+    const conn = await connectUsbPrinterDevice()
+    printers.set('default', conn)
+    syncLegacyRefs()
+    return conn.name
+  } catch (e) {
+    printers.delete('default')
+    syncLegacyRefs()
+    throw e
+  }
+}
+
+/** Connect a station-specific printer via USB */
+export async function connectStationUsbPrinter(station: StationName): Promise<string> {
+  try {
+    const conn = await connectUsbPrinterDevice()
+    printers.set(station, conn)
+    console.log(`[printer] Station ${station} → ${conn.name} (USB)`)
+    savePrinterAssignments()
+    return conn.name
+  } catch (e) {
+    printers.delete(station)
+    throw e
+  }
 }
 
 /** Connect the default (main POS) printer */

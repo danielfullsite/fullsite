@@ -44,6 +44,8 @@ import {
   isBluetoothConnected,
   connectBluetoothPrinter,
   disconnectBluetoothPrinter,
+  isUsbAvailable,
+  connectUsbPrinter,
 } from '@/lib/printer'
 import {
   ChefHat,
@@ -72,6 +74,7 @@ import {
   Menu,
   Printer,
   Bluetooth,
+  Usb,
   ScanBarcode,
   Stamp,
   Monitor,
@@ -1117,8 +1120,10 @@ function POSContent() {
   const [btPrinter, setBtPrinter] = useState<string | null>(null)
   const [btConnecting, setBtConnecting] = useState(false)
   const hasBluetooth = typeof window !== 'undefined' && isBluetoothAvailable()
+  const hasUsb = typeof window !== 'undefined' && isUsbAvailable()
 
   const handleConnectPrinter = async () => {
+    // isBluetoothConnected() checks the 'default' slot — works for BT and USB
     if (isBluetoothConnected()) {
       await disconnectBluetoothPrinter()
       setBtPrinter(null)
@@ -1130,6 +1135,24 @@ function POSContent() {
       const name = await connectBluetoothPrinter()
       setBtPrinter(name)
       showToast(`Impresora ${name} conectada`)
+    } catch (e) {
+      showToast(`Error: ${e instanceof Error ? e.message : 'No se pudo conectar'}`)
+    }
+    setBtConnecting(false)
+  }
+
+  const handleConnectUsbPrinter = async () => {
+    if (isBluetoothConnected()) {
+      await disconnectBluetoothPrinter()
+      setBtPrinter(null)
+      showToast('Impresora desconectada')
+      return
+    }
+    setBtConnecting(true)
+    try {
+      const name = await connectUsbPrinter()
+      setBtPrinter(name)
+      showToast(`Impresora ${name} conectada (USB)`)
     } catch (e) {
       showToast(`Error: ${e instanceof Error ? e.message : 'No se pudo conectar'}`)
     }
@@ -1884,6 +1907,17 @@ function POSContent() {
               >
                 <Bluetooth size={16} />
                 {btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}
+              </button>
+            )}
+            {hasUsb && !btPrinter && (
+              <button
+                onClick={handleConnectUsbPrinter}
+                disabled={btConnecting}
+                className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]"
+                title="Impresora térmica USB"
+              >
+                <Usb size={16} />
+                {btConnecting ? '...' : 'USB'}
               </button>
             )}
             <button
