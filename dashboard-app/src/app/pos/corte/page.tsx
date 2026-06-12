@@ -49,6 +49,17 @@ async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
   return res.json()
 }
 
+// Corte por turno: las órdenes cerradas llevan turno_id estampado al cobrar.
+// Esto evita que un turno que cruza medianoche se parta en dos cortes.
+async function getOrdersByTurno(turnoId: string): Promise<OrderFromDB[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc&limit=500`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
 export default function CortePage() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
@@ -62,15 +73,20 @@ export default function CortePage() {
 
   const [cardPct, setCardPct] = useState(0)
   const [turno, setTurno] = useState<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null>(null)
+  // 'turno' = corte del turno activo (por turno_id); 'dia' = corte histórico por fecha
+  const [corteMode, setCorteMode] = useState<'turno' | 'dia'>('turno')
 
   const fetchData = async () => {
     setLoading(true)
-    const [o, a, pct, t] = await Promise.all([
-      getOrders(selectedDate),
+    const [a, pct, t] = await Promise.all([
       getAuditLog(200),
       getCardCommissionPct(),
       getActiveTurno(),
     ])
+    // Por turno si hay turno abierto; si no, fallback a fecha
+    const o = corteMode === 'turno' && t
+      ? await getOrdersByTurno(t.id)
+      : await getOrders(selectedDate)
     setOrders(o)
     setAuditLog(a)
     setCardPct(pct)
@@ -128,7 +144,7 @@ export default function CortePage() {
     setAccessGranted(true)
   }
 
-  useEffect(() => { if (accessGranted) fetchData() }, [selectedDate, accessGranted])
+  useEffect(() => { if (accessGranted) fetchData() }, [selectedDate, accessGranted, corteMode])
 
   const stats = useMemo(() => {
     const closed = orders.filter(o => o.status === 'cerrada')
@@ -270,12 +286,33 @@ export default function CortePage() {
             <RefreshCw size={14} />
           </button>
         </div>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={e => setSelectedDate(e.target.value)}
-          className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-lg overflow-hidden border border-slate-600">
+            <button
+              onClick={() => setCorteMode('turno')}
+              className={`px-3 py-2 text-sm font-semibold ${corteMode === 'turno' ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:text-white'}`}
+            >
+              Turno actual
+            </button>
+            <button
+              onClick={() => setCorteMode('dia')}
+              className={`px-3 py-2 text-sm font-semibold ${corteMode === 'dia' ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:text-white'}`}
+            >
+              Por día
+            </button>
+          </div>
+          {corteMode === 'dia' && (
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+            />
+          )}
+          {corteMode === 'turno' && !loading && !turno && (
+            <span className="text-xs text-amber-400">Sin turno abierto — mostrando hoy por fecha</span>
+          )}
+        </div>
       </header>
 
       {loading ? (
