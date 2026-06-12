@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, X } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, type AuditLogEntry } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, type AuditLogEntry, type PagoForma } from '@/lib/pos-data'
+import { isTiempoItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -20,6 +21,8 @@ interface OrderFromDB {
   descuento: number
   propina: number | null
   metodo_pago: string | null
+  pagos?: PagoForma[] | null
+  turno_id?: string | null
   items: string
   created_at: string
   closed_at: string | null
@@ -58,17 +61,20 @@ export default function CortePage() {
   })
 
   const [cardPct, setCardPct] = useState(0)
+  const [turno, setTurno] = useState<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
-    const [o, a, pct] = await Promise.all([
+    const [o, a, pct, t] = await Promise.all([
       getOrders(selectedDate),
       getAuditLog(200),
       getCardCommissionPct(),
+      getActiveTurno(),
     ])
     setOrders(o)
     setAuditLog(a)
     setCardPct(pct)
+    setTurno(t)
     setLoading(false)
   }
 
@@ -119,10 +125,24 @@ export default function CortePage() {
 
     // Payment methods
     // Incluye propina: lo cobrado por método debe cuadrar contra caja/terminal (la propina con tarjeta entra por la terminal)
+    // Si la orden tiene pagos[] (pago mixto / formas custom), desglosamos por forma real.
     const byPayment: Record<string, number> = {}
+    // Formato Wansoft: venta y propina separadas por forma (propina prorrateada por pago)
+    const ventasPorForma: Record<string, number> = {}
+    const propinaPorForma: Record<string, number> = {}
     for (const o of closed) {
-      const method = o.metodo_pago || 'sin metodo'
-      byPayment[method] = (byPayment[method] || 0) + o.total + (Number(o.propina) || 0)
+      const propina = Number(o.propina) || 0
+      const cobrado = o.total + propina
+      const pagos: PagoForma[] = Array.isArray(o.pagos) && o.pagos.length > 0
+        ? o.pagos
+        : [{ metodo: o.metodo_pago || 'sin metodo', monto: cobrado }]
+      const sumPagos = pagos.reduce((s, p) => s + p.monto, 0) || 1
+      for (const p of pagos) {
+        const frac = p.monto / sumPagos
+        byPayment[p.metodo] = (byPayment[p.metodo] || 0) + p.monto
+        ventasPorForma[p.metodo] = (ventasPorForma[p.metodo] || 0) + o.total * frac
+        propinaPorForma[p.metodo] = (propinaPorForma[p.metodo] || 0) + propina * frac
+      }
     }
 
     // By mesero
@@ -146,7 +166,31 @@ export default function CortePage() {
       .reduce((s, [, v]) => s + v, 0)
     const comisionTarjeta = totalTarjeta * cardPct / 100
 
+    // ── Arqueo de efectivo (formato Wansoft, spec 14.2) ──
+    const isEfectivo = (m: string) => m.toLowerCase().includes('efectivo')
+    const ventasEfectivo = Object.entries(ventasPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
+    const propinaEfectivo = Object.entries(propinaPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
+    // Propinas cobradas por formas NO efectivo (se pagan al mesero en efectivo desde caja)
+    const propinasNoEfectivo = Object.entries(propinaPorForma).filter(([m]) => !isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
+
+    // ── Información operativa ──
+    let totalPlatillos = 0
+    let ventasEnMesa = 0
+    let ventasOtros = 0
+    for (const o of closed) {
+      try {
+        const items: { menuItemId: string; cantidad: number }[] = JSON.parse(o.items)
+        totalPlatillos += items.filter(it => !isTiempoItem(it)).reduce((s, it) => s + (it.cantidad || 1), 0)
+      } catch { /* items ilegibles */ }
+      if (o.mesa > 0) ventasEnMesa += o.total
+      else ventasOtros += o.total
+    }
+    const descuentosCount = closed.filter(o => o.descuento > 0).length
+
     return {
+      ventasPorForma, propinaPorForma,
+      ventasEfectivo, propinaEfectivo, propinasNoEfectivo,
+      totalPlatillos, ventasEnMesa, ventasOtros, descuentosCount,
       totalVentas, totalSubtotal, totalIva, totalDescuentos, totalPropinas,
       totalTarjeta, comisionTarjeta,
       totalPersonas, ticketPromedio,
@@ -293,6 +337,74 @@ export default function CortePage() {
                 {Object.keys(stats.byPayment).length === 0 && (
                   <p className="text-[var(--text-2)] text-sm">Sin pagos registrados</p>
                 )}
+              </div>
+            </div>
+
+            {/* Reporte Corte Turno — formato Wansoft (spec 14.2) */}
+            <div className="bg-[var(--surface-2)]/60 border border-slate-700 rounded-xl p-5 md:col-span-2">
+              <h3 className="font-bold text-white mb-1 flex items-center gap-2">
+                <Receipt size={18} className="text-emerald-400" />
+                Reporte Corte Turno
+              </h3>
+              <p className="text-[var(--text-2)] text-xs mb-4">
+                {turno
+                  ? `Turno abierto por ${turno.opened_by} · ${new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })} · Fondo ${formatMXN(Number(turno.fondo_inicial) || 0)}`
+                  : 'Sin turno abierto — fondo de caja $0.00'}
+              </p>
+              <div className="grid md:grid-cols-3 gap-6 font-mono text-sm">
+                {/* Columna 1: Totales + ventas por forma */}
+                <div>
+                  <p className="text-[var(--text-3)] font-bold mb-2 tracking-wider">TOTALES GENERALES</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Ventas</span><span className="text-white">{formatMXN(stats.totalVentas)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Propinas</span><span className="text-white">{formatMXN(stats.totalPropinas)}</span></div>
+                    <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">Total cobrado</span><span className="text-emerald-400 font-bold">{formatMXN(stats.totalVentas + stats.totalPropinas)}</span></div>
+                  </div>
+                  <p className="text-[var(--text-3)] font-bold mt-4 mb-2 tracking-wider">VENTAS POR FORMA DE PAGO</p>
+                  <div className="space-y-1.5">
+                    {Object.entries(stats.ventasPorForma).map(([m, v]) => (
+                      <div key={m} className="flex justify-between"><span className="text-[var(--text-4)] capitalize">{m}</span><span className="text-white">{formatMXN(v)}</span></div>
+                    ))}
+                    {Object.keys(stats.ventasPorForma).length === 0 && <p className="text-[var(--text-2)]">—</p>}
+                  </div>
+                  <p className="text-[var(--text-3)] font-bold mt-4 mb-2 tracking-wider">PROPINA POR FORMA DE PAGO</p>
+                  <div className="space-y-1.5">
+                    {Object.entries(stats.propinaPorForma).filter(([, v]) => v > 0.005).map(([m, v]) => (
+                      <div key={m} className="flex justify-between"><span className="text-[var(--text-4)] capitalize">{m}</span><span className="text-amber-400">{formatMXN(v)}</span></div>
+                    ))}
+                    {Object.entries(stats.propinaPorForma).filter(([, v]) => v > 0.005).length === 0 && <p className="text-[var(--text-2)]">—</p>}
+                  </div>
+                </div>
+                {/* Columna 2: Control de efectivo (arqueo) */}
+                <div>
+                  <p className="text-[var(--text-3)] font-bold mb-2 tracking-wider">CONTROL POR FORMA PAGO</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Fondo de Caja</span><span className="text-white">{formatMXN(Number(turno?.fondo_inicial) || 0)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Ventas efectivo</span><span className="text-white">{formatMXN(stats.ventasEfectivo)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Propina efectivo</span><span className="text-white">{formatMXN(stats.propinaEfectivo)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Depósitos</span><span className="text-[var(--text-2)]">{formatMXN(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">− Vales</span><span className="text-[var(--text-2)]">{formatMXN(0)}</span></div>
+                    <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">= Efectivo Real</span><span className="text-emerald-400 font-bold">{formatMXN((Number(turno?.fondo_inicial) || 0) + stats.ventasEfectivo + stats.propinaEfectivo)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">− Propinas x tarjeta/otros</span><span className="text-red-400">{formatMXN(stats.propinasNoEfectivo)}</span></div>
+                    <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">Efectivo en caja</span><span className="text-emerald-400 font-bold">{formatMXN((Number(turno?.fondo_inicial) || 0) + stats.ventasEfectivo + stats.propinaEfectivo - stats.propinasNoEfectivo)}</span></div>
+                  </div>
+                  <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja (regla Wansoft).</p>
+                </div>
+                {/* Columna 3: Información operativa */}
+                <div>
+                  <p className="text-[var(--text-3)] font-bold mb-2 tracking-wider">INFORMACIÓN OPERATIVA</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Órdenes cerradas</span><span className="text-white">{stats.ordenesCerradas}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Platillos vendidos</span><span className="text-white">{stats.totalPlatillos}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Personas</span><span className="text-white">{stats.totalPersonas}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Promedio x persona</span><span className="text-white">{formatMXN(stats.totalPersonas > 0 ? stats.totalVentas / stats.totalPersonas : 0)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Promedio x orden</span><span className="text-white">{formatMXN(stats.ticketPromedio)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Ventas en mesa</span><span className="text-white">{formatMXN(stats.ventasEnMesa)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Ventas otros (llevar/barra)</span><span className="text-white">{formatMXN(stats.ventasOtros)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Descuentos aplicados</span><span className="text-white">{stats.descuentosCount} · {formatMXN(stats.totalDescuentos)}</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Cancelaciones</span><span className="text-red-400">{stats.cancellations}</span></div>
+                  </div>
+                </div>
               </div>
             </div>
 

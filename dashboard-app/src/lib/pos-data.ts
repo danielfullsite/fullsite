@@ -20,6 +20,10 @@
 //   closed_at TIMESTAMPTZ
 // );
 //
+// -- 2026-06-12: pago mixto multi-forma + corte por turno (correr en SQL Editor):
+// ALTER TABLE pos_orders ADD COLUMN IF NOT EXISTS pagos JSONB;
+// ALTER TABLE pos_orders ADD COLUMN IF NOT EXISTS turno_id TEXT;
+//
 // -- BLINDAJE: Immutable audit log (nothing deleteable)
 // CREATE TABLE pos_audit_log (
 //   id BIGSERIAL PRIMARY KEY,
@@ -291,6 +295,39 @@ export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   }
 }
 
+/** Forma de pago custom (catálogo pos_payment_methods, estilo Wansoft: Rappi, Ubereats, Cortesía...) */
+export interface PaymentMethodDB {
+  id: string
+  name: string
+  /** 'cash' (cuenta para arqueo de efectivo) | 'card' (comisión) | 'other' */
+  type: string
+  commission_pct?: number
+}
+
+export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
+  try {
+    const res = await fetch(
+      `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
+      { headers: _SB_HEADERS, cache: 'no-store' }
+    )
+    if (!res.ok) return []
+    return res.json()
+  } catch { return [] }
+}
+
+/** Turno activo (pos_turnos sin closed_at). Devuelve null si no hay turno abierto. */
+export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
+  try {
+    const res = await fetch(
+      `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=1`,
+      { headers: _SB_HEADERS, cache: 'no-store' }
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows[0] || null
+  } catch { return null }
+}
+
 export async function getModifiersForCategoryFromDB(categoryId: string): Promise<{
   quitarOptions: string[]
   agregarOptions: ModificadorAgregar[]
@@ -399,6 +436,12 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'te verde': ['te verde'],
 }
 
+/** Un pago dentro de una cuenta (pago mixto multi-forma, estilo Wansoft) */
+export interface PagoForma {
+  metodo: string
+  monto: number
+}
+
 export interface Order {
   id: string
   mesa: number
@@ -414,6 +457,10 @@ export interface Order {
   descuento: number
   propina?: number
   metodoPago?: string
+  /** Desglose multi-forma del pago (suma = total + propina). Si es pago simple, 1 elemento. */
+  pagos?: PagoForma[]
+  /** Turno activo (pos_turnos.id) al momento de cerrar */
+  turnoId?: string
   notas?: string
   createdAt: Date
   closedAt?: Date
@@ -860,6 +907,8 @@ export async function saveOrder(order: Order): Promise<boolean> {
     descuento: order.descuento,
     propina: order.propina ?? 0,
     metodo_pago: order.metodoPago ?? null,
+    pagos: order.pagos && order.pagos.length > 0 ? order.pagos : null,
+    turno_id: order.turnoId ?? null,
     notas: order.notas ?? null,
     items: JSON.stringify(order.items),
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
@@ -867,7 +916,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
   }
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
+    const post = (body: Record<string, unknown>) => fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_KEY,
@@ -875,8 +924,14 @@ export async function saveOrder(order: Order): Promise<boolean> {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify({ id: order.id, ...orderData }),
+      body: JSON.stringify(body),
     })
+    let res = await post({ id: order.id, ...orderData })
+    if (!res.ok && res.status === 400) {
+      // Columnas pagos/turno_id aún no existen en Supabase — reintenta sin ellas
+      const { pagos: _p, turno_id: _t, ...legacy } = orderData
+      res = await post({ id: order.id, ...legacy })
+    }
     if (!res.ok) {
       console.warn(`[saveOrder] Failed: ${res.status} ${res.statusText}`)
     }
@@ -1016,6 +1071,8 @@ export type AuditAction =
   | 'payment_processed'
   | 'preticket_printed'
   | 'merma_registered'
+  | 'tiempo_fired'
+  | 'silla_changed'
 
 export interface AuditEvent {
   client_id?: string

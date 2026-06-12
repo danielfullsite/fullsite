@@ -91,6 +91,13 @@ export function getStationByName(name: string): StationName {
   return 'cocina'
 }
 
+// ── Tiempos de platillo (estilo Wansoft: separador "XX TIEMPO: N XX" como partida $0.00) ──
+export const TIEMPO_ITEM_ID = '__tiempo__'
+
+export function isTiempoItem(item: { menuItemId: string }): boolean {
+  return item.menuItemId === TIEMPO_ITEM_ID
+}
+
 // Payment methods available
 export const PAYMENT_METHODS = [
   { id: 'efectivo', label: 'Efectivo', icon: 'Banknote', color: 'bg-emerald-600 hover:bg-emerald-500' },

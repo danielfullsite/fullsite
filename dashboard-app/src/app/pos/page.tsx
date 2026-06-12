@@ -19,10 +19,15 @@ import {
   getModifiersForCategory,
   getMenuCategoriesFromDB,
   getModifiersForCategoryFromDB,
+  getPaymentMethodsFromDB,
+  getActiveTurno,
   type RecipeRow,
   type Ingredient,
   type ModificadorAgregar,
+  type PaymentMethodDB,
+  type PagoForma,
 } from '@/lib/pos-data'
+import { TIEMPO_ITEM_ID, isTiempoItem } from '@/lib/pos-constants'
 import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
@@ -69,6 +74,8 @@ import {
   Loader2,
   Smartphone,
   Lock,
+  Flame,
+  Armchair,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -737,7 +744,19 @@ function POSContent() {
   const [clock, setClock] = useState<string>('')
   const [showPayment, setShowPayment] = useState(false)
   const [showMixto, setShowMixto] = useState(false)
-  const [mixtoEfectivo, setMixtoEfectivo] = useState('')
+  // Pago mixto multi-forma (estilo Wansoft): lista de {metodo, monto}
+  const [mixtoPagos, setMixtoPagos] = useState<PagoForma[]>([])
+  const [mixtoForma, setMixtoForma] = useState('Efectivo')
+  const [mixtoMonto, setMixtoMonto] = useState('')
+  // Formas de pago custom desde pos_payment_methods (Rappi, Ubereats, Cortesía...)
+  const [paymentMethodsDB, setPaymentMethodsDB] = useState<PaymentMethodDB[]>([])
+  // Turno activo — se adjunta turno_id a cada orden cerrada
+  const [turnoId, setTurnoId] = useState<string | null>(null)
+  // Sillas: silla activa para nuevos items (spinner SILLA estilo Wansoft)
+  const [sillaActual, setSillaActual] = useState(1)
+  // Tiempos: firebutton "Impresión por tiempos"
+  const [showFirebutton, setShowFirebutton] = useState(false)
+  const [tiempoFired, setTiempoFired] = useState(0)
   const [showCashCalc, setShowCashCalc] = useState(false)
   const [showCashFlow, setShowCashFlow] = useState(false)
   const [cashAmount, setCashAmount] = useState('')
@@ -758,10 +777,14 @@ function POSContent() {
 
   useEffect(() => {
     (async () => {
-      const [r, i, dbMenu] = await Promise.all([getRecipes(), getIngredients(), getMenuCategoriesFromDB()])
+      const [r, i, dbMenu, pm, turno] = await Promise.all([
+        getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurno(),
+      ])
       setAllRecipes(r)
       setAllIngredients(i)
       if (dbMenu.length > 0) setMenuCategories(dbMenu)
+      setPaymentMethodsDB(pm)
+      if (turno) setTurnoId(turno.id)
 
       // Check which menu items are out of stock
       try {
@@ -915,7 +938,8 @@ function POSContent() {
     setPersonas(count)
     setShowPersonVerify(false)
     setShowMixto(false)
-    setMixtoEfectivo('')
+    setMixtoPagos([])
+    setMixtoMonto('')
     setShowPayment(true)
   }
 
@@ -1207,15 +1231,16 @@ function POSContent() {
       }
       logAudit({
         order_id: orderId, action: 'item_added', actor: mesero, mesa,
-        details: { item: orderItem.nombre, cantidad: orderItem.cantidad, precio: orderItem.precio, modificadores: orderItem.modificadores },
+        details: { item: orderItem.nombre, cantidad: orderItem.cantidad, precio: orderItem.precio, modificadores: orderItem.modificadores, silla: orderItem.silla ?? sillaActual },
       })
-      return [...prev, orderItem]
+      // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
+      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual }]
     })
     setFlashItemId(orderItem.id)
     setTimeout(() => setFlashItemId(null), 500)
     setModifierItem(null)
     setEditingOrderItem(null)
-  }, [orderId, mesero, mesa])
+  }, [orderId, mesero, mesa, sillaActual])
 
   const handleModifierCancel = useCallback(() => {
     setModifierItem(null)
@@ -1285,6 +1310,38 @@ function POSContent() {
     })
   }, [orderId, mesero, mesa])
 
+  // Cambiar silla de un item (tap en el badge — cicla 1..personas, estilo Wansoft "Cambiar # de silla")
+  const cycleSilla = useCallback((id: string) => {
+    setOrderItems(prev => prev.map(oi => {
+      if (oi.id !== id || isTiempoItem(oi)) return oi
+      const next = ((oi.silla || 1) % Math.max(personas, 1)) + 1
+      logAudit({ order_id: orderId, action: 'item_modified', actor: mesero, mesa, details: { item: oi.nombre, silla_from: oi.silla || 1, silla_to: next } })
+      return { ...oi, silla: next }
+    }))
+  }, [personas, orderId, mesero, mesa])
+
+  // Insertar separador de tiempo (estilo Wansoft "XX TIEMPO: N XX" — partida especial $0.00, silla 0)
+  const addTiempoSeparator = useCallback(() => {
+    setOrderItems(prev => {
+      const n = prev.filter(isTiempoItem).length + 1
+      const sep: OrderItem = {
+        id: generateId(), menuItemId: TIEMPO_ITEM_ID, nombre: `XX TIEMPO: ${n} XX`,
+        precio: 0, cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 0, silla: 0,
+      }
+      logAudit({ order_id: orderId, action: 'item_added', actor: mesero, mesa, details: { item: sep.nombre, tiempo: n } })
+      return [...prev, sep]
+    })
+  }, [orderId, mesero, mesa])
+
+  const removeTiempoSeparator = useCallback((id: string) => {
+    setOrderItems(prev => {
+      // Re-numera los separadores restantes
+      const rest = prev.filter(i => i.id !== id)
+      let n = 0
+      return rest.map(i => isTiempoItem(i) ? { ...i, nombre: `XX TIEMPO: ${++n} XX` } : i)
+    })
+  }, [])
+
   const activeItems = orderItems.filter(i => !cancelledItems.has(i.id))
   const subtotal = activeItems.reduce((sum, item) => sum + item.subtotal, 0)
   const subtotalAfterDiscount = Math.max(0, subtotal - discount)
@@ -1326,6 +1383,7 @@ function POSContent() {
       iva,
       total,
       descuento: discount,
+      turnoId: turnoId || undefined,
       notas: orderNotes || undefined,
       createdAt: new Date(),
     }
@@ -1424,6 +1482,14 @@ function POSContent() {
     const payIva = paySubtotalAfterDiscount * IVA_RATE
     const payId = splitPayingCuenta > 0 ? `${orderId}-C${splitPayingCuenta}` : orderId
 
+    // Desglose de pagos (multi-forma estilo Wansoft). Pago simple → 1 elemento.
+    const pagos: PagoForma[] = method === 'Mixto' && mixtoPagos.length > 0
+      ? mixtoPagos
+      : [{ metodo: method, monto: payTotal + propina }]
+    const metodoLabel = method === 'Mixto'
+      ? mixtoPagos.map(p => `${p.metodo} ${formatMXN(p.monto)}`).join(' + ')
+      : method
+
     const order: Order = {
       id: payId,
       mesa,
@@ -1438,25 +1504,25 @@ function POSContent() {
       descuento: payDiscount,
       // Cada cuenta del split es su propia orden en BD — registra la propina capturada en ESTA cuenta
       propina: propina > 0 ? propina : undefined,
-      metodoPago: method,
+      metodoPago: metodoLabel,
+      pagos,
+      turnoId: turnoId || undefined,
       notas: splitPayingCuenta > 0
         ? `Cuenta ${splitPayingCuenta} de ${splitMode === 'parejo' ? splitParejoN : splitCount} (${splitMode === 'parejo' ? 'parejo' : 'split'})`
-        : method === 'Mixto'
-          ? `Mixto: Efectivo ${formatMXN(parseFloat(mixtoEfectivo) || 0)} + Tarjeta ${formatMXN(payTotal - (parseFloat(mixtoEfectivo) || 0))}${orderNotes ? ' | ' + orderNotes : ''}`
-          : (orderNotes || undefined),
+        : (orderNotes || undefined),
       createdAt: new Date(),
       closedAt: new Date(),
     }
     const ok = await saveOrder(order)
     if (ok) {
-      // Open cash drawer for cash payments
-      if (method === 'Efectivo' || method === 'Mixto') {
+      // Open cash drawer for cash payments (incluye mixto con componente efectivo)
+      if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) {
         openCashDrawer()
       }
 
       logAudit({
         order_id: payId, action: 'payment_processed', actor: mesero, mesa,
-        details: { method, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
+        details: { method: metodoLabel, pagos, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
 
       // Print ticket for THIS cuenta
@@ -1488,6 +1554,11 @@ function POSContent() {
     setShowPayment(false)
     setShowCashFlow(false)
     setCashAmount('')
+    setShowMixto(false)
+    setMixtoPagos([])
+    setMixtoMonto('')
+    setSillaActual(1)
+    setTiempoFired(0)
     setSplitPayingCuenta(0)
     setSplitAssignments({})
     setSplitCount(0)
@@ -1721,6 +1792,21 @@ function POSContent() {
               <div className="space-y-0.5">
                 {orderItems.map((item) => {
                   const isCancelled = cancelledItems.has(item.id)
+                  // Separador de tiempo (estilo Wansoft) — fila especial
+                  if (isTiempoItem(item)) {
+                    return (
+                      <div key={item.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                        <Flame size={13} className="text-amber-400 flex-shrink-0" />
+                        <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeTiempoSeparator(item.id) }}
+                          className="w-7 h-7 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )
+                  }
                   return (
                     <div
                       key={item.id}
@@ -1773,6 +1859,17 @@ function POSContent() {
                         )}
                       </div>
 
+                      {/* Silla badge (tap para ciclar 1..personas) */}
+                      {!isCancelled && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); cycleSilla(item.id) }}
+                          className="flex-shrink-0 min-w-[28px] h-7 px-1 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[11px] font-bold flex items-center justify-center transition-colors hover:bg-sky-500/30"
+                          title="Silla — toca para cambiar"
+                        >
+                          S{item.silla || 1}
+                        </button>
+                      )}
+
                       {/* Line total */}
                       <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 ${isCancelled ? 'line-through text-red-400/60' : ''}`}>
                         {formatMXN(item.subtotal)}
@@ -1820,6 +1917,41 @@ function POSContent() {
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
           <div className="border-t border-[var(--line)] px-3 py-2 bg-[var(--surface-2)]/50 flex-shrink-0">
+            {/* Silla activa + Tiempos row (estilo Wansoft CANT/SILLA + firebutton) */}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="flex items-center gap-0.5 bg-sky-500/10 border border-sky-500/25 rounded-md px-1 py-0.5">
+                <Armchair size={12} className="text-sky-400" />
+                <button
+                  onClick={() => setSillaActual(s => Math.max(1, s - 1))}
+                  className="w-6 h-6 rounded bg-[var(--surface)] text-sky-400 flex items-center justify-center text-xs"
+                ><Minus size={10} /></button>
+                <span className="text-sky-400 text-xs font-bold w-7 text-center">S{sillaActual}</span>
+                <button
+                  onClick={() => setSillaActual(s => Math.min(Math.max(personas, 1), s + 1))}
+                  className="w-6 h-6 rounded bg-[var(--surface)] text-sky-400 flex items-center justify-center text-xs"
+                ><Plus size={10} /></button>
+              </div>
+              <button
+                onClick={addTiempoSeparator}
+                disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 text-xs font-medium transition-colors"
+                title="Insertar separador de tiempo"
+              >
+                <Clock size={12} />
+                Tiempo
+              </button>
+              {orderItems.some(isTiempoItem) && (
+                <button
+                  onClick={() => setShowFirebutton(true)}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-colors"
+                  title="Impresión por tiempos — disparar siguiente tiempo a cocina"
+                >
+                  <Flame size={12} />
+                  Disparar
+                </button>
+              )}
+              <div className="flex-1" />
+            </div>
             {/* Inline tools row: discount, notes, void */}
             <div className="flex items-center gap-1.5 mb-1.5">
               <button
@@ -2488,6 +2620,65 @@ function POSContent() {
         </div>
       )}
 
+      {/* Impresión por tiempos (firebutton estilo Wansoft) */}
+      {showFirebutton && (() => {
+        // Tiempo 1 sale con la comanda inicial; el firebutton dispara los siguientes
+        const numTiempos = activeItems.filter(isTiempoItem).length + 1
+        const nextTiempo = tiempoFired + 2
+        const done = nextTiempo > numTiempos
+        // Items del tiempo N: entre el separador N-1 y el N (tiempo 1 = antes del primer separador)
+        const itemsOfTiempo = (n: number) => {
+          let t = 1
+          const out: OrderItem[] = []
+          for (const it of activeItems) {
+            if (isTiempoItem(it)) { t++; continue }
+            if (t === n) out.push(it)
+          }
+          return out
+        }
+        const nextItems = done ? [] : itemsOfTiempo(nextTiempo)
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-amber-500/30">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold flex items-center gap-2"><Flame size={18} className="text-amber-400" />Impresión por tiempos</h3>
+                <button onClick={() => setShowFirebutton(false)} className="w-9 h-9 rounded-lg bg-[var(--line)] flex items-center justify-center"><X size={18} /></button>
+              </div>
+              {done ? (
+                <p className="text-emerald-400 text-sm text-center py-4">Todos los tiempos fueron disparados ({numTiempos} de {numTiempos})</p>
+              ) : (
+                <>
+                  <p className="text-[var(--text-3)] text-sm mb-1">Tiempo siguiente: <span className="text-amber-400 font-bold text-lg">{nextTiempo}</span> de {numTiempos}</p>
+                  <div className="bg-[var(--line)]/50 rounded-lg p-3 mb-4 max-h-36 overflow-y-auto">
+                    {nextItems.length === 0
+                      ? <p className="text-[var(--text-2)] text-xs">Sin platillos en este tiempo</p>
+                      : nextItems.map(i => <p key={i.id} className="text-white text-xs py-0.5">{i.cantidad}x {i.nombre}</p>)}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const fireOrder: Order = {
+                        id: orderId, mesa, mesero, personas, status: 'enviada',
+                        items: nextItems, subtotal: 0, iva: 0, total: 0, descuento: 0,
+                        notas: `*** PREPARAR Y SACAR TIEMPO ${nextTiempo} ***`,
+                        createdAt: new Date(),
+                      }
+                      try { await printByStation(fireOrder) } catch { /* sin impresora */ }
+                      logAudit({ order_id: orderId, action: 'tiempo_fired', actor: mesero, mesa, details: { tiempo: nextTiempo, items: nextItems.map(i => i.nombre) } })
+                      setTiempoFired(t => t + 1)
+                      setShowFirebutton(false)
+                      showToast(`Tiempo ${nextTiempo} disparado a cocina`)
+                    }}
+                    className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold flex items-center justify-center gap-2"
+                  >
+                    <Printer size={18} />Imprimir
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -2702,54 +2893,120 @@ function POSContent() {
                 <CreditCard size={24} />
                 {saving ? 'Esperando terminal...' : 'Tarjeta'}
               </button>
+              {/* Formas de pago custom desde catálogo (estilo Wansoft: Rappi, Ubereats, Cortesía...) */}
+              {(() => {
+                const customMethods = paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card')
+                if (customMethods.length === 0) {
+                  return (
+                    <button
+                      onClick={() => handlePayment('Transferencia electronica')}
+                      className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                    >
+                      <Send size={22} />
+                      Transferencia
+                    </button>
+                  )
+                }
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {customMethods.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => handlePayment(m.name)}
+                        className="flex items-center justify-center gap-2 bg-purple-600/80 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl text-sm transition-colors min-h-[48px]"
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
               <button
-                onClick={() => handlePayment('Transferencia electronica')}
-                className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
-              >
-                <Send size={22} />
-                Transferencia
-              </button>
-              <button
-                onClick={() => { setShowMixto(!showMixto); setMixtoEfectivo('') }}
+                onClick={() => { setShowMixto(!showMixto); setMixtoPagos([]); setMixtoMonto(''); setMixtoForma('Efectivo') }}
                 className={`w-full flex items-center justify-center gap-3 ${showMixto ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[var(--line)] hover:bg-[var(--line-soft)]'} text-${showMixto ? 'white' : '[var(--text-2)]'} font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]`}
               >
-                Mixto (efectivo + tarjeta)
+                Pago mixto (varias formas)
               </button>
-              {showMixto && (
-                <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-[var(--text-2)]">Efectivo:</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white">$</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={mixtoEfectivo}
-                        onChange={(e) => setMixtoEfectivo(e.target.value)}
-                        placeholder="0.00"
-                        className="w-28 bg-[var(--bg)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-right focus:outline-none focus:border-amber-500"
-                        autoFocus
-                      />
+              {showMixto && (() => {
+                const totalConPropina = payTotal + propina
+                const pagado = mixtoPagos.reduce((s, p) => s + p.monto, 0)
+                const restante = Math.max(0, totalConPropina - pagado)
+                const formaNames = ['Efectivo', 'Tarjeta de credito', ...paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card').map(m => m.name)]
+                const montoNum = parseFloat(mixtoMonto) || 0
+                return (
+                  <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">
+                    {/* Pagos agregados */}
+                    {mixtoPagos.map((p, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-[var(--bg)]/60 rounded-lg px-3 py-2">
+                        <span className="text-sm text-white">{p.metodo}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-white">{formatMXN(p.monto)}</span>
+                          <button
+                            onClick={() => setMixtoPagos(prev => prev.filter((_, i) => i !== idx))}
+                            className="w-6 h-6 rounded bg-red-500/15 text-red-400 flex items-center justify-center"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Selector de forma */}
+                    {restante > 0.009 && (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {formaNames.map(name => (
+                            <button
+                              key={name}
+                              onClick={() => setMixtoForma(name)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${mixtoForma === name ? 'bg-amber-600 text-white' : 'bg-[var(--bg)]/60 text-[var(--text-3)]'}`}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={mixtoMonto}
+                            onChange={(e) => setMixtoMonto(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 bg-[var(--bg)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-right focus:outline-none focus:border-amber-500"
+                          />
+                          <button
+                            onClick={() => setMixtoMonto(restante.toFixed(2))}
+                            className="px-2.5 py-2 rounded-lg bg-[var(--bg)]/60 text-amber-400 text-xs font-medium"
+                          >
+                            Restante
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (montoNum <= 0 || montoNum > restante + 0.009) return
+                              setMixtoPagos(prev => [...prev, { metodo: mixtoForma, monto: montoNum }])
+                              setMixtoMonto('')
+                            }}
+                            disabled={montoNum <= 0 || montoNum > restante + 0.009}
+                            className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold"
+                          >
+                            Agregar
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--text-2)]">Restante:</span>
+                      <span className={`font-bold ${restante <= 0.009 ? 'text-emerald-400' : 'text-amber-400'}`}>{formatMXN(restante)}</span>
                     </div>
+                    <button
+                      onClick={() => handlePayment('Mixto')}
+                      disabled={mixtoPagos.length === 0 || restante > 0.009}
+                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl text-base transition-colors"
+                    >
+                      {restante > 0.009 ? `Faltan ${formatMXN(restante)}` : 'Confirmar pago mixto'}
+                    </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-[var(--text-2)]">Tarjeta:</label>
-                    <span className="text-white text-sm font-medium">
-                      {formatMXN(Math.max(0, total - (parseFloat(mixtoEfectivo) || 0)))}
-                    </span>
-                  </div>
-                  {(parseFloat(mixtoEfectivo) || 0) > total && (
-                    <p className="text-red-400 text-xs text-center">El efectivo excede el total</p>
-                  )}
-                  <button
-                    onClick={() => handlePayment('Mixto')}
-                    disabled={(parseFloat(mixtoEfectivo) || 0) <= 0 || (parseFloat(mixtoEfectivo) || 0) > total}
-                    className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl text-base transition-colors"
-                  >
-                    Confirmar pago mixto
-                  </button>
-                </div>
-              )}
+                )
+              })()}
             </div>
               </>)
             })()}
