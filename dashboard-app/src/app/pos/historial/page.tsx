@@ -86,7 +86,7 @@ export default function HistorialPage() {
             <FileText size={24} className="text-[var(--text-3)]" />
             <h1 className="text-xl font-bold">Historial de ordenes</h1>
           </div>
-          <button onClick={fetchOrders} className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
+          <button onClick={fetchOrders} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
           </button>
         </div>

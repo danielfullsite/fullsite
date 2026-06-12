@@ -36,6 +36,21 @@ html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
   -webkit-user-select: text;
   user-select: text;
 }
+/* ============ POS touch-friendly (estilo Wansoft) ============
+ * Piso mínimo de touch target en TODO el POS: ningún control < 44px.
+ * Los controles primarios se suben a 56-60px vía clases Tailwind puntuales. */
+.pos-kiosk button {
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-kiosk input:not([type="checkbox"]):not([type="radio"]),
+.pos-kiosk select {
+  min-height: 44px;
+}
+.pos-kiosk input[type="checkbox"], .pos-kiosk input[type="radio"] {
+  width: 22px;
+  height: 22px;
+}
 /* Sin overflow:hidden — subpáginas /pos/* (turno, ordenes) sí scrollean */
 body:has(.pos-kiosk) {
   overscroll-behavior: none;

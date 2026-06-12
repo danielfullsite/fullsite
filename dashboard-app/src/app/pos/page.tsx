@@ -211,7 +211,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           </div>
           <button
             onClick={onCancel}
-            className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-4)]"
+            className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-4)]"
           >
             <X size={20} />
           </button>
@@ -314,7 +314,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                         setNotas(prev => prev ? `${prev}, ${tag}` : tag)
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-4 min-h-[48px] rounded-lg text-sm font-semibold transition-colors ${
                       isActive
                         ? 'bg-amber-600/40 border border-amber-500/60 text-amber-200'
                         : 'bg-[var(--line)]/50 border border-slate-600/50 text-slate-300 hover:bg-[var(--line)]'
@@ -407,7 +407,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
       <div className="relative bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white">Aplicar descuento</h3>
-          <button onClick={onCancel} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-4)]">
+          <button onClick={onCancel} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-[var(--text-4)]">
             <X size={20} />
           </button>
         </div>
@@ -416,7 +416,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setMode('percent')}
-            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
+            className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors min-h-[48px] ${
               mode === 'percent' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
@@ -424,7 +424,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
           </button>
           <button
             onClick={() => setMode('fixed')}
-            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
+            className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors min-h-[48px] ${
               mode === 'fixed' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
@@ -432,7 +432,7 @@ function DiscountModal({ subtotal, personas, onApply, onCancel }: DiscountModalP
           </button>
           <button
             onClick={() => setMode('cortesia')}
-            className={`flex-1 py-3 rounded-lg font-medium text-xs transition-colors min-h-[44px] ${
+            className={`flex-1 py-3 rounded-lg font-semibold text-sm transition-colors min-h-[48px] ${
               mode === 'cortesia' ? 'bg-violet-600 text-white' : 'bg-[var(--line)] text-[var(--text-4)]'
             }`}
           >
@@ -1582,7 +1582,7 @@ function POSContent() {
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
         <div className="flex items-center justify-between px-3 py-1.5">
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowNav(!showNav)} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
+            <button onClick={() => setShowNav(!showNav)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
               {showNav ? <X size={18} /> : <Menu size={18} />}
             </button>
             <span className="text-white font-black text-base tracking-tight">
@@ -1613,11 +1613,11 @@ function POSContent() {
               <button
                 onClick={handleConnectPrinter}
                 disabled={btConnecting}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
                   btPrinter ? 'bg-blue-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
                 }`}
               >
-                <Bluetooth size={12} />
+                <Bluetooth size={16} />
                 {btConnecting ? '...' : btPrinter ? btPrinter.slice(0, 8) : 'Printer'}
               </button>
             )}
@@ -1627,12 +1627,12 @@ function POSContent() {
                 if (cfg) { setMpAccessToken(cfg.accessToken); setMpDeviceId(cfg.deviceId) }
                 setShowMPConfig(true)
               }}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
                 mpConfig ? 'bg-cyan-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
               }`}
               title="Mercado Pago Point"
             >
-              <Smartphone size={12} />
+              <Smartphone size={16} />
               {mpConfig ? 'Point' : 'MP'}
             </button>
             {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
@@ -1650,15 +1650,15 @@ function POSContent() {
                 window.location.reload()
               }}
               title="Bloquear pantalla"
-              className="w-8 h-8 rounded-lg bg-[var(--line)] hover:bg-red-900/40 flex items-center justify-center transition-colors"
+              className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-red-900/40 flex items-center justify-center transition-colors"
             >
-              <Lock size={14} />
+              <Lock size={18} />
             </button>
           </div>
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--line)]/50 overflow-x-auto">
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-2 py-1 border border-slate-600 min-h-[40px]">
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-1 border border-slate-600 min-h-[48px]">
             <span className="text-white text-sm font-medium">Mesa</span>
             <input
               type="number"
@@ -1673,10 +1673,10 @@ function POSContent() {
                 setMesa(newMesa)
               }}
               min={1} max={999}
-              className="w-12 bg-transparent text-white text-sm font-bold text-center border-none outline-none"
+              className="w-14 bg-transparent text-white text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-2 py-1 border border-slate-600 min-h-[40px]">
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-1 border border-slate-600 min-h-[48px]">
             <span className="text-teal-400 text-sm font-medium">#</span>
             <input
               type="text"
@@ -1689,13 +1689,13 @@ function POSContent() {
               }}
               placeholder="Cliente"
               maxLength={30}
-              className="w-24 bg-transparent text-teal-300 text-sm font-bold border-none outline-none placeholder:text-[var(--text-4)] placeholder:font-normal"
+              className="w-28 bg-transparent text-teal-300 text-base font-bold border-none outline-none placeholder:text-[var(--text-4)] placeholder:font-normal"
             />
           </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px]">
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px]">
             {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => { setMesero(e.target.value); try { localStorage.setItem('pos_mesero', e.target.value) } catch {} }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-sm font-medium border border-slate-600 min-h-[40px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => { setMesero(e.target.value); try { localStorage.setItem('pos_mesero', e.target.value) } catch {} }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
@@ -1703,13 +1703,13 @@ function POSContent() {
         <div className="flex md:hidden border-t border-[var(--line)]/50">
           <button
             onClick={() => setMobileView('menu')}
-            className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${mobileView === 'menu' ? 'bg-emerald-600 text-white' : 'text-[var(--text-3)]'}`}
+            className={`flex-1 py-3 min-h-[52px] text-base font-semibold text-center transition-colors ${mobileView === 'menu' ? 'bg-emerald-600 text-white' : 'text-[var(--text-3)]'}`}
           >
             Menu
           </button>
           <button
             onClick={() => setMobileView('order')}
-            className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors relative ${mobileView === 'order' ? 'bg-blue-600 text-white' : 'text-[var(--text-3)]'}`}
+            className={`flex-1 py-3 min-h-[52px] text-base font-semibold text-center transition-colors relative ${mobileView === 'order' ? 'bg-blue-600 text-white' : 'text-[var(--text-3)]'}`}
           >
             Orden {activeItems.length > 0 && <span className="ml-1 bg-emerald-500 text-white text-xs rounded-full px-1.5 py-0.5">{activeItems.length}</span>}
           </button>
@@ -1800,9 +1800,9 @@ function POSContent() {
                         <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
                         <button
                           onClick={(e) => { e.stopPropagation(); removeTiempoSeparator(item.id) }}
-                          className="w-7 h-7 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
+                          className="w-11 h-11 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
                         >
-                          <X size={12} />
+                          <X size={16} />
                         </button>
                       </div>
                     )
@@ -1823,19 +1823,19 @@ function POSContent() {
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
                           disabled={isCancelled}
-                          className="w-9 h-9 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
-                          <Minus size={12} />
+                          <Minus size={18} />
                         </button>
-                        <span className="w-6 text-center font-semibold text-base">
+                        <span className="w-7 text-center font-bold text-lg">
                           {item.cantidad}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
                           disabled={isCancelled}
-                          className="w-9 h-9 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
+                          className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
-                          <Plus size={12} />
+                          <Plus size={18} />
                         </button>
                       </div>
 
@@ -1863,7 +1863,7 @@ function POSContent() {
                       {!isCancelled && (
                         <button
                           onClick={(e) => { e.stopPropagation(); cycleSilla(item.id) }}
-                          className="flex-shrink-0 min-w-[28px] h-7 px-1 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[11px] font-bold flex items-center justify-center transition-colors hover:bg-sky-500/30"
+                          className="flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-sm font-bold flex items-center justify-center transition-colors hover:bg-sky-500/30"
                           title="Silla — toca para cambiar"
                         >
                           S{item.silla || 1}
@@ -1880,18 +1880,18 @@ function POSContent() {
                           {/* Edit */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
-                            className="w-8 h-8 rounded-md bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
                           >
-                            <Pencil size={12} />
+                            <Pencil size={18} />
                           </button>
 
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
-                            className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            className="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
                             title="Cancelar item (requiere gerente)"
                           >
-                            <Ban size={12} />
+                            <Ban size={18} />
                           </button>
                         </>
                       )}
@@ -1919,34 +1919,34 @@ function POSContent() {
           <div className="border-t border-[var(--line)] px-3 py-2 bg-[var(--surface-2)]/50 flex-shrink-0">
             {/* Silla activa + Tiempos row (estilo Wansoft CANT/SILLA + firebutton) */}
             <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="flex items-center gap-0.5 bg-sky-500/10 border border-sky-500/25 rounded-md px-1 py-0.5">
-                <Armchair size={12} className="text-sky-400" />
+              <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-500/25 rounded-lg px-1.5 py-1">
+                <Armchair size={18} className="text-sky-400" />
                 <button
                   onClick={() => setSillaActual(s => Math.max(1, s - 1))}
-                  className="w-6 h-6 rounded bg-[var(--surface)] text-sky-400 flex items-center justify-center text-xs"
-                ><Minus size={10} /></button>
-                <span className="text-sky-400 text-xs font-bold w-7 text-center">S{sillaActual}</span>
+                  className="w-11 h-11 rounded-md bg-[var(--surface)] text-sky-400 flex items-center justify-center"
+                ><Minus size={16} /></button>
+                <span className="text-sky-400 text-base font-bold w-9 text-center">S{sillaActual}</span>
                 <button
                   onClick={() => setSillaActual(s => Math.min(Math.max(personas, 1), s + 1))}
-                  className="w-6 h-6 rounded bg-[var(--surface)] text-sky-400 flex items-center justify-center text-xs"
-                ><Plus size={10} /></button>
+                  className="w-11 h-11 rounded-md bg-[var(--surface)] text-sky-400 flex items-center justify-center"
+                ><Plus size={16} /></button>
               </div>
               <button
                 onClick={addTiempoSeparator}
                 disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-400 text-sm font-semibold transition-colors"
                 title="Insertar separador de tiempo"
               >
-                <Clock size={12} />
+                <Clock size={18} />
                 Tiempo
               </button>
               {orderItems.some(isTiempoItem) && (
                 <button
                   onClick={() => setShowFirebutton(true)}
-                  className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-colors"
+                  className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-colors"
                   title="Impresión por tiempos — disparar siguiente tiempo a cocina"
                 >
-                  <Flame size={12} />
+                  <Flame size={18} />
                   Disparar
                 </button>
               )}
@@ -1957,10 +1957,10 @@ function POSContent() {
               <button
                 onClick={() => setShowDiscount(true)}
                 disabled={orderItems.length === 0}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-xs transition-colors"
+                className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
                 title="Aplicar descuento"
               >
-                <Percent size={12} />
+                <Percent size={16} />
                 {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
               </button>
               {discount > 0 && (
@@ -1969,9 +1969,9 @@ function POSContent() {
                     logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
                     setDiscount(0)
                   }}
-                  className="px-1.5 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 text-xs transition-colors"
+                  className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 transition-colors"
                 >
-                  <X size={12} />
+                  <X size={18} />
                 </button>
               )}
               {/* Order notes — inline input */}
@@ -1982,15 +1982,15 @@ function POSContent() {
                   value={orderNotes}
                   onChange={(e) => setOrderNotes(e.target.value)}
                   placeholder="Nota..."
-                  className="flex-1 min-w-0 bg-[var(--line)]/60 border border-slate-600/50 rounded-md px-2 py-1 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500/50"
+                  className="flex-1 min-w-0 bg-[var(--line)]/60 border border-slate-600/50 rounded-lg px-3 min-h-[48px] text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
               <button
                 onClick={() => { openCashDrawer(); showToast('Cajón abierto') }}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-700/50 hover:bg-slate-700 text-[var(--text-3)] text-xs transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 text-[var(--text-3)] transition-colors"
                 title="Abrir cajón"
               >
-                <Banknote size={12} />
+                <Banknote size={18} />
               </button>
               <button
                 onClick={() => {
@@ -2004,18 +2004,18 @@ function POSContent() {
                   handlePrintTicket(reprintOrder)
                 }}
                 disabled={orderItems.length === 0}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-slate-700/50 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] text-xs transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"
                 title="Reimprimir ticket"
               >
-                <Printer size={12} />
+                <Printer size={18} />
               </button>
               <button
                 onClick={() => setShowVoidOrder(true)}
                 disabled={orderItems.length === 0}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 text-xs transition-colors"
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-400 transition-colors"
                 title="Anular orden"
               >
-                <ShieldAlert size={12} />
+                <ShieldAlert size={18} />
               </button>
             </div>
 
@@ -2033,7 +2033,7 @@ function POSContent() {
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
             >
               <Send size={18} />
               {saving ? '...' : sentToKitchen ? 'Enviado' : 'Cocina'}
@@ -2041,7 +2041,7 @@ function POSContent() {
             <button
               onClick={handlePreTicket}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
             >
               <Receipt size={16} />
               Cuenta
@@ -2049,14 +2049,14 @@ function POSContent() {
             <button
               onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-sm transition-all min-h-[52px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
             >
               <CreditCard size={18} />
               Cobrar
@@ -2155,7 +2155,7 @@ function POSContent() {
                   <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
-                      <button onClick={() => setSelectedCategory('')} className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white text-xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                      <button onClick={() => setSelectedCategory('')} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
                     <div className="overflow-y-auto p-4 max-h-[65vh]">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -2255,7 +2255,7 @@ function POSContent() {
           <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-lg border border-[var(--line)] max-h-[85vh] overflow-y-auto mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Dividir cuenta — Mesa {mesa}</h3>
-              <button onClick={() => { setShowSplit(false); setSplitMode(null); setSplitCount(0); setSplitParejoN(0) }} className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center">
+              <button onClick={() => { setShowSplit(false); setSplitMode(null); setSplitCount(0); setSplitParejoN(0) }} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center">
                 <X size={20} />
               </button>
             </div>
@@ -2439,7 +2439,7 @@ function POSContent() {
               <h3 className="text-lg font-bold text-white">Confirmar personas</h3>
               <button
                 onClick={() => setShowPersonVerify(false)}
-                className="w-9 h-9 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
+                className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={18} />
               </button>
@@ -2515,7 +2515,7 @@ function POSContent() {
               </h3>
               <button
                 onClick={() => setShowMPConfig(false)}
-                className="w-9 h-9 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
+                className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={18} />
               </button>
@@ -2642,7 +2642,7 @@ function POSContent() {
             <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-sm border border-amber-500/30">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold flex items-center gap-2"><Flame size={18} className="text-amber-400" />Impresión por tiempos</h3>
-                <button onClick={() => setShowFirebutton(false)} className="w-9 h-9 rounded-lg bg-[var(--line)] flex items-center justify-center"><X size={18} /></button>
+                <button onClick={() => setShowFirebutton(false)} className="w-11 h-11 rounded-lg bg-[var(--line)] flex items-center justify-center"><X size={18} /></button>
               </div>
               {done ? (
                 <p className="text-emerald-400 text-sm text-center py-4">Todos los tiempos fueron disparados ({numTiempos} de {numTiempos})</p>
@@ -2681,8 +2681,8 @@ function POSContent() {
 
       {/* Payment Modal */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)]">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)] max-h-[92vh] overflow-y-auto">
             {(() => {
               // Calculate total for current split cuenta or full order
               const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
@@ -2719,7 +2719,7 @@ function POSContent() {
               <h3 className="text-xl font-bold">Cerrar cuenta{cuentaLabel}</h3>
               <button
                 onClick={() => { setShowPayment(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
-                className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
+                className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={20} />
               </button>
@@ -2751,7 +2751,7 @@ function POSContent() {
                   <button
                     key={pct}
                     onClick={() => setPropina(pct === 0 ? 0 : Math.round(total * pct / 100))}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 min-h-[52px] rounded-lg text-base font-bold transition-colors ${
                       (pct === 0 && propina === 0) || (pct > 0 && propina === Math.round(total * pct / 100))
                         ? 'bg-emerald-600 text-white'
                         : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
@@ -2766,7 +2766,7 @@ function POSContent() {
                   value={propina || ''}
                   onChange={e => setPropina(Number(e.target.value) || 0)}
                   placeholder="$"
-                  className="w-20 bg-[var(--line)] border border-slate-600 rounded-lg px-2 py-2.5 text-white text-sm text-center focus:outline-none focus:border-emerald-500"
+                  className="w-24 min-h-[52px] bg-[var(--line)] border border-slate-600 rounded-lg px-2 text-white text-base text-center focus:outline-none focus:border-emerald-500"
                 />
               </div>
               {propina > 0 && (
@@ -2796,7 +2796,7 @@ function POSContent() {
                       <div className="flex gap-2 mb-2">
                         {[100, 200, 500, 1000].map(bill => (
                           <button key={bill} onClick={() => setCashAmount(String(bill))}
-                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                            className={`flex-1 min-h-[52px] rounded-lg text-base font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                           >${bill}</button>
                         ))}
                       </div>
@@ -2913,7 +2913,7 @@ function POSContent() {
                       <button
                         key={m.id}
                         onClick={() => handlePayment(m.name)}
-                        className="flex items-center justify-center gap-2 bg-purple-600/80 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl text-sm transition-colors min-h-[48px]"
+                        className="flex items-center justify-center gap-2 bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-4 rounded-xl text-base transition-colors min-h-[60px]"
                       >
                         {m.name}
                       </button>
@@ -2923,7 +2923,7 @@ function POSContent() {
               })()}
               <button
                 onClick={() => { setShowMixto(!showMixto); setMixtoPagos([]); setMixtoMonto(''); setMixtoForma('Efectivo') }}
-                className={`w-full flex items-center justify-center gap-3 ${showMixto ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[var(--line)] hover:bg-[var(--line-soft)]'} text-${showMixto ? 'white' : '[var(--text-2)]'} font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]`}
+                className={`w-full flex items-center justify-center gap-3 ${showMixto ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)]'} font-bold py-4 rounded-xl text-base transition-colors min-h-[60px]`}
               >
                 Pago mixto (varias formas)
               </button>
@@ -2943,9 +2943,9 @@ function POSContent() {
                           <span className="text-sm font-semibold text-white">{formatMXN(p.monto)}</span>
                           <button
                             onClick={() => setMixtoPagos(prev => prev.filter((_, i) => i !== idx))}
-                            className="w-6 h-6 rounded bg-red-500/15 text-red-400 flex items-center justify-center"
+                            className="w-11 h-11 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"
                           >
-                            <X size={12} />
+                            <X size={18} />
                           </button>
                         </div>
                       </div>
@@ -2958,7 +2958,7 @@ function POSContent() {
                             <button
                               key={name}
                               onClick={() => setMixtoForma(name)}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${mixtoForma === name ? 'bg-amber-600 text-white' : 'bg-[var(--bg)]/60 text-[var(--text-3)]'}`}
+                              className={`px-4 min-h-[48px] rounded-lg text-sm font-semibold transition-colors ${mixtoForma === name ? 'bg-amber-600 text-white' : 'bg-[var(--bg)]/60 text-[var(--text-3)]'}`}
                             >
                               {name}
                             </button>
@@ -2971,11 +2971,11 @@ function POSContent() {
                             value={mixtoMonto}
                             onChange={(e) => setMixtoMonto(e.target.value)}
                             placeholder="0.00"
-                            className="flex-1 bg-[var(--bg)] border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-right focus:outline-none focus:border-amber-500"
+                            className="flex-1 min-h-[52px] bg-[var(--bg)] border border-slate-600 rounded-lg px-3 text-white text-lg text-right focus:outline-none focus:border-amber-500"
                           />
                           <button
                             onClick={() => setMixtoMonto(restante.toFixed(2))}
-                            className="px-2.5 py-2 rounded-lg bg-[var(--bg)]/60 text-amber-400 text-xs font-medium"
+                            className="px-4 min-h-[52px] rounded-lg bg-[var(--bg)]/60 text-amber-400 text-sm font-semibold"
                           >
                             Restante
                           </button>
@@ -2986,7 +2986,7 @@ function POSContent() {
                               setMixtoMonto('')
                             }}
                             disabled={montoNum <= 0 || montoNum > restante + 0.009}
-                            className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold"
+                            className="px-5 min-h-[52px] rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-base font-bold"
                           >
                             Agregar
                           </button>
@@ -3000,7 +3000,7 @@ function POSContent() {
                     <button
                       onClick={() => handlePayment('Mixto')}
                       disabled={mixtoPagos.length === 0 || restante > 0.009}
-                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl text-base transition-colors"
+                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[60px]"
                     >
                       {restante > 0.009 ? `Faltan ${formatMXN(restante)}` : 'Confirmar pago mixto'}
                     </button>
@@ -3153,8 +3153,8 @@ function POSAlerts({ role }: { role: string }) {
         <div key={alert.id} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border backdrop-blur-sm shadow-lg text-sm font-medium ${colors[alert.type]}`}>
           <span>{alert.message}</span>
           {alert.dismissible && (
-            <button onClick={() => setDismissed(prev => new Set(prev).add(alert.id))} className="ml-3 opacity-60 hover:opacity-100">
-              <X size={14} />
+            <button onClick={() => setDismissed(prev => new Set(prev).add(alert.id))} className="ml-3 min-w-[44px] min-h-[44px] flex items-center justify-center opacity-60 hover:opacity-100">
+              <X size={18} />
             </button>
           )}
         </div>
