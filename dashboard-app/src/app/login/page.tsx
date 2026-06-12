@@ -1,9 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 
+type CapacitorStatusBar = {
+  Capacitor?: { isNativePlatform?: () => boolean; Plugins?: { StatusBar?: { setStyle: (o: { style: string }) => void } } }
+}
+
 export default function LoginPage() {
+  // Login es la única página clara: el status bar nativo usa texto claro (invisible aquí).
+  // Cambiar a texto oscuro mientras esta página está montada.
+  useEffect(() => {
+    const cap = (window as unknown as CapacitorStatusBar).Capacitor
+    const sb = cap?.Plugins?.StatusBar
+    if (!cap?.isNativePlatform?.() || !sb) return
+    sb.setStyle({ style: 'LIGHT' })
+    return () => sb.setStyle({ style: 'DARK' })
+  }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

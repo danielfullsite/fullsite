@@ -21,6 +21,8 @@ html.capacitor * { -webkit-tap-highlight-color: transparent; }
 html.capacitor body { padding-bottom: env(safe-area-inset-bottom); }
 /* iOS hace auto-zoom si el input tiene <16px — fijar tamaño evita el brinco al enfocar */
 html.capacitor input, html.capacitor select, html.capacitor textarea { font-size: 16px !important; }
+/* POS: el header pegado al top necesita su propio safe-area (no usa AppShell) */
+html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
 
 /* ============ Fullsite Design Tokens ============
  * DARK by default. Accent emerald #10b981.
