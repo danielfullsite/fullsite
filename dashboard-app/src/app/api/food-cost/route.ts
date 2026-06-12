@@ -10,12 +10,15 @@ export async function GET() {
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     const opts = { headers, cache: 'no-store' as const }
 
-    const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes] = await Promise.all([
+    const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_recipes?client_id=eq.amalay&select=saucer_id,saucer_name,budget_cost,ingredients`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price,category_id`, opts),
       fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta&precio_venta=gt.0`, opts),
       fetch(`${sbUrl}/rest/v1/wansoft_menu_config?client_id=eq.amalay&select=fecha,saucers&order=fecha.desc&limit=10`, opts),
       fetch(`${sbUrl}/rest/v1/wansoft_data?tipo=eq.costeo_por_platillo&order=fecha.desc&limit=1&select=data,fecha`, opts),
+      // Modificadores reales de Wansoft (wsm-*) — para costear recetas huérfanas
+      // (EXT. POLLO, C/ PAN BRIOCHE...) contra su precio extra
+      fetch(`${sbUrl}/rest/v1/pos_modifiers?client_id=eq.amalay&id=like.wsm-*&select=name,price`, opts),
     ])
 
     return Response.json({
@@ -24,8 +27,9 @@ export async function GET() {
       posRecipes: posRecipesRes.ok ? await posRecipesRes.json() : [],
       menuConfig: menuConfigRes.ok ? await menuConfigRes.json() : [],
       costeo: costeoRes.ok ? await costeoRes.json() : [],
+      posModifiers: modsRes.ok ? await modsRes.json() : [],
     })
   } catch {
-    return Response.json({ recipes: [], menuItems: [], posRecipes: [], menuConfig: [], costeo: [] })
+    return Response.json({ recipes: [], menuItems: [], posRecipes: [], menuConfig: [], costeo: [], posModifiers: [] })
   }
 }

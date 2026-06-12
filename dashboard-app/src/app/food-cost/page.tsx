@@ -16,6 +16,7 @@ interface CostItem {
   margen_pct: number
   matched: boolean          // true if we found a menu price
   market: boolean           // producto de Market (retail) — excluido de KPIs de cocina
+  modifier?: boolean        // receta de modificador (wsm-*): costo vs precio extra
   precioPromedio?: boolean  // precio derivado de ventas reales (total/qty), no de lista
   sospechoso?: {            // probable capture error in Wansoft recipe
     ingrediente: string
@@ -119,6 +120,7 @@ export default function FoodCostPage() {
   const [source, setSource] = useState('')
   const [error, setError] = useState('')
   const [showMarket, setShowMarket] = useState(false)
+  const [showMods, setShowMods] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -170,6 +172,16 @@ export default function FoodCostPage() {
               }
               break // primer snapshot con datos
             }
+          }
+
+          // Modificadores reales (wsm-*): las ~93 recetas huérfanas de Wansoft
+          // (EXT. POLLO, C/ PAN BRIOCHE...) son recetas de modificadores — se
+          // costean contra el precio EXTRA del modificador, no contra el menú.
+          const modMap = new Map<string, number>()
+          const posModifiers: Array<{ name: string; price: number }> = api.posModifiers || []
+          for (const m of posModifiers) {
+            const n = norm(m.name)
+            if (n && !modMap.has(n)) modMap.set(n, Number(m.price) || 0)
           }
 
           // Detección Market: nombre exacto/fuzzy de items mkt-*, o marca conocida.
@@ -242,8 +254,25 @@ export default function FoodCostPage() {
                   }
                 : undefined
 
-            const market = isMarket(recipe.saucer_name)
-            const { price: precio, promedio } = findPrice(recipe.saucer_name)
+            // ¿Es receta de modificador? Match exacto contra wsm-* primero;
+            // el match exacto con el menú de cocina gana siempre.
+            const nr0 = norm(recipe.saucer_name)
+            let modPrice: number | undefined =
+              !menuMap.has(nr0) && modMap.has(nr0) ? modMap.get(nr0) : undefined
+
+            const market = modPrice === undefined && isMarket(recipe.saucer_name)
+            const { price: menuPrice, promedio } =
+              modPrice === undefined ? findPrice(recipe.saucer_name) : { price: 0, promedio: false }
+
+            // Fuzzy contra modificadores solo si no hubo precio de cocina ni es Market
+            if (modPrice === undefined && !market && menuPrice <= 0) {
+              modMap.forEach((p, name) => {
+                if (modPrice === undefined && fuzzyMatch(nr0, name)) modPrice = p
+              })
+            }
+
+            const isMod = modPrice !== undefined
+            const precio = isMod ? modPrice! : menuPrice
             const margen = precio > 0 ? Math.round((1 - costoTotal / precio) * 1000) / 10 : 0
 
             // Sanity check: si el margen es < -100%, el match es casi seguro incorrecto
@@ -258,6 +287,7 @@ export default function FoodCostPage() {
               margen_pct: validMatch ? margen : 0,
               matched: validMatch,
               market,
+              modifier: isMod,
               precioPromedio: validMatch && promedio,
               sospechoso,
             })
@@ -265,10 +295,11 @@ export default function FoodCostPage() {
 
           if (costItems.length > 0) {
             setItems(costItems.sort((a, b) => a.margen_pct - b.margen_pct))
-            const cocina = costItems.filter(i => !i.market)
+            const cocina = costItems.filter(i => !i.market && !i.modifier)
             const matchedCount = cocina.filter(i => i.matched).length
-            const mktCount = costItems.length - cocina.length
-            setSource(`wansoft_recipes · ${cocina.length} recetas cocina · ${matchedCount} con precio · ${mktCount} Market excluidas`)
+            const mktCount = costItems.filter(i => i.market).length
+            const modCount = costItems.filter(i => i.modifier).length
+            setSource(`wansoft_recipes · ${cocina.length} recetas cocina · ${matchedCount} con precio · ${mktCount} Market excluidas · ${modCount} modificadores`)
             setLoading(false)
             return
           }
@@ -326,6 +357,7 @@ export default function FoodCostPage() {
   const filtered = useMemo(() => {
     return items
       .filter(i => showMarket || !i.market)
+      .filter(i => showMods || !i.modifier)
       .filter(i => !search || i.platillo.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
         const va = a[sortKey]
@@ -335,11 +367,12 @@ export default function FoodCostPage() {
         }
         return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number)
       })
-  }, [items, search, sortKey, sortAsc, showMarket])
+  }, [items, search, sortKey, sortAsc, showMarket, showMods])
 
-  /* ---- KPIs (solo cocina — Market siempre excluido de métricas) ---- */
-  const cocina = items.filter(i => !i.market)
+  /* ---- KPIs (solo cocina — Market y modificadores excluidos de métricas) ---- */
+  const cocina = items.filter(i => !i.market && !i.modifier)
   const marketItems = items.filter(i => i.market)
+  const modItems = items.filter(i => i.modifier)
   const withPrice = cocina.filter(i => i.matched)
   const avgMargin = withPrice.length > 0 ? withPrice.reduce((s, i) => s + i.margen_pct, 0) / withPrice.length : 0
   const stars = withPrice.filter(i => i.margen_pct > 70)
@@ -473,6 +506,17 @@ export default function FoodCostPage() {
               Mostrar Market ({marketItems.length})
             </label>
           )}
+          {modItems.length > 0 && (
+            <label className="flex items-center gap-2 text-xs text-[var(--text-2)] cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showMods}
+                onChange={e => setShowMods(e.target.checked)}
+                className="accent-emerald-500"
+              />
+              Modificadores ({modItems.length})
+            </label>
+          )}
         </div>
 
         {error || filtered.length === 0 ? (
@@ -528,7 +572,15 @@ export default function FoodCostPage() {
                             market
                           </span>
                         )}
-                        {!item.matched && (
+                        {item.modifier && (
+                          <span
+                            className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-600"
+                            title={item.precio > 0 ? 'Costeado contra el precio extra del modificador' : 'Modificador incluido en el precio del platillo (costo sin cobro extra)'}
+                          >
+                            modificador{!item.matched ? ' · incluido' : ''}
+                          </span>
+                        )}
+                        {!item.matched && !item.modifier && (
                           <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600">
                             sin precio
                           </span>
@@ -557,7 +609,7 @@ export default function FoodCostPage() {
                         {formatCurrency(item.costo)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">
-                        {item.matched ? formatCurrency(item.precio) : '-'}
+                        {item.matched ? `${item.modifier ? '+' : ''}${formatCurrency(item.precio)}` : '-'}
                       </td>
                       <td
                         className={`px-4 py-3 text-right tabular-nums font-bold ${
