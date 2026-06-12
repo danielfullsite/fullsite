@@ -28,6 +28,7 @@ export default function FacturacionPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [searchRFC, setSearchRFC] = useState('')
+  const [stampingId, setStampingId] = useState<string | null>(null)
 
   // Form state
   const [rfc, setRfc] = useState('')
@@ -92,6 +93,27 @@ export default function FacturacionPage() {
     } else {
       showToast('Error al crear solicitud')
     }
+  }
+
+  const handleTimbrar = async (id: string) => {
+    setStampingId(id)
+    try {
+      const res = await fetch('/api/factura/timbrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        showToast(data.emailed ? 'Factura timbrada y enviada por email' : 'Factura timbrada')
+      } else {
+        showToast(`Error: ${data.error || 'no se pudo timbrar'}`)
+      }
+    } catch {
+      showToast('Error de red al timbrar')
+    }
+    setStampingId(null)
+    fetchRequests()
   }
 
   const filteredRequests = searchRFC
@@ -320,19 +342,38 @@ export default function FacturacionPage() {
                           )}
                         </div>
                       )}
-                      {req.status === 'pendiente' && (
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-700">
+                      {(req.status === 'pendiente' || req.status === 'error') && (
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-700">
                           <button
-                            onClick={async () => {
-                              await updateCFDIStatus(req.id, 'cancelada')
-                              showToast('Solicitud cancelada')
-                              fetchRequests()
-                            }}
-                            className="text-xs font-medium text-red-400 hover:text-red-300"
+                            onClick={() => handleTimbrar(req.id)}
+                            disabled={stampingId !== null}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg transition-colors"
                           >
-                            Cancelar solicitud
+                            {stampingId === req.id ? (
+                              <><RefreshCw size={14} className="animate-spin" /> Timbrando...</>
+                            ) : (
+                              <><FileText size={14} /> {req.status === 'error' ? 'Reintentar timbrado' : 'Timbrar'}</>
+                            )}
                           </button>
+                          {req.status === 'pendiente' && (
+                            <button
+                              onClick={async () => {
+                                await updateCFDIStatus(req.id, 'cancelada')
+                                showToast('Solicitud cancelada')
+                                fetchRequests()
+                              }}
+                              className="text-xs font-medium text-red-400 hover:text-red-300"
+                            >
+                              Cancelar solicitud
+                            </button>
+                          )}
                         </div>
+                      )}
+                      {req.status === 'error' && req.error_msg && (
+                        <p className="text-xs text-red-400 mt-2">{req.error_msg}</p>
+                      )}
+                      {req.folio_fiscal && (
+                        <p className="text-xs text-[var(--text-2)] mt-2 font-mono">Folio fiscal: {req.folio_fiscal}</p>
                       )}
                     </div>
                   )
