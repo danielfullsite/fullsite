@@ -37,13 +37,17 @@ export const STATION_CATEGORIES: Record<StationName, string[]> = {
     'pizzas', 'bowls', 'ceviche',
     // Grupos Wansoft (AMALAY): comida → cocina
     'promos', 'keto', 'kids', 'soups', 'munchies', 'extras', 'envios',
+    'enchiladas-tacos', 'salads-ceviche', 'appetizers', 'evento',
   ],
   barra: [
     'coffee', 'signature', 'jugos', 'fresh', 'smoothies', 'frappes',
     'sodas', 'tea', 'alcohol', 'activaciones',
+    'vinos', 'cerveza', 'licores', 'icecream',
   ],
   caja: [
     'toast', 'bakery', 'postres', 'mkt-cafe',
+    // Market consolidado Wansoft (junio 2026)
+    'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay',
   ],
 }
 
