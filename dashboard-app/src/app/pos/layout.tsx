@@ -34,6 +34,54 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
   }, [])
 
+  // ── Modo kiosk para terminal de caja (hardware AMALAY: touch all-in-one) ──
+  useEffect(() => {
+    // 1. Manifest dedicado: fullscreen + landscape + start_url /pos
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+    const prevManifest = link?.href
+    if (link) link.href = '/manifest-pos.json'
+
+    // 2. Sin menú contextual (long-press en monitor touch abre click derecho)
+    const blockCtx = (e: Event) => {
+      const t = e.target as HTMLElement
+      if (!(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement)) e.preventDefault()
+    }
+    document.addEventListener('contextmenu', blockCtx)
+
+    return () => {
+      if (link && prevManifest) link.href = prevManifest
+      document.removeEventListener('contextmenu', blockCtx)
+    }
+  }, [])
+
+  // 3. Wake Lock: la pantalla del terminal NUNCA se duerme con sesión abierta
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
+  const unlockedRef = useRef(unlocked)
+  useEffect(() => { unlockedRef.current = unlocked }, [unlocked])
+  useEffect(() => {
+    let cancelled = false
+    const acquire = async () => {
+      try {
+        const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }
+        if (!nav.wakeLock) return
+        const lock = await nav.wakeLock.request('screen')
+        if (cancelled) { lock.release().catch(() => {}) } else { wakeLockRef.current = lock }
+      } catch { /* sin permiso o batería baja — no crítico */ }
+    }
+    const reacquire = () => { if (document.visibilityState === 'visible' && unlockedRef.current) acquire() }
+
+    if (unlocked) {
+      acquire()
+      document.addEventListener('visibilitychange', reacquire)
+    }
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', reacquire)
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+  }, [unlocked])
+
   // Restore session
   useEffect(() => {
     if (typeof window !== 'undefined') {

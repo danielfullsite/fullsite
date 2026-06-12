@@ -31,6 +31,8 @@ html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
   overscroll-behavior: none;
   -webkit-touch-callout: none;
   touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .pos-kiosk input, .pos-kiosk textarea {
   -webkit-user-select: text;

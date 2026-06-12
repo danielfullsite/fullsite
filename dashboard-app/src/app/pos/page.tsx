@@ -759,6 +759,9 @@ function POSContent() {
   const [tiempoFired, setTiempoFired] = useState(0)
   const [showCashCalc, setShowCashCalc] = useState(false)
   const [showCashFlow, setShowCashFlow] = useState(false)
+  // Getnet standalone (spec 14.1): el cajero teclea el monto a mano en la terminal roja
+  // → mostrar el monto GIGANTE + confirmación para evitar descuadres
+  const [showCardConfirm, setShowCardConfirm] = useState(false)
   const [cashAmount, setCashAmount] = useState('')
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [sentToKitchen, setSentToKitchen] = useState(false)
@@ -940,6 +943,7 @@ function POSContent() {
     setShowMixto(false)
     setMixtoPagos([])
     setMixtoMonto('')
+    setShowCardConfirm(false)
     setShowPayment(true)
   }
 
@@ -2718,7 +2722,7 @@ function POSContent() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Cerrar cuenta{cuentaLabel}</h3>
               <button
-                onClick={() => { setShowPayment(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
+                onClick={() => { setShowPayment(false); setShowCardConfirm(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
                 className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={20} />
@@ -2883,8 +2887,9 @@ function POSContent() {
                       handlePayment('Tarjeta de credito')
                     }
                   } else {
-                    // No MP terminal configured — manual
-                    handlePayment('Tarjeta de credito')
+                    // Sin MP configurado — terminal bancaria standalone (Getnet):
+                    // mostrar monto gigante para que el cajero lo teclee sin error
+                    setShowCardConfirm(true)
                   }
                 }}
                 disabled={saving}
@@ -2893,6 +2898,27 @@ function POSContent() {
                 <CreditCard size={24} />
                 {saving ? 'Esperando terminal...' : 'Tarjeta'}
               </button>
+              {showCardConfirm && (
+                <div className="bg-[var(--surface-2)] border border-blue-600/50 rounded-xl p-4 space-y-3">
+                  <p className="text-blue-300 text-sm font-bold text-center uppercase tracking-wide">Teclea en la terminal bancaria</p>
+                  <p className="text-5xl font-black text-white text-center tabular-nums">{formatMXN(payTotal + propina)}</p>
+                  <p className="text-[var(--text-3)] text-xs text-center">Verifica que el monto en la Getnet coincida ANTES de cobrar</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowCardConfirm(false)}
+                      className="flex-1 py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)] font-bold min-h-[56px] transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => { setShowCardConfirm(false); handlePayment('Tarjeta de credito') }}
+                      className="flex-[2] py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-lg min-h-[56px] transition-colors"
+                    >
+                      Pago aprobado
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Formas de pago custom desde catálogo (estilo Wansoft: Rappi, Ubereats, Cortesía...) */}
               {(() => {
                 const customMethods = paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card')

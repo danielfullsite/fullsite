@@ -1,0 +1,39 @@
+{
+  "name": "Fullsite POS — Caja",
+  "short_name": "Fullsite POS",
+  "description": "Terminal de punto de venta Fullsite. Offline-first, cualquier hardware.",
+  "start_url": "/pos",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "categories": ["business", "food"],
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "/icon-192v2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Caja", "url": "/pos", "description": "Pantalla principal de caja" },
+    { "name": "Cocina", "url": "/pos/cocina", "description": "Comandas de cocina" },
+    { "name": "Corte", "url": "/pos/corte", "description": "Corte de caja" },
+    { "name": "Turno", "url": "/pos/turno", "description": "Abrir/cerrar turno" }
+  ]
+}
