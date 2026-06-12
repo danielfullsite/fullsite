@@ -6,8 +6,10 @@ Default: DRY-RUN (imprime payloads, no manda nada).
 no coincide hace rollback con DeleteIngredientFromSaucerRecipe.
 
 Uso:
-  .venv/bin/python capture_recipe.py            # dry-run
-  .venv/bin/python capture_recipe.py --apply    # captura real
+  .venv/bin/python capture_recipe.py specs/<receta>.json            # dry-run
+  .venv/bin/python capture_recipe.py specs/<receta>.json --apply    # captura real
+
+Spec JSON: {"saucer": str, "analog": str|null, "ingredients": [{"product": str, "unit": str, "quantity": num}]}
 """
 
 import json
@@ -23,13 +25,13 @@ ENV = dotenv_values(".env")
 WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
 SUBSIDIARY_ID = 6043
 
-SAUCER_NAME = "BOTE DE OATMEAL PECAN COOKIES"
-ANALOG_NAME = "BOTE CHOCOLATE CHIP COOKIES"
-# (producto, unidad, cantidad) — idéntico al análogo BOTE CHOCOLATE CHIP COOKIES
-INGREDIENTS = [
-    ("BOTE CILINDRO GALLETAS CHICO", "Pieza", 1),
-    ("ETIQUETA BOTE CHICO GALLETAS", "Pieza", 1),
-]
+def load_spec():
+    args = [a for a in sys.argv[1:] if a != "--apply"]
+    if not args:
+        raise SystemExit("Falta el spec: capture_recipe.py specs/<receta>.json [--apply]")
+    spec = json.load(open(args[0]))
+    ings = [(i["product"], i["unit"], i["quantity"]) for i in spec["ingredients"]]
+    return spec["saucer"], spec.get("analog"), ings
 
 
 def norm(s):
@@ -102,6 +104,7 @@ def fmt_rows(rows):
 
 def main():
     apply_mode = "--apply" in sys.argv
+    SAUCER_NAME, ANALOG_NAME, INGREDIENTS = load_spec()
     s = login()
 
     # token antiforgery de la página
@@ -142,7 +145,9 @@ def main():
     print(fmt_rows(before))
 
     # análogo de referencia
-    analog_id, analog_name, _ = find_by_name(saucers, ANALOG_NAME)
+    analog_id, analog_name = (None, None)
+    if ANALOG_NAME:
+        analog_id, analog_name, _ = find_by_name(saucers, ANALOG_NAME)
     if analog_id:
         analog_rows, _ = get_recipe(s, analog_id, 0)
         print(f"\nAnálogo {analog_name}:")

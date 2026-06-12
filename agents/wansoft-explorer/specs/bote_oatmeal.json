@@ -1,0 +1,9 @@
+{
+  "saucer": "BOTE DE OATMEAL PECAN COOKIES",
+  "analog": "BOTE CHOCOLATE CHIP COOKIES",
+  "_status": "CAPTURADA 2026-06-12",
+  "ingredients": [
+    {"product": "BOTE CILINDRO GALLETAS CHICO", "unit": "Pieza", "quantity": 1},
+    {"product": "ETIQUETA BOTE CHICO GALLETAS", "unit": "Pieza", "quantity": 1}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "saucer": "COZY COMBO (SOPA/PANNINI)",
+  "analog": null,
+  "_status": "PENDIENTE confirmar: ¿es grilled cheese + sopa de tomate? Fuente: COSTEO GENERICO AMALAY 30052024.xlsx (COMBO GRILLED CHEESE SANDWICH + TOMATOE BASIL SOUP). GRANA PADANO no existe en inventario -> QUESO PARMESANO.",
+  "ingredients": [
+    {"product": "SUB TOMATO BASIL SOUP", "unit": "Kilogramo", "quantity": 0.17},
+    {"product": "SUB PAN CAMPESINO (MASA MADRE)", "unit": "Pieza", "quantity": 2},
+    {"product": "QUESO SUIZO", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "QUESO CHEDDAR", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "QUESO GOUDA", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "QUESO PARMESANO", "unit": "Kilogramo", "quantity": 0.02},
+    {"product": "QUESO FETFA", "unit": "Kilogramo", "quantity": 0.003},
+    {"product": "CEBOLLA CAMBRAY", "unit": "Kilogramo", "quantity": 0.001},
+    {"product": "FLOR COMESTIBLE", "unit": "Pieza", "quantity": 1}
+  ]
+}
