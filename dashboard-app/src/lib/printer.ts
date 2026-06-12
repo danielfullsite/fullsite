@@ -95,6 +95,24 @@ const GS = 0x1D
 const LF = 0x0A
 const DLE = 0x10
 
+// ─── ANCHO DE TICKET ────────────────────────────────────────────────────────
+// Las impresoras EC Line EC-PM-80250 (80mm, vía bridge) imprimen 48 columnas;
+// la SEAFON Bluetooth (58mm, de prueba) imprime 32. Los builders reciben el
+// ancho como parámetro: bridge → 48, Bluetooth → 32.
+
+type TicketCols = 32 | 48
+const COLS_BT: TicketCols = 32 // 58mm (SEAFON Bluetooth)
+const COLS_BRIDGE: TicketCols = 48 // 80mm (EC-PM-80250 vía bridge)
+
+function dashedLine(cols: TicketCols): string {
+  return '-'.repeat(cols) + '\n'
+}
+
+function padLine(label: string, val: string, cols: TicketCols): string {
+  const spaces = Math.max(1, cols - label.length - val.length)
+  return label + ' '.repeat(spaces) + val + '\n'
+}
+
 // ─── CASH DRAWER ────────────────────────────────────────────────────────────
 
 export async function openCashDrawer(): Promise<boolean> {
@@ -277,7 +295,7 @@ export function printPreTicketCSS(order: Order) {
   win.document.close()
 }
 
-function buildPreTicketBytes(order: Order): Uint8Array {
+function buildPreTicketBytes(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   const cmds: number[] = []
   const now = new Date()
   const dateStr = now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -296,42 +314,37 @@ function buildPreTicketBytes(order: Order): Uint8Array {
   cmds.push(GS, 0x21, 0x00)
   cmds.push(ESC, 0x45, 0x00)
   cmds.push(...textToBytes('Coffee & Market\n'))
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Left align
   cmds.push(ESC, 0x61, 0x00)
   cmds.push(...textToBytes(`Mesa: ${order.mesa}  ${order.mesero}\n`))
   cmds.push(...textToBytes(`${dateStr}  ${timeStr}\n`))
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Items
   for (const item of order.items.filter(i => !isTiempoItem(i))) {
     const name = `${item.cantidad}x ${item.nombre}`
     const price = formatMXN(item.subtotal)
-    const spaces = Math.max(1, 32 - name.length - price.length)
-    cmds.push(...textToBytes(name + ' '.repeat(spaces) + price + '\n'))
+    cmds.push(...textToBytes(padLine(name, price, cols)))
     if (item.modificadores) {
       cmds.push(...textToBytes(`  ${item.modificadores}\n`))
     }
   }
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Totals
-  const pad = (label: string, val: string) => {
-    const spaces = Math.max(1, 32 - label.length - val.length)
-    return label + ' '.repeat(spaces) + val + '\n'
-  }
-  cmds.push(...textToBytes(pad('Subtotal', formatMXN(order.subtotal))))
+  cmds.push(...textToBytes(padLine('Subtotal', formatMXN(order.subtotal), cols)))
   if (order.descuento > 0) {
-    cmds.push(...textToBytes(pad('Descuento', '-' + formatMXN(order.descuento))))
+    cmds.push(...textToBytes(padLine('Descuento', '-' + formatMXN(order.descuento), cols)))
   }
-  cmds.push(...textToBytes(pad('IVA (16%)', formatMXN(order.iva))))
+  cmds.push(...textToBytes(padLine('IVA (16%)', formatMXN(order.iva), cols)))
   cmds.push(ESC, 0x45, 0x01)
   cmds.push(GS, 0x21, 0x01)
-  cmds.push(...textToBytes(pad('TOTAL', formatMXN(order.total))))
+  cmds.push(...textToBytes(padLine('TOTAL', formatMXN(order.total), cols)))
   cmds.push(GS, 0x21, 0x00)
   cmds.push(ESC, 0x45, 0x00)
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Footer
   cmds.push(ESC, 0x61, 0x01)
@@ -364,7 +377,7 @@ export async function printPreTicketBluetooth(order: Order): Promise<boolean> {
 
 export async function printPreTicket(order: Order) {
   // 1) Bridge local
-  if (await bridgePrint(buildPreTicketBytes(order))) return
+  if (await bridgePrint(buildPreTicketBytes(order, COLS_BRIDGE))) return
   // 2) Bluetooth (reconecta si la impresora se durmió)
   if (await ensureConnected('default')) {
     try {
@@ -380,7 +393,7 @@ export async function printPreTicket(order: Order) {
 
 // ─── WEBBLUETOOTH ESC/POS (Android Chrome) ──────────────────────────────────
 
-function buildESCPOS(order: Order): Uint8Array {
+function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   const cmds: number[] = []
 
   // Initialize printer
@@ -399,7 +412,7 @@ function buildESCPOS(order: Order): Uint8Array {
   cmds.push(...textToBytes('San Pedro Garza Garcia, NL\n'))
 
   // Dashed line
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Left align
   cmds.push(ESC, 0x61, 0x00) // ESC a 0 — left
@@ -411,48 +424,42 @@ function buildESCPOS(order: Order): Uint8Array {
   cmds.push(...textToBytes(`Mesa: ${order.mesa}  ${order.mesero}\n`))
   cmds.push(...textToBytes(`${dateStr}  ${timeStr}\n`))
   cmds.push(...textToBytes(`Orden: ${order.id.slice(0, 8)}\n`))
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Items
   for (const item of order.items.filter(i => !isTiempoItem(i))) {
     const name = `${item.cantidad}x ${item.nombre}`
     const price = formatMXN(item.subtotal)
-    const spaces = Math.max(1, 32 - name.length - price.length)
-    cmds.push(...textToBytes(name + ' '.repeat(spaces) + price + '\n'))
+    cmds.push(...textToBytes(padLine(name, price, cols)))
     if (item.modificadores) {
       cmds.push(...textToBytes(`  ${item.modificadores}\n`))
     }
   }
 
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Totals
-  const pad = (label: string, val: string) => {
-    const spaces = Math.max(1, 32 - label.length - val.length)
-    return label + ' '.repeat(spaces) + val + '\n'
-  }
-
-  cmds.push(...textToBytes(pad('Subtotal', formatMXN(order.subtotal))))
+  cmds.push(...textToBytes(padLine('Subtotal', formatMXN(order.subtotal), cols)))
   if (order.descuento > 0) {
-    cmds.push(...textToBytes(pad('Descuento', '-' + formatMXN(order.descuento))))
+    cmds.push(...textToBytes(padLine('Descuento', '-' + formatMXN(order.descuento), cols)))
   }
-  cmds.push(...textToBytes(pad('IVA (16%)', formatMXN(order.iva))))
+  cmds.push(...textToBytes(padLine('IVA (16%)', formatMXN(order.iva), cols)))
 
   // Bold total
   cmds.push(ESC, 0x45, 0x01) // bold on
   cmds.push(GS, 0x21, 0x01) // double height
-  cmds.push(...textToBytes(pad('TOTAL', formatMXN(order.total))))
+  cmds.push(...textToBytes(padLine('TOTAL', formatMXN(order.total), cols)))
   cmds.push(GS, 0x21, 0x00) // normal
   cmds.push(ESC, 0x45, 0x00) // bold off
 
   if (order.propina) {
-    cmds.push(...textToBytes(pad('Propina', formatMXN(order.propina))))
+    cmds.push(...textToBytes(padLine('Propina', formatMXN(order.propina), cols)))
     cmds.push(ESC, 0x45, 0x01)
-    cmds.push(...textToBytes(pad('Total + propina', formatMXN(order.total + order.propina))))
+    cmds.push(...textToBytes(padLine('Total + propina', formatMXN(order.total + order.propina), cols)))
     cmds.push(ESC, 0x45, 0x00)
   }
 
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Center
   cmds.push(ESC, 0x61, 0x01)
@@ -480,7 +487,7 @@ function buildESCPOS(order: Order): Uint8Array {
   cmds.push(LF)
   cmds.push(...textToBytes('Escanea para tu factura\n'))
 
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
   cmds.push(...textToBytes('Gracias por tu visita!\n'))
   cmds.push(...textToBytes('fullsite.mx\n'))
 
@@ -936,7 +943,7 @@ export async function printKitchenTicketBluetooth(order: Order): Promise<boolean
 
   cmds.push(...textToBytes(`Mesa ${order.mesa} - ${order.mesero}\n`))
   cmds.push(...textToBytes(`${timeStr}\n`))
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(COLS_BT)))
 
   // Left align, items
   cmds.push(ESC, 0x61, 0x00)
@@ -954,7 +961,7 @@ export async function printKitchenTicketBluetooth(order: Order): Promise<boolean
   cmds.push(ESC, 0x45, 0x00)
 
   if (order.notas) {
-    cmds.push(...textToBytes('--------------------------------\n'))
+    cmds.push(...textToBytes(dashedLine(COLS_BT)))
     cmds.push(ESC, 0x45, 0x01)
     cmds.push(...textToBytes(`NOTA: ${order.notas}\n`))
     cmds.push(ESC, 0x45, 0x00)
@@ -1000,7 +1007,7 @@ export async function printKitchenTicket(order: Order) {
 
 export async function printTicket(order: Order) {
   // 1) Bridge local (impresora de caja en la terminal Windows)
-  if (await bridgePrint(buildESCPOS(order))) return
+  if (await bridgePrint(buildESCPOS(order, COLS_BRIDGE))) return
   // 2) Bluetooth (reconecta si la impresora se durmió)
   if (await ensureConnected('default')) {
     try {
@@ -1096,7 +1103,7 @@ export function splitOrderByStation(order: Order): Record<StationName, OrderItem
  * Print a kitchen ticket for a specific station via Bluetooth ESC/POS.
  * Uses station-specific printer if connected, otherwise falls back to default.
  */
-function buildStationTicketBytes(order: Order, station: StationName, items: OrderItem[]): Uint8Array {
+function buildStationTicketBytes(order: Order, station: StationName, items: OrderItem[], cols: TicketCols = COLS_BT): Uint8Array {
   const cmds: number[] = []
   const now = new Date()
   const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -1115,7 +1122,7 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
 
   cmds.push(...textToBytes(`Mesa ${order.mesa} - ${order.mesero}\n`))
   cmds.push(...textToBytes(`${timeStr}\n`))
-  cmds.push(...textToBytes('--------------------------------\n'))
+  cmds.push(...textToBytes(dashedLine(cols)))
 
   // Left align, items
   cmds.push(ESC, 0x61, 0x00)
@@ -1143,7 +1150,7 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
   cmds.push(ESC, 0x45, 0x00)
 
   if (order.notas) {
-    cmds.push(...textToBytes('--------------------------------\n'))
+    cmds.push(...textToBytes(dashedLine(cols)))
     cmds.push(ESC, 0x45, 0x01)
     cmds.push(...textToBytes(`NOTA: ${order.notas}\n`))
     cmds.push(ESC, 0x45, 0x00)
@@ -1249,7 +1256,7 @@ export async function printByStation(order: Order) {
     }
 
     // 1) Bridge local: rutea por nombre de estación (cocina/barra/caja)
-    if (await bridgePrint(buildStationTicketBytes(order, station, items), station)) {
+    if (await bridgePrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station)) {
       printed = true
       continue
     }
