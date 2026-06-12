@@ -517,6 +517,49 @@ export async function POST(request: NextRequest) {
       ordersContext = `\n\nÓRDENES POS (${ordersRaw.length}):\n${statusLines.join('\n')}${cancelInfo}`
     }
 
+    // 2e. Product search — FULL platillos list (incl. Market) from wansoft_data.platillos_full
+    // platillos_top solo trae top 30/día; productos chicos del Market (ej. Smarty chips) nunca aparecen ahí.
+    let productContext = ''
+    const wantsProducto = ['vendid', 'market', 'cuant', 'cuánt', 'producto', 'piezas', 'unidades'].some(kw => q.includes(kw))
+    if (wantsProducto) {
+      try {
+        const pfStart = dateFilter?.start || todayStr.slice(0, 8) + '01'
+        const pfEnd = dateFilter?.end || todayStr
+        const pfRes = await fetch(`${sbUrl}/rest/v1/wansoft_data?client_id=eq.${encodeURIComponent(client_id || 'amalay')}&data_key=eq.platillos_full&fecha=gte.${pfStart}&fecha=lte.${pfEnd}&select=fecha,data&order=fecha.asc&limit=92`, { headers: sbHeaders, cache: 'no-store' })
+        const pfRows = pfRes.ok ? await pfRes.json() as Array<{ fecha: string; data: unknown }> : []
+        if (pfRows.length > 0) {
+          // Tokens de búsqueda: palabras del mensaje (4+ letras) que no son stopwords
+          const stop = new Set(['cuantas', 'cuantos', 'cuanta', 'cuanto', 'vendido', 'vendidas', 'vendidos', 'vendieron', 'vendimos', 'venta', 'ventas', 'tienes', 'tiene', 'sobre', 'desde', 'hasta', 'para', 'este', 'esta', 'estos', 'estas', 'donde', 'dónde', 'como', 'cómo', 'producto', 'productos', 'piezas', 'unidades', 'restaurante', 'market', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre', 'semana', 'inventario'])
+          const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const tokens = norm(message).split(/[^a-z0-9ñ]+/).filter(t => t.length >= 4 && !stop.has(t))
+          // Agregar por producto a través de los días
+          const agg = new Map<string, { cantidad: number; total: number; dias: number }>()
+          for (const row of pfRows) {
+            const items = parseJsonb(row.data) as Array<{ nombre?: string; cantidad?: number; total?: number }>
+            for (const it of items) {
+              if (!it.nombre) continue
+              const nm = norm(it.nombre)
+              if (tokens.length > 0 && !tokens.some(t => nm.includes(t))) continue
+              const cur = agg.get(it.nombre) || { cantidad: 0, total: 0, dias: 0 }
+              cur.cantidad += Number(it.cantidad) || 0
+              cur.total += Number(it.total) || 0
+              cur.dias++
+              agg.set(it.nombre, cur)
+            }
+          }
+          const fechas = pfRows.map(r => r.fecha)
+          const cobertura = `${fechas[0]} a ${fechas[fechas.length - 1]} (${fechas.length} días con datos)`
+          if (tokens.length > 0 && agg.size > 0) {
+            const lines = [...agg.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 30)
+              .map(([nm, v]) => `  ${nm}: ${v.cantidad} pzas, $${Math.round(v.total)} (${v.dias} días)`)
+            productContext = `\n\nPRODUCTOS ENCONTRADOS (lista COMPLETA de platillos incl. Market, periodo ${cobertura}, búsqueda: ${tokens.join(', ')}):\n${lines.join('\n')}\nUsa estas cantidades para responder cuántas piezas se vendieron de un producto.`
+          } else if (tokens.length > 0) {
+            productContext = `\n\nBÚSQUEDA DE PRODUCTO "${tokens.join(' ')}": 0 ventas registradas en la lista completa de platillos del periodo ${cobertura}. Responde que no se vendió ese producto en el periodo (NO digas que no tienes datos).`
+          }
+        }
+      } catch { /* non-blocking */ }
+    }
+
     // 3. Build daily context
     let dailyContext = 'No hay datos disponibles.'
     if (recentDays && recentDays.length > 0) {
@@ -809,6 +852,7 @@ ${waiterContext}
 ${foodCostContext}
 ${reservasContext}
 ${ordersContext}
+${productContext}
 
 ${dailyContext}`
 

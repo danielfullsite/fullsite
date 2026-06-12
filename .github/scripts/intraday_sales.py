@@ -559,6 +559,35 @@ def main():
                 if platillo_data:
                     update_data["platillos_top"] = json.dumps(platillo_data)
 
+            # Full platillos list (ALL items incl. Market) → wansoft_data.platillos_full
+            # so dashboard chat can answer about low-volume products (e.g. Smarty chips)
+            if saucers:
+                try:
+                    full_data = [{"nombre": s["name"], "cantidad": s["qty"], "total": s["total"]}
+                                 for s in sorted(saucers, key=lambda x: -x["total"]) if s.get("name")]
+                    wd_h = {"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                            "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}",
+                            "Content-Type": "application/json", "Prefer": "return=minimal"}
+                    wd_base = f"{os.environ['SUPABASE_URL'].rstrip('/')}/rest/v1/wansoft_data"
+                    wd_filter = f"client_id=eq.{CLIENT['id']}&fecha=eq.{today_str}&data_key=eq.platillos_full"
+                    wd_payload = {"data": full_data,
+                                  "updated_at": datetime.now(timezone.utc).isoformat()}
+                    wpr = requests.patch(f"{wd_base}?{wd_filter}", headers=wd_h, json=wd_payload, timeout=10)
+                    # Check row exists (PATCH 204 even if 0 rows matched)
+                    wcr = requests.get(f"{wd_base}?{wd_filter}&select=data_key",
+                                       headers={"apikey": os.environ["SUPABASE_SERVICE_KEY"],
+                                                "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_KEY']}"},
+                                       timeout=10)
+                    if wcr.ok and not wcr.json():
+                        requests.post(wd_base, headers=wd_h,
+                                      json={"client_id": CLIENT["id"], "fecha": today_str,
+                                            "data_key": "platillos_full", **wd_payload}, timeout=10)
+                        print(f"[intraday] INSERTED platillos_full ({len(full_data)} items) en wansoft_data")
+                    else:
+                        print(f"[intraday] Updated platillos_full ({len(full_data)} items) en wansoft_data")
+                except Exception as e:
+                    print(f"[intraday] platillos_full save failed (non-blocking): {e}")
+
             # Pago metodos - fetch from Wansoft
             try:
                 pay_resp = session.post(f"{WANSOFT_URL}/Reports/SalesByPaymentType",

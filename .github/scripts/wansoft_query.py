@@ -802,6 +802,9 @@ REGLA #1 — SI NO HAY DATOS DE HOY:
 REGLA #2 — BUSCAR ANTES DE DECIR "NO TENGO":
 - Si puedes CALCULARLO de los datos que SI tienes: suma, promedia, compara. HAZLO.
 - Busca SINÓNIMOS: H&H = Half & Half = HALF HALF COMBO. Pan = Toast = Bagel. Postre = Dessert.
+- Los productos del MARKET (Smarty chips, snacks, abarrotes, marca propia) SÍ están en los
+  platillos vendidos — NO es un módulo separado. Si preguntan por un producto del Market,
+  búscalo en "PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA" y suma las cantidades del periodo.
 
 DATOS DISPONIBLES (tienes acceso a ABSOLUTAMENTE TODO):
 VENTAS: ventas_consolidadas, ventas por fecha/mesero/platillo/categoría/método de pago, histórico 870+ días
@@ -888,10 +891,15 @@ def ask_groq(question, wansoft_data, historical_data):
 
     # Smart search: find platillos matching the question
     q_lower = question.lower()
-    skip_words = {"hoy", "ayer", "cuántos", "cuantos", "cuánto", "cuanto", "vendieron",
-                  "vendió", "vendio", "qué", "que", "cómo", "como", "los", "las", "del",
+    skip_words = {"hoy", "ayer", "cuántos", "cuantos", "cuánto", "cuanto", "cuántas",
+                  "cuantas", "cuánta", "cuanta", "vendieron", "vendió", "vendio",
+                  "vendido", "vendidos", "vendida", "vendidas", "vendimos", "venta",
+                  "ventas", "qué", "que", "cómo", "como", "los", "las", "del",
                   "por", "para", "con", "sin", "hay", "tiene", "fueron", "total", "todos",
-                  "mes", "semana", "día", "dia"}
+                  "mes", "semana", "día", "dia", "han", "sido", "este", "esta", "van",
+                  "lleva", "llevamos", "enero", "febrero", "marzo", "abril", "mayo",
+                  "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
+                  "diciembre"}
     search_terms = [w.rstrip("s") for w in q_lower.split() if len(w) > 2 and w not in skip_words]
 
     relevant_platillos = []
@@ -1038,7 +1046,11 @@ def ask_groq(question, wansoft_data, historical_data):
 
     # Block 1: If there are matching platillos, put them FIRST
     if relevant_platillos:
-        blocks.append(f"PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA ({len(relevant_platillos)}):\n"
+        blocks.append(f"PLATILLOS QUE COINCIDEN CON LA BÚSQUEDA ({len(relevant_platillos)}) — "
+                      f"'cantidad' y 'total' son ACUMULADOS de TODO el periodo {date_range}. "
+                      f"Para responder cuántas piezas se vendieron de un producto, SUMA las "
+                      f"cantidades de las variantes que coincidan. Estos datos SÍ incluyen "
+                      f"productos del Market:\n"
                       + json.dumps(relevant_platillos[:50], ensure_ascii=False, indent=1))
 
     # Block 2: Core sales data (compact) — include propinas + food cost
