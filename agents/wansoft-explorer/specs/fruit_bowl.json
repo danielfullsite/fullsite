@@ -1,0 +1,12 @@
+{
+  "saucer": "FRUIT BOWL",
+  "analog": null,
+  "_status": "CAPTURADA 2026-06-12 (verificada, costo $24.20). Cantidades de Mónica por WhatsApp: 40 gr de cada fruta.",
+  "ingredients": [
+    {"product": "MELON CHINO", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "FRESAS FRESCAS", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "PLATANO", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "BLUEBERRYS", "unit": "Kilogramo", "quantity": 0.04},
+    {"product": "PAPAYA", "unit": "Kilogramo", "quantity": 0.04}
+  ]
+}
