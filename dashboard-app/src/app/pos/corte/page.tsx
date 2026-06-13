@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, X } from 'lucide-react'
+import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X } from 'lucide-react'
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, type AuditLogEntry, type PagoForma } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
@@ -321,6 +321,24 @@ export default function CortePage() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Alerta turno abierto demasiado tiempo */}
+          {turno && (() => {
+            const hoursOpen = (Date.now() - new Date(turno.opened_at).getTime()) / (1000 * 60 * 60)
+            if (hoursOpen < 18) return null
+            return (
+              <div className="mb-6 bg-red-900/30 border border-red-600/50 rounded-xl px-5 py-4 flex items-start gap-3">
+                <AlertTriangle size={22} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-300 font-bold text-sm">
+                    Este turno lleva {Math.floor(hoursOpen)} horas abierto. ¿Olvidaste cerrarlo?
+                  </p>
+                  <p className="text-red-400/70 text-xs mt-1">
+                    Abierto por {turno.opened_by} el {new Date(turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })}
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-4 py-4">
