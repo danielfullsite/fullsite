@@ -707,15 +707,13 @@ def main():
             print("[intraday] No sales data — skipping report")
             return
 
-        msg = build_message(consolidated, users, groups, saucers, order_types, monthly_avg)
-        print(f"[intraday] Message built ({len(msg)} chars)")
-
-        sent = send_telegram(msg)
-        print(f"[intraday] Sent to {sent} chats")
+        # Telegram disabled (2026-06-13) — data goes to Supabase only
+        # msg = build_message(consolidated, users, groups, saucers, order_types, monthly_avg)
+        # sent = send_telegram(msg)
 
         duration = int((time.time() - start) * 1000)
         ventas = consolidated.get("TotalSales", 0)
-        log_run("success", duration, f"Ventas: ${ventas:,.0f}, {len(users)} meseros, sent to {sent} chats")
+        log_run("success", duration, f"Ventas: ${ventas:,.0f}, {len(users)} meseros, DB only")
         print("[intraday] Done")
 
     except Exception as e:

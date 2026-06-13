@@ -2,11 +2,9 @@ name: Intraday Sales Report
 
 on:
   schedule:
-    # Every 30 min during AMALAY hours: 9am-8pm MX = 15:00-02:00 UTC
-    - cron: '0,30 15,16,17,18,19,20,21,22,23 * * *'   # 9am-5:30pm MX
-    - cron: '0,30 0,1 * * *'                             # 6pm-7:30pm MX
-    # Cierre report at 8pm MX (02:00 UTC)
-    - cron: '0 2 * * *'                                   # 8pm MX — cierre
+    # Hourly during AMALAY hours: 10am-9pm MX = 16:00-03:00 UTC
+    - cron: '0 16,17,18,19,20,21,22,23 * * *'   # 10am-5pm MX
+    - cron: '0 0,1,2,3 * * *'                     # 6pm-9pm MX
   workflow_dispatch:
     inputs:
       client_id:
