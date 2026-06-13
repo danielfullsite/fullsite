@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload debug artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wansoft-debug-${{ steps.date.outputs.target }}-${{ steps.params.outputs.type }}
           path: |
