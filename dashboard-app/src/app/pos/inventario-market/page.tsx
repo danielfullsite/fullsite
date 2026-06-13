@@ -5,7 +5,8 @@
 // El descuento automático ocurre al cobrar (pos/page.tsx → deductMarketStockForOrder).
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ArrowLeft, Check, PackagePlus, Trash2, SlidersHorizontal } from 'lucide-react'
+import { Search, ArrowLeft, Check, PackagePlus, Trash2, SlidersHorizontal, ScanBarcode } from 'lucide-react'
+import BarcodeScanner from '@/components/BarcodeScanner'
 import Link from 'next/link'
 import {
   getMarketMenuItems,
@@ -35,6 +36,7 @@ export default function InventarioMarketPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
   const [toast, setToast] = useState('')
 
   // Modal state
@@ -165,6 +167,11 @@ export default function InventarioMarketPage() {
             placeholder="Buscar producto o escanear barcode..."
             className="w-full pl-9 pr-4 py-2.5 bg-[var(--surface)] border border-[var(--line)] rounded-lg text-sm text-[var(--text-1)] placeholder-[var(--text-3)] focus:outline-none focus:border-emerald-500" />
         </div>
+        <button onClick={() => setShowScanner(true)}
+          className="px-4 py-2 rounded-lg text-xs font-medium bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)] flex items-center gap-1.5"
+          title="Escanear código de barras">
+          <ScanBarcode size={16} /> Scan
+        </button>
         <button onClick={() => setOnlyAlerts(!onlyAlerts)}
           className={`px-4 py-2 rounded-lg text-xs font-medium ${onlyAlerts ? 'bg-amber-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-3)]'}`}>
           {onlyAlerts ? `Reorden (${alerts.length})` : 'Solo reorden'}
@@ -292,6 +299,16 @@ export default function InventarioMarketPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--surface)] border border-[var(--line)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-1)] shadow-lg flex items-center gap-2 z-50">
           <Check size={14} className="text-emerald-400" /> {toast}
         </div>
+      )}
+
+      {showScanner && (
+        <BarcodeScanner
+          onScan={(code) => {
+            setSearch(code)
+            setShowScanner(false)
+          }}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   )
