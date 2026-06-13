@@ -6,6 +6,14 @@
 //   FACTURAMA_USER / FACTURAMA_PASSWORD — credenciales de la cuenta
 //   FACTURAMA_EXPEDITION_PLACE          — CP del emisor (lugar de expedición)
 //   FACTURAMA_ENV                       — 'production' | (default: sandbox)
+//
+// Sandbox: se usa la ruta multiemisor (/api-lite) con el CSD de pruebas del
+// SAT (CACX7605101P8) porque las cuentas sandbox quedan amarradas al RFC del
+// registro y los RFCs de prueba ya están todos registrados por otros usuarios.
+// El CSD de pruebas se carga una sola vez vía POST /api-lite/csds.
+// Producción: ruta mono-emisor (/3/cfdis) con el CSD real de AMALAY cargado
+// en la cuenta (verificado 2026-06-12: AFO200806JI0, vigente a 2028-05-31).
+//   FACTURAMA_LITE_ISSUER_RFC / _NAME / _REGIMEN — emisor api-lite (sandbox)
 
 export interface CfdiRequestRow {
   id: string
@@ -35,6 +43,19 @@ export function facturamaBaseUrl(): string {
     : 'https://apisandbox.facturama.mx'
 }
 
+/** En sandbox timbramos vía multiemisor (api-lite); en producción mono-emisor. */
+export function isLiteMode(): boolean {
+  return process.env.FACTURAMA_ENV !== 'production'
+}
+
+function liteIssuer() {
+  return {
+    Rfc: process.env.FACTURAMA_LITE_ISSUER_RFC || 'CACX7605101P8',
+    Name: process.env.FACTURAMA_LITE_ISSUER_NAME || 'XOCHILT CASAS CHAVEZ',
+    FiscalRegime: process.env.FACTURAMA_LITE_ISSUER_REGIMEN || '612',
+  }
+}
+
 export function isFacturamaConfigured(): boolean {
   return Boolean(
     process.env.FACTURAMA_USER &&
@@ -60,6 +81,8 @@ export function buildCfdiBody(req: CfdiRequestRow, expeditionPlace: string, paym
   const subtotal = round2(total / 1.16)
   const iva = round2(total - subtotal)
 
+  const rfc = req.rfc.toUpperCase().trim()
+  const now = new Date()
   return {
     CfdiType: 'I',
     NameId: '1',
@@ -68,6 +91,14 @@ export function buildCfdiBody(req: CfdiRequestRow, expeditionPlace: string, paym
     PaymentMethod: 'PUE',
     Currency: 'MXN',
     Exportation: '01',
+    // CFDI 4.0: factura global a público en general exige GlobalInformation
+    ...(rfc === 'XAXX010101000' && {
+      GlobalInformation: {
+        Periodicity: '01',
+        Months: String(now.getMonth() + 1).padStart(2, '0'),
+        Year: now.getFullYear(),
+      },
+    }),
     Receiver: {
       Rfc: req.rfc.toUpperCase(),
       Name: req.razon_social.toUpperCase().trim(),
@@ -99,8 +130,15 @@ export async function stampCfdi(req: CfdiRequestRow, paymentForm?: string): Prom
   if (!isFacturamaConfigured()) {
     return { ok: false, error: 'Facturama no configurado (FACTURAMA_USER/PASSWORD/EXPEDITION_PLACE)' }
   }
-  const body = buildCfdiBody(req, process.env.FACTURAMA_EXPEDITION_PLACE!, paymentForm)
-  const res = await fetch(`${facturamaBaseUrl()}/3/cfdis`, {
+  const body: Record<string, unknown> = buildCfdiBody(req, process.env.FACTURAMA_EXPEDITION_PLACE!, paymentForm)
+  if (isLiteMode()) {
+    // api-lite exige Serie/Folio explícitos y nodo Issuer
+    body.Serie = 'POS'
+    body.Folio = String(Date.now())
+    body.Issuer = liteIssuer()
+  }
+  const endpoint = isLiteMode() ? '/api-lite/3/cfdis' : '/3/cfdis'
+  const res = await fetch(`${facturamaBaseUrl()}${endpoint}`, {
     method: 'POST',
     headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -120,8 +158,9 @@ export async function stampCfdi(req: CfdiRequestRow, paymentForm?: string): Prom
 
 /** Descarga PDF/XML de un CFDI emitido. Devuelve los bytes decodificados. */
 export async function fetchCfdiFile(facturamaId: string, format: 'pdf' | 'xml'): Promise<Uint8Array | null> {
+  const kind = isLiteMode() ? 'issuedLite' : 'issued'
   const res = await fetch(
-    `${facturamaBaseUrl()}/cfdi/${format}/issued/${encodeURIComponent(facturamaId)}`,
+    `${facturamaBaseUrl()}/cfdi/${format}/${kind}/${encodeURIComponent(facturamaId)}`,
     { headers: { Authorization: authHeader() } }
   )
   if (!res.ok) {
@@ -136,7 +175,8 @@ export async function fetchCfdiFile(facturamaId: string, format: 'pdf' | 'xml'):
 /** Envía el CFDI por email (best-effort — no truena el timbrado si falla). */
 export async function emailCfdi(facturamaId: string, email: string): Promise<boolean> {
   try {
-    const url = `${facturamaBaseUrl()}/cfdi?cfdiType=issued&cfdiId=${encodeURIComponent(facturamaId)}&email=${encodeURIComponent(email)}`
+    const cfdiType = isLiteMode() ? 'issuedLite' : 'issued'
+    const url = `${facturamaBaseUrl()}/cfdi?cfdiType=${cfdiType}&cfdiId=${encodeURIComponent(facturamaId)}&email=${encodeURIComponent(email)}`
     const res = await fetch(url, { method: 'POST', headers: { Authorization: authHeader() } })
     if (!res.ok) console.warn('[facturama] email failed:', res.status, (await res.text()).slice(0, 200))
     return res.ok
