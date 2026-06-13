@@ -30,8 +30,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Fullsite Dashboard',
-  description: 'Restaurant Operations Dashboard - Fullsite',
+  title: 'Fullsite POS',
+  description: 'Fullsite — Restaurant Operating System',
   icons: { icon: '/favicon.ico' },
 }
 

@@ -61,12 +61,12 @@ export default function FacturacionPage() {
 
   const handleSubmit = async () => {
     const rfcClean = rfc.toUpperCase().trim()
-    if (!validateRFC(rfcClean)) { showToast('RFC invalido'); return }
-    if (!razonSocial.trim()) { showToast('Razon social requerida'); return }
-    if (!validateCP(codigoPostal)) { showToast('Codigo postal invalido (5 digitos)'); return }
-    if (!validateEmail(email)) { showToast('Email invalido'); return }
+    if (!validateRFC(rfcClean)) { showToast('RFC inválido'); return }
+    if (!razonSocial.trim()) { showToast('Razón social requerida'); return }
+    if (!validateCP(codigoPostal)) { showToast('Código postal inválido (5 dígitos)'); return }
+    if (!validateEmail(email)) { showToast('Email inválido'); return }
     const total = parseFloat(montoTotal)
-    if (isNaN(total) || total <= 0) { showToast('Monto invalido'); return }
+    if (isNaN(total) || total <= 0) { showToast('Monto inválido'); return }
 
     const subtotal = total / (1 + IVA_RATE)
     const iva = total - subtotal
