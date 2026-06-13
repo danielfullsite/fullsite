@@ -52,6 +52,12 @@ import {
   connectUsbPrinter,
 } from '@/lib/printer'
 import {
+  type AppliedPromo,
+  getActivePromos,
+  evaluatePromos,
+  buildCategoryMap,
+} from '@/lib/pos-promos'
+import {
   ChefHat,
   Grid3X3,
   Minus,
@@ -88,6 +94,7 @@ import {
   Lock,
   Flame,
   Armchair,
+  Tag,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -1013,6 +1020,10 @@ function POSContent() {
       if (dbMenu.length > 0) setMenuCategories(dbMenu)
       setPaymentMethodsDB(pm)
       if (turno) setTurnoId(turno.id)
+      // Promos: build category map + load
+      const cats = dbMenu.length > 0 ? dbMenu : menuCategories
+      categoryMapRef.current = buildCategoryMap(cats)
+      getActivePromos(_cid()).then(setAllPromos).catch(() => {})
 
       // Check which menu items are out of stock
       try {
@@ -1237,6 +1248,12 @@ function POSContent() {
   // Discount state
   const [showDiscount, setShowDiscount] = useState(false)
   const [discount, setDiscount] = useState(0)
+
+  // Promos
+  const [availablePromos, setAvailablePromos] = useState<AppliedPromo[]>([])
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
+  const [allPromos, setAllPromos] = useState<Awaited<ReturnType<typeof getActivePromos>>>([])
+  const categoryMapRef = useRef(new Map<string, string>())
 
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
@@ -1646,6 +1663,26 @@ function POSContent() {
 
   const activeItems = orderItems.filter(i => !cancelledItems.has(i.id))
   const subtotal = activeItems.reduce((sum, item) => sum + item.subtotal, 0)
+
+  // Re-evaluate promos when items/subtotal change
+  useEffect(() => {
+    if (allPromos.length === 0 || activeItems.length === 0) {
+      setAvailablePromos([])
+      return
+    }
+    const results = evaluatePromos(allPromos, activeItems, subtotal, categoryMapRef.current)
+    setAvailablePromos(results)
+    // Auto-apply the best auto_apply promo if no manual discount
+    if (discount === 0 && !appliedPromo) {
+      const auto = results.find(r => r.promo.auto_apply)
+      if (auto) {
+        setAppliedPromo(auto)
+        setDiscount(auto.discount)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItems.length, subtotal, allPromos.length])
+
   const subtotalAfterDiscount = Math.max(0, subtotal - discount)
   const iva = subtotalAfterDiscount * IVA_RATE
   const total = subtotalAfterDiscount + iva
@@ -2326,6 +2363,7 @@ function POSContent() {
                   onClick={() => {
                     logAudit({ order_id: orderId, action: 'discount_removed', actor: mesero, mesa, details: { amount: discount } })
                     setDiscount(0)
+                    setAppliedPromo(null)
                   }}
                   className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 transition-colors"
                 >
@@ -2376,6 +2414,36 @@ function POSContent() {
                 <ShieldAlert size={18} />
               </button>
             </div>
+
+            {/* Promos available */}
+            {availablePromos.length > 0 && discount === 0 && (
+              <div className="flex items-center gap-1.5 mb-1.5 overflow-x-auto">
+                {availablePromos.slice(0, 3).map((ap, i) => (
+                  <button
+                    key={ap.promo.id || i}
+                    onClick={() => {
+                      setAppliedPromo(ap)
+                      setDiscount(ap.discount)
+                      logAudit({
+                        order_id: orderId, action: 'discount_applied', actor: mesero, mesa,
+                        details: { amount: ap.discount, promo: ap.promo.name, type: ap.promo.type, auto: false },
+                      })
+                      showToast(`${ap.label} aplicado: -${formatMXN(ap.discount)}`)
+                    }}
+                    className="flex items-center gap-1 px-3 min-h-[36px] rounded-full bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold whitespace-nowrap hover:bg-emerald-600/30 animate-pulse"
+                  >
+                    <Tag size={12} />
+                    {ap.label} (-{formatMXN(ap.discount)})
+                  </button>
+                ))}
+              </div>
+            )}
+            {appliedPromo && discount > 0 && (
+              <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
+                <Tag size={12} />
+                <span className="font-semibold">{appliedPromo.label}</span>
+              </div>
+            )}
 
             {/* Totals — compact */}
             <div className="flex items-center justify-between text-xs text-[var(--text-3)] mb-0.5">
