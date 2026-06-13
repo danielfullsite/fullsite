@@ -1,7 +1,7 @@
 import { sendMessage, sendChatAction } from '../lib/telegram';
 import type { Env } from '../types';
 
-const REPO = 'ramonfaurdaniel-png/fullsite';
+const REPO = 'danielfullsite/fullsite';
 
 async function dispatchWansoftQuery(env: Env, chatId: string, message: string): Promise<boolean> {
   if (!env.GITHUB_TOKEN) {

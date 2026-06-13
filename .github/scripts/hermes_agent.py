@@ -392,7 +392,7 @@ def auto_heal(all_issues):
                     github_token = os.environ.get("GITHUB_TOKEN", "")
                     if github_token:
                         r = requests.post(
-                            f"https://api.github.com/repos/ramonfaurdaniel-png/fullsite/actions/workflows/{wf}/dispatches",
+                            f"https://api.github.com/repos/danielfullsite/fullsite/actions/workflows/{wf}/dispatches",
                             headers={"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"},
                             json={"ref": "main"},
                             timeout=10,

@@ -33,7 +33,7 @@ interface TelegramUpdate {
   edited_message?: TelegramMessage;
 }
 
-const GITHUB_REPO     = "ramonfaurdaniel-png/fullsite";
+const GITHUB_REPO     = "danielfullsite/fullsite";
 const GITHUB_WORKFLOW = "orquestador.yml";
 const GITHUB_REF      = "main";
 
