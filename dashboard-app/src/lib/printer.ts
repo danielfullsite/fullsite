@@ -1213,11 +1213,34 @@ function printStationTicketCSS(order: Order, station: StationName, items: OrderI
   win.document.close()
 }
 
+// ── Modo piloto: mute de comandas ────────────────────────────────────────
+// Durante el piloto en paralelo con Wansoft, las comandas físicas las imprime
+// SOLO Wansoft (evitar dobles en cocina). Este flag apaga printByStation en
+// esta terminal (localStorage = por dispositivo). El KDS no se afecta — las
+// órdenes siguen llegando por Supabase. Toggle protegido con PIN de gerente.
+
+const COMANDAS_MUTED_KEY = 'pos_comandas_muted'
+
+export function comandasMuted(): boolean {
+  try { return localStorage.getItem(COMANDAS_MUTED_KEY) === '1' } catch { return false }
+}
+
+export function setComandasMuted(muted: boolean) {
+  try {
+    if (muted) localStorage.setItem(COMANDAS_MUTED_KEY, '1')
+    else localStorage.removeItem(COMANDAS_MUTED_KEY)
+  } catch { /* private mode */ }
+}
+
 /**
  * Print per-station tickets: splits the order and prints a separate ticket
  * for each station that has items. Adds 200ms delay between tickets.
  */
 export async function printByStation(order: Order) {
+  if (comandasMuted()) {
+    console.log('[printer] printByStation OMITIDO — modo piloto (comandas muteadas)')
+    return
+  }
   const split = splitOrderByStation(order)
   const stations: StationName[] = ['cocina', 'barra', 'caja']
   let printed = false

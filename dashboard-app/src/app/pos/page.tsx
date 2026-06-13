@@ -38,6 +38,8 @@ import { apiUrl } from '@/lib/api-base'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
+  comandasMuted,
+  setComandasMuted,
   printPreTicket,
   printTicketCSS,
   printTicketBluetooth,
@@ -1143,6 +1145,29 @@ function POSContent() {
     setBtConnecting(false)
   }
 
+  // Modo piloto: mute de comandas físicas (solo Wansoft imprime ese día).
+  // Toggle protegido con PIN de gerente + evento de auditoría.
+  const [comandasOff, setComandasOff] = useState(false)
+  useEffect(() => { setComandasOff(comandasMuted()) }, [])
+
+  const handleToggleComandas = async () => {
+    const next = !comandasOff
+    const pin = window.prompt(next
+      ? 'PIN de gerente para APAGAR comandas (modo piloto):'
+      : 'PIN de gerente para ENCENDER comandas:')
+    if (!pin) return
+    const manager = await verifyManagerPin(pin)
+    if (!manager) { showToast('PIN inválido'); return }
+    setComandasMuted(next)
+    setComandasOff(next)
+    logAudit({
+      action: next ? 'comandas_print_off' : 'comandas_print_on',
+      actor: manager,
+      details: { motivo: 'modo piloto', terminal: getDeviceId() },
+    })
+    showToast(next ? 'Comandas APAGADAS — solo KDS (modo piloto)' : 'Comandas encendidas')
+  }
+
   const handleConnectUsbPrinter = async () => {
     if (isBluetoothConnected()) {
       await disconnectBluetoothPrinter()
@@ -1919,6 +1944,16 @@ function POSContent() {
                 {readyOrders} listas
               </Link>
             )}
+            <button
+              onClick={handleToggleComandas}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold min-h-[44px] ${
+                comandasOff ? 'bg-amber-600 text-white animate-pulse' : 'bg-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)]'
+              }`}
+              title={comandasOff ? 'Comandas APAGADAS (modo piloto) — toca para encender' : 'Comandas encendidas — toca para apagar (modo piloto)'}
+            >
+              <ChefHat size={16} />
+              {comandasOff ? 'Comandas OFF' : 'Comandas'}
+            </button>
             {hasBluetooth && (
               <button
                 onClick={handleConnectPrinter}

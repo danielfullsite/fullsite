@@ -1149,6 +1149,8 @@ export type AuditAction =
   | 'delivery_assigned'
   | 'delivery_status_changed'
   | 'delivery_closed'
+  | 'comandas_print_off'
+  | 'comandas_print_on'
 
 export interface AuditEvent {
   client_id?: string
