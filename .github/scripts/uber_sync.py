@@ -1,210 +1,160 @@
 #!/usr/bin/env python3
 """
-Uber Eats Sales Sync — login via Playwright, navigate to orders/payments,
-capture API responses.
+Uber Eats Sales Sync — uses saved session cookies to fetch weekly sales
+via the merchants.ubereats.com internal API.
 
 Usage:
-  python uber_sync.py              # explore
-  python uber_sync.py --headed     # visible browser
+  python uber_sync.py              # last 8 weeks
+  python uber_sync.py --weeks 12   # last 12 weeks
+
+Cookies: ~/.uber-cookies/session.json (from DevTools → Network → Copy as cURL)
+Env: SUPABASE_URL / SUPABASE_SERVICE_KEY
 """
 
-import asyncio
 import json
 import os
 import sys
+import requests
 from datetime import datetime, timedelta, date
 
-UBER_USER = os.environ.get("UBER_USER", "")
-UBER_PASSWORD = os.environ.get("UBER_PASSWORD", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 CLIENT_ID = os.environ.get("CLIENT_ID", "amalay")
-HEADLESS = "--headed" not in sys.argv
+WEEKS = int(sys.argv[sys.argv.index("--weeks") + 1]) if "--weeks" in sys.argv else 8
+COOKIE_FILE = os.path.expanduser("~/.uber-cookies/session.json")
 
 
-async def run():
-    from playwright.async_api import async_playwright
+def load_cookies():
+    with open(COOKIE_FILE) as f:
+        return json.load(f)
 
-    if not UBER_USER or not UBER_PASSWORD:
-        print("ERROR: UBER_USER / UBER_PASSWORD not set"); sys.exit(1)
 
-    print(f"[uber] Starting sync, headless={HEADLESS}")
+def sb_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
 
-    # Collected API data
-    captured = []
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=HEADLESS)
-        ctx = await browser.new_context(viewport={"width": 1280, "height": 900}, locale="es-MX")
-        page = await ctx.new_page()
+def fetch_week_sales(cookies, start_date, end_date):
+    """Fetch sales metrics for a date range."""
+    s = int(datetime.strptime(start_date, "%Y-%m-%d").replace(hour=6).timestamp())
+    e = int(datetime.strptime(end_date, "%Y-%m-%d").replace(hour=6).timestamp())
 
-        # Capture ALL JSON API responses
-        async def on_response(response):
-            url = response.url
-            if response.status >= 400:
-                return
-            try:
-                ct = response.headers.get("content-type", "")
-                if "json" in ct:
-                    body = await response.json()
-                    captured.append({"url": url, "body": body})
-            except Exception:
-                pass
+    cookie_str = f"sid={cookies['sid']}; jwt-session={cookies['jwt_session']}; selectedRestaurant={cookies['restaurant_uuid']}"
+    r = requests.post(
+        "https://merchants.ubereats.com/manager/api/getTodaySalesMetrics?localeCode=en",
+        headers={
+            "content-type": "application/json",
+            "cookie": cookie_str,
+            "x-csrf-token": "x",
+        },
+        json={
+            "userTimezoneOffset": 360,
+            "restaurantUuids": [cookies["restaurant_uuid"]],
+            "timeRange": {"startTime": s, "endTime": e},
+            "currentDate": f"{start_date} 00:00:00",
+            "endDate": f"{end_date} 00:00:00",
+            "dominantCurrencyCode": "MXN",
+            "isUMetricQueries": True,
+        },
+        timeout=15,
+    )
+    if r.ok:
+        data = r.json()
+        if data.get("status") == "success":
+            return data["data"]
+    return None
 
-        page.on("response", on_response)
 
-        # ── Login ──────────────────────────────────────────────────────────
-        print("[uber] Navigating to login...")
-        await page.goto("https://merchants.ubereats.com/manager/", wait_until="networkidle", timeout=30000)
-        await page.wait_for_timeout(2000)
+def main():
+    if not os.path.exists(COOKIE_FILE):
+        print(f"ERROR: No cookies file at {COOKIE_FILE}")
+        print("Login to merchants.ubereats.com, copy a request as cURL, and save cookies.")
+        sys.exit(1)
 
-        # Uber login flow — could be email+password on same page or multi-step
-        current = page.url
-        print(f"[uber] Login page: {current}")
+    cookies = load_cookies()
+    print(f"[uber] Syncing last {WEEKS} weeks")
+    print(f"[uber] Restaurant: {cookies['restaurant_uuid']}")
 
-        # Try to find email input
-        email_selectors = [
-            'input[name="email"]', 'input[type="email"]', '#useridInput',
-            'input[id*="email"]', 'input[autocomplete="username"]',
-        ]
-        email_filled = False
-        for sel in email_selectors:
-            try:
-                el = page.locator(sel).first
-                if await el.is_visible(timeout=3000):
-                    await el.fill(UBER_USER)
-                    email_filled = True
-                    print(f"[uber] Email filled via {sel}")
-                    break
-            except Exception:
-                continue
+    # Generate week ranges (Mon-Sun)
+    today = date.today()
+    weeks = []
+    for i in range(WEEKS):
+        end = today - timedelta(days=today.weekday() + 7 * i)  # last Monday
+        end = end + timedelta(days=6)  # Sunday
+        start = end - timedelta(days=6)  # Monday
+        if end > today:
+            end = today
+        weeks.append((start.isoformat(), end.isoformat()))
 
-        if not email_filled:
-            # Maybe it's an SSO page or different layout
-            await page.screenshot(path="/tmp/uber-login-1.png")
-            print("[uber] Could not find email input — screenshot: /tmp/uber-login-1.png")
-            # Dump all inputs
-            inputs = await page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('input')).map(i => ({
-                    name: i.name, type: i.type, id: i.id, placeholder: i.placeholder,
-                    class: i.className?.slice(0, 40),
-                }));
-            }""")
-            print(f"[uber] Inputs: {json.dumps(inputs, indent=1)}")
+    weeks.reverse()  # oldest first
 
-        # Click Next/Continue
-        for btn_sel in ['button:has-text("Next")', 'button:has-text("Siguiente")', 'button:has-text("Continue")', 'button:has-text("Continuar")', 'button[type="submit"]']:
-            try:
-                el = page.locator(btn_sel).first
-                if await el.is_visible(timeout=2000):
-                    await el.click()
-                    print(f"[uber] Clicked {btn_sel}")
-                    break
-            except Exception:
-                continue
+    print(f"\n{'='*55}")
+    print(f"  UBER EATS — AMALAY ({weeks[0][0]} → {weeks[-1][1]})")
+    print(f"{'='*55}\n")
 
-        await page.wait_for_timeout(3000)
+    results = []
+    total_sales = 0
+    total_orders = 0
 
-        # Password step
-        pw_selectors = ['input[type="password"]', 'input[name="password"]', '#password']
-        pw_filled = False
-        for sel in pw_selectors:
-            try:
-                el = page.locator(sel).first
-                if await el.is_visible(timeout=5000):
-                    await el.fill(UBER_PASSWORD)
-                    pw_filled = True
-                    print(f"[uber] Password filled via {sel}")
-                    break
-            except Exception:
-                continue
+    for start, end in weeks:
+        data = fetch_week_sales(cookies, start, end)
+        if data:
+            sales = data.get("totalSales", 0)
+            orders = data.get("totalOrders", 0)
+            avg = data.get("avgTicketSize", 0)
+            total_sales += sales
+            total_orders += orders
+            results.append({
+                "start": start, "end": end,
+                "sales": sales, "orders": orders, "avg": round(avg, 2),
+            })
+            print(f"  {start} → {end} | {orders:>3} pedidos | ${sales:>10,} | avg ${avg:>8,.2f}")
+        else:
+            print(f"  {start} → {end} | FAILED (cookies expired?)")
 
-        if not pw_filled:
-            await page.screenshot(path="/tmp/uber-login-2.png")
-            print("[uber] Could not find password input — screenshot: /tmp/uber-login-2.png")
-            inputs = await page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('input')).map(i => ({
-                    name: i.name, type: i.type, id: i.id, placeholder: i.placeholder,
-                }));
-            }""")
-            print(f"[uber] Inputs: {json.dumps(inputs, indent=1)}")
+    print(f"\n  {'TOTAL':>37} {total_orders:>3} pedidos | ${total_sales:>10,}")
 
-        # Click Login/Submit
-        for btn_sel in ['button:has-text("Log In")', 'button:has-text("Iniciar sesión")', 'button:has-text("Sign In")', 'button:has-text("Siguiente")', 'button[type="submit"]']:
-            try:
-                el = page.locator(btn_sel).first
-                if await el.is_visible(timeout=2000):
-                    await el.click()
-                    print(f"[uber] Clicked {btn_sel}")
-                    break
-            except Exception:
-                continue
+    # Upsert to Supabase
+    if SUPABASE_URL and SUPABASE_KEY and results:
+        print(f"\n[uber] Upserting {len(results)} weeks to Supabase...")
+        rows = []
+        for r in results:
+            rows.append({
+                "id": f"uber-week-{r['start']}",
+                "client_id": CLIENT_ID,
+                "platform": "ubereats",
+                "lot_id": f"week-{r['start']}",
+                "period_start": r["start"],
+                "period_end": r["end"],
+                "paid_date": None,
+                "total": r["sales"],
+                "status": "sales",
+                "payment_ref": "",
+                "raw_json": json.dumps({
+                    "ventas": r["sales"],
+                    "pedidos": r["orders"],
+                    "ticket_promedio": r["avg"],
+                    "source": "api_weekly_sales",
+                }),
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+            })
 
-        # Wait for redirect
-        print("[uber] Waiting for dashboard...")
-        try:
-            await page.wait_for_url("**/manager/**", timeout=30000)
-        except Exception:
-            await page.wait_for_timeout(10000)
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/delivery_platform_payments",
+            headers=sb_headers(),
+            json=rows,
+        )
+        if resp.status_code in (200, 201):
+            print(f"  {len(rows)} weeks upserted OK")
+        else:
+            print(f"  Error: {resp.status_code} {resp.text[:300]}")
 
-        current = page.url
-        print(f"[uber] After login: {current}")
-        await page.screenshot(path="/tmp/uber-dashboard.png", full_page=True)
-        print("[uber] Screenshot: /tmp/uber-dashboard.png")
-
-        # Check if 2FA/verification is needed
-        if "challenge" in current or "verify" in current or "otp" in current:
-            print("[uber] ⚠ 2FA/verification required — need manual intervention")
-            await page.screenshot(path="/tmp/uber-2fa.png")
-            await browser.close()
-            sys.exit(1)
-
-        # ── Navigate to key sections ───────────────────────────────────────
-        # Try Orders
-        print("[uber] Looking for Orders/Payments...")
-        nav_clicked = []
-        for sel in [
-            'a:has-text("Orders")', 'a:has-text("Pedidos")',
-            'a:has-text("Payments")', 'a:has-text("Pagos")',
-            '[href*="order"]', '[href*="payment"]',
-        ]:
-            try:
-                el = page.locator(sel).first
-                if await el.is_visible(timeout=2000):
-                    await el.click()
-                    await page.wait_for_timeout(4000)
-                    nav_clicked.append(sel)
-                    print(f"[uber] Clicked: {sel} → {page.url}")
-                    await page.screenshot(path=f"/tmp/uber-nav-{len(nav_clicked)}.png", full_page=True)
-                    break
-            except Exception:
-                continue
-
-        # Dump interactive elements
-        links = await page.evaluate("""() => {
-            const els = document.querySelectorAll('a, button, [role="menuitem"], [role="tab"], [role="link"]');
-            return Array.from(els).slice(0, 50).map(e => ({
-                tag: e.tagName,
-                text: e.textContent?.trim()?.slice(0, 80),
-                href: e.href || e.getAttribute('href') || '',
-            })).filter(e => e.text || e.href);
-        }""")
-
-        print(f"\n[uber] Interactive elements ({len(links)}):")
-        for l in links[:30]:
-            print(f"  {l['tag']:8} | {l['text'][:40]:40} | {l['href'][:50]}")
-
-        # Dump captured APIs
-        print(f"\n[uber] Captured {len(captured)} API responses:")
-        for c in captured[:20]:
-            body_str = json.dumps(c["body"], ensure_ascii=False)[:300]
-            print(f"\n  {c['url'][:100]}")
-            print(f"  {body_str}")
-
-        await browser.close()
-
-    print(f"\n[uber] Done. Check /tmp/uber-*.png for screenshots.")
+    print("\n[uber] Done.")
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    main()
