@@ -76,13 +76,14 @@ export default function InventarioMarketPage() {
 
   const q = search.trim().toLowerCase()
   const filtered = rows.filter(r => {
-    if (onlyAlerts && !(r.hasStockRow && r.stock <= r.reorder_point)) return false
+    if (onlyAlerts && !(r.hasStockRow && r.reorder_point > 0 && r.stock <= r.reorder_point)) return false
     if (!q) return true
     // Barcode scan: match exacto primero, luego nombre parcial
     return (r.barcode ?? '').toLowerCase() === q || r.name.toLowerCase().includes(q)
   })
 
-  const alerts = rows.filter(r => r.hasStockRow && r.stock <= r.reorder_point)
+  const alerts = rows.filter(r => r.hasStockRow && r.reorder_point > 0 && r.stock <= r.reorder_point)
+  const agotados = rows.filter(r => r.hasStockRow && r.stock === 0)
   const conStock = rows.filter(r => r.stock > 0)
   const valorStock = rows.reduce((s, r) => s + r.stock * r.price, 0)
 
@@ -154,8 +155,9 @@ export default function InventarioMarketPage() {
           <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(valorStock)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4">
-          <p className="text-xs text-[var(--text-3)]">En punto de reorden</p>
-          <p className={`text-2xl font-bold ${alerts.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{alerts.length}</p>
+          <p className="text-xs text-[var(--text-3)]">Agotados</p>
+          <p className={`text-2xl font-bold ${agotados.length > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{agotados.length}</p>
+          {alerts.length > 0 && <p className="text-[10px] text-amber-400 mt-1">{alerts.length} en punto de reorden</p>}
         </div>
       </div>
 
@@ -192,7 +194,7 @@ export default function InventarioMarketPage() {
           </thead>
           <tbody className="divide-y divide-[var(--line-soft)]">
             {filtered.slice(0, 100).map(r => {
-              const low = r.hasStockRow && r.stock <= r.reorder_point
+              const low = r.hasStockRow && r.reorder_point > 0 && r.stock <= r.reorder_point
               return (
                 <tr key={r.id} className={low ? 'bg-amber-500/5' : ''}>
                   <td className="px-4 py-2.5">
@@ -200,7 +202,7 @@ export default function InventarioMarketPage() {
                     <p className="text-[11px] text-[var(--text-3)]">{r.category_id}{r.barcode ? ` · ${r.barcode}` : ''}</p>
                   </td>
                   <td className="px-4 py-2.5 text-sm text-[var(--text-2)] text-right tabular-nums">{formatCurrency(r.price)}</td>
-                  <td className={`px-4 py-2.5 text-sm text-right tabular-nums font-semibold ${low ? 'text-amber-400' : r.stock > 0 ? 'text-[var(--text-1)]' : 'text-[var(--text-3)]'}`}>
+                  <td className={`px-4 py-2.5 text-sm text-right tabular-nums font-semibold ${low ? 'text-amber-400' : r.stock > 0 ? 'text-[var(--text-1)]' : r.hasStockRow ? 'text-red-400' : 'text-[var(--text-3)]'}`}>
                     {r.hasStockRow || r.stock > 0 ? r.stock : '—'}
                   </td>
                   <td className="px-4 py-2.5 text-sm text-[var(--text-3)] text-right tabular-nums">{r.reorder_point || '—'}</td>
