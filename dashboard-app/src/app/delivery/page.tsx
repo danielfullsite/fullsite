@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Bike, TrendingUp, DollarSign, Package } from 'lucide-react'
+import { Bike, TrendingUp, DollarSign, Package, Banknote, Calendar, CheckCircle } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
@@ -9,12 +9,30 @@ import { getRecentDays } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
+interface PlatformPayment {
+  id: string
+  platform: string
+  lot_id: string
+  period_start: string
+  period_end: string
+  paid_date: string | null
+  total: number
+  status: string
+}
+
 export default function DeliveryPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
   const [loading, setLoading] = useState(true)
+  const [payments, setPayments] = useState<PlatformPayment[]>([])
 
   useEffect(() => {
     getRecentDays(90).then(d => { setData(d); setLoading(false) })
+    // Fetch real platform payments from Supabase
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    fetch(`${sbUrl}/rest/v1/delivery_platform_payments?order=period_start.desc&limit=20`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    }).then(r => r.ok ? r.json() : []).then(setPayments).catch(() => {})
   }, [])
 
   // Extract delivery data from pago_metodos (Ubereats, Rappi appear as payment methods)
@@ -111,7 +129,7 @@ export default function DeliveryPage() {
             </div>
           </div>
 
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-6">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-6 mb-6">
             <h3 className="text-sm font-semibold text-[var(--text-1)] mb-4">Tendencia mensual</h3>
             <div className="h-[200px] sm:h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -127,6 +145,66 @@ export default function DeliveryPage() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Pagos reales de plataformas (Rappi, Uber) */}
+          {payments.length > 0 && (
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-[var(--text-1)] flex items-center gap-2">
+                  <Banknote size={16} className="text-orange-400" />
+                  Pagos de plataformas
+                </h3>
+                <span className="text-xs text-[var(--text-3)]">
+                  Total: {formatCurrency(payments.reduce((s, p) => s + Number(p.total), 0))}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--line-soft)]">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--text-3)]">Plataforma</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--text-3)]">Período</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--text-3)]">Fecha pago</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-[var(--text-3)]">Depositado</th>
+                      <th className="text-center px-3 py-2 text-xs font-semibold text-[var(--text-3)]">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map(p => (
+                      <tr key={p.id} className="border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)]/50">
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full ${
+                            p.platform === 'rappi' ? 'bg-orange-500/15 text-orange-400' : 'bg-emerald-500/15 text-emerald-400'
+                          }`}>
+                            {p.platform === 'rappi' ? '🟠' : '🟢'} {p.platform === 'rappi' ? 'Rappi' : 'Uber Eats'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-[var(--text-2)] text-xs flex items-center gap-1">
+                          <Calendar size={12} className="text-[var(--text-3)]" />
+                          {p.period_start && new Date(p.period_start + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                          {' → '}
+                          {p.period_end && new Date(p.period_end + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-[var(--text-3)]">
+                          {p.paid_date ? new Date(p.paid_date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold tabular-nums text-[var(--text-1)]">
+                          {formatCurrency(Number(p.total))}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+                            p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
+                          }`}>
+                            {p.status === 'paid' ? <><CheckCircle size={10} /> Pagado</> : p.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </>
