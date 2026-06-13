@@ -1,0 +1,32 @@
+name: Rappi Sales Sync
+
+on:
+  schedule:
+    # Diario a las 7am MX (13:00 UTC) — después del cierre de AMALAY
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+env:
+  RAPPI_USER: ${{ secrets.RAPPI_USER }}
+  RAPPI_PASSWORD: ${{ secrets.RAPPI_PASSWORD }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  CLIENT_ID: amalay
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright requests
+          playwright install chromium
+
+      - name: Run Rappi sync
+        run: python .github/scripts/rappi_sync.py --days 14
