@@ -1,9 +1,10 @@
 name: Rappi Sales Sync
 
 on:
-  schedule:
-    # Diario a las 7am MX (13:00 UTC) — después del cierre de AMALAY
-    - cron: '0 13 * * *'
+  # DESACTIVADO: Rappi bloquea login desde IPs de datacenter (GitHub Actions).
+  # Usar cron local: bash .github/scripts/rappi_cron_local.sh
+  # schedule:
+  #   - cron: '0 13 * * *'
   workflow_dispatch:
 
 env:
