@@ -10,42 +10,22 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
-import { Banknote, CreditCard, ArrowRightLeft, DollarSign, Monitor } from 'lucide-react'
+import { Banknote, CreditCard, ArrowRightLeft, DollarSign } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregatePayments, getWansoftDataLatest } from '@/lib/data'
+import { getRecentDays, aggregatePayments } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
 const PAYMENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899']
 
-interface CashClosingPayment {
-  PaymentName: string
-  Total: number
-}
-
 export default function IngresosPage() {
   const [data, setData] = useState<WansoftDaily[]>([])
-  const [cashClosing, setCashClosing] = useState<CashClosingPayment[]>([])
-  const [salesTerminal, setSalesTerminal] = useState<{ nombre: string; total: number }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      getRecentDays(30),
-      getWansoftDataLatest('closing_cash_mega'),
-      getWansoftDataLatest('sales_terminal'),
-    ]).then(([d, cashData, termData]) => {
+    getRecentDays(30).then(d => {
       setData(d)
-      if (cashData?.data) {
-        const raw = cashData.data as any
-        const payments = raw?.ClosingCashPayments || []
-        setCashClosing(payments.filter((p: any) => p.Total > 0))
-      }
-      if (termData?.data) {
-        const raw = Array.isArray(termData.data) ? termData.data : []
-        setSalesTerminal(raw.filter((t: any) => t.nombre && t.total > 0))
-      }
       setLoading(false)
     })
   }, [])
@@ -263,48 +243,6 @@ export default function IngresosPage() {
         </>
       )}
 
-      {/* Cash Closing by Payment Method (from Wansoft) */}
-      {cashClosing.length > 0 && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 mt-6">
-          <h3 className="text-sm font-bold text-[var(--text-1)] mb-3 flex items-center gap-2">
-            <Banknote size={14} className="text-emerald-400" /> Corte de caja — desglose por método
-          </h3>
-          <div className="space-y-2">
-            {cashClosing.map((p, i) => {
-              const total = cashClosing.reduce((s, c) => s + c.Total, 0)
-              const pct = total > 0 ? (p.Total / total * 100).toFixed(1) : '0'
-              return (
-                <div key={i}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-[var(--text-1)]">{p.PaymentName}</span>
-                    <span className="text-[var(--text-2)]">{formatCurrency(p.Total)} ({pct}%)</span>
-                  </div>
-                  <div className="w-full bg-[var(--surface-2)] rounded-full h-1.5">
-                    <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Sales by Terminal */}
-      {salesTerminal.length > 0 && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5 mt-6">
-          <h3 className="text-sm font-bold text-[var(--text-1)] mb-3 flex items-center gap-2">
-            <Monitor size={14} className="text-blue-400" /> Ventas por terminal
-          </h3>
-          <div className="space-y-2">
-            {salesTerminal.map((t, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-[var(--text-1)]">{t.nombre}</span>
-                <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(t.total)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   )
 }
