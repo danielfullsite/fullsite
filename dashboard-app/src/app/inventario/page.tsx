@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Package, AlertTriangle, TrendingDown, Search, ArrowUpDown } from 'lucide-react'
-import { getLatestDeep } from '@/lib/data'
-import { getIngredients, type Ingredient } from '@/lib/pos-data'
+import { Package, AlertTriangle, TrendingDown, Search, ArrowUpDown, Filter } from 'lucide-react'
+import { sbApi } from '@/lib/supabase-api'
 import { formatCurrency } from '@/lib/format'
 
 interface InventoryItem {
@@ -12,53 +11,43 @@ interface InventoryItem {
   unidad: string
   costo_unitario: number
   costo_total: number
+  category: string
+  reorder_point: number
+  below_reorder: boolean
 }
 
-interface ShrinkageItem {
-  producto: string
-  sistema: number
-  fisico: number
-  diferencia: number
-  costo_diferencia: number
-}
-
-type SortKey = 'producto' | 'existencia' | 'costo_total'
+type SortKey = 'producto' | 'existencia' | 'costo_total' | 'category'
 
 export default function InventarioPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
-  const [shrinkage, setShrinkage] = useState<ShrinkageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('costo_total')
   const [sortAsc, setSortAsc] = useState(false)
-  const [tab, setTab] = useState<'stock' | 'merma'>('stock')
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [fecha, setFecha] = useState('')
 
   useEffect(() => {
     async function load() {
       try {
-        const [invRow, shrinkRow] = await Promise.all([
-          getLatestDeep('wansoft_inventory'),
-          getLatestDeep('wansoft_shrinkage'),
-        ])
-        if (invRow?.data && Array.isArray(invRow.data) && invRow.data.length > 0) {
-          setInventory(invRow.data)
-          setFecha(invRow.fecha as string || '')
-        } else {
-          // Fallback: show pos_ingredients as inventory listing
-          const ingredients = await getIngredients()
-          if (ingredients.length > 0) {
-            setInventory(ingredients.map((i: Ingredient) => ({
-              producto: i.name,
-              existencia: 0,
-              unidad: i.unit,
-              costo_unitario: i.cost_per_unit || 0,
-              costo_total: 0,
-            })))
-            setFecha('pos_ingredients')
-          }
+        // Read from pos_inventory_products (769 products with real stock)
+        const data = await sbApi('pos_inventory_products?active=eq.true&order=name.asc&select=name,unit,cost_per_unit,stock,reorder_point,category,updated_at')
+        if (Array.isArray(data) && data.length > 0) {
+          const items: InventoryItem[] = data.map((row: { name: string; unit: string; cost_per_unit: number; stock: number; reorder_point: number; category: string; updated_at: string }) => ({
+            producto: row.name,
+            existencia: row.stock ?? 0,
+            unidad: row.unit || '',
+            costo_unitario: row.cost_per_unit ?? 0,
+            costo_total: (row.stock ?? 0) * (row.cost_per_unit ?? 0),
+            category: row.category || 'SIN CATEGORIA',
+            reorder_point: row.reorder_point ?? 0,
+            below_reorder: row.reorder_point > 0 && (row.stock ?? 0) <= row.reorder_point,
+          }))
+          setInventory(items)
+          // Use the most recent updated_at as the date
+          const latest = data.reduce((max: string, r: { updated_at: string }) => r.updated_at > max ? r.updated_at : max, data[0].updated_at)
+          setFecha(latest ? new Date(latest).toLocaleDateString('es-MX') : '')
         }
-        if (shrinkRow?.data && Array.isArray(shrinkRow.data)) setShrinkage(shrinkRow.data)
       } catch (err) {
         console.error('Error loading inventory:', err)
       } finally {
@@ -68,7 +57,10 @@ export default function InventarioPage() {
     load()
   }, [])
 
+  const categories = Array.from(new Set(inventory.map(i => i.category))).sort()
+
   const filtered = inventory
+    .filter(i => !categoryFilter || i.category === categoryFilter)
     .filter(i => !search || i.producto.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const va = a[sortKey] ?? 0
@@ -78,7 +70,8 @@ export default function InventarioPage() {
     })
 
   const totalValue = inventory.reduce((s, i) => s + (i.costo_total || 0), 0)
-  const lowStock = inventory.filter(i => i.existencia > 0 && i.existencia < 5)
+  const belowReorder = inventory.filter(i => i.below_reorder)
+  const outOfStock = inventory.filter(i => i.existencia <= 0)
 
   if (loading) {
     return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -93,98 +86,79 @@ export default function InventarioPage() {
     <>
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Inventario</h2>
-        <p className="text-sm text-[var(--text-3)]">Stock actual y detección de merma {fecha && `· ${fecha}`}</p>
+        <p className="text-sm text-[var(--text-3)]">769 productos con stock real {fecha && `· Actualizado ${fecha}`}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2"><Package size={16} className="text-blue-500" /><span className="text-xs text-[var(--text-2)] font-medium">Productos</span></div>
           <p className="text-2xl font-bold text-[var(--text-1)]">{inventory.length}</p>
+          <p className="text-xs text-[var(--text-3)] mt-1">{categories.length} categorias</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
           <div className="flex items-center gap-2 mb-2"><Package size={16} className="text-emerald-500" /><span className="text-xs text-[var(--text-2)] font-medium">Valor total</span></div>
           <p className="text-2xl font-bold text-[var(--text-1)]">{formatCurrency(totalValue)}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><AlertTriangle size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Stock bajo</span></div>
-          <p className="text-2xl font-bold text-amber-400">{lowStock.length}</p>
+          <div className="flex items-center gap-2 mb-2"><AlertTriangle size={16} className="text-amber-500" /><span className="text-xs text-[var(--text-2)] font-medium">Bajo reorden</span></div>
+          <p className="text-2xl font-bold text-amber-400">{belowReorder.length}</p>
         </div>
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-2"><TrendingDown size={16} className="text-red-500" /><span className="text-xs text-[var(--text-2)] font-medium">Items con merma</span></div>
-          <p className="text-2xl font-bold text-red-600">{shrinkage.length}</p>
+          <div className="flex items-center gap-2 mb-2"><TrendingDown size={16} className="text-red-500" /><span className="text-xs text-[var(--text-2)] font-medium">Sin stock</span></div>
+          <p className="text-2xl font-bold text-red-600">{outOfStock.length}</p>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setTab('stock')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'stock' ? 'bg-[var(--surface)] text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Stock ({inventory.length})</button>
-        <button onClick={() => setTab('merma')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'merma' ? 'bg-red-600 text-white' : 'bg-[var(--surface-2)] text-[var(--text-2)]'}`}>Merma ({shrinkage.length})</button>
-      </div>
-
-      {tab === 'stock' ? (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
-          <div className="p-4 border-b border-[var(--line-soft)]">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar producto..." className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--line)] rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
-            </div>
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
+        <div className="p-4 border-b border-[var(--line-soft)] flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar producto..." className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--line)] rounded-lg bg-[var(--surface)] text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
           </div>
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center">
-              <Package size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
-              <p className="text-sm font-bold text-[var(--text-1)] mb-1">{inventory.length === 0 ? 'Sin datos de inventario' : 'Sin resultados'}</p>
-              <p className="text-xs text-[var(--text-3)]">{inventory.length === 0 ? 'El scraper corre diario a las 11pm.' : 'Intenta con otro término de búsqueda.'}</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
-                  <th className="text-left px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('producto')}>Producto <ArrowUpDown size={12} className="inline" /></th>
-                  <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('existencia')}>Existencia <ArrowUpDown size={12} className="inline" /></th>
-                  <th className="text-left px-4 py-3 font-medium">Unidad</th>
-                  <th className="text-right px-4 py-3 font-medium">Costo unit.</th>
-                  <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('costo_total')}>Costo total <ArrowUpDown size={12} className="inline" /></th>
-                </tr></thead>
-                <tbody>{filtered.slice(0, 200).map((item, i) => (
-                  <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.existencia < 5 && item.existencia > 0 ? 'bg-amber-500/10' : ''}`}>
-                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${item.existencia < 5 ? 'text-amber-400 font-bold' : 'text-[var(--text-1)]'}`}>{item.existencia}</td>
-                    <td className="px-4 py-3 text-[var(--text-2)]">{item.unidad}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(item.costo_unitario)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-1)]">{formatCurrency(item.costo_total)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
+          <div className="relative">
+            <Filter size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-3)]" />
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="pl-8 pr-3 py-2 text-sm border border-[var(--line)] rounded-lg bg-[var(--surface)] text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none">
+              <option value="">Todas las categorias ({inventory.length})</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
         </div>
-      ) : (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm">
-          {shrinkage.length === 0 ? (
-            <div className="p-8 text-center text-[var(--text-3)] text-sm">Sin diferencias detectadas</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
-                  <th className="text-left px-4 py-3 font-medium">Producto</th>
-                  <th className="text-right px-4 py-3 font-medium">Sistema</th>
-                  <th className="text-right px-4 py-3 font-medium">Fisico</th>
-                  <th className="text-right px-4 py-3 font-medium">Diferencia</th>
-                  <th className="text-right px-4 py-3 font-medium">Costo dif.</th>
-                </tr></thead>
-                <tbody>{shrinkage.map((item, i) => (
-                  <tr key={i} className="border-b border-[var(--line-soft)] hover:bg-red-500/10">
-                    <td className="px-4 py-3 font-medium text-[var(--text-1)]">{item.producto}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{item.sistema}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{item.fisico}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums font-bold ${item.diferencia < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{item.diferencia > 0 ? '+' : ''}{item.diferencia}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-red-600">{formatCurrency(Math.abs(item.costo_diferencia))}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center">
+            <Package size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
+            <p className="text-sm font-bold text-[var(--text-1)] mb-1">{inventory.length === 0 ? 'Sin datos de inventario' : 'Sin resultados'}</p>
+            <p className="text-xs text-[var(--text-3)]">{inventory.length === 0 ? 'Verifica la tabla pos_inventory_products.' : 'Intenta con otro termino de busqueda.'}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-[var(--line-soft)] text-[var(--text-2)]">
+                <th className="text-left px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('producto')}>Producto <ArrowUpDown size={12} className="inline" /></th>
+                <th className="text-left px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('category')}>Categoria <ArrowUpDown size={12} className="inline" /></th>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('existencia')}>Stock <ArrowUpDown size={12} className="inline" /></th>
+                <th className="text-left px-4 py-3 font-medium">Unidad</th>
+                <th className="text-right px-4 py-3 font-medium">Costo unit.</th>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer" onClick={() => toggleSort('costo_total')}>Valor <ArrowUpDown size={12} className="inline" /></th>
+              </tr></thead>
+              <tbody>{filtered.slice(0, 300).map((item, i) => (
+                <tr key={i} className={`border-b border-[var(--line-soft)] hover:bg-[var(--surface-2)] ${item.below_reorder ? 'bg-amber-500/10' : item.existencia <= 0 ? 'bg-red-500/5' : ''}`}>
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">
+                    {item.producto}
+                    {item.below_reorder && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600">reorden</span>}
+                    {item.existencia <= 0 && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-500">sin stock</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-[var(--text-2)]">{item.category}</td>
+                  <td className={`px-4 py-3 text-right tabular-nums ${item.below_reorder ? 'text-amber-400 font-bold' : item.existencia <= 0 ? 'text-red-500 font-bold' : 'text-[var(--text-1)]'}`}>{item.existencia.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-[var(--text-2)]">{item.unidad}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(item.costo_unitario)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-1)]">{formatCurrency(item.costo_total)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            {filtered.length > 300 && <p className="p-3 text-center text-xs text-[var(--text-3)]">Mostrando 300 de {filtered.length} productos</p>}
+          </div>
+        )}
+      </div>
     </>
   )
 }

@@ -10,7 +10,7 @@ export async function GET() {
     const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     const opts = { headers, cache: 'no-store' as const }
 
-    const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes] = await Promise.all([
+    const [recipesRes, menuRes, posRecipesRes, menuConfigRes, costeoRes, modsRes, invRes] = await Promise.all([
       fetch(`${sbUrl}/rest/v1/wansoft_recipes?client_id=eq.amalay&select=saucer_id,saucer_name,budget_cost,ingredients`, opts),
       fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price,category_id`, opts),
       fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta&precio_venta=gt.0`, opts),
@@ -19,6 +19,8 @@ export async function GET() {
       // Modificadores reales de Wansoft (wsm-*) — para costear recetas huérfanas
       // (EXT. POLLO, C/ PAN BRIOCHE...) contra su precio extra
       fetch(`${sbUrl}/rest/v1/pos_modifiers?client_id=eq.amalay&id=like.wsm-*&select=name,price`, opts),
+      // Current ingredient costs from pos_inventory_products (769 products with real stock)
+      fetch(`${sbUrl}/rest/v1/pos_inventory_products?active=eq.true&select=name,unit,cost_per_unit,stock,category`, opts),
     ])
 
     return Response.json({
@@ -28,6 +30,7 @@ export async function GET() {
       menuConfig: menuConfigRes.ok ? await menuConfigRes.json() : [],
       costeo: costeoRes.ok ? await costeoRes.json() : [],
       posModifiers: modsRes.ok ? await modsRes.json() : [],
+      inventoryProducts: invRes.ok ? await invRes.json() : [],
     })
   } catch {
     return Response.json({ recipes: [], menuItems: [], posRecipes: [], menuConfig: [], costeo: [], posModifiers: [] })
