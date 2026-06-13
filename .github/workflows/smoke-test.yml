@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     # Wait 90 seconds after push for Vercel to deploy
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Wait for Vercel deploy
         if: github.event_name == 'push'
