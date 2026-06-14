@@ -1452,7 +1452,7 @@ function POSContent() {
   }, [])
 
   const activeCategory =
-    menuCategories.find((c) => c.id === selectedCategory) || menuCategories[0]
+    menuCategories.find((c) => c.id === selectedCategory) || menuCategories[0] || { id: '', name: '', items: [] }
 
   // Open modifier modal for a new item
   const handleMenuItemTap = useCallback((item: MenuItem, catId?: string) => {
@@ -1661,12 +1661,12 @@ function POSContent() {
     })
   }, [])
 
-  const activeItems = orderItems.filter(i => !cancelledItems.has(i.id))
-  const subtotal = activeItems.reduce((sum, item) => sum + item.subtotal, 0)
+  const activeItems = (orderItems || []).filter(i => !cancelledItems.has(i.id))
+  const subtotal = activeItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
 
   // Re-evaluate promos when items/subtotal change
   useEffect(() => {
-    if (allPromos.length === 0 || activeItems.length === 0) {
+    if (!allPromos || allPromos.length === 0 || activeItems.length === 0) {
       setAvailablePromos([])
       return
     }
