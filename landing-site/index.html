@@ -524,23 +524,41 @@ ul { list-style: none; }
   margin-bottom: 48px;
 }
 .integrations-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  display: flex;
+  gap: 32px;
+  overflow: hidden;
+  padding: 20px 0;
+}
+.integrations-track {
+  display: flex;
+  gap: 32px;
+  animation: slideLogos 20s linear infinite;
+}
+@keyframes slideLogos {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.integrations-grid:hover .integrations-track {
+  animation-play-state: paused;
 }
 .int-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 32px 24px;
-  text-align: center;
+  border: 1px solid #eee;
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f9f9f9;
   transition: all 0.3s;
-  background: #fff;
 }
 .int-card:hover {
   border-color: #10b981;
-  box-shadow: 0 8px 24px rgba(16,185,129,0.08);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(16,185,129,0.1);
+  transform: scale(1.05);
 }
+.int-card img { max-height: 36px; max-width: 80px; object-fit: contain; }
 .int-icon {
   width: 48px;
   height: 48px;
@@ -959,21 +977,18 @@ ul { list-style: none; }
     <h2 class="integrations-heading reveal">Se integra con lo que ya usas</h2>
     <p class="integrations-sub reveal">Conectamos tu operacion con las plataformas que mueven tu negocio.</p>
     <div class="integrations-grid">
-      <div class="int-card reveal">
-        <img src="/logo-ubereats.png" alt="Uber Eats" style="height:32px;object-fit:contain;margin:0 auto 16px;">
-        <div class="int-desc">Pedidos de delivery directo a tu POS. Sin doble captura, sin errores.</div>
-      </div>
-      <div class="int-card reveal" style="transition-delay:0.08s;">
-        <img src="/logo-rappi.png" alt="Rappi" style="height:28px;object-fit:contain;margin:0 auto 16px;">
-        <div class="int-desc">Sincroniza menu, precios y disponibilidad en tiempo real.</div>
-      </div>
-      <div class="int-card reveal" style="transition-delay:0.16s;">
-        <img src="/logo-sat.jpg" alt="SAT CFDI 4.0" style="height:36px;object-fit:contain;margin:0 auto 16px;">
-        <div class="int-desc">Timbrado automatico, autofactura por QR y reportes fiscales.</div>
-      </div>
-      <div class="int-card reveal" style="transition-delay:0.24s;">
-        <img src="/logo-mercadopago.svg" alt="Mercado Pago" style="height:28px;object-fit:contain;margin:0 auto 16px;">
-        <div class="int-desc">Cobros con QR, tarjeta y ligas de pago. Conciliacion automatica.</div>
+      <div class="integrations-track">
+        <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
+        <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
+        <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
+        <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
+        <div class="int-card"><img src="/logo-fullsite.png" alt="Fullsite"></div>
+        <!-- duplicates for infinite loop -->
+        <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
+        <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
+        <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
+        <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
+        <div class="int-card"><img src="/logo-fullsite.png" alt="Fullsite"></div>
       </div>
     </div>
   </div>
