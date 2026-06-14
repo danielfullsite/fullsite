@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
     const wantsFoodCost = ['costo', 'cost', 'food cost', 'margen', 'insumo', 'ingrediente', 'receta', 'rentab', 'compra', 'comprado', 'precio', 'caro', 'barato', 'cuesta', 'kilo', 'gramo', 'lleva', 'platillo', 'proveedor', 'merma', 'porcion', 'porción'].some(kw => q.includes(kw))
     const wantsReservas = ['reserv', 'proxim', 'próxim', 'evento', 'fiesta', 'cumple', 'boda', 'terraza', 'jardin', 'jardín', 'paquete', 'pastel', 'invitados'].some(kw => q.includes(kw))
     const wantsOrders = ['orden', 'ordenes', 'órdenes', 'cancelacion', 'cancelada', 'abierta', 'mesa ', 'ticket pos', 'cuantas mesas', 'cuántas mesas'].some(kw => q.includes(kw))
+    const wantsMarket = ['market', 'inventario', 'stock', 'existencia', 'agotado', 'reorden', 'tienda', 'abarrote', 'producto market'].some(kw => q.includes(kw))
 
     const fetches: Promise<unknown>[] = [
       // 0: Daily data (always)
@@ -139,9 +140,11 @@ export async function POST(request: NextRequest) {
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 6: Insumos (conditional)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=500`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      // 7: Market stock (conditional)
+      wantsMarket ? fetch(`${sbUrl}/rest/v1/pos_market_stock?select=menu_item_id,stock,reorder_point&client_id=eq.${encodeURIComponent(client_id || 'amalay')}&order=stock.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
 
-    const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
+    const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, marketStockRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
 
     // 2. Detect date from question
     const now = new Date()
@@ -517,6 +520,21 @@ export async function POST(request: NextRequest) {
       ordersContext = `\n\nÓRDENES POS (${ordersRaw.length}):\n${statusLines.join('\n')}${cancelInfo}`
     }
 
+    // 2d-2. Market inventory
+    let marketContext = ''
+    if (wantsMarket && Array.isArray(marketStockRaw) && marketStockRaw.length > 0) {
+      const agotados = marketStockRaw.filter((m: Record<string, unknown>) => Number(m.stock) <= 0)
+      const bajoStock = marketStockRaw.filter((m: Record<string, unknown>) => Number(m.stock) > 0 && Number(m.reorder_point) > 0 && Number(m.stock) <= Number(m.reorder_point))
+      const conStock = marketStockRaw.filter((m: Record<string, unknown>) => Number(m.stock) > 0)
+      marketContext = `\n\nINVENTARIO MARKET (${marketStockRaw.length} items):\n- Con stock: ${conStock.length}\n- Agotados: ${agotados.length}\n- Bajo punto de reorden: ${bajoStock.length}`
+      if (agotados.length > 0) {
+        marketContext += `\nAGOTADOS: ${agotados.slice(0, 10).map((m: Record<string, unknown>) => String(m.menu_item_id)).join(', ')}`
+      }
+      if (bajoStock.length > 0) {
+        marketContext += `\nBAJO STOCK: ${bajoStock.slice(0, 10).map((m: Record<string, unknown>) => `${m.menu_item_id}(${m.stock})`).join(', ')}`
+      }
+    }
+
     // 2e. Product search — FULL platillos list (incl. Market) from wansoft_data.platillos_full
     // platillos_top solo trae top 30/día; productos chicos del Market (ej. Smarty chips) nunca aparecen ahí.
     let productContext = ''
@@ -804,7 +822,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "hoy" sin datos de hoy → NO digas "no tengo datos". Di "el restaurante aún no abre, te doy el último día:" y da los datos del día más reciente. SIEMPRE da datos, nunca dejes al usuario sin respuesta.
 - "hora pico" → si hay VENTAS POR HORA en los datos, usarlas. Si no, decir "no tengo desglose por hora, revísalo en el dashboard"
 - "propinas" → NO hay datos de propinas en el sistema. Di: "las propinas no llegan al sistema — revísalas en el corte de caja físico o en Wansoft → Reportes → Corte de Caja". NO inventes montos.
-- "inventario" → NO hay datos de inventario. Di que se revisa en el módulo de inventario del POS o con cocina/almacén.
+- "inventario" / "stock" / "market" → buscar en INVENTARIO MARKET si hay datos. Dar stock actual, items con bajo stock, últimos movimientos. Si preguntan por ingredientes de cocina, decir que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → usa los RESÚMENES ÚLTIMOS 7 DÍAS y compara con los 7 días anteriores de los datos diarios. NO digas "no tengo datos completos" si tienes datos de ambos periodos
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
 
@@ -852,6 +870,7 @@ ${waiterContext}
 ${foodCostContext}
 ${reservasContext}
 ${ordersContext}
+${marketContext}
 ${productContext}
 
 ${dailyContext}`
