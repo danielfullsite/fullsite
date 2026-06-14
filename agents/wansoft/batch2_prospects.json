@@ -1,0 +1,401 @@
+[
+  {
+    "name": "Grupo RosaNegra",
+    "restaurant": "RosaNegra (Cancun, Tulum, CDMX, Cabo)",
+    "email": "contacto@gruporosanegra.com.mx",
+    "mx_verified": true,
+    "notes": "Fine dining + beach clubs, multiple locations MX + international"
+  },
+  {
+    "name": "Grupo Fisher's",
+    "restaurant": "Fisher's, Luzine, Decrab, Fisher's House (28 locations)",
+    "email": "ventaseventos@fishers.com.mx",
+    "mx_verified": true,
+    "notes": "Seafood chain, 28 locations nationwide since 1989"
+  },
+  {
+    "name": "Cafe Nin",
+    "restaurant": "Cafe Nin (Roma, CDMX)",
+    "email": "info@cafenin.com.mx",
+    "mx_verified": true,
+    "notes": "Popular brunch/cafe concept in Juarez neighborhood"
+  },
+  {
+    "name": "Grupo Rosetta",
+    "restaurant": "Rosetta (Roma Norte, CDMX)",
+    "email": "reservaciones@rrosetta.com.mx",
+    "mx_verified": true,
+    "notes": "World's 50 Best, Elena Reygadas chef"
+  },
+  {
+    "name": "Grupo Santa Sed",
+    "restaurant": "Sanlucar, Taberna El Quillo (Queretaro)",
+    "email": "direccion@gruposantased.com",
+    "mx_verified": true,
+    "notes": "Spanish Mediterranean cuisine in Queretaro"
+  },
+  {
+    "name": "Grupo Mole",
+    "restaurant": "Taco Inn, El Farolito de Mole, others (CDMX)",
+    "email": "contacto@grupomole.com",
+    "mx_verified": true,
+    "notes": "Fast food Mexican since 2008, multiple brands"
+  },
+  {
+    "name": "Grupo Potzollcalli",
+    "restaurant": "Potzollcalli (25 locations CDMX/EdoMex/Yucatan)",
+    "email": "mercadotecnia@potzollcalli.com",
+    "mx_verified": true,
+    "notes": "Mexican chain since 1972, 25+ locations"
+  },
+  {
+    "name": "Grupo Lomas",
+    "restaurant": "Restaurants + Hotels (Cancun, QRoo)",
+    "email": "talento@grupolomas.com",
+    "mx_verified": true,
+    "notes": "40+ years in tourism, Cancun-based hospitality group"
+  },
+  {
+    "name": "Cafe Bola de Oro",
+    "restaurant": "Bola de Oro (Xalapa, multiple locations)",
+    "email": "contacto@boladeoro.com.mx",
+    "mx_verified": true,
+    "notes": "Coffee chain with multiple cafeterias"
+  },
+  {
+    "name": "Restaurante Maximo Bistrot",
+    "restaurant": "Maximo Bistrot (Roma Norte, CDMX)",
+    "email": "info@maximobistrot.com.mx",
+    "mx_verified": true,
+    "notes": "Latin America's 50 Best, Michelin star"
+  },
+  {
+    "name": "Grupo Casamata (Enrique Olvera)",
+    "restaurant": "Pujol, Cosme, Atla, Damian, Ticuchi",
+    "email": "info@casamata.com",
+    "mx_verified": true,
+    "notes": "Top restaurant group by Enrique Olvera, World's 50 Best"
+  },
+  {
+    "name": "Grupo Los Danzantes",
+    "restaurant": "Los Danzantes (Oaxaca, CDMX)",
+    "email": "oaxaca@losdanzantes.com",
+    "mx_verified": true,
+    "notes": "Fine dining Oaxacan cuisine since 1995"
+  },
+  {
+    "name": "Grupo Contramar",
+    "restaurant": "Contramar, Cala (CDMX)",
+    "email": "mariana@grupocontramar.com",
+    "mx_verified": true,
+    "notes": "Iconic seafood restaurant, Gabriela Camara"
+  },
+  {
+    "name": "Grupo Puerto Madero",
+    "restaurant": "Puerto Madero, PM, Bandoneon, Dale Boca (7 locations)",
+    "email": "contacto@puertomaderorestaurantes.com",
+    "mx_verified": true,
+    "notes": "7 restaurants in Mexico and USA"
+  },
+  {
+    "name": "Cafebreria El Pendulo",
+    "restaurant": "El Pendulo (Condesa, Polanco, Santa Fe, Perisur)",
+    "email": "web@pendulo.com",
+    "mx_verified": true,
+    "notes": "Bookstore-cafe chain, multiple CDMX locations"
+  },
+  {
+    "name": "Grupo Brisas",
+    "restaurant": "Las Brisas, Galeria Plaza, Nizuc (Hotels+Restaurants)",
+    "email": "info@brisas.com.mx",
+    "mx_verified": true,
+    "notes": "Luxury hotel group with restaurant operations"
+  },
+  {
+    "name": "Grupo Presidente",
+    "restaurant": "Au Pied de Cochon, Alfredo di Roma, Chapulin, The Palm (50+ bars/restaurants)",
+    "email": "mexico_reservaciones@grupopresidente.com",
+    "mx_verified": true,
+    "notes": "50+ years, 50+ bars and restaurants in their hotels"
+  },
+  {
+    "name": "Grupo Habita",
+    "restaurant": "Hotel Habita, Downtown Hotel, Casa Habita (boutique hotels+restaurants)",
+    "email": "rafa@grupohabita.mx",
+    "mx_verified": true,
+    "notes": "Boutique hotel pioneer in LATAM with on-site restaurants"
+  },
+  {
+    "name": "Harry's Prime Steakhouse",
+    "restaurant": "Harry's (Cancun, Playa, Acapulco, Polanco)",
+    "email": "contacto@harrys.com.mx",
+    "mx_verified": true,
+    "notes": "Part of Grupo Andersons, premium steakhouse chain"
+  },
+  {
+    "name": "Porfirio's",
+    "restaurant": "Porfirio's (CDMX, Guadalajara, multiple locations)",
+    "email": "contacto@porfirios.com.mx",
+    "mx_verified": true,
+    "notes": "Contemporary Mexican, part of Grupo Andersons"
+  },
+  {
+    "name": "Cielito Querido Cafe",
+    "restaurant": "Cielito Querido (CDMX, national chain)",
+    "email": "datos.personales@cielitoquerido.com.mx",
+    "mx_verified": true,
+    "notes": "Major Mexican coffee chain, 100+ locations"
+  },
+  {
+    "name": "Tierra Garat",
+    "restaurant": "Tierra Garat (CDMX, multiple locations)",
+    "email": "tierragaratmx@gmail.com",
+    "mx_verified": true,
+    "notes": "Coffee + chocolate cafeterias, Polanco/Roma/Condesa"
+  },
+  {
+    "name": "Coco Bongo",
+    "restaurant": "Coco Bongo Show & Disco (Cancun, Playa del Carmen)",
+    "email": "contacto@cocobongo.net",
+    "mx_verified": true,
+    "notes": "Major nightlife/entertainment with food service"
+  },
+  {
+    "name": "Grupo La Mansion",
+    "restaurant": "La Mansion (CDMX, multiple locations)",
+    "email": "esmeralda@lamansion.com.mx",
+    "mx_verified": true,
+    "notes": "Traditional Mexican restaurant chain"
+  },
+  {
+    "name": "Cafe Garat / Sabormex",
+    "restaurant": "Cafe Garat (brand of Sabormex)",
+    "email": "contacto@sabormex.com.mx",
+    "mx_verified": true,
+    "notes": "Coffee brand with cafe operations, national distribution"
+  },
+  {
+    "name": "La Poblanita de Tacubaya",
+    "restaurant": "La Poblanita (CDMX, 2 locations since 1947)",
+    "email": "direccion@poblanita.com.mx",
+    "mx_verified": true,
+    "notes": "Traditional Mexican since 1947, Escandon + San Miguel Chapultepec"
+  },
+  {
+    "name": "Cafe Negro / Grupo Bakal",
+    "restaurant": "Cafe Negro (Coyoacan, CDMX)",
+    "email": "acadena@grupobakal.com",
+    "mx_verified": true,
+    "notes": "Artisan coffee in Coyoacan, Grupo Bakal"
+  },
+  {
+    "name": "Sirloin Stockade Mexico",
+    "restaurant": "Sirloin Stockade (Monterrey, Reynosa, Cancun, Toluca)",
+    "email": "anahuac@sirloinmty.com",
+    "mx_verified": true,
+    "notes": "Buffet chain, multiple locations in northern Mexico"
+  },
+  {
+    "name": "Sirloin Stockade Baja",
+    "restaurant": "Sirloin Stockade (Baja California)",
+    "email": "infosirloin@alcomesa.com",
+    "mx_verified": true,
+    "notes": "Baja California franchise operator"
+  },
+  {
+    "name": "Wings Army",
+    "restaurant": "Wings Army (29 states, national chain)",
+    "email": "albertosantaella@franquiciasmaso.com",
+    "mx_verified": true,
+    "notes": "Wings franchise since 2005 in Guadalajara, 29 states"
+  },
+  {
+    "name": "Restaurante Limosneros",
+    "restaurant": "Limosneros (Centro Historico, CDMX)",
+    "email": "reservacioneslimosneros@gmail.com",
+    "mx_verified": true,
+    "notes": "Contemporary Mexican in Historic Center"
+  },
+  {
+    "name": "Madero Restaurante",
+    "restaurant": "Madero Restaurante (Pachuca, Hidalgo)",
+    "email": "atracciontalentomadero@mrc.mx",
+    "mx_verified": true,
+    "notes": "Family-owned restaurant chain in Hidalgo"
+  },
+  {
+    "name": "La Nacional",
+    "restaurant": "La Nacional (Monterrey, 3 locations)",
+    "email": "contacto@lanacional.mx",
+    "mx_verified": true,
+    "notes": "Premium steakhouse in Monterrey, 3 locations"
+  },
+  {
+    "name": "Chill-Akil",
+    "restaurant": "Chill-Akil (Merida, 3 locations)",
+    "email": "franquicias@chillakil.com.mx",
+    "mx_verified": true,
+    "notes": "Breakfast chain specializing in chilaquiles, Merida"
+  },
+  {
+    "name": "Italiannis Mexico",
+    "restaurant": "Italiannis (national chain, 100+ locations)",
+    "email": "ch_aeropuertoT1@chilismexico.com.mx",
+    "mx_verified": true,
+    "notes": "Same operator as Chilis Mexico (Italcafe), 100+ locations"
+  },
+  {
+    "name": "Chili's Mexico",
+    "restaurant": "Chili's Grill & Bar Mexico (national chain)",
+    "email": "contacto@chilismexico.com.mx",
+    "mx_verified": true,
+    "notes": "Major casual dining chain, Italcafe operator"
+  },
+  {
+    "name": "Grupo Andersons",
+    "restaurant": "Senor Frog's, Carlos'n Charlie's, Harry's, Porfirio's",
+    "email": "ventas@andermail.com",
+    "mx_verified": true,
+    "notes": "Largest restaurant group in Mexico, multiple brands"
+  },
+  {
+    "name": "Potzollcalli Banquetes",
+    "restaurant": "Potzollcalli Banquetes/Events",
+    "email": "banquetes@potzollcalli.com",
+    "mx_verified": true,
+    "notes": "Events department of 25-location chain"
+  },
+  {
+    "name": "Rosetta - HR",
+    "restaurant": "Rosetta group (CDMX)",
+    "email": "rh@rrosetta.com.mx",
+    "mx_verified": true,
+    "notes": "Alternative contact for Rosetta group"
+  },
+  {
+    "name": "La Parroquia de Veracruz",
+    "restaurant": "La Parroquia (Veracruz, CDMX, Yucatan)",
+    "email": "grancafedelaparroquia@outlook.com",
+    "mx_verified": true,
+    "notes": "Iconic cafe chain from Veracruz, multiple cities"
+  },
+  {
+    "name": "Cafe Avellaneda",
+    "restaurant": "Cafe Avellaneda (Coyoacan, CDMX)",
+    "email": "avellanedakf@gmail.com",
+    "mx_verified": true,
+    "notes": "Award-winning specialty coffee in Coyoacan"
+  },
+  {
+    "name": "Fisher's Catering",
+    "restaurant": "Fisher's Catering/Events",
+    "email": "agabucio@fishers.com.mx",
+    "mx_verified": true,
+    "notes": "Events/catering arm of Grupo Fisher's"
+  },
+  {
+    "name": "Grupo Contramar - Catering",
+    "restaurant": "Contramar Catering (CDMX)",
+    "email": "catering@grupocontramar.com",
+    "mx_verified": true,
+    "notes": "Catering arm of iconic seafood restaurant"
+  },
+  {
+    "name": "Grupo Presidente - Hotels",
+    "restaurant": "InterContinental, Holiday Inn restaurants",
+    "email": "mexico_reservaciones@grupopresidente.com.mx",
+    "mx_verified": true,
+    "notes": "Hotel-restaurant division (alternate domain)"
+  },
+  {
+    "name": "Rosetta - Events",
+    "restaurant": "Rosetta Events (CDMX)",
+    "email": "eventos@rrosetta.com.mx",
+    "mx_verified": true,
+    "notes": "Events department of World's 50 Best restaurant"
+  },
+  {
+    "name": "Toks Social",
+    "restaurant": "Toks (257 restaurants)",
+    "email": "responsabilidadsocial@toks.com.mx",
+    "mx_verified": true,
+    "notes": "Alternative contact for Toks/GRG chain"
+  },
+  {
+    "name": "La Casa de Tono",
+    "restaurant": "La Casa de Tono (CDMX chain, 20+ locations)",
+    "email": "contacto@lacasadetono.mx",
+    "mx_verified": true,
+    "notes": "Popular pozole/Mexican food chain in CDMX"
+  },
+  {
+    "name": "Lomas Hospitality",
+    "restaurant": "Grupo Lomas Hotels + Restaurants (Cancun)",
+    "email": "bookwithus@lomashospitality.com",
+    "mx_verified": true,
+    "notes": "Hotel+restaurant group in Cancun/Riviera Maya"
+  },
+  {
+    "name": "Grupo Costeno - RH",
+    "restaurant": "Mochomos, brands (HR contact)",
+    "email": "rh@grupocosteno.com",
+    "mx_verified": true,
+    "notes": "HR department of 9-brand restaurant group"
+  },
+  {
+    "name": "Grupo Andersons - Corporate",
+    "restaurant": "All Grupo Andersons brands",
+    "email": "rodrigo.prado@andermail.com",
+    "mx_verified": true,
+    "notes": "Corporate contact at Mexico's largest restaurant group"
+  },
+  {
+    "name": "Grupo Rosetta - Facturas",
+    "restaurant": "Rosetta billing",
+    "email": "facturas@rrosetta.com.mx",
+    "mx_verified": true,
+    "notes": "Billing department - good entry point"
+  },
+  {
+    "name": "Grupo RosaNegra - Madrid/Intl",
+    "restaurant": "RosaNegra International",
+    "email": "ventasmadrid@gruporosanegra.com.mx",
+    "mx_verified": true,
+    "notes": "International sales team - shows scale"
+  },
+  {
+    "name": "Cielito Querido Cafe - Alt",
+    "restaurant": "Cielito Querido corporate",
+    "email": "contacto@cielitoquerido.com.mx",
+    "mx_verified": true,
+    "notes": "General contact for major coffee chain"
+  },
+  {
+    "name": "Cafe Garat - Exports",
+    "restaurant": "Cafe Garat / Sabormex exports",
+    "email": "exportaciones@sabormex.com.mx",
+    "mx_verified": true,
+    "notes": "Export division shows B2B orientation"
+  },
+  {
+    "name": "Grupo Carolo - Corporate",
+    "restaurant": "Carolo restaurants (Monterrey, CDMX)",
+    "email": "info@grupocarolo.com.mx",
+    "mx_verified": true,
+    "notes": "Corporate info for gastronomy group"
+  },
+  {
+    "name": "Cafebreria El Pendulo - Mgmt",
+    "restaurant": "El Pendulo (Condesa, Polanco, etc)",
+    "email": "liliana.dominguez@pendulo.com",
+    "mx_verified": true,
+    "notes": "Management contact at bookstore-cafe chain"
+  },
+  {
+    "name": "La Mansion - Service",
+    "restaurant": "La Mansion restaurants (CDMX)",
+    "email": "atencion@lamansion.com.mx",
+    "mx_verified": true,
+    "notes": "Customer service for La Mansion chain"
+  }
+]
