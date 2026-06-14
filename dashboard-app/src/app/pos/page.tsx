@@ -95,6 +95,7 @@ import {
   Flame,
   Armchair,
   Tag,
+  ArrowRightLeft,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -2138,6 +2139,7 @@ function POSContent() {
                 { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
                 { href: '/pos/facturacion', icon: Stamp, label: 'Facturacion', section: 'facturacion' },
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
+                { href: '/pos/configuracion', icon: Settings, label: 'Configuracion', section: 'configuracion' },
               ].filter(item => canSee(item.section)).map(item => (
                 <Link
                   key={item.href}
@@ -2411,6 +2413,24 @@ function POSContent() {
                 title="Reimprimir ticket"
               >
                 <Printer size={18} />
+              </button>
+              <button
+                onClick={() => {
+                  if (orderItems.length === 0) return
+                  const input = window.prompt('Transferir a mesa #:')
+                  if (!input) return
+                  const newMesa = parseInt(input, 10)
+                  if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
+                  const oldMesa = mesa
+                  setMesa(newMesa)
+                  logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
+                  showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)
+                }}
+                disabled={orderItems.length === 0}
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-sky-900/30 hover:bg-sky-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-sky-400 transition-colors"
+                title="Transferir mesa"
+              >
+                <ArrowRightLeft size={18} />
               </button>
               <button
                 onClick={() => setShowVoidOrder(true)}
