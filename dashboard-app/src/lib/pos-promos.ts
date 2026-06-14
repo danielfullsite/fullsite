@@ -75,21 +75,30 @@ export function clearPromoCache() {
 /** Is this promo active right now (day + time + date range)? */
 function isActiveNow(p: Promotion): boolean {
   if (!p.active) return false
+
+  // schedule may come as JSON string from Supabase
+  const sched = typeof p.schedule === 'string' ? (() => { try { return JSON.parse(p.schedule) } catch { return {} } })() : (p.schedule || {})
+  const days: number[] = Array.isArray(sched.days) ? sched.days : []
+  const startDate: string = sched.start_date || ''
+  const endDate: string = sched.end_date || ''
+  const startTime: string = sched.start_time || ''
+  const endTime: string = sched.end_time || ''
+
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
   const dayOfWeek = now.getDay() // 0=Dom
 
   // Date range
-  if (p.schedule.start_date && today < p.schedule.start_date) return false
-  if (p.schedule.end_date && today > p.schedule.end_date) return false
+  if (startDate && today < startDate) return false
+  if (endDate && today > endDate) return false
 
   // Day of week (empty = all days)
-  if (p.schedule.days.length > 0 && !p.schedule.days.includes(dayOfWeek)) return false
+  if (days.length > 0 && !days.includes(dayOfWeek)) return false
 
   // Time window (empty = all day)
-  if (p.schedule.start_time && p.schedule.end_time) {
+  if (startTime && endTime) {
     const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    if (hhmm < p.schedule.start_time || hhmm > p.schedule.end_time) return false
+    if (hhmm < startTime || hhmm > endTime) return false
   }
 
   return true
