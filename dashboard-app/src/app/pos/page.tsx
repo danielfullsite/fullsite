@@ -1353,6 +1353,11 @@ function POSContent() {
     } catch { /* */ }
   }, [])
 
+  // Mobile device detection — meseros en celular solo pueden tomar orden + enviar a cocina
+  const isMobileDevice = typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent))
+  const isMobileRestricted = isMobileDevice && (staffRole === 'mesero' || staffRole === 'barra')
+  // Mobile-restricted users cannot: cobrar, cancelar, descontar, corte, abrir cajón
+
   // Role permissions — granular system (50+ permissions per Wansoft parity)
   const _perms = (() => {
     try {
@@ -2029,6 +2034,7 @@ function POSContent() {
               {mpConfig ? 'Point' : 'MP'}
             </button>
             {staffName && <span className="text-xs text-emerald-400">{staffName}</span>}
+            {isMobileRestricted && <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Solo ordenes</span>}
             <div className="flex items-center gap-1">
               <Clock size={14} />
               <span className="text-xs font-mono">{clock}</span>
@@ -2351,9 +2357,9 @@ function POSContent() {
             <div className="flex items-center gap-1.5 mb-1.5">
               <button
                 onClick={() => setShowDiscount(true)}
-                disabled={orderItems.length === 0}
+                disabled={orderItems.length === 0 || isMobileRestricted}
                 className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
-                title="Aplicar descuento"
+                title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Aplicar descuento'}
               >
                 <Percent size={16} />
                 {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
@@ -2382,9 +2388,10 @@ function POSContent() {
                 />
               </div>
               <button
-                onClick={() => { openCashDrawer(); showToast('Cajón abierto') }}
-                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 text-[var(--text-3)] transition-colors"
-                title="Abrir cajón"
+                onClick={() => { if (!isMobileRestricted) { openCashDrawer(); showToast('Cajón abierto') } }}
+                disabled={isMobileRestricted}
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
               >
                 <Banknote size={18} />
               </button>
@@ -2474,18 +2481,20 @@ function POSContent() {
             </button>
             <button
               onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
-              disabled={activeItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving || isMobileRestricted}
               className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
-              disabled={activeItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving || isMobileRestricted}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
             >
               <CreditCard size={18} />
-              Cobrar
+              {isMobileRestricted ? 'Solo caja' : 'Cobrar'}
             </button>
           </div>
         </div>
