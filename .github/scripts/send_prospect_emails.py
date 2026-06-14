@@ -42,6 +42,12 @@ DEFAULT_PROSPECTS = [
     {"name": "Equipo Hunan", "restaurant": "Grupo Hunan", "email": "contacto@grupohunan.com"},
     {"name": "Equipo Pangea", "restaurant": "Grupo Pangea", "email": "pangea@grupopangea.com"},
     {"name": "Equipo Sonora Grill", "restaurant": "Sonora Grill Group", "email": "contacto@sggroup.com.mx"},
+    {"name": "Equipo Costeño", "restaurant": "Grupo Costeño (Mochomos)", "email": "contacto@grupocosteno.com"},
+    {"name": "Equipo Toks", "restaurant": "Grupo Restaurantero Gigante (Toks)", "email": "contacto@grg.mx"},
+    {"name": "Equipo Punta del Cielo", "restaurant": "Café Punta del Cielo", "email": "pedidos@puntadelcielo.com.mx"},
+    {"name": "Equipo Carolo", "restaurant": "Grupo Carolo", "email": "contacto@grupocarolo.com.mx"},
+    {"name": "Equipo Anderson's", "restaurant": "Grupo Anderson's", "email": "contacto@grupoandersons.com"},
+    {"name": "Equipo Origo", "restaurant": "Grupo Origo", "email": "contacto@grupoorigo.mx"},
 ]
 
 
