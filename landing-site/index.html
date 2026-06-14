@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fullsite — IA Operativa para Restaurantes | POS + Copiloto IA</title>
-<meta name="description" content="El primer POS con IA que te dice que hacer — ahora, no en el reporte de fin de mes. Briefings, alertas, anti-fraude, menu engineering y WhatsApp bot.">
+<title>Fullsite — POS + IA para Restaurantes</title>
+<meta name="description" content="El primer POS con IA que te dice qué hacer — ahora, no en el reporte de fin de mes. Briefings, alertas, anti-fraude, menu engineering y WhatsApp bot.">
 <meta name="keywords" content="POS restaurante, sistema punto de venta, IA restaurantes, software restaurante Mexico, copiloto IA, gestion restaurante">
 
 <!-- Open Graph -->
-<meta property="og:title" content="Fullsite — IA Operativa para Restaurantes">
+<meta property="og:title" content="Fullsite — POS + IA para Restaurantes">
 <meta property="og:description" content="POS + Copiloto IA que opera tu restaurante 24/7. Alertas, briefings, anti-fraude y predicciones.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fullsite.mx/">
 <meta property="og:locale" content="es_MX">
 <meta property="og:site_name" content="Fullsite">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Fullsite — IA Operativa para Restaurantes">
+<meta name="twitter:title" content="Fullsite — POS + IA para Restaurantes">
 <meta name="twitter:description" content="POS + Copiloto IA que opera tu restaurante 24/7. Alertas, briefings, anti-fraude y predicciones.">
 <link rel="canonical" href="https://fullsite.mx/">
 
@@ -36,7 +36,7 @@
   "contactPoint": {
     "@type": "ContactPoint",
     "contactType": "sales",
-    "url": "https://wa.me/528112741000"
+    "url": "https://wa.me/528115324371"
   }
 }
 </script>
@@ -151,1285 +151,1089 @@
 }
 </script>
 
-<!-- PWA -->
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0a0a0b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fullsite">
-<link rel="apple-touch-icon" href="/pwa/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/pwa/icons/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/pwa/icons/favicon-16.png">
-
+<!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500;1,9..144,700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
-/* === RESET === */
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1a1a1a;
+  background: #ffffff;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; height: auto; display: block; }
+ul { list-style: none; }
 
-/* === DESIGN SYSTEM TOKENS === */
-:root{
-  --bg:#0a0a0b;
-  --bg-1:#0f0f10;
-  --bg-2:#131315;
-  --bg-3:#1a1a1d;
-  --bg-4:#222226;
-  --bg-light:#fafaf7;
-  --bg-light-1:#f3f3ee;
-  --bg-light-2:#e8e8e1;
-  --ink:#ffffff;
-  --ink-1:rgba(255,255,255,0.86);
-  --ink-2:rgba(255,255,255,0.62);
-  --ink-3:rgba(255,255,255,0.42);
-  --ink-4:rgba(255,255,255,0.16);
-  --ink-dark:#0a0a0b;
-  --ink-dark-2:rgba(10,10,11,0.62);
-  --line:rgba(255,255,255,0.06);
-  --line-2:rgba(255,255,255,0.10);
-  --line-3:rgba(255,255,255,0.18);
-  --line-light:rgba(10,10,11,0.08);
-  --line-light-2:rgba(10,10,11,0.14);
-  --accent:#00ff88;
-  --accent-2:#00d67a;
-  --accent-dim:rgba(0,255,136,0.12);
-  --accent-soft:rgba(0,255,136,0.06);
-  --accent-glow:rgba(0,255,136,0.4);
-  --coral:#ff6b4a;
-  --amber:#ffc857;
-  --violet:#8b5cf6;
-  --wa-green:#075e54;
-  --wa-body:#ece5dd;
-  --wa-out:#dcf8c6;
-  --sans:'Geist',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
-  --serif:'Fraunces','Times New Roman',serif;
-  --mono:'Geist Mono',ui-monospace,monospace;
-  --max:1280px;
-  --pad:32px;
-  --ease-out-quint:cubic-bezier(0.22,1,0.36,1);
-  --ease-spring:cubic-bezier(0.16,1,0.3,1);
-  --ease-soft:cubic-bezier(0.4,0,0.2,1);
+/* ===== UTILITIES ===== */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 96px 0; }
+.section-sm { padding: 64px 0; }
+.text-center { text-align: center; }
+
+/* ===== REVEAL ANIMATION ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-body{
-  font-family:var(--sans);background:var(--bg);color:var(--ink-1);
-  overflow-x:hidden;font-size:17px;line-height:1.55;
-  font-feature-settings:'ss01','cv01','cv02';
+/* ===== NAV ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e5e5;
+  height: 64px;
 }
-a{color:inherit;text-decoration:none;}
-img{display:block;max-width:100%;}
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+.nav-logo {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0a0a0a;
+  letter-spacing: -0.5px;
+}
+.nav-logo sup {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: #10b981;
+  border-radius: 2px;
+  vertical-align: super;
+  margin-left: 1px;
+  position: relative;
+  top: -2px;
+}
+.nav-links {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+.nav-links a {
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: #0a0a0a; }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.nav-portal {
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  transition: color 0.2s;
+}
+.nav-portal:hover { color: #0a0a0a; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+.btn-primary {
+  background: #10b981;
+  color: #fff;
+}
+.btn-primary:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+.btn-outline {
+  background: transparent;
+  color: #1a1a1a;
+  border: 1.5px solid #d1d5db;
+}
+.btn-outline:hover { border-color: #10b981; color: #10b981; }
+.btn-lg { padding: 14px 28px; font-size: 15px; border-radius: 10px; }
+.btn-white {
+  background: #fff;
+  color: #0a0a0a;
+  font-weight: 600;
+}
+.btn-white:hover { background: #f0fdf4; transform: translateY(-1px); }
+.btn-ghost-white {
+  background: transparent;
+  color: rgba(255,255,255,0.8);
+  border: 1.5px solid rgba(255,255,255,0.3);
+}
+.btn-ghost-white:hover { border-color: #fff; color: #fff; }
 
-/* === COVER === */
-#cover{
-  position:fixed;inset:0;z-index:100;background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  transition:opacity .8s var(--ease-out-quint),visibility .8s;
+/* Hamburger */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 4px;
 }
-#cover.exit{opacity:0;visibility:hidden;pointer-events:none;}
-.cover-logo{display:flex;align-items:center;gap:0;user-select:none;}
-.cover-letter{
-  font-family:var(--sans);font-size:clamp(48px,10vw,96px);font-weight:700;
-  letter-spacing:-0.03em;color:var(--ink);
-  opacity:0;filter:blur(8px);
-  animation:coverIn .6s var(--ease-spring) forwards;
-}
-.cover-letter:nth-child(1){animation-delay:.1s}
-.cover-letter:nth-child(2){animation-delay:.16s}
-.cover-letter:nth-child(3){animation-delay:.22s}
-.cover-letter:nth-child(4){animation-delay:.28s}
-.cover-letter:nth-child(5){animation-delay:.34s}
-.cover-letter:nth-child(6){animation-delay:.4s}
-.cover-letter:nth-child(7){animation-delay:.46s}
-.cover-letter:nth-child(8){animation-delay:.52s}
-.cover-dot{
-  width:clamp(10px,2vw,18px);height:clamp(10px,2vw,18px);
-  background:var(--accent);border-radius:2px;
-  margin-left:2px;margin-bottom:clamp(8px,1.5vw,14px);
-  opacity:0;transform:scale(0);
-  animation:dotIn .5s var(--ease-spring) .7s forwards;
-  box-shadow:0 0 20px var(--accent-glow),0 0 60px rgba(0,255,136,0.15);
-  position:relative;
-}
-.cover-dot::after{
-  content:'';position:absolute;inset:-6px;border-radius:4px;
-  border:1.5px solid rgba(0,255,136,0.3);
-  opacity:0;animation:ringPulse 2s ease-in-out 1.2s infinite;
-}
-.cover-tagline{
-  font-size:clamp(13px,1.4vw,16px);color:var(--ink-3);letter-spacing:0.08em;
-  text-transform:uppercase;margin-top:24px;
-  opacity:0;animation:fadeUp .5s var(--ease-spring) .9s forwards;
-}
-@keyframes coverIn{to{opacity:1;filter:blur(0);}}
-@keyframes dotIn{to{opacity:1;transform:scale(1);}}
-@keyframes ringPulse{0%,100%{opacity:0;transform:scale(1);}50%{opacity:1;transform:scale(1.4);}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-
-/* === NAV === */
-#nav{
-  position:fixed;top:0;left:0;right:0;z-index:90;
-  height:64px;display:flex;align-items:center;
-  padding:0 var(--pad);
-  background:rgba(10,10,11,0.72);backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
-  border-bottom:1px solid var(--line);
-  opacity:0;transform:translateY(-10px);
-  transition:opacity .5s var(--ease-spring),transform .5s var(--ease-spring);
-}
-#nav.visible{opacity:1;transform:translateY(0);}
-.nav-inner{width:100%;max-width:var(--max);margin:0 auto;display:flex;align-items:center;justify-content:space-between;}
-.nav-logo{display:flex;align-items:center;gap:0;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--ink);}
-.nav-logo .dot{width:8px;height:8px;background:var(--accent);border-radius:2px;margin-left:1px;margin-bottom:4px;box-shadow:0 0 12px var(--accent-glow);}
-.nav-links{display:flex;align-items:center;gap:6px;}
-.nav-links a{font-size:14px;font-weight:450;color:var(--ink-2);padding:6px 12px;border-radius:8px;transition:color .2s;}
-.nav-links a:hover{color:var(--ink);}
-.nav-right{display:flex;align-items:center;gap:12px;}
-.nav-login{font-size:14px;font-weight:450;color:var(--ink-2);transition:color .2s;}
-.nav-login:hover{color:var(--ink);}
-.nav-cta{
-  font-size:14px;font-weight:500;color:var(--ink-dark);background:var(--ink);
-  padding:8px 20px;border-radius:99px;transition:all .2s var(--ease-soft);
-}
-.nav-cta:hover{background:var(--accent);box-shadow:0 4px 20px var(--accent-glow);}
-.nav-hamburger{display:none;background:none;border:none;cursor:pointer;padding:8px;}
-.nav-hamburger span{display:block;width:20px;height:2px;background:var(--ink);margin:4px 0;transition:all .2s;}
-
-/* === SHARED === */
-.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--pad);}
-section{padding:120px 0;}
-.eyebrow{
-  font-size:12px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;
-  color:var(--ink-3);display:flex;align-items:center;gap:8px;margin-bottom:20px;
-}
-.eyebrow::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:1px;}
-h1,h2,h3{font-weight:500;letter-spacing:-0.03em;line-height:1.05;}
-h2.display{font-size:clamp(36px,5.6vw,64px);}
-h2.display em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
-.section-divider{height:1px;background:var(--line);position:relative;}
-.section-divider::after{
-  content:'';position:absolute;left:50%;top:-1px;transform:translateX(-50%);
-  width:200px;height:3px;background:var(--accent);filter:blur(8px);opacity:.5;
-}
-
-/* scroll reveal */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease-spring),transform .7s var(--ease-spring);}
-.reveal.visible{opacity:1;transform:translateY(0);}
-.rd1{transition-delay:.08s}.rd2{transition-delay:.16s}.rd3{transition-delay:.24s}.rd4{transition-delay:.32s}.rd5{transition-delay:.4s}.rd6{transition-delay:.48s}
-
-/* === HERO === */
-#hero{padding-top:140px;padding-bottom:80px;}
-.hero-badge{
-  display:inline-flex;align-items:center;gap:8px;
-  background:var(--bg-2);border:1px solid var(--line-2);border-radius:99px;
-  padding:6px 16px 6px 10px;margin-bottom:28px;
-}
-.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:pulse 2s ease-in-out infinite;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.hero-badge span{font-size:13px;color:var(--ink-2);}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;}
-.hero-copy h1{
-  font-size:clamp(36px,4.8vw,56px);font-weight:500;letter-spacing:-0.03em;
-  line-height:1.08;color:var(--ink);margin-bottom:24px;
-}
-.hero-copy h1 em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
-.hero-sub{font-size:18px;color:var(--ink-2);line-height:1.6;max-width:480px;margin-bottom:32px;}
-.hero-ctas{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-.btn-primary{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:14px 28px;background:var(--accent);color:var(--ink-dark);
-  font-weight:600;font-size:15px;border-radius:99px;
-  box-shadow:0 0 24px var(--accent-glow);
-  transition:all .25s var(--ease-soft);
-}
-.btn-primary:hover{background:var(--accent-2);transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-glow);}
-.btn-secondary{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:14px 24px;color:var(--ink-2);font-weight:500;font-size:15px;
-  border-radius:99px;border:1px solid var(--line-3);
-  background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);
-  transition:all .2s;
-}
-.btn-secondary:hover{color:var(--ink);border-color:var(--ink-4);background:rgba(255,255,255,0.06);}
-
-/* Dashboard mockup */
-.hero-mockup{
-  background:var(--bg-2);border:1px solid var(--line-2);border-radius:20px;
-  overflow:hidden;position:relative;
-}
-.mockup-chrome{
-  display:flex;align-items:center;gap:6px;padding:12px 16px;
-  background:var(--bg-3);border-bottom:1px solid var(--line);
-}
-.mockup-dot-r{width:8px;height:8px;border-radius:50%;background:var(--coral);opacity:.7;}
-.mockup-dot-y{width:8px;height:8px;border-radius:50%;background:var(--amber);opacity:.7;}
-.mockup-dot-g{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.7;}
-.mockup-body{padding:20px;}
-.mockup-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
-.mockup-kpi{background:var(--bg-3);border:1px solid var(--line);border-radius:12px;padding:14px;}
-.mockup-kpi-label{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
-.mockup-kpi-val{font-size:20px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
-.mockup-signals{display:flex;flex-direction:column;gap:8px;}
-.signal-card{
-  display:flex;align-items:center;gap:10px;padding:10px 14px;
-  border-radius:10px;border:1px solid var(--line);font-size:13px;
-}
-.signal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.signal-coral .signal-dot{background:var(--coral);}
-.signal-amber .signal-dot{background:var(--amber);}
-.signal-green .signal-dot{background:var(--accent);}
-.signal-card span{color:var(--ink-2);}
-
-/* Floating pills */
-.hero-pills{
-  display:flex;flex-wrap:wrap;gap:8px;margin-top:-10px;padding:0 20px 20px;
-}
-.pill{
-  font-size:12px;font-weight:500;color:var(--ink-2);
-  background:var(--bg-3);border:1px solid var(--line);
-  padding:6px 14px;border-radius:99px;
-  white-space:nowrap;
+.hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #0a0a0a;
+  border-radius: 2px;
+  transition: all 0.3s;
 }
 
-/* Stats row */
-.hero-stats{
-  display:flex;gap:40px;margin-top:48px;padding-top:32px;
-  border-top:1px solid var(--line);
+/* ===== HERO ===== */
+.hero {
+  padding-top: 140px;
+  padding-bottom: 80px;
+  background: #fff;
 }
-.hero-stat{display:flex;flex-direction:column;gap:4px;}
-.hero-stat-val{font-size:clamp(20px,2.5vw,28px);font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;}
-.hero-stat-label{font-size:12px;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.06em;}
-
-/* Incluye row */
-.hero-incluye{
-  display:flex;gap:24px;flex-wrap:wrap;margin-top:32px;
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
 }
-.hero-inc-item{
-  font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:6px;
+.hero-eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 16px;
 }
-.hero-inc-item::before{content:'';width:4px;height:4px;background:var(--accent);border-radius:1px;}
-
-/* === WHATSAPP SECTION === */
-#whatsapp{background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.wa-header{text-align:center;max-width:640px;margin:0 auto 48px;}
-.wa-header p{font-size:17px;color:var(--ink-2);margin-top:16px;line-height:1.6;}
-.wa-tabs{display:flex;gap:4px;justify-content:center;margin-bottom:48px;flex-wrap:wrap;}
-.wa-tab{
-  font-size:14px;font-weight:500;color:var(--ink-3);
-  padding:10px 20px;border-radius:99px;cursor:pointer;
-  border:1px solid transparent;transition:all .2s;background:none;font-family:var(--sans);
+.hero-heading {
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #0a0a0a;
+  letter-spacing: -1px;
+  margin-bottom: 20px;
 }
-.wa-tab:hover{color:var(--ink-2);}
-.wa-tab.active{color:var(--ink);background:var(--bg-3);border-color:var(--line-2);}
-.wa-panels{position:relative;min-height:480px;}
-.wa-panel{
-  display:none;grid-template-columns:1fr 1fr;gap:64px;align-items:center;
+.hero-sub {
+  font-size: 17px;
+  color: #6b7280;
+  line-height: 1.7;
+  margin-bottom: 32px;
+  max-width: 480px;
 }
-.wa-panel.active{display:grid;}
-.wa-panel-copy h3{font-size:clamp(24px,3vw,32px);font-weight:500;letter-spacing:-0.03em;color:var(--ink);margin-bottom:12px;}
-.wa-panel-copy p{font-size:16px;color:var(--ink-2);line-height:1.6;margin-bottom:20px;}
-.wa-features{display:flex;flex-direction:column;gap:10px;}
-.wa-feature{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2);}
-.wa-feature::before{content:'';width:16px;height:16px;border-radius:50%;background:var(--accent-dim);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-
-/* WhatsApp phone */
-.wa-phone{
-  width:320px;margin:0 auto;background:#111b21;border-radius:36px;
-  padding:12px;box-shadow:0 24px 64px rgba(0,0,0,.4);
+.hero-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.wa-phone-screen{border-radius:24px;overflow:hidden;}
-.wa-phone-header{
-  background:var(--wa-green);padding:14px 16px;
-  display:flex;align-items:center;gap:10px;
-}
-.wa-phone-avatar{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;}
-.wa-phone-name{font-size:14px;font-weight:600;color:#fff;}
-.wa-phone-body{background:var(--wa-body);padding:16px 12px;min-height:340px;display:flex;flex-direction:column;gap:8px;}
-.wa-msg{
-  max-width:85%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;
-  position:relative;
-}
-.wa-in{background:#fff;color:#111;align-self:flex-start;border-top-left-radius:4px;}
-.wa-out{background:var(--wa-out);color:#111;align-self:flex-end;border-top-right-radius:4px;}
-.wa-time{font-size:10px;color:rgba(0,0,0,0.4);text-align:right;margin-top:2px;}
-.wa-bar{
-  height:6px;border-radius:3px;margin:3px 0;
+.hero-img {
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
 }
 
-/* === CALLOUT === */
-#callout{padding:80px 0;text-align:center;}
-#callout p{
-  font-family:var(--serif);font-style:italic;font-weight:400;
-  font-size:clamp(24px,3.6vw,40px);line-height:1.3;
-  color:var(--ink-2);max-width:800px;margin:0 auto;
+/* ===== LOGOS STRIP ===== */
+.logos-strip {
+  background: #f9f9f9;
+  padding: 40px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
 }
-#callout p em{color:var(--accent);font-weight:500;}
+.logos-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+.logos-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+.logos-row img {
+  height: 28px;
+  width: auto;
+  filter: grayscale(100%) opacity(0.4);
+  transition: filter 0.3s;
+}
+.logos-row img:hover {
+  filter: grayscale(0%) opacity(1);
+}
+.logo-placeholder {
+  font-size: 16px;
+  font-weight: 700;
+  color: #c0c0c0;
+  transition: color 0.3s;
+  user-select: none;
+}
+.logo-placeholder:hover { color: #555; }
 
-/* === BENTO GRID === */
-#bento{background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.bento-header{text-align:center;max-width:600px;margin:0 auto 48px;}
-.bento-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;}
-.bento-card{
-  background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015));
-  border:1px solid var(--line);border-radius:20px;
-  padding:28px;position:relative;overflow:hidden;
-  transition:transform .3s var(--ease-spring),border-color .3s;
+/* ===== FEATURES ===== */
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+  padding: 80px 0;
 }
-.bento-card:hover{transform:translateY(-2px);border-color:var(--line-2);}
-.bento-card:hover::before{opacity:1;}
-.bento-card::before{
-  content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
-  background:var(--accent);filter:blur(4px);opacity:0;transition:opacity .3s;
+.feature-row + .feature-row {
+  border-top: 1px solid #f0f0f0;
 }
-.bento-card .eyebrow{margin-bottom:12px;}
-.bento-card h3{font-size:20px;font-weight:500;letter-spacing:-0.02em;color:var(--ink);margin-bottom:8px;}
-.bento-card p{font-size:14px;color:var(--ink-2);line-height:1.5;}
-.b-4{grid-column:span 4;}.b-2{grid-column:span 2;}.b-3{grid-column:span 3;}
-
-/* Mini chart visuals in bento */
-.bento-bars{display:flex;align-items:flex-end;gap:6px;height:80px;margin-top:16px;}
-.bento-bar{flex:1;border-radius:4px 4px 0 0;transition:height .5s var(--ease-spring);}
-.bento-bar-labels{display:flex;gap:6px;margin-top:4px;}
-.bento-bar-labels span{flex:1;font-size:10px;color:var(--ink-3);text-align:center;}
-
-/* === HOW IT WORKS === */
-#how{background:var(--bg);}
-.how-header{text-align:center;max-width:560px;margin:0 auto 56px;}
-.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
-.how-card{
-  background:var(--bg-2);border:1px solid var(--line);border-radius:20px;
-  padding:32px;text-align:center;
+.feature-row.reverse .feature-text { order: 1; }
+.feature-row.reverse .feature-visual { order: 2; }
+.feature-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+  background: #f0fdf4;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.how-num{
-  font-family:var(--serif);font-style:italic;font-size:48px;font-weight:300;
-  color:var(--accent);line-height:1;margin-bottom:16px;
+.feature-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #0a0a0a;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
 }
-.how-card h3{font-size:18px;font-weight:500;letter-spacing:-0.02em;color:var(--ink);margin-bottom:8px;}
-.how-card p{font-size:14px;color:var(--ink-2);line-height:1.5;}
-
-/* === CAPABILITIES (light section) === */
-#capabilities{background:var(--bg-light);color:var(--ink-dark);}
-#capabilities .eyebrow{color:var(--ink-dark-2);}
-#capabilities .eyebrow::before{background:var(--accent-2);}
-#capabilities h2.display{color:var(--ink-dark);}
-#capabilities h2.display em{color:var(--accent-2);}
-.cap-header{text-align:center;max-width:560px;margin:0 auto 48px;}
-.cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.cap-card{
-  background:#fff;border:1px solid var(--line-light);border-radius:20px;
-  padding:28px;transition:transform .2s,box-shadow .2s;
+.feature-desc {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.7;
+  margin-bottom: 24px;
 }
-.cap-card:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.06);}
-.cap-icon{
-  width:44px;height:44px;border-radius:12px;
-  background:rgba(0,214,122,0.08);border:1px solid rgba(0,214,122,0.15);
-  display:flex;align-items:center;justify-content:center;font-size:20px;
-  margin-bottom:16px;
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.cap-card h3{font-size:16px;font-weight:600;color:var(--ink-dark);margin-bottom:6px;letter-spacing:-0.01em;}
-.cap-card p{font-size:14px;color:var(--ink-dark-2);line-height:1.55;}
-
-/* === STATS (dark) === */
-#stats-section{background:var(--bg);}
-.stats-card{
-  border:1px solid var(--line-2);border-radius:20px;
-  padding:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:32px;
-  text-align:center;
+.feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #4b5563;
 }
-.stat-big{font-size:clamp(36px,4.5vw,56px);font-weight:500;letter-spacing:-0.03em;color:var(--ink);font-variant-numeric:tabular-nums;}
-.stat-big em{font-family:var(--serif);font-style:italic;color:var(--accent);}
-.stat-desc{font-size:14px;color:var(--ink-2);margin-top:4px;}
-
-/* === SOLUCIONES === */
-#soluciones{background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.sol-header{text-align:center;max-width:560px;margin:0 auto 48px;}
-.sol-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
-.sol-card{
-  background:var(--bg-2);border:1px solid var(--line);border-radius:20px;
-  padding:24px;text-align:center;transition:transform .2s,border-color .2s;
+.feature-list li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  background: #f0fdf4;
+  border-radius: 50%;
+  margin-top: 1px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2310b981'%3E%3Cpath fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-size: 14px;
+  background-repeat: no-repeat;
+  background-position: center;
 }
-.sol-card:hover{transform:translateY(-2px);border-color:var(--line-2);}
-.sol-icon{font-size:28px;margin-bottom:12px;display:block;}
-.sol-card h3{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;}
-.sol-card p{font-size:13px;color:var(--ink-2);line-height:1.45;margin-bottom:12px;}
-.sol-link{font-size:13px;font-weight:600;color:var(--accent);}
-
-/* === PRICING === */
-#pricing{background:var(--bg);}
-.pricing-layout{max-width:960px;margin:0 auto;text-align:center;}
-.pricing-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:2rem;}
-@media(max-width:768px){.pricing-grid-3{grid-template-columns:1fr;}}
-.pricing-card{
-  background:var(--bg-2);overflow:hidden;position:relative;
+.feature-img {
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.06);
 }
-.pricing-card.featured{background:var(--bg-3,#0e1117);}
-.pricing-card.featured::before{
-  content:'MAS POPULAR';position:absolute;top:-1px;left:50%;transform:translateX(-50%);
-  font-size:11px;font-weight:700;letter-spacing:0.12em;color:var(--ink-dark);
-  background:var(--accent);padding:4px 16px;border-radius:0 0 8px 8px;
+.feature-icon-box {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
-.pricing-inner{padding:40px 32px 32px;}
-.pricing-name{font-size:13px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px;}
-.pricing-tagline{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink);margin-bottom:20px;}
-.pricing-price{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--line);}
-.pricing-amount{font-size:clamp(36px,4vw,48px);font-weight:700;color:var(--accent);letter-spacing:-0.02em;}
-.pricing-period{font-size:14px;color:var(--ink-3);}
-.pricing-setup{font-size:13px;color:var(--ink-3);margin-top:4px;}
-.pricing-features{display:flex;flex-direction:column;text-align:left;}
-.pf-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
-.pf-row:last-child{border-bottom:none;}
-.pf-check{color:var(--accent);font-size:16px;flex-shrink:0;}
-.pf-label{font-size:15px;color:var(--ink-1);}
-.pricing-cta-btn{
-  display:block;width:100%;text-align:center;margin-top:24px;padding:16px;
-  border-radius:99px;font-size:16px;font-weight:600;
-  background:var(--accent);color:var(--ink-dark);
-  box-shadow:0 0 24px var(--accent-glow);transition:all .2s;
+.feature-icon-box svg {
+  width: 64px;
+  height: 64px;
+  color: #10b981;
 }
-.pricing-cta-btn:hover{background:var(--accent-2);transform:translateY(-1px);box-shadow:0 8px 28px var(--accent-glow);}
-.pricing-note{font-size:13px;color:var(--ink-3);margin-top:12px;}
-.pricing-guarantee{
-  margin-top:24px;padding:20px;border:1px solid var(--line);border-radius:12px;
-  background:var(--bg-1);text-align:left;
-}
-.pricing-guarantee p{font-size:14px;color:var(--ink-2);line-height:1.5;}
-.pricing-guarantee strong{color:var(--ink);}
-
-/* === FAQ (light) === */
-#faq{background:var(--bg-light);color:var(--ink-dark);}
-#faq .eyebrow{color:var(--ink-dark-2);}
-#faq .eyebrow::before{background:var(--accent-2);}
-.faq-layout{max-width:720px;}
-.faq-layout h2{color:var(--ink-dark);margin-bottom:40px;}
-.faq-list{display:flex;flex-direction:column;}
-.faq-item{border-bottom:1px solid var(--line-light-2);}
-.faq-item summary{
-  cursor:pointer;font-weight:500;font-size:16px;color:var(--ink-dark);
-  list-style:none;display:flex;justify-content:space-between;align-items:center;
-  padding:20px 0;transition:color .15s;
-}
-.faq-item summary:hover{color:rgba(10,10,11,0.7);}
-.faq-item summary::-webkit-details-marker{display:none;}
-.faq-icon{color:var(--accent-2);font-size:18px;transition:transform .2s;flex-shrink:0;margin-left:16px;}
-.faq-item[open] .faq-icon{transform:rotate(45deg);}
-.faq-item p{padding:0 0 20px;font-size:15px;color:var(--ink-dark-2);line-height:1.65;}
-
-/* === CTA FINAL === */
-#cta-final{background:var(--bg);text-align:center;position:relative;overflow:hidden;}
-#cta-final::before{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(var(--line) 1px,transparent 1px),
-    linear-gradient(90deg,var(--line) 1px,transparent 1px);
-  background-size:60px 60px;opacity:.5;
-}
-.cta-final-inner{position:relative;z-index:1;max-width:640px;margin:0 auto;}
-.cta-final-inner h2{font-size:clamp(32px,5vw,52px);font-weight:500;letter-spacing:-0.03em;color:var(--ink);margin-bottom:16px;line-height:1.1;}
-.cta-final-inner h2 em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
-.cta-final-inner p{font-size:17px;color:var(--ink-2);margin-bottom:32px;line-height:1.6;}
-
-/* === FOOTER === */
-footer{padding:48px 0 24px;border-top:1px solid var(--line);}
-.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
-.footer-left{display:flex;align-items:center;gap:16px;}
-.footer-logo{display:flex;align-items:center;gap:0;font-size:14px;font-weight:700;letter-spacing:-0.02em;color:var(--ink);}
-.footer-logo .dot{width:6px;height:6px;background:var(--accent);border-radius:1px;margin-left:1px;margin-bottom:3px;}
-.footer-copy{font-size:13px;color:var(--ink-3);}
-.footer-links{display:flex;gap:24px;}
-.footer-links a{font-size:13px;color:var(--ink-3);transition:color .15s;}
-.footer-links a:hover{color:var(--ink-2);}
-
-/* === MOBILE MENU === */
-#mobile-menu{
-  position:fixed;inset:0;z-index:89;background:rgba(10,10,11,.97);backdrop-filter:blur(24px);
-  display:flex;flex-direction:column;padding:80px 24px 24px;
-  opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s;
-}
-#mobile-menu.open{opacity:1;visibility:visible;}
-.mobile-link{display:block;padding:12px 0;font-size:17px;font-weight:500;color:var(--ink);border-bottom:1px solid var(--line);}
-.mobile-cta{
-  margin-top:auto;padding:16px;text-align:center;
-  background:var(--accent);color:var(--ink-dark);font-weight:600;font-size:16px;
-  border-radius:99px;
+.feature-icon-label {
+  font-size: 18px;
+  font-weight: 600;
+  color: #10b981;
 }
 
-/* === RESPONSIVE === */
-@media(max-width:1024px){
-  .hero-grid{grid-template-columns:1fr;gap:48px;}
-  .bento-grid{grid-template-columns:repeat(2,1fr);}
-  .b-4,.b-3,.b-2{grid-column:span 1;}
-  .cap-grid{grid-template-columns:repeat(2,1fr);}
-  .stats-card{grid-template-columns:repeat(2,1fr);padding:40px;}
-  .sol-grid{grid-template-columns:repeat(3,1fr);}
-  .how-grid{grid-template-columns:1fr;max-width:480px;margin:0 auto;}
+/* ===== STATS ===== */
+.stats {
+  background: #0a0a1a;
+  padding: 80px 0;
 }
-@media(max-width:768px){
-  :root{--pad:20px;}
-  section{padding:80px 0;}
-  .nav-links{display:none;}
-  .nav-hamburger{display:block;}
-  .hero-stats{flex-wrap:wrap;gap:20px;}
-  .wa-panel.active{grid-template-columns:1fr;gap:32px;}
-  .wa-phone{width:280px;}
-  .bento-grid{grid-template-columns:1fr;}
-  .cap-grid{grid-template-columns:1fr;}
-  .stats-card{grid-template-columns:1fr;padding:32px;}
-  .sol-grid{grid-template-columns:1fr 1fr;}
-  .footer-inner{flex-direction:column;text-align:center;}
-  .footer-links{flex-wrap:wrap;justify-content:center;}
-  .hero-ctas{flex-direction:column;align-items:flex-start;}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  text-align: center;
 }
-@media(max-width:480px){
-  .sol-grid{grid-template-columns:1fr;}
-  .hero-incluye{flex-direction:column;gap:8px;}
+.stat-number {
+  font-size: 42px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 400;
 }
 
-/* WhatsApp float */
-.wa-float{
-  position:fixed;bottom:24px;right:24px;z-index:99;
-  width:56px;height:56px;border-radius:50%;
-  background:#25d366;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 20px rgba(37,211,102,0.4);
-  transition:transform .2s var(--ease-spring),box-shadow .2s;
+/* ===== INTEGRATIONS ===== */
+.integrations-heading {
+  font-size: 32px;
+  font-weight: 600;
+  color: #0a0a0a;
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
 }
-.wa-float:hover{transform:scale(1.08);box-shadow:0 8px 32px rgba(37,211,102,0.5);}
+.integrations-sub {
+  font-size: 16px;
+  color: #6b7280;
+  text-align: center;
+  margin-bottom: 48px;
+}
+.integrations-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+.int-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 32px 24px;
+  text-align: center;
+  transition: all 0.3s;
+  background: #fff;
+}
+.int-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 8px 24px rgba(16,185,129,0.08);
+  transform: translateY(-2px);
+}
+.int-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.int-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0a0a0a;
+  margin-bottom: 6px;
+}
+.int-desc {
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
 
-/* Exit-intent modal */
-.exit-overlay{
-  position:fixed;inset:0;z-index:200;
-  background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:flex;align-items:center;justify-content:center;
-  opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s;
+/* ===== PRODUCT PHOTOS ===== */
+.photos-section {
+  background: #f9f9f9;
+  padding: 80px 0;
 }
-.exit-overlay.show{opacity:1;visibility:visible;}
-.exit-card{
-  background:var(--bg-2);border:1px solid rgba(0,255,136,0.2);border-radius:20px;
-  padding:40px;max-width:420px;width:90%;text-align:center;position:relative;
-  transform:scale(0.9) translateY(20px);transition:transform .4s var(--ease-spring);
+.photos-heading {
+  font-size: 32px;
+  font-weight: 600;
+  color: #0a0a0a;
+  text-align: center;
+  margin-bottom: 48px;
+  letter-spacing: -0.5px;
 }
-.exit-overlay.show .exit-card{transform:scale(1) translateY(0);}
-.exit-close{
-  position:absolute;top:16px;right:16px;background:none;border:none;
-  color:var(--ink-3);font-size:20px;cursor:pointer;padding:4px 8px;
-  transition:color .2s;line-height:1;
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
-.exit-close:hover{color:var(--ink);}
-.exit-card h3{font-size:24px;font-weight:500;letter-spacing:-0.02em;color:var(--ink);margin-bottom:8px;}
-.exit-card h3 em{font-family:var(--serif);font-style:italic;color:var(--accent);}
-.exit-card p{font-size:16px;color:var(--ink-2);line-height:1.6;margin-bottom:24px;}
-.exit-cta{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:14px 28px;background:var(--accent);color:var(--ink-dark);
-  font-weight:700;font-size:15px;border-radius:99px;
-  box-shadow:0 0 24px var(--accent-glow);transition:all .2s;
+.photos-grid img {
+  border-radius: 12px;
+  width: 100%;
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  transition: transform 0.3s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
-.exit-cta:hover{background:var(--accent-2);transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-glow);}
-.exit-sub{font-size:13px;color:var(--ink-3);margin-top:12px;}
+.photos-grid img:hover {
+  transform: scale(1.03);
+}
+
+/* ===== FAQ ===== */
+.faq-heading {
+  font-size: 32px;
+  font-weight: 600;
+  color: #0a0a0a;
+  text-align: center;
+  margin-bottom: 48px;
+  letter-spacing: -0.5px;
+}
+.faq-list {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.faq-item {
+  border-bottom: 1px solid #e5e7eb;
+}
+.faq-item:first-child {
+  border-top: 1px solid #e5e7eb;
+}
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #0a0a0a;
+  list-style: none;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: '+';
+  font-size: 22px;
+  font-weight: 300;
+  color: #9ca3af;
+  transition: transform 0.3s;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+.faq-item[open] summary::after {
+  transform: rotate(45deg);
+}
+.faq-answer {
+  padding: 0 0 20px;
+  font-size: 15px;
+  color: #6b7280;
+  line-height: 1.7;
+}
+
+/* ===== CTA ===== */
+.cta {
+  background: #0a0a1a;
+  padding: 96px 0;
+  text-align: center;
+}
+.cta-heading {
+  font-size: 36px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+.cta-sub {
+  font-size: 16px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 36px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.cta-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.cta-email {
+  margin-top: 24px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
+}
+.cta-email a { color: rgba(255,255,255,0.5); text-decoration: underline; }
+.cta-email a:hover { color: #fff; }
+
+/* ===== FOOTER ===== */
+.footer {
+  background: #050510;
+  padding: 48px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.footer-logo {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+}
+.footer-logo sup {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #10b981;
+  border-radius: 1px;
+  vertical-align: super;
+  margin-left: 1px;
+}
+.footer-copy {
+  font-size: 13px;
+  color: rgba(255,255,255,0.3);
+}
+.footer-links {
+  display: flex;
+  gap: 24px;
+}
+.footer-links a {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: #fff; }
+
+/* ===== WHATSAPP FLOAT ===== */
+.wa-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  background: #25d366;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(37,211,102,0.3);
+  z-index: 999;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.wa-float:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(37,211,102,0.4);
+}
+
+/* ===== MOBILE NAV ===== */
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 24px;
+  z-index: 999;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu a {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  padding: 8px 0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .integrations-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 40px; }
+}
+
+@media (max-width: 768px) {
+  .nav-links, .nav-right { display: none; }
+  .hamburger { display: flex; }
+
+  .hero { padding-top: 100px; padding-bottom: 48px; }
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    text-align: center;
+  }
+  .hero-heading { font-size: 34px; }
+  .hero-sub { max-width: 100%; margin-left: auto; margin-right: auto; }
+  .hero-buttons { justify-content: center; }
+
+  .feature-row {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 56px 0;
+  }
+  .feature-row.reverse .feature-text { order: 2; }
+  .feature-row.reverse .feature-visual { order: 1; }
+
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .stat-number { font-size: 32px; }
+
+  .integrations-grid { grid-template-columns: 1fr 1fr; }
+  .photos-grid { grid-template-columns: 1fr; }
+
+  .section { padding: 64px 0; }
+  .cta-heading { font-size: 28px; }
+
+  .footer-inner { flex-direction: column; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .integrations-grid { grid-template-columns: 1fr; }
+  .hero-heading { font-size: 28px; }
+  .logos-row { gap: 28px; }
+}
 </style>
 </head>
 <body>
 
-<!-- === COVER === -->
-<div id="cover">
-  <div class="cover-logo">
-    <span class="cover-letter">f</span>
-    <span class="cover-letter">u</span>
-    <span class="cover-letter">l</span>
-    <span class="cover-letter">l</span>
-    <span class="cover-letter">s</span>
-    <span class="cover-letter">i</span>
-    <span class="cover-letter">t</span>
-    <span class="cover-letter">e</span>
-    <span class="cover-dot"></span>
-  </div>
-  <div class="cover-tagline">POS + IA para restaurantes</div>
-</div>
-
-<!-- === NAV === -->
-<nav id="nav">
+<!-- ===== NAV ===== -->
+<nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">fullsite<span class="dot"></span></a>
+    <a href="/" class="nav-logo"><img src="/logo-fullsite.png" alt="fullsite" style="height:28px;"></a>
     <div class="nav-links">
-      <a href="#bento">Producto</a>
-      
-      <a href="/demo.html">Demo</a>
-      <a href="/integraciones.html">Integraciones</a>
-      <a href="/blog/">Blog</a>
-      <a href="#soluciones">Soluciones</a>
+      <a href="#features">Producto</a>
+      <a href="#integrations">Integraciones</a>
+      <a href="#photos">Funcionalidades</a>
       <a href="#faq">FAQ</a>
     </div>
     <div class="nav-right">
-      <a href="https://app.fullsite.mx/login" class="nav-login">Iniciar sesion</a>
-      <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="nav-cta">Agendar demo</a>
+      <a href="https://app.fullsite.mx/login" class="nav-portal">Log in</a>
+      <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="btn btn-primary">Empieza con Fullsite</a>
     </div>
-    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+    <button class="hamburger" id="hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
     </button>
   </div>
 </nav>
-
-<!-- === MOBILE MENU === -->
-<div id="mobile-menu">
-  <a href="#bento" class="mobile-link">Producto</a>
-  
-  <a href="/demo.html" class="mobile-link">Demo</a>
-  <a href="/integraciones.html" class="mobile-link">Integraciones</a>
-  <a href="/blog/" class="mobile-link">Blog</a>
-  <a href="#soluciones" class="mobile-link">Soluciones</a>
-  <a href="#faq" class="mobile-link">FAQ</a>
-  <a href="https://app.fullsite.mx/login" class="mobile-link">Iniciar sesion</a>
-  <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="mobile-cta">Agendar demo</a>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#features">Producto</a>
+  <a href="#integrations">Integraciones</a>
+  <a href="#photos">Funcionalidades</a>
+  <a href="#faq">FAQ</a>
+  <a href="https://app.fullsite.mx/login">Log in</a>
+  <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="btn btn-primary" style="text-align:center;">Empieza con Fullsite</a>
 </div>
 
-<!-- === HERO === -->
-<section id="hero">
-  <div class="wrap">
-    <div class="hero-badge reveal">
-      <span class="hero-badge-dot"></span>
-      <span>Nuevo &middot; 2026 &nbsp;|&nbsp; Disenado en Monterrey, para restaurantes</span>
-    </div>
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
     <div class="hero-grid">
-      <div class="hero-copy">
-        <h1 class="reveal rd1">Tu restaurante tiene los datos. <em>Fullsite</em> los convierte en accion.</h1>
-        <p class="hero-sub reveal rd2">El primer POS con IA que te dice que hacer &mdash; ahora, no en el reporte de fin de mes.</p>
-        <div class="hero-ctas reveal rd3">
-          <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="btn-primary">Agendar demo &rarr;</a>
-          <a href="#whatsapp" class="btn-secondary">Ver como funciona</a>
-        </div>
-        <div class="hero-stats reveal rd4">
-          <div class="hero-stat">
-            <span class="hero-stat-val">$70M+</span>
-            <span class="hero-stat-label">MXN analizados</span>
-          </div>
-          <div class="hero-stat">
-            <span class="hero-stat-val">181K+</span>
-            <span class="hero-stat-label">Tickets</span>
-          </div>
-          <div class="hero-stat">
-            <span class="hero-stat-val">869</span>
-            <span class="hero-stat-label">Dias operando</span>
-          </div>
-          <div class="hero-stat">
-            <span class="hero-stat-val">24/7</span>
-            <span class="hero-stat-label">Monitoreo</span>
-          </div>
-        </div>
-        <div class="hero-incluye reveal rd5">
-          <span class="hero-inc-item">POS completo</span>
-          <span class="hero-inc-item">Copiloto IA</span>
-          <span class="hero-inc-item">WhatsApp</span>
-          <span class="hero-inc-item">Inventario</span>
-          <span class="hero-inc-item">Cocina + Barra</span>
+      <div class="reveal">
+        <span class="hero-eyebrow">POS + Inteligencia Artificial</span>
+        <h1 class="hero-heading">El sistema que los restaurantes necesitan</h1>
+        <p class="hero-sub">POS completo con IA que detecta fugas, sugiere acciones y opera tu restaurante 24/7. Sin hardware propietario.</p>
+        <div class="hero-buttons">
+          <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="btn btn-primary btn-lg">Empieza con Fullsite</a>
+          <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20quiero%20agendar%20una%20demo%20de%20Fullsite" class="btn btn-outline btn-lg">Agendar demo</a>
         </div>
       </div>
-      <div class="hero-mockup reveal rd3">
-        <div class="mockup-chrome">
-          <span class="mockup-dot-r"></span>
-          <span class="mockup-dot-y"></span>
-          <span class="mockup-dot-g"></span>
-        </div>
-        <div class="mockup-body">
-          <div class="mockup-kpis">
-            <div class="mockup-kpi">
-              <div class="mockup-kpi-label">Ventas hoy</div>
-              <div class="mockup-kpi-val" style="color:var(--accent)">$12,400</div>
-            </div>
-            <div class="mockup-kpi">
-              <div class="mockup-kpi-label">Ticket prom.</div>
-              <div class="mockup-kpi-val">$513</div>
-            </div>
-            <div class="mockup-kpi">
-              <div class="mockup-kpi-label">Mesas</div>
-              <div class="mockup-kpi-val">18/24</div>
-            </div>
-          </div>
-          <div class="mockup-signals">
-            <div class="signal-card signal-coral"><span class="signal-dot"></span><span>Inventario: aguacate bajo minimo</span></div>
-            <div class="signal-card signal-amber"><span class="signal-dot"></span><span>Mesero Miguel lleva $800 abajo del promedio</span></div>
-            <div class="signal-card signal-green"><span class="signal-dot"></span><span>Proyeccion de cierre: $18,200 (+8%)</span></div>
-          </div>
-        </div>
-        <div class="hero-pills">
-          <span class="pill">POS en tiempo real</span>
-          <span class="pill">6 meseros activos</span>
-          <span class="pill">2 alertas inventario</span>
-          <span class="pill">Cocina: 3 ordenes</span>
-        </div>
+      <div class="reveal" style="transition-delay:0.15s;">
+        <img src="/img-terminal.png" alt="Fullsite POS Terminal" class="hero-img">
       </div>
     </div>
   </div>
 </section>
 
-<div class="section-divider"></div>
-
-<!-- === WHATSAPP SECTION === -->
-<section id="whatsapp">
-  <div class="wrap">
-    <div class="wa-header reveal">
-      <div class="eyebrow">WhatsApp + IA</div>
-      <h2 class="display">Inteligencia que llega a tu <em>celular</em></h2>
-      <p>Reportes, alertas y concursos que tu equipo recibe directo en WhatsApp. Sin abrir ningun dashboard.</p>
+<!-- ===== LOGOS STRIP ===== -->
+<section class="logos-strip">
+  <div class="container">
+    <p class="logos-label">Integrado con</p>
+    <div class="logos-row">
+      <span class="logo-placeholder">Uber Eats</span>
+      <span class="logo-placeholder">Rappi</span>
+      <span class="logo-placeholder">Mercado Pago</span>
+      <span class="logo-placeholder">SAT</span>
     </div>
-    <div class="wa-tabs reveal rd1">
-      <button class="wa-tab active" data-tab="0">Rendimiento de meseros</button>
-      <button class="wa-tab" data-tab="1">Concurso semanal</button>
-      <button class="wa-tab" data-tab="2">Reporte matutino</button>
-      <button class="wa-tab" data-tab="3">Alerta proactiva</button>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section class="section" id="features">
+  <div class="container">
+    <!-- Feature 1 -->
+    <div class="feature-row reveal">
+      <div class="feature-visual">
+        <img src="/img-dashboard.png" alt="Fullsite POS Dashboard" class="feature-img">
+      </div>
+      <div class="feature-text">
+        <span class="feature-tag">Punto de venta</span>
+        <h2 class="feature-title">POS inteligente</h2>
+        <p class="feature-desc">Corre en cualquier navegador. Sin terminales propietarias, sin licencias de hardware. Tu restaurante opera desde una tablet, laptop o celular.</p>
+        <ul class="feature-list">
+          <li>248 items de menu configurados y listos</li>
+          <li>Funciona offline — no pierdes ventas si cae internet</li>
+          <li>Audit trail anti-fraude: nada se borra</li>
+          <li>Modificadores, combos y promociones</li>
+        </ul>
+      </div>
     </div>
-    <div class="wa-panels">
-      <!-- Tab 0: Rendimiento -->
-      <div class="wa-panel active" data-panel="0">
-        <div class="wa-panel-copy">
-          <h3>Ranking de meseros en tiempo real</h3>
-          <p>Cada mesero sabe exactamente donde esta parado. Ventas, propinas, ticket promedio &mdash; actualizado al momento.</p>
-          <div class="wa-features">
-            <div class="wa-feature">Ventas acumuladas por turno</div>
-            <div class="wa-feature">Ticket promedio vs meta</div>
-            <div class="wa-feature">Propinas como % de ventas</div>
-            <div class="wa-feature">Comparativa con el equipo</div>
-          </div>
-        </div>
-        <div class="wa-phone">
-          <div class="wa-phone-screen">
-            <div class="wa-phone-header">
-              <div class="wa-phone-avatar"></div>
-              <span class="wa-phone-name">Fullsite IA</span>
-            </div>
-            <div class="wa-phone-body">
-              <div class="wa-msg wa-in">
-                <strong>Ranking meseros 2:00 PM</strong><br><br>
-                1. Carlos &mdash; $3,800<br>
-                <div class="wa-bar" style="width:100%;background:#00d67a;"></div>
-                2. Laura &mdash; $2,900<br>
-                <div class="wa-bar" style="width:76%;background:#00d67a;"></div>
-                3. Andres &mdash; $2,100<br>
-                <div class="wa-bar" style="width:55%;background:#ffc857;"></div>
-                4. Miguel &mdash; $1,450<br>
-                <div class="wa-bar" style="width:38%;background:#ff6b4a;"></div>
-                <div class="wa-time">2:01 PM</div>
-              </div>
-              <div class="wa-msg wa-out">
-                Quien tiene mejor ticket promedio?
-                <div class="wa-time">2:02 PM</div>
-              </div>
-              <div class="wa-msg wa-in">
-                Laura: $650 (meta: $500). Carlos: $510. Andres: $420.
-                <div class="wa-time">2:02 PM</div>
-              </div>
-            </div>
-          </div>
+
+    <!-- Feature 2 -->
+    <div class="feature-row reverse reveal">
+      <div class="feature-text">
+        <span class="feature-tag">Inteligencia artificial</span>
+        <h2 class="feature-title">Copiloto IA 24/7</h2>
+        <p class="feature-desc">30 agentes de IA monitorean tu operacion en tiempo real. Detectan anomalias, sugieren upselling y predicen el cierre del dia.</p>
+        <ul class="feature-list">
+          <li>Deteccion de fraude en cancelaciones y descuentos</li>
+          <li>Alertas WhatsApp cuando algo se sale de patron</li>
+          <li>Prediccion de cierre a las 2pm con 95% precision</li>
+          <li>Menu engineering: estrellas, vacas y perros</li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <img src="/img-bartender.png" alt="Fullsite IA Copiloto" class="feature-img">
+      </div>
+    </div>
+
+    <!-- Feature 3 -->
+    <div class="feature-row reveal">
+      <div class="feature-visual">
+        <div class="feature-icon-box">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <span class="feature-icon-label">CFDI 4.0</span>
         </div>
       </div>
-
-      <!-- Tab 1: Concurso -->
-      <div class="wa-panel" data-panel="1">
-        <div class="wa-panel-copy">
-          <h3>Concursos que motivan al equipo</h3>
-          <p>Crea concursos semanales automaticos. El sistema trackea, publica avances y anuncia ganadores.</p>
-          <div class="wa-features">
-            <div class="wa-feature">Concursos por ventas, propinas o upselling</div>
-            <div class="wa-feature">Leaderboard automatico cada turno</div>
-            <div class="wa-feature">Premios configurables</div>
-            <div class="wa-feature">Historial de ganadores</div>
-          </div>
-        </div>
-        <div class="wa-phone">
-          <div class="wa-phone-screen">
-            <div class="wa-phone-header">
-              <div class="wa-phone-avatar"></div>
-              <span class="wa-phone-name">Fullsite IA</span>
-            </div>
-            <div class="wa-phone-body">
-              <div class="wa-msg wa-in">
-                <strong>CONCURSO SEMANAL</strong><br>
-                "Mejor ticket promedio"<br>
-                Premio: Dia libre + $500<br><br>
-                Lider: Laura ($650)<br>
-                <div class="wa-bar" style="width:100%;background:#00d67a;"></div>
-                2do: Carlos ($510)<br>
-                <div class="wa-bar" style="width:79%;background:#ffc857;"></div>
-                3ro: Roberto ($480)<br>
-                <div class="wa-bar" style="width:74%;background:#ffc857;"></div>
-                <br>Faltan 3 dias. Vamos equipo!
-                <div class="wa-time">9:00 AM</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 2: Reporte matutino -->
-      <div class="wa-panel" data-panel="2">
-        <div class="wa-panel-copy">
-          <h3>Briefing antes de llegar al restaurante</h3>
-          <p>Cada manana a las 7 AM recibes un resumen ejecutivo: ventas de ayer, anomalias, y que esperar hoy.</p>
-          <div class="wa-features">
-            <div class="wa-feature">Ventas netas y ticket promedio</div>
-            <div class="wa-feature">Top meseros y platillos</div>
-            <div class="wa-feature">Anomalias detectadas</div>
-            <div class="wa-feature">Reservaciones del dia</div>
-          </div>
-        </div>
-        <div class="wa-phone">
-          <div class="wa-phone-screen">
-            <div class="wa-phone-header">
-              <div class="wa-phone-avatar"></div>
-              <span class="wa-phone-name">Fullsite IA</span>
-            </div>
-            <div class="wa-phone-body">
-              <div class="wa-msg wa-in">
-                <strong>BRIEFING 25-May</strong><br><br>
-                Ventas ayer: $18,500<br>
-                vs promedio: +12%<br>
-                Tickets: 36 | T.prom: $512<br><br>
-                Top mesero: Carlos ($4,200)<br>
-                Top platillo: Chilaquiles ($2,840)<br><br>
-                Alerta: propinas -15% vs semana pasada<br>
-                Reservas hoy: 2 (12pm, 2pm)
-                <div class="wa-time">7:00 AM</div>
-              </div>
-              <div class="wa-msg wa-out">
-                Por que bajaron las propinas?
-                <div class="wa-time">7:12 AM</div>
-              </div>
-              <div class="wa-msg wa-in">
-                Miguel y Andres tuvieron propinas 40% bajo su promedio. Posible causa: mesas grandes con servicio lento.
-                <div class="wa-time">7:12 AM</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 3: Alerta proactiva -->
-      <div class="wa-panel" data-panel="3">
-        <div class="wa-panel-copy">
-          <h3>Alertas antes de que sea problema</h3>
-          <p>La IA detecta anomalias en tiempo real y te avisa antes de que impacten tu operacion.</p>
-          <div class="wa-features">
-            <div class="wa-feature">Descuentos fuera de patron</div>
-            <div class="wa-feature">Inventario critico</div>
-            <div class="wa-feature">Ventas por debajo de proyeccion</div>
-            <div class="wa-feature">Mesero con desempeno bajo</div>
-          </div>
-        </div>
-        <div class="wa-phone">
-          <div class="wa-phone-screen">
-            <div class="wa-phone-header">
-              <div class="wa-phone-avatar"></div>
-              <span class="wa-phone-name">Fullsite IA</span>
-            </div>
-            <div class="wa-phone-body">
-              <div class="wa-msg wa-in" style="border-left:3px solid var(--coral);">
-                <strong>ALERTA: Descuentos inusuales</strong><br><br>
-                Roberto aplico 4 cortesias en 2 horas ($1,200 total). Promedio normal: 1 cortesia por turno.<br><br>
-                Accion sugerida: revisar tickets #4812, #4815, #4819, #4823.
-                <div class="wa-time">3:45 PM</div>
-              </div>
-              <div class="wa-msg wa-in" style="border-left:3px solid var(--amber);">
-                <strong>ALERTA: Inventario bajo</strong><br><br>
-                Aguacate: 2 piezas (minimo: 8). Salmon: 4 porciones (minimo: 10).<br><br>
-                Proveedor sugerido: La Norena. Tel: 81-1234-5678
-                <div class="wa-time">4:10 PM</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="feature-text">
+        <span class="feature-tag">Fiscal</span>
+        <h2 class="feature-title">Facturacion CFDI 4.0</h2>
+        <p class="feature-desc">Cumple con el SAT sin complicaciones. Tus clientes facturan desde un QR en el ticket, y todo se timbra automaticamente.</p>
+        <ul class="feature-list">
+          <li>QR en ticket para autofactura del cliente</li>
+          <li>Timbrado automatico con el SAT</li>
+          <li>PDF y XML enviados por email al instante</li>
+          <li>Reportes fiscales listos para tu contador</li>
+        </ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- === CALLOUT === -->
-<section id="callout" class="reveal">
-  <div class="wrap">
-    <p>No es un dashboard encima de tu POS.<br><em>Es el POS que piensa por ti.</em></p>
-  </div>
-</section>
-
-<div class="section-divider"></div>
-
-<!-- === BENTO FEATURES === -->
-<section id="bento">
-  <div class="wrap">
-    <div class="bento-header reveal">
-      <div class="eyebrow">Funcionalidades</div>
-      <h2 class="display">Todo lo que necesitas, <em>integrado</em></h2>
-    </div>
-    <div class="bento-grid">
-      <!-- Rendimiento por mesero (4col) -->
-      <div class="bento-card b-4 reveal">
-        <div class="eyebrow">Analytics</div>
-        <h3>Rendimiento por mesero</h3>
-        <p>Ventas, propinas, ticket promedio, mesas atendidas. Por turno, dia o semana. Automatico.</p>
-        <div class="bento-bars">
-          <div class="bento-bar" style="height:90%;background:var(--accent);"></div>
-          <div class="bento-bar" style="height:72%;background:var(--accent);opacity:.8;"></div>
-          <div class="bento-bar" style="height:58%;background:var(--amber);"></div>
-          <div class="bento-bar" style="height:45%;background:var(--amber);opacity:.8;"></div>
-          <div class="bento-bar" style="height:32%;background:var(--coral);"></div>
-          <div class="bento-bar" style="height:25%;background:var(--coral);opacity:.7;"></div>
-        </div>
-        <div class="bento-bar-labels">
-          <span>Carlos</span><span>Laura</span><span>Andres</span><span>Miguel</span><span>Roberto</span><span>Diego</span>
-        </div>
-      </div>
-
-      <!-- Proyecciones (2col) -->
-      <div class="bento-card b-2 reveal rd1">
-        <div class="eyebrow">Prediccion</div>
-        <h3>Proyecciones de cierre</h3>
-        <p>A las 2 PM ya sabe cuanto vas a cerrar. Se afina a las 4 y 6 PM.</p>
-        <div class="bento-bars" style="height:64px;">
-          <div class="bento-bar" style="height:60%;background:var(--ink-4);"></div>
-          <div class="bento-bar" style="height:75%;background:var(--ink-4);"></div>
-          <div class="bento-bar" style="height:65%;background:var(--ink-4);"></div>
-          <div class="bento-bar" style="height:85%;background:var(--ink-4);"></div>
-          <div class="bento-bar" style="height:70%;background:var(--accent);border:1px dashed var(--accent);background:var(--accent-dim);"></div>
-        </div>
-        <div class="bento-bar-labels"><span>Lun</span><span>Mar</span><span>Mie</span><span>Jue</span><span style="color:var(--accent)">Hoy</span></div>
-      </div>
-
-      <!-- Menu engineering (2col) -->
-      <div class="bento-card b-2 reveal rd2">
-        <div class="eyebrow">Menu</div>
-        <h3>Menu engineering</h3>
-        <p>Clasifica cada platillo: estrella, vaca, puzzle o perro. Te dice que promover y que quitar.</p>
-        <div style="margin-top:12px;font-size:13px;color:var(--ink-2);line-height:2;">
-          <span style="color:var(--accent);">&#9733;</span> Chilaquiles &mdash; 42% margen<br>
-          <span style="color:var(--amber);">&#9733;</span> Bowl acai &mdash; 38% margen<br>
-          <span style="color:var(--coral);">&#9733;</span> Pasta trufa &mdash; 12% margen
-        </div>
-      </div>
-
-      <!-- Retencion (4col) -->
-      <div class="bento-card b-4 reveal rd3">
-        <div class="eyebrow">CRM</div>
-        <h3>Retencion de clientes</h3>
-        <p>Detecta clientes que dejaron de venir y te avisa. "47 clientes no han regresado en 30 dias &mdash; 12 eran habituales."</p>
-      </div>
-
-      <!-- Alertas (3col) -->
-      <div class="bento-card b-3 reveal rd4">
-        <div class="eyebrow">Operaciones</div>
-        <h3>Alertas proactivas</h3>
-        <p>Inventario bajo, fraude en descuentos, mesero bajo rendimiento, ventas debajo de proyeccion. Te avisa antes de que sea problema.</p>
-      </div>
-
-      <!-- Concurso meseros (3col) -->
-      <div class="bento-card b-3 reveal rd5">
-        <div class="eyebrow">Equipo</div>
-        <h3>Concurso de meseros</h3>
-        <p>Concursos semanales automaticos por ventas, propinas o ticket promedio. Leaderboard en tiempo real.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<div class="section-divider"></div>
-
-<!-- === HOW IT WORKS === -->
-<section id="how">
-  <div class="wrap">
-    <div class="how-header reveal">
-      <div class="eyebrow">Proceso</div>
-      <h2 class="display">Tres pasos para <em>empezar</em></h2>
-    </div>
-    <div class="how-grid">
-      <div class="how-card reveal">
-        <div class="how-num">1</div>
-        <h3>Conectamos tu operacion</h3>
-        <p>Vinculamos tu POS actual o instalamos el nuestro. Configuramos agentes y calibramos con tus datos reales. 48 horas.</p>
-      </div>
-      <div class="how-card reveal rd1">
-        <div class="how-num">2</div>
-        <h3>Empiezas a recibir</h3>
-        <p>Briefings a las 7 AM, alertas en tiempo real, rankings de meseros y predicciones de cierre. Todo en WhatsApp.</p>
-      </div>
-      <div class="how-card reveal rd2">
-        <div class="how-num">3</div>
-        <h3>Tu restaurante opera mejor</h3>
-        <p>Menos fraude, mejor servicio, decisiones con datos. Tu equipo se motiva, tus margenes suben.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- === CAPABILITIES (light) === -->
-<section id="capabilities">
-  <div class="wrap">
-    <div class="cap-header reveal">
-      <div class="eyebrow">Plataforma</div>
-      <h2 class="display">Un sistema. Todo <em>integrado.</em></h2>
-    </div>
-    <div class="cap-grid">
-      <div class="cap-card reveal">
-        <div class="cap-icon">&#9641;</div>
-        <h3>POS completo</h3>
-        <p>Mesas, QR ordering, KDS, cortes de caja, facturacion. iPad y web. Funciona offline.</p>
-      </div>
-      <div class="cap-card reveal rd1">
-        <div class="cap-icon">&#9883;</div>
-        <h3>Copiloto IA</h3>
-        <p>Pregunta lo que quieras por WhatsApp: "cuanto vendimos ayer", "quien es mi mejor mesero". Responde con datos reales.</p>
-      </div>
-      <div class="cap-card reveal rd2">
-        <div class="cap-icon">&#9888;</div>
-        <h3>Alertas inteligentes</h3>
-        <p>Anomalias en descuentos, inventario critico, ventas bajo proyeccion. Te avisa antes de que sea tarde.</p>
-      </div>
-      <div class="cap-card reveal rd3">
-        <div class="cap-icon">&#9733;</div>
-        <h3>Menu engineering</h3>
-        <p>Clasifica platillos por popularidad y margen. Estrellas, vacas, puzzles y perros. Reporte semanal automatico.</p>
-      </div>
-      <div class="cap-card reveal rd4">
-        <div class="cap-icon">&#9993;</div>
-        <h3>WhatsApp bot</h3>
-        <p>Reservaciones automaticas, consultas 24/7, alertas operativas. Tu equipo y clientes en el mismo canal.</p>
-      </div>
-      <div class="cap-card reveal rd5">
-        <div class="cap-icon">&#9881;</div>
-        <h3>Multi-sucursal</h3>
-        <p>Dashboard centralizado. Compara unidades, estandariza menus, controla permisos por rol y ubicacion.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- === STATS === -->
-<section id="stats-section">
-  <div class="wrap">
-    <div class="stats-card reveal">
+<!-- ===== STATS ===== -->
+<section class="stats reveal">
+  <div class="container">
+    <div class="stats-grid">
       <div>
-        <div class="stat-big"><em>$70M+</em></div>
-        <div class="stat-desc">MXN en ventas analizadas</div>
+        <div class="stat-number">$72M+</div>
+        <div class="stat-label">MXN analizados</div>
       </div>
       <div>
-        <div class="stat-big"><em>181K+</em></div>
-        <div class="stat-desc">Tickets procesados</div>
+        <div class="stat-number">97K+</div>
+        <div class="stat-label">tickets procesados</div>
       </div>
       <div>
-        <div class="stat-big"><em>869</em></div>
-        <div class="stat-desc">Dias operando</div>
+        <div class="stat-number">883</div>
+        <div class="stat-label">dias operando</div>
       </div>
       <div>
-        <div class="stat-big"><em>24/7</em></div>
-        <div class="stat-desc">Monitoreo autonomo</div>
+        <div class="stat-number">24/7</div>
+        <div class="stat-label">monitoreo IA</div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="section-divider"></div>
-
-<!-- === SOLUCIONES POR TIPO === -->
-<section id="soluciones">
-  <div class="wrap">
-    <div class="sol-header reveal">
-      <div class="eyebrow">Soluciones</div>
-      <h2 class="display">Para tu tipo de <em>restaurante</em></h2>
-    </div>
-    <div class="sol-grid">
-      <a href="/soluciones/restaurante-premium.html" class="sol-card reveal">
-        <span class="sol-icon">&#9733;</span>
-        <h3>Restaurante premium</h3>
-        <p>Fine dining, servicio de mesa, reservaciones VIP, experiencia personalizada</p>
-        <span class="sol-link">Explorar &rarr;</span>
-      </a>
-      <a href="/soluciones/cafeteria.html" class="sol-card reveal rd1">
-        <span class="sol-icon">&#9749;</span>
-        <h3>Cafeteria</h3>
-        <p>Alto volumen, rotacion rapida, menus cambiantes, takeaway</p>
-        <span class="sol-link">Explorar &rarr;</span>
-      </a>
-      <a href="/soluciones/bar.html" class="sol-card reveal rd2">
-        <span class="sol-icon">&#127863;</span>
-        <h3>Bar</h3>
-        <p>Control de bebidas, anti-fraude de barra, tabs, happy hour</p>
-        <span class="sol-link">Explorar &rarr;</span>
-      </a>
-      <a href="/soluciones/dark-kitchen.html" class="sol-card reveal rd3">
-        <span class="sol-icon">&#9889;</span>
-        <h3>Dark kitchen</h3>
-        <p>Multi-marca, delivery integrado, KDS multi-estacion</p>
-        <span class="sol-link">Explorar &rarr;</span>
-      </a>
-      <a href="/soluciones/multi-sucursal.html" class="sol-card reveal rd4">
-        <span class="sol-icon">&#9881;</span>
-        <h3>Multi-sucursal</h3>
-        <p>Dashboard centralizado, benchmarks entre unidades</p>
-        <span class="sol-link">Explorar &rarr;</span>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- pricing section removed -->
-
-<!-- === FAQ (light) === -->
-<section id="faq">
-  <div class="wrap">
-    <div class="faq-layout reveal">
-      <div class="eyebrow">Preguntas frecuentes</div>
-      <h2 class="display" style="color:var(--ink-dark);">Lo que nos preguntan antes de <em style="color:var(--accent-2)">empezar</em></h2>
-      <div class="faq-list">
-        <details class="faq-item">
-          <summary>Cuanto tiempo toma la instalacion?<span class="faq-icon">+</span></summary>
-          <p>48 horas. Conectamos tu POS, configuramos los agentes y calibramos las alertas con tus datos reales. Al tercer dia ya tienes tu primer briefing en WhatsApp.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Funciona con mi sistema POS actual?<span class="faq-icon">+</span></summary>
-          <p>Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Tengo que cambiar de POS?<span class="faq-icon">+</span></summary>
-          <p>No necesariamente. Fullsite funciona como capa de IA sobre tu POS actual. Pero tambien incluye POS completo por si quieres consolidar todo en un sistema.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Que pasa si no me gusta?<span class="faq-icon">+</span></summary>
-          <p>60 dias de garantia. Si en 2 meses no ves valor, te devolvemos el setup completo. Sin preguntas. Tu equipo sigue usando su POS como antes.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Como funciona la IA? Necesito saber de tecnologia?<span class="faq-icon">+</span></summary>
-          <p>No. Los agentes trabajan solos. Tu recibes reportes, alertas y respuestas por WhatsApp. Es como tener un analista que trabaja 24/7 y nunca se equivoca de formato.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Mis datos estan seguros?<span class="faq-icon">+</span></summary>
-          <p>Si. Usamos Supabase (PostgreSQL) con encriptacion en transito y reposo, Row Level Security, y cumplimos con regulaciones de proteccion de datos en Mexico. Tus datos nunca se comparten.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Tienen contrato de permanencia?<span class="faq-icon">+</span></summary>
-          <p>No. Mes a mes. Cancelas cuando quieras. Creemos que si te quedas es porque ves resultados, no porque firmaste un contrato.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Puedo empezar con una sucursal y expandir despues?<span class="faq-icon">+</span></summary>
-          <p>Si. De hecho es lo que recomendamos. Empiezas con una, ves los resultados, y luego conectas las demas. Cada sucursal adicional se activa en 24 horas.</p>
-        </details>
+<!-- ===== INTEGRATIONS ===== -->
+<section class="section" id="integrations">
+  <div class="container">
+    <h2 class="integrations-heading reveal">Se integra con lo que ya usas</h2>
+    <p class="integrations-sub reveal">Conectamos tu operacion con las plataformas que mueven tu negocio.</p>
+    <div class="integrations-grid">
+      <div class="int-card reveal">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Uber_Eats_2020_logo.svg/320px-Uber_Eats_2020_logo.svg.png" alt="Uber Eats" style="height:28px;margin:0 auto 12px;">
+        <div class="int-name">Uber Eats</div>
+        <div class="int-desc">Pedidos de delivery directo a tu POS. Sin doble captura, sin errores.</div>
+      </div>
+      <div class="int-card reveal" style="transition-delay:0.08s;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Rappi_logo.svg/320px-Rappi_logo.svg.png" alt="Rappi" style="height:32px;margin:0 auto 12px;">
+        <div class="int-name">Rappi</div>
+        <div class="int-desc">Sincroniza menu, precios y disponibilidad en tiempo real.</div>
+      </div>
+      <div class="int-card reveal" style="transition-delay:0.16s;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/SAT_logo.svg/200px-SAT_logo.svg.png" alt="SAT CFDI" style="height:32px;margin:0 auto 12px;">
+        <div class="int-name">CFDI 4.0</div>
+        <div class="int-desc">Timbrado automatico, autofactura por QR y reportes fiscales.</div>
+      </div>
+      <div class="int-card reveal" style="transition-delay:0.24s;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Mercado_Pago_Horizontal.svg/200px-Mercado_Pago_Horizontal.svg.png" alt="Mercado Pago" style="height:24px;margin:0 auto 12px;">
+        <div class="int-name">Mercado Pago</div>
+        <div class="int-desc">Cobros con QR, tarjeta y ligas de pago. Conciliacion automatica.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- === CTA FINAL === -->
-<section id="cta-final">
-  <div class="wrap">
-    <div class="cta-final-inner reveal">
-      <h2>Tu restaurante merece operar con <em>inteligencia</em></h2>
-      <p>Agenda una llamada de 15 minutos. Te mostramos el dashboard con datos reales y como se veria en tu restaurante.</p>
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-        <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20quiero%20agendar%20una%20demo%20de%20Fullsite" class="btn-primary" style="font-size:16px;padding:16px 32px;">Agendar demo por WhatsApp &rarr;</a>
-        <a href="/demo.html" class="btn-secondary">Probar demo en vivo</a>
+<!-- ===== PRODUCT PHOTOS ===== -->
+<section class="photos-section" id="photos">
+  <div class="container">
+    <h2 class="photos-heading reveal">Conoce el producto</h2>
+    <div class="photos-grid reveal">
+      <img src="/img-terminal.png" alt="Fullsite POS en tablet" loading="lazy">
+      <img src="/img-dashboard.png" alt="Dashboard de operaciones" loading="lazy">
+      <img src="/img-bartender.png" alt="IA operando en restaurante" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section class="section" id="faq">
+  <div class="container">
+    <h2 class="faq-heading reveal">Preguntas frecuentes</h2>
+    <div class="faq-list reveal">
+      <details class="faq-item">
+        <summary>Cuanto tiempo toma la instalacion?</summary>
+        <div class="faq-answer">48 horas. Conectamos tu POS, configuramos los agentes y calibramos las alertas con tus datos reales. Al tercer dia ya tienes tu primer briefing en WhatsApp.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Funciona con mi sistema POS actual?</summary>
+        <div class="faq-answer">Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Tengo que cambiar de POS?</summary>
+        <div class="faq-answer">No necesariamente. Fullsite funciona como capa de IA sobre tu POS actual. Pero tambien incluye POS completo por si quieres consolidar todo en un sistema.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Que pasa si no me gusta?</summary>
+        <div class="faq-answer">60 dias de garantia. Si en 2 meses no ves valor, te devolvemos el setup completo. Sin preguntas. Tu equipo sigue usando su POS como antes.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Como funciona la IA? Necesito saber de tecnologia?</summary>
+        <div class="faq-answer">No. Los agentes trabajan solos. Tu recibes reportes, alertas y respuestas por WhatsApp. Es como tener un analista que trabaja 24/7 y nunca se equivoca de formato.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Mis datos estan seguros?</summary>
+        <div class="faq-answer">Si. Usamos Supabase (PostgreSQL) con encriptacion en transito y reposo, Row Level Security, y cumplimos con regulaciones de proteccion de datos en Mexico. Tus datos nunca se comparten.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Tienen contrato de permanencia?</summary>
+        <div class="faq-answer">No. Mes a mes. Cancelas cuando quieras. Creemos que si te quedas es porque ves resultados, no porque firmaste un contrato.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Puedo empezar con una sucursal y expandir despues?</summary>
+        <div class="faq-answer">Si. De hecho es lo que recomendamos. Empiezas con una, ves los resultados, y luego conectas las demas. Cada sucursal adicional se activa en 24 horas.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECURITY / TRUST ===== -->
+<section class="section" style="background:#0a0a1a;color:#fff;border-top:none;">
+  <div class="container">
+    <div style="text-align:center;max-width:600px;margin:0 auto 48px;" class="reveal">
+      <div style="font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#10b981;margin-bottom:16px;display:flex;align-items:center;gap:8px;justify-content:center"><span style="width:6px;height:6px;background:#10b981;border-radius:1px;"></span> Seguridad</div>
+      <h2 style="font-size:clamp(32px,5vw,48px);font-weight:600;letter-spacing:-0.03em;line-height:1.1;margin-bottom:16px;">Tu data, <em style="font-family:'Fraunces',serif;font-style:italic;color:#10b981;font-weight:400;">blindada.</em></h2>
+      <p style="font-size:16px;color:rgba(255,255,255,0.6);line-height:1.6;">Los mismos estándares que usan instituciones financieras. Todos nuestros proveedores de infraestructura tienen SOC 2 Type II.</p>
+    </div>
+    <div class="reveal" style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;">
+      <div style="background:#111127;padding:32px 24px;text-align:center">
+        <div style="width:42px;height:42px;border-radius:11px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#10b981,#059669)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">AES-256</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5">TLS 1.3 en tránsito.<br>AES-256 en reposo.</div>
+        <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+      </div>
+      <div style="background:#111127;padding:32px 24px;text-align:center">
+        <div style="width:42px;height:42px;border-radius:11px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#8b5cf6,#7c3aed)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">PCI-DSS</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5">Nunca tocamos<br>datos de tarjeta.</div>
+        <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+      </div>
+      <div style="background:#111127;padding:32px 24px;text-align:center">
+        <div style="width:42px;height:42px;border-radius:11px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f59e0b,#d97706)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">CFDI 4.0</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5">Facturación SAT<br>vía PAC autorizado.</div>
+        <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+      </div>
+      <div style="background:#111127;padding:32px 24px;text-align:center">
+        <div style="width:42px;height:42px;border-radius:11px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#22d3ee,#06b6d4)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">SOC 2</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5">10 políticas.<br>Auditoría en proceso.</div>
+        <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);border:1px solid rgba(255,255,255,0.08)">En proceso</div>
+      </div>
+      <div style="background:#111127;padding:32px 24px;text-align:center">
+        <div style="width:42px;height:42px;border-radius:11px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#ec4899,#db2777)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 10v4M7 10V7a5 5 0 0110 0v3"/><rect x="3" y="10" width="18" height="12" rx="2"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">MFA</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);line-height:1.5">GitHub, Supabase,<br>Vercel, Cloudflare.</div>
+        <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+      </div>
+    </div>
+    <div class="reveal" style="text-align:center;margin-top:32px">
+      <div style="display:flex;justify-content:center;gap:32px;margin-bottom:16px">
+        <div><span style="font-size:20px;font-weight:700;color:#fff">21/21</span><br><span style="font-size:11px;color:rgba(255,255,255,0.45)">controles activos</span></div>
+        <div><span style="font-size:20px;font-weight:700;color:#fff">6</span><br><span style="font-size:11px;color:rgba(255,255,255,0.45)">proveedores SOC 2</span></div>
+        <div><span style="font-size:20px;font-weight:700;color:#fff">5</span><br><span style="font-size:11px;color:rgba(255,255,255,0.45)">certificaciones</span></div>
+      </div>
+    </div>
+
+    <!-- AI GOVERNANCE -->
+    <div class="reveal" style="margin-top:64px">
+      <div style="text-align:center;margin-bottom:32px">
+        <div style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#10b981;margin-bottom:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+          AI Governance
+        </div>
+        <h3 style="font-size:clamp(22px,3vw,28px);font-weight:700;color:#fff;margin-bottom:8px">Nuestros agentes de IA estan <em style="font-family:'Fraunces',serif;font-style:italic;color:#10b981;">constreñidos.</em></h3>
+        <p style="font-size:14px;color:rgba(255,255,255,0.45);max-width:500px;margin:0 auto">30 agentes autonomos operando 24/7 con controles de seguridad en cada capa.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.06);border-radius:16px;overflow:hidden">
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">Agent Audit Trail</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">Cada agente registra START, READ, WRITE y END en un log inmutable.</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">AI Action Controls</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">Solo puede leer 23 tablas whitelisted. SQL peligroso bloqueado automaticamente.</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">Safe Execution</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">Input sanitizado, roles con permisos minimos, ejecucion aislada por agente.</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.06);border-radius:0 0 16px 16px;overflow:hidden;margin-top:1px">
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">Least Privilege Roles</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">Roles PostgreSQL: fullsite_readonly (solo SELECT) y fullsite_agent (SELECT + log).</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">Table Whitelist</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">23 tablas permitidas. Acceso fuera de lista se bloquea y registra.</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
+        <div style="background:#111127;padding:28px 24px">
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:6px">Injection Protection</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.6">REST API parametrizado. Input filtrado contra inyeccion. Sin acceso a DDL.</div>
+          <div style="display:inline-flex;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:12px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2)">Activo</div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- === FOOTER === -->
-<footer>
-  <div class="wrap">
+<!-- ===== CTA ===== -->
+<section class="cta">
+  <div class="container reveal">
+    <h2 class="cta-heading">Tu restaurante merece operar con inteligencia</h2>
+    <p class="cta-sub">Empieza en 48 horas. Sin contrato. Garantia de 60 dias.</p>
+    <div class="cta-buttons">
+      <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="btn btn-white btn-lg">Escribenos por WhatsApp</a>
+      <a href="mailto:daniel@fullsite.mx" class="btn btn-ghost-white btn-lg">Enviar email</a>
+    </div>
+    <p class="cta-email">O escribe directamente a <a href="mailto:daniel@fullsite.mx">daniel@fullsite.mx</a></p>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container">
     <div class="footer-inner">
-      <div class="footer-left">
-        <span class="footer-logo">fullsite<span class="dot"></span></span>
-        <span class="footer-copy">&copy; 2026 Fullsite &middot; Monterrey, MX</span>
-      </div>
+      <span class="footer-logo"><img src="/logo-fullsite.png" alt="fullsite" style="height:22px;filter:brightness(0) invert(1);"></span>
+      <span class="footer-copy">&copy; 2026 Fullsite. Monterrey, Mexico.</span>
       <div class="footer-links">
-        <a href="#bento">Producto</a>
-        
-        <a href="/demo.html">Demo</a>
-        <a href="/blog/">Blog</a>
-        <a href="/privacidad.html">Privacidad</a>
-        <a href="/terminos.html">Terminos</a>
+        <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite">WhatsApp</a>
+        <a href="mailto:daniel@fullsite.mx">Email</a>
+        <a href="https://app.fullsite.mx/login">Log in</a>
       </div>
     </div>
   </div>
 </footer>
 
+<!-- ===== WHATSAPP FLOAT ===== -->
+<a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="wa-float" aria-label="WhatsApp">
+  <svg viewBox="0 0 24 24" fill="#fff" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<!-- ===== SCRIPTS ===== -->
 <script>
-/* === COVER + NAV REVEAL === */
-(function(){
-  var cover = document.getElementById('cover');
-  var nav = document.getElementById('nav');
-  setTimeout(function(){
-    cover.classList.add('exit');
-    nav.classList.add('visible');
-  }, 2200);
-})();
-
-/* === SCROLL REVEAL === */
-(function(){
-  var ro = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('visible'); });
-  }, {threshold:0.08, rootMargin:'0px 0px -40px 0px'});
-  document.querySelectorAll('.reveal').forEach(function(el){ ro.observe(el); });
-})();
-
-/* === WHATSAPP TABS === */
-(function(){
-  var tabs = document.querySelectorAll('.wa-tab');
-  var panels = document.querySelectorAll('.wa-panel');
-  tabs.forEach(function(tab){
-    tab.addEventListener('click', function(){
-      var idx = this.getAttribute('data-tab');
-      tabs.forEach(function(t){ t.classList.remove('active'); });
-      panels.forEach(function(p){ p.classList.remove('active'); });
-      this.classList.add('active');
-      document.querySelector('.wa-panel[data-panel="'+idx+'"]').classList.add('active');
+// Hamburger menu
+(function() {
+  var btn = document.getElementById('hamburger');
+  var menu = document.getElementById('mobile-menu');
+  btn.addEventListener('click', function() {
+    menu.classList.toggle('open');
+  });
+  // Close on link click
+  menu.querySelectorAll('a').forEach(function(a) {
+    a.addEventListener('click', function() {
+      menu.classList.remove('open');
     });
   });
 })();
 
-/* === MOBILE MENU === */
-(function(){
-  var btn = document.getElementById('hamburger');
-  var menu = document.getElementById('mobile-menu');
-  if(!btn || !menu) return;
-  btn.addEventListener('click', function(){
-    menu.classList.toggle('open');
-  });
-  menu.querySelectorAll('a').forEach(function(a){
-    a.addEventListener('click', function(){ menu.classList.remove('open'); });
-  });
+// Scroll reveal with IntersectionObserver
+(function() {
+  var els = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    els.forEach(function(el) { obs.observe(el); });
+  } else {
+    els.forEach(function(el) { el.classList.add('visible'); });
+  }
 })();
 
-/* === EXIT-INTENT POPUP === */
-(function(){
-  var shown = false;
-  var key = 'fs_exit_shown';
-  if(sessionStorage.getItem(key)) return;
-  document.addEventListener('mouseout', function(e){
-    if(shown) return;
-    if(e.clientY > 10) return;
-    if(e.relatedTarget || e.toElement) return;
-    shown = true;
-    sessionStorage.setItem(key, '1');
-    document.getElementById('exit-modal').classList.add('show');
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    var target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
-  var overlay = document.getElementById('exit-modal');
-  if(!overlay) return;
-  overlay.addEventListener('click', function(e){
-    if(e.target === overlay) overlay.classList.remove('show');
-  });
-  var closeBtn = overlay.querySelector('.exit-close');
-  if(closeBtn) closeBtn.addEventListener('click', function(){ overlay.classList.remove('show'); });
-})();
-
+});
 </script>
 
-<!-- Exit-intent modal -->
-<div id="exit-modal" class="exit-overlay">
-  <div class="exit-card">
-    <button class="exit-close" aria-label="Cerrar">&times;</button>
-    <h3>Antes de <em>irte...</em></h3>
-    <p>Agenda una demo de 15 minutos. Sin compromiso. Te mostramos el sistema con datos reales de un restaurante.</p>
-    <a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20vi%20la%20pagina%20de%20Fullsite%20y%20me%20interesa%20una%20demo" class="exit-cta">Agendar por WhatsApp &rarr;</a>
-    <p class="exit-sub">Sin contrato &middot; Garantia 60 dias</p>
-  </div>
-</div>
-
-<!-- WhatsApp Float -->
-<a href="https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="wa-float" aria-label="WhatsApp">
-  <svg viewBox="0 0 24 24" fill="#fff" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-</a>
-
+<!-- PostHog -->
 <script>
 !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once unregister opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking reset isFeatureEnabled getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group identify setPersonProperties".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
 posthog.init('phc_placeholder',{api_host:'https://us.i.posthog.com',person_profiles:'identified_only'});
