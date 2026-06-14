@@ -82,7 +82,7 @@
       "name": "Funciona con mi sistema POS actual?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Si. Nos conectamos a cualquier sistema POS con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo."
+        "text": "Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo."
       }
     },
     {
@@ -723,61 +723,6 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
 }
 .exit-cta:hover{background:var(--accent-2);transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-glow);}
 .exit-sub{font-size:13px;color:var(--ink-3);margin-top:12px;}
-
-/* === INTEGRATIONS === */
-#integraciones-section{background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.integ-header{text-align:center;max-width:600px;margin:0 auto 48px;}
-.integ-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
-.integ-card{
-  background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015));
-  border:1px solid var(--line);border-radius:20px;
-  padding:28px;text-align:center;position:relative;overflow:hidden;
-  transition:transform .3s var(--ease-spring),border-color .3s;
-}
-.integ-card:hover{transform:translateY(-2px);border-color:var(--line-2);}
-.integ-card:hover::before{opacity:1;}
-.integ-card::before{
-  content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
-  background:var(--accent);filter:blur(4px);opacity:0;transition:opacity .3s;
-}
-.integ-icon{font-size:36px;margin-bottom:14px;display:block;}
-.integ-card h3{font-size:17px;font-weight:500;letter-spacing:-0.02em;color:var(--ink);margin-bottom:6px;}
-.integ-card p{font-size:14px;color:var(--ink-2);line-height:1.5;}
-@media(max-width:1024px){.integ-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:480px){.integ-grid{grid-template-columns:1fr;}}
-
-/* === PRODUCT PHOTOS === */
-#product-photos{background:var(--bg);padding:100px 0;}
-.photos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
-.photos-grid img{
-  width:100%;aspect-ratio:4/3;object-fit:cover;
-  border-radius:16px;border:1px solid var(--line-2);
-  transition:transform .4s var(--ease-spring),box-shadow .4s;
-}
-.photos-grid img:hover{transform:scale(1.03);box-shadow:0 16px 48px rgba(0,0,0,0.3);}
-@media(max-width:768px){.photos-grid{grid-template-columns:1fr;}}
-
-/* === COMPARISON TABLE === */
-#comparison{background:var(--bg);padding-top:0;}
-.comp-header{text-align:center;max-width:600px;margin:0 auto 48px;}
-.comp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.comp-table{
-  width:100%;border-collapse:separate;border-spacing:0;
-  border:1px solid var(--line-2);border-radius:16px;overflow:hidden;
-}
-.comp-table th,.comp-table td{padding:16px 20px;text-align:center;font-size:14px;border-bottom:1px solid var(--line);}
-.comp-table th{font-weight:600;color:var(--ink);background:var(--bg-3);font-size:13px;letter-spacing:0.04em;text-transform:uppercase;}
-.comp-table td{color:var(--ink-2);background:var(--bg-1);}
-.comp-table td:first-child{text-align:left;font-weight:500;color:var(--ink-1);}
-.comp-table tr:last-child td{border-bottom:none;}
-.comp-table th.comp-highlight,.comp-table td.comp-highlight{
-  background:rgba(0,255,136,0.06);border-left:1px solid rgba(0,255,136,0.15);border-right:1px solid rgba(0,255,136,0.15);
-}
-.comp-table th.comp-highlight{background:rgba(0,255,136,0.12);color:var(--accent);}
-.comp-yes{color:var(--accent);font-size:18px;}
-.comp-no{color:var(--coral);font-size:18px;}
-.comp-partial{color:var(--amber);font-size:18px;}
-@media(max-width:768px){.comp-table th,.comp-table td{padding:12px 10px;font-size:13px;}}
 </style>
 </head>
 <body>
@@ -804,7 +749,7 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
     <a href="/" class="nav-logo">fullsite<span class="dot"></span></a>
     <div class="nav-links">
       <a href="#bento">Producto</a>
-      <a href="#integraciones-section">Integraciones</a>
+      <a href="#pricing">Precios</a>
       <a href="/demo.html">Demo</a>
       <a href="/integraciones.html">Integraciones</a>
       <a href="/blog/">Blog</a>
@@ -824,7 +769,7 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
 <!-- === MOBILE MENU === -->
 <div id="mobile-menu">
   <a href="#bento" class="mobile-link">Producto</a>
-  <a href="#integraciones-section" class="mobile-link">Integraciones</a>
+  <a href="#pricing" class="mobile-link">Precios</a>
   <a href="/demo.html" class="mobile-link">Demo</a>
   <a href="/integraciones.html" class="mobile-link">Integraciones</a>
   <a href="/blog/" class="mobile-link">Blog</a>
@@ -851,15 +796,15 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
         </div>
         <div class="hero-stats reveal rd4">
           <div class="hero-stat">
-            <span class="hero-stat-val">$72M+</span>
+            <span class="hero-stat-val">$70M+</span>
             <span class="hero-stat-label">MXN analizados</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">97K+</span>
+            <span class="hero-stat-val">181K+</span>
             <span class="hero-stat-label">Tickets</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">883</span>
+            <span class="hero-stat-val">869</span>
             <span class="hero-stat-label">Dias operando</span>
           </div>
           <div class="hero-stat">
@@ -1255,98 +1200,21 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
   <div class="wrap">
     <div class="stats-card reveal">
       <div>
-        <div class="stat-big"><em>$72M+</em></div>
+        <div class="stat-big"><em>$70M+</em></div>
         <div class="stat-desc">MXN en ventas analizadas</div>
       </div>
       <div>
-        <div class="stat-big"><em>97K+</em></div>
+        <div class="stat-big"><em>181K+</em></div>
         <div class="stat-desc">Tickets procesados</div>
       </div>
       <div>
-        <div class="stat-big"><em>883</em></div>
+        <div class="stat-big"><em>869</em></div>
         <div class="stat-desc">Dias operando</div>
       </div>
       <div>
         <div class="stat-big"><em>24/7</em></div>
         <div class="stat-desc">Monitoreo autonomo</div>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- === INTEGRATIONS === -->
-<section id="integraciones-section">
-  <div class="wrap">
-    <div class="integ-header reveal">
-      <div class="eyebrow">Integraciones</div>
-      <h2 class="display">Delivery directo al <em>POS</em></h2>
-    </div>
-    <div class="integ-grid">
-      <div class="integ-card reveal">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Uber_Eats_2020_logo.svg/320px-Uber_Eats_2020_logo.svg.png" alt="Uber Eats" style="height:24px;filter:brightness(0) invert(1);opacity:.8;margin:0 auto 12px;">
-        <h3>Uber Eats</h3>
-        <p>Ordenes de Uber Eats directo a tu cocina, sin tablet extra.</p>
-      </div>
-      <div class="integ-card reveal rd1">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Rappi_logo.svg/320px-Rappi_logo.svg.png" alt="Rappi" style="height:28px;filter:brightness(0) invert(1);opacity:.8;margin:0 auto 12px;">
-        <h3>Rappi</h3>
-        <p>Recibe pedidos de Rappi sin duplicar captura manual.</p>
-      </div>
-      <div class="integ-card reveal rd2">
-        <span class="integ-icon">&#x26A1;</span>
-        <h3>CFDI 4.0</h3>
-        <p>Facturacion electronica automatica con cada corte de caja.</p>
-      </div>
-      <div class="integ-card reveal rd3">
-        <span class="integ-icon">&#x1F4B3;</span>
-        <h3>Mercado Pago</h3>
-        <p>Cobros con QR y terminal integrados al POS.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- === PRODUCT PHOTOS === -->
-<section id="product-photos">
-  <div class="wrap">
-    <div class="photos-grid reveal">
-      <img src="/img-terminal.png" alt="Terminal Fullsite POS" loading="lazy">
-      <img src="/img-dashboard.png" alt="Dashboard Fullsite" loading="lazy">
-      <img src="/img-bartender.png" alt="Bartender usando Fullsite" loading="lazy">
-    </div>
-  </div>
-</section>
-
-<!-- === COMPARISON TABLE === -->
-<section id="comparison">
-  <div class="wrap">
-    <div class="comp-header reveal">
-      <div class="eyebrow">Comparativa</div>
-      <h2 class="display">Por que elegir <em>Fullsite</em></h2>
-    </div>
-    <div class="comp-table-wrap reveal rd1">
-      <table class="comp-table">
-        <thead>
-          <tr>
-            <th>Funcionalidad</th>
-            <th class="comp-highlight">Fullsite</th>
-            <th>POS tradicional</th>
-            <th>POS con tablet</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>POS completo</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-yes">&#10003;</span></td><td><span class="comp-yes">&#10003;</span></td></tr>
-          <tr><td>Funciona offline</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-yes">&#10003;</span></td><td><span class="comp-partial">&#9888;</span></td></tr>
-          <tr><td>Copiloto IA (12 agentes)</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-no">&#10007;</span></td></tr>
-          <tr><td>Facturacion CFDI 4.0</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-partial">&#9888;</span></td><td><span class="comp-partial">&#9888;</span></td></tr>
-          <tr><td>Integracion Uber/Rappi</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-partial">&#9888;</span></td></tr>
-          <tr><td>Sin hardware propietario</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-yes">&#10003;</span></td></tr>
-          <tr><td>Anti-fraude automatico</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-no">&#10007;</span></td></tr>
-          <tr><td>Food cost por receta</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-partial">&#9888;</span></td><td><span class="comp-no">&#10007;</span></td></tr>
-          <tr><td>Reportes por WhatsApp</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-no">&#10007;</span></td></tr>
-          <tr><td>Datos en la nube</td><td class="comp-highlight"><span class="comp-yes">&#10003;</span></td><td><span class="comp-no">&#10007;</span></td><td><span class="comp-yes">&#10003;</span></td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </section>
@@ -1395,7 +1263,7 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
   </div>
 </section>
 
-<!-- === PRICING (HIDDEN) ===
+<!-- === PRICING === -->
 <section id="pricing">
   <div class="wrap">
     <div class="pricing-layout reveal">
@@ -1480,7 +1348,6 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
     </div>
   </div>
 </section>
-END PRICING HIDDEN -->
 
 <!-- === FAQ (light) === -->
 <section id="faq">
@@ -1495,7 +1362,7 @@ END PRICING HIDDEN -->
         </details>
         <details class="faq-item">
           <summary>Funciona con mi sistema POS actual?<span class="faq-icon">+</span></summary>
-          <p>Si. Nos conectamos a cualquier sistema POS con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</p>
+          <p>Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</p>
         </details>
         <details class="faq-item">
           <summary>Tengo que cambiar de POS?<span class="faq-icon">+</span></summary>
@@ -1550,7 +1417,7 @@ END PRICING HIDDEN -->
       </div>
       <div class="footer-links">
         <a href="#bento">Producto</a>
-        <a href="#integraciones-section">Integraciones</a>
+        <a href="#pricing">Precios</a>
         <a href="/demo.html">Demo</a>
         <a href="/blog/">Blog</a>
         <a href="/privacidad.html">Privacidad</a>
