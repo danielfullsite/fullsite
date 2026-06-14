@@ -2564,7 +2564,7 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 p-3 auto-rows-fr">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 gap-2.5 p-3 auto-rows-fr">
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
