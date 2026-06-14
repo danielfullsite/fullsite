@@ -48,6 +48,14 @@ DEFAULT_PROSPECTS = [
     {"name": "Equipo Carolo", "restaurant": "Grupo Carolo", "email": "contacto@grupocarolo.com.mx"},
     {"name": "Equipo Anderson's", "restaurant": "Grupo Anderson's", "email": "contacto@grupoandersons.com"},
     {"name": "Equipo Origo", "restaurant": "Grupo Origo", "email": "contacto@grupoorigo.mx"},
+    {"name": "Equipo Sanborns", "restaurant": "Grupo Sanborns", "email": "inversionistas@gcarso.com.mx"},
+    {"name": "Equipo Café de Tacuba", "restaurant": "Café de Tacuba", "email": "reservaciones@cafedetacuba.mx"},
+    {"name": "Equipo Azul", "restaurant": "Azul Restaurantes", "email": "contacto@azul.rest"},
+    {"name": "Equipo Alme", "restaurant": "Grupo Alme", "email": "contacto@grupoalme.mx"},
+    {"name": "Equipo BWW", "restaurant": "Buffalo Wild Wings México", "email": "contacto@buffalowildwings.com.mx"},
+    {"name": "Equipo BHW", "restaurant": "Buffalo's Hot Wings Monterrey", "email": "contacto@buffaloshotwings.com"},
+    {"name": "Equipo GRG", "restaurant": "Grupo Restaurantero Gigante", "email": "contacto@gruporestauranterogigante.com.mx"},
+    {"name": "Equipo Lalo", "restaurant": "Lalo Café CDMX", "email": "hola@eat-lalo.com"},
 ]
 
 
