@@ -160,16 +160,21 @@ export default function MesasPage() {
       .catch(() => { /* */ })
   }, [])
 
-  // Escala del plano: se ajusta al ancho disponible (tablet/celular) sin scroll horizontal
+  // Escala del plano: se ajusta al ancho Y alto disponible para que quepa sin scroll
   const PLANO_BASE_W = 940
   const PLANO_BASE_H = 940 * 0.82
   const planoWrapRef = useRef<HTMLDivElement>(null)
   const [planoScale, setPlanoScale] = useState(1)
   useEffect(() => {
-    // Leer el ref al momento del evento: la vista interna se re-monta en cada render
     const update = () => {
       const el = planoWrapRef.current
-      if (el) setPlanoScale(Math.min(1, el.clientWidth / PLANO_BASE_W))
+      if (el) {
+        const scaleW = el.clientWidth / PLANO_BASE_W
+        // Available height: viewport minus header (~130px)
+        const availH = window.innerHeight - 140
+        const scaleH = availH / PLANO_BASE_H
+        setPlanoScale(Math.min(1, scaleW, scaleH))
+      }
     }
     update()
     window.addEventListener('resize', update)
