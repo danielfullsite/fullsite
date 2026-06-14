@@ -209,9 +209,17 @@ function bytesToBase64(data: Uint8Array): string {
   return btoa(bin)
 }
 
-/** Imprime vía bridge. Devuelve false si el bridge no está o falla (→ fallback). */
+/** Imprime vía bridge. Si falla, encola para retry automático. */
 async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<boolean> {
-  if (!(await isBridgeAvailable())) return false
+  if (!(await isBridgeAvailable())) {
+    // Bridge not available — enqueue for retry
+    try {
+      const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
+      enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
+      startRetryLoop()
+    } catch { /* print-queue not available */ }
+    return false
+  }
   try {
     const res = await fetch(`${BRIDGE_URL}/print`, {
       method: 'POST',
@@ -220,6 +228,12 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
     })
     if (!res.ok) {
       console.warn(`[printer] Bridge /print HTTP ${res.status}`)
+      // Enqueue failed print for retry
+      try {
+        const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
+        enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
+        startRetryLoop()
+      } catch { /* */ }
       return false
     }
     console.log(`[printer] Bridge imprimió ${bytes.length} bytes${station ? ` (${station})` : ''}`)
@@ -227,6 +241,12 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
   } catch (e) {
     console.warn('[printer] Bridge print falló:', e)
     bridgeAvailable = false
+    // Enqueue for retry
+    try {
+      const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
+      enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
+      startRetryLoop()
+    } catch { /* */ }
     return false
   }
 }
