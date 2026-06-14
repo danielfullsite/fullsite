@@ -2185,7 +2185,7 @@ function POSContent() {
       {/* Top Bar */}
       <header className="pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
-        <div className="flex items-center justify-between px-3 py-1.5">
+        <div className="flex items-center justify-between px-3 py-1">
           <div className="flex items-center gap-2">
             <button onClick={() => setShowNav(!showNav)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
               {showNav ? <X size={18} /> : <Menu size={18} />}
@@ -2347,8 +2347,8 @@ function POSContent() {
       {/* Nav overlay */}
       {showNav && (
         <div className="fixed inset-0 z-40 flex" onClick={() => setShowNav(false)}>
-          <div className="w-64 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-3">Navegacion</p>
+          <div className="w-64 bg-[var(--surface-2)] border-r border-[var(--line)] p-4 shadow-2xl overflow-y-auto max-h-[100dvh]" onClick={e => e.stopPropagation()}>
+            <p className="text-[var(--text-2)] text-xs font-semibold uppercase mb-2">Navegacion</p>
             <div className="space-y-1">
               {[
                 { href: '/pos/mesas', icon: Grid3X3, label: 'Mesas', section: 'mesas' },
@@ -2372,7 +2372,7 @@ function POSContent() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setShowNav(false)}
-                  className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-emerald-500/10 transition-colors min-h-[48px]"
+                  className="flex items-center gap-3 px-4 py-1.5 rounded-xl text-[var(--text-4)] hover:bg-[var(--line)] hover:text-white active:bg-emerald-500/10 transition-colors min-h-[40px]"
                 >
                   <item.icon size={18} />
                   <span className="text-sm font-medium">{item.label}</span>
@@ -2552,7 +2552,7 @@ function POSContent() {
           </div>
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
-          <div className="border-t border-[var(--line)] px-3 py-2 bg-[var(--surface-2)]/50 flex-shrink-0">
+          <div className="border-t border-[var(--line)] px-3 py-1.5 bg-[var(--surface-2)]/50 flex-shrink-0">
             {/* Silla activa + Tiempos row (estilo Wansoft CANT/SILLA + firebutton) */}
             <div className="flex items-center gap-1.5 mb-1.5">
               <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-500/25 rounded-lg px-1.5 py-1">
@@ -2723,11 +2723,11 @@ function POSContent() {
           </div>
 
           {/* Action buttons — compact for tablets */}
-          <div className="px-3 py-2 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
+          <div className="px-3 py-1.5 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               <Send size={18} />
               {saving ? '...' : sentToKitchen ? 'Enviado' : 'Cocina'}
@@ -2735,7 +2735,7 @@ function POSContent() {
             <button
               onClick={handlePreTicket}
               disabled={activeItems.length === 0 || saving}
-              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               <Receipt size={16} />
               Cuenta
@@ -2743,7 +2743,7 @@ function POSContent() {
             <button
               onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
               disabled={activeItems.length === 0 || saving || isMobileRestricted}
-              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
             >
               Split
@@ -2751,7 +2751,7 @@ function POSContent() {
             <button
               onClick={handleCloseOrder}
               disabled={activeItems.length === 0 || saving || isMobileRestricted}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-3 rounded-xl text-base transition-all min-h-[60px]"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
               title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
             >
               <CreditCard size={18} />
@@ -2825,7 +2825,7 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 gap-2.5 p-3 auto-rows-fr">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 p-3 auto-rows-fr">
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
@@ -2835,7 +2835,7 @@ function POSContent() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-80 text-white hover:opacity-100 active:scale-95`}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[56px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-80 text-white hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
