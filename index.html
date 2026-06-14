@@ -50,11 +50,9 @@
   "description": "El primer POS con IA que te dice que hacer. Briefings, alertas, anti-fraude, menu engineering y WhatsApp bot para restaurantes.",
   "offers": {
     "@type": "Offer",
-    "price": "4999",
     "priceCurrency": "MXN",
-    "priceValidUntil": "2027-12-31",
     "availability": "https://schema.org/InStock",
-    "url": "https://fullsite.mx/precios.html"
+    "url": "https://fullsite.mx/"
   },
   "aggregateRating": {
     "@type": "AggregateRating",
@@ -82,7 +80,7 @@
       "name": "Funciona con mi sistema POS actual?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo."
+        "text": "Si. Nos conectamos a cualquier sistema POS con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo."
       }
     },
     {
@@ -553,46 +551,36 @@ h2.display em{font-family:var(--serif);font-style:italic;color:var(--accent);fon
 .sol-card p{font-size:13px;color:var(--ink-2);line-height:1.45;margin-bottom:12px;}
 .sol-link{font-size:13px;font-weight:600;color:var(--accent);}
 
-/* === PRICING === */
-#pricing{background:var(--bg);}
-.pricing-layout{max-width:960px;margin:0 auto;text-align:center;}
-.pricing-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:2rem;}
-@media(max-width:768px){.pricing-grid-3{grid-template-columns:1fr;}}
-.pricing-card{
-  background:var(--bg-2);overflow:hidden;position:relative;
+/* === INTEGRATIONS === */
+.integ-section{background:var(--bg);padding:100px 0;}
+.integ-header{text-align:center;max-width:600px;margin:0 auto 48px;}
+.integ-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.integ-card{
+  background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015));
+  border:1px solid var(--line);border-radius:20px;
+  padding:32px 24px;text-align:center;
+  transition:transform .3s var(--ease-spring),border-color .3s;
 }
-.pricing-card.featured{background:var(--bg-3,#0e1117);}
-.pricing-card.featured::before{
-  content:'MAS POPULAR';position:absolute;top:-1px;left:50%;transform:translateX(-50%);
-  font-size:11px;font-weight:700;letter-spacing:0.12em;color:var(--ink-dark);
-  background:var(--accent);padding:4px 16px;border-radius:0 0 8px 8px;
+.integ-card:hover{transform:translateY(-2px);border-color:var(--line-2);}
+.integ-card .integ-icon{font-size:40px;margin-bottom:16px;display:block;}
+.integ-card .integ-logo{height:40px;margin:0 auto 16px;filter:brightness(0) invert(1);object-fit:contain;}
+.integ-card h3{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;letter-spacing:-0.01em;}
+.integ-card p{font-size:13px;color:var(--ink-2);line-height:1.5;}
+@media(max-width:768px){.integ-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.integ-grid{grid-template-columns:1fr;}}
+
+/* === PRODUCT PHOTOS === */
+.photos-section{padding:80px 0;}
+.photos-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
+  max-width:var(--max);margin:0 auto;padding:0 var(--pad);
 }
-.pricing-inner{padding:40px 32px 32px;}
-.pricing-name{font-size:13px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px;}
-.pricing-tagline{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink);margin-bottom:20px;}
-.pricing-price{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--line);}
-.pricing-amount{font-size:clamp(36px,4vw,48px);font-weight:700;color:var(--accent);letter-spacing:-0.02em;}
-.pricing-period{font-size:14px;color:var(--ink-3);}
-.pricing-setup{font-size:13px;color:var(--ink-3);margin-top:4px;}
-.pricing-features{display:flex;flex-direction:column;text-align:left;}
-.pf-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
-.pf-row:last-child{border-bottom:none;}
-.pf-check{color:var(--accent);font-size:16px;flex-shrink:0;}
-.pf-label{font-size:15px;color:var(--ink-1);}
-.pricing-cta-btn{
-  display:block;width:100%;text-align:center;margin-top:24px;padding:16px;
-  border-radius:99px;font-size:16px;font-weight:600;
-  background:var(--accent);color:var(--ink-dark);
-  box-shadow:0 0 24px var(--accent-glow);transition:all .2s;
+.photos-grid img{
+  width:100%;border-radius:16px;border:1px solid var(--line-2);
+  transition:transform .3s var(--ease-spring);
 }
-.pricing-cta-btn:hover{background:var(--accent-2);transform:translateY(-1px);box-shadow:0 8px 28px var(--accent-glow);}
-.pricing-note{font-size:13px;color:var(--ink-3);margin-top:12px;}
-.pricing-guarantee{
-  margin-top:24px;padding:20px;border:1px solid var(--line);border-radius:12px;
-  background:var(--bg-1);text-align:left;
-}
-.pricing-guarantee p{font-size:14px;color:var(--ink-2);line-height:1.5;}
-.pricing-guarantee strong{color:var(--ink);}
+.photos-grid img:hover{transform:scale(1.02);}
+@media(max-width:768px){.photos-grid{grid-template-columns:1fr;}}
 
 /* === FAQ (light) === */
 #faq{background:var(--bg-light);color:var(--ink-dark);}
@@ -796,15 +784,15 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
         </div>
         <div class="hero-stats reveal rd4">
           <div class="hero-stat">
-            <span class="hero-stat-val">$70M+</span>
+            <span class="hero-stat-val">$72M+</span>
             <span class="hero-stat-label">MXN analizados</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">181K+</span>
+            <span class="hero-stat-val">97K+</span>
             <span class="hero-stat-label">Tickets</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">869</span>
+            <span class="hero-stat-val">883</span>
             <span class="hero-stat-label">Dias operando</span>
           </div>
           <div class="hero-stat">
@@ -1200,15 +1188,15 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
   <div class="wrap">
     <div class="stats-card reveal">
       <div>
-        <div class="stat-big"><em>$70M+</em></div>
+        <div class="stat-big"><em>$72M+</em></div>
         <div class="stat-desc">MXN en ventas analizadas</div>
       </div>
       <div>
-        <div class="stat-big"><em>181K+</em></div>
+        <div class="stat-big"><em>97K+</em></div>
         <div class="stat-desc">Tickets procesados</div>
       </div>
       <div>
-        <div class="stat-big"><em>869</em></div>
+        <div class="stat-big"><em>883</em></div>
         <div class="stat-desc">Dias operando</div>
       </div>
       <div>
@@ -1216,6 +1204,47 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
         <div class="stat-desc">Monitoreo autonomo</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- === INTEGRACIONES === -->
+<section class="integ-section">
+  <div class="wrap">
+    <div class="integ-header reveal">
+      <div class="eyebrow">Integraciones</div>
+      <h2 class="display">Delivery directo al <em>POS</em></h2>
+    </div>
+    <div class="integ-grid">
+      <div class="integ-card reveal">
+        <img class="integ-logo" src="https://upload.wikimedia.org/wikipedia/commons/6/6b/Uber_Eats_2020_logo.svg" alt="Uber Eats" loading="lazy">
+        <h3>Uber Eats</h3>
+        <p>Ordenes de Uber Eats directo a tu cocina. Sin tablet extra.</p>
+      </div>
+      <div class="integ-card reveal rd1">
+        <img class="integ-logo" src="https://upload.wikimedia.org/wikipedia/commons/d/d2/Rappi_logo_2018.svg" alt="Rappi" loading="lazy">
+        <h3>Rappi</h3>
+        <p>Pedidos de Rappi integrados al flujo de tu POS automaticamente.</p>
+      </div>
+      <div class="integ-card reveal rd2">
+        <span class="integ-icon">&#9889;</span>
+        <h3>CFDI 4.0</h3>
+        <p>Facturacion electronica automatica. Timbrado directo desde el corte.</p>
+      </div>
+      <div class="integ-card reveal rd3">
+        <span class="integ-icon">&#128179;</span>
+        <h3>Mercado Pago</h3>
+        <p>Cobros con QR, link de pago y terminal integrada. Comisiones competitivas.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === PRODUCT PHOTOS === -->
+<section class="photos-section">
+  <div class="photos-grid reveal">
+    <img src="/img-terminal.png" alt="Terminal POS Fullsite" loading="lazy">
+    <img src="/img-dashboard.png" alt="Dashboard Fullsite" loading="lazy">
+    <img src="/img-bartender.png" alt="Bartender usando Fullsite" loading="lazy">
   </div>
 </section>
 
@@ -1229,31 +1258,31 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
       <h2 class="display">Para tu tipo de <em>restaurante</em></h2>
     </div>
     <div class="sol-grid">
-      <a href="/soluciones/restaurante-premium.html" class="sol-card reveal">
+      <a href="#" class="sol-card reveal">
         <span class="sol-icon">&#9733;</span>
         <h3>Restaurante premium</h3>
         <p>Fine dining, servicio de mesa, reservaciones VIP, experiencia personalizada</p>
         <span class="sol-link">Explorar &rarr;</span>
       </a>
-      <a href="/soluciones/cafeteria.html" class="sol-card reveal rd1">
+      <a href="#" class="sol-card reveal rd1">
         <span class="sol-icon">&#9749;</span>
         <h3>Cafeteria</h3>
         <p>Alto volumen, rotacion rapida, menus cambiantes, takeaway</p>
         <span class="sol-link">Explorar &rarr;</span>
       </a>
-      <a href="/soluciones/bar.html" class="sol-card reveal rd2">
+      <a href="#" class="sol-card reveal rd2">
         <span class="sol-icon">&#127863;</span>
         <h3>Bar</h3>
         <p>Control de bebidas, anti-fraude de barra, tabs, happy hour</p>
         <span class="sol-link">Explorar &rarr;</span>
       </a>
-      <a href="/soluciones/dark-kitchen.html" class="sol-card reveal rd3">
+      <a href="#" class="sol-card reveal rd3">
         <span class="sol-icon">&#9889;</span>
         <h3>Dark kitchen</h3>
         <p>Multi-marca, delivery integrado, KDS multi-estacion</p>
         <span class="sol-link">Explorar &rarr;</span>
       </a>
-      <a href="/soluciones/multi-sucursal.html" class="sol-card reveal rd4">
+      <a href="#" class="sol-card reveal rd4">
         <span class="sol-icon">&#9881;</span>
         <h3>Multi-sucursal</h3>
         <p>Dashboard centralizado, benchmarks entre unidades</p>
@@ -1262,8 +1291,6 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
     </div>
   </div>
 </section>
-
-<!-- pricing section removed -->
 
 <!-- === FAQ (light) === -->
 <section id="faq">
@@ -1278,7 +1305,7 @@ footer{padding:48px 0 24px;border-top:1px solid var(--line);}
         </details>
         <details class="faq-item">
           <summary>Funciona con mi sistema POS actual?<span class="faq-icon">+</span></summary>
-          <p>Si. Nos conectamos a Wansoft, Soft Restaurant, Square, Toast, Clip, Aloha y cualquier sistema con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</p>
+          <p>Si. Nos conectamos a cualquier sistema POS con API o exportacion de datos. Si el tuyo no esta en la lista, lo evaluamos sin costo.</p>
         </details>
         <details class="faq-item">
           <summary>Tengo que cambiar de POS?<span class="faq-icon">+</span></summary>
