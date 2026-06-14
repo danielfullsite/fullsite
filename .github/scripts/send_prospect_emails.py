@@ -40,6 +40,8 @@ DEFAULT_PROSPECTS = [
     {"name": "Equipo GIM", "restaurant": "Grupo GIM", "email": "info@grupogim.com.mx"},
     {"name": "Equipo Estancia", "restaurant": "Grupo Estancia", "email": "atencion.clientes@grupoestancia.com"},
     {"name": "Equipo Hunan", "restaurant": "Grupo Hunan", "email": "contacto@grupohunan.com"},
+    {"name": "Equipo Pangea", "restaurant": "Grupo Pangea", "email": "pangea@grupopangea.com"},
+    {"name": "Equipo Sonora Grill", "restaurant": "Sonora Grill Group", "email": "contacto@sggroup.com.mx"},
 ]
 
 
