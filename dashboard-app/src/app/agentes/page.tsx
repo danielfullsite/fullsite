@@ -1,227 +1,383 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
-import { Bot, AlertTriangle, TrendingUp, Users, UtensilsCrossed, Shield, Truck, Trash2, Clock, ChefHat, HandCoins, CloudSun, Target, RefreshCw, Timer, Package, MessageCircle, BarChart3, Calendar, Zap, FileText, Activity, Bell, Sparkles, Settings, Star } from 'lucide-react'
-import { getDeepTable } from '@/lib/data'
+import {
+  Bot, Activity, Clock, Zap, CheckCircle, XCircle, AlertTriangle, Search,
+  ChevronUp, ChevronDown, RefreshCw, Filter,
+} from 'lucide-react'
+import KPICard from '@/components/KPICard'
+import PageHeader from '@/components/PageHeader'
 
-interface AgentResult {
+/* ── Types ─────────────────────────────────────────────────────────── */
+
+interface AgentRun {
   agent_id: string
-  fecha: string
-  data: unknown
-  summary: string
-  priority: string
-  updated_at: string
+  status: string
+  created_at: string
+  duration_ms: number | null
+  tentacle: string | null
+  tokens_used: number | null
 }
 
-const AGENTS = [
-  { id: 'anomaly', name: 'Anomalías', icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-500/8', desc: 'Detecta métricas fuera de patrón', href: '/agentes/anomalias' },
-  { id: 'predictor', name: 'Predicción de Cierre', icon: Target, color: 'text-blue-500', bg: 'bg-blue-500/10', desc: 'Proyecta cómo cierra el día', href: '/agentes/prediccion' },
-  { id: 'upselling', name: 'Upselling', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10', desc: 'Oportunidades de venta adicional', href: '/agentes/upselling' },
-  { id: 'menu-engineering', name: 'Menu Engineering', icon: UtensilsCrossed, color: 'text-violet-500', bg: 'bg-violet-500/10', desc: 'Matriz BCG del menú', href: '/agentes/menu' },
-  { id: 'staffing', name: 'Staffing', icon: Users, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Optimización de personal', href: '/agentes/staffing' },
-  { id: 'antifraud', name: 'Anti-Fraude', icon: Shield, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Detección de patrones sospechosos', href: '/agentes/antifraude' },
-  { id: 'kitchen', name: 'Calidad Cocina', icon: ChefHat, color: 'text-orange-500', bg: 'bg-orange-500/10', desc: 'Cancelaciones y calidad', href: '/agentes/cocina' },
-  { id: 'table-time', name: 'Tiempo de Mesa', icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-500/10', desc: 'Velocidad de atención', href: '/agentes/tiempo-mesa' },
-  { id: 'tips', name: 'Propinas', icon: HandCoins, color: 'text-emerald-600', bg: 'bg-emerald-500/10', desc: 'Patrones de servicio', href: '/agentes/propinas-agente' },
-  { id: 'suppliers', name: 'Proveedores', icon: Truck, color: 'text-blue-400', bg: 'bg-blue-500/10', desc: 'Gasto y concentración', href: '/agentes/proveedores-agente' },
-  { id: 'waste', name: 'Desperdicio', icon: Trash2, color: 'text-red-400', bg: 'bg-red-500/8', desc: 'Compras vs consumo', href: '/agentes/desperdicio' },
-  { id: 'climate', name: 'Clima + Eventos', icon: CloudSun, color: 'text-sky-500', bg: 'bg-sky-500/10', desc: 'Pronóstico × historial', href: '/agentes/clima' },
-  { id: 'hermes', name: 'Hermes', icon: Bot, color: 'text-indigo-500', bg: 'bg-indigo-500/10', desc: 'Mejora continua de agentes', href: '/agentes/hermes' },
-  { id: 'speed-of-service', name: 'Velocidad', icon: Timer, color: 'text-cyan-600', bg: 'bg-cyan-500/10', desc: 'Tiempo de preparación por platillo' },
-  { id: 'inventory-auto-order', name: 'Auto-Orden', icon: Package, color: 'text-teal-500', bg: 'bg-teal-500/10', desc: 'OC automática cuando baja stock' },
-  { id: 'daily-briefing', name: 'Briefing Diario', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10', desc: 'Resumen 7 AM en Telegram' },
-  { id: 'weekly-summary', name: 'Reporte Semanal', icon: BarChart3, color: 'text-purple-500', bg: 'bg-purple-500/10', desc: 'Ejecutivo cada lunes' },
-  { id: 'wansoft-query', name: 'KB 24/7', icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-500/10', desc: 'Preguntas on-demand por Telegram' },
-  { id: 'reservas', name: 'Reservaciones', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Alertas de reservas pendientes' },
-  { id: 'wansoft-staleness', name: 'Monitor Sync', icon: Activity, color: 'text-red-500', bg: 'bg-red-500/8', desc: 'Alerta si datos >24h sin sync' },
-  { id: 'proactive-alerts', name: 'Alertas Proactivas', icon: Bell, color: 'text-red-400', bg: 'bg-red-500/8', desc: 'Clima, eventos, días festivos' },
-  { id: 'intraday-sales', name: 'Ventas Intraday', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-500/10', desc: 'Avance de ventas en tiempo real' },
-  { id: 'menu-gap', name: 'Análisis de Menú', icon: Sparkles, color: 'text-violet-600', bg: 'bg-violet-500/10', desc: 'Gaps y oportunidades del menú' },
-  { id: 'config-validator', name: 'Config Validator', icon: Settings, color: 'text-[var(--text-2)]', bg: 'bg-[var(--surface-2)]', desc: 'Verifica configuración del cliente' },
-  { id: 'orquestador', name: 'Orquestador', icon: Bot, color: 'text-[var(--text-1)]', bg: 'bg-[var(--surface-2)]', desc: 'Cerebro central — despacha agentes' },
-]
+type SortKey = 'agent_id' | 'tentacle' | 'status' | 'duration_ms' | 'created_at'
+type SortDir = 'asc' | 'desc'
 
-const priorityColors: Record<string, string> = {
-  critical: 'bg-red-500/80 text-white',
-  warning: 'bg-amber-500/15 text-amber-400',
-  info: 'bg-emerald-500/15 text-emerald-400',
+/* ── Helpers ───────────────────────────────────────────────────────── */
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function fetchAgentRuns(): Promise<AgentRun[]> {
+  const url = `${SUPABASE_URL}/rest/v1/agent_runs?select=agent_id,status,created_at,duration_ms,tentacle,tokens_used&order=created_at.desc&limit=200`
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return Array.isArray(data) ? data : []
 }
 
-export default function AgentesPage() {
-  const [results, setResults] = useState<Record<string, AgentResult>>({})
-  const [loading, setLoading] = useState(true)
-
-  async function loadResults() {
-    try {
-      // Fetch from both agent_results (detailed) and agent_runs (execution log)
-      const [resultsData, runsData] = await Promise.all([
-        getDeepTable('agent_results', 50),
-        getDeepTable('agent_runs', 100),
-      ])
-      const map: Record<string, AgentResult> = {}
-
-      // First pass: agent_results (has detailed summary/priority)
-      for (const row of resultsData) {
-        const r = row as unknown as AgentResult
-        if (!map[r.agent_id] || r.fecha > map[r.agent_id].fecha) {
-          map[r.agent_id] = r
-        }
-      }
-
-      // Second pass: agent_runs (many agents only log here)
-      // Map agent_runs IDs to AGENTS IDs
-      const runsIdMap: Record<string, string> = {
-        'anomaly-detector': 'anomaly',
-        'close-predictor': 'predictor',
-        'antifraud-agent': 'antifraud',
-        'kitchen-quality': 'kitchen',
-        'tips-analyzer': 'tips',
-        'supplier-monitor': 'suppliers',
-        'waste-detector': 'waste',
-        'staffing-optimizer': 'staffing',
-        'climate-events': 'climate',
-        'reservas-pendientes': 'reservas',
-        'weekly-amalay': 'weekly-summary',
-      }
-      const runCounts: Record<string, { count: number; lastRun: string }> = {}
-      for (const row of runsData) {
-        const r = row as unknown as { agent_id: string; status: string; created_at: string; updated_at: string }
-        const mappedId = runsIdMap[r.agent_id] || r.agent_id
-        if (!runCounts[mappedId]) {
-          runCounts[mappedId] = { count: 1, lastRun: r.updated_at || r.created_at || '' }
-        } else {
-          runCounts[mappedId].count++
-          const ts = r.updated_at || r.created_at || ''
-          if (ts > runCounts[mappedId].lastRun) runCounts[mappedId].lastRun = ts
-        }
-      }
-
-      // Fill in agents that only have agent_runs data
-      for (const [agentId, info] of Object.entries(runCounts)) {
-        if (!map[agentId]) {
-          map[agentId] = {
-            agent_id: agentId,
-            fecha: info.lastRun.slice(0, 10),
-            data: null,
-            summary: `${info.count} ejecuciones registradas`,
-            priority: 'info',
-            updated_at: info.lastRun,
-          }
-        }
-      }
-
-      setResults(map)
-    } catch (err) {
-      console.error('Error loading agent results:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { loadResults() }, [])
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-96"><div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
-  }
-
-  const activeCount = Object.keys(results).length
-  const criticalCount = Object.values(results).filter(r => r.priority === 'critical').length
-  const warningCount = Object.values(results).filter(r => r.priority === 'warning').length
-
-  return (
-    <>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Agentes de IA</h2>
-          <p className="text-sm text-[var(--text-3)]">30 agentes monitoreando tu operación 24/7</p>
-        </div>
-        <button onClick={() => { setLoading(true); loadResults() }}
-          className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">
-          <RefreshCw size={16} />
-        </button>
-      </div>
-
-      {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Agentes activos</p>
-          <p className="text-2xl font-bold text-[var(--text-1)]">{activeCount} <span className="text-sm font-normal text-[var(--text-3)]">/ 30</span></p>
-        </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Alertas críticas</p>
-          <p className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-emerald-600'}`}>{criticalCount}</p>
-        </div>
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-4">
-          <p className="text-xs text-[var(--text-2)] font-medium mb-1">Advertencias</p>
-          <p className={`text-2xl font-bold ${warningCount > 0 ? 'text-amber-400' : 'text-emerald-600'}`}>{warningCount}</p>
-        </div>
-      </div>
-
-      {/* Agent cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {AGENTS.map(agent => {
-          const result = results[agent.id]
-          const Icon = agent.icon
-          const hasData = !!result
-          const timeSince = result?.updated_at ? getTimeSince(result.updated_at) : null
-
-          const agentHref = (agent as { href?: string }).href
-          const cardClass = `bg-[var(--surface)] rounded-xl border shadow-sm p-5 transition-all hover:shadow-md block ${
-            result?.priority === 'critical' ? 'border-red-300 bg-red-500/10' :
-            result?.priority === 'warning' ? 'border-amber-500/20' : 'border-[var(--line)]'
-          } ${agentHref ? 'cursor-pointer' : ''}`
-
-          const card = (<>
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl ${agent.bg} flex items-center justify-center`}>
-                    <Icon size={20} className={agent.color} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-[var(--text-1)]">{agent.name}</h3>
-                    <p className="text-xs text-[var(--text-3)]">{agent.desc}</p>
-                  </div>
-                </div>
-                {result?.priority && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${priorityColors[result.priority] || priorityColors.info}`}>
-                    {result.priority}
-                  </span>
-                )}
-              </div>
-
-              {hasData ? (
-                <>
-                  <p className="text-sm text-[var(--text-1)] leading-relaxed mb-3">{result.summary || 'Sin resumen'}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-[var(--text-3)]">{timeSince}</span>
-                    <span className="text-[11px] text-[var(--text-3)]">{result.fecha}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="py-2">
-                  <p className="text-xs text-[var(--text-3)]">Sin datos. Se actualiza automáticamente.</p>
-                </div>
-              )}
-          </>)
-
-          return agentHref ? (
-            <Link key={agent.id} href={agentHref} className={cardClass}>{card}</Link>
-          ) : (
-            <div key={agent.id} className={cardClass}>{card}</div>
-          )
-        })}
-      </div>
-    </>
-  )
-}
-
-function getTimeSince(timestamp: string): string {
-  const diff = Date.now() - new Date(timestamp).getTime()
+function timeSince(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime()
   const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'ahora'
   if (mins < 60) return `hace ${mins}m`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `hace ${hours}h`
   const days = Math.floor(hours / 24)
   return `hace ${days}d`
+}
+
+function fmtDate(ts: string): string {
+  const d = new Date(ts)
+  return d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtDuration(ms: number | null): string {
+  if (ms == null) return '--'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+/* ── Status badge ──────────────────────────────────────────────────── */
+
+const statusStyles: Record<string, { bg: string; text: string; label: string }> = {
+  success: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', label: 'OK' },
+  warning: { bg: 'bg-amber-500/15', text: 'text-amber-400', label: 'Warn' },
+  error: { bg: 'bg-red-500/15', text: 'text-red-400', label: 'Error' },
+  no_data: { bg: 'bg-[var(--surface-2)]', text: 'text-[var(--text-4)]', label: 'Sin datos' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusStyles[status] || statusStyles.no_data
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${s.bg} ${s.text}`}>
+      {status === 'success' && <CheckCircle size={11} />}
+      {status === 'error' && <XCircle size={11} />}
+      {status === 'warning' && <AlertTriangle size={11} />}
+      {s.label}
+    </span>
+  )
+}
+
+/* ── Agent summary type ────────────────────────────────────────────── */
+
+interface AgentSummary {
+  agent_id: string
+  lastRun: string
+  totalRuns: number
+  successCount: number
+  avgDuration: number
+  tentacle: string | null
+}
+
+/* ── Main page ─────────────────────────────────────────────────────── */
+
+export default function AgentesPage() {
+  const [runs, setRuns] = useState<AgentRun[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Table state
+  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [search, setSearch] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const data = await fetchAgentRuns()
+    setRuns(data)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  /* ── KPI computations ────────────────────────────────────────────── */
+  const now = Date.now()
+  const last24h = useMemo(() => runs.filter(r => now - new Date(r.created_at).getTime() < 86400000), [runs, now])
+
+  const totalRuns24h = last24h.length
+  const successRate = last24h.length > 0
+    ? Math.round((last24h.filter(r => r.status === 'success').length / last24h.length) * 100)
+    : 0
+  const avgDuration = useMemo(() => {
+    const durations = last24h.filter(r => r.duration_ms != null).map(r => r.duration_ms!)
+    return durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0
+  }, [last24h])
+  const uniqueAgents = useMemo(() => new Set(last24h.map(r => r.agent_id)).size, [last24h])
+
+  /* ── Agent summaries ─────────────────────────────────────────────── */
+  const agentSummaries = useMemo(() => {
+    const map = new Map<string, AgentSummary>()
+    for (const r of runs) {
+      if (!map.has(r.agent_id)) {
+        map.set(r.agent_id, {
+          agent_id: r.agent_id,
+          lastRun: r.created_at,
+          totalRuns: 0,
+          successCount: 0,
+          avgDuration: 0,
+          tentacle: r.tentacle,
+        })
+      }
+      const s = map.get(r.agent_id)!
+      s.totalRuns++
+      if (r.status === 'success') s.successCount++
+      if (r.duration_ms != null) s.avgDuration += r.duration_ms
+      if (r.created_at > s.lastRun) s.lastRun = r.created_at
+    }
+    for (const s of map.values()) {
+      const withDur = runs.filter(r => r.agent_id === s.agent_id && r.duration_ms != null)
+      s.avgDuration = withDur.length > 0 ? Math.round(s.avgDuration / withDur.length) : 0
+    }
+    return Array.from(map.values()).sort((a, b) => b.lastRun.localeCompare(a.lastRun))
+  }, [runs])
+
+  /* ── Filtered / sorted table data ────────────────────────────────── */
+  const filteredRuns = useMemo(() => {
+    let list = [...runs]
+    if (filterStatus !== 'all') list = list.filter(r => r.status === filterStatus)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(r => r.agent_id.toLowerCase().includes(q))
+    }
+    list.sort((a, b) => {
+      const aVal = a[sortKey]
+      const bVal = b[sortKey]
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      if (typeof aVal === 'number' && typeof bVal === 'number') return sortDir === 'asc' ? aVal - bVal : bVal - aVal
+      return sortDir === 'asc'
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal))
+    })
+    return list
+  }, [runs, filterStatus, search, sortKey, sortDir])
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ChevronDown size={12} className="opacity-30" />
+    return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+  }
+
+  /* ── Unique statuses for filter dropdown ─────────────────────────── */
+  const statuses = useMemo(() => Array.from(new Set(runs.map(r => r.status))), [runs])
+
+  /* ── Render ──────────────────────────────────────────────────────── */
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Agentes de IA"
+        subtitle={`${runs.length} ejecuciones recientes`}
+        eyebrow="War Room"
+        action={
+          <button
+            onClick={load}
+            className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors"
+          >
+            <RefreshCw size={16} />
+          </button>
+        }
+      />
+
+      {/* ── KPI Cards ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPICard
+          label="Runs (24h)"
+          value={String(totalRuns24h)}
+          icon={Zap}
+          accentClass="kpi-accent-blue"
+          index={0}
+        />
+        <KPICard
+          label="Tasa de exito"
+          value={`${successRate}%`}
+          icon={CheckCircle}
+          accentClass="kpi-accent-green"
+          index={1}
+        />
+        <KPICard
+          label="Duracion promedio"
+          value={fmtDuration(avgDuration)}
+          icon={Clock}
+          accentClass="kpi-accent-amber"
+          index={2}
+        />
+        <KPICard
+          label="Agentes activos"
+          value={String(uniqueAgents)}
+          icon={Bot}
+          accentClass="kpi-accent-purple"
+          index={3}
+        />
+      </div>
+
+      {/* ── Agent Summary Cards ────────────────────────────────────── */}
+      <h3 className="text-sm font-bold text-[var(--text-2)] uppercase tracking-widest mb-3">
+        Resumen por agente
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-8">
+        {agentSummaries.map(agent => {
+          const rate = agent.totalRuns > 0
+            ? Math.round((agent.successCount / agent.totalRuns) * 100)
+            : 0
+          return (
+            <div
+              key={agent.agent_id}
+              className="rounded-xl border border-[var(--line)] p-4 transition-all hover:border-violet-500/40"
+              style={{ background: 'var(--bento-card)' }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <Bot size={16} className="text-violet-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[var(--text-1)] truncate">{agent.agent_id}</p>
+                  {agent.tentacle && (
+                    <p className="text-[10px] text-[var(--text-4)] uppercase tracking-wider">{agent.tentacle}</p>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-bold text-[var(--text-1)]">{agent.totalRuns}</p>
+                  <p className="text-[9px] text-[var(--text-4)] uppercase">Runs</p>
+                </div>
+                <div>
+                  <p className={`text-lg font-bold ${rate >= 80 ? 'text-emerald-400' : rate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {rate}%
+                  </p>
+                  <p className="text-[9px] text-[var(--text-4)] uppercase">Exito</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-[var(--text-1)]">{fmtDuration(agent.avgDuration)}</p>
+                  <p className="text-[9px] text-[var(--text-4)] uppercase">Avg</p>
+                </div>
+              </div>
+              <p className="text-[10px] text-[var(--text-4)] mt-2 text-right">{timeSince(agent.lastRun)}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Runs Table ─────────────────────────────────────────────── */}
+      <h3 className="text-sm font-bold text-[var(--text-2)] uppercase tracking-widest mb-3">
+        Ejecuciones recientes
+      </h3>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
+          <input
+            type="text"
+            placeholder="Buscar agente..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-violet-500/50"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Filter size={14} className="text-[var(--text-4)]" />
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--text-2)] px-3 py-2 focus:outline-none focus:border-violet-500/50"
+          >
+            <option value="all">Todos</option>
+            {statuses.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-[var(--line)]" style={{ background: 'var(--bento-card)' }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--line)]">
+              {([
+                ['agent_id', 'Agente'],
+                ['tentacle', 'Tentaculo'],
+                ['status', 'Status'],
+                ['duration_ms', 'Duracion'],
+                ['created_at', 'Fecha'],
+              ] as [SortKey, string][]).map(([key, label]) => (
+                <th
+                  key={key}
+                  onClick={() => toggleSort(key)}
+                  className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--text-3)] cursor-pointer hover:text-[var(--text-2)] select-none"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    <SortIcon col={key} />
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRuns.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-12 text-[var(--text-4)]">
+                  Sin resultados
+                </td>
+              </tr>
+            ) : (
+              filteredRuns.map((run, i) => (
+                <tr
+                  key={`${run.agent_id}-${run.created_at}-${i}`}
+                  className="border-b border-[var(--line)] last:border-b-0 hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <td className="px-4 py-3 font-medium text-[var(--text-1)]">{run.agent_id}</td>
+                  <td className="px-4 py-3 text-[var(--text-3)]">{run.tentacle || '--'}</td>
+                  <td className="px-4 py-3"><StatusBadge status={run.status} /></td>
+                  <td className="px-4 py-3 text-[var(--text-2)] font-mono text-xs">{fmtDuration(run.duration_ms)}</td>
+                  <td className="px-4 py-3 text-[var(--text-3)] text-xs">{fmtDate(run.created_at)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
 }
