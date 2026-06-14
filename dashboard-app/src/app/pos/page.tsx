@@ -1729,7 +1729,9 @@ function POSContent() {
         qty: orderItem.cantidad, precio: orderItem.precio, mesa, clientId: getClientId(),
       })
       // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
-      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual, station }]
+      // courseId: items go into the current (last) course group
+      const currentCourse = prev.filter(isTiempoItem).length + 1
+      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual, station, courseId: currentCourse, courseStatus: 'pending' as const }]
     })
     setFlashItemId(orderItem.id)
     setTimeout(() => setFlashItemId(null), 500)
@@ -1861,6 +1863,15 @@ function POSContent() {
     }))
   }, [personas, orderId, mesero, mesa])
 
+  // Derive courseId for all items based on tiempo separator positions
+  const assignCourseIds = useCallback((items: OrderItem[]): OrderItem[] => {
+    let course = 1
+    return items.map(it => {
+      if (isTiempoItem(it)) { course++; return it }
+      return { ...it, courseId: course, courseStatus: it.courseStatus || 'pending' }
+    })
+  }, [])
+
   // Insertar separador de tiempo (estilo Wansoft "XX TIEMPO: N XX" — partida especial $0.00, silla 0)
   const addTiempoSeparator = useCallback(() => {
     setOrderItems(prev => {
@@ -1870,9 +1881,9 @@ function POSContent() {
         precio: 0, cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 0, silla: 0,
       }
       logAudit({ order_id: orderId, action: 'item_added', actor: mesero, mesa, details: { item: sep.nombre, tiempo: n } })
-      return [...prev, sep]
+      return assignCourseIds([...prev, sep])
     })
-  }, [orderId, mesero, mesa])
+  }, [orderId, mesero, mesa, assignCourseIds])
 
   const removeTiempoSeparator = useCallback((id: string) => {
     setOrderItems(prev => {
@@ -3360,6 +3371,9 @@ function POSContent() {
                       }
                       try { await printByStation(fireOrder) } catch { /* sin impresora */ }
                       logAudit({ order_id: orderId, action: 'tiempo_fired', actor: mesero, mesa, details: { tiempo: nextTiempo, items: nextItems.map(i => i.nombre) } })
+                      // Update courseStatus to 'fired' for items in this course
+                      const firedIds = new Set(nextItems.map(i => i.id))
+                      setOrderItems(prev => prev.map(it => firedIds.has(it.id) ? { ...it, courseStatus: 'fired' as const } : it))
                       setTiempoFired(t => t + 1)
                       setShowFirebutton(false)
                       showToast(`Tiempo ${nextTiempo} disparado a cocina`)

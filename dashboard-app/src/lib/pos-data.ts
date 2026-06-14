@@ -170,6 +170,8 @@ export interface OrderItem {
   subtotal: number         // (precio + precioExtra) * cantidad
   silla?: number           // seat/person number (1, 2, 3...)
   station?: 'cocina' | 'barra' | 'caja'  // estación de ruteo, fijada al agregar (por categoría)
+  courseId?: number         // 1=Tiempo 1, 2=Tiempo 2, etc. Assigned when tiempo separator is added
+  courseStatus?: 'pending' | 'fired' | 'preparing' | 'ready' | 'served'
 }
 
 // Keep legacy alias for any other pages that import the old shape

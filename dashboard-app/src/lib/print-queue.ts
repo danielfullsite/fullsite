@@ -81,6 +81,42 @@ export function removeJob(id: string) {
   saveQueue(queue)
 }
 
+// ── Cloud sync (optional persistence to Supabase) ──────────────────────
+
+async function syncJobToCloud(job: PrintJob) {
+  try {
+    const sbUrl = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_URL : undefined
+    const sbKey = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined
+    if (!sbUrl || !sbKey) return
+
+    await fetch(`${sbUrl}/rest/v1/pos_print_jobs`, {
+      method: 'POST',
+      headers: {
+        apikey: sbKey,
+        Authorization: `Bearer ${sbKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: job.id,
+        order_id: job.meta?.orderId || null,
+        station: job.station,
+        type: job.type,
+        status: job.status,
+        retries: job.retries,
+        error: job.error,
+        meta: job.meta || null,
+        created_at: job.createdAt,
+        printed_at: job.status === 'printed' ? job.lastAttempt : null,
+        updated_at: new Date().toISOString(),
+      }),
+    })
+  } catch {
+    // Cloud sync is best-effort — never block local queue
+    console.warn(`[print-queue] Cloud sync failed for ${job.id}`)
+  }
+}
+
 // ── Retry engine ────────────────────────────────────────────────────────
 
 async function attemptPrint(job: PrintJob): Promise<boolean> {
@@ -123,10 +159,12 @@ async function processQueue() {
       job.status = 'printed'
       job.error = null
       console.log(`[print-queue] ✓ ${job.type} ${job.station} printed (${job.id}, attempt ${job.retries})`)
+      syncJobToCloud(job)
     } else if (job.retries >= job.maxRetries) {
       job.status = 'failed'
       job.error = `Failed after ${job.retries} attempts`
       console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED permanently (${job.id})`)
+      syncJobToCloud(job)
     } else {
       job.status = 'pending'
       job.error = `Attempt ${job.retries}/${job.maxRetries} failed`

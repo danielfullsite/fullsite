@@ -9,6 +9,16 @@ import { isTiempoItem } from '@/lib/pos-constants'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+interface CashMovement {
+  id: string
+  type: 'retiro' | 'deposito'
+  amount: number
+  reason: string
+  actor: string
+  approved_by: string
+  created_at: string
+}
+
 interface OrderFromDB {
   id: string
   mesa: number
@@ -60,6 +70,24 @@ async function getOrdersByTurno(turnoId: string): Promise<OrderFromDB[]> {
   return res.json()
 }
 
+async function getCashMovementsByTurno(turnoId: string): Promise<CashMovement[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
+async function getCashMovementsByDate(dateStr: string): Promise<CashMovement[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+  )
+  if (!res.ok) return []
+  return res.json()
+}
+
 export default function CortePage() {
   const [orders, setOrders] = useState<OrderFromDB[]>([])
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
@@ -72,6 +100,8 @@ export default function CortePage() {
   })
 
   const [cardPct, setCardPct] = useState(0)
+  const [cashMovements, setCashMovements] = useState<CashMovement[]>([])
+  const [declarado, setDeclarado] = useState(0)
   const [turno, setTurno] = useState<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null>(null)
   // 'turno' = corte del turno activo (por turno_id); 'dia' = corte histórico por fecha
   const [corteMode, setCorteMode] = useState<'turno' | 'dia'>('turno')
@@ -87,7 +117,11 @@ export default function CortePage() {
     const o = corteMode === 'turno' && t
       ? await getOrdersByTurno(t.id)
       : await getOrders(selectedDate)
+    const cm = corteMode === 'turno' && t
+      ? await getCashMovementsByTurno(t.id)
+      : await getCashMovementsByDate(selectedDate)
     setOrders(o)
+    setCashMovements(cm)
     setAuditLog(a)
     setCardPct(pct)
     setTurno(t)
@@ -223,6 +257,10 @@ export default function CortePage() {
     }
     const descuentosCount = closed.filter(o => o.descuento > 0).length
 
+    // ── Movimientos de caja ──
+    const depositos = cashMovements.filter(m => m.type === 'deposito').reduce((s, m) => s + Number(m.amount), 0)
+    const retiros = cashMovements.filter(m => m.type === 'retiro').reduce((s, m) => s + Number(m.amount), 0)
+
     return {
       ventasPorForma, propinaPorForma,
       ventasEfectivo, propinaEfectivo, propinasNoEfectivo,
@@ -230,6 +268,7 @@ export default function CortePage() {
       totalVentas, totalSubtotal, totalIva, totalDescuentos, totalPropinas,
       totalTarjeta, comisionTarjeta,
       totalPersonas, ticketPromedio,
+      depositos, retiros,
       ordenesCerradas: closed.length,
       ordenesAbiertas: all.filter(o => o.status === 'enviada' || o.status === 'abierta').length,
       ordenesCanceladas: cancelled.length,
@@ -237,7 +276,7 @@ export default function CortePage() {
       byMesero: Object.entries(byMesero).sort((a, b) => b[1].ventas - a[1].ventas),
       cancellations: cancellations.length,
     }
-  }, [orders, auditLog, cardPct])
+  }, [orders, auditLog, cardPct, cashMovements])
 
   if (!accessGranted) {
     return (
@@ -484,16 +523,56 @@ export default function CortePage() {
                 {/* Columna 2: Control de efectivo (arqueo) */}
                 <div>
                   <p className="text-[var(--text-3)] font-bold mb-2 tracking-wider">CONTROL POR FORMA PAGO</p>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">Fondo de Caja</span><span className="text-white">{formatMXN(Number(turno?.fondo_inicial) || 0)}</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Ventas efectivo</span><span className="text-white">{formatMXN(stats.ventasEfectivo)}</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Propina efectivo</span><span className="text-white">{formatMXN(stats.propinaEfectivo)}</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Depósitos</span><span className="text-[var(--text-2)]">{formatMXN(0)}</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">− Vales</span><span className="text-[var(--text-2)]">{formatMXN(0)}</span></div>
-                    <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">= Efectivo Real</span><span className="text-emerald-400 font-bold">{formatMXN((Number(turno?.fondo_inicial) || 0) + stats.ventasEfectivo + stats.propinaEfectivo)}</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-4)]">− Propinas x tarjeta/otros</span><span className="text-red-400">{formatMXN(stats.propinasNoEfectivo)}</span></div>
-                    <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">Efectivo en caja</span><span className="text-emerald-400 font-bold">{formatMXN((Number(turno?.fondo_inicial) || 0) + stats.ventasEfectivo + stats.propinaEfectivo - stats.propinasNoEfectivo)}</span></div>
-                  </div>
+                  {(() => {
+                    const fondo = Number(turno?.fondo_inicial) || 0
+                    const esperado = fondo + stats.ventasEfectivo + stats.propinaEfectivo + stats.depositos - stats.retiros - stats.propinasNoEfectivo
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">Fondo de Caja</span><span className="text-white">{formatMXN(fondo)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Ventas efectivo</span><span className="text-white">{formatMXN(stats.ventasEfectivo)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Propina efectivo</span><span className="text-white">{formatMXN(stats.propinaEfectivo)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">+ Depósitos</span><span className={stats.depositos > 0 ? 'text-emerald-400' : 'text-[var(--text-2)]'}>{formatMXN(stats.depositos)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">− Retiros</span><span className={stats.retiros > 0 ? 'text-red-400' : 'text-[var(--text-2)]'}>{formatMXN(stats.retiros)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--text-4)]">− Propinas x tarjeta/otros</span><span className="text-red-400">{formatMXN(stats.propinasNoEfectivo)}</span></div>
+                        <div className="flex justify-between border-t border-slate-700 pt-1.5"><span className="text-white font-bold">= Esperado en caja</span><span className="text-emerald-400 font-bold">{formatMXN(esperado)}</span></div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[var(--text-4)]">Declarado</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            placeholder="$0.00"
+                            value={declarado || ''}
+                            onChange={e => setDeclarado(parseFloat(e.target.value) || 0)}
+                            className="w-28 bg-[var(--surface)] border border-slate-600 rounded-lg px-2 py-1.5 text-right text-white text-sm focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        {declarado > 0 && (() => {
+                          const diff = declarado - esperado
+                          const color = Math.abs(diff) < 1 ? 'text-emerald-400' : diff > 0 ? 'text-blue-400' : 'text-red-400'
+                          const label = Math.abs(diff) < 1 ? 'Cuadra' : diff > 0 ? 'Sobrante' : 'Faltante'
+                          return (
+                            <div className="flex justify-between border-t border-slate-700 pt-1.5">
+                              <span className={`font-bold ${color}`}>{label}</span>
+                              <span className={`font-bold ${color}`}>{diff >= 0 ? '+' : ''}{formatMXN(diff)}</span>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )
+                  })()}
+                  {cashMovements.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                      <p className="text-[var(--text-3)] font-bold mb-1.5 tracking-wider text-xs">MOVIMIENTOS DE CAJA</p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {cashMovements.map(m => (
+                          <div key={m.id} className="flex justify-between text-xs">
+                            <span className="text-[var(--text-4)]">{m.type === 'deposito' ? '+' : '−'} {m.reason}</span>
+                            <span className={m.type === 'deposito' ? 'text-emerald-400' : 'text-red-400'}>{formatMXN(Number(m.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-[var(--text-2)] text-xs mt-3 leading-relaxed">Las propinas cobradas con tarjeta/otras formas se pagan al mesero en efectivo desde caja (regla Wansoft).</p>
                 </div>
                 {/* Columna 3: Información operativa */}
