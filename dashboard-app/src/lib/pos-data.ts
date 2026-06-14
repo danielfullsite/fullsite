@@ -1152,6 +1152,9 @@ export type AuditAction =
   | 'comandas_print_off'
   | 'comandas_print_on'
   | 'mesa_transferred'
+  | 'cash_retiro'
+  | 'cash_deposito'
+  | 'item_voided'
 
 export interface AuditEvent {
   client_id?: string

@@ -96,6 +96,8 @@ import {
   Armchair,
   Tag,
   ArrowRightLeft,
+  DollarSign,
+  ArrowDownUp,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -772,7 +774,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
 
 interface CancelModalProps {
   itemName: string
-  onConfirm: (reason: string, managerName: string) => void
+  onConfirm: (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => void
   onCancel: () => void
 }
 
@@ -780,6 +782,8 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
   const [reason, setReason] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [step, setStep] = useState<'reason' | 'prepared'>('reason')
+  const [managerName, setManagerName] = useState('')
 
   const CANCEL_REASONS = [
     'Cliente cambio de opinion',
@@ -790,12 +794,13 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
     'Otro',
   ]
 
-  const handleConfirm = async () => {
+  const handlePinConfirm = async () => {
     if (!reason) { setError('Selecciona un motivo'); return }
     if (!pin) { setError('Ingresa PIN de gerente'); return }
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN invalido'); return }
-    onConfirm(reason, manager)
+    setManagerName(manager)
+    setStep('prepared')
   }
 
   return (
@@ -807,59 +812,95 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
             <ShieldAlert size={20} className="text-red-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Cancelar item</h3>
+            <h3 className="text-lg font-bold text-white">{step === 'reason' ? 'Cancelar item' : 'Se preparo este articulo?'}</h3>
             <p className="text-red-400 text-sm">{itemName}</p>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de cancelacion</label>
-            <div className="grid grid-cols-2 gap-2">
-              {CANCEL_REASONS.map(r => (
-                <button
-                  key={r}
-                  onClick={() => { setReason(r); setError('') }}
-                  className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors min-h-[44px] ${
-                    reason === r
-                      ? 'bg-red-900/40 border border-red-600 text-white'
-                      : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
+        {step === 'reason' && (
+          <>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de cancelacion</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {CANCEL_REASONS.map(r => (
+                    <button
+                      key={r}
+                      onClick={() => { setReason(r); setError('') }}
+                      className={`px-3 py-2.5 rounded-lg text-sm text-left transition-colors min-h-[44px] ${
+                        reason === r
+                          ? 'bg-red-900/40 border border-red-600 text-white'
+                          : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)] hover:bg-[var(--line)]'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pin}
+                  onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+                  placeholder="****"
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+                />
+              </div>
+
+              {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             </div>
-          </div>
 
-          <div>
-            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
-              placeholder="****"
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
-            />
-          </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]">
+                Volver
+              </button>
+              <button
+                onClick={handlePinConfirm}
+                className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+              >
+                <Ban size={18} />
+                Siguiente
+              </button>
+            </div>
+          </>
+        )}
 
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-        </div>
-
-        <div className="flex gap-3 mt-5">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]">
-            Volver
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="flex-[2] py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
-          >
-            <Ban size={18} />
-            Cancelar item
-          </button>
-        </div>
+        {step === 'prepared' && (
+          <>
+            <p className="text-[var(--text-4)] text-sm mb-4">Si se preparo, queda registrado como merma. Si fue un error operativo, puedes anular (no afecta metricas).</p>
+            <div className="space-y-2 mb-5">
+              <button
+                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: false })}
+                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+              >
+                <Ban size={18} />
+                Cancelar — No se preparo
+              </button>
+              <button
+                onClick={() => onConfirm(reason, managerName, { prepared: true, voided: false })}
+                className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+              >
+                <ShieldAlert size={18} />
+                Cancelar — Si, se preparo (merma)
+              </button>
+              <button
+                onClick={() => onConfirm(reason, managerName, { prepared: false, voided: true })}
+                className="w-full py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+              >
+                <X size={18} />
+                Anular — Error operativo
+              </button>
+            </div>
+            <button onClick={() => setStep('reason')} className="w-full py-2.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[44px]">
+              Volver
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -939,6 +980,151 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
           >
             <Ban size={18} />
             Anular orden
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Cash Movement Modal (Retiros / Depósitos) ─────────────────────────────
+
+interface CashMovementModalProps {
+  turnoId: string | null
+  actor: string
+  onConfirm: (type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => void
+  onCancel: () => void
+}
+
+function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovementModalProps) {
+  const [type, setType] = useState<'retiro' | 'deposito'>('retiro')
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleConfirm = async () => {
+    const num = parseFloat(amount)
+    if (!num || num <= 0) { setError('Ingresa un monto valido'); return }
+    if (!reason.trim()) { setError('Ingresa un motivo'); return }
+    if (!pin) { setError('Ingresa PIN de gerente'); return }
+    const manager = await verifyManagerPin(pin)
+    if (!manager) { setError('PIN invalido'); return }
+    setSaving(true)
+    try {
+      // Save to Supabase
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const res = await fetch(`${sbUrl}/rest/v1/pos_cash_movements`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: _cid(),
+          turno_id: turnoId,
+          type,
+          amount: num,
+          reason: reason.trim(),
+          actor,
+          approved_by: manager,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      onConfirm(type, num, reason.trim(), manager)
+    } catch {
+      setError('Error al guardar — intenta de nuevo')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div className="relative bg-[var(--surface-2)] border border-slate-600/40 rounded-2xl w-full max-w-md shadow-2xl mx-4 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-emerald-900/60 flex items-center justify-center">
+            <ArrowDownUp size={20} className="text-emerald-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Movimiento de caja</h3>
+            <p className="text-[var(--text-3)] text-sm">Retiro o deposito de efectivo</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Toggle Retiro / Deposito */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setType('retiro')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+                type === 'retiro' ? 'bg-red-600 text-white' : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)]'
+              }`}
+            >
+              Retiro
+            </button>
+            <button
+              onClick={() => setType('deposito')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+                type === 'deposito' ? 'bg-emerald-600 text-white' : 'bg-[var(--line)]/50 border border-slate-600/50 text-[var(--text-4)]'
+              }`}
+            >
+              Deposito
+            </button>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Monto</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => { setAmount(e.target.value); setError('') }}
+              placeholder="$0.00"
+              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl focus:outline-none focus:border-emerald-500 min-h-[48px]"
+            />
+          </div>
+
+          {/* Reason */}
+          <div>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setError('') }}
+              placeholder="Ej: Cambio, pago proveedor, fondo inicial..."
+              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 min-h-[48px]"
+            />
+          </div>
+
+          {/* Manager PIN */}
+          <div>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+              placeholder="****"
+              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-emerald-500 min-h-[48px]"
+            />
+          </div>
+
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]">
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className={`flex-[2] py-3 rounded-xl ${type === 'retiro' ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-semibold transition-colors min-h-[48px] flex items-center justify-center gap-2 disabled:opacity-50`}
+          >
+            <DollarSign size={18} />
+            {saving ? 'Guardando...' : `Confirmar ${type}`}
           </button>
         </div>
       </div>
@@ -1330,9 +1516,13 @@ function POSContent() {
 
   // Void order modal state
   const [showVoidOrder, setShowVoidOrder] = useState(false)
+  // Cash movement modal state (retiros / depositos)
+  const [showCashMovement, setShowCashMovement] = useState(false)
 
   // Cancelled items (kept for audit — shown with strikethrough)
   const [cancelledItems, setCancelledItems] = useState<Set<string>>(new Set())
+  // Voided items (error operativo — strikethrough + gray + ANULADO badge, no metrics)
+  const [voidedItems, setVoidedItems] = useState<Set<string>>(new Set())
 
   // Order ID for audit trail (generated once per order)
   const [orderId] = useState(() => generateId())
@@ -1553,26 +1743,38 @@ function POSContent() {
   }, [])
 
   // Cancel item (requires reason + manager PIN — NEVER delete)
-  const handleCancelItem = useCallback((reason: string, managerName: string) => {
+  const handleCancelItem = useCallback((reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
     if (!cancellingItem) return
+    const { prepared, voided } = options
+    const action = voided ? 'item_voided' as const : 'item_cancelled' as const
     logAudit({
-      order_id: orderId, action: 'item_cancelled', actor: mesero, mesa,
-      details: { item: cancellingItem.nombre, cantidad: cancellingItem.cantidad, precio: cancellingItem.subtotal },
+      order_id: orderId, action, actor: mesero, mesa,
+      details: { item: cancellingItem.nombre, cantidad: cancellingItem.cantidad, precio: cancellingItem.subtotal, prepared, voided },
       reason,
       approved_by: managerName,
     })
     // Shadow mode: evento SENSIBLE — la BD lo rechaza sin audit.approvedBy
-    publishEvent('orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
+    publishEvent(voided ? 'orders.item.voided.v1' : 'orders.item.cancelled.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {
       ticketId: orderId, itemId: cancellingItem.id, productId: cancellingItem.nombre,
-      qty: cancellingItem.cantidad, inventoryImpact: true, mesa, clientId: getClientId(),
+      qty: cancellingItem.cantidad, inventoryImpact: !voided, mesa, clientId: getClientId(),
     }, {
       requestedBy: mesero, approvedBy: managerName, reason,
-      before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal },
-      after: { qty: 0, cancelled: true },
+      before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
+      after: { qty: 0, cancelled: !voided, voided },
     })
-    setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
+    if (voided) {
+      setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
+    } else {
+      setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
+    }
     setCancellingItem(null)
-    showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
+    if (voided) {
+      showToast(`${cancellingItem.nombre} ANULADO — aprobado por ${managerName}`)
+    } else if (prepared) {
+      showToast(`${cancellingItem.nombre} cancelado — registrado como merma`)
+    } else {
+      showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
+    }
   }, [cancellingItem, orderId, mesero, mesa])
 
   // Void entire order
@@ -1607,11 +1809,25 @@ function POSContent() {
     }
     setOrderItems([])
     setCancelledItems(new Set())
+    setVoidedItems(new Set())
     setDiscount(0)
     setOrderNotes('')
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
   }, [orderId, mesero, mesa, orderItems, loadedOrderId])
+
+  // Cash movement confirmed (already saved to Supabase in modal)
+  const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
+    const action = type === 'retiro' ? 'cash_retiro' as const : 'cash_deposito' as const
+    logAudit({
+      order_id: undefined, action, actor: mesero, mesa,
+      details: { type, amount, reason, turno_id: turnoId },
+      reason,
+      approved_by: managerName,
+    })
+    setShowCashMovement(false)
+    showToast(`${type === 'retiro' ? 'Retiro' : 'Deposito'} de ${formatMXN(amount)} registrado`)
+  }, [mesero, mesa, turnoId])
 
   const updateQuantity = useCallback((id: string, delta: number) => {
     setOrderItems((prev) => {
@@ -1667,7 +1883,7 @@ function POSContent() {
     })
   }, [])
 
-  const activeItems = (orderItems || []).filter(i => !cancelledItems.has(i.id))
+  const activeItems = (orderItems || []).filter(i => !cancelledItems.has(i.id) && !voidedItems.has(i.id))
   const subtotal = activeItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
 
   // Re-evaluate promos when items/subtotal change
@@ -2195,6 +2411,7 @@ function POSContent() {
               <div className="space-y-0.5">
                 {orderItems.map((item) => {
                   const isCancelled = cancelledItems.has(item.id)
+                  const isVoided = voidedItems.has(item.id)
                   // Separador de tiempo (estilo Wansoft) — fila especial
                   if (isTiempoItem(item)) {
                     return (
@@ -2214,7 +2431,9 @@ function POSContent() {
                     <div
                       key={item.id}
                       className={`flex items-center gap-2 py-2 px-2 rounded-lg transition-all ${
-                        isCancelled
+                        isVoided
+                          ? 'bg-slate-500/10 border border-slate-500/20 opacity-40'
+                          : isCancelled
                           ? 'bg-red-500/10 border border-red-500/20 opacity-60'
                           : flashItemId === item.id
                           ? 'ring-2 ring-emerald-500 bg-emerald-500/10'
@@ -2225,7 +2444,7 @@ function POSContent() {
                       <div className="flex items-center gap-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
-                          disabled={isCancelled}
+                          disabled={isCancelled || isVoided}
                           className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
                           <Minus size={18} />
@@ -2235,7 +2454,7 @@ function POSContent() {
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
-                          disabled={isCancelled}
+                          disabled={isCancelled || isVoided}
                           className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
                           <Plus size={18} />
@@ -2244,10 +2463,13 @@ function POSContent() {
 
                       {/* Item name + modifiers */}
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm leading-tight ${isCancelled ? 'line-through text-red-400' : ''}`}>
+                        <p className={`font-medium text-sm leading-tight ${isVoided ? 'line-through text-slate-500' : isCancelled ? 'line-through text-red-400' : ''}`}>
                           {item.nombre}
                         </p>
-                        {isCancelled && (
+                        {isVoided && (
+                          <span className="inline-block bg-slate-600/60 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded">ANULADO</span>
+                        )}
+                        {isCancelled && !isVoided && (
                           <p className="text-red-500 text-[10px] font-semibold">CANCELADO</p>
                         )}
                         {item.modificadores.length > 0 && (
@@ -2263,7 +2485,7 @@ function POSContent() {
                       </div>
 
                       {/* Silla badge (tap para ciclar 1..personas) */}
-                      {!isCancelled && (
+                      {!isCancelled && !isVoided && (
                         <button
                           onClick={(e) => { e.stopPropagation(); cycleSilla(item.id) }}
                           className="flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-sm font-bold flex items-center justify-center transition-colors hover:bg-sky-500/30"
@@ -2274,11 +2496,11 @@ function POSContent() {
                       )}
 
                       {/* Line total */}
-                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 ${isCancelled ? 'line-through text-red-400/60' : ''}`}>
+                      <span className={`font-semibold text-sm w-20 text-right flex-shrink-0 ${isVoided ? 'line-through text-slate-500/60' : isCancelled ? 'line-through text-red-400/60' : ''}`}>
                         {formatMXN(item.subtotal)}
                       </span>
 
-                      {!isCancelled && (
+                      {!isCancelled && !isVoided && (
                         <>
                           {/* Edit */}
                           <button
@@ -2396,6 +2618,14 @@ function POSContent() {
                 title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Abrir cajón'}
               >
                 <Banknote size={18} />
+              </button>
+              <button
+                onClick={() => { if (!isMobileRestricted) setShowCashMovement(true) }}
+                disabled={isMobileRestricted}
+                className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-30 text-[var(--text-3)] transition-colors"
+                title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Retiro / Deposito'}
+              >
+                <DollarSign size={18} />
               </button>
               <button
                 onClick={() => {
@@ -2695,6 +2925,16 @@ function POSContent() {
           total={total}
           onConfirm={handleVoidOrder}
           onCancel={() => setShowVoidOrder(false)}
+        />
+      )}
+
+      {/* Cash Movement Modal (retiros / depositos) */}
+      {showCashMovement && (
+        <CashMovementModal
+          turnoId={turnoId}
+          actor={mesero}
+          onConfirm={handleCashMovement}
+          onCancel={() => setShowCashMovement(false)}
         />
       )}
 
