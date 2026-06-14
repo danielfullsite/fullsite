@@ -380,6 +380,8 @@ h1,h2,h3{font-weight:600;letter-spacing:-0.02em;line-height:1.1;}
 .feature-row:last-child{margin-bottom:0;}
 .feature-row.reverse{direction:rtl;}
 .feature-row.reverse > *{direction:ltr;}
+.feature-img{border-radius:16px;overflow:hidden;}
+.feature-img img{width:100%;height:auto;display:block;}
 .feature-copy .eyebrow{margin-bottom:12px;}
 .feature-copy h3{font-size:clamp(24px,3vw,36px);font-weight:700;letter-spacing:-0.02em;color:var(--ink);margin-bottom:12px;}
 .feature-copy p{font-size:16px;color:var(--ink-2);line-height:1.65;margin-bottom:20px;}
@@ -715,20 +717,8 @@ footer{background:var(--bg-dark);padding:48px 0 24px;border-top:1px solid rgba(2
           <div class="feature-list-item"><span class="check">&#10003;</span> Anti-fraude: nada se borra, todo queda en audit trail</div>
         </div>
       </div>
-      <div class="phone-mockup">
-        <div class="phone-screen">
-          <div class="phone-header">
-            <span class="phone-header-title">fullsite. POS</span>
-          </div>
-          <div class="phone-grid">
-            <div class="phone-item"><div class="phone-item-icon">&#9749;</div><div class="phone-item-label">Americano</div><div class="phone-item-price">$55</div></div>
-            <div class="phone-item"><div class="phone-item-icon">&#129380;</div><div class="phone-item-label">Chilaquiles</div><div class="phone-item-price">$159</div></div>
-            <div class="phone-item"><div class="phone-item-icon">&#129374;</div><div class="phone-item-label">Avocado T.</div><div class="phone-item-price">$149</div></div>
-            <div class="phone-item"><div class="phone-item-icon">&#127849;</div><div class="phone-item-label">Pancakes</div><div class="phone-item-price">$119</div></div>
-            <div class="phone-item"><div class="phone-item-icon">&#129388;</div><div class="phone-item-label">Bowl</div><div class="phone-item-price">$169</div></div>
-            <div class="phone-item"><div class="phone-item-icon">&#127862;</div><div class="phone-item-label">Latte</div><div class="phone-item-price">$75</div></div>
-          </div>
-        </div>
+      <div class="feature-img">
+        <img src="/img-terminal.png" alt="Terminal Fullsite POS" style="border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,0.12);">
       </div>
     </div>
 
@@ -745,30 +735,8 @@ footer{background:var(--bg-dark);padding:48px 0 24px;border-top:1px solid rgba(2
           <div class="feature-list-item"><span class="check">&#10003;</span> Anti-fraude: detecta patrones en cancelaciones</div>
         </div>
       </div>
-      <div class="wa-mockup">
-        <div class="wa-header">
-          <div class="wa-avatar"></div>
-          <span class="wa-name">Fullsite Copiloto</span>
-        </div>
-        <div class="wa-body">
-          <div class="wa-msg wa-out">Ticket promedio por mesero?<div class="wa-time">2:14 PM</div></div>
-          <div class="wa-msg wa-in">
-            <strong>TP por mesero (hoy):</strong><br>
-            Omar: $385<br>
-            Hector: $342<br>
-            Brayan: $318<br>
-            Daniela: $295
-            <div class="wa-chart-bars">
-              <div class="wa-chart-bar" style="height:100%;background:var(--accent)"></div>
-              <div class="wa-chart-bar" style="height:82%;background:var(--accent);opacity:0.7"></div>
-              <div class="wa-chart-bar" style="height:74%;background:var(--accent);opacity:0.5"></div>
-              <div class="wa-chart-bar" style="height:65%;background:var(--amber)"></div>
-            </div>
-            <div class="wa-time">2:14 PM</div>
-          </div>
-          <div class="wa-msg wa-out">Que puede mejorar Daniela?<div class="wa-time">2:15 PM</div></div>
-          <div class="wa-msg wa-in">Sugerencia: Daniela no ofrece 2da bebida. Si lo hace, su TP sube ~$42 por mesa.<div class="wa-time">2:15 PM</div></div>
-        </div>
+      <div class="feature-img">
+        <img src="/img-dashboard.png" alt="Fullsite Dashboard con IA" style="border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,0.12);">
       </div>
     </div>
 
@@ -785,22 +753,8 @@ footer{background:var(--bg-dark);padding:48px 0 24px;border-top:1px solid rgba(2
           <div class="feature-list-item"><span class="check">&#10003;</span> Complementos de pago, notas de credito</div>
         </div>
       </div>
-      <div class="invoice-mockup">
-        <div class="invoice-header">
-          <div>
-            <div class="invoice-logo">fullsite<span class="inv-dot">.</span></div>
-            <div style="font-size:11px;color:var(--ink-3);margin-top:2px;">Folio: FS-2026-04821</div>
-          </div>
-          <span class="invoice-badge">Timbrada</span>
-        </div>
-        <div class="invoice-row"><span>Chilaquiles verdes</span><span>$159.00</span></div>
-        <div class="invoice-row"><span>Americano grande</span><span>$55.00</span></div>
-        <div class="invoice-row"><span>Avocado toast</span><span>$149.00</span></div>
-        <div class="invoice-row"><span>Latte con leche oat</span><span>$85.00</span></div>
-        <div class="invoice-row"><span>IVA (16%)</span><span>$71.68</span></div>
-        <div class="invoice-row total"><span>Total</span><span>$519.68</span></div>
-        <div class="invoice-qr">QR SAT</div>
-        <div class="invoice-footer">CFDI 4.0 &middot; Regimen 612 &middot; UUID: a3f7...e291</div>
+      <div class="feature-img">
+        <img src="/img-bartender.png" alt="Fullsite POS en accion" style="border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,0.12);">
       </div>
     </div>
 
