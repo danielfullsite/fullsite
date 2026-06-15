@@ -1479,33 +1479,61 @@ export async function getInventory(): Promise<InventoryItem[]> {
 }
 
 export async function updateInventoryStock(ingredientId: string, newStock: number): Promise<boolean> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&ingredient_id=eq.${ingredientId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ stock: newStock, updated_at: new Date().toISOString() }),
-    }
-  )
-  return res.ok
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_getClientId()}&ingredient_id=eq.${ingredientId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json', Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ stock: newStock, updated_at: new Date().toISOString() }),
+      }
+    )
+    if (!res.ok) throw new Error(`PATCH failed: ${res.status}`)
+    return true
+  } catch {
+    // OFFLINE: queue for sync
+    try {
+      const { queueOperation } = await import('./pos-offline-db')
+      await queueOperation(
+        `pos_inventory?client_id=eq.${_getClientId()}&ingredient_id=eq.${ingredientId}`,
+        'PATCH',
+        { stock: newStock, updated_at: new Date().toISOString() },
+      )
+      console.warn(`[inventory] Offline: queued stock update for ${ingredientId} → ${newStock}`)
+    } catch { /* IndexedDB unavailable */ }
+    return false
+  }
 }
 
 export async function logInventoryMovement(movement: {
   ingredient_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
 }): Promise<boolean> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json', Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ client_id: _getClientId(), ...movement }),
-  })
-  return res.ok
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ client_id: _getClientId(), ...movement }),
+    })
+    if (!res.ok) throw new Error(`POST failed: ${res.status}`)
+    return true
+  } catch {
+    // OFFLINE: queue movement for sync
+    try {
+      const { queueOperation } = await import('./pos-offline-db')
+      await queueOperation('pos_inventory_movements', 'POST', {
+        client_id: _getClientId(), ...movement,
+      })
+      console.warn(`[inventory] Offline: queued movement for ${movement.ingredient_id}`)
+    } catch { /* IndexedDB unavailable */ }
+    return false
+  }
 }
 
 // ─── Auto-deduction: deduct recipe ingredients when order sent to kitchen ───
@@ -1746,37 +1774,64 @@ export async function upsertMarketStock(
   menuItemId: string,
   fields: { stock?: number; reorder_point?: number; reorder_quantity?: number; last_restock?: string },
 ): Promise<boolean> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_market_stock?on_conflict=client_id,menu_item_id`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify({
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_market_stock?on_conflict=client_id,menu_item_id`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({
+          client_id: _getClientId(), menu_item_id: menuItemId,
+          ...fields, updated_at: new Date().toISOString(),
+        }),
+      }
+    )
+    if (!res.ok) throw new Error(`POST failed: ${res.status}`)
+    return true
+  } catch {
+    // OFFLINE: queue for sync
+    try {
+      const { queueOperation } = await import('./pos-offline-db')
+      await queueOperation('pos_market_stock?on_conflict=client_id,menu_item_id', 'POST', {
         client_id: _getClientId(), menu_item_id: menuItemId,
         ...fields, updated_at: new Date().toISOString(),
-      }),
-    }
-  )
-  return res.ok
+      })
+      console.warn(`[market] Offline: queued stock update for ${menuItemId}`)
+    } catch { /* IndexedDB unavailable */ }
+    return false
+  }
 }
 
 export async function logMarketMovement(movement: {
   menu_item_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;
 }): Promise<boolean> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_market_movements`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json', Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({ client_id: _getClientId(), ...movement }),
-  })
-  return res.ok
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_market_movements`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ client_id: _getClientId(), ...movement }),
+    })
+    if (!res.ok) throw new Error(`POST failed: ${res.status}`)
+    return true
+  } catch {
+    // OFFLINE: queue movement for sync
+    try {
+      const { queueOperation } = await import('./pos-offline-db')
+      await queueOperation('pos_market_movements', 'POST', {
+        client_id: _getClientId(), ...movement,
+      })
+      console.warn(`[market] Offline: queued movement for ${movement.menu_item_id}`)
+    } catch { /* IndexedDB unavailable */ }
+    return false
+  }
 }
 
 export async function getMarketMovements(limit = 50): Promise<MarketMovement[]> {
