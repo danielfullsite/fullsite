@@ -90,7 +90,18 @@ function uuid(): string {
 
 function daysSince(dateStr: string | null): number {
   if (!dateStr) return 999
-  const d = new Date(dateStr + 'T12:00:00')
+  // Handle both YYYY-MM-DD and DD/MM/YYYY formats
+  let d: Date
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    if (parts.length === 3) {
+      d = new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T12:00:00`)
+    } else {
+      d = new Date(dateStr + 'T12:00:00')
+    }
+  } else {
+    d = new Date(dateStr + 'T12:00:00')
+  }
   const now = new Date()
   return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
 }
