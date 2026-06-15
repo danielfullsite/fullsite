@@ -1525,15 +1525,29 @@ export async function deductIngredientsForOrder(
   const alerts: string[] = []
 
   // 2. For each order item, find matching recipe and deduct
+  // Normalize: strip prefixes, size suffixes, temperature variants
+  const normalizeRecipeName = (n: string) => n.toLowerCase()
+    .replace(/^sprw\s*-\s*/i, '')
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
+    .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
+    .replace(/\s*(media porción|para compartir|1\/2)\s*/gi, ' ')
+    .replace(/\s+/g, ' ').trim()
+
   const recipesByName = new Map<string, typeof recipes>()
+  const recipesByNorm = new Map<string, typeof recipes>()
   for (const r of recipes) {
     const key = r.menu_item_name.toLowerCase()
     if (!recipesByName.has(key)) recipesByName.set(key, [])
     recipesByName.get(key)!.push(r)
+    const norm = normalizeRecipeName(r.menu_item_name)
+    if (!recipesByNorm.has(norm)) recipesByNorm.set(norm, [])
+    recipesByNorm.get(norm)!.push(r)
   }
 
   for (const item of items) {
     const itemName = item.nombre.toLowerCase()
+    const itemNorm = normalizeRecipeName(item.nombre)
     let recipeRows: typeof recipes = []
 
     // Priority 1: use alias map
@@ -1550,12 +1564,22 @@ export async function deductIngredientsForOrder(
       recipeRows = recipesByName.get(itemName) ?? []
     }
 
-    // Priority 3: best single partial match
+    // Priority 3: normalized match (strips prefixes, sizes, temperature)
+    if (recipeRows.length === 0) {
+      recipeRows = recipesByNorm.get(itemNorm) ?? []
+    }
+
+    // Priority 4: best partial match (normalized)
     if (recipeRows.length === 0) {
       let bestMatch: { name: string; rows: typeof recipes } | null = null
-      for (const [name, rows] of recipesByName) {
-        if (name.includes(itemName) || itemName.includes(name)) {
-          if (!bestMatch || Math.abs(name.length - itemName.length) < Math.abs(bestMatch.name.length - itemName.length)) {
+      let bestScore = 0
+      for (const [name, rows] of recipesByNorm) {
+        if (name.length < 3 || itemNorm.length < 3) continue // skip very short names
+        if (name.includes(itemNorm) || itemNorm.includes(name)) {
+          // Score: prefer closest length match (avoid "HUEVO" matching "MACHACADO CON HUEVO")
+          const score = Math.min(name.length, itemNorm.length) / Math.max(name.length, itemNorm.length)
+          if (score > bestScore && score > 0.5) { // at least 50% overlap
+            bestScore = score
             bestMatch = { name, rows }
           }
         }
@@ -1624,6 +1648,15 @@ export async function getInventoryMovements(limit = 50): Promise<InventoryMoveme
 // Tablas: pos_market_stock (por menu_item_id) + pos_market_movements (audit).
 
 export const MARKET_CATEGORY_PREFIX = 'mkt-'
+// Categories that deduct 1:1 from pos_market_stock (no recipe needed — bottled/packaged)
+// Categories that deduct 1:1 from pos_market_stock (no recipe needed — bottled/packaged/retail)
+// Bebidas preparadas (coffee, frappes, jugos, smoothies, tea, fresh, alcohol) SÍ necesitan receta
+// para descontar ingredientes — pero si no tienen receta, al menos deducen de market stock.
+export const DIRECT_STOCK_CATEGORIES = [
+  'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay', // Market retail
+  'cerveza', 'vinos', 'licores', 'sodas', 'icecream', 'bakery', // Embotellados/empacados
+  'postres', // Postres pre-hechos
+]
 
 export interface MarketStockRow {
   id: number
@@ -1792,9 +1825,10 @@ export async function deductMarketStockForOrder(
     const ids = [...new Set(items.map(i => i.menuItemId).filter(Boolean))]
     if (ids.length === 0) return { success: true, deductions: [], alerts: [] }
 
-    // 1. ¿Cuáles items de la orden son Market?
+    // 1. ¿Cuáles items de la orden son de stock directo (Market, cerveza, sodas, vinos, licores, bakery, ice cream)?
+    const catFilter = DIRECT_STOCK_CATEGORIES.map(c => `category_id.eq.${c}`).join(',')
     const itemsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&id=in.(${ids.join(',')})&category_id=like.${MARKET_CATEGORY_PREFIX}*&select=id,name`,
+      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&id=in.(${ids.join(',')})&or=(${catFilter})&select=id,name`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
     )
     if (!itemsRes.ok) return { success: false, deductions: [], alerts: [] }
