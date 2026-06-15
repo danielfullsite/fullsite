@@ -235,12 +235,27 @@ const NO_MODIFIER_CATEGORIES = ['sodas', 'cerveza', 'vinos', 'licores']
 const BAKERY_CATEGORIES = ['bakery', 'toast', 'postres', 'mkt-cafe', 'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay']
 
 // Category name → modifier type (for DB categories with UUID ids)
-function getModifierTypeFromCategoryName(catName: string): 'none' | 'coffee' | 'beverage' | 'bakery' | 'food' {
+// Mapping validated against AMALAY categories (June 2026):
+//   NONE:     Cerveza, Vinos, Licores 2oz, Sodas, Bebidas OH
+//   COFFEE:   Coffee Hot/Ice, Tea & Tisanas
+//   BEVERAGE: Jugos, Fresh Drinks, Frappes, Smoothies, Signature, Ice Cream
+//   BAKERY:   Bakery, Toast & Bagels, Desserts, Market:*, Croissants Breakfast
+//   FOOD:     Chilaquiles, Eggs & Keto, Bowls, Ceviche, Paninis, Pizzas & Pastas,
+//             Pancakes & Waffles, Appetizers, Everyday Specials, Evento/Menu Temp
+export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coffee' | 'beverage' | 'bakery' | 'food' {
   const lower = catName.toLowerCase()
-  if (['soda', 'cerveza', 'beer', 'vino', 'licor', '2oz'].some(kw => lower.includes(kw))) return 'none'
+  // NO modifiers at all (packaged/bottled/canned — nothing to customize)
+  if (['soda', 'cerveza', 'beer', 'vino', 'licor', '2oz', 'bebidas oh'].some(kw => lower.includes(kw))) return 'none'
+  // Coffee modifiers (shots, leches, jarabes)
   if (['coffee', 'café', 'cafe', 'tea', 'tisana'].some(kw => lower.includes(kw))) return 'coffee'
-  if (['jugo', 'fresh', 'smoothie', 'frappe', 'signature', 'ice cream', 'helado'].some(kw => lower.includes(kw))) return 'beverage'
-  if (['bakery', 'panadería', 'toast', 'bagel', 'dessert', 'postre', 'market', 'healthy', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'semilla', 'dulce'].some(kw => lower.includes(kw))) return 'bakery'
+  // Drink modifiers (leches, fruta, proteina)
+  if (['jugo', 'fresh drink', 'smoothie', 'frappe', 'signature', 'ice cream', 'helado'].some(kw => lower.includes(kw))) return 'beverage'
+  // No food modifiers (no queso/aguacate/proteina — these are bread/retail/sweets)
+  if (['bakery', 'panadería', 'toast', 'bagel', 'dessert', 'postre', 'croissant',
+       'market', 'healthy', 'vitamina', 'suplemento', 'regalo', 'detalle',
+       'marca propia', 'semilla', 'dulce', 'abarrote'].some(kw => lower.includes(kw))) return 'bakery'
+  // Food modifiers (extra queso, aguacate, proteina, huevo, salsa)
+  // Applies to: Chilaquiles, Eggs, Bowls, Ceviche, Paninis, Pizzas, Pancakes, Appetizers, Specials
   return 'food'
 }
 
@@ -372,6 +387,24 @@ export interface ModifierGroupDef {
   options: ModificadorAgregar[]
 }
 
+// Modifier groups that should NEVER appear for certain category types
+// "Término" (medio/bien cocido) only makes sense for food with meat
+const MEAT_ONLY_KEYWORDS = ['término', 'termino', 'cocción', 'coccion', 'bien cocido', 'tres cuartos', 'medio']
+function isGroupCompatible(groupName: string, categoryId: string): boolean {
+  const catName = _categoryNameCache[categoryId] || ''
+  const catType = catName ? getModifierTypeFromCategoryName(catName) : 'food'
+  const lowerGroup = groupName.toLowerCase()
+  // Meat cooking terms should only appear for food categories
+  if (MEAT_ONLY_KEYWORDS.some(kw => lowerGroup.includes(kw))) {
+    return catType === 'food'
+  }
+  // Coffee-specific groups (shots, leches) shouldn't appear for food
+  if (['shot', 'leche', 'jarabe', 'syrup'].some(kw => lowerGroup.includes(kw))) {
+    return catType === 'coffee' || catType === 'beverage'
+  }
+  return true
+}
+
 /**
  * Grupos de modificadores multinivel para un producto.
  * Asignación por item (pos_item_modifier_groups) + por categoría (pos_category_modifiers).
@@ -423,6 +456,8 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
         options: optsByGroup.get(g.id) || [],
       }))
       .filter(g => g.options.length > 0)
+      // Filter out incompatible groups (e.g. "Término" on coffee, "Shot" on food)
+      .filter(g => isGroupCompatible(g.name, categoryId))
   } catch {
     return []
   }

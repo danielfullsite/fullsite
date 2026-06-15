@@ -18,6 +18,7 @@ import {
   getRecipes,
   getIngredients,
   getModifiersForCategory,
+  getModifierTypeFromCategoryName,
   getMenuCategoriesFromDB,
   getModifiersForCategoryFromDB,
   getModifierGroupsForItem,
@@ -31,7 +32,7 @@ import {
   type PaymentMethodDB,
   type PagoForma,
 } from '@/lib/pos-data'
-import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache } from '@/lib/pos-constants'
+import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -210,10 +211,13 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
     return count < min
   })
 
-  // Dynamic "quitar" options from recipe ingredients (food only)
-  const quitarOptions = recipeIngredients.length > 0
-    ? recipeIngredients.map(name => `Sin ${name}`)
-    : defaultQuitar
+  // Dynamic "quitar" options from recipe ingredients (food only — not for drinks/bakery/market)
+  const catName = _categoryNameCache[categoryId] || ''
+  const catType = catName ? getModifierTypeFromCategoryName(catName) : (defaultQuitar.length > 0 ? 'food' : 'none')
+  const isFood = catType === 'food'
+  const quitarOptions = isFood
+    ? (recipeIngredients.length > 0 ? recipeIngredients.map(name => `Sin ${name}`) : defaultQuitar)
+    : []
 
   const [quitarChecked, setQuitarChecked] = useState<Set<string>>(
     () => new Set(existingOrder?.modificadores.filter(m => m.startsWith('Sin ')) ?? [])
