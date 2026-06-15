@@ -31,7 +31,7 @@ import {
   type PaymentMethodDB,
   type PagoForma,
 } from '@/lib/pos-data'
-import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem } from '@/lib/pos-constants'
+import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -1204,7 +1204,13 @@ function POSContent() {
       ])
       setAllRecipes(r)
       setAllIngredients(i)
-      if (dbMenu.length > 0) setMenuCategories(dbMenu)
+      if (dbMenu.length > 0) {
+        setMenuCategories(dbMenu)
+        // Build category name cache for station routing (UUID ids → display names)
+        const nameMap: Record<string, string> = {}
+        for (const cat of dbMenu) nameMap[cat.id] = cat.name
+        setCategoryNameCache(nameMap)
+      }
       setPaymentMethodsDB(pm)
       if (turno) setTurnoId(turno.id)
       // Promos: build category map + load

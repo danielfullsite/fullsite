@@ -15,6 +15,14 @@ export const BEBIDA_KEYWORDS = [
   'smoothie', 'frappe', 'jugo', 'limonada', 'fresco',
   'soda', 'coca', 'agua', 'te ', 'té ', 'tisana',
   'mimosa', 'chamoyada', 'cerveza', 'vino',
+  // Marcas de cerveza (no contienen "cerveza" en el nombre)
+  'heineken', 'corona', 'modelo', 'pacifico', 'pacífico', 'victoria', 'bohemia',
+  'stella', 'budweiser', 'michelob', 'miller', 'tecate', 'indio', 'dos equis',
+  'negra modelo', 'xx lager', 'montejo', 'carta blanca', 'leon', 'león',
+  // Licores / bebidas OH
+  'whisky', 'whiskey', 'tequila', 'mezcal', 'vodka', 'ron ', 'ginebra', 'gin ',
+  'margarita', 'mojito', 'piña colada', 'sangria', 'sangría', 'michelada',
+  'carajillo', 'baileys', 'kahlua', 'amaretto',
 ]
 
 export const BARRA_CATEGORIES = [
@@ -87,14 +95,55 @@ export const CATEGORY_TO_STATION: Record<string, StationName> = (() => {
   return map
 })()
 
+// Category name → station mapping (for DB categories with UUID ids)
+// Matches by substring: "Cerveza" → barra, "Coffee Hot/Ice" → barra, etc.
+const CATEGORY_NAME_TO_STATION: Array<{ keywords: string[]; station: StationName }> = [
+  { keywords: ['coffee', 'café', 'cafe'], station: 'barra' },
+  { keywords: ['cerveza', 'beer'], station: 'barra' },
+  { keywords: ['bebidas oh', 'licores', 'licor', '2oz'], station: 'barra' },
+  { keywords: ['jugos', 'juice'], station: 'barra' },
+  { keywords: ['fresh drink', 'fresh'], station: 'barra' },
+  { keywords: ['smoothie'], station: 'barra' },
+  { keywords: ['frappe'], station: 'barra' },
+  { keywords: ['soda'], station: 'barra' },
+  { keywords: ['tea', 'tisana'], station: 'barra' },
+  { keywords: ['signature'], station: 'barra' },
+  { keywords: ['ice cream', 'helado', 'nieve'], station: 'barra' },
+  { keywords: ['bakery', 'panadería', 'panaderia'], station: 'caja' },
+  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia'], station: 'caja' },
+  { keywords: ['dessert', 'postre'], station: 'caja' },
+]
+
+function getStationFromCategoryName(catName: string): StationName | null {
+  const lower = catName.toLowerCase()
+  for (const entry of CATEGORY_NAME_TO_STATION) {
+    if (entry.keywords.some(kw => lower.includes(kw))) return entry.station
+  }
+  return null
+}
+
+// categoryNameHint: the display name of the category (e.g. "Cerveza", "Bebidas OH")
+// When categories come from Supabase with UUID ids, we use the name to route.
+let _categoryNameCache: Record<string, string> = {}
+export function setCategoryNameCache(map: Record<string, string>) { _categoryNameCache = map }
+
 // Fallback: determine station from item name using BEBIDA_KEYWORDS
 export function getStationForItem(categoryId: string, itemName: string): StationName {
-  // Try category-based routing first
+  // Try category-based routing first (static category IDs like 'cerveza', 'coffee')
   if (CATEGORY_TO_STATION[categoryId]) {
     return CATEGORY_TO_STATION[categoryId]
   }
-  // Fallback: use beverage detection
+  // Try category name from DB (UUID category IDs)
+  const catName = _categoryNameCache[categoryId]
+  if (catName) {
+    const station = getStationFromCategoryName(catName)
+    if (station) return station
+  }
+  // Fallback: use beverage detection by item name
   if (isBebida(itemName)) return 'barra'
+  // Fallback: use caja keywords
+  const lower = itemName.toLowerCase()
+  if (CAJA_KEYWORDS.some(kw => lower.includes(kw))) return 'caja'
   return 'cocina'
 }
 
