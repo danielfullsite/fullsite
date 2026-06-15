@@ -159,6 +159,96 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }, [unlocked, resetIdleTimer])
 
   const isLocked = lockedUntil > Date.now()
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricChecking, setBiometricChecking] = useState(false)
+
+  // Check if WebAuthn/biometric is available
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
+        .then(ok => setBiometricAvailable(ok))
+        .catch(() => {})
+    }
+  }, [])
+
+  // Register fingerprint for current staff member
+  const handleBiometricRegister = async (staffMember: StaffMember) => {
+    try {
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'Fullsite POS', id: window.location.hostname },
+          user: {
+            id: new TextEncoder().encode(staffMember.id),
+            name: staffMember.name,
+            displayName: staffMember.name,
+          },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+          },
+          timeout: 60000,
+        },
+      })
+      if (credential) {
+        // Save credential ID linked to staff member
+        const credId = btoa(String.fromCharCode(...new Uint8Array((credential as PublicKeyCredential).rawId)))
+        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+        stored[credId] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
+        localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
+        return true
+      }
+    } catch (e) {
+      console.warn('[biometric] Registration failed:', e)
+    }
+    return false
+  }
+
+  // Authenticate with fingerprint
+  const handleBiometricLogin = async () => {
+    setBiometricChecking(true)
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const credIds = Object.keys(stored)
+      if (credIds.length === 0) {
+        setBiometricChecking(false)
+        return
+      }
+
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          allowCredentials: credIds.map(id => ({
+            id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
+            type: 'public-key' as const,
+          })),
+          userVerification: 'required',
+          timeout: 30000,
+        },
+      })
+
+      if (assertion) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+        const member = stored[credId]
+        if (member) {
+          setStaff(member)
+          setUnlocked(true)
+          setAttempts(0)
+          sessionStorage.setItem('pos_staff', JSON.stringify(member))
+          sessionStorage.setItem('pos_last_activity', Date.now().toString())
+        }
+      }
+    } catch (e) {
+      console.warn('[biometric] Auth failed:', e)
+    }
+    setBiometricChecking(false)
+  }
 
   const handleSubmit = async () => {
     if (pin.length < 4 || isLocked) return
@@ -243,18 +333,37 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             className="h-24 mx-auto mb-4 object-contain"
             onError={(e) => { const el = e.target as HTMLImageElement; el.style.display = 'none' }}
           />
-          <p className="text-slate-400 text-sm mt-2">Ingresa tu PIN para abrir</p>
+          <p className="text-slate-400 text-sm mt-2">
+            {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}
+          </p>
         </div>
+
+        {/* Biometric login button */}
+        {biometricAvailable && (
+          <button
+            onClick={handleBiometricLogin}
+            disabled={biometricChecking || isLocked}
+            className="w-full py-5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[64px] mb-4 flex items-center justify-center gap-3"
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 10v4M7.5 7.5C9 6 10.5 5.5 12 5.5c3.5 0 6.5 3 6.5 6.5 0 1.5-.5 3-1.5 4" />
+              <path d="M4.5 12.5c0-4 3.5-7.5 7.5-7.5" />
+              <path d="M19.5 12.5c0 4-3.5 7.5-7.5 7.5-2 0-3.5-.5-5-2" />
+              <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
+            </svg>
+            {biometricChecking ? 'Verificando huella...' : 'Entrar con huella'}
+          </button>
+        )}
 
         <input
           type="password"
           inputMode="numeric"
-          maxLength={4}
+          maxLength={6}
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder="PIN"
-          autoFocus
+          autoFocus={!biometricAvailable}
           disabled={isLocked}
           className={`w-full bg-slate-800 border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 placeholder-slate-500 ${
             error ? 'border-red-500' : isLocked ? 'border-red-800 opacity-50' : 'border-slate-600 focus:border-emerald-500'
@@ -266,7 +375,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           disabled={pin.length < 4 || checking || isLocked}
           className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-all min-h-[56px]"
         >
-          {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar'}
+          {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar con PIN'}
         </button>
 
         {error && !isLocked && (
