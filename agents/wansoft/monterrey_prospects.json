@@ -1,0 +1,470 @@
+[
+  {
+    "id": 1,
+    "name": "Cara de Vaca",
+    "type": "Parrilla de Autor / Fine Dining",
+    "location": "San Pedro Garza Garcia",
+    "email": "hola@caradevaca.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 2,
+    "name": "Cafe Limon",
+    "type": "Cafe de Especialidad / Brunch",
+    "location": "Altavista, Monterrey",
+    "email": "hola@cafe-limon.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 3,
+    "name": "Kona Coffee Experience",
+    "type": "Cafe de Especialidad / Brunch",
+    "location": "Santa Maria, Monterrey",
+    "email": "contacto@konaexperience.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 4,
+    "name": "Grupo Barra (La Buena Barra / Gran Barra / Doble B)",
+    "type": "Grupo Restaurantero - Fine Dining",
+    "location": "San Pedro Garza Garcia",
+    "email": "contacto@grupobarra.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 5,
+    "name": "El Jonuco",
+    "type": "Cocina Regional Noreste",
+    "location": "Centro, Apodaca (Metro MTY)",
+    "email": "info@eljonuco.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 6,
+    "name": "Restaurante San Carlos",
+    "type": "Cortes / Fine Dining Tradicional",
+    "location": "Loma Larga, Monterrey",
+    "email": "ventas@restaurantesancarlos.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 7,
+    "name": "RP Catering (operaciones)",
+    "type": "Catering Empresarial",
+    "location": "Centro, Monterrey",
+    "email": "operaciones@rpcatering.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 8,
+    "name": "RP Catering (ventas)",
+    "type": "Catering Empresarial",
+    "location": "Centro, Monterrey",
+    "email": "ventas@rpcatering.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 9,
+    "name": "Almacen 42",
+    "type": "Bar de Cerveza / Gastropub",
+    "location": "Centro, Monterrey",
+    "email": "info@almacen42.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 10,
+    "name": "Restaurante Pangea (alta cocina)",
+    "type": "Fine Dining Contemporanea",
+    "location": "Parque Arboleda, San Pedro",
+    "email": "reservaciones@restaurantepangea.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 11,
+    "name": "Bistro Bardot (Grupo Pangea)",
+    "type": "Cocina Francesa",
+    "location": "Parque Arboleda, San Pedro",
+    "email": "reservasbardot@grupopangea.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 12,
+    "name": "Cafe Laurel (Grupo Pangea)",
+    "type": "Cafe / Brunch",
+    "location": "Parque Arboleda, San Pedro",
+    "email": "laurelcafelaurel@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 13,
+    "name": "El Lindero",
+    "type": "Cocina Huasteca Tradicional (50+ anos)",
+    "location": "Obispado, Monterrey",
+    "email": "ajua@ellindero.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 14,
+    "name": "Koli Cocina de Origen",
+    "type": "Fine Dining - Estrella Michelin",
+    "location": "Santa Catarina (Metro MTY)",
+    "email": "reservaciones@koli.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 15,
+    "name": "El Gran Pastor (Garza Sada)",
+    "type": "Cabrito / Cocina Noreste - 6 sucursales",
+    "location": "Garza Sada, Monterrey",
+    "email": "garzasada@granpastor.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 16,
+    "name": "El Gran Pastor (Linda Vista)",
+    "type": "Cabrito / Cocina Noreste - 6 sucursales",
+    "location": "Linda Vista, Monterrey",
+    "email": "lindavista@granpastor.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 17,
+    "name": "El Gran Pastor (Simon Bolivar)",
+    "type": "Cabrito / Cocina Noreste - 6 sucursales",
+    "location": "Simon Bolivar, Monterrey",
+    "email": "simonbolivar@granpastor.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 18,
+    "name": "Restaurante Los Fresnos",
+    "type": "Cocina Mexicana / Cortes (multi-sucursal)",
+    "location": "Cumbres + Valle, Monterrey",
+    "email": "info@restaurantelosfresnos.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 19,
+    "name": "El Gaucho Restaurante",
+    "type": "Parrilla Argentina (desde 1968)",
+    "location": "Arroyo Seco + Arboleda, MTY",
+    "email": "info@restauranteelgaucho.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 20,
+    "name": "La Colonia San Pedro",
+    "type": "Cocina Mexicana Contemporanea - FAV 2025",
+    "location": "Bosques del Valle, San Pedro",
+    "email": "reservaciones@lacoloniasanpedro.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 21,
+    "name": "Los Generales Buffets",
+    "type": "Buffet / Eventos (multi-sucursal)",
+    "location": "Valle Oriente + sucursales",
+    "email": "eventos@generales.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 22,
+    "name": "Restaurante Mirador",
+    "type": "Fine Dining Tradicional (desde 1985)",
+    "location": "Centro, Monterrey",
+    "email": "mirador_rest@hotmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 23,
+    "name": "Taqueria Orinoco",
+    "type": "Taqueria (5+ sucursales MTY + CDMX)",
+    "location": "San Pedro / TEC / San Jeronimo",
+    "email": "info@tr3sco.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 24,
+    "name": "Sirloin Stockade Mexico (Grupo Refran)",
+    "type": "Buffet Americano (franquicia regional)",
+    "location": "San Pedro Garza Garcia",
+    "email": "customercare@gruporefran.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 25,
+    "name": "Chapulin Restaurante (Hotel Intercontinental)",
+    "type": "Cocina a las Brasas / Hotel",
+    "location": "San Pedro Garza Garcia",
+    "email": "mexico_reservaciones@grupopresidente.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 26,
+    "name": "Beluga Oyster Bar",
+    "type": "Mariscos / Oyster Bar",
+    "location": "San Pedro Garza Garcia",
+    "email": "contacto@beluga.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 27,
+    "name": "El Nuevo Nopal",
+    "type": "Panaderia / Cafe / Pasteleria",
+    "location": "Centro, Monterrey",
+    "email": "cafeteriagaby@yahoo.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 28,
+    "name": "Reina Comfort Food",
+    "type": "Comfort Food (multi-sucursal)",
+    "location": "Pabellon M, Via 02, etc",
+    "email": "reinaadmon@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 29,
+    "name": "La Reynita Taqueria",
+    "type": "Taqueria",
+    "location": "San Pedro Garza Garcia",
+    "email": "taquerialareynita@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 30,
+    "name": "Old Jimmy's BBQ",
+    "type": "BBQ Tejano - FAV 2025 BBQ/Americana",
+    "location": "San Pedro + Sur de Monterrey",
+    "email": "oldJimmyBBQ@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 31,
+    "name": "Sushi Roll (franquicia NL)",
+    "type": "Sushi / Japones (multi-sucursal)",
+    "location": "Galerias MTY / Cumbres + mas",
+    "email": "servicioaclientes@sushiroll.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 32,
+    "name": "Cinco Catering",
+    "type": "Catering Corporativo / Eventos",
+    "location": "Col. Fierro, Monterrey",
+    "email": "contacto@cincocatering.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 33,
+    "name": "Appetite Catering Corporate & Events",
+    "type": "Catering Corporativo",
+    "location": "Monterrey",
+    "email": "info@appetitecatering.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 34,
+    "name": "Grupo Mesarosa Catering",
+    "type": "Catering / DMC / Eventos (20 anos)",
+    "location": "Jose Vasconcelos, San Pedro",
+    "email": "ventas@mesarosa.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 35,
+    "name": "Sandra's Catering Services",
+    "type": "Catering / Banquetes",
+    "location": "Vista Hermosa, Monterrey",
+    "email": "ventas@sandrascatering.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 36,
+    "name": "Cafe Belmonte Bar",
+    "type": "Cafe / Bar / Brunch",
+    "location": "Centro, Monterrey",
+    "email": "reservacionesbelmonte@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 37,
+    "name": "Los Gaviones Terraza & Grill",
+    "type": "Parrilla / Terraza / Eventos",
+    "location": "Rincon de la Primavera, MTY",
+    "email": "contacto@losgaviones.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 38,
+    "name": "La Nacional (Gastronomica Holdings)",
+    "type": "Cocina Mexicana (multi-sucursal) - FAV 2025",
+    "location": "Del Valle, San Pedro",
+    "email": "contacto@lanacional.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 39,
+    "name": "Senor Latino",
+    "type": "Desayunos / Brunch (multi-sucursal desde 2011)",
+    "location": "Centrito Valle + Cumbres + mas",
+    "email": "contacto@senorlatino.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 40,
+    "name": "El Lingote Restaurante",
+    "type": "Cocina Internacional",
+    "location": "Obrera, Monterrey",
+    "email": "contacto@ellingote.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 41,
+    "name": "Holsteins Steakhouse",
+    "type": "Premium Steakhouse - Top 50 mundial",
+    "location": "San Pedro Garza Garcia",
+    "email": "reservaciones@holsteins.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 42,
+    "name": "Super Roma",
+    "type": "Supermercado / Deli (multi-sucursal)",
+    "location": "Colonia Roma + Cumbres, MTY",
+    "email": "contacto@superroma.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 43,
+    "name": "Firehouse Subs (Grupo Inlosa - NL)",
+    "type": "Sandwich / Fast Casual (100 planned)",
+    "location": "Paseo TEC + Paseo la Fe",
+    "email": "contacto@firehousesubs.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 44,
+    "name": "Boquiaches",
+    "type": "Pan Relleno / Brunch",
+    "location": "Valle del Mirador, Monterrey",
+    "email": "hola@boquiaches.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 45,
+    "name": "Nectarworks",
+    "type": "Comida Saludable / Bowls (multi-sucursal) - FAV 2025 Green",
+    "location": "Cumbres + Del Valle + TEC",
+    "email": "hola@nectarworks.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 46,
+    "name": "Sanchez e Hijos Catering",
+    "type": "Catering Gourmet",
+    "location": "Obispado, Monterrey",
+    "email": "contacto@sanchezehijoscatering.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 47,
+    "name": "Cryzma Catering",
+    "type": "Catering / Box Lunch / Corporativo",
+    "location": "Monterrey",
+    "email": "contacto@cryzma.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 48,
+    "name": "Casa Benell",
+    "type": "Desayunos / Comfort Food Noreste (multi-sucursal + CDMX)",
+    "location": "Cordillera + Omnia + Park Point",
+    "email": "hola@panbenell.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 49,
+    "name": "El Rey del Cabrito",
+    "type": "Cabrito Tradicional (iconico desde 1960s)",
+    "location": "Centro, Monterrey",
+    "email": "reservaciones@reydelcabrito.com",
+    "domain_mx_verified": false,
+    "note": "No MX records on domain - try phone first"
+  },
+  {
+    "id": 50,
+    "name": "Catering Monterrey",
+    "type": "Catering para Eventos",
+    "location": "Centro, Monterrey",
+    "email": "ventas@cateringmonterrey.com",
+    "domain_mx_verified": false,
+    "note": "No MX records on domain - try phone first"
+  },
+  {
+    "id": 51,
+    "name": "La Estelina Pizza (Grupo Pangea)",
+    "type": "Pizza / Italian",
+    "location": "Del Valle, San Pedro",
+    "email": "info@laestelina.com",
+    "domain_mx_verified": false,
+    "note": "No MX records on domain - try phone first"
+  },
+  {
+    "id": 52,
+    "name": "Mima Chilaquiles",
+    "type": "Desayunos / Chilaquiles (multi-sucursal)",
+    "location": "General Escobedo (Metro MTY)",
+    "email": "info@mimamita.com.mx",
+    "domain_mx_verified": false,
+    "note": "No MX records on domain - try phone first"
+  },
+  {
+    "id": 53,
+    "name": "RP Catering (personal gmail)",
+    "type": "Catering Empresarial",
+    "location": "Centro, Monterrey",
+    "email": "cateringrodolfop@gmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 54,
+    "name": "Los Gaviones (alt contact)",
+    "type": "Parrilla / Terraza / Eventos",
+    "location": "Rincon de la Primavera, MTY",
+    "email": "losgaviones@hotmail.com",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 55,
+    "name": "Blanc Eventos",
+    "type": "Salon de Eventos / Restaurante Lujo",
+    "location": "Jardin, Monterrey",
+    "email": "info@blanceventos.com.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 56,
+    "name": "Central de Carnes",
+    "type": "Carniceria / Restaurante (desde 1958, multi-sucursal)",
+    "location": "Obrerista + sucursales, MTY",
+    "email": "contacto@ccarnes.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 57,
+    "name": "Los Legendarios",
+    "type": "Carnes al Carbon (franquicia, 4+ sucursales)",
+    "location": "Rangel Frias + Fleteros + Cumbres",
+    "email": "contacto@loslegendarios.mx",
+    "domain_mx_verified": true
+  },
+  {
+    "id": 58,
+    "name": "Casa Padre Mier",
+    "type": "Cafe / Restaurante / Bar / Eventos (Porfirian mansion)",
+    "location": "Centro, Monterrey",
+    "email": "info@casapadremier.com",
+    "domain_mx_verified": true
+  }
+]
