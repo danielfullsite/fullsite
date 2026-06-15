@@ -1184,6 +1184,7 @@ export type AuditAction =
   | 'cash_retiro'
   | 'cash_deposito'
   | 'item_voided'
+  | 'combo_added'
 
 export interface AuditEvent {
   client_id?: string

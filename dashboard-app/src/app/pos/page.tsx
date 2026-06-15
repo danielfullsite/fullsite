@@ -57,6 +57,7 @@ import {
   evaluatePromos,
   buildCategoryMap,
 } from '@/lib/pos-promos'
+import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
 import {
   ChefHat,
   Grid3X3,
@@ -98,6 +99,7 @@ import {
   ArrowRightLeft,
   DollarSign,
   ArrowDownUp,
+  Layers,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -1217,6 +1219,7 @@ function POSContent() {
       const cats = dbMenu.length > 0 ? dbMenu : menuCategories
       categoryMapRef.current = buildCategoryMap(cats)
       getActivePromos(_cid()).then(setAllPromos).catch(() => {})
+      getActiveCombos(_cid()).then(setAllCombos).catch(() => {})
 
       // Check which menu items are out of stock
       try {
@@ -1438,6 +1441,8 @@ function POSContent() {
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
   const [allPromos, setAllPromos] = useState<Awaited<ReturnType<typeof getActivePromos>>>([])
   const categoryMapRef = useRef(new Map<string, string>())
+  const [allCombos, setAllCombos] = useState<Combo[]>([])
+  const [showComboModal, setShowComboModal] = useState(false)
 
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
@@ -2824,6 +2829,16 @@ function POSContent() {
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-2 p-2.5 auto-rows-fr pb-6">
+                  {allCombos.length > 0 && (
+                    <button
+                      onClick={() => setShowComboModal(true)}
+                      className="px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[68px] leading-tight flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
+                    >
+                      <Layers size={18} />
+                      <span>Combos</span>
+                      <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
+                    </button>
+                  )}
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
@@ -2876,6 +2891,75 @@ function POSContent() {
                     </button>
                     )
                   })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Combo selection modal */}
+              {showComboModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowComboModal(false)}>
+                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[600px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] bg-gradient-to-r from-amber-600 to-orange-600">
+                      <h3 className="text-white font-bold text-lg">Combos <span className="text-white/60 text-sm font-normal ml-2">{allCombos.length} disponibles</span></h3>
+                      <button onClick={() => setShowComboModal(false)} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                    </div>
+                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <div className="space-y-3">
+                        {allCombos.map(combo => {
+                          const menuPrices = new Map<string, number>()
+                          for (const cat of menuCategories) {
+                            for (const item of cat.items) {
+                              menuPrices.set(item.id, item.price)
+                            }
+                          }
+                          const originalTotal = combo.items.reduce((s, ci) => s + (menuPrices.get(ci.menu_item_id) ?? 0), 0)
+                          const savings = originalTotal - combo.price
+                          return (
+                            <button
+                              key={combo.id}
+                              onClick={() => {
+                                const menuPrices = new Map<string, number>()
+                                for (const cat of menuCategories) {
+                                  for (const item of cat.items) menuPrices.set(item.id, item.price)
+                                }
+                                const comboItems = applyCombo(combo, menuPrices)
+                                setOrderItems(prev => {
+                                  const currentCourse = prev.filter(isTiempoItem).length + 1
+                                  return [...prev, ...comboItems.map(ci => ({
+                                    ...ci,
+                                    silla: sillaActual,
+                                    courseId: currentCourse,
+                                    courseStatus: 'pending' as const,
+                                  }))]
+                                })
+                                logAudit({
+                                  order_id: orderId, action: 'combo_added', actor: mesero, mesa,
+                                  details: { combo: combo.name, price: combo.price, items: combo.items.map(i => i.name) },
+                                })
+                                showToast(`${combo.name} agregado`)
+                                setShowComboModal(false)
+                                setMobileView('order')
+                              }}
+                              className="w-full bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border border-[rgba(255,255,255,0.08)] hover:border-amber-500/30 rounded-2xl text-left transition-all p-4 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-white text-lg">{combo.name}</span>
+                                <span className="text-amber-400 font-bold text-xl">${Math.round(combo.price)}</span>
+                              </div>
+                              <div className="text-[var(--text-3)] text-sm space-y-0.5">
+                                {combo.items.map((ci, i) => (
+                                  <div key={i}>• {ci.name}</div>
+                                ))}
+                              </div>
+                              {savings > 0 && (
+                                <div className="mt-2 text-emerald-400 text-xs font-semibold">
+                                  Ahorras ${Math.round(savings)} (era ${Math.round(originalTotal)})
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
