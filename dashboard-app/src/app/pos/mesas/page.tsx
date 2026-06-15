@@ -67,8 +67,8 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 53, x: 93, y: 7, shape: 'rect-h' },
   { number: 51, x: 82, y: 20, shape: 'rect-h' },
   { number: 52, x: 93, y: 20, shape: 'rect-h' },
-  { number: 55, x: 82, y: 42, shape: 'rect-h' },
-  { number: 54, x: 93, y: 42, shape: 'rect-h' },
+  { number: 55, x: 85, y: 42, shape: 'rect-h' },
+  { number: 54, x: 95, y: 42, shape: 'rect-h' },
   // ── Privado (derecha inferior — reubicado para evitar scroll)
   { number: 61, x: 82, y: 55, shape: 'rect-h' },
   { number: 63, x: 93, y: 55, shape: 'rect-h' },
