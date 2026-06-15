@@ -62,18 +62,18 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 10, x: 57, y: 34, shape: 'square' },
   { number: 11, x: 57, y: 46, shape: 'square' },
   { number: 12, x: 57, y: 58, shape: 'square' },
-  // ── Toldo (exterior, abajo izquierda)
-  { number: 50, x: 12, y: 78, shape: 'rect-h' },
-  { number: 53, x: 24, y: 78, shape: 'rect-h' },
-  { number: 55, x: 36, y: 78, shape: 'rect-h' },
-  { number: 51, x: 12, y: 91, shape: 'rect-h' },
-  { number: 52, x: 24, y: 91, shape: 'rect-h' },
-  { number: 54, x: 36, y: 91, shape: 'rect-h' },
-  // ── Privado (exterior, abajo derecha)
-  { number: 61, x: 68, y: 78, shape: 'rect-h' },
-  { number: 63, x: 80, y: 78, shape: 'rect-h' },
-  { number: 60, x: 68, y: 91, shape: 'rect-h' },
-  { number: 62, x: 80, y: 91, shape: 'rect-h' },
+  // ── Toldo (derecha superior — reubicado para evitar scroll)
+  { number: 50, x: 80, y: 9, shape: 'rect-h' },
+  { number: 53, x: 92, y: 9, shape: 'rect-h' },
+  { number: 51, x: 80, y: 22, shape: 'rect-h' },
+  { number: 52, x: 92, y: 22, shape: 'rect-h' },
+  { number: 55, x: 80, y: 35, shape: 'rect-h' },
+  { number: 54, x: 92, y: 35, shape: 'rect-h' },
+  // ── Privado (derecha inferior — reubicado para evitar scroll)
+  { number: 61, x: 80, y: 52, shape: 'rect-h' },
+  { number: 63, x: 92, y: 52, shape: 'rect-h' },
+  { number: 60, x: 80, y: 65, shape: 'rect-h' },
+  { number: 62, x: 92, y: 65, shape: 'rect-h' },
 ]
 
 interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
@@ -84,8 +84,8 @@ const FLOOR_LABELS: FloorLabel[] = [
   { text: 'PASILLO', x: 3, y: 46, vertical: true },
   { text: 'TERRAZA', x: 35, y: 41 },
   { text: 'BARRA', x: 64, y: 41 },
-  { text: 'TOLDO', x: 24, y: 70 },
-  { text: 'PRIVADO', x: 56, y: 84, vertical: true },
+  { text: 'TOLDO', x: 86, y: 2 },
+  { text: 'PRIVADO', x: 86, y: 46 },
 ]
 
 // Paredes / muros del plano (verde = muro terraza, vino = barra física)
@@ -161,8 +161,8 @@ export default function MesasPage() {
   }, [])
 
   // Escala del plano: se ajusta al ancho Y alto disponible para que quepa sin scroll
-  const PLANO_BASE_W = 940
-  const PLANO_BASE_H = 940 * 0.82
+  const PLANO_BASE_W = 1100
+  const PLANO_BASE_H = 1100 * 0.65
   const planoWrapRef = useRef<HTMLDivElement>(null)
   const [planoScale, setPlanoScale] = useState(1)
   useEffect(() => {
