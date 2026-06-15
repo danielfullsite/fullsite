@@ -100,6 +100,23 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           sessionStorage.removeItem('pos_last_activity')
         }
       }
+      // Pre-populate PIN cache for offline-first: fetch all staff PINs once when online
+      // This ensures the terminal can authenticate even if internet drops on first use
+      ;(async () => {
+        try {
+          const res = await fetch(apiUrl('/api/pos/staff-cache'), { headers: { 'x-client-id': _cid() } })
+          if (res.ok) {
+            const { staff: allStaff } = await res.json()
+            if (Array.isArray(allStaff) && allStaff.length > 0) {
+              const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
+              for (const s of allStaff) {
+                if (s.pin && s.id) cached[s.pin] = { id: s.id, name: s.name, role: s.role, cached_at: Date.now() }
+              }
+              localStorage.setItem('pos_pin_cache', JSON.stringify(cached))
+            }
+          }
+        } catch { /* offline — use existing cache */ }
+      })()
     }
   }, [])
 
