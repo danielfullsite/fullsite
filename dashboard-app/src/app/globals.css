@@ -57,6 +57,27 @@ html.capacitor .pos-safe-top { padding-top: env(safe-area-inset-top, 0px); }
 body:has(.pos-kiosk) {
   overscroll-behavior: none;
 }
+/* Scroll suave y fluido en todas las áreas scrolleables del POS */
+.pos-kiosk [class*="overflow-y-auto"],
+.pos-kiosk [class*="overflow-x-auto"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* Scrollbar delgado y discreto en POS (no estorba en touch) */
+.pos-kiosk ::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.pos-kiosk ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pos-kiosk ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+}
+.pos-kiosk ::-webkit-scrollbar-thumb:active {
+  background: rgba(255,255,255,0.25);
+}
 
 /* ============ Fullsite Design Tokens ============
  * DARK by default. Accent emerald #10b981.

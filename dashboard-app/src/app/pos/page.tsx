@@ -2419,7 +2419,7 @@ function POSContent() {
           </div>
 
           {/* Order items list — MAIN AREA, takes all available space */}
-          <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-3 py-1 min-h-0 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}
             {orderItems.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-[var(--text-2)]">
                 <p className="text-sm">Toca un producto para agregar</p>
@@ -2788,7 +2788,7 @@ function POSContent() {
 
           {menuSearch.trim() ? (
             /* Search results across all categories */
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-3 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               {(() => {
                 const term = menuSearch.toLowerCase()
                 const results: { item: MenuItem; category: string; catId: string }[] = []
@@ -2830,8 +2830,8 @@ function POSContent() {
           ) : (
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
-              <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 p-3 auto-rows-fr">
+              <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 p-3 auto-rows-fr pb-6">
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
@@ -2859,8 +2859,8 @@ function POSContent() {
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => setSelectedCategory('')} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
-                    <div className="overflow-y-auto p-4 max-h-[65vh]">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-4">
                 {activeCategory.items.filter(item => item.price > 0).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
                     return (
