@@ -41,8 +41,8 @@ import {
   comandasMuted,
   setComandasMuted,
   printPreTicket,
+  printTicket,
   printTicketCSS,
-  printTicketBluetooth,
   openCashDrawer,
   isBluetoothAvailable,
   isBluetoothConnected,
@@ -1391,17 +1391,8 @@ function POSContent() {
   }
 
   const handlePrintTicket = async (order: Order) => {
-    if (isBluetoothConnected()) {
-      try {
-        await printTicketBluetooth(order)
-        showToast('Ticket impreso')
-      } catch {
-        // Fallback to CSS print
-        printTicketCSS(order)
-      }
-    } else {
-      printTicketCSS(order)
-    }
+    // Bridge → Bluetooth → CSS (same priority as kitchen tickets)
+    await printTicket(order)
   }
 
   // Person count verification before payment
@@ -2544,8 +2535,8 @@ function POSContent() {
               </div>
             )}
 
-            {/* AI Copilot + Customer Memory — below items, scrollable */}
-            {orderItems.length > 0 && (
+            {/* AI Copilot + Customer Memory — only on mobile (terminal has limited space) */}
+            {orderItems.length > 0 && isMobileDevice && (
               <div className="mt-2 space-y-1">
                 <POSCopilot
                   orderItems={orderItems.map(i => ({ id: i.id, nombre: i.nombre, precio: i.precio, cantidad: i.cantidad, subtotal: i.subtotal }))}
@@ -2832,7 +2823,7 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 p-3 auto-rows-fr pb-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-2 p-2.5 auto-rows-fr pb-6">
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
                     .map((cat) => {
@@ -2842,7 +2833,7 @@ function POSContent() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[56px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-80 text-white hover:opacity-100 active:scale-95`}
+                          className={`px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[68px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
