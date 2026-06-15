@@ -534,10 +534,10 @@ export default function MesasPage() {
               {label.text}
             </span>
           ))}
-          {/* Divisor interior / exterior (toldo + privado) */}
-          <div className="absolute left-[3%] right-[3%] border-t-2 border-dashed border-[var(--line)]" style={{ top: '67%' }} />
+          {/* Divisor vertical interior / exterior (toldo + privado a la derecha) */}
+          <div className="absolute top-[3%] bottom-[3%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
           {/* Marca AMALAY */}
-          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '80%', top: '62%' }}>
+          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '68%' }}>
             AMALAY
           </span>
           {/* Mesas con sillas */}
