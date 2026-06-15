@@ -1982,6 +1982,18 @@ function POSContent() {
       }
       if (result.alerts.length > 0) {
         showToast(`Orden enviada — ${result.alerts.length} alertas de inventario`)
+        // Persist alerts to Supabase for dashboard visibility
+        try {
+          const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+          const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          for (const alert of result.alerts) {
+            fetch(`${sbUrl}/rest/v1/pos_inventory_alerts`, {
+              method: 'POST',
+              headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({ client_id: _cid(), message: alert, order_id: orderId, actor: mesero, resolved: false }),
+            }).catch(() => {})
+          }
+        } catch { /* best-effort */ }
       } else {
         showToast('Orden enviada a cocina')
       }
@@ -2374,6 +2386,7 @@ function POSContent() {
                 { href: '/pos/facturacion', icon: Stamp, label: 'Facturacion', section: 'facturacion' },
                 { href: '/pos/facturas-proveedor', icon: FileText, label: 'Facturas Proveedor', section: 'facturacion' },
                 { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
+                { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
                 { href: '/pos/configuracion', icon: Settings, label: 'Configuracion', section: 'configuracion' },
               ].filter(item => canSee(item.section)).map(item => (
@@ -3853,20 +3866,21 @@ function POSAlerts({ role }: { role: string }) {
         const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-        // Check low inventory (gerente/admin only)
+        // Check low inventory using reorder_point (gerente/admin only)
         if (role === 'admin' || role === 'gerente') {
           try {
+            // Fetch items where stock <= reorder_point (the actual threshold, not hardcoded)
             const invRes = await fetch(
-              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock&stock=lt.5&stock=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=5`,
+              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&reorder_point=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=20`,
               { headers }
             )
             if (invRes.ok) {
-              const lowStock: { ingredient_id: string; stock: number }[] = await invRes.json()
+              const allInv: { ingredient_id: string; stock: number; reorder_point: number }[] = await invRes.json()
+              const lowStock = allInv.filter(i => i.stock <= i.reorder_point && i.stock >= 0)
               if (lowStock.length > 0) {
-                // Resolver nombres de insumos (pos_inventory solo guarda el ID)
                 const names: Record<string, string> = {}
                 try {
-                  const ids = lowStock.map(i => i.ingredient_id).join(',')
+                  const ids = lowStock.slice(0, 10).map(i => i.ingredient_id).join(',')
                   const nRes = await fetch(
                     `${sbUrl}/rest/v1/pos_ingredients?select=id,name&id=in.(${ids})&client_id=eq.${_cid()}`,
                     { headers }
@@ -3875,8 +3889,8 @@ function POSAlerts({ role }: { role: string }) {
                 } catch { /* ignore */ }
                 const label = (i: { ingredient_id: string; stock: number }) =>
                   `${names[String(i.ingredient_id)] || `#${i.ingredient_id}`} (${(Math.round(i.stock * 100) / 100).toLocaleString('es-MX')})`
-                const shown = lowStock.slice(0, 2).map(label).join(', ')
-                const extra = lowStock.length > 2 ? ` y ${lowStock.length - 2} más` : ''
+                const shown = lowStock.slice(0, 3).map(label).join(', ')
+                const extra = lowStock.length > 3 ? ` y ${lowStock.length - 3} más` : ''
                 newAlerts.push({
                   id: 'inv-low',
                   type: 'warning',
