@@ -140,6 +140,16 @@ export default function ReporteFiscalPage() {
           className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-semibold rounded-lg transition-colors">
           {loading ? 'Generando...' : 'Generar reporte'}
         </button>
+        {data && (
+          <a
+            href={`/api/export/polizas?from=${year}-${String(month).padStart(2, '0')}-01&to=${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}&client_id=${_cid()}`}
+            download
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-lg transition-colors"
+          >
+            <Download size={16} />
+            Descargar CSV contable
+          </a>
+        )}
       </div>
 
       {data && (
