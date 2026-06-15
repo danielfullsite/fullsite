@@ -186,6 +186,138 @@ export async function emailCfdi(facturamaId: string, email: string): Promise<boo
   }
 }
 
+// ── Complemento de Pago (CFDI tipo "P" — PPD) ──────────────────────────────
+// Cuando una factura se emite como PPD (Pago en Parcialidades o Diferido),
+// el pago se registra después con un complemento de pago.
+
+export interface PaymentComplementRequest {
+  /** UUID del CFDI original (el que se está pagando) */
+  relatedUuid: string
+  /** Serie del CFDI original */
+  relatedSerie?: string
+  /** Folio del CFDI original */
+  relatedFolio?: string
+  /** RFC del receptor (mismo que el CFDI original) */
+  receiverRfc: string
+  receiverName: string
+  receiverFiscalRegime: string
+  receiverTaxZipCode: string
+  /** Monto pagado en esta parcialidad */
+  amount: number
+  /** Forma de pago: 01=efectivo, 03=transferencia, 04=TC, 28=TD */
+  paymentForm: string
+  /** Fecha del pago (ISO string) */
+  paymentDate: string
+  /** Número de parcialidad (1, 2, 3...) */
+  installment: number
+  /** Saldo anterior antes de este pago */
+  previousBalance: number
+  /** Moneda */
+  currency?: string
+}
+
+export function buildPaymentComplementBody(req: PaymentComplementRequest, expeditionPlace: string) {
+  const amount = round2(req.amount)
+  const newBalance = round2(req.previousBalance - amount)
+
+  return {
+    CfdiType: 'P',
+    NameId: '14',
+    ExpeditionPlace: expeditionPlace,
+    Currency: 'XXX', // Complemento de pago siempre usa XXX
+    Exportation: '01',
+    Receiver: {
+      Rfc: req.receiverRfc.toUpperCase(),
+      Name: req.receiverName.toUpperCase().trim(),
+      CfdiUse: 'CP01', // Pagos
+      FiscalRegime: req.receiverFiscalRegime,
+      TaxZipCode: req.receiverTaxZipCode,
+    },
+    Complemento: {
+      Payments: [{
+        Date: req.paymentDate.slice(0, 10),
+        PaymentForm: req.paymentForm,
+        Currency: req.currency || 'MXN',
+        Amount: amount,
+        RelatedDocuments: [{
+          TaxObject: '02',
+          Uuid: req.relatedUuid,
+          Serie: req.relatedSerie || 'POS',
+          Folio: req.relatedFolio || '',
+          PaymentMethod: 'PPD',
+          PartialityNumber: req.installment,
+          PreviousBalanceAmount: req.previousBalance,
+          AmountPaid: amount,
+          ImpSaldoInsoluto: Math.max(0, newBalance),
+        }],
+      }],
+    },
+  }
+}
+
+/** Timbra un complemento de pago. Misma mecánica que stampCfdi. */
+export async function stampPaymentComplement(req: PaymentComplementRequest): Promise<FacturamaResult> {
+  if (!isFacturamaConfigured()) {
+    return { ok: false, error: 'Facturama no configurado' }
+  }
+  const body: Record<string, unknown> = buildPaymentComplementBody(req, process.env.FACTURAMA_EXPEDITION_PLACE!)
+  if (isLiteMode()) {
+    body.Serie = 'PAG'
+    body.Folio = String(Date.now())
+    body.Issuer = liteIssuer()
+  }
+  const endpoint = isLiteMode() ? '/api-lite/3/cfdis' : '/3/cfdis'
+  const res = await fetch(`${facturamaBaseUrl()}${endpoint}`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const txt = await res.text()
+    console.error('[facturama] payment complement failed:', res.status, txt.slice(0, 500))
+    return { ok: false, error: extractFacturamaError(txt, res.status) }
+  }
+  const data = await res.json()
+  return {
+    ok: true,
+    facturamaId: String(data.Id ?? ''),
+    uuid: String(data.Complement?.TaxStamp?.Uuid ?? ''),
+  }
+}
+
+// ── Listado de CFDIs emitidos (para reporte fiscal) ─────────────────────────
+
+export interface CfdiListItem {
+  Id: string
+  CfdiType: string // I=Ingreso, E=Egreso, P=Pago
+  Folio: string
+  Serie: string
+  Date: string
+  Total: number
+  Status: string // active, canceled
+  Uuid: string
+  Receiver: { Rfc: string; Name: string }
+}
+
+/** Lista CFDIs emitidos en un rango de fechas. Para reporte fiscal mensual. */
+export async function listIssuedCfdis(from: string, to: string): Promise<CfdiListItem[]> {
+  if (!isFacturamaConfigured()) return []
+  const kind = isLiteMode() ? 'issuedLite' : 'issued'
+  // Facturama API: GET /cfdi?type={kind}&status=active|all
+  // Filter by date range via query params
+  const url = `${facturamaBaseUrl()}/cfdi?cfdiType=${kind}&cfdiDateInitial=${from}&cfdiDateFinal=${to}&status=all`
+  try {
+    const res = await fetch(url, { headers: { Authorization: authHeader() } })
+    if (!res.ok) {
+      console.error('[facturama] list failed:', res.status)
+      return []
+    }
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
 /** Los errores de Facturama vienen como {Message, ModelState:{campo:[msgs]}}. */
 function extractFacturamaError(txt: string, status: number): string {
   try {
