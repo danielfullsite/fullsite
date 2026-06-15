@@ -2387,6 +2387,7 @@ function POSContent() {
                 { href: '/pos/facturas-proveedor', icon: FileText, label: 'Facturas Proveedor', section: 'facturacion' },
                 { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
                 { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
+                { href: '/pos/monitor', icon: Monitor, label: 'Monitor', section: 'configuracion' },
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
                 { href: '/pos/configuracion', icon: Settings, label: 'Configuracion', section: 'configuracion' },
               ].filter(item => canSee(item.section)).map(item => (
