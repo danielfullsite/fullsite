@@ -63,23 +63,29 @@ body:has(.pos-kiosk) {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
-/* Scrollbar visible y touch-friendly en POS */
+/* Scrollbar visible y touch-friendly en POS — 14px para arrastrar con dedo */
 .pos-kiosk ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 .pos-kiosk ::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.03);
-  border-radius: 5px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 7px;
+  margin: 4px 0;
 }
 .pos-kiosk ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.18);
-  border-radius: 5px;
-  border: 2px solid transparent;
+  background: rgba(255,255,255,0.25);
+  border-radius: 7px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  min-height: 40px;
+}
+.pos-kiosk ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.35);
   background-clip: padding-box;
 }
 .pos-kiosk ::-webkit-scrollbar-thumb:active {
-  background: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.5);
   background-clip: padding-box;
 }
 
@@ -233,10 +239,10 @@ body {
 .demo-border { border-color: var(--demo-border, rgba(255,255,255,0.05)); }
 .demo-muted-bg { background: var(--demo-text-muted, #52525b); }
 
-/* Scrollbars */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Scrollbars — touch-friendly defaults */
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 2px solid var(--bg); min-height: 40px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent-line); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
