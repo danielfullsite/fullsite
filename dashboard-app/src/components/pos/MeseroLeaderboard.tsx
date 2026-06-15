@@ -15,6 +15,8 @@ interface MeseroStats {
   tickets: number
   ticketPromedio: number
   personas: number
+  horasTurno: number | null  // hours since clock-in (null = no attendance data)
+  ventasPorHora: number | null  // ventas / horasTurno
 }
 
 interface MeseroLeaderboardProps {
@@ -38,21 +40,44 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
     try {
       const today = new Date()
       const todayStr = new Date(today.toLocaleString('en-US', { timeZone: 'America/Monterrey' })).toISOString().split('T')[0]
+      const nowMs = Date.now()
 
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.${_cid()}&created_at=gte.${todayStr}T00:00:00`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
-      if (!res.ok) return
+      const [ordersRes, attendanceRes] = await Promise.all([
+        fetch(
+          `${SUPABASE_URL}/rest/v1/pos_orders?select=mesero,total,personas&status=eq.cerrada&client_id=eq.${_cid()}&created_at=gte.${todayStr}T00:00:00`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+        ),
+        fetch(
+          `${SUPABASE_URL}/rest/v1/pos_attendance?select=staff_name,type,registered_at&client_id=eq.${_cid()}&registered_at=gte.${todayStr}T00:00:00&order=registered_at.asc`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+        ).catch(() => null), // attendance table may not exist yet
+      ])
+      if (!ordersRes.ok) return
 
-      const orders = await res.json()
+      const orders = await ordersRes.json()
+
+      // Build attendance map: staff_name → clock-in time (last entrada without salida = still working)
+      const clockInMap = new Map<string, number>() // name → hours since clock-in
+      if (attendanceRes?.ok) {
+        const att: { staff_name: string; type: string; registered_at: string }[] = await attendanceRes.json()
+        const lastEntry = new Map<string, string>() // name → last entrada timestamp
+        for (const a of att) {
+          if (a.type === 'entrada') lastEntry.set(a.staff_name, a.registered_at)
+          if (a.type === 'salida') lastEntry.delete(a.staff_name) // they left
+        }
+        for (const [name, ts] of lastEntry) {
+          const hours = (nowMs - new Date(ts).getTime()) / 3600000
+          if (hours > 0 && hours < 24) clockInMap.set(name, Math.round(hours * 10) / 10)
+        }
+      }
+
       const byMesero = new Map<string, MeseroStats>()
       let total = 0
 
       for (const o of orders) {
         const name = o.mesero || 'Sin mesero'
         if (!byMesero.has(name)) {
-          byMesero.set(name, { name, ventas: 0, tickets: 0, ticketPromedio: 0, personas: 0 })
+          byMesero.set(name, { name, ventas: 0, tickets: 0, ticketPromedio: 0, personas: 0, horasTurno: null, ventasPorHora: null })
         }
         const m = byMesero.get(name)!
         m.ventas += Number(o.total) || 0
@@ -61,9 +86,14 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
         total += Number(o.total) || 0
       }
 
-      // Calculate ticket promedio
+      // Calculate ticket promedio + hours + ventas/hora
       for (const m of byMesero.values()) {
         m.ticketPromedio = m.tickets > 0 ? m.ventas / m.tickets : 0
+        const hours = clockInMap.get(m.name)
+        if (hours !== undefined) {
+          m.horasTurno = hours
+          m.ventasPorHora = hours > 0 ? Math.round(m.ventas / hours) : null
+        }
       }
 
       const sorted = Array.from(byMesero.values()).sort((a, b) => b.ventas - a.ventas)
@@ -146,9 +176,13 @@ export default function MeseroLeaderboard({ currentMesero, compact = false, meta
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isMe ? 'text-emerald-400' : 'text-[var(--text-1)]'}`}>
                       {m.name.split(' ').slice(0, 2).join(' ')}
+                      {m.horasTurno !== null && (
+                        <span className="text-[10px] text-[var(--text-3)] font-normal ml-1">{m.horasTurno}h</span>
+                      )}
                     </p>
                     <p className="text-xs text-[var(--text-3)]">
                       {m.tickets} tickets · TP {formatMXN(m.ticketPromedio)}
+                      {m.ventasPorHora !== null && ` · ${formatMXN(m.ventasPorHora)}/h`}
                     </p>
                   </div>
                   <div className="text-right">
