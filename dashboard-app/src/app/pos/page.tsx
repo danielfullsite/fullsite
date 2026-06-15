@@ -2191,7 +2191,7 @@ function POSContent() {
       {/* Top Bar */}
       <header className="pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
-        <div className="flex items-center justify-between px-3 py-1">
+        <div className="flex items-center justify-between px-3 py-0.5">
           <div className="flex items-center gap-2">
             <button onClick={() => setShowNav(!showNav)} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] active:bg-[var(--surface-2)]0 flex items-center justify-center transition-colors">
               {showNav ? <X size={18} /> : <Menu size={18} />}
@@ -2291,8 +2291,8 @@ function POSContent() {
           </div>
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-[var(--line)]/50 overflow-x-auto">
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-1 border border-slate-600 min-h-[48px]">
+        <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
+          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-slate-600 min-h-[40px]">
             <span className="text-white text-sm font-medium">Mesa</span>
             <input
               type="number"
@@ -2401,7 +2401,7 @@ function POSContent() {
         {/* Left Panel -- Current Order (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[45%] md:flex flex-col border-r border-[var(--line)] bg-[var(--surface)] ${mobileView === 'order' ? 'flex w-full' : 'hidden'}`}>
           {/* Order header — compact */}
-          <div className="px-3 py-1.5 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
+          <div className="px-3 py-1 border-b border-[var(--line)] bg-[var(--surface-2)]/50 flex-shrink-0">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold flex items-center gap-1">
                 Mesa
@@ -2426,14 +2426,14 @@ function POSContent() {
                 <p className="text-sm">Toca un producto para agregar</p>
               </div>
             ) : (
-              <div className="space-y-0.5">
+              <div className="space-y-px">
                 {orderItems.map((item) => {
                   const isCancelled = cancelledItems.has(item.id)
                   const isVoided = voidedItems.has(item.id)
                   // Separador de tiempo (estilo Wansoft) — fila especial
                   if (isTiempoItem(item)) {
                     return (
-                      <div key={item.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                      <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
                         <Flame size={13} className="text-amber-400 flex-shrink-0" />
                         <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
                         <button
@@ -2448,7 +2448,7 @@ function POSContent() {
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-2 py-2 px-2 rounded-lg transition-all ${
+                      className={`flex items-center gap-2 py-1 px-2 rounded-lg transition-all ${
                         isVoided
                           ? 'bg-slate-500/10 border border-slate-500/20 opacity-40'
                           : isCancelled
@@ -2559,9 +2559,9 @@ function POSContent() {
           </div>
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
-          <div className="border-t border-[var(--line)] px-3 py-1.5 bg-[var(--surface-2)]/50 flex-shrink-0">
+          <div className="border-t border-[var(--line)] px-3 py-1 bg-[var(--surface-2)]/50 flex-shrink-0">
             {/* Silla activa + Tiempos row (estilo Wansoft CANT/SILLA + firebutton) */}
-            <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex items-center gap-1 mb-1">
               <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-500/25 rounded-lg px-1.5 py-1">
                 <Armchair size={18} className="text-sky-400" />
                 <button
@@ -2596,7 +2596,7 @@ function POSContent() {
               <div className="flex-1" />
             </div>
             {/* Inline tools row: discount, notes, void */}
-            <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex items-center gap-1 mb-1">
               <button
                 onClick={() => setShowDiscount(true)}
                 disabled={orderItems.length === 0 || isMobileRestricted}
@@ -2730,7 +2730,7 @@ function POSContent() {
           </div>
 
           {/* Action buttons — compact for tablets */}
-          <div className="px-3 py-1.5 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
+          <div className="px-3 py-1 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
             <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
@@ -2770,7 +2770,7 @@ function POSContent() {
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'#0d0d12'}}>
           {/* Search bar — touch target + barcode scanner */}
-          <div className="px-3 pt-2 pb-1.5 flex-shrink-0 flex gap-2">
+          <div className="px-3 pt-1.5 pb-1 flex-shrink-0 flex gap-2">
             <input
               type="text"
               value={menuSearch}
@@ -2832,11 +2832,11 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-2 p-2.5 auto-rows-fr pb-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 p-2 auto-rows-fr pb-4">
                   {allCombos.length > 0 && (
                     <button
                       onClick={() => setShowComboModal(true)}
-                      className="px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[68px] leading-tight flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
+                      className="px-2 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[58px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
                     >
                       <Layers size={18} />
                       <span>Combos</span>
@@ -2852,7 +2852,7 @@ function POSContent() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-2 py-3 rounded-xl text-xs font-bold text-center transition-all min-h-[68px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
+                          className={`px-2 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[58px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
