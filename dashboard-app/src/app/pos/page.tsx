@@ -2384,6 +2384,7 @@ function POSContent() {
                 { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
                 { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
                 { href: '/pos/facturacion', icon: Stamp, label: 'Facturacion', section: 'facturacion' },
+                { href: '/pos/recepcion-factura', icon: FileText, label: 'Recepcion XML', section: 'facturacion' },
                 { href: '/pos/facturas-proveedor', icon: FileText, label: 'Facturas Proveedor', section: 'facturacion' },
                 { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
                 { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
