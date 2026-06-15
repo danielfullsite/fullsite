@@ -354,8 +354,8 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   const cutoffStr = cutoff.toISOString().split('T')[0]
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,metodo_pago,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00&order=created_at.asc&limit=5000`
-  ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; metodo_pago: string; status: string; created_at: string }[]
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00&order=created_at.asc&limit=5000`
+  ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []
 
@@ -383,15 +383,38 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       .map(([nombre, total]) => ({ nombre, total }))
       .sort((a, b) => b.total - a.total)
 
-    // Payment methods
+    // Payment methods + efectivo/tarjeta split
     const pagoMap = new Map<string, number>()
+    let efectivo = 0, tarjeta = 0, propinasTotal = 0
     for (const o of dayOrders) {
-      const method = o.metodo_pago || 'Efectivo'
-      pagoMap.set(method, (pagoMap.get(method) || 0) + o.total)
+      propinasTotal += o.propina || 0
+      const pagos = Array.isArray(o.pagos) && o.pagos.length > 0
+        ? o.pagos
+        : [{ metodo: o.metodo_pago || 'Efectivo', monto: o.total }]
+      for (const p of pagos) {
+        const m = (p.metodo || '').toLowerCase()
+        pagoMap.set(p.metodo || 'Efectivo', (pagoMap.get(p.metodo || 'Efectivo') || 0) + (p.monto || 0))
+        if (/efectivo|cash/.test(m)) efectivo += p.monto || 0
+        else tarjeta += p.monto || 0
+      }
     }
     const pagoMetodos = Array.from(pagoMap.entries())
       .map(([nombre, total]) => ({ nombre, total }))
       .sort((a, b) => b.total - a.total)
+
+    // Top platillos from items
+    const itemMap = new Map<string, number>()
+    for (const o of dayOrders) {
+      if (Array.isArray(o.items)) {
+        for (const item of o.items) {
+          if (item.nombre) itemMap.set(item.nombre, (itemMap.get(item.nombre) || 0) + (item.precio || 0) * (item.cantidad || 1))
+        }
+      }
+    }
+    const platillosTop = Array.from(itemMap.entries())
+      .map(([nombre, total]) => ({ nombre, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20)
 
     result.push({
       fecha,
@@ -399,18 +422,18 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       ventas_dia: ventas,
       descuentos,
       devoluciones: 0,
-      efectivo: 0,
-      tarjeta: 0,
+      efectivo,
+      tarjeta,
       tickets_count: dayOrders.length,
       mesas_atendidas: new Set(dayOrders.map(o => o.mesa)).size,
       ordenes_llevar: 0,
       personas_restaurant: personas,
       ticket_promedio_restaurant: tp,
-      propinas_total: 0,
+      propinas_total: propinasTotal,
       chilaquiles_total: 0,
       half_half_total: 0,
       meseros,
-      platillos_top: [],
+      platillos_top: platillosTop,
       ventas_por_grupo: [],
       pago_métodos: pagoMetodos,
       updated_at: new Date().toISOString(),

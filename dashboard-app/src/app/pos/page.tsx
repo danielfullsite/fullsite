@@ -2376,6 +2376,7 @@ function POSContent() {
                 { href: '/pos/barra', icon: Wine, label: 'Barra', section: 'barra' },
                 { href: '/pos/delivery', icon: Bike, label: 'Domicilio', section: 'delivery' },
                 { href: '/pos/recetas', icon: BookOpen, label: 'Recetas', section: 'recetas' },
+                { href: '/pos/food-cost', icon: DollarSign, label: 'Food Cost', section: 'recetas' },
                 { href: '/pos/compras', icon: ShoppingCart, label: 'Compras', section: 'compras' },
                 { href: '/pos/inventario', icon: Package, label: 'Inventario', section: 'inventario' },
                 { href: '/pos/inventario-market', icon: Package, label: 'Inventario Market', section: 'inventario' },
