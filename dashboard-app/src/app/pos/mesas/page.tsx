@@ -26,10 +26,10 @@ interface FloorTable {
 }
 
 const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
-  round: { w: 54, h: 54 },
-  'round-lg': { w: 72, h: 72 },
-  square: { w: 56, h: 52 },
-  'rect-h': { w: 88, h: 50 },
+  round: { w: 62, h: 62 },
+  'round-lg': { w: 82, h: 82 },
+  square: { w: 64, h: 60 },
+  'rect-h': { w: 96, h: 56 },
 }
 
 // Posiciones calcadas del plano físico
@@ -63,17 +63,17 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 11, x: 57, y: 46, shape: 'square' },
   { number: 12, x: 57, y: 58, shape: 'square' },
   // ── Toldo (derecha superior — reubicado para evitar scroll)
-  { number: 50, x: 82, y: 7, shape: 'rect-h' },
-  { number: 53, x: 93, y: 7, shape: 'rect-h' },
-  { number: 51, x: 82, y: 20, shape: 'rect-h' },
-  { number: 52, x: 93, y: 20, shape: 'rect-h' },
-  { number: 55, x: 85, y: 42, shape: 'rect-h' },
-  { number: 54, x: 95, y: 42, shape: 'rect-h' },
+  { number: 50, x: 84, y: 7, shape: 'rect-h' },
+  { number: 53, x: 94, y: 7, shape: 'rect-h' },
+  { number: 51, x: 84, y: 20, shape: 'rect-h' },
+  { number: 52, x: 94, y: 20, shape: 'rect-h' },
+  { number: 55, x: 84, y: 33, shape: 'rect-h' },
+  { number: 54, x: 94, y: 33, shape: 'rect-h' },
   // ── Privado (derecha inferior — reubicado para evitar scroll)
-  { number: 61, x: 82, y: 55, shape: 'rect-h' },
-  { number: 63, x: 93, y: 55, shape: 'rect-h' },
-  { number: 60, x: 82, y: 68, shape: 'rect-h' },
-  { number: 62, x: 93, y: 68, shape: 'rect-h' },
+  { number: 61, x: 84, y: 55, shape: 'rect-h' },
+  { number: 63, x: 94, y: 55, shape: 'rect-h' },
+  { number: 60, x: 84, y: 68, shape: 'rect-h' },
+  { number: 62, x: 94, y: 68, shape: 'rect-h' },
 ]
 
 interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
