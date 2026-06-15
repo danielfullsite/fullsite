@@ -101,8 +101,8 @@ const FLOOR_WALLS: FloorWall[] = [
   { x: 50.5, y: 30.5, w: 0.7, h: 33, color: 'green' },
   // Muro terraza: vertical izquierdo (inferior, junto a 42)
   { x: 19.5, y: 52, w: 0.7, h: 12, color: 'green' },
-  // Barra física en L (vino) con texto vertical
-  { x: 71, y: 31, w: 14, h: 4, color: 'maroon' },
+  // Barra física en L (vino) con texto vertical — acortada para no chocar con Toldo
+  { x: 71, y: 31, w: 7, h: 4, color: 'maroon' },
   { x: 71, y: 31, w: 4.5, h: 30, color: 'maroon' },
 ]
 
