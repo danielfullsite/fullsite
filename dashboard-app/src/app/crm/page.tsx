@@ -158,15 +158,52 @@ export default function CRMPage() {
   const [messages, setMessages] = useState<RecoveryMsg[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Load from localStorage on mount
+  // Load clients from Supabase pos_clients (real data from Reservy)
   useEffect(() => {
-    const c = loadFromStorage<CRMClient>(STORAGE_KEYS.clients, DEMO_CLIENTS)
-    const camp = loadFromStorage<Campaign>(STORAGE_KEYS.campaigns, [])
-    const msgs = loadFromStorage<RecoveryMsg>(STORAGE_KEYS.messages, [])
-    setClients(c)
-    setCampaigns(camp)
-    setMessages(msgs)
-    setLoading(false)
+    const cid = typeof window !== 'undefined' ? (localStorage.getItem('fullsite_client_id') || 'amalay') : 'amalay'
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    async function loadClients() {
+      try {
+        const res = await fetch(
+          `${sbUrl}/rest/v1/pos_clients?client_id=eq.${cid}&select=id,nombre,apellido,telefono,email,cumpleanos,visitas,ultima_visita,gasto_total,gasto_por_visita,tags,notas,source&order=visitas.desc&limit=5000`,
+          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+        )
+        if (res.ok) {
+          const data = await res.json()
+          const mapped: CRMClient[] = data.map((r: Record<string, unknown>) => ({
+            id: String(r.id),
+            name: [r.nombre, r.apellido].filter(Boolean).join(' ').trim() || 'Sin nombre',
+            phone: String(r.telefono || ''),
+            email: String(r.email || ''),
+            source: String(r.source || 'manual'),
+            first_visit: null,
+            last_visit: r.ultima_visita ? String(r.ultima_visita) : null,
+            total_visits: Number(r.visitas) || 0,
+            avg_ticket: Number(r.gasto_por_visita) || 0,
+            tags: r.tags ? String(r.tags).split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+            notes: String(r.notas || ''),
+          }))
+          if (mapped.length > 0) {
+            setClients(mapped)
+          } else {
+            setClients(DEMO_CLIENTS)
+          }
+        } else {
+          setClients(DEMO_CLIENTS)
+        }
+      } catch {
+        setClients(DEMO_CLIENTS)
+      }
+
+      const camp = loadFromStorage<Campaign>(STORAGE_KEYS.campaigns, [])
+      const msgs = loadFromStorage<RecoveryMsg>(STORAGE_KEYS.messages, [])
+      setCampaigns(camp)
+      setMessages(msgs)
+      setLoading(false)
+    }
+    loadClients()
   }, [])
 
   // Persist on change
