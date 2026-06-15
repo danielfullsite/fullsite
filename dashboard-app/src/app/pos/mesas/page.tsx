@@ -63,17 +63,17 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 11, x: 57, y: 46, shape: 'square' },
   { number: 12, x: 57, y: 58, shape: 'square' },
   // ── Toldo (derecha superior — reubicado para evitar scroll)
-  { number: 50, x: 84, y: 7, shape: 'rect-h' },
-  { number: 53, x: 94, y: 7, shape: 'rect-h' },
-  { number: 51, x: 84, y: 20, shape: 'rect-h' },
-  { number: 52, x: 94, y: 20, shape: 'rect-h' },
-  { number: 55, x: 84, y: 33, shape: 'rect-h' },
-  { number: 54, x: 94, y: 33, shape: 'rect-h' },
+  { number: 50, x: 85, y: 7, shape: 'rect-h' },
+  { number: 53, x: 95, y: 7, shape: 'rect-h' },
+  { number: 51, x: 85, y: 20, shape: 'rect-h' },
+  { number: 52, x: 95, y: 20, shape: 'rect-h' },
+  { number: 55, x: 85, y: 33, shape: 'rect-h' },
+  { number: 54, x: 95, y: 33, shape: 'rect-h' },
   // ── Privado (derecha inferior — reubicado para evitar scroll)
-  { number: 61, x: 84, y: 55, shape: 'rect-h' },
-  { number: 63, x: 94, y: 55, shape: 'rect-h' },
-  { number: 60, x: 84, y: 68, shape: 'rect-h' },
-  { number: 62, x: 94, y: 68, shape: 'rect-h' },
+  { number: 61, x: 85, y: 55, shape: 'rect-h' },
+  { number: 63, x: 95, y: 55, shape: 'rect-h' },
+  { number: 60, x: 85, y: 68, shape: 'rect-h' },
+  { number: 62, x: 95, y: 68, shape: 'rect-h' },
 ]
 
 interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
@@ -84,8 +84,8 @@ const FLOOR_LABELS: FloorLabel[] = [
   { text: 'PASILLO', x: 3, y: 46, vertical: true },
   { text: 'TERRAZA', x: 35, y: 41 },
   { text: 'BARRA', x: 64, y: 41 },
-  { text: 'TOLDO', x: 86, y: 2 },
-  { text: 'PRIVADO', x: 86, y: 46 },
+  { text: 'TOLDO', x: 89, y: 1 },
+  { text: 'PRIVADO', x: 89, y: 48 },
 ]
 
 // Paredes / muros del plano (verde = muro terraza, vino = barra física)
