@@ -124,7 +124,7 @@ function getStationFromCategoryName(catName: string): StationName | null {
 
 // categoryNameHint: the display name of the category (e.g. "Cerveza", "Bebidas OH")
 // When categories come from Supabase with UUID ids, we use the name to route.
-let _categoryNameCache: Record<string, string> = {}
+export let _categoryNameCache: Record<string, string> = {}
 export function setCategoryNameCache(map: Record<string, string>) { _categoryNameCache = map }
 
 // Fallback: determine station from item name using BEBIDA_KEYWORDS

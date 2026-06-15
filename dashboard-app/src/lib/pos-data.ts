@@ -229,14 +229,33 @@ export const MODIFIERS_AGREGAR = MODIFIERS_AGREGAR_FOOD
 // Beverage categories (no "quitar" options, drink-specific extras)
 const BEVERAGE_CATEGORIES = ['coffee', 'tea', 'fresh', 'smoothies', 'frappes', 'signature', 'alcohol']
 const COFFEE_CATEGORIES = ['coffee', 'tea']
-// Items with no modifiers at all
-const NO_MODIFIER_CATEGORIES = ['sodas']
+// Items with no modifiers at all (no extras)
+const NO_MODIFIER_CATEGORIES = ['sodas', 'cerveza', 'vinos', 'licores']
+// Bakery/market — no food extras (no queso/aguacate on conchas)
+const BAKERY_CATEGORIES = ['bakery', 'toast', 'postres', 'mkt-cafe', 'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay']
+
+// Category name → modifier type (for DB categories with UUID ids)
+function getModifierTypeFromCategoryName(catName: string): 'none' | 'coffee' | 'beverage' | 'bakery' | 'food' {
+  const lower = catName.toLowerCase()
+  if (['soda', 'cerveza', 'beer', 'vino', 'licor', '2oz'].some(kw => lower.includes(kw))) return 'none'
+  if (['coffee', 'café', 'cafe', 'tea', 'tisana'].some(kw => lower.includes(kw))) return 'coffee'
+  if (['jugo', 'fresh', 'smoothie', 'frappe', 'signature', 'ice cream', 'helado'].some(kw => lower.includes(kw))) return 'beverage'
+  if (['bakery', 'panadería', 'toast', 'bagel', 'dessert', 'postre', 'market', 'healthy', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'semilla', 'dulce'].some(kw => lower.includes(kw))) return 'bakery'
+  return 'food'
+}
+
+// Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
+import { _categoryNameCache } from '@/lib/pos-constants'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
   agregarOptions: ModificadorAgregar[]
 } {
+  // Static category ID match first
   if (NO_MODIFIER_CATEGORIES.includes(categoryId)) {
+    return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_NONE }
+  }
+  if (BAKERY_CATEGORIES.includes(categoryId)) {
     return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_NONE }
   }
   if (COFFEE_CATEGORIES.includes(categoryId)) {
@@ -244,6 +263,14 @@ export function getModifiersForCategory(categoryId: string): {
   }
   if (BEVERAGE_CATEGORIES.includes(categoryId)) {
     return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_DRINKS }
+  }
+  // DB category name match (UUID ids)
+  const catName = _categoryNameCache[categoryId]
+  if (catName) {
+    const type = getModifierTypeFromCategoryName(catName)
+    if (type === 'none' || type === 'bakery') return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_NONE }
+    if (type === 'coffee') return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_COFFEE }
+    if (type === 'beverage') return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_DRINKS }
   }
   // Food items — use recipe ingredients for "quitar", food extras for "agregar"
   return { quitarOptions: [], agregarOptions: MODIFIERS_AGREGAR_FOOD }
