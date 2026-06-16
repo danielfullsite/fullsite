@@ -470,7 +470,7 @@ export default function CocinaPage() {
                   </div>
 
                   <div className="flex-1 space-y-2 mb-4">
-                    {items.map((item, i) => (
+                    {activeItems.map((item, i) => (
                       <div key={i} className={`flex items-start gap-2 ${item.cancelled ? 'opacity-40' : ''}`}>
                         <span className={`font-bold text-sm min-w-[24px] ${item.cancelled ? 'text-red-500' : 'text-emerald-400'}`}>
                           {item.cancelled ? '✕' : `${item.cantidad || item.quantity || 1}x`}
