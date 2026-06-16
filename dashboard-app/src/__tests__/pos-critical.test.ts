@@ -8,7 +8,7 @@ import {
   getActiveItems,
   round2,
 } from '@/lib/pos-calculations'
-import { IVA_RATE } from '@/lib/pos-data'
+import { IVA_RATE } from '@/lib/pos-constants'
 import type { OrderItem } from '@/lib/pos-data'
 import type { Promotion } from '@/lib/pos-promos'
 import { evaluatePromos, buildCategoryMap } from '@/lib/pos-promos'

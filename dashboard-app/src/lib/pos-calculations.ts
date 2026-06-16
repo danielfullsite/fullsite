@@ -4,7 +4,7 @@
  * Extracted from pos/page.tsx so they can be tested independently.
  */
 
-import { IVA_RATE } from './pos-data'
+import { IVA_RATE } from './pos-constants'
 import type { OrderItem } from './pos-data'
 
 // ─── Item subtotal ─────────────────────────────────────────────────────────

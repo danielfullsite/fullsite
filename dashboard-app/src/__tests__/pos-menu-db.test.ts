@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { IVA_RATE } from '@/lib/pos-constants'
 import {
   MENU_CATEGORIES,
   MODIFIERS_QUITAR,
@@ -6,7 +7,6 @@ import {
   MODIFIERS_AGREGAR_COFFEE,
   MODIFIERS_AGREGAR_DRINKS,
   getModifiersForCategory,
-  IVA_RATE,
   MESEROS,
   MESAS_CONFIG,
   formatMXN,

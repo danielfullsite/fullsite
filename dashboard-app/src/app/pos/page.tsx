@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation'
 import {
   MENU_CATEGORIES,
   MESEROS,
-  IVA_RATE,
   verifyManagerPin,
   RECIPE_ALIASES,
   formatMXN,
@@ -32,7 +31,7 @@ import {
   type PaymentMethodDB,
   type PagoForma,
 } from '@/lib/pos-data'
-import { TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
+import { IVA_RATE, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
@@ -2049,6 +2048,9 @@ function POSContent() {
 
       // Auto-deduct ingredients from inventory
       const result = await deductIngredientsForOrder(activeItems, orderId, mesero)
+      if (!result.success) {
+        showToast('Orden enviada — inventario no se pudo descontar (sin red)')
+      }
       if (result.deductions.length > 0) {
         logAudit({
           order_id: orderId, action: 'order_sent_kitchen', actor: 'Sistema',
@@ -4103,7 +4105,7 @@ function POSAlerts({ role }: { role: string }) {
             for (const d of deliveryOrders) {
               // Skip test/invalid data
               if (!d.customer_name || d.customer_name === 'TEST' || d.total <= 0) continue
-              const platform: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi', didi: '🔶 Didi' }
+              const platform: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi' }
               newAlerts.push({
                 id: `del-${d.id}`,
                 type: 'info',

@@ -7,8 +7,8 @@ import {
   splitPersonas,
   formatMXN,
 } from '@/lib/pos-calculations'
+import { IVA_RATE } from '@/lib/pos-constants'
 import {
-  IVA_RATE,
   MESAS_CONFIG,
   MENU_CATEGORIES,
 } from '@/lib/pos-data'

@@ -11,7 +11,7 @@ import {
   getActiveItems,
   formatMXN,
 } from '@/lib/pos-calculations'
-import { IVA_RATE } from '@/lib/pos-data'
+import { IVA_RATE } from '@/lib/pos-constants'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 

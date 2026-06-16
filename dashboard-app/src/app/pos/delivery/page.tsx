@@ -99,7 +99,11 @@ export default function DeliveryPage() {
         `${SUPABASE_URL}/rest/v1/delivery_orders?client_id=eq.${getClientId()}&platform=in.(ubereats,rappi)&created_at=gte.${today}T00:00:00&order=created_at.desc`,
         { headers: SB_HEADERS, cache: 'no-store' }
       )
-      if (res.ok) setOrders(await res.json())
+      if (res.ok) {
+        const data: DeliveryOrder[] = await res.json()
+        // Filter out test/invalid orders
+        setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
+      }
     } catch { /* sin red */ } finally {
       setLoading(false)
     }

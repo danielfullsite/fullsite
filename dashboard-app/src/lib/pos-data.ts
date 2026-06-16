@@ -993,7 +993,7 @@ export const MESEROS = [
   'Mario Garcia Ramirez',
 ]
 
-export const IVA_RATE = 0.16
+// IVA_RATE lives in pos-constants.ts (single source of truth)
 
 // Mesa config — layout real AMALAY (plano físico, foto 2026-06-10)
 // Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),

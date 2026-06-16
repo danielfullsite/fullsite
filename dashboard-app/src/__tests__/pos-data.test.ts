@@ -15,10 +15,10 @@ beforeEach(() => localStorageMock.clear())
 
 // ─── Import after mocking ─────────────────────────────────────────────────
 
+import { IVA_RATE } from '@/lib/pos-constants'
 import {
   formatMXN,
   generateId,
-  IVA_RATE,
   MESAS_CONFIG,
   MENU_CATEGORIES,
   MESEROS,

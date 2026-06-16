@@ -142,7 +142,7 @@ export default function CocinaPage() {
       if (delRes.ok) {
         const deliveryOrders = await delRes.json()
         for (const d of deliveryOrders) {
-          const platformBadge: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi', didi: '🔶 Didi' }
+          const platformBadge: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi' }
           const items = typeof d.items === 'string' ? JSON.parse(d.items) : d.items || []
           fresh.push({
             id: d.id,
