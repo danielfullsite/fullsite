@@ -348,6 +348,34 @@ export async function getLatestAgentRuns(): Promise<AgentRun[]> {
 
 /** Aggregate pos_orders into WansoftDaily-compatible format for dashboard pages.
  *  Used when wansoft_daily has no data for a client (new clients using only Fullsite POS). */
+// Classify item into a menu group by name keywords (for ventas_por_grupo)
+function classifyItemGroup(lower: string): string {
+  if (/chilaquil|enchilada/.test(lower)) return 'CHILAQUILES & ENCHILADAS'
+  if (/huevo|egg|omelette|keto/.test(lower)) return 'EGGS & KETO'
+  if (/cafe|café|latte|cappuccino|americano|espresso|mocca|matcha/.test(lower)) return 'COFFEE'
+  if (/toast|bagel/.test(lower)) return 'TOAST & BAGELS'
+  if (/panini/.test(lower)) return 'PANINIS'
+  if (/bowl/.test(lower)) return 'BOWLS'
+  if (/smoothie/.test(lower)) return 'SMOOTHIES'
+  if (/frappe|frapé/.test(lower)) return 'FRAPPES'
+  if (/jugo|juice/.test(lower)) return 'JUGOS'
+  if (/limonada|fresco|agua|horchata/.test(lower)) return 'FRESH DRINKS'
+  if (/pancake|waffle|hotcake/.test(lower)) return 'PANCAKES & WAFFLES'
+  if (/croissant/.test(lower)) return 'CROISSANTS BREAKFAST'
+  if (/cerveza|heineken|corona|modelo|pacif|victoria|bohemia|stella|tecate|indio|dos equis|michelada/.test(lower)) return 'CERVEZA'
+  if (/vino|wine|sangria/.test(lower)) return 'VINOS'
+  if (/whisky|tequila|mezcal|vodka|gin|ron |margarita|mojito|carajillo|baileys|kahlua/.test(lower)) return 'BEBIDAS OH'
+  if (/soda|coca|sprite|fanta|topo/.test(lower)) return 'SODAS'
+  if (/te |té |tisana|chai/.test(lower)) return 'TEA & TISANAS'
+  if (/ensalada|salad/.test(lower)) return 'EVERYDAY SPECIALS'
+  if (/pizza|pasta/.test(lower)) return 'PIZZAS & PASTAS'
+  if (/ceviche/.test(lower)) return 'CEVICHE'
+  if (/helado|ice cream|nieve/.test(lower)) return 'ICE CREAM'
+  if (/pastel|cheesecake|brownie|galleta|tiramis|postre|dessert/.test(lower)) return 'DESSERTS'
+  if (/concha|cuerno|rol de canela|bakery/.test(lower)) return 'BAKERY'
+  return 'OTROS'
+}
+
 export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - days)
@@ -402,12 +430,25 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       .map(([nombre, total]) => ({ nombre, total }))
       .sort((a, b) => b.total - a.total)
 
-    // Top platillos from items
+    // Top platillos from items + group by category
     const itemMap = new Map<string, number>()
+    const grupoMap = new Map<string, number>()
+    let chilaquilesTotal = 0, halfHalfTotal = 0
     for (const o of dayOrders) {
       if (Array.isArray(o.items)) {
         for (const item of o.items) {
-          if (item.nombre) itemMap.set(item.nombre, (itemMap.get(item.nombre) || 0) + (item.precio || 0) * (item.cantidad || 1))
+          if (!item.nombre) continue
+          const itemTotal = (item.precio || 0) * (item.cantidad || 1)
+          itemMap.set(item.nombre, (itemMap.get(item.nombre) || 0) + itemTotal)
+
+          // Classify into grupo by item name keywords
+          const lower = item.nombre.toLowerCase()
+          const grupo = classifyItemGroup(lower)
+          grupoMap.set(grupo, (grupoMap.get(grupo) || 0) + itemTotal)
+
+          // Special KPIs
+          if (lower.includes('chilaquil') || lower.includes('enchilada')) chilaquilesTotal += itemTotal
+          if (lower.includes('half') || lower.includes('h&h') || lower.includes('mitad')) halfHalfTotal += itemTotal
         }
       }
     }
@@ -415,6 +456,12 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       .map(([nombre, total]) => ({ nombre, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 20)
+    const ventasPorGrupo = Array.from(grupoMap.entries())
+      .map(([nombre, total]) => ({ nombre, total }))
+      .sort((a, b) => b.total - a.total)
+
+    // Count para llevar (mesa 0 = para llevar/domicilio)
+    const ordenesLlevar = dayOrders.filter(o => o.mesa === 0 || o.mesa >= 900).length
 
     result.push({
       fecha,
@@ -425,16 +472,16 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       efectivo,
       tarjeta,
       tickets_count: dayOrders.length,
-      mesas_atendidas: new Set(dayOrders.map(o => o.mesa)).size,
-      ordenes_llevar: 0,
+      mesas_atendidas: new Set(dayOrders.filter(o => o.mesa > 0 && o.mesa < 900).map(o => o.mesa)).size,
+      ordenes_llevar: ordenesLlevar,
       personas_restaurant: personas,
       ticket_promedio_restaurant: tp,
       propinas_total: propinasTotal,
-      chilaquiles_total: 0,
-      half_half_total: 0,
+      chilaquiles_total: chilaquilesTotal,
+      half_half_total: halfHalfTotal,
       meseros,
       platillos_top: platillosTop,
-      ventas_por_grupo: [],
+      ventas_por_grupo: ventasPorGrupo,
       pago_métodos: pagoMetodos,
       updated_at: new Date().toISOString(),
     })
