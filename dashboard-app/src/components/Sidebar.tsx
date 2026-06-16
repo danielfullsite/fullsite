@@ -49,6 +49,7 @@ import {
   Wallet,
   Heart,
   Map,
+  Calculator,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -89,6 +90,7 @@ const navSections = [
       { href: '/reporte-fiscal', label: 'Reporte Fiscal', icon: FileSpreadsheet },
       { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
       { href: '/egresos', label: 'Egresos', icon: Wallet },
+      { href: '/contabilidad', label: 'Contabilidad CONTPAQi', icon: Calculator },
     ],
   },
   {
