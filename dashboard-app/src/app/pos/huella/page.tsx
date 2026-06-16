@@ -100,15 +100,16 @@ export default function HuellaPage() {
   const registeredCount = Object.keys(registered).length
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
-        <Fingerprint size={24} className="text-blue-400" />
+    <div className="h-dvh flex flex-col bg-[#0a0a0f] text-white overflow-hidden">
+      <header className="flex items-center gap-4 px-6 py-4 bg-[#111118] border-b border-white/10 flex-shrink-0">
+        <Link href="/pos" className="w-11 h-11 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center"><ArrowLeft size={20} /></Link>
+        <Fingerprint size={28} className="text-blue-400" />
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-1)]">Registro de Huellas</h1>
-          <p className="text-sm text-[var(--text-3)]">{registeredCount} de {staff.length} empleados registrados</p>
+          <h1 className="text-2xl font-bold">Registro de Huellas</h1>
+          <p className="text-sm text-white/50">{registeredCount} de {staff.length} empleados registrados</p>
         </div>
-      </div>
+      </header>
+      <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
 
       {!biometricAvailable && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
@@ -136,33 +137,35 @@ export default function HuellaPage() {
           const isRegistered = member.id in registered
           return (
             <div key={member.id}
-              className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                isRegistered ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-[var(--surface)] border-[var(--line)]'
+              className={`flex items-center gap-4 p-5 rounded-2xl border transition-all ${
+                isRegistered ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/5 border-white/10'
               }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                isRegistered ? 'bg-emerald-600' : 'bg-[var(--surface-2)]'
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+                isRegistered ? 'bg-emerald-600' : 'bg-white/10'
               }`}>
-                {isRegistered ? <Fingerprint size={20} className="text-white" /> : <User size={20} className="text-[var(--text-3)]" />}
+                {isRegistered ? <Fingerprint size={28} className="text-white" /> : <User size={28} className="text-white/40" />}
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-[var(--text-1)]">{member.name}</p>
-                <p className="text-xs text-[var(--text-3)]">{member.role}{isRegistered ? ' — huella registrada' : ''}</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-lg truncate">{member.name}</p>
+                <p className="text-sm text-white/50">{member.role}{isRegistered ? ' — registrada ✓' : ''}</p>
               </div>
               {isRegistered ? (
                 <button onClick={() => handleRemove(member.id)}
-                  className="p-2 rounded-lg hover:bg-red-500/10 text-red-400">
-                  <Trash2 size={16} />
+                  className="w-12 h-12 rounded-xl hover:bg-red-500/10 text-red-400 flex items-center justify-center flex-shrink-0">
+                  <Trash2 size={20} />
                 </button>
               ) : (
                 <button onClick={() => handleRegister(member)}
                   disabled={!biometricAvailable}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold text-sm">
-                  Registrar huella
+                  className="px-6 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-base flex items-center gap-2 flex-shrink-0 min-h-[56px]">
+                  <Fingerprint size={22} />
+                  Registrar
                 </button>
               )}
             </div>
           )
         })}
+      </div>
       </div>
     </div>
   )
