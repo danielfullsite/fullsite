@@ -50,9 +50,19 @@ function clientId(): string {
   return 'amalay'
 }
 
+function parseDate(dateStr: string): Date {
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    if (parts.length === 3) return new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T12:00:00`)
+  }
+  return new Date(dateStr)
+}
+
 function daysSince(dateStr: string | null): number {
   if (!dateStr) return 999
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
+  const d = parseDate(dateStr)
+  if (isNaN(d.getTime())) return 999
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function relativeDate(dateStr: string | null): string {
