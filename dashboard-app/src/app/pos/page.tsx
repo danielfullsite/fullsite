@@ -790,6 +790,64 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
   const [error, setError] = useState('')
   const [step, setStep] = useState<'reason' | 'prepared'>('reason')
   const [managerName, setManagerName] = useState('')
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricChecking, setBiometricChecking] = useState(false)
+
+  useEffect(() => {
+    // Check if there are manager/admin biometric credentials stored
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const hasManagerCreds = Object.values(stored).some((m: unknown) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (hasManagerCreds && window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(ok => setBiometricAvailable(ok))
+          .catch(() => {})
+      }
+    } catch {}
+  }, [])
+
+  const handleBiometricAuth = async () => {
+    if (!reason) { setError('Selecciona un motivo'); return }
+    setBiometricChecking(true)
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      // Only allow manager/admin credentials
+      const managerCreds = Object.entries(stored).filter(([, m]) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (managerCreds.length === 0) { setError('No hay huellas de gerente registradas'); setBiometricChecking(false); return }
+
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          allowCredentials: managerCreds.map(([id]) => ({
+            id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
+            type: 'public-key' as const,
+          })),
+          userVerification: 'required',
+          timeout: 30000,
+        },
+      })
+      if (assertion) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+        const member = stored[credId] as { name?: string }
+        if (member?.name) {
+          setManagerName(member.name)
+          setStep('prepared')
+        }
+      }
+    } catch {
+      setError('Huella no reconocida')
+    }
+    setBiometricChecking(false)
+  }
 
   const CANCEL_REASONS = [
     'Cliente cambio de opinion',
@@ -846,16 +904,33 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={pin}
-                  onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
-                  placeholder="****"
-                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
-                />
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
+                  {biometricAvailable ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={pin}
+                    onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+                    placeholder="****"
+                    className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+                  />
+                  {biometricAvailable && (
+                    <button
+                      onClick={handleBiometricAuth}
+                      disabled={biometricChecking}
+                      className="w-14 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white flex items-center justify-center transition-colors"
+                      title="Autorizar con huella digital"
+                    >
+                      {biometricChecking
+                        ? <Loader2 size={22} className="animate-spin" />
+                        : <Lock size={22} />
+                      }
+                    </button>
+                  )}
+                </div>
               </div>
 
               {error && <p className="text-red-400 text-sm text-center">{error}</p>}
