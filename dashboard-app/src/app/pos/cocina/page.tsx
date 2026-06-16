@@ -28,6 +28,8 @@ interface ParsedItem {
   cancelled?: boolean
   cancelReason?: string
   cancelledBy?: string
+  station?: 'cocina' | 'barra' | 'caja'
+  menuItemId?: string
 }
 
 export default function CocinaPage() {
@@ -437,9 +439,13 @@ export default function CocinaPage() {
               // Filter items based on station filter
               const activeItems = items.filter(i => {
                 if (i.cancelled) return false
+                // Skip tiempo separators — they belong to no station
+                if (i.menuItemId === '__tiempo__') return stationFilter === 'todo'
                 const name = i.nombre || i.name || ''
                 if (stationFilter === 'todo') return true
-                return getStationByName(name) === stationFilter
+                // Use saved station first, fallback to name-based detection
+                const itemStation = i.station || getStationByName(name)
+                return itemStation === stationFilter
               })
 
               // Skip orders with no items matching the filter

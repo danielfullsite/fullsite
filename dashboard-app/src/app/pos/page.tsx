@@ -1737,7 +1737,7 @@ function POSContent() {
       // Silla activa (estilo Wansoft CANT/SILLA): nuevos items se asignan a la silla seleccionada
       // courseId: items go into the current (last) course group
       const currentCourse = prev.filter(isTiempoItem).length + 1
-      return [...prev, { ...orderItem, silla: orderItem.silla ?? sillaActual, station, courseId: currentCourse, courseStatus: 'pending' as const }]
+      return [...prev, { ...orderItem, silla: orderItem.silla ?? (sillaActual || 1), station, courseId: currentCourse, courseStatus: 'pending' as const }]
     })
     setFlashItemId(orderItem.id)
     setTimeout(() => setFlashItemId(null), 500)
@@ -2446,24 +2446,61 @@ function POSContent() {
               </div>
             ) : (
               <div className="space-y-px">
-                {orderItems.map((item) => {
+                {/* Group items by seat when personas > 1 */}
+                {(() => {
+                  // Build seat groups
+                  const seatGroups: Map<number, typeof orderItems> = new Map()
+                  const tiempoItems: typeof orderItems = []
+                  for (const item of orderItems) {
+                    if (isTiempoItem(item)) {
+                      tiempoItems.push(item)
+                      continue
+                    }
+                    const seat = item.silla || 1
+                    if (!seatGroups.has(seat)) seatGroups.set(seat, [])
+                    seatGroups.get(seat)!.push(item)
+                  }
+                  const seats = Array.from(seatGroups.keys()).sort((a, b) => a - b)
+                  const showSeatHeaders = personas > 1
+
+                  // Render tiempo separators first
+                  const tiempoElements = tiempoItems.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                      <Flame size={13} className="text-amber-400 flex-shrink-0" />
+                      <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeTiempoSeparator(item.id) }}
+                        className="w-11 h-11 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))
+
+                  return (
+                    <>
+                      {tiempoElements}
+                      {seats.map(seat => {
+                        const seatItems = seatGroups.get(seat)!
+                        const seatActive = seatItems.filter(i => !cancelledItems.has(i.id) && !voidedItems.has(i.id))
+                        const seatTotal = seatActive.reduce((s, i) => s + i.subtotal, 0)
+                        return (
+                          <div key={`seat-${seat}`}>
+                            {showSeatHeaders && (
+                              <button
+                                onClick={() => setSillaActual(seat)}
+                                className={`w-full flex items-center gap-2 px-2 py-1 mt-1 rounded-lg transition-colors ${
+                                  sillaActual === seat ? 'bg-sky-500/15 border border-sky-500/30' : 'bg-[var(--surface-2)]/40'
+                                }`}
+                              >
+                                <Armchair size={14} className="text-sky-400" />
+                                <span className="text-sky-400 text-xs font-bold">Asiento {seat}</span>
+                                <span className="text-[var(--text-3)] text-xs ml-auto">{formatMXN(seatTotal)}</span>
+                              </button>
+                            )}
+                            {seatItems.map(item => {
                   const isCancelled = cancelledItems.has(item.id)
                   const isVoided = voidedItems.has(item.id)
-                  // Separador de tiempo (estilo Wansoft) — fila especial
-                  if (isTiempoItem(item)) {
-                    return (
-                      <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                        <Flame size={13} className="text-amber-400 flex-shrink-0" />
-                        <p className="flex-1 text-amber-400 font-bold text-xs tracking-widest text-center">{item.nombre}</p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeTiempoSeparator(item.id) }}
-                          className="w-11 h-11 rounded-md bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 flex items-center justify-center transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    )
-                  }
                   return (
                     <div
                       key={item.id}
@@ -2560,6 +2597,12 @@ function POSContent() {
                     </div>
                   )
                 })}
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
+                })()}
               </div>
             )}
 
@@ -2579,20 +2622,8 @@ function POSContent() {
 
           {/* Discount + Order notes + Totals — fixed at bottom, compact */}
           <div className="border-t border-[var(--line)] px-3 py-1 bg-[var(--surface-2)]/50 flex-shrink-0">
-            {/* Silla activa + Tiempos row (estilo Wansoft CANT/SILLA + firebutton) */}
+            {/* Tiempos row */}
             <div className="flex items-center gap-1 mb-1">
-              <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-500/25 rounded-lg px-1.5 py-1">
-                <Armchair size={18} className="text-sky-400" />
-                <button
-                  onClick={() => setSillaActual(s => Math.max(1, s - 1))}
-                  className="w-11 h-11 rounded-md bg-[var(--surface)] text-sky-400 flex items-center justify-center"
-                ><Minus size={16} /></button>
-                <span className="text-sky-400 text-base font-bold w-9 text-center">S{sillaActual}</span>
-                <button
-                  onClick={() => setSillaActual(s => Math.min(Math.max(personas, 1), s + 1))}
-                  className="w-11 h-11 rounded-md bg-[var(--surface)] text-sky-400 flex items-center justify-center"
-                ><Plus size={16} /></button>
-              </div>
               <button
                 onClick={addTiempoSeparator}
                 disabled={activeItems.filter(i => !isTiempoItem(i)).length === 0}
@@ -2805,6 +2836,48 @@ function POSContent() {
               <ScanBarcode size={20} />
             </button>
           </div>
+
+          {/* Seat tabs — PoloTab style */}
+          {personas > 1 && (
+            <div className="px-3 pb-1 flex-shrink-0 flex items-center gap-1.5 overflow-x-auto">
+              <button
+                onClick={() => setSillaActual(0)}
+                className={`px-4 min-h-[40px] rounded-xl text-sm font-bold transition-all flex-shrink-0 ${
+                  sillaActual === 0
+                    ? 'bg-white text-black'
+                    : 'bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] hover:bg-[var(--line)]'
+                }`}
+              >
+                Todos
+              </button>
+              {Array.from({ length: personas }, (_, i) => i + 1).map(s => {
+                const seatItems = orderItems.filter(oi => !cancelledItems.has(oi.id) && !voidedItems.has(oi.id) && !isTiempoItem(oi) && (oi.silla || 1) === s)
+                const seatTotal = seatItems.reduce((sum, oi) => sum + oi.subtotal, 0)
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setSillaActual(s)}
+                    className={`px-4 min-h-[40px] rounded-xl text-sm font-bold transition-all flex-shrink-0 flex items-center gap-2 ${
+                      sillaActual === s
+                        ? 'bg-sky-600 text-white ring-2 ring-sky-400/40'
+                        : 'bg-[var(--surface-2)] text-[var(--text-2)] border border-[var(--line)] hover:bg-[var(--line)]'
+                    }`}
+                  >
+                    <Armchair size={16} />
+                    <span>{s}</span>
+                    {seatTotal > 0 && <span className="text-xs opacity-70">{formatMXN(seatTotal)}</span>}
+                  </button>
+                )
+              })}
+              <button
+                onClick={() => setPersonas(p => p + 1)}
+                className="w-10 min-h-[40px] rounded-xl bg-[var(--surface-2)] border border-dashed border-[var(--line)] text-[var(--text-3)] hover:bg-[var(--line)] flex items-center justify-center flex-shrink-0 transition-colors"
+                title="Agregar comensal"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          )}
 
           {menuSearch.trim() ? (
             /* Search results across all categories */
