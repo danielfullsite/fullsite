@@ -11,14 +11,14 @@
 # │  ┌─────────────┬────────────┬──────────────┬──────────────────────┐   │
 # │  │ Type        │ Time (MX)  │ Days (MX)    │ UTC cron             │   │
 # │  ├─────────────┼────────────┼──────────────┼──────────────────────┤   │
-# │  │ avance      │ 3:00pm     │ Daily        │ 0 21 * * *           │   │
-# │  │ cierre      │ 8:30pm     │ Dom-Mie      │ 30 2 * * 1-4         │   │
-# │  │ cierre      │ 11:00pm    │ Jue-Sab      │ 0 5 * * 0,5,6        │   │
+# │  │ avance      │ 2:50pm     │ Daily        │ 50 20 * * *          │   │
+# │  │ cierre      │ 10:30pm    │ Dom-Mie      │ 30 4 * * 1-4         │   │
+# │  │ cierre      │ 11:30pm    │ Jue-Sab      │ 30 5 * * 0,5,6       │   │
 # │  └─────────────┴────────────┴──────────────┴──────────────────────┘   │
 # │                                                                        │
 # │  AMALAY close times:                                                   │
-# │  - Dom-Mie: 5pm close → report at 8:30pm (buffer for last orders)    │
-# │  - Jue-Sab: 11pm close → report at 11pm                              │
+# │  - Dom-Mie: 5pm close → report at 10:30pm (extra buffer for sync)    │
+# │  - Jue-Sab: 11pm close → report at 11:30pm                           │
 # │                                                                        │
 # │  Target date = today in MX timezone. All crons fire while MX date     │
 # │  is still "today" = the business day being reported.                  │
@@ -28,9 +28,9 @@ name: Wansoft Daily Mesero Report
 
 on:
   schedule:
-    - cron: '50 20 * * *'      # 3pm MX daily → avance
-    - cron: '20 2 * * 1-4'    # 8:30pm MX Sun-Wed → cierre
-    - cron: '50 4 * * 0,5,6'   # 11pm MX Thu-Sat → cierre
+    - cron: '50 20 * * *'      # 2:50pm MX daily → avance
+    - cron: '30 4 * * 1-4'    # 10:30pm MX Sun-Wed → cierre (moved from 8:20pm for complete data)
+    - cron: '30 5 * * 0,5,6'   # 11:30pm MX Thu-Sat → cierre
   workflow_dispatch:
     inputs:
       target_date:
