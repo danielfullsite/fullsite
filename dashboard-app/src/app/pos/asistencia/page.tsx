@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, LogIn, LogOut, Clock, User, Fingerprint } from 'lucide-react'
 import { apiUrl } from '@/lib/api-base'
@@ -36,6 +36,7 @@ export default function AsistenciaPage() {
   const [lastAction, setLastAction] = useState<'entrada' | 'salida' | null>(null)
   const [success, setSuccess] = useState('')
   const [clock, setClock] = useState('')
+  const authMethodRef = useRef<'pin' | 'huella'>('pin')
 
   // Live clock
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function AsistenciaPage() {
     if (pin.length < 4 || checking) return
     setChecking(true)
     setError('')
+    authMethodRef.current = 'pin'
     setStaff(null)
     setLastAction(null)
 
@@ -102,7 +104,7 @@ export default function AsistenciaPage() {
       staff_id: staff.id,
       staff_name: staff.name,
       type,
-      method: 'pin',
+      method: authMethodRef.current,
     }
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_attendance`, {
       method: 'POST',
@@ -136,6 +138,67 @@ export default function AsistenciaPage() {
     }, 30000) // 30s timeout
     return () => clearTimeout(t)
   }, [staff])
+
+  // Biometric auth for attendance
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricChecking, setBiometricChecking] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      if (Object.keys(stored).length > 0 && window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(ok => setBiometricAvailable(ok))
+          .catch(() => {})
+      }
+    } catch {}
+  }, [])
+
+  const handleBiometric = async () => {
+    setBiometricChecking(true)
+    setError('')
+    authMethodRef.current = 'huella'
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const credIds = Object.keys(stored)
+      if (credIds.length === 0) { setError('No hay huellas registradas'); setBiometricChecking(false); return }
+
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          allowCredentials: credIds.map(id => ({
+            id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
+            type: 'public-key' as const,
+          })),
+          userVerification: 'required',
+          timeout: 30000,
+        },
+      })
+      if (assertion) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+        const member = stored[credId] as StaffMember | undefined
+        if (member?.id) {
+          setStaff(member)
+          // Load history
+          const histRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/pos_attendance?client_id=eq.${_cid()}&staff_id=eq.${encodeURIComponent(member.id)}&order=registered_at.desc&limit=14`,
+            { headers: SB_HEADERS },
+          )
+          if (histRes.ok) {
+            const hist = await histRes.json()
+            setRecords(hist)
+            if (hist.length > 0) setLastAction(hist[0].type)
+          }
+        }
+      }
+    } catch {
+      setError('Huella no reconocida')
+    }
+    setBiometricChecking(false)
+  }
 
   const today = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -181,7 +244,25 @@ export default function AsistenciaPage() {
               <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-6">
                 <Fingerprint size={40} className="text-white/40" />
               </div>
-              <p className="text-white/60 text-sm mb-6">Ingresa tu PIN para registrar asistencia</p>
+              <p className="text-white/60 text-sm mb-6">
+                {biometricAvailable ? 'Pon tu huella o ingresa tu PIN' : 'Ingresa tu PIN para registrar asistencia'}
+              </p>
+
+              {biometricAvailable && (
+                <button
+                  onClick={handleBiometric}
+                  disabled={biometricChecking}
+                  className="w-full py-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-emerald-800 text-white font-bold text-xl transition-all min-h-[80px] mb-4 flex flex-col items-center gap-2"
+                >
+                  <Fingerprint size={36} className={biometricChecking ? 'animate-pulse' : ''} />
+                  {biometricChecking ? 'Esperando huella...' : 'Registrar con huella'}
+                </button>
+              )}
+
+              {biometricAvailable && (
+                <p className="text-white/30 text-xs mb-3 text-center">— o usa tu PIN —</p>
+              )}
+
               <input
                 type="password"
                 inputMode="numeric"
@@ -190,15 +271,15 @@ export default function AsistenciaPage() {
                 onChange={e => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
                 onKeyDown={e => e.key === 'Enter' && handlePin()}
                 placeholder="PIN"
-                autoFocus
+                autoFocus={!biometricAvailable}
                 className={`w-full bg-white/5 border rounded-xl px-6 py-4 text-white text-center text-3xl tracking-[0.5em] focus:outline-none mb-4 placeholder-white/20 ${error ? 'border-red-500' : 'border-white/20 focus:border-emerald-500'}`}
               />
               <button
                 onClick={handlePin}
                 disabled={pin.length < 4 || checking}
-                className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:bg-white/10 disabled:text-white/30 text-white font-bold text-lg transition-all min-h-[56px]"
+                className="w-full py-4 rounded-xl bg-white/10 hover:bg-white/20 active:scale-[0.97] disabled:bg-white/5 disabled:text-white/30 text-white font-bold text-lg transition-all min-h-[56px]"
               >
-                {checking ? 'Verificando...' : 'Identificar'}
+                {checking ? 'Verificando...' : 'Entrar con PIN'}
               </button>
               {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
             </div>
