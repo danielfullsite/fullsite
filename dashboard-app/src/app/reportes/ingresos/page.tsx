@@ -5,10 +5,8 @@ import { ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
+import { getMonthlyData } from '@/lib/data'
 import type { WansoftDaily } from '@/lib/types'
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 type Period = 'dia' | 'semana' | 'mes' | 'año'
 
@@ -37,17 +35,12 @@ export default function IngresosReportePage() {
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => getWeekRange(new Date()).start)
   const [selectedDay, setSelectedDay] = useState<string>(new Date().toISOString().slice(0, 10))
 
-  // Load ALL data once
+  // Load ALL data once (with POS fallback via getMonthlyData)
   useEffect(() => {
-    async function load() {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/wansoft_daily?select=fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,propinas_total,efectivo,tarjeta&ventas_dia=gt.0&order=fecha.asc&limit=2000`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      )
-      if (res.ok) setAllData(await res.json())
+    getMonthlyData().then(data => {
+      setAllData(data)
       setLoading(false)
-    }
-    load()
+    }).catch(() => setLoading(false))
   }, [])
 
   // Available years

@@ -136,7 +136,7 @@ export default function ContabilidadPage() {
       // Fetch POS sales and CFDI invoices in parallel
       const [posRes, cfdiRes, wansoftRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,tax&limit=5000`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,iva&limit=5000`,
           { headers }
         ),
         fetch(

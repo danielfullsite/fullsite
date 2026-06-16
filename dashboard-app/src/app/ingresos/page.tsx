@@ -13,7 +13,7 @@ import {
 import { Banknote, CreditCard, ArrowRightLeft, DollarSign } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
-import { getRecentDays, aggregatePayments } from '@/lib/data'
+import { getRecentDays, aggregatePayments, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -24,7 +24,10 @@ export default function IngresosPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getRecentDays(30).then(d => {
+    getRecentDays(30).then(async d => {
+      if (d.length === 0) {
+        d = await getDashboardFromPosOrders(30)
+      }
       setData(d)
       setLoading(false)
     })

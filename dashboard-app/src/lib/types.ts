@@ -18,6 +18,7 @@ export interface WansoftDaily {
   platillos_top: PlatilloEntry[]
   ventas_por_grupo: GrupoEntry[]
   pago_métodos: PagoMetodoEntry[]
+  propinas_meseros?: { nombre: string; total: number }[]
   updated_at?: string
 }
 
@@ -29,6 +30,7 @@ export interface MeseroEntry {
 export interface PlatilloEntry {
   nombre: string
   total: number
+  cantidad?: number
 }
 
 export interface GrupoEntry {

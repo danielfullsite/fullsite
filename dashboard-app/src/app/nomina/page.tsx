@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Users, Clock, DollarSign, TrendingUp, Calendar, AlertTriangle, ChevronDown, Download, Wallet, Receipt, UserCheck, Timer } from 'lucide-react'
-import { getRecentDays, getLatestDeep, getWansoftData, getWansoftDataRange, getDateRange, aggregateMeseros } from '@/lib/data'
+import { getRecentDays, getLatestDeep, getWansoftData, getWansoftDataRange, getDateRange, aggregateMeseros, getDashboardFromPosOrders } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
@@ -131,7 +131,11 @@ export default function NominaPage() {
         getWansoftDataRange('hours_worked', days),
       ])
 
-      setDailyData(dailyRows.length > 0 ? dailyRows : await getRecentDays(days))
+      let finalDailyData = dailyRows.length > 0 ? dailyRows : await getRecentDays(days)
+      if (finalDailyData.length === 0) {
+        finalDailyData = await getDashboardFromPosOrders(days)
+      }
+      setDailyData(finalDailyData)
 
       if (laborRow?.data && Array.isArray(laborRow.data)) {
         setLaborEntries(laborRow.data)

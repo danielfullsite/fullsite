@@ -114,6 +114,7 @@ function parseRow(row: Record<string, unknown>): WansoftDaily {
     platillos_top: parseJsonbField(row.platillos_top),
     ventas_por_grupo: parseJsonbField(row.ventas_por_grupo),
     pago_métodos: parseJsonbField(row.pago_metodos ?? row.pago_métodos),
+    propinas_meseros: row.propinas_meseros ? parseJsonbField(row.propinas_meseros) : undefined,
     updated_at: (row.updated_at as string) || undefined,
   }
 }
@@ -160,7 +161,10 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
-  return deduped.length > 0 ? parseRow(deduped[0]) : null
+  if (deduped.length > 0) return parseRow(deduped[0])
+  // POS fallback
+  const posData = await getDashboardFromPosOrders(7, clientSlug)
+  return posData.length > 0 ? posData[posData.length - 1] : null
 }
 
 export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
@@ -171,7 +175,10 @@ export async function getDayData(fecha: string, clientSlug: string = getActiveCl
 
 export async function getMonthlyData(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.asc&limit=1000`) as Record<string, unknown>[]
-  return dedupeByFecha(data).map(parseRow)
+  const rows = dedupeByFecha(data).map(parseRow)
+  if (rows.length > 0) return rows
+  // POS fallback
+  return getDashboardFromPosOrders(365, clientSlug)
 }
 
 export async function getWaiterCategories(days: number = 7) {
@@ -219,7 +226,14 @@ export async function getDateRange(from: string, to: string, clientSlug: string 
     'wansoft_daily',
     `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&fecha=gte.${from}&fecha=lte.${to}&ventas_dia=gt.0&order=fecha.asc`
   ) as Record<string, unknown>[]
-  return dedupeByFecha(data).map(parseRow)
+  const rows = dedupeByFecha(data).map(parseRow)
+  if (rows.length > 0) return rows
+  // POS fallback: calculate days in range, fetch, then filter
+  const fromDate = new Date(from + 'T00:00:00')
+  const toDate = new Date(to + 'T23:59:59')
+  const days = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  const posData = await getDashboardFromPosOrders(days, clientSlug)
+  return posData.filter(d => d.fecha >= from && d.fecha <= to)
 }
 
 // Aggregate payment methods across days
@@ -431,7 +445,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       .sort((a, b) => b.total - a.total)
 
     // Top platillos from items + group by category
-    const itemMap = new Map<string, number>()
+    const itemMap = new Map<string, { total: number; cantidad: number }>()
     const grupoMap = new Map<string, number>()
     let chilaquilesTotal = 0, halfHalfTotal = 0
     for (const o of dayOrders) {
@@ -439,7 +453,14 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
         for (const item of o.items) {
           if (!item.nombre) continue
           const itemTotal = (item.precio || 0) * (item.cantidad || 1)
-          itemMap.set(item.nombre, (itemMap.get(item.nombre) || 0) + itemTotal)
+          const qty = item.cantidad || 1
+          const existing = itemMap.get(item.nombre)
+          if (existing) {
+            existing.total += itemTotal
+            existing.cantidad += qty
+          } else {
+            itemMap.set(item.nombre, { total: itemTotal, cantidad: qty })
+          }
 
           // Classify into grupo by item name keywords
           const lower = item.nombre.toLowerCase()
@@ -453,10 +474,21 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       }
     }
     const platillosTop = Array.from(itemMap.entries())
-      .map(([nombre, total]) => ({ nombre, total }))
+      .map(([nombre, v]) => ({ nombre, total: v.total, cantidad: v.cantidad }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 20)
     const ventasPorGrupo = Array.from(grupoMap.entries())
+      .map(([nombre, total]) => ({ nombre, total }))
+      .sort((a, b) => b.total - a.total)
+
+    // Propinas per mesero
+    const propinasMeseroMap = new Map<string, number>()
+    for (const o of dayOrders) {
+      if (o.mesero && (o.propina || 0) > 0) {
+        propinasMeseroMap.set(o.mesero, (propinasMeseroMap.get(o.mesero) || 0) + o.propina)
+      }
+    }
+    const propinasMeseros = Array.from(propinasMeseroMap.entries())
       .map(([nombre, total]) => ({ nombre, total }))
       .sort((a, b) => b.total - a.total)
 
@@ -483,6 +515,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
       platillos_top: platillosTop,
       ventas_por_grupo: ventasPorGrupo,
       pago_métodos: pagoMetodos,
+      propinas_meseros: propinasMeseros,
       updated_at: new Date().toISOString(),
     })
   }
