@@ -66,9 +66,9 @@ export default function ClienteDisplay() {
       {/* Header */}
       <header className="text-center py-6 border-b border-slate-800">
         <span className="text-white font-black text-3xl tracking-tight">
-          fullsite
-          <span className="inline-block w-2.5 h-2.5 bg-emerald-500 ml-1 mb-1" />
+          AMALAY
         </span>
+        <p className="text-emerald-400 text-sm tracking-widest">COFFEE & MARKET</p>
         {order && (
           <p className="text-[var(--text-3)] text-lg mt-2">Mesa {order.mesa}</p>
         )}
@@ -79,8 +79,8 @@ export default function ClienteDisplay() {
         {!order || items.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-[var(--text-2)] text-2xl font-light">Bienvenido</p>
-              <p className="text-[var(--text-1)] text-sm mt-2">Tu orden aparecera aqui</p>
+              <p className="text-[var(--text-2)] text-2xl font-light">Bienvenido a AMALAY</p>
+              <p className="text-[var(--text-1)] text-sm mt-2">Tu orden aparecerá aquí</p>
             </div>
           </div>
         ) : (

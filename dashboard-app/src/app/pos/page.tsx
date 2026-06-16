@@ -4025,7 +4025,7 @@ function POSAlerts({ role }: { role: string }) {
           try {
             // Fetch items where stock <= reorder_point (the actual threshold, not hardcoded)
             const invRes = await fetch(
-              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&reorder_point=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=20`,
+              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&reorder_point=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=100`,
               { headers }
             )
             if (invRes.ok) {

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   IVA_RATE,
-  MESAS_COUNT,
   KITCHEN_ARCHIVE_HOURS,
   POLL_INTERVAL_KITCHEN,
   POLL_INTERVAL_KDS,
@@ -21,10 +20,6 @@ import {
 describe('POS Constants', () => {
   it('IVA_RATE is 0.16', () => {
     expect(IVA_RATE).toBe(0.16)
-  })
-
-  it('MESAS_COUNT is 16', () => {
-    expect(MESAS_COUNT).toBe(16)
   })
 
   it('KITCHEN_ARCHIVE_HOURS is 4', () => {

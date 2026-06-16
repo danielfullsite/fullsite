@@ -2,8 +2,6 @@
 
 export const IVA_RATE = 0.16
 
-export const MESAS_COUNT = 16
-
 export const KITCHEN_ARCHIVE_HOURS = 4
 
 export const POLL_INTERVAL_KITCHEN = 5000  // 5 seconds
