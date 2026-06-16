@@ -90,12 +90,13 @@ export default function CRMPage() {
   // ─── Fetch customers ────────────────────────────────────────────
   const loadCustomers = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_customers?client_id=eq.${cid}&select=*&order=last_visit.desc.nullslast&limit=5000`,
-        { headers: hdrs() }
-      )
+      const url = `${SUPABASE_URL}/rest/v1/pos_customers?client_id=eq.${cid}&select=*&order=total_visits.desc&limit=1000`
+      console.log('[CRM] Fetching:', url.slice(0, 100))
+      const res = await fetch(url, { headers: hdrs() })
+      console.log('[CRM] Status:', res.status, 'OK:', res.ok)
       if (res.ok) {
         const data = await res.json()
+        console.log('[CRM] Rows:', data.length)
         setCustomers(data.map((r: Record<string, unknown>) => ({
           ...r,
           tags: Array.isArray(r.tags) ? r.tags : [],
@@ -103,8 +104,10 @@ export default function CRMPage() {
           email: r.email || '',
           notes: r.notes || '',
         })))
+      } else {
+        console.error('[CRM] Error:', res.status, await res.text().then(t => t.slice(0, 200)))
       }
-    } catch { /* silent */ }
+    } catch (e) { console.error('[CRM] Fetch failed:', e) }
     setLoading(false)
   }, [cid])
 
