@@ -90,6 +90,7 @@ const navSections = [
       { href: '/reporte-fiscal', label: 'Reporte Fiscal', icon: FileSpreadsheet },
       { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
       { href: '/egresos', label: 'Egresos', icon: Wallet },
+      { href: '/control-efectivo', label: 'Control de Efectivo', icon: Coins },
       { href: '/contabilidad', label: 'Contabilidad CONTPAQi', icon: Calculator },
     ],
   },
@@ -97,6 +98,7 @@ const navSections = [
     label: 'Operaciones',
     items: [
       { href: '/inventario-real', label: 'Inventario', icon: Package },
+      { href: '/cierre-inventario', label: 'Cierre Inventario', icon: ClipboardList },
       { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
       { href: '/acceso', label: 'Control Acceso', icon: Clock },
