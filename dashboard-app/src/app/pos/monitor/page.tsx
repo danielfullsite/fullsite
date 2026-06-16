@@ -28,6 +28,7 @@ export default function MonitorPage() {
   const [data, setData] = useState<MonitorData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState('')
+  const [error, setError] = useState('')
 
   const refresh = async () => {
     setLoading(true)
@@ -102,8 +103,10 @@ export default function MonitorPage() {
       })
 
       setLastRefresh(new Date().toLocaleTimeString('es-MX'))
+      setError('')
     } catch (e) {
       console.error(e)
+      setError('Sin conexión — datos no actualizados')
     }
     setLoading(false)
   }
@@ -127,6 +130,7 @@ export default function MonitorPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--text-1)]">Monitor — Primer Dia</h1>
             <p className="text-sm text-[var(--text-3)]">Ultima actualización: {lastRefresh || '...'} (auto cada 30s)</p>
+            {error && <p className="text-sm text-red-400">{error}</p>}
           </div>
         </div>
         <button onClick={refresh} disabled={loading} className="p-2 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--surface-2)]">

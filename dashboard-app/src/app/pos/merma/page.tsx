@@ -149,6 +149,7 @@ export default function MermaPage() {
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       console.error('Error saving merma:', err)
+      alert('Error al guardar merma — intenta de nuevo')
     } finally {
       setSaving(false)
     }

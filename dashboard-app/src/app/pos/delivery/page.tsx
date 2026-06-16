@@ -5,7 +5,7 @@
 // Este módulo solo controla el status de cocina: Recibida → Preparando → Lista
 // El resto (en ruta, entregada) lo maneja la plataforma.
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
@@ -92,7 +92,10 @@ export default function DeliveryPage() {
     } catch { /* */ }
   }, [])
 
+  const fetchingRef = useRef(false)
   const fetchOrders = useCallback(async () => {
+    if (fetchingRef.current) return // prevent piling up requests on slow network
+    fetchingRef.current = true
     try {
       const today = new Date().toISOString().slice(0, 10)
       const res = await fetch(
@@ -105,6 +108,7 @@ export default function DeliveryPage() {
         setOrders(data.filter(o => o.customer_name && !o.customer_name.startsWith('TEST') && o.total > 0))
       }
     } catch { /* sin red */ } finally {
+      fetchingRef.current = false
       setLoading(false)
     }
   }, [])
