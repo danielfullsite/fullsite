@@ -516,12 +516,16 @@ async function getResumenMensual(mes: string, formato: string) {
   const margenBruto = ventasNetas - costoVentas
   const margenPct = ventasNetas > 0 ? (margenBruto / ventasNetas) * 100 : 0
 
+  // Track whether costo de ventas is estimated or from real recipe costs
+  const costoVentasReal = orders.length > 0 && orders.some(o => (o.items || []).some(item => (item.recipe_cost || 0) > 0))
+
   const resumen = {
     mes,
     ventasBrutas: round2(ventasBrutas),
     ventasNetas: round2(ventasNetas),
     ivaTrasladadoMes: round2(totalIVA),
     costoVentas: round2(costoVentas),
+    costoVentasEstimado: !costoVentasReal,
     margenBruto: round2(margenBruto),
     margenPct: round2(margenPct),
     entradasInventario: round2(totalEntradas),

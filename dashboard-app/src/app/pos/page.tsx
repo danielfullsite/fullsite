@@ -58,6 +58,8 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
+import { syncAll, getPendingQueue } from '@/lib/pos-offline-db'
+import { getPermissions } from '@/lib/pos-permissions'
 import {
   ChefHat,
   Grid3X3,
@@ -1369,7 +1371,7 @@ function POSContent() {
   const syncRef = useRef(false)
   useEffect(() => {
     let mounted = true
-    const { syncAll, getPendingQueue } = require('@/lib/pos-offline-db')
+    // syncAll, getPendingQueue imported at top level
     setOnline(navigator.onLine)
 
     const updateCount = async () => {
@@ -1435,22 +1437,29 @@ function POSContent() {
   const [comandasOff, setComandasOff] = useState(false)
   useEffect(() => { setComandasOff(comandasMuted()) }, [])
 
+  // Pin prompt state (replaces window.prompt for kiosk/PWA compatibility)
+  const [pinPrompt, setPinPrompt] = useState<{ title: string; onSubmit: (pin: string) => void } | null>(null)
+  const [pinInput, setPinInput] = useState('')
+
   const handleToggleComandas = async () => {
     const next = !comandasOff
-    const pin = window.prompt(next
-      ? 'PIN de gerente para APAGAR comandas (modo piloto):'
-      : 'PIN de gerente para ENCENDER comandas:')
-    if (!pin) return
-    const manager = await verifyManagerPin(pin)
-    if (!manager) { showToast('PIN inválido'); return }
-    setComandasMuted(next)
-    setComandasOff(next)
-    logAudit({
-      action: next ? 'comandas_print_off' : 'comandas_print_on',
-      actor: manager,
-      details: { motivo: 'modo piloto', terminal: getDeviceId() },
+    setPinInput('')
+    setPinPrompt({
+      title: next ? 'PIN de gerente para APAGAR comandas (modo piloto):' : 'PIN de gerente para ENCENDER comandas:',
+      onSubmit: async (pin: string) => {
+        const manager = await verifyManagerPin(pin)
+        if (!manager) { showToast('PIN inválido'); return }
+        setComandasMuted(next)
+        setComandasOff(next)
+        logAudit({
+          action: next ? 'comandas_print_off' : 'comandas_print_on',
+          actor: manager || 'manager',
+          details: { motivo: 'modo piloto', terminal: getDeviceId() },
+        })
+        showToast(next ? 'Comandas APAGADAS — solo KDS (modo piloto)' : 'Comandas encendidas')
+        setPinPrompt(null)
+      },
     })
-    showToast(next ? 'Comandas APAGADAS — solo KDS (modo piloto)' : 'Comandas encendidas')
   }
 
   const handleConnectUsbPrinter = async () => {
@@ -1611,7 +1620,7 @@ function POSContent() {
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
   // Staff role from session
-  const [staffRole, setStaffRole] = useState('admin')
+  const [staffRole, setStaffRole] = useState('cajero')
   const [staffName, setStaffName] = useState('')
   useEffect(() => {
     try {
@@ -1632,11 +1641,11 @@ function POSContent() {
   // Role permissions — granular system (50+ permissions per Wansoft parity)
   const _perms = (() => {
     try {
-      const { getPermissions } = require('@/lib/pos-permissions')
+      // getPermissions imported at top level
       return getPermissions(staffRole)
     } catch { return null }
   })()
-  const can = (perm: string) => _perms ? (_perms as Record<string, boolean>)[perm] ?? true : true
+  const can = (perm: string) => _perms ? (_perms as unknown as Record<string, boolean>)[perm] ?? true : true
 
   // Section visibility (maps nav sections to granular permissions)
   const canSee = (section: string) => {
@@ -2792,14 +2801,19 @@ function POSContent() {
               <button
                 onClick={() => {
                   if (orderItems.length === 0) return
-                  const input = window.prompt('Transferir a mesa #:')
-                  if (!input) return
-                  const newMesa = parseInt(input, 10)
-                  if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
-                  const oldMesa = mesa
-                  setMesa(newMesa)
-                  logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
-                  showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)
+                  setPinInput('')
+                  setPinPrompt({
+                    title: 'Transferir a mesa #:',
+                    onSubmit: (input: string) => {
+                      const newMesa = parseInt(input, 10)
+                      if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
+                      const oldMesa = mesa
+                      setMesa(newMesa)
+                      logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
+                      showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)
+                      setPinPrompt(null)
+                    },
+                  })
                 }}
                 disabled={orderItems.length === 0}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-sky-900/30 hover:bg-sky-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-sky-400 transition-colors"
@@ -4001,6 +4015,41 @@ function POSContent() {
 
       {/* Smart Alerts (replaces chat) */}
       <POSAlerts role={staffRole} />
+
+      {/* Pin/Input Prompt Modal (replaces window.prompt for kiosk/PWA) */}
+      {pinPrompt && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl p-6 w-80 shadow-2xl">
+            <p className="text-sm font-medium text-[var(--text-1)] mb-4">{pinPrompt.title}</p>
+            <input
+              type={pinPrompt.title.toLowerCase().includes('pin') ? 'password' : 'number'}
+              autoFocus
+              value={pinInput}
+              onChange={e => setPinInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput); setPinInput('') }
+                if (e.key === 'Escape') { setPinPrompt(null); setPinInput('') }
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-center text-lg font-mono text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
+              placeholder={pinPrompt.title.toLowerCase().includes('pin') ? '****' : '#'}
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setPinPrompt(null); setPinInput('') }}
+                className="flex-1 py-2.5 rounded-xl text-sm text-[var(--text-3)] hover:bg-[var(--surface-2)] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { if (pinInput) { pinPrompt.onSubmit(pinInput); setPinInput('') } }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

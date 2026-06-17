@@ -256,7 +256,8 @@ export default function NominaPage() {
       const basePay = Math.round(hoursTotal * hourlyRate)
       const tipsEarned = tipsByMesero[nombre] || 0
       const salesTotal = mesero?.total || 0
-      const deductions = 0 // Placeholder for future deduction logic
+      // Estimated deductions: ISR ~3% + IMSS ~2.5% of base pay for low-income bracket
+      const deductions = Math.round(basePay * 0.055)
       const totalPay = basePay + tipsEarned - deductions
       const attendanceRate = totalDaysInPeriod > 0 ? Math.min(100, Math.round((daysWorked / totalDaysInPeriod) * 100)) : 0
 
@@ -486,6 +487,9 @@ export default function NominaPage() {
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('salesTotal')}>
                         <span className="inline-flex items-center gap-1 justify-end">Ventas <SortIcon field="salesTotal" /></span>
                       </th>
+                      <th className="text-right px-4 py-3 font-medium">
+                        <span className="inline-flex items-center gap-1 justify-end text-red-400">Deducciones</span>
+                      </th>
                       <th className="text-right px-4 py-3 font-medium group cursor-pointer select-none" onClick={() => toggleSort('totalPay')}>
                         <span className="inline-flex items-center gap-1 justify-end font-bold text-emerald-500">Total <SortIcon field="totalPay" /></span>
                       </th>
@@ -528,6 +532,7 @@ export default function NominaPage() {
                         <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(emp.basePay)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-emerald-500 font-medium">{emp.tipsEarned > 0 ? formatCurrency(emp.tipsEarned) : '--'}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{emp.salesTotal > 0 ? formatCurrency(emp.salesTotal) : '--'}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-red-400">{emp.deductions > 0 ? `-${formatCurrency(emp.deductions)}` : '--'}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-bold text-[var(--text-1)]">{formatCurrency(emp.totalPay)}</td>
                       </tr>
                     ))}
@@ -546,6 +551,7 @@ export default function NominaPage() {
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-1)]">{formatCurrency(totalBasePay)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-emerald-500">{formatCurrency(tipsTotal)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-[var(--text-2)]">{formatCurrency(totalVentas)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-red-400">-{formatCurrency(employees.reduce((s, e) => s + e.deductions, 0))}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-emerald-400 text-base">{formatCurrency(totalNomina)}</td>
                     </tr>
                   </tfoot>
@@ -555,7 +561,7 @@ export default function NominaPage() {
               <div className="px-4 py-3 border-t border-[var(--line-soft)] bg-amber-500/5">
                 <p className="text-[11px] text-amber-500/80 flex items-center gap-1.5">
                   <AlertTriangle size={12} />
-                  Pre-nomina estimada. Las horas de asistencia provienen de Wansoft. Ajusta la tarifa por hora manualmente si es necesario.
+                  Pre-nomina estimada. Las horas provienen de Wansoft. Deducciones estimadas al 5.5% (ISR ~3% + IMSS ~2.5%). Ajusta tarifa por hora manualmente.
                 </p>
               </div>
             </div>

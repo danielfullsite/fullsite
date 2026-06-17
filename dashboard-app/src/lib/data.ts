@@ -5,14 +5,25 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 /** RLS: wansoft_daily/agent_runs are authenticated-only since rls_tighten_policies.sql.
- *  Use the logged-in session token as Bearer (anon key alone sees 0 rows). */
+ *  Use the logged-in session token as Bearer (anon key alone sees 0 rows).
+ *  Token is cached for 30s to avoid 3s timeout on every single fetch. */
+let _cachedToken: string | null = null
+let _cachedTokenTime = 0
+const TOKEN_CACHE_MS = 30_000
+
 async function getAuthToken(): Promise<string> {
+  const now = Date.now()
+  if (_cachedToken && (now - _cachedTokenTime) < TOKEN_CACHE_MS) return _cachedToken
   try {
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
     const sessionP = supabase.auth.getSession().then(r => r.data.session).catch(() => null)
     const session = await Promise.race([sessionP, timeout])
-    return session?.access_token || SUPABASE_KEY
+    _cachedToken = session?.access_token || SUPABASE_KEY
+    _cachedTokenTime = now
+    return _cachedToken
   } catch {
+    _cachedToken = SUPABASE_KEY
+    _cachedTokenTime = now
     return SUPABASE_KEY
   }
 }

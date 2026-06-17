@@ -839,56 +839,15 @@ export default function TendenciasPage() {
         </div>
       )}
 
-      {/* Horas pico — from wansoft_hourly (if available) */}
+      {/* Horas pico — requires POS hourly data (not available from Wansoft) */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Ventas por hora</h3>
         <p className="text-xs text-[var(--text-3)] mb-5">Promedio de ventas por franja horaria</p>
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={(() => {
-              // Aggregate hourly data from allData groups if available
-              const hourMap: Record<string, { total: number; count: number }> = {}
-              for (const d of allData.slice(-30)) {
-                if (!d.ventas_dia) continue
-                // Estimate: distribute ventas across typical hours (8am-10pm)
-                const hours = ['8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm']
-                // Peak distribution: breakfast peak 9-11am, lunch 1-3pm, dinner 7-9pm
-                const weights = [0.02, 0.08, 0.12, 0.10, 0.08, 0.12, 0.10, 0.08, 0.05, 0.04, 0.05, 0.06, 0.06, 0.04]
-                hours.forEach((h, i) => {
-                  if (!hourMap[h]) hourMap[h] = { total: 0, count: 0 }
-                  hourMap[h].total += (d.ventas_dia || 0) * weights[i]
-                  hourMap[h].count += 1
-                })
-              }
-              return Object.entries(hourMap).map(([hora, v]) => ({
-                hora,
-                promedio: v.count > 0 ? Math.round(v.total / v.count) : 0,
-              }))
-            })()}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
-              <XAxis dataKey="hora" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={50} />
-              <Tooltip formatter={(v) => [formatCurrency(Number(v)), 'Promedio']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="promedio" radius={[4, 4, 0, 0]}>
-                {(() => {
-                  const hourMap: Record<string, { total: number; count: number }> = {}
-                  for (const d of allData.slice(-30)) {
-                    if (!d.ventas_dia) continue
-                    const hours = ['8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm']
-                    const weights = [0.02, 0.08, 0.12, 0.10, 0.08, 0.12, 0.10, 0.08, 0.05, 0.04, 0.05, 0.06, 0.06, 0.04]
-                    hours.forEach((h, i) => {
-                      if (!hourMap[h]) hourMap[h] = { total: 0, count: 0 }
-                      hourMap[h].total += (d.ventas_dia || 0) * weights[i]
-                      hourMap[h].count += 1
-                    })
-                  }
-                  const vals = Object.values(hourMap).map(v => v.count > 0 ? v.total / v.count : 0)
-                  const max = Math.max(...vals)
-                  return vals.map((v, i) => <Cell key={i} fill={v >= max * 0.8 ? '#10b981' : v >= max * 0.5 ? '#3b82f6' : '#94a3b8'} />)
-                })()}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="h-[120px] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-sm text-[var(--text-3)]">Datos por hora no disponibles</p>
+            <p className="text-xs text-[var(--text-4)] mt-1">Se activara automaticamente con ordenes del POS Fullsite</p>
+          </div>
         </div>
       </div>
 

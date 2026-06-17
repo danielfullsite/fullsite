@@ -225,8 +225,8 @@ export default function EstadoResultadosPage() {
                 <span className="text-sm font-bold text-[var(--text-1)] tabular-nums">{formatCurrency(totalCostoEstimado)}</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-[var(--line-soft)]">
-                <span className="text-sm text-[var(--text-3)]">Labor cost</span>
-                <span className="text-sm text-[var(--text-3)]">Conectar nomina</span>
+                <span className="text-sm text-[var(--text-3)]">Labor cost (est. 25%)</span>
+                <span className="text-sm text-[var(--text-3)] tabular-nums">{formatCurrency(Math.round(totalNetas * 0.25))}</span>
               </div>
               <div className="flex items-center justify-between py-2 bg-emerald-500/10 rounded-lg px-3">
                 <span className="text-sm font-semibold text-emerald-700">

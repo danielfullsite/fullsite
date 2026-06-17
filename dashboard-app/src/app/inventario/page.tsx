@@ -86,7 +86,7 @@ export default function InventarioPage() {
     <>
       <div className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Inventario</h2>
-        <p className="text-sm text-[var(--text-3)]">769 productos con stock real {fecha && `· Actualizado ${fecha}`}</p>
+        <p className="text-sm text-[var(--text-3)]">{inventory.length} productos con stock real {fecha && `· Actualizado ${fecha}`}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

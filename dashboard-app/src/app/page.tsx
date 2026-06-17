@@ -150,8 +150,14 @@ export default function DashboardPage() {
       try {
         // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
         const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
-        let recent = await Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[])
-        let latest = await Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null)
+        // Fetch all data in parallel instead of sequentially
+        const [recentRaw, latestRaw, runs] = await Promise.all([
+          Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[]),
+          Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null),
+          getLatestAgentRuns().catch(() => [] as AgentRun[]),
+        ])
+        let recent = recentRaw
+        let latest = latestRaw
 
         // Fallback: if no wansoft_daily data, build from pos_orders
         if (recent.length === 0) {
@@ -170,8 +176,6 @@ export default function DashboardPage() {
             setPrevDay(recent[recent.length - 2])
           }
         }
-        // Load agent runs
-        const runs = await getLatestAgentRuns()
         setAgentRuns(runs)
       } catch (err) {
         console.error('Error loading dashboard data:', err)

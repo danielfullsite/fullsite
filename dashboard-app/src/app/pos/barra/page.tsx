@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
@@ -26,7 +26,7 @@ export default function BarraPage() {
   const [stationFilter, setStationFilter] = useState<'todo' | StationName>('barra')
   const [offline, setOffline] = useState(false)
 
-  const prevCountRef = { current: 0 }
+  const prevCountRef = useRef(0)
 
   const playSound = () => {
     try {

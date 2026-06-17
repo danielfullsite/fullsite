@@ -38,14 +38,16 @@ export default function ReporteFiscalPage() {
       const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
       const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
 
-      // Fetch CFDI requests (emitted invoices)
-      const [cfdiRes, ordersRes] = await Promise.all([
+      // Fetch CFDI requests, POS orders, and purchase orders (egresos)
+      const [cfdiRes, ordersRes, purchasesRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.${_cid()}&created_at=gte.${from}T00:00:00&created_at=lte.${to}T23:59:59&select=*&order=created_at.asc&limit=1000`, { headers: h }),
         fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=eq.cerrada&created_at=gte.${from}T00:00:00&created_at=lte.${to}T23:59:59&select=total,created_at&order=created_at.asc&limit=5000`, { headers: h }),
+        fetch(`${SUPABASE_URL}/rest/v1/pos_purchase_orders?client_id=eq.${_cid()}&created_at=gte.${from}T00:00:00&created_at=lte.${to}T23:59:59&status=neq.cancelada&select=total,subtotal,tax,created_at,supplier,status&order=created_at.asc&limit=1000`, { headers: h }),
       ])
 
       const cfdis = cfdiRes.ok ? await cfdiRes.json() : []
       const orders = ordersRes.ok ? await ordersRes.json() : []
+      const purchases = purchasesRes.ok ? await purchasesRes.json() : []
 
       // Classify CFDIs
       const emitidas = cfdis.filter((c: { status: string }) => c.status === 'emitida' || c.status === 'timbrada')
@@ -59,9 +61,11 @@ export default function ReporteFiscalPage() {
         total: emitidas.reduce((s: number, c: { total: number }) => s + (Number(c.total) || 0), 0),
       }
 
-      // Egresos placeholder (facturas de proveedores)
-      // TODO: fetch from pos_facturas when available
-      const egresos = { count: 0, subtotal: 0, iva: 0, total: 0 }
+      // Egresos from purchase orders (facturas de proveedores)
+      const egresosTotal = purchases.reduce((s: number, p: { total: number }) => s + (Number(p.total) || 0), 0)
+      const egresosSubtotal = purchases.reduce((s: number, p: { subtotal: number; total: number }) => s + (Number(p.subtotal) || Math.round(Number(p.total || 0) / 1.16 * 100) / 100), 0)
+      const egresosIva = purchases.reduce((s: number, p: { tax: number; total: number }) => s + (Number(p.tax) || Math.round((Number(p.total || 0) - Number(p.total || 0) / 1.16) * 100) / 100), 0)
+      const egresos = { count: purchases.length, subtotal: egresosSubtotal, iva: egresosIva, total: egresosTotal }
 
       // IVA calculation
       const ivaTraslado = ingresos.iva

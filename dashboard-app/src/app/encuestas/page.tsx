@@ -158,10 +158,6 @@ export default function EncuestasPage() {
     const storedResponses = load<SurveyResponse[]>(STORAGE_KEY_RESPONSES, [])
     if (storedResponses.length > 0) {
       setResponses(storedResponses)
-    } else {
-      const demo = generateDemoResponses(DEFAULT_CONFIG.questions)
-      setResponses(demo)
-      save(STORAGE_KEY_RESPONSES, demo)
     }
 
     // Also try to load from Supabase

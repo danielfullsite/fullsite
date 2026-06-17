@@ -91,12 +91,9 @@ export default function CRMPage() {
   const loadCustomers = useCallback(async () => {
     try {
       const url = `${SUPABASE_URL}/rest/v1/pos_customers?client_id=eq.${cid}&select=*&order=total_visits.desc&limit=1000`
-      console.log('[CRM] Fetching:', url.slice(0, 100))
       const res = await fetch(url, { headers: hdrs() })
-      console.log('[CRM] Status:', res.status, 'OK:', res.ok)
       if (res.ok) {
         const data = await res.json()
-        console.log('[CRM] Rows:', data.length)
         setCustomers(data.map((r: Record<string, unknown>) => ({
           ...r,
           tags: Array.isArray(r.tags) ? r.tags : [],
@@ -209,6 +206,68 @@ export default function CRMPage() {
     } catch { /* silent */ }
   }
 
+  // Import customers from reservations
+  const importFromReservations = async () => {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/amalay_reservaciones?select=nombre,telefono,fecha,total&order=fecha.desc&limit=500`,
+        { headers: hdrs() }
+      )
+      if (!res.ok) return
+      const reservations = await res.json()
+
+      // Dedupe by phone or name
+      const seen = new Map<string, { nombre: string; telefono: string; total: number; visits: number; firstVisit: string; lastVisit: string }>()
+      for (const r of reservations) {
+        const key = r.telefono || r.nombre
+        if (!key) continue
+        const existing = seen.get(key)
+        if (existing) {
+          existing.visits++
+          existing.total += Number(r.total) || 0
+          if (r.fecha < existing.firstVisit) existing.firstVisit = r.fecha
+          if (r.fecha > existing.lastVisit) existing.lastVisit = r.fecha
+        } else {
+          seen.set(key, {
+            nombre: r.nombre,
+            telefono: r.telefono || '',
+            total: Number(r.total) || 0,
+            visits: 1,
+            firstVisit: r.fecha,
+            lastVisit: r.fecha,
+          })
+        }
+      }
+
+      // Insert batch
+      const batch = Array.from(seen.values()).map(c => ({
+        client_id: cid,
+        name: c.nombre,
+        phone: c.telefono || null,
+        total_visits: c.visits,
+        total_spent: c.total,
+        avg_ticket: c.visits > 0 ? Math.round(c.total / c.visits) : 0,
+        first_visit: c.firstVisit,
+        last_visit: c.lastVisit,
+        tags: c.visits >= 3 ? ['frecuente'] : [],
+      }))
+
+      if (batch.length === 0) return
+
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_customers`, {
+        method: 'POST',
+        headers: { ...hdrs(), Prefer: 'return=representation' },
+        body: JSON.stringify(batch),
+      })
+
+      if (insertRes.ok) {
+        loadCustomers()
+      }
+    } catch (e) {
+      console.error('[CRM] Import error:', e)
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-[var(--text-3)]">Cargando CRM...</div>
   }
@@ -222,8 +281,18 @@ export default function CRMPage() {
       />
 
       {/* Integration note */}
-      <div className="mb-6 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-        <strong>Integracion POS:</strong> Los clientes se vinculan a ordenes al momento del pago ingresando su telefono. Esto actualiza automaticamente visitas, gasto total y ticket promedio.
+      <div className="mb-6 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-center justify-between">
+        <span>
+          <strong>Integracion POS:</strong> Los clientes se vinculan a ordenes al momento del pago ingresando su telefono. Esto actualiza automaticamente visitas, gasto total y ticket promedio.
+        </span>
+        {customers.length === 0 && (
+          <button
+            onClick={importFromReservations}
+            className="ml-4 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-500 transition-colors whitespace-nowrap"
+          >
+            Importar desde reservaciones
+          </button>
+        )}
       </div>
 
       {/* KPI Cards */}

@@ -66,6 +66,7 @@ interface ResumenMensual {
   ventasNetas: number
   ivaTrasladadoMes: number
   costoVentas: number
+  costoVentasEstimado?: boolean
   margenBruto: number
   margenPct: number
   entradasInventario: number
@@ -243,12 +244,12 @@ export default function ContabilidadPage() {
           index={1}
         />
         <KPICard
-          label="Costo de Ventas"
+          label={resumenMes?.costoVentasEstimado ? 'Costo de Ventas (est.)' : 'Costo de Ventas'}
           value={resumenMes ? formatCurrency(resumenMes.costoVentas) : '--'}
           icon={Calculator}
           accentClass="kpi-accent-pink"
           index={2}
-          subtitle={resumenMes ? `${resumenMes.margenPct.toFixed(1)}% margen` : ''}
+          subtitle={resumenMes ? `${resumenMes.margenPct.toFixed(1)}% margen${resumenMes.costoVentasEstimado ? ' · estimado 35%' : ''}` : ''}
         />
         <KPICard
           label="Margen Bruto"
@@ -421,8 +422,8 @@ export default function ContabilidadPage() {
                   { label: 'Ventas Brutas', value: resumenMes.ventasBrutas, color: 'text-[var(--text-1)]' },
                   { label: 'IVA Trasladado', value: -resumenMes.ivaTrasladadoMes, color: 'text-amber-400' },
                   { label: 'Ventas Netas', value: resumenMes.ventasNetas, color: 'text-blue-400', bold: true },
-                  { label: 'Costo de Ventas', value: -resumenMes.costoVentas, color: 'text-pink-400' },
-                  { label: 'Margen Bruto', value: resumenMes.margenBruto, color: 'text-emerald-400', bold: true },
+                  { label: resumenMes.costoVentasEstimado ? 'Costo de Ventas (est. 35%)' : 'Costo de Ventas', value: -resumenMes.costoVentas, color: 'text-pink-400' },
+                  { label: resumenMes.costoVentasEstimado ? 'Margen Bruto (est.)' : 'Margen Bruto', value: resumenMes.margenBruto, color: 'text-emerald-400', bold: true },
                   { label: 'Merma/Desperdicios', value: -resumenMes.merma, color: 'text-red-400' },
                   { label: 'Compras (entradas)', value: resumenMes.entradasInventario, color: 'text-cyan-400' },
                 ].map((row, i) => (
@@ -514,7 +515,8 @@ export default function ContabilidadPage() {
 
             {/* Tax estimates */}
             <div className="rounded-xl border border-[var(--accent-line)] p-5" style={{ background: 'var(--bento-card)' }}>
-              <h4 className="text-xs font-mono uppercase tracking-wider text-[var(--text-3)] mb-4">Estimacion Impuestos</h4>
+              <h4 className="text-xs font-mono uppercase tracking-wider text-[var(--text-3)] mb-2">Estimacion Impuestos</h4>
+              <p className="text-[10px] text-amber-400/70 mb-4">Todos los valores son estimados. ISR: RESICO 2.5%. IVA acreditable: estimado 30% del trasladado.</p>
               <div className="space-y-4">
                 <div>
                   <p className="text-xs text-[var(--text-3)]">IVA Trasladado (estimado)</p>
@@ -560,11 +562,11 @@ export default function ContabilidadPage() {
                 <h5 className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-4)] mb-2">Proyeccion Flujo</h5>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[var(--text-3)]">IVA mensual 17</span>
+                    <span className="text-[var(--text-3)]">IVA mensual (est.)</span>
                     <span className="font-mono text-red-400">-{formatCurrency(fiscal.ivaPorPagar)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-[var(--text-3)]">ISR provisional 17</span>
+                    <span className="text-[var(--text-3)]">ISR provisional (est.)</span>
                     <span className="font-mono text-red-400">-{formatCurrency(fiscal.isrEstimado)}</span>
                   </div>
                   <div className="flex justify-between text-xs border-t border-[var(--accent-line)] pt-2">
