@@ -148,8 +148,10 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        let recent = await getRecentDays(1000) // Load all history for full navigation
-        let latest = await getLatestDay()
+        // Timeout: if data doesn't load in 10s, show empty state instead of infinite spinner
+        const timeoutP = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+        let recent = await Promise.race([getRecentDays(1000), timeoutP]).catch(() => [] as WansoftDaily[])
+        let latest = await Promise.race([getLatestDay(), timeoutP]).catch(() => null as WansoftDaily | null)
 
         // Fallback: if no wansoft_daily data, build from pos_orders
         if (recent.length === 0) {

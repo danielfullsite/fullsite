@@ -8,7 +8,9 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
  *  Use the logged-in session token as Bearer (anon key alone sees 0 rows). */
 async function getAuthToken(): Promise<string> {
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+    const sessionP = supabase.auth.getSession().then(r => r.data.session).catch(() => null)
+    const session = await Promise.race([sessionP, timeout])
     return session?.access_token || SUPABASE_KEY
   } catch {
     return SUPABASE_KEY
