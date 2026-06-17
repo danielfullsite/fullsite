@@ -147,15 +147,15 @@ function locationFilter(locationId?: string | null): string {
 }
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
-  // If data source is Fullsite POS, try pos_orders first
-  if (isFullsitePOS()) {
-    const posData = await getDashboardFromPosOrders(days, clientSlug)
-    if (posData.length > 0) return posData
-  }
-  // Default: read from wansoft_daily (works for Wansoft clients + fallback)
+  // Always try wansoft_daily first (fast, indexed)
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const filtered = dedupeByFecha(data).slice(0, days)
-  return filtered.reverse().map(parseRow)
+  if (filtered.length > 0) return filtered.reverse().map(parseRow)
+  // Fallback: if no wansoft_daily data, try pos_orders (capped at 90 days to avoid timeout)
+  const posDays = Math.min(days, 90)
+  const posData = await getDashboardFromPosOrders(posDays, clientSlug)
+  if (posData.length > 0) return posData
+  return []
 }
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
