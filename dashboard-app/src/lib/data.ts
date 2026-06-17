@@ -410,7 +410,7 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   }
 
   const result: WansoftDaily[] = []
-  for (const [fecha, dayOrders] of byDate) {
+  for (const [fecha, dayOrders] of Array.from(byDate.entries())) {
     const ventas = dayOrders.reduce((s, o) => s + (o.total || 0), 0)
     const descuentos = dayOrders.reduce((s, o) => s + (o.descuento || 0), 0)
     const personas = dayOrders.reduce((s, o) => s + (o.personas || 0), 0)
