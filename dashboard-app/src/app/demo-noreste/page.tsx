@@ -1,10 +1,11 @@
 'use client'
 
+import { useState, useRef } from 'react'
 import {
   DollarSign, Receipt, TrendingUp, Users, Flame, Bot,
   AlertTriangle, BarChart3, ChefHat, Shield, Zap, Clock,
   ArrowUpRight, UserCheck, CalendarDays, UtensilsCrossed,
-  Monitor, MessageSquare,
+  Monitor, MessageSquare, Send, Loader2,
 } from 'lucide-react'
 
 // ─── DATA ────────────────────────────────────────────────
@@ -413,7 +414,13 @@ export default function DemoNorestePage() {
           </div>
         </div>
 
-        {/* ── Section 8: CTA ── */}
+        {/* ── Section 8: Chat IA ── */}
+        <div style={{ marginBottom: 48 }}>
+          <SectionTitle title="Chat IA — Preguntale a tu restaurante" icon={Bot} />
+          <NoresteChat />
+        </div>
+
+        {/* ── Section 9: CTA ── */}
         <div style={{
           textAlign: 'center', padding: '56px 24px 72px',
           background: 'linear-gradient(180deg, transparent, rgba(16,185,129,0.03) 50%, transparent)',
@@ -493,6 +500,129 @@ function KPICard({ label, value, sub, icon: Icon, accent, positive }: {
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={18} style={{ color: 'rgba(255,255,255,0.2)' }} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+const SUGGESTED_QUESTIONS = [
+  '¿Cómo vamos hoy?',
+  '¿Quién es el mejor mesero?',
+  '¿Qué sucursal va ganando?',
+  '¿Cuánto vendimos de arrachera?',
+  '¿Hay alertas de fraude?',
+  '¿Cómo va el food cost?',
+]
+
+function NoresteChat() {
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return
+    const userMsg = text.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }])
+    setLoading(true)
+    try {
+      const res = await fetch('/api/demo-chat-noreste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg }),
+      })
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'ai', text: data.response || 'Sin respuesta' }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'ai', text: 'Ayer cerraron con $487,350 en las 8 sucursales. Intenta de nuevo.' }])
+    }
+    setLoading(false)
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100)
+  }
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, overflow: 'hidden' }}>
+      {/* Messages area */}
+      <div ref={scrollRef} style={{ height: 360, overflowY: 'auto', padding: 20 }}>
+        {messages.length === 0 ? (
+          <div style={{ textAlign: 'center', paddingTop: 40 }}>
+            <Bot size={40} style={{ color: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 24 }}>
+              Preguntale cualquier cosa a Noreste Grill
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+              {SUGGESTED_QUESTIONS.map(q => (
+                <button
+                  key={q}
+                  onClick={() => sendMessage(q)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
+                    color: '#10b981', cursor: 'pointer',
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                {m.role === 'ai' && (
+                  <div style={{ width: 32, height: 32, borderRadius: 16, background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Bot size={16} style={{ color: '#10b981' }} />
+                  </div>
+                )}
+                <div style={{
+                  maxWidth: '75%', padding: '10px 16px', borderRadius: 16, fontSize: 14, lineHeight: 1.5,
+                  background: m.role === 'user' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+                  border: m.role === 'user' ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 16, background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Loader2 size={16} style={{ color: '#10b981', animation: 'spin 1s linear infinite' }} />
+                </div>
+                <div style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>
+                  Analizando datos...
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: 16, display: 'flex', gap: 10 }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
+          placeholder="Pregunta algo... ej: ¿cuánto vendimos de quesabirrias?"
+          style={{
+            flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, padding: '12px 16px', color: '#fff', fontSize: 14, outline: 'none',
+          }}
+        />
+        <button
+          onClick={() => sendMessage(input)}
+          disabled={!input.trim() || loading}
+          style={{
+            width: 48, height: 48, borderRadius: 12, background: '#10b981', border: 'none',
+            color: '#fff', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+            opacity: input.trim() && !loading ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Send size={18} />
+        </button>
       </div>
     </div>
   )
