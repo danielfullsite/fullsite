@@ -527,7 +527,15 @@ export default function DemoNorestePage() {
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {['POS completo (órdenes, mesas, cobro)', 'KDS cocina y barra', 'Dashboard de ventas', 'Corte de caja', 'Soporte por chat IA'].map(f => (
+                {[
+                  'Punto de venta táctil (órdenes, mesas, split cuenta, asientos)',
+                  'Pantalla de cocina y barra (KDS) con ruteo automático',
+                  'Dashboard de ventas del día con ticket promedio y meseros',
+                  'Corte de caja (X, Z, turno, mesero)',
+                  'Cobro efectivo, tarjeta y mixto',
+                  'Comandas impresas por estación',
+                  'Soporte por chat IA 24/7',
+                ].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
                   </div>
@@ -551,7 +559,19 @@ export default function DemoNorestePage() {
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {['Todo lo de Esencial +', '30 agentes de IA 24/7', 'Anti-fraude automático', 'Food cost por platillo', 'Predicción de cierre', 'Coaching a meseros', 'Inventario con recetas', 'CFDI facturación', 'Delivery (Uber Eats + Rappi)'].map(f => (
+                {[
+                  'Todo lo de Esencial +',
+                  '30 agentes de IA analizando tu operación 24/7',
+                  'Anti-fraude: detecta cancelaciones y descuentos sospechosos',
+                  'Food cost real por platillo con recetas y costos de insumos',
+                  'Predicción de cierre: a las 2pm sabes cuánto vas a facturar',
+                  'Coaching automático: identifica meseros que no venden postres o bebidas',
+                  'Inventario con recetas: auto-deducción al vender, alertas de reorden',
+                  'CFDI facturación electrónica integrada (timbrado automático)',
+                  'Delivery integrado (Uber Eats + Rappi directo al POS)',
+                  'Checador de asistencia con huella digital',
+                  'Historial y auditoría de cada acción',
+                ].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#10b981' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
                   </div>
@@ -572,7 +592,18 @@ export default function DemoNorestePage() {
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                {['Todo lo de Pro +', 'Dashboard multi-sucursal', 'Comparativa entre sucursales', 'Onboarding dedicado (48 hrs)', 'Soporte prioritario', 'API abierta', 'Reportes ejecutivos semanales', 'Capacitación presencial'].map(f => (
+                {[
+                  'Todo lo de Pro +',
+                  'Dashboard multi-sucursal: todas tus ubicaciones en una pantalla',
+                  'Comparativa entre sucursales: quién vende más, quién tiene problemas',
+                  'Heatmap de demanda: horas pico por sucursal para optimizar turnos',
+                  'Onboarding dedicado: tu sistema corriendo en 48 horas',
+                  'Soporte prioritario: respuesta en menos de 1 hora',
+                  'API abierta para integraciones custom',
+                  'Reportes ejecutivos automáticos cada lunes por email',
+                  'Capacitación presencial a tu equipo en cada sucursal',
+                  'Gerente de cuenta asignado',
+                ].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
                     <span style={{ color: '#a78bfa', fontWeight: 700 }}>✓</span> {f}
                   </div>
