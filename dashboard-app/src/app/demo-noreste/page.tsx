@@ -5,7 +5,7 @@ import {
   DollarSign, Receipt, TrendingUp, Users, Flame, Bot,
   AlertTriangle, BarChart3, ChefHat, Shield, Zap, Clock,
   ArrowUpRight, UserCheck, CalendarDays, UtensilsCrossed,
-  Monitor, MessageSquare, Send, Loader2,
+  Monitor, MessageSquare, Send, Loader2, Package, Activity,
 } from 'lucide-react'
 
 // ─── DATA ────────────────────────────────────────────────
@@ -132,7 +132,87 @@ const POS_ITEMS = [
   { name: 'Coca-Cola 355ml', price: 35, cat: 'Bebidas' },
 ]
 
-const formatMXN = (n: number) => `$${n.toLocaleString('es-MX')}`
+// ─── NEW DATA ────────────────────────────────────────────
+
+const REVENUE_TREND = [
+  { dia: 'Lun', ventas: 385200 },
+  { dia: 'Mar', ventas: 412800 },
+  { dia: 'Mie', ventas: 398500 },
+  { dia: 'Jue', ventas: 425100 },
+  { dia: 'Vie', ventas: 478900 },
+  { dia: 'Sab', ventas: 521300 },
+  { dia: 'Dom', ventas: 487350 },
+]
+
+const HEATMAP_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+const HEATMAP_DATA: Record<string, number[]> = {
+  'Paseo Tec':        [15, 25, 55, 95, 90, 60, 30, 25, 45, 85, 90, 75, 40, 15],
+  'Patio Lincoln':    [10, 20, 50, 80, 75, 55, 25, 20, 50, 80, 85, 70, 35, 12],
+  'Cumbres Elite':    [12, 22, 48, 78, 72, 50, 28, 22, 48, 78, 82, 68, 32, 10],
+  'Centro':           [8,  18, 42, 72, 68, 45, 22, 20, 55, 92, 95, 85, 50, 20],
+  'La Ladrillera':    [10, 18, 45, 75, 70, 48, 25, 18, 42, 75, 80, 65, 30, 10],
+  'Sendero Escobedo': [8,  15, 40, 70, 65, 42, 20, 15, 40, 70, 72, 58, 28, 8],
+  'Juarez':           [6,  12, 35, 62, 58, 38, 18, 14, 38, 65, 68, 55, 25, 6],
+  'Sendero La Fe':    [5,  10, 32, 58, 55, 35, 15, 12, 35, 60, 62, 50, 22, 5],
+}
+
+const WATERFALL_ITEMS = [
+  { label: 'Ingresos', amount: 487350, pct: 100, type: 'positive' as const },
+  { label: 'Costo de venta', amount: -165700, pct: 34, type: 'negative' as const },
+  { label: 'Utilidad bruta', amount: 321650, pct: 66, type: 'positive' as const },
+  { label: 'Gastos operativos', amount: -195000, pct: 40, type: 'negative' as const },
+  { label: 'Utilidad neta', amount: 126650, pct: 26, type: 'result' as const },
+]
+
+const MESERO_RADAR = [
+  {
+    nombre: 'Carlos Mendoza',
+    scores: { Ventas: 95, 'Ticket Prom.': 92, 'Propinas %': 88, 'Upselling': 45, 'Velocidad': 85 },
+    color: '#10b981',
+  },
+  {
+    nombre: 'Miguel A. Torres',
+    scores: { Ventas: 85, 'Ticket Prom.': 88, 'Propinas %': 82, 'Upselling': 72, 'Velocidad': 78 },
+    color: '#3b82f6',
+  },
+  {
+    nombre: 'Ana L. Villarreal',
+    scores: { Ventas: 72, 'Ticket Prom.': 95, 'Propinas %': 90, 'Upselling': 68, 'Velocidad': 70 },
+    color: '#a855f7',
+  },
+]
+
+const FRAUD_TIMELINE = [
+  { time: '2:15 PM', status: 'normal' as const, label: 'Cancelacion aprobada por gerente', location: 'Paseo Tec' },
+  { time: '5:30 PM', status: 'normal' as const, label: 'Descuento 10% — cliente frecuente', location: 'Cumbres Elite' },
+  { time: '8:12 PM', status: 'alert' as const, label: 'Cancelacion sin preparar', location: 'La Ladrillera', actor: 'Roberto Garza' },
+  { time: '8:28 PM', status: 'alert' as const, label: '2da cancelacion en 16 min', location: 'La Ladrillera', actor: 'Roberto Garza' },
+  { time: '8:45 PM', status: 'alert' as const, label: '3ra cancelacion — patron detectado', location: 'La Ladrillera' },
+  { time: '9:01 PM', status: 'action' as const, label: 'Notificacion enviada a gerente de zona', location: 'Sistema' },
+]
+
+const SUCURSAL_DETAILS = [
+  { nombre: 'Paseo Tec', ventas: 82400, tp: 285, vsProm: 14.2, trend: [62, 68, 72, 75, 70, 78, 82] },
+  { nombre: 'Patio Lincoln', ventas: 71200, tp: 271, vsProm: 4.8, trend: [58, 62, 65, 60, 68, 72, 71] },
+  { nombre: 'Cumbres Elite', ventas: 65800, tp: 268, vsProm: 1.3, trend: [55, 58, 60, 62, 58, 64, 66] },
+  { nombre: 'Centro', ventas: 61500, tp: 256, vsProm: -2.1, trend: [52, 56, 58, 55, 60, 62, 62] },
+  { nombre: 'La Ladrillera', ventas: 58900, tp: 248, vsProm: -5.8, trend: [50, 52, 55, 54, 56, 58, 59] },
+  { nombre: 'Sendero Escobedo', ventas: 54200, tp: 242, vsProm: -9.4, trend: [48, 50, 52, 50, 54, 55, 54] },
+  { nombre: 'Juarez', ventas: 48350, tp: 235, vsProm: -14.2, trend: [42, 44, 46, 45, 48, 50, 48] },
+  { nombre: 'Sendero La Fe', ventas: 45000, tp: 228, vsProm: -17.8, trend: [38, 40, 42, 41, 44, 46, 45] },
+]
+
+const INVENTORY_ITEMS = [
+  { nombre: 'Arrachera', actual: 45, max: 80, unit: 'kg', status: 'warning' as const, note: 'Reordenar hoy' },
+  { nombre: 'Rib Eye', actual: 28, max: 50, unit: 'kg', status: 'warning' as const, note: 'Reordenar hoy' },
+  { nombre: 'Carbon', actual: 120, max: 200, unit: 'kg', status: 'warning' as const, note: 'Reordenar manana' },
+  { nombre: 'Tortilla Harina', actual: 180, max: 200, unit: 'kg', status: 'ok' as const, note: 'OK' },
+  { nombre: 'Coca-Cola', actual: 4, max: 24, unit: 'cajas', status: 'critical' as const, note: 'Critico — Juarez' },
+  { nombre: 'Cebolla', actual: 95, max: 100, unit: 'kg', status: 'ok' as const, note: 'OK' },
+]
+
+const formatMXN = (n: number) => `$${Math.abs(n).toLocaleString('es-MX')}`
 
 // ─── PAGE ────────────────────────────────────────────────
 
@@ -183,43 +263,41 @@ export default function DemoNorestePage() {
           </div>
         </div>
 
-        {/* ── Section 3: Ventas por Sucursal ── */}
-        <SectionTitle title="Ventas por Sucursal" icon={BarChart3} />
-        <div style={{ background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 32 }}>
-          {SUCURSALES.map((s, i) => {
-            const pct = (s.ventas / maxSucursal) * 100
-            return (
-              <div key={s.nombre} style={{ marginBottom: i < SUCURSALES.length - 1 ? 14 : 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 11, fontWeight: 700,
-                      background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(255,255,255,0.08)',
-                      color: i < 3 ? '#000' : 'rgba(255,255,255,0.5)',
-                    }}>{i + 1}</span>
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{s.nombre}</span>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatMXN(s.ventas)}</span>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, height: 8, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 6,
-                    width: `${pct}%`,
-                    background: i === 0
-                      ? 'linear-gradient(90deg, #10b981, #34d399)'
-                      : i < 3
-                        ? 'linear-gradient(90deg, rgba(16,185,129,0.7), rgba(52,211,153,0.7))'
-                        : 'linear-gradient(90deg, rgba(16,185,129,0.35), rgba(52,211,153,0.35))',
-                    transition: 'width 0.5s ease',
-                  }} />
-                </div>
-              </div>
-            )
-          })}
+        {/* ── NEW: Revenue Trend Chart ── */}
+        <SectionTitle title="Tendencia de Ingresos — 7 Dias" icon={TrendingUp} />
+        <RevenueTrendChart />
+
+        {/* ── NEW: Sucursal Comparison Cards ── */}
+        <SectionTitle title="Comparativo por Sucursal" icon={BarChart3} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 32 }}>
+          {SUCURSAL_DETAILS.map((s, i) => (
+            <SucursalCard key={s.nombre} sucursal={s} rank={i + 1} />
+          ))}
         </div>
 
-        {/* ── Section 4: Top Meseros ── */}
+        {/* ── NEW: Heatmap ── */}
+        <SectionTitle title="Heatmap de Demanda por Hora" icon={Flame} />
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+          Identifica horas pico por sucursal para optimizar staffing
+        </div>
+        <HeatmapSection />
+
+        {/* ── NEW: Food Cost Waterfall ── */}
+        <SectionTitle title="Food Cost — Cascada P&L" icon={DollarSign} />
+        <WaterfallChart />
+
+        {/* ── NEW: Mesero Performance Radar ── */}
+        <SectionTitle title="Performance — Top 3 Meseros" icon={UserCheck} />
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+          Comparativo multidimensional: ventas, ticket promedio, propinas, upselling y velocidad
+        </div>
+        <MeseroRadar />
+
+        {/* ── NEW: Anti-Fraud Timeline ── */}
+        <SectionTitle title="Anti-Fraude — Timeline 24h" icon={Shield} />
+        <FraudTimeline />
+
+        {/* ── Section: Top Meseros (original table) ── */}
         <SectionTitle title="Top Meseros del Dia" icon={UserCheck} />
         <div style={{ background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 32, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
@@ -252,7 +330,7 @@ export default function DemoNorestePage() {
           </table>
         </div>
 
-        {/* ── Section 5: Top Platillos ── */}
+        {/* ── Section: Top Platillos ── */}
         <SectionTitle title="Top 10 Platillos" icon={ChefHat} />
         <div style={{ background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 32 }}>
           {PLATILLOS.map((p, i) => {
@@ -286,7 +364,11 @@ export default function DemoNorestePage() {
           })}
         </div>
 
-        {/* ── Section 6: AI Agents ── */}
+        {/* ── NEW: Inventory Alerts ── */}
+        <SectionTitle title="Alertas de Inventario" icon={Package} />
+        <InventoryPanel />
+
+        {/* ── Section: AI Agents ── */}
         <SectionTitle title="Agentes de IA — Alertas en Vivo" icon={Bot} />
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
           6 agentes monitoreando las 8 sucursales 24/7. Estas son las alertas de hoy.
@@ -320,7 +402,7 @@ export default function DemoNorestePage() {
           ))}
         </div>
 
-        {/* ── Section 7: POS Preview ── */}
+        {/* ── Section: POS Preview ── */}
         <SectionTitle title="Vista Previa del POS" icon={Monitor} />
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
           Asi se veria el punto de venta en cada sucursal. Corre en cualquier tablet o computadora.
@@ -414,13 +496,13 @@ export default function DemoNorestePage() {
           </div>
         </div>
 
-        {/* ── Section 8: Chat IA ── */}
+        {/* ── Section: Chat IA ── */}
         <div style={{ marginBottom: 48 }}>
           <SectionTitle title="Chat IA — Preguntale a tu restaurante" icon={Bot} />
           <NoresteChat />
         </div>
 
-        {/* ── Section 9: CTA ── */}
+        {/* ── Section: CTA ── */}
         <div style={{
           textAlign: 'center', padding: '56px 24px 72px',
           background: 'linear-gradient(180deg, transparent, rgba(16,185,129,0.03) 50%, transparent)',
@@ -504,6 +586,455 @@ function KPICard({ label, value, sub, icon: Icon, accent, positive }: {
     </div>
   )
 }
+
+// ─── Revenue Trend Chart (SVG) ──────────────────────────
+
+function RevenueTrendChart() {
+  const data = REVENUE_TREND
+  const minVal = 360000
+  const maxVal = 540000
+  const W = 700
+  const H = 260
+  const padL = 70
+  const padR = 30
+  const padT = 20
+  const padB = 40
+  const chartW = W - padL - padR
+  const chartH = H - padT - padB
+
+  const points = data.map((d, i) => {
+    const x = padL + (i / (data.length - 1)) * chartW
+    const y = padT + chartH - ((d.ventas - minVal) / (maxVal - minVal)) * chartH
+    return { x, y, ...d }
+  })
+
+  const polyline = points.map(p => `${p.x},${p.y}`).join(' ')
+  const areaPath = `M${points[0].x},${padT + chartH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${padT + chartH} Z`
+
+  const gridLines = [360000, 400000, 440000, 480000, 520000]
+
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: '24px 16px', border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32, overflowX: 'auto',
+    }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto', display: 'block', margin: '0 auto' }}>
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* Grid lines */}
+        {gridLines.map(v => {
+          const y = padT + chartH - ((v - minVal) / (maxVal - minVal)) * chartH
+          return (
+            <g key={v}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+              <text x={padL - 8} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="10" fontFamily="system-ui">
+                ${(v / 1000).toFixed(0)}K
+              </text>
+            </g>
+          )
+        })}
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#areaGrad)" />
+        {/* Line */}
+        <polyline points={polyline} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Dots + labels */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r="4" fill="#0a0a0f" stroke="#10b981" strokeWidth="2" />
+            <text x={p.x} y={p.y - 12} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="10" fontWeight="600" fontFamily="system-ui">
+              ${(p.ventas / 1000).toFixed(0)}K
+            </text>
+            <text x={p.x} y={H - 8} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="11" fontFamily="system-ui">
+              {p.dia}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+// ─── Sucursal Comparison Card ───────────────────────────
+
+function SucursalCard({ sucursal, rank }: {
+  sucursal: typeof SUCURSAL_DETAILS[0]; rank: number
+}) {
+  const medal = rank === 1 ? '\uD83E\uDD47' : rank === 2 ? '\uD83E\uDD48' : rank === 3 ? '\uD83E\uDD49' : null
+  const trend = sucursal.trend
+  const tMax = Math.max(...trend)
+  const tMin = Math.min(...trend)
+  const sparkW = 80
+  const sparkH = 28
+  const sparkPoints = trend.map((v, i) => {
+    const x = (i / (trend.length - 1)) * sparkW
+    const y = sparkH - ((v - tMin) / (tMax - tMin || 1)) * (sparkH - 4) - 2
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: 18, border: '1px solid rgba(255,255,255,0.06)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {medal ? (
+            <span style={{ fontSize: 18 }}>{medal}</span>
+          ) : (
+            <span style={{
+              width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+            }}>{rank}</span>
+          )}
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{sucursal.nombre}</span>
+        </div>
+        <svg width={sparkW} height={sparkH} style={{ flexShrink: 0 }}>
+          <defs>
+            <linearGradient id={`spark-${rank}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polygon
+            points={`0,${sparkH} ${sparkPoints} ${sparkW},${sparkH}`}
+            fill={`url(#spark-${rank})`}
+          />
+          <polyline points={sparkPoints} fill="none" stroke="#10b981" strokeWidth="1.5" />
+        </svg>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
+            {formatMXN(sucursal.ventas)}
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+            TP: {formatMXN(sucursal.tp)}
+          </div>
+        </div>
+        <div style={{
+          fontSize: 13, fontWeight: 700,
+          color: sucursal.vsProm >= 0 ? '#10b981' : '#ef4444',
+          display: 'flex', alignItems: 'center', gap: 2,
+        }}>
+          {sucursal.vsProm >= 0 ? '+' : ''}{sucursal.vsProm}%
+          <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>vs prom</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Heatmap ────────────────────────────────────────────
+
+function HeatmapSection() {
+  const maxIntensity = 95
+  const sucNames = Object.keys(HEATMAP_DATA)
+
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: '20px 16px', border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32, overflowX: 'auto',
+    }}>
+      <div style={{ minWidth: 700 }}>
+        {/* Hour headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: '130px repeat(14, 1fr)', gap: 2, marginBottom: 2 }}>
+          <div />
+          {HEATMAP_HOURS.map(h => (
+            <div key={h} style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.35)', padding: '4px 0' }}>
+              {h > 12 ? `${h - 12}pm` : h === 12 ? '12pm' : `${h}am`}
+            </div>
+          ))}
+        </div>
+        {/* Rows */}
+        {sucNames.map(name => (
+          <div key={name} style={{ display: 'grid', gridTemplateColumns: '130px repeat(14, 1fr)', gap: 2, marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', paddingRight: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {name}
+            </div>
+            {HEATMAP_DATA[name].map((val, i) => {
+              const intensity = val / maxIntensity
+              const alpha = 0.05 + intensity * 0.85
+              return (
+                <div key={i} style={{
+                  height: 28, borderRadius: 4,
+                  background: `rgba(16, 185, 129, ${alpha})`,
+                  position: 'relative',
+                  cursor: 'default',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {val >= 70 && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(0,0,0,0.6)' }}>{val}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        {/* Legend */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Baja</span>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {[0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map((a, i) => (
+              <div key={i} style={{ width: 16, height: 10, borderRadius: 2, background: `rgba(16,185,129,${a})` }} />
+            ))}
+          </div>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Alta</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Waterfall Chart ────────────────────────────────────
+
+function WaterfallChart() {
+  const maxAmount = 487350
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32,
+    }}>
+      {WATERFALL_ITEMS.map((item, i) => {
+        const absAmount = Math.abs(item.amount)
+        const barWidth = (absAmount / maxAmount) * 100
+        const isNeg = item.type === 'negative'
+        const isResult = item.type === 'result'
+        const barColor = isNeg
+          ? 'linear-gradient(90deg, #ef4444, #f87171)'
+          : isResult
+            ? 'linear-gradient(90deg, #10b981, #34d399)'
+            : 'linear-gradient(90deg, #10b981, #34d399)'
+        // For waterfall effect, offset negative bars
+        const offset = isNeg ? ((maxAmount - absAmount) / maxAmount) * 100 * 0.15 : 0
+
+        return (
+          <div key={item.label} style={{ marginBottom: i < WATERFALL_ITEMS.length - 1 ? 16 : 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 10, height: 10, borderRadius: 2, flexShrink: 0,
+                  background: isNeg ? '#ef4444' : isResult ? '#10b981' : '#10b981',
+                }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{item.label}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{
+                  fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+                  color: isNeg ? '#ef4444' : isResult ? '#10b981' : '#10b981',
+                }}>
+                  {isNeg ? '-' : ''}{formatMXN(absAmount)}
+                </span>
+                <span style={{
+                  fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+                  background: isNeg ? 'rgba(239,68,68,0.15)' : isResult ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)',
+                  color: isNeg ? '#ef4444' : '#10b981',
+                }}>
+                  {item.pct}%
+                </span>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, height: 12, overflow: 'hidden', position: 'relative' }}>
+              <div style={{
+                height: '100%', borderRadius: 6,
+                width: `${barWidth}%`,
+                marginLeft: isNeg ? `${offset}%` : 0,
+                background: barColor,
+                transition: 'width 0.5s ease',
+                boxShadow: isResult ? '0 0 12px rgba(16,185,129,0.3)' : 'none',
+              }} />
+            </div>
+            {isResult && (
+              <div style={{
+                marginTop: 4, borderTop: '1px dashed rgba(16,185,129,0.3)', paddingTop: 0,
+              }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Mesero Performance Comparison ──────────────────────
+
+function MeseroRadar() {
+  const dimensions = ['Ventas', 'Ticket Prom.', 'Propinas %', 'Upselling', 'Velocidad']
+
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32,
+    }}>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 20, marginBottom: 20, flexWrap: 'wrap' }}>
+        {MESERO_RADAR.map(m => (
+          <div key={m.nombre} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: m.color }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{m.nombre}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Dimension rows */}
+      {dimensions.map(dim => (
+        <div key={dim} style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 500 }}>{dim}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {MESERO_RADAR.map(m => {
+              const score = m.scores[dim as keyof typeof m.scores]
+              return (
+                <div key={m.nombre} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 100, fontSize: 11, color: 'rgba(255,255,255,0.5)', textAlign: 'right', flexShrink: 0 }}>
+                    {m.nombre.split(' ')[0]}
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 14, overflow: 'hidden', position: 'relative' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 4,
+                      width: `${score}%`,
+                      background: m.color,
+                      opacity: 0.7,
+                      transition: 'width 0.5s ease',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: m.color, width: 28, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {score}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Fraud Timeline ─────────────────────────────────────
+
+function FraudTimeline() {
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32,
+    }}>
+      <div style={{ position: 'relative', paddingLeft: 28 }}>
+        {/* Vertical line */}
+        <div style={{
+          position: 'absolute', left: 8, top: 6, bottom: 6, width: 2,
+          background: 'linear-gradient(180deg, rgba(16,185,129,0.3), rgba(239,68,68,0.5), rgba(245,158,11,0.3))',
+        }} />
+
+        {FRAUD_TIMELINE.map((event, i) => {
+          const dotColor = event.status === 'normal' ? '#10b981' : event.status === 'alert' ? '#ef4444' : '#f59e0b'
+          const bgColor = event.status === 'normal'
+            ? 'rgba(16,185,129,0.06)'
+            : event.status === 'alert'
+              ? 'rgba(239,68,68,0.06)'
+              : 'rgba(245,158,11,0.06)'
+          const borderColor = event.status === 'normal'
+            ? 'rgba(16,185,129,0.15)'
+            : event.status === 'alert'
+              ? 'rgba(239,68,68,0.2)'
+              : 'rgba(245,158,11,0.2)'
+          const icon = event.status === 'normal' ? '\u2705' : event.status === 'alert' ? '\uD83D\uDD34' : '\uD83D\uDFE1'
+
+          return (
+            <div key={i} style={{ position: 'relative', marginBottom: i < FRAUD_TIMELINE.length - 1 ? 12 : 0 }}>
+              {/* Dot */}
+              <div style={{
+                position: 'absolute', left: -24, top: 14, width: 12, height: 12, borderRadius: '50%',
+                background: dotColor, border: '2px solid #111118',
+                boxShadow: `0 0 8px ${dotColor}40`,
+              }} />
+              {/* Card */}
+              <div style={{
+                background: bgColor, border: `1px solid ${borderColor}`,
+                borderRadius: 10, padding: '12px 16px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: dotColor }}>
+                      {event.status === 'normal' ? 'Normal' : event.status === 'alert' ? 'ALERTA' : 'ACCION'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{event.time}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                  {event.label}
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}> — {event.location}</span>
+                  {event.actor && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}> ({event.actor})</span>}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Inventory Panel ────────────────────────────────────
+
+function InventoryPanel() {
+  return (
+    <div style={{
+      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      marginBottom: 32,
+    }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+        {INVENTORY_ITEMS.map(item => {
+          const pct = Math.round((item.actual / item.max) * 100)
+          const barColor = item.status === 'critical'
+            ? '#ef4444'
+            : item.status === 'warning'
+              ? '#f59e0b'
+              : '#10b981'
+          const bgColor = item.status === 'critical'
+            ? 'rgba(239,68,68,0.06)'
+            : item.status === 'warning'
+              ? 'rgba(245,158,11,0.06)'
+              : 'rgba(16,185,129,0.06)'
+          const statusIcon = item.status === 'critical' ? '\uD83D\uDD34' : item.status === 'warning' ? '\uD83D\uDFE1' : '\uD83D\uDFE2'
+
+          return (
+            <div key={item.nombre} style={{
+              background: bgColor, borderRadius: 10, padding: '14px 16px',
+              border: `1px solid ${barColor}20`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>{statusIcon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{item.nombre}</span>
+                </div>
+                <span style={{ fontSize: 12, color: barColor, fontWeight: 600 }}>{item.note}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4,
+                    width: `${pct}%`,
+                    background: barColor,
+                    transition: 'width 0.5s ease',
+                  }} />
+                </div>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  {item.actual}/{item.max} {item.unit} ({pct}%)
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Chat IA ────────────────────────────────────────────
 
 const SUGGESTED_QUESTIONS = [
   '¿Cómo vamos hoy?',
