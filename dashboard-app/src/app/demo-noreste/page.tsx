@@ -517,26 +517,89 @@ export default function DemoNorestePage() {
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
             Todo esto corriendo con los datos reales de tus 8 sucursales. Implementacion en 48 horas.
           </p>
-          <a href="https://wa.me/528115324371" target="_blank" rel="noopener" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 10,
-            padding: '16px 36px', background: '#25D366', color: '#fff',
-            borderRadius: 14, fontWeight: 800, fontSize: 17, textDecoration: 'none',
-            boxShadow: '0 4px 24px rgba(37,211,102,0.3)',
-          }}>
-            <MessageSquare size={20} />
-            Agenda demo en vivo
-          </a>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 24, flexWrap: 'wrap' }}>
-            {[
-              'Implementacion en 48 horas',
-              '$4,999/mes por sucursal',
-              'Sin contrato',
-            ].map(item => (
-              <span key={item} style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                {item}
-              </span>
-            ))}
+          {/* Pricing Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto 40px', textAlign: 'left' }}>
+            {/* Esencial */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Esencial</span>
+              <div style={{ marginTop: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$1,499</span>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {['POS completo (órdenes, mesas, cobro)', 'KDS cocina y barra', 'Dashboard de ventas', 'Corte de caja', 'Soporte por chat IA'].map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+              <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Esencial" target="_blank" rel="noopener" style={{
+                display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+              }}>Contactar</a>
+            </div>
+
+            {/* Pro — recommended */}
+            <div style={{ background: 'rgba(16,185,129,0.05)', border: '2px solid rgba(16,185,129,0.3)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#10b981', color: '#fff', fontSize: 11, fontWeight: 800, padding: '4px 16px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Recomendado
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: 1 }}>Pro</span>
+              <div style={{ marginTop: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$2,499</span>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {['Todo lo de Esencial +', '30 agentes de IA 24/7', 'Anti-fraude automático', 'Food cost por platillo', 'Predicción de cierre', 'Coaching a meseros', 'Inventario con recetas', 'CFDI facturación', 'Delivery (Uber Eats + Rappi)'].map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#10b981' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+              <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Pro" target="_blank" rel="noopener" style={{
+                display: 'block', textAlign: 'center', padding: '14px 0', borderRadius: 10,
+                background: '#10b981', color: '#fff', fontWeight: 800, fontSize: 15, textDecoration: 'none',
+                boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
+              }}>Agendar demo</a>
+            </div>
+
+            {/* Enterprise */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 1 }}>Enterprise</span>
+              <div style={{ marginTop: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$3,499</span>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {['Todo lo de Pro +', 'Dashboard multi-sucursal', 'Comparativa entre sucursales', 'Onboarding dedicado (48 hrs)', 'Soporte prioritario', 'API abierta', 'Reportes ejecutivos semanales', 'Capacitación presencial'].map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
+                    <span style={{ color: '#a78bfa', fontWeight: 700 }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+              <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Enterprise" target="_blank" rel="noopener" style={{
+                display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+              }}>Contactar</a>
+            </div>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, marginBottom: 32, textAlign: 'center' }}>
+            Sin contrato a largo plazo · Implementación en 48 horas · Cancela cuando quieras
+          </p>
+
+          <div style={{ textAlign: 'center' }}>
+            <a href="https://wa.me/528115324371" target="_blank" rel="noopener" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              padding: '16px 36px', background: '#25D366', color: '#fff',
+              borderRadius: 14, fontWeight: 800, fontSize: 17, textDecoration: 'none',
+              boxShadow: '0 4px 24px rgba(37,211,102,0.3)',
+            }}>
+              <MessageSquare size={20} />
+              Hablar con Daniel por WhatsApp
+            </a>
           </div>
         </div>
 
