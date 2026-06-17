@@ -989,8 +989,10 @@ export const MESEROS = [
   'Oscar Rios Alvarado',
   'Mauricio Rodriguez Rodriguez',
   'Alexis Alejandro Ocampo Vera',
-  'Christopher Antonio Sanchez',
-  'Mario Garcia Ramirez',
+  'Aldo Ruiz Ramirez',
+  'Mariana Carolina Salas Alva',
+  'Mario García Ramírez',
+  'MESERO EVENTO',
 ]
 
 // IVA_RATE lives in pos-constants.ts (single source of truth)
