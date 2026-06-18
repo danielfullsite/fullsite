@@ -13,6 +13,7 @@ import {
   saveOrder,
   logAudit,
   deductIngredientsForOrder,
+  reverseIngredientDeduction,
   deductMarketStockForOrder,
   getRecipes,
   getIngredients,
@@ -1230,10 +1231,13 @@ function POSContent() {
   const [mesero, setMesero] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
+        // First check localStorage (dropdown selection persists across reloads)
+        const fromDropdown = localStorage.getItem('pos_mesero')
+        if (fromDropdown && MESEROS.includes(fromDropdown)) return fromDropdown
+        // Fallback: match from staff session
         const saved = sessionStorage.getItem('pos_staff')
         if (saved) {
           const s = JSON.parse(saved)
-          // Match staff name to MESEROS list
           const match = MESEROS.find(m => m.toLowerCase().includes(s.name?.toLowerCase()?.split(' ')[0] || ''))
           if (match) return match
         }
@@ -1853,7 +1857,15 @@ function POSContent() {
       before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
       after: { qty: 0, cancelled: !voided, voided },
     })
+    // Reverse inventory deduction for cancelled items (not voided — voided means never made)
+    if (!voided && prepared) {
+      reverseIngredientDeduction(cancellingItem, orderId, managerName, reason)
+        .catch(() => { /* inventory reversal failed but cancellation proceeds */ })
+    }
     if (voided) {
+      // Voided = never made, but ingredients were deducted at send-to-kitchen — reverse them
+      reverseIngredientDeduction(cancellingItem, orderId, managerName, reason)
+        .catch(() => { /* inventory reversal failed but void proceeds */ })
       setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
     } else {
       setCancelledItems(prev => new Set(prev).add(cancellingItem.id))

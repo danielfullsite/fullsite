@@ -1664,6 +1664,66 @@ export async function deductIngredientsForOrder(
   }
 }
 
+/** Reverse ingredient deduction for a cancelled item (return stock) */
+export async function reverseIngredientDeduction(
+  item: OrderItem,
+  orderId: string,
+  actor: string,
+  reason: string,
+): Promise<void> {
+  try {
+    const recipes = await getRecipes()
+    const inventory = await getInventory()
+    const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
+
+    const normalizeRecipeName = (n: string) => n.toLowerCase()
+      .replace(/^sprw\s*-\s*/i, '').replace(/\s*\(.*?\)\s*/g, ' ')
+      .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
+      .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
+      .replace(/\s+/g, ' ').trim()
+
+    const recipesByName = new Map<string, typeof recipes>()
+    for (const r of recipes) {
+      const key = r.menu_item_name.toLowerCase()
+      if (!recipesByName.has(key)) recipesByName.set(key, [])
+      recipesByName.get(key)!.push(r)
+      const norm = normalizeRecipeName(r.menu_item_name)
+      if (!recipesByName.has(norm)) recipesByName.set(norm, [])
+      recipesByName.get(norm)!.push(r)
+    }
+
+    const itemName = item.nombre.toLowerCase()
+    const aliases = RECIPE_ALIASES[itemName]
+    let recipeRows: typeof recipes = []
+    if (aliases) {
+      for (const alias of aliases) {
+        const rows = recipesByName.get(alias.toLowerCase())
+        if (rows && rows.length > 0) { recipeRows = rows; break }
+      }
+    }
+    if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
+    if (recipeRows.length === 0) recipeRows = recipesByName.get(normalizeRecipeName(item.nombre)) ?? []
+
+    for (const row of recipeRows) {
+      const qty = row.quantity * (item.cantidad || 1)
+      const inv = invMap.get(row.ingredient_id)
+      if (inv) {
+        await updateInventoryStock(row.ingredient_id, inv.stock + qty)
+        await logInventoryMovement({
+          ingredient_id: row.ingredient_id,
+          movement_type: 'adjustment',
+          quantity: qty,
+          order_id: orderId,
+          actor,
+          notes: `Cancelacion: ${item.nombre} — ${reason}`,
+        })
+      }
+    }
+  } catch (err) {
+    console.warn('[reverseIngredientDeduction] Failed:', err)
+  }
+}
+
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.${_getClientId()}&order=created_at.desc&limit=${limit}`,
