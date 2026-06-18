@@ -216,10 +216,14 @@ const formatMXN = (n: number) => `$${Math.abs(n).toLocaleString('es-MX')}`
 
 // ─── PAGE ────────────────────────────────────────────────
 
-const themes = {
+const themes: Record<'dark' | 'light', Record<string, string>> = {
   dark: {
-    bg: '#0a0a0f', text: '#fff', textSoft: 'rgba(255,255,255,0.6)', textMuted: 'rgba(255,255,255,0.45)', textFaint: 'rgba(255,255,255,0.35)',
+    bg: '#0a0a0f', text: '#fff', textStrong: 'rgba(255,255,255,0.8)', textSoft: 'rgba(255,255,255,0.6)',
+    textMuted: 'rgba(255,255,255,0.45)', textFaint: 'rgba(255,255,255,0.35)',
+    text70: 'rgba(255,255,255,0.7)', text50: 'rgba(255,255,255,0.5)', text40: 'rgba(255,255,255,0.4)', text30: 'rgba(255,255,255,0.3)',
     card: 'rgba(255,255,255,0.03)', cardBorder: 'rgba(255,255,255,0.06)', line: 'rgba(255,255,255,0.06)',
+    surfaceLight: 'rgba(255,255,255,0.04)', surfaceHover: 'rgba(255,255,255,0.08)', surfaceSubtle: 'rgba(255,255,255,0.05)',
+    surfaceFaint: 'rgba(255,255,255,0.02)', surface10: 'rgba(255,255,255,0.1)', surface15: 'rgba(255,255,255,0.15)', surface20: 'rgba(255,255,255,0.2)',
     headerGrad: 'linear-gradient(180deg, rgba(16,185,129,0.04) 0%, transparent 100%)',
     pillBg: 'rgba(16,185,129,0.1)', pillBorder: 'rgba(16,185,129,0.2)', pillText: 'rgba(255,255,255,0.6)',
     kpiBg: 'rgba(255,255,255,0.03)', kpiBorder: 'rgba(255,255,255,0.06)',
@@ -227,8 +231,12 @@ const themes = {
     barBg: 'rgba(255,255,255,0.06)', toggleBg: 'rgba(255,255,255,0.08)', toggleText: 'rgba(255,255,255,0.5)',
   },
   light: {
-    bg: '#f8f9fa', text: '#1a1a2e', textSoft: '#4a4a5a', textMuted: '#6b7280', textFaint: '#9ca3af',
+    bg: '#f8f9fa', text: '#1a1a2e', textStrong: '#1f2937', textSoft: '#4a4a5a',
+    textMuted: '#6b7280', textFaint: '#9ca3af',
+    text70: '#374151', text50: '#6b7280', text40: '#9ca3af', text30: '#d1d5db',
     card: '#ffffff', cardBorder: '#e5e7eb', line: '#e5e7eb',
+    surfaceLight: '#f3f4f6', surfaceHover: '#e5e7eb', surfaceSubtle: '#f9fafb',
+    surfaceFaint: '#f9fafb', surface10: '#e5e7eb', surface15: '#d1d5db', surface20: '#d1d5db',
     headerGrad: 'linear-gradient(180deg, rgba(16,185,129,0.06) 0%, transparent 100%)',
     pillBg: 'rgba(16,185,129,0.08)', pillBorder: 'rgba(16,185,129,0.2)', pillText: '#374151',
     kpiBg: '#ffffff', kpiBorder: '#e5e7eb',
@@ -315,7 +323,7 @@ export default function DemoNorestePage() {
 
         {/* ── NEW: Heatmap ── */}
         <SectionTitle title="Heatmap de Demanda por Hora" icon={Flame} />
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+        <div style={{ fontSize: 13, color: _currentTheme.text40, marginBottom: 16, marginTop: -16 }}>
           Identifica horas pico por sucursal para optimizar staffing
         </div>
         <HeatmapSection />
@@ -326,7 +334,7 @@ export default function DemoNorestePage() {
 
         {/* ── NEW: Mesero Performance Radar ── */}
         <SectionTitle title="Performance — Top 3 Meseros" icon={UserCheck} />
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+        <div style={{ fontSize: 13, color: _currentTheme.text40, marginBottom: 16, marginTop: -16 }}>
           Comparativo multidimensional: ventas, ticket promedio, propinas, upselling y velocidad
         </div>
         <MeseroRadar />
@@ -340,7 +348,7 @@ export default function DemoNorestePage() {
         <div style={{ background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${t.cardBorder}`, marginBottom: 32, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <tr style={{ borderBottom: `1px solid ${_currentTheme.surfaceHover}` }}>
                 {['#', 'Mesero', 'Sucursal', 'Ventas', 'Tickets', 'Ticket Prom.'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: t.textFaint, fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
@@ -348,17 +356,17 @@ export default function DemoNorestePage() {
             </thead>
             <tbody>
               {MESEROS.map((m, i) => (
-                <tr key={m.nombre} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <tr key={m.nombre} style={{ borderBottom: `1px solid ${_currentTheme.surfaceLight}` }}>
                   <td style={{ padding: '12px', width: 40 }}>
                     <span style={{
                       width: 24, height: 24, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 11, fontWeight: 700,
-                      background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(255,255,255,0.08)',
-                      color: i < 3 ? '#000' : 'rgba(255,255,255,0.5)',
+                      background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : _currentTheme.surfaceHover,
+                      color: i < 3 ? '#000' : _currentTheme.text50,
                     }}>{i + 1}</span>
                   </td>
                   <td style={{ padding: '12px', fontSize: 13, fontWeight: 600 }}>{m.nombre}</td>
-                  <td style={{ padding: '12px', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{m.sucursal}</td>
+                  <td style={{ padding: '12px', fontSize: 12, color: _currentTheme.text50 }}>{m.sucursal}</td>
                   <td style={{ padding: '12px', fontSize: 14, fontWeight: 700, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{formatMXN(m.ventas)}</td>
                   <td style={{ padding: '12px', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{m.tickets}</td>
                   <td style={{ padding: '12px', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{formatMXN(m.tp)}</td>
@@ -379,18 +387,18 @@ export default function DemoNorestePage() {
                 <span style={{
                   width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 12, fontWeight: 700, flexShrink: 0,
-                  background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(255,255,255,0.06)',
-                  color: i < 3 ? '#000' : 'rgba(255,255,255,0.4)',
+                  background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : _currentTheme.barBg,
+                  color: i < 3 ? '#000' : _currentTheme.text40,
                 }}>{i + 1}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nombre}</span>
                     <div style={{ display: 'flex', gap: 16, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>{p.qty} vendidos</span>
+                      <span style={{ fontSize: 12, color: _currentTheme.text40, fontVariantNumeric: 'tabular-nums' }}>{p.qty} vendidos</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981', fontVariantNumeric: 'tabular-nums', minWidth: 80, textAlign: 'right' }}>{formatMXN(p.revenue)}</span>
                     </div>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 5, overflow: 'hidden' }}>
+                  <div style={{ background: _currentTheme.surfaceLight, borderRadius: 4, height: 5, overflow: 'hidden' }}>
                     <div style={{
                       height: '100%', borderRadius: 4, width: `${pct}%`,
                       background: i === 0 ? '#10b981' : 'rgba(16,185,129,0.4)',
@@ -408,7 +416,7 @@ export default function DemoNorestePage() {
 
         {/* ── Section: AI Agents ── */}
         <SectionTitle title="Agentes de IA — Alertas en Vivo" icon={Bot} />
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+        <div style={{ fontSize: 13, color: _currentTheme.text40, marginBottom: 16, marginTop: -16 }}>
           6 agentes monitoreando las 8 sucursales 24/7. Estas son las alertas de hoy.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14, marginBottom: 32 }}>
@@ -428,10 +436,10 @@ export default function DemoNorestePage() {
                   <span style={{ fontSize: 16 }}>{a.emoji}</span>
                   <span style={{ fontWeight: 700, fontSize: 13, color: a.color, letterSpacing: 0.5 }}>{a.name}</span>
                 </div>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{a.time}</span>
+                <span style={{ fontSize: 11, color: _currentTheme.text30 }}>{a.time}</span>
               </div>
               <div style={{
-                fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6,
+                fontSize: 13, color: _currentTheme.text70, lineHeight: 1.6,
                 padding: '12px 14px', background: 'rgba(0,0,0,0.2)', borderRadius: 8,
               }}>
                 {a.message}
@@ -442,7 +450,7 @@ export default function DemoNorestePage() {
 
         {/* ── Section: POS Preview ── */}
         <SectionTitle title="Vista Previa del POS" icon={Monitor} />
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16, marginTop: -16 }}>
+        <div style={{ fontSize: 13, color: _currentTheme.text40, marginBottom: 16, marginTop: -16 }}>
           Asi se veria el punto de venta en cada sucursal. Corre en cualquier tablet o computadora.
         </div>
         <div style={{
@@ -456,10 +464,10 @@ export default function DemoNorestePage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontWeight: 800, fontSize: 14 }}>NORESTE GRILL</span>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Paseo Tec</span>
+              <span style={{ color: _currentTheme.text30, fontSize: 12 }}>Paseo Tec</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Mesa 5 &middot; Luis F.</span>
+              <span style={{ fontSize: 12, color: _currentTheme.text40 }}>Mesa 5 &middot; Luis F.</span>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
             </div>
           </div>
@@ -472,9 +480,9 @@ export default function DemoNorestePage() {
                 {POS_CATEGORIES.map((c, i) => (
                   <span key={c.name} style={{
                     padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                    background: i === 0 ? c.color : 'rgba(255,255,255,0.06)',
-                    color: i === 0 ? '#fff' : 'rgba(255,255,255,0.5)',
-                    border: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                    background: i === 0 ? c.color : _currentTheme.barBg,
+                    color: i === 0 ? '#fff' : _currentTheme.text50,
+                    border: i === 0 ? 'none' : `1px solid ${_currentTheme.surfaceHover}`,
                   }}>{c.name}</span>
                 ))}
               </div>
@@ -485,7 +493,7 @@ export default function DemoNorestePage() {
                     background: t.card, border: `1px solid ${t.cardBorder}`,
                     borderRadius: 10, padding: '12px 10px', cursor: 'default',
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6, lineHeight: 1.3, color: 'rgba(255,255,255,0.8)' }}>{item.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6, lineHeight: 1.3, color: _currentTheme.textStrong }}>{item.name}</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#10b981' }}>{formatMXN(item.price)}</div>
                   </div>
                 ))}
@@ -503,7 +511,7 @@ export default function DemoNorestePage() {
             </div>
 
             {/* Order panel */}
-            <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', padding: 16, background: 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ borderLeft: `1px solid ${_currentTheme.barBg}`, padding: 16, background: 'rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Orden Actual</div>
               {[
                 { name: '5 Tacos Arrachera', qty: 2, price: 390 },
@@ -514,13 +522,13 @@ export default function DemoNorestePage() {
               ].map(item => (
                 <div key={item.name} style={{
                   display: 'flex', justifyContent: 'space-between', padding: '7px 0',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12,
+                  borderBottom: `1px solid ${_currentTheme.surfaceLight}`, fontSize: 12,
                 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)' }}>{item.qty}x {item.name}</span>
+                  <span style={{ color: _currentTheme.text70 }}>{item.qty}x {item.name}</span>
                   <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatMXN(item.price)}</span>
                 </div>
               ))}
-              <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14 }}>
+              <div style={{ marginTop: 'auto', borderTop: `1px solid ${_currentTheme.surface10}`, paddingTop: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
                   <span>TOTAL</span>
                   <span>{formatMXN(1483)}</span>
@@ -558,11 +566,11 @@ export default function DemoNorestePage() {
           {/* Pricing Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto 40px', textAlign: 'left' }}>
             {/* Esencial */}
-            <div style={{ background: t.card, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: t.card, border: `1px solid ${_currentTheme.surfaceHover}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Esencial</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$1,499</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+                <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                 {[
@@ -581,7 +589,7 @@ export default function DemoNorestePage() {
               </div>
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Esencial" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
-                background: t.barBg, border: '1px solid rgba(255,255,255,0.1)',
+                background: t.barBg, border: `1px solid ${_currentTheme.surface10}`,
                 color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
@@ -594,7 +602,7 @@ export default function DemoNorestePage() {
               <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: 1 }}>Pro</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$2,499</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+                <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                 {[
@@ -610,7 +618,7 @@ export default function DemoNorestePage() {
                   'Checador de asistencia con huella digital',
                   'Historial y auditoría de cada acción',
                 ].map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#10b981' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#10b981' : _currentTheme.textSoft, fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
                   </div>
                 ))}
@@ -623,11 +631,11 @@ export default function DemoNorestePage() {
             </div>
 
             {/* Enterprise */}
-            <div style={{ background: t.card, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: t.card, border: `1px solid ${_currentTheme.surfaceHover}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 1 }}>Enterprise</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$3,499</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/mes por sucursal</span>
+                <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                 {[
@@ -642,20 +650,20 @@ export default function DemoNorestePage() {
                   'Capacitación presencial a tu equipo en cada sucursal',
                   'Gerente de cuenta asignado',
                 ].map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: f.startsWith('Todo') ? '#a78bfa' : _currentTheme.textSoft, fontWeight: f.startsWith('Todo') ? 700 : 400 }}>
                     <span style={{ color: '#a78bfa', fontWeight: 700 }}>✓</span> {f}
                   </div>
                 ))}
               </div>
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Enterprise" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
-                background: t.barBg, border: '1px solid rgba(255,255,255,0.1)',
+                background: t.barBg, border: `1px solid ${_currentTheme.surface10}`,
                 color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, marginBottom: 32, textAlign: 'center' }}>
+          <p style={{ color: _currentTheme.text30, fontSize: 13, marginBottom: 32, textAlign: 'center' }}>
             Sin contrato a largo plazo · Implementación en 48 horas · Cancela cuando quieras
           </p>
 
@@ -675,8 +683,8 @@ export default function DemoNorestePage() {
         {/* Footer */}
         <div style={{
           textAlign: 'center', padding: '24px 0 40px',
-          borderTop: '1px solid rgba(255,255,255,0.04)',
-          color: 'rgba(255,255,255,0.2)', fontSize: 12,
+          borderTop: `1px solid ${_currentTheme.surfaceLight}`,
+          color: _currentTheme.surface20, fontSize: 12,
         }}>
           fullsite.mx — El copiloto operativo para restaurantes
         </div>
@@ -707,14 +715,14 @@ function KPICard({ label, value, sub, icon: Icon, accent, positive, t }: {
           <div style={{ color: _currentTheme.textMuted, fontSize: 12, marginBottom: 8, fontWeight: 500 }}>{label}</div>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, color: accent }}>{value}</div>
           {sub && (
-            <div style={{ color: positive ? '#10b981' : 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ color: positive ? '#10b981' : _currentTheme.text30, fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
               {positive && <ArrowUpRight size={12} />}
               {sub}
             </div>
           )}
         </div>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={18} style={{ color: 'rgba(255,255,255,0.2)' }} />
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: _currentTheme.surfaceLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon size={18} style={{ color: _currentTheme.surface20 }} />
         </div>
       </div>
     </div>
@@ -764,8 +772,8 @@ function RevenueTrendChart() {
           const y = padT + chartH - ((v - minVal) / (maxVal - minVal)) * chartH
           return (
             <g key={v}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-              <text x={padL - 8} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="10" fontFamily="system-ui">
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={_currentTheme.barBg} strokeWidth="1" />
+              <text x={padL - 8} y={y + 4} textAnchor="end" fill={_currentTheme.text30} fontSize="10" fontFamily="system-ui">
                 ${(v / 1000).toFixed(0)}K
               </text>
             </g>
@@ -779,10 +787,10 @@ function RevenueTrendChart() {
         {points.map((p, i) => (
           <g key={i}>
             <circle cx={p.x} cy={p.y} r="4" fill="#0a0a0f" stroke="#10b981" strokeWidth="2" />
-            <text x={p.x} y={p.y - 12} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="10" fontWeight="600" fontFamily="system-ui">
+            <text x={p.x} y={p.y - 12} textAnchor="middle" fill={_currentTheme.textSoft} fontSize="10" fontWeight="600" fontFamily="system-ui">
               ${(p.ventas / 1000).toFixed(0)}K
             </text>
-            <text x={p.x} y={H - 8} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="11" fontFamily="system-ui">
+            <text x={p.x} y={H - 8} textAnchor="middle" fill={_currentTheme.text40} fontSize="11" fontFamily="system-ui">
               {p.dia}
             </text>
           </g>
@@ -821,7 +829,7 @@ function SucursalCard({ sucursal, rank }: {
           ) : (
             <span style={{
               width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+              fontSize: 11, fontWeight: 700, background: _currentTheme.surfaceHover, color: _currentTheme.text50,
             }}>{rank}</span>
           )}
           <span style={{ fontSize: 14, fontWeight: 600 }}>{sucursal.nombre}</span>
@@ -845,7 +853,7 @@ function SucursalCard({ sucursal, rank }: {
           <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
             {formatMXN(sucursal.ventas)}
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: _currentTheme.text40, marginTop: 2 }}>
             TP: {formatMXN(sucursal.tp)}
           </div>
         </div>
@@ -855,7 +863,7 @@ function SucursalCard({ sucursal, rank }: {
           display: 'flex', alignItems: 'center', gap: 2,
         }}>
           {sucursal.vsProm >= 0 ? '+' : ''}{sucursal.vsProm}%
-          <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>vs prom</span>
+          <span style={{ fontSize: 10, fontWeight: 400, color: _currentTheme.text30, marginLeft: 4 }}>vs prom</span>
         </div>
       </div>
     </div>
@@ -910,13 +918,13 @@ function HeatmapSection() {
         ))}
         {/* Legend */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Baja</span>
+          <span style={{ fontSize: 10, color: _currentTheme.text30 }}>Baja</span>
           <div style={{ display: 'flex', gap: 2 }}>
             {[0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map((a, i) => (
               <div key={i} style={{ width: 16, height: 10, borderRadius: 2, background: `rgba(16,185,129,${a})` }} />
             ))}
           </div>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Alta</span>
+          <span style={{ fontSize: 10, color: _currentTheme.text30 }}>Alta</span>
         </div>
       </div>
     </div>
@@ -953,7 +961,7 @@ function WaterfallChart() {
                   width: 10, height: 10, borderRadius: 2, flexShrink: 0,
                   background: isNeg ? '#ef4444' : isResult ? '#10b981' : '#10b981',
                 }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{item.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: _currentTheme.textStrong }}>{item.label}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{
@@ -971,7 +979,7 @@ function WaterfallChart() {
                 </span>
               </div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, height: 12, overflow: 'hidden', position: 'relative' }}>
+            <div style={{ background: _currentTheme.surfaceLight, borderRadius: 6, height: 12, overflow: 'hidden', position: 'relative' }}>
               <div style={{
                 height: '100%', borderRadius: 6,
                 width: `${barWidth}%`,
@@ -1008,7 +1016,7 @@ function MeseroRadar() {
         {MESERO_RADAR.map(m => (
           <div key={m.nombre} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: m.color }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{m.nombre}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: _currentTheme.textStrong }}>{m.nombre}</span>
           </div>
         ))}
       </div>
@@ -1016,16 +1024,16 @@ function MeseroRadar() {
       {/* Dimension rows */}
       {dimensions.map(dim => (
         <div key={dim} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontWeight: 500 }}>{dim}</div>
+          <div style={{ fontSize: 12, color: _currentTheme.text40, marginBottom: 6, fontWeight: 500 }}>{dim}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {MESERO_RADAR.map(m => {
               const score = m.scores[dim as keyof typeof m.scores]
               return (
                 <div key={m.nombre} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 100, fontSize: 11, color: 'rgba(255,255,255,0.5)', textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ width: 100, fontSize: 11, color: _currentTheme.text50, textAlign: 'right', flexShrink: 0 }}>
                     {m.nombre.split(' ')[0]}
                   </div>
-                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 14, overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ flex: 1, background: _currentTheme.surfaceLight, borderRadius: 4, height: 14, overflow: 'hidden', position: 'relative' }}>
                     <div style={{
                       height: '100%', borderRadius: 4,
                       width: `${score}%`,
@@ -1098,10 +1106,10 @@ function FraudTimeline() {
                   </div>
                   <span style={{ fontSize: 12, color: _currentTheme.textFaint, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{event.time}</span>
                 </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: _currentTheme.text70, lineHeight: 1.5 }}>
                   {event.label}
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}> — {event.location}</span>
-                  {event.actor && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}> ({event.actor})</span>}
+                  <span style={{ color: _currentTheme.text40, fontSize: 12 }}> — {event.location}</span>
+                  {event.actor && <span style={{ color: _currentTheme.text40, fontSize: 12 }}> ({event.actor})</span>}
                 </div>
               </div>
             </div>
@@ -1156,7 +1164,7 @@ function InventoryPanel() {
                     transition: 'width 0.5s ease',
                   }} />
                 </div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, color: _currentTheme.text50, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {item.actual}/{item.max} {item.unit} ({pct}%)
                 </span>
               </div>
@@ -1207,13 +1215,13 @@ function NoresteChat() {
   }
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${_currentTheme.cardBorder}`, borderRadius: 20, overflow: 'hidden' }}>
+    <div style={{ background: _currentTheme.surfaceFaint, border: `1px solid ${_currentTheme.cardBorder}`, borderRadius: 20, overflow: 'hidden' }}>
       {/* Messages area */}
       <div ref={scrollRef} style={{ height: 360, overflowY: 'auto', padding: 20 }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 40 }}>
-            <Bot size={40} style={{ color: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 24 }}>
+            <Bot size={40} style={{ color: _currentTheme.surface15, margin: '0 auto 16px' }} />
+            <p style={{ color: _currentTheme.text40, fontSize: 15, marginBottom: 24 }}>
               Preguntale cualquier cosa a Noreste Grill
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
@@ -1243,8 +1251,8 @@ function NoresteChat() {
                 )}
                 <div style={{
                   maxWidth: '75%', padding: '10px 16px', borderRadius: 16, fontSize: 14, lineHeight: 1.5,
-                  background: m.role === 'user' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
-                  border: m.role === 'user' ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                  background: m.role === 'user' ? 'rgba(16,185,129,0.15)' : _currentTheme.surfaceSubtle,
+                  border: m.role === 'user' ? '1px solid rgba(16,185,129,0.3)' : `1px solid ${_currentTheme.surfaceHover}`,
                   whiteSpace: 'pre-wrap',
                 }}>
                   {m.text}
@@ -1256,7 +1264,7 @@ function NoresteChat() {
                 <div style={{ width: 32, height: 32, borderRadius: 16, background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Loader2 size={16} style={{ color: '#10b981', animation: 'spin 1s linear infinite' }} />
                 </div>
-                <div style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ padding: '10px 16px', borderRadius: 16, background: _currentTheme.surfaceSubtle, border: `1px solid ${_currentTheme.surfaceHover}`, fontSize: 14, color: _currentTheme.text40 }}>
                   Analizando datos...
                 </div>
               </div>
@@ -1273,7 +1281,7 @@ function NoresteChat() {
           onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
           placeholder="Pregunta algo... ej: ¿cuánto vendimos de quesabirrias?"
           style={{
-            flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            flex: 1, background: _currentTheme.surfaceSubtle, border: `1px solid ${_currentTheme.surface10}`,
             borderRadius: 12, padding: '12px 16px', color: '#fff', fontSize: 14, outline: 'none',
           }}
         />
