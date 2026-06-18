@@ -120,7 +120,35 @@ def get_sales_by_user(session, start, end):
     r = session.post(f"{WANSOFT_URL}/Reports/SalesByUser", data={
         "subsidiaryId": SUBSIDIARY_ID, "startDate": start, "endDate": end,
     })
-    return parse_html_report(r.text)
+    # Parse with extra columns — SalesByUser has: Name, Tickets, AvgTicket, Total, Propinas
+    soup = BeautifulSoup(r.text, "html.parser")
+    rows = soup.select(".rowReport")
+    results = []
+    for row in rows:
+        cols = [c.text.strip() for c in row.select("div")]
+        if len(cols) >= 4:
+            name = cols[0]
+            try:
+                total = float(cols[3].replace("$", "").replace(",", ""))
+            except ValueError:
+                total = 0
+            qty = 0
+            try:
+                qty = int(cols[1])
+            except (ValueError, IndexError):
+                pass
+            # Propinas may be in cols[4] or cols[5]
+            propinas = 0
+            for ci in range(4, min(len(cols), 7)):
+                try:
+                    val = float(cols[ci].replace("$", "").replace(",", ""))
+                    if 0 < val < total:  # propinas should be less than total sales
+                        propinas = val
+                        break
+                except ValueError:
+                    pass
+            results.append({"name": name, "total": total, "qty": qty, "propinas": propinas})
+    return results
 
 
 def get_sales_by_group(session, start, end):
@@ -474,8 +502,12 @@ def main():
         print(f"[intraday] Consolidated: TotalSales={consolidated.get('TotalSales')}, GrossSales={consolidated.get('TotalGrossSales')}, Discounts={consolidated.get('TotalDiscounts')}, Tickets={consolidated.get('TotalTickets', 'N/A')}, Personas={consolidated.get('TotalPersons', 'N/A')}")
         print(f"[intraday] OrderTypes breakdown: {order_types}")
         user_sum = sum(float(str(u.get("total", "0")).replace(",", "").replace("$", "")) for u in users) if users else 0
-        print(f"[intraday] Data: {len(users)} users (sum=${user_sum:,.0f}), {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
+        user_propinas = sum(u.get("propinas", 0) for u in users) if users else 0
+        print(f"[intraday] Data: {len(users)} users (sum=${user_sum:,.0f}, propinas=${user_propinas:,.0f}), {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
         print(f"[intraday] API TotalSales=${consolidated.get('TotalSales', 0):,.0f} vs UserSum=${user_sum:,.0f} (diff=${user_sum - (consolidated.get('TotalSales', 0) or 0):,.0f} = Market)")
+        # Debug: log first user's columns to understand SalesByUser structure
+        if users and len(users) > 0:
+            print(f"[intraday] SalesByUser sample: {users[0]}")
 
         # Hora pico via snapshots acumulativos: Wansoft NO tiene endpoint de
         # ventas por hora (SalesByHours/SalesByHour/etc = 200 pero 0 filas,
@@ -650,10 +682,12 @@ def main():
             except Exception as e:
                 print(f"[intraday] Payment methods error: {e}")
 
-            # Propinas — DISABLED: wansoft_kpis has stale value $8587.99 that gets
-            # copied infinitely. Only wansoft_deep_scraper should write propinas_total
-            # when it gets REAL data from the SalesByUser endpoint.
-            # DO NOT copy from wansoft_kpis — it's a stale accumulator, not daily.
+            # Propinas — from SalesByUser per-mesero propinas field
+            if users:
+                total_propinas = sum(u.get("propinas", 0) for u in users)
+                if total_propinas > 0:
+                    update_data["propinas_total"] = round(total_propinas, 2)
+                    print(f"[intraday] Propinas: ${total_propinas:,.2f}")
 
             # Ticket promedio — ventas / tickets (matches Wansoft app definition)
             ventas_total = consolidated.get("TotalSales", 0) or 0
