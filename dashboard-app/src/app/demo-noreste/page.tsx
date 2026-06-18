@@ -569,7 +569,7 @@ export default function DemoNorestePage() {
             <div style={{ background: t.card, border: `1px solid ${_currentTheme.surfaceHover}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Esencial</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
-                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$1,499</span>
+                <span style={{ fontSize: 36, fontWeight: 900, color: _currentTheme.text }}>$1,499</span>
                 <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
@@ -590,7 +590,7 @@ export default function DemoNorestePage() {
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Esencial" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
                 background: t.barBg, border: `1px solid ${_currentTheme.surface10}`,
-                color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+                color: _currentTheme.text, fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
 
@@ -601,7 +601,7 @@ export default function DemoNorestePage() {
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: 1 }}>Pro</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
-                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$2,499</span>
+                <span style={{ fontSize: 36, fontWeight: 900, color: _currentTheme.text }}>$2,499</span>
                 <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
@@ -634,7 +634,7 @@ export default function DemoNorestePage() {
             <div style={{ background: t.card, border: `1px solid ${_currentTheme.surfaceHover}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 1 }}>Enterprise</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
-                <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$3,499</span>
+                <span style={{ fontSize: 36, fontWeight: 900, color: _currentTheme.text }}>$3,499</span>
                 <span style={{ fontSize: 14, color: _currentTheme.text40 }}>/mes por sucursal</span>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
@@ -658,7 +658,7 @@ export default function DemoNorestePage() {
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Enterprise" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
                 background: t.barBg, border: `1px solid ${_currentTheme.surface10}`,
-                color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
+                color: _currentTheme.text, fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
           </div>
@@ -670,7 +670,7 @@ export default function DemoNorestePage() {
           <div style={{ textAlign: 'center' }}>
             <a href="https://wa.me/528115324371" target="_blank" rel="noopener" style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
-              padding: '16px 36px', background: '#25D366', color: '#fff',
+              padding: '16px 36px', background: '#25D366', color: _currentTheme.text,
               borderRadius: 14, fontWeight: 800, fontSize: 17, textDecoration: 'none',
               boxShadow: '0 4px 24px rgba(37,211,102,0.3)',
             }}>
@@ -1282,7 +1282,7 @@ function NoresteChat() {
           placeholder="Pregunta algo... ej: ¿cuánto vendimos de quesabirrias?"
           style={{
             flex: 1, background: _currentTheme.surfaceSubtle, border: `1px solid ${_currentTheme.surface10}`,
-            borderRadius: 12, padding: '12px 16px', color: '#fff', fontSize: 14, outline: 'none',
+            borderRadius: 12, padding: '12px 16px', color: _currentTheme.text, fontSize: 14, outline: 'none',
           }}
         />
         <button
@@ -1290,7 +1290,7 @@ function NoresteChat() {
           disabled={!input.trim() || loading}
           style={{
             width: 48, height: 48, borderRadius: 12, background: '#10b981', border: 'none',
-            color: '#fff', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+            color: _currentTheme.text, cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
             opacity: input.trim() && !loading ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
