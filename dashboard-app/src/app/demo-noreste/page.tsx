@@ -216,31 +216,69 @@ const formatMXN = (n: number) => `$${Math.abs(n).toLocaleString('es-MX')}`
 
 // ─── PAGE ────────────────────────────────────────────────
 
+const themes = {
+  dark: {
+    bg: '#0a0a0f', text: '#fff', textSoft: 'rgba(255,255,255,0.6)', textMuted: 'rgba(255,255,255,0.45)', textFaint: 'rgba(255,255,255,0.35)',
+    card: 'rgba(255,255,255,0.03)', cardBorder: 'rgba(255,255,255,0.06)', line: 'rgba(255,255,255,0.06)',
+    headerGrad: 'linear-gradient(180deg, rgba(16,185,129,0.04) 0%, transparent 100%)',
+    pillBg: 'rgba(16,185,129,0.1)', pillBorder: 'rgba(16,185,129,0.2)', pillText: 'rgba(255,255,255,0.6)',
+    kpiBg: 'rgba(255,255,255,0.03)', kpiBorder: 'rgba(255,255,255,0.06)',
+    chartArea: 'rgba(16,185,129,0.15)', chartLine: '#10b981',
+    barBg: 'rgba(255,255,255,0.06)', toggleBg: 'rgba(255,255,255,0.08)', toggleText: 'rgba(255,255,255,0.5)',
+  },
+  light: {
+    bg: '#f8f9fa', text: '#1a1a2e', textSoft: '#4a4a5a', textMuted: '#6b7280', textFaint: '#9ca3af',
+    card: '#ffffff', cardBorder: '#e5e7eb', line: '#e5e7eb',
+    headerGrad: 'linear-gradient(180deg, rgba(16,185,129,0.06) 0%, transparent 100%)',
+    pillBg: 'rgba(16,185,129,0.08)', pillBorder: 'rgba(16,185,129,0.2)', pillText: '#374151',
+    kpiBg: '#ffffff', kpiBorder: '#e5e7eb',
+    chartArea: 'rgba(16,185,129,0.1)', chartLine: '#059669',
+    barBg: '#e5e7eb', toggleBg: '#e5e7eb', toggleText: '#6b7280',
+  },
+}
+
+// Module-level theme state for sub-components
+let _currentTheme = themes.dark
+
 export default function DemoNorestePage() {
   const maxSucursal = Math.max(...SUCURSALES.map(s => s.ventas))
+  const [mode, setMode] = useState<'dark' | 'light'>('dark')
+  const t = themes[mode]
+  _currentTheme = t
 
   return (
-    <div style={{ background: '#0a0a0f', color: '#fff', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ background: t.bg, color: t.text, minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', transition: 'background 0.3s, color 0.3s' }}>
 
       {/* ── Section 1: Header ── */}
       <div style={{
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'linear-gradient(180deg, rgba(16,185,129,0.04) 0%, transparent 100%)',
+        borderBottom: `1px solid ${t.line}`,
+        background: t.headerGrad,
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px 32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1.5 }}>Noreste Grill</span>
-            <span style={{ width: 6, height: 6, background: '#10b981', display: 'inline-block', borderRadius: 1 }} />
-            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1.5, color: '#10b981' }}>Fullsite</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1.5 }}>Noreste Grill</span>
+              <span style={{ width: 6, height: 6, background: '#10b981', display: 'inline-block', borderRadius: 1 }} />
+              <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1.5, color: '#10b981' }}>Fullsite</span>
+            </div>
+            <button
+              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+              style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: t.toggleBg, border: `1px solid ${t.line}`, color: t.toggleText, transition: 'all 0.3s',
+              }}
+            >
+              {mode === 'dark' ? '☀ Light' : '● Dark'}
+            </button>
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, margin: 0, maxWidth: 600 }}>
+          <p style={{ color: t.textMuted, fontSize: 16, margin: 0, maxWidth: 600 }}>
             Demo personalizado — asi se veria tu operacion con IA en las 8 sucursales
           </p>
           <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
             {['Centro', 'Patio Lincoln', 'Cumbres Elite', 'La Ladrillera', 'Paseo Tec', 'Sendero Escobedo', 'Sendero La Fe', 'Juarez'].map(loc => (
               <span key={loc} style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: 'rgba(255,255,255,0.6)',
+                background: t.pillBg, border: `1px solid ${t.pillBorder}`, color: t.pillText,
               }}>{loc}</span>
             ))}
           </div>
@@ -251,15 +289,15 @@ export default function DemoNorestePage() {
 
         {/* ── Section 2: KPIs ── */}
         <div style={{ padding: '32px 0 24px' }}>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+          <div style={{ fontSize: 13, color: t.textFaint, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
             Resumen del dia — Domingo 15 Jun 2026
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-            <KPICard label="Ventas del dia" value="$487,350" sub="8 sucursales" icon={DollarSign} accent="#10b981" />
-            <KPICard label="Tickets" value="1,847" sub="4,210 personas" icon={Receipt} accent="#3b82f6" />
-            <KPICard label="Ticket promedio" value="$263.80" sub="+12.3% vs ayer" icon={TrendingUp} accent="#818cf8" positive />
-            <KPICard label="Personas" value="4,210" sub="525 por sucursal prom." icon={Users} accent="#f59e0b" />
-            <KPICard label="Sucursal lider" value="Paseo Tec" sub="$82,400 — 16.9%" icon={Flame} accent="#ef4444" />
+            <KPICard t={t} label="Ventas del dia" value="$487,350" sub="8 sucursales" icon={DollarSign} accent="#10b981" />
+            <KPICard t={t} label="Tickets" value="1,847" sub="4,210 personas" icon={Receipt} accent="#3b82f6" />
+            <KPICard t={t} label="Ticket promedio" value="$263.80" sub="+12.3% vs ayer" icon={TrendingUp} accent="#818cf8" positive />
+            <KPICard t={t} label="Personas" value="4,210" sub="525 por sucursal prom." icon={Users} accent="#f59e0b" />
+            <KPICard t={t} label="Sucursal lider" value="Paseo Tec" sub="$82,400 — 16.9%" icon={Flame} accent="#ef4444" />
           </div>
         </div>
 
@@ -299,12 +337,12 @@ export default function DemoNorestePage() {
 
         {/* ── Section: Top Meseros (original table) ── */}
         <SectionTitle title="Top Meseros del Dia" icon={UserCheck} />
-        <div style={{ background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 32, overflowX: 'auto' }}>
+        <div style={{ background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${t.cardBorder}`, marginBottom: 32, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 {['#', 'Mesero', 'Sucursal', 'Ventas', 'Tickets', 'Ticket Prom.'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: t.textFaint, fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -332,7 +370,7 @@ export default function DemoNorestePage() {
 
         {/* ── Section: Top Platillos ── */}
         <SectionTitle title="Top 10 Platillos" icon={ChefHat} />
-        <div style={{ background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 32 }}>
+        <div style={{ background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${t.cardBorder}`, marginBottom: 32 }}>
           {PLATILLOS.map((p, i) => {
             const maxRev = PLATILLOS[0].revenue
             const pct = (p.revenue / maxRev) * 100
@@ -408,13 +446,13 @@ export default function DemoNorestePage() {
           Asi se veria el punto de venta en cada sucursal. Corre en cualquier tablet o computadora.
         </div>
         <div style={{
-          background: '#111118', borderRadius: 14, border: '1px solid rgba(255,255,255,0.06)',
+          background: _currentTheme.kpiBg, borderRadius: 14, border: `1px solid ${t.cardBorder}`,
           marginBottom: 32, overflow: 'hidden',
         }}>
           {/* POS Top bar */}
           <div style={{
             padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.3)',
+            borderBottom: `1px solid ${t.line}`, background: 'rgba(0,0,0,0.3)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontWeight: 800, fontSize: 14 }}>NORESTE GRILL</span>
@@ -444,7 +482,7 @@ export default function DemoNorestePage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                 {POS_ITEMS.filter(i => i.cat === 'Tacos' || i.cat === 'Parrilladas' || i.cat === 'Quesabirrias').map(item => (
                   <div key={item.name} style={{
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                    background: t.card, border: `1px solid ${t.cardBorder}`,
                     borderRadius: 10, padding: '12px 10px', cursor: 'default',
                   }}>
                     <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6, lineHeight: 1.3, color: 'rgba(255,255,255,0.8)' }}>{item.name}</div>
@@ -458,7 +496,7 @@ export default function DemoNorestePage() {
                 background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
               }}>
                 <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 700, marginBottom: 4, letterSpacing: 0.5 }}>IA COPILOT</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: t.textSoft, lineHeight: 1.5 }}>
                   Mesa 5 pidio 5 Tacos Arrachera sin complementos. Ofrece Papas Galeana NG ($85) + Guacamole ($74) — sube ticket $159 y 72% de clientes aceptan combo.
                 </div>
               </div>
@@ -514,13 +552,13 @@ export default function DemoNorestePage() {
           <h2 style={{ fontSize: 32, fontWeight: 900, marginBottom: 8, letterSpacing: -1 }}>
             Listo para ver Fullsite en accion?
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
+          <p style={{ color: t.textMuted, fontSize: 16, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
             Todo esto corriendo con los datos reales de tus 8 sucursales. Implementacion en 48 horas.
           </p>
           {/* Pricing Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto 40px', textAlign: 'left' }}>
             {/* Esencial */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: t.card, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Esencial</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$1,499</span>
@@ -536,14 +574,14 @@ export default function DemoNorestePage() {
                   'Comandas impresas por estación',
                   'Soporte por chat IA 24/7',
                 ].map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.textSoft }}>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> {f}
                   </div>
                 ))}
               </div>
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Esencial" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                background: t.barBg, border: '1px solid rgba(255,255,255,0.1)',
                 color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
@@ -585,7 +623,7 @@ export default function DemoNorestePage() {
             </div>
 
             {/* Enterprise */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: t.card, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 1 }}>Enterprise</span>
               <div style={{ marginTop: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 36, fontWeight: 900, color: '#fff' }}>$3,499</span>
@@ -611,7 +649,7 @@ export default function DemoNorestePage() {
               </div>
               <a href="https://wa.me/528115324371?text=Me%20interesa%20el%20plan%20Enterprise" target="_blank" rel="noopener" style={{
                 display: 'block', textAlign: 'center', padding: '12px 0', borderRadius: 10,
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                background: t.barBg, border: '1px solid rgba(255,255,255,0.1)',
                 color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none',
               }}>Contactar</a>
             </div>
@@ -649,13 +687,15 @@ export default function DemoNorestePage() {
 
 // ─── COMPONENTS ──────────────────────────────────────────
 
-function KPICard({ label, value, sub, icon: Icon, accent, positive }: {
-  label: string; value: string; sub?: string; icon: React.ElementType; accent: string; positive?: boolean
+type Theme = typeof themes.dark
+
+function KPICard({ label, value, sub, icon: Icon, accent, positive, t }: {
+  label: string; value: string; sub?: string; icon: React.ElementType; accent: string; positive?: boolean; t: Theme
 }) {
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 20,
-      border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: 20,
+      border: `1px solid ${_currentTheme.kpiBorder}`,
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{
@@ -664,7 +704,7 @@ function KPICard({ label, value, sub, icon: Icon, accent, positive }: {
       }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 8, fontWeight: 500 }}>{label}</div>
+          <div style={{ color: _currentTheme.textMuted, fontSize: 12, marginBottom: 8, fontWeight: 500 }}>{label}</div>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, color: accent }}>{value}</div>
           {sub && (
             <div style={{ color: positive ? '#10b981' : 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -709,7 +749,7 @@ function RevenueTrendChart() {
 
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: '24px 16px', border: '1px solid rgba(255,255,255,0.06)',
+      background: 'inherit', borderRadius: 14, padding: '24px 16px', border: '1px solid inherit',
       marginBottom: 32, overflowX: 'auto',
     }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto', display: 'block', margin: '0 auto' }}>
@@ -771,7 +811,7 @@ function SucursalCard({ sucursal, rank }: {
 
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 18, border: '1px solid rgba(255,255,255,0.06)',
+      background: 'inherit', borderRadius: 14, padding: 18, border: '1px solid rgba(128,128,128,0.15)',
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -830,7 +870,7 @@ function HeatmapSection() {
 
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: '20px 16px', border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: '20px 16px', border: `1px solid ${_currentTheme.cardBorder}`,
       marginBottom: 32, overflowX: 'auto',
     }}>
       <div style={{ minWidth: 700 }}>
@@ -838,7 +878,7 @@ function HeatmapSection() {
         <div style={{ display: 'grid', gridTemplateColumns: '130px repeat(14, 1fr)', gap: 2, marginBottom: 2 }}>
           <div />
           {HEATMAP_HOURS.map(h => (
-            <div key={h} style={{ textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.35)', padding: '4px 0' }}>
+            <div key={h} style={{ textAlign: 'center', fontSize: 10, color: _currentTheme.textFaint, padding: '4px 0' }}>
               {h > 12 ? `${h - 12}pm` : h === 12 ? '12pm' : `${h}am`}
             </div>
           ))}
@@ -846,7 +886,7 @@ function HeatmapSection() {
         {/* Rows */}
         {sucNames.map(name => (
           <div key={name} style={{ display: 'grid', gridTemplateColumns: '130px repeat(14, 1fr)', gap: 2, marginBottom: 2 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', paddingRight: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: 11, color: _currentTheme.textSoft, display: 'flex', alignItems: 'center', paddingRight: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {name}
             </div>
             {HEATMAP_DATA[name].map((val, i) => {
@@ -889,7 +929,7 @@ function WaterfallChart() {
   const maxAmount = 487350
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${_currentTheme.cardBorder}`,
       marginBottom: 32,
     }}>
       {WATERFALL_ITEMS.map((item, i) => {
@@ -960,7 +1000,7 @@ function MeseroRadar() {
 
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${_currentTheme.cardBorder}`,
       marginBottom: 32,
     }}>
       {/* Legend */}
@@ -1012,7 +1052,7 @@ function MeseroRadar() {
 function FraudTimeline() {
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${_currentTheme.cardBorder}`,
       marginBottom: 32,
     }}>
       <div style={{ position: 'relative', paddingLeft: 28 }}>
@@ -1056,7 +1096,7 @@ function FraudTimeline() {
                       {event.status === 'normal' ? 'Normal' : event.status === 'alert' ? 'ALERTA' : 'ACCION'}
                     </span>
                   </div>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{event.time}</span>
+                  <span style={{ fontSize: 12, color: _currentTheme.textFaint, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{event.time}</span>
                 </div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                   {event.label}
@@ -1077,7 +1117,7 @@ function FraudTimeline() {
 function InventoryPanel() {
   return (
     <div style={{
-      background: '#111118', borderRadius: 14, padding: 24, border: '1px solid rgba(255,255,255,0.06)',
+      background: _currentTheme.kpiBg, borderRadius: 14, padding: 24, border: `1px solid ${_currentTheme.cardBorder}`,
       marginBottom: 32,
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
@@ -1108,7 +1148,7 @@ function InventoryPanel() {
                 <span style={{ fontSize: 12, color: barColor, fontWeight: 600 }}>{item.note}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: _currentTheme.barBg, borderRadius: 4, height: 8, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%', borderRadius: 4,
                     width: `${pct}%`,
@@ -1167,7 +1207,7 @@ function NoresteChat() {
   }
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, overflow: 'hidden' }}>
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${_currentTheme.cardBorder}`, borderRadius: 20, overflow: 'hidden' }}>
       {/* Messages area */}
       <div ref={scrollRef} style={{ height: 360, overflowY: 'auto', padding: 20 }}>
         {messages.length === 0 ? (
@@ -1226,7 +1266,7 @@ function NoresteChat() {
       </div>
 
       {/* Input */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: 16, display: 'flex', gap: 10 }}>
+      <div style={{ borderTop: `1px solid ${_currentTheme.line}`, padding: 16, display: 'flex', gap: 10 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
