@@ -560,9 +560,31 @@ export default function DemoNorestePage() {
           <h2 style={{ fontSize: 32, fontWeight: 900, marginBottom: 8, letterSpacing: -1 }}>
             Listo para ver Fullsite en accion?
           </h2>
-          <p style={{ color: t.textMuted, fontSize: 16, marginBottom: 32, maxWidth: 500, margin: '0 auto 32px' }}>
+          <p style={{ color: t.textMuted, fontSize: 16, marginBottom: 40, maxWidth: 500, margin: '0 auto 40px' }}>
             Todo esto corriendo con los datos reales de tus 8 sucursales. Implementacion en 48 horas.
           </p>
+
+          {/* 5 Key Value Props */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, maxWidth: 960, margin: '0 auto 48px', textAlign: 'left' }}>
+            {[
+              { icon: '🕐', title: 'Prediccion de cierre en tiempo real', desc: 'A las 2pm ya sabes cuanto vas a facturar hoy en las 8 sucursales. Sin esperar al cierre, sin juntar reportes.' },
+              { icon: '🥩', title: 'Food cost automatico', desc: 'Si la arrachera sube de precio, el sistema te avisa antes de que pierdas margen. Costos reales por platillo, no estimados.' },
+              { icon: '🚨', title: 'Anti-fraude inteligente', desc: 'Si un mesero cancela 8 ordenes cuando el promedio es 2, te llega alerta. No puedes estar en 8 sucursales a la vez, pero la IA si.' },
+              { icon: '📊', title: 'Un dashboard, todas las sucursales', desc: 'Ventas, tickets, meseros, inventario — todo en tiempo real. Quien vende mas, quien vende menos, que sucursal esta abajo.' },
+              { icon: '🔥', title: 'Heatmap de demanda por hora', desc: 'Sabes exactamente a que hora pegar en cada sucursal. Optimiza turnos, promo happy hour, y staffing por franja horaria.' },
+            ].map((item, i) => (
+              <div key={i} style={{
+                background: t.card, border: `1px solid ${_currentTheme.cardBorder}`, borderRadius: 16, padding: 24,
+                display: 'flex', gap: 16, alignItems: 'flex-start',
+              }}>
+                <span style={{ fontSize: 28, lineHeight: 1 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: t.text, marginBottom: 6 }}>{item.title}</div>
+                  <div style={{ fontSize: 13, color: t.textMuted, lineHeight: 1.5 }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
           {/* Pricing Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto 40px', textAlign: 'left' }}>
             {/* Esencial */}
