@@ -473,7 +473,9 @@ def main():
         print(f"[intraday] Consolidated keys: {list(consolidated.keys()) if isinstance(consolidated, dict) else type(consolidated)}")
         print(f"[intraday] Consolidated: TotalSales={consolidated.get('TotalSales')}, GrossSales={consolidated.get('TotalGrossSales')}, Discounts={consolidated.get('TotalDiscounts')}, Tickets={consolidated.get('TotalTickets', 'N/A')}, Personas={consolidated.get('TotalPersons', 'N/A')}")
         print(f"[intraday] OrderTypes breakdown: {order_types}")
-        print(f"[intraday] Data: {len(users)} users, {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
+        user_sum = sum(float(str(u.get("total", "0")).replace(",", "").replace("$", "")) for u in users) if users else 0
+        print(f"[intraday] Data: {len(users)} users (sum=${user_sum:,.0f}), {len(groups)} groups, {len(saucers)} saucers, {order_types['total_ordenes']} ordenes, {order_types['total_personas']} personas")
+        print(f"[intraday] API TotalSales=${consolidated.get('TotalSales', 0):,.0f} vs UserSum=${user_sum:,.0f} (diff=${user_sum - (consolidated.get('TotalSales', 0) or 0):,.0f} = Market)")
 
         # Hora pico via snapshots acumulativos: Wansoft NO tiene endpoint de
         # ventas por hora (SalesByHours/SalesByHour/etc = 200 pero 0 filas,
@@ -522,15 +524,30 @@ def main():
             update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
 
             # Ventas brutas, netas, y descuentos
+            # CRITICAL: GetConsolidatedSales EXCLUDES Market sales.
+            # SalesByUser includes ALL staff (incl Market). Sum all users
+            # to get the real total that matches the Wansoft app display.
             if consolidated:
-                update_data["ventas_brutas"] = consolidated.get("TotalGrossSales", 0)
+                api_total = consolidated.get("TotalSales", 0) or 0
+                user_total = sum(float(str(u.get("total", "0")).replace(",", "").replace("$", "")) for u in users) if users else 0
+                # Use whichever is higher — user_total includes Market
+                real_total = max(api_total, user_total)
+                update_data["ventas_dia"] = real_total
+                # Gross sales: same logic — add Market if missing
+                api_gross = consolidated.get("TotalGrossSales", 0) or 0
+                update_data["ventas_brutas"] = max(api_gross, real_total)
                 update_data["descuentos"] = consolidated.get("TotalDiscount", 0) or consolidated.get("TotalDiscounts", 0)
-                update_data["ventas_dia"] = consolidated.get("TotalSales", 0)
 
-            # Tickets y personas — closed + open orders (matches Wansoft app's "# Órdenes")
+            # Tickets y personas — closed + open orders + Market estimate
+            # SalesByTypeOfOrder excludes Market orders. Estimate Market tickets
+            # from Market sales / avg Market ticket (~$65 per data rules).
             if order_types:
-                update_data["tickets_count"] = order_types.get("total_ordenes", 0)
-                update_data["personas_restaurant"] = order_types.get("total_personas", 0)
+                market_staff = CLIENT.get("staff_market") or []
+                market_sales = sum(float(str(u.get("total", "0")).replace(",", "").replace("$", ""))
+                                   for u in users if any(m.lower() in u.get("name", "").lower() for m in market_staff)) if users and market_staff else 0
+                market_tickets = round(market_sales / 65) if market_sales > 0 else 0
+                update_data["tickets_count"] = order_types.get("total_ordenes", 0) + market_tickets
+                update_data["personas_restaurant"] = order_types.get("total_personas", 0) + market_tickets
 
             # Ventas por grupo
             if groups:
