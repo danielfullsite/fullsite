@@ -366,10 +366,10 @@ export default function EstadoResultadosPage() {
           {/* Monthly P&L table */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow">
             <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">
-              P&L mensual
+              P&L {periodoView === 'mes' ? 'mensual' : periodoView === 'trimestre' ? 'trimestral' : periodoView === 'semestre' ? 'semestral' : 'anual'}
             </h3>
             <p className="text-xs text-[var(--text-3)] mb-5">
-              Estado de resultados por mes
+              Estado de resultados por {periodoView}
             </p>
 
             {monthlyPL.length > 0 ? (
@@ -377,7 +377,9 @@ export default function EstadoResultadosPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--line)]">
-                      <th className="text-left py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Mes</th>
+                      <th className="text-left py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">
+                        {periodoView === 'mes' ? 'Mes' : periodoView === 'trimestre' ? 'Trimestre' : periodoView === 'semestre' ? 'Semestre' : 'Año'}
+                      </th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">V. Brutas</th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">Descuentos</th>
                       <th className="text-right py-3 px-3 text-xs font-semibold text-[var(--text-2)] uppercase tracking-wider">V. Netas</th>
