@@ -182,6 +182,14 @@ export default function GastosPage() {
     loadGastos()
   }
 
+  async function deleteGasto(id: string) {
+    if (!confirm('¿Eliminar este gasto?')) return
+    await fetch(`${SUPABASE_URL}/rest/v1/pos_gastos?id=eq.${id}`, {
+      method: 'DELETE', headers: hdrs(),
+    })
+    loadGastos()
+  }
+
   const statusColor: Record<string, string> = {
     pendiente: 'bg-amber-500/15 text-amber-500',
     pagado: 'bg-emerald-500/15 text-emerald-500',
@@ -304,10 +312,11 @@ export default function GastosPage() {
                     <td className="px-5 py-3 text-center">
                       <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${statusColor[g.status]}`}>{g.status}</span>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 flex items-center gap-2">
                       {g.status === 'pendiente' && (
                         <button onClick={() => markPaid(g.id)} className="text-xs text-emerald-500 hover:text-emerald-400">Pagar</button>
                       )}
+                      <button onClick={() => deleteGasto(g.id)} className="text-xs text-red-400 hover:text-red-300">Eliminar</button>
                     </td>
                   </tr>
                 ))}
