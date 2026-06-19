@@ -4084,40 +4084,8 @@ function POSAlerts({ role }: { role: string }) {
         const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
 
-        // Check low inventory using reorder_point (gerente/admin only)
+        // Stock bajo alerts moved to dashboard only — too distracting in POS during rush
         if (role === 'admin' || role === 'gerente') {
-          try {
-            // Fetch items where stock <= reorder_point (the actual threshold, not hardcoded)
-            const invRes = await fetch(
-              `${sbUrl}/rest/v1/pos_inventory?select=ingredient_id,stock,reorder_point&reorder_point=gt.0&client_id=eq.${_cid()}&order=stock.asc&limit=100`,
-              { headers }
-            )
-            if (invRes.ok) {
-              const allInv: { ingredient_id: string; stock: number; reorder_point: number }[] = await invRes.json()
-              const lowStock = allInv.filter(i => i.stock <= i.reorder_point && i.stock >= 0)
-              if (lowStock.length > 0) {
-                const names: Record<string, string> = {}
-                try {
-                  const ids = lowStock.slice(0, 10).map(i => i.ingredient_id).join(',')
-                  const nRes = await fetch(
-                    `${sbUrl}/rest/v1/pos_ingredients?select=id,name&id=in.(${ids})&client_id=eq.${_cid()}`,
-                    { headers }
-                  )
-                  if (nRes.ok) for (const n of await nRes.json()) names[String(n.id)] = n.name
-                } catch { /* ignore */ }
-                const label = (i: { ingredient_id: string; stock: number }) =>
-                  `${names[String(i.ingredient_id)] || `#${i.ingredient_id}`} (${(Math.round(i.stock * 100) / 100).toLocaleString('es-MX')})`
-                const shown = lowStock.slice(0, 3).map(label).join(', ')
-                const extra = lowStock.length > 3 ? ` y ${lowStock.length - 3} más` : ''
-                newAlerts.push({
-                  id: 'inv-low',
-                  type: 'warning',
-                  message: `⚠️ Stock bajo: ${shown}${extra}`,
-                  dismissible: true,
-                })
-              }
-            }
-          } catch { /* ignore */ }
 
           // Check agent anomalies
           try {
@@ -4168,7 +4136,7 @@ function POSAlerts({ role }: { role: string }) {
             const deliveryOrders = await delRes.json()
             for (const d of deliveryOrders) {
               // Skip test/invalid data
-              if (!d.customer_name || d.customer_name === 'TEST' || d.total <= 0) continue
+              if (!d.customer_name || d.customer_name === 'TEST' || d.customer_name.includes('test') || d.customer_name.includes('default') || d.total <= 1) continue
               const platform: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi' }
               newAlerts.push({
                 id: `del-${d.id}`,
