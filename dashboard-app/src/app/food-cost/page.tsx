@@ -402,7 +402,7 @@ export default function FoodCostPage() {
             Costo y margen por platillo {source && `· ${source}`}
           </p>
         </div>
-        <a href="/pos/recetas" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors">
+        <a href="/recetas" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors">
           <ChefHat size={16} />
           Gestionar recetas
         </a>
