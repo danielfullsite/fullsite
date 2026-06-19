@@ -2073,34 +2073,14 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Auto-deduct ingredients from inventory
-      const result = await deductIngredientsForOrder(activeItems, orderId, mesero)
-      if (!result.success) {
-        showToast('Orden enviada — inventario no se pudo descontar (sin red)')
-      }
-      if (result.deductions.length > 0) {
-        logAudit({
-          order_id: orderId, action: 'order_sent_kitchen', actor: 'Sistema',
-          details: { inventory_deductions: result.deductions.length, alerts: result.alerts.length },
-        })
-      }
-      if (result.alerts.length > 0) {
-        showToast(`Orden enviada — ${result.alerts.length} alertas de inventario`)
-        // Persist alerts to Supabase for dashboard visibility
-        try {
-          const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-          const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-          for (const alert of result.alerts) {
-            fetch(`${sbUrl}/rest/v1/pos_inventory_alerts`, {
-              method: 'POST',
-              headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-              body: JSON.stringify({ client_id: _cid(), message: alert, order_id: orderId, actor: mesero, resolved: false }),
-            }).catch(() => {})
-          }
-        } catch { /* best-effort */ }
-      } else {
-        showToast('Orden enviada a cocina')
-      }
+      showToast('Orden enviada a cocina')
+
+      // Auto-deduct ingredients from inventory (fire-and-forget, don't block UI)
+      deductIngredientsForOrder(activeItems, orderId, mesero).then(result => {
+        if (result.alerts.length > 0) {
+          showToast(`${result.alerts.length} alertas de inventario`)
+        }
+      }).catch(() => {})
       // Print per-station tickets (splits order by cocina/barra/caja)
       printByStation(order)
 
