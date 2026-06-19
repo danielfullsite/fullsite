@@ -40,6 +40,7 @@ export default function EstadoResultadosPage() {
   const [foodCostItems, setFoodCostItems] = useState<FoodCostItem[]>([])
   const [pnlData, setPnlData] = useState<PnlData | null>(null)
   const [pnlPeriodo, setPnlPeriodo] = useState<string | null>(null)
+  const [periodoView, setPeriodoView] = useState<'mes' | 'trimestre' | 'semestre' | 'año'>('mes')
 
   useEffect(() => {
     // Fetch all data in parallel
@@ -79,12 +80,28 @@ export default function EstadoResultadosPage() {
   const monthlyPL = useMemo(() => {
     const map: Record<string, { brutas: number; descuentos: number; netas: number }> = {}
 
+    const getPeriodKey = (fecha: string): string => {
+      const [y, m] = fecha.split('-')
+      const mi = parseInt(m)
+      if (periodoView === 'mes') return `${y}-${m}`
+      if (periodoView === 'trimestre') return `${y}-Q${Math.ceil(mi / 3)}`
+      if (periodoView === 'semestre') return `${y}-${mi <= 6 ? 'H1' : 'H2'}`
+      return y
+    }
+
+    const getPeriodLabel = (key: string): string => {
+      if (periodoView === 'mes') return new Date(key + '-15T12:00:00').toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+      if (periodoView === 'trimestre') { const [y, q] = key.split('-'); return `${q} ${y}` }
+      if (periodoView === 'semestre') { const [y, h] = key.split('-'); return `${h === 'H1' ? 'Ene-Jun' : 'Jul-Dic'} ${y}` }
+      return key
+    }
+
     for (const day of data) {
-      const month = day.fecha.slice(0, 7)
-      if (!map[month]) map[month] = { brutas: 0, descuentos: 0, netas: 0 }
-      map[month].brutas += day.ventas_brutas || 0
-      map[month].descuentos += day.descuentos || 0
-      map[month].netas += day.ventas_dia || 0
+      const key = getPeriodKey(day.fecha)
+      if (!map[key]) map[key] = { brutas: 0, descuentos: 0, netas: 0 }
+      map[key].brutas += day.ventas_brutas || 0
+      map[key].descuentos += day.descuentos || 0
+      map[key].netas += day.ventas_dia || 0
     }
 
     return Object.entries(map)
@@ -94,7 +111,7 @@ export default function EstadoResultadosPage() {
         const margenPct = vals.netas > 0 ? (margenBruto / vals.netas) * 100 : 0
         return {
           mes,
-          mesLabel: new Date(mes + '-15T12:00:00').toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }),
+          mesLabel: getPeriodLabel(mes),
           ventasBrutas: vals.brutas,
           descuentos: vals.descuentos,
           ventasNetas: vals.netas,
@@ -104,7 +121,7 @@ export default function EstadoResultadosPage() {
         }
       })
       .sort((a, b) => b.mes.localeCompare(a.mes))
-  }, [data, effectiveFoodCostPct])
+  }, [data, effectiveFoodCostPct, periodoView])
 
   const totalBrutas = data.reduce((s, d) => s + (d.ventas_brutas || 0), 0)
   const totalDescuentos = data.reduce((s, d) => s + (d.descuentos || 0), 0)
@@ -119,7 +136,17 @@ export default function EstadoResultadosPage() {
     <>
       <PageHeader
         title="Estado de Resultados"
-        subtitle="Profit & Loss - Resumen financiero mensual"
+        subtitle={`Profit & Loss — Vista ${periodoView === 'mes' ? 'mensual' : periodoView === 'trimestre' ? 'trimestral' : periodoView === 'semestre' ? 'semestral' : 'anual'}`}
+        action={
+          <div className="flex gap-1 bg-[var(--surface)] rounded-lg p-1 border border-[var(--line)]">
+            {(['mes', 'trimestre', 'semestre', 'año'] as const).map(p => (
+              <button key={p} onClick={() => setPeriodoView(p)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${periodoView === p ? 'bg-emerald-600 text-white' : 'text-[var(--text-3)] hover:text-[var(--text-1)]'}`}>
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
+        }
       />
 
       {loading ? (
