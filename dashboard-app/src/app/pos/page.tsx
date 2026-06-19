@@ -1227,6 +1227,21 @@ function POSContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
+
+  // When URL mesa param changes (e.g. from plano), reset order for new mesa
+  const urlMesa = Number(searchParams.get('mesa')) || 0
+  useEffect(() => {
+    if (urlMesa > 0 && urlMesa !== mesa) {
+      setMesa(urlMesa)
+      setOrderItems([])
+      setOrderId(generateId())
+      setLoadedOrderId(null)
+      setLoadedUpdatedAt(null)
+      setCancelledItems(new Set())
+      setVoidedItems(new Set())
+      setDiscount(0)
+    }
+  }, [urlMesa])
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
     if (typeof window !== 'undefined') {
