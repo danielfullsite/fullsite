@@ -12,14 +12,14 @@ function _cid() {
 }
 
 const EXPORTS = [
-  { id: 'ingredients', label: 'Ingredientes', icon: Package, table: 'pos_ingredients', select: 'id,name,unit,cost_per_unit,category', desc: 'Catálogo completo de insumos con costos' },
-  { id: 'inventory', label: 'Inventario (stocks)', icon: Layers, table: 'pos_inventory', select: 'ingredient_id,stock,reorder_point,reorder_quantity', desc: 'Stock actual de cada ingrediente' },
-  { id: 'recipes', label: 'Recetas', icon: ChefHat, table: 'pos_recipes_old', select: 'menu_item_id,menu_item_name,ingredient_id,quantity,unit', desc: 'Recetas con ingredientes y cantidades' },
-  { id: 'menu', label: 'Menú (platillos)', icon: FileSpreadsheet, table: 'pos_menu_items', select: 'id,name,price,category_id,active,barcode', desc: 'Todos los platillos con precios' },
-  { id: 'categories', label: 'Categorías', icon: Layers, table: 'pos_menu_categories', select: 'id,name,sort_order,active', desc: 'Categorías del menú' },
-  { id: 'staff', label: 'Staff', icon: Users, table: 'pos_staff', select: 'id,name,role,active', desc: 'Empleados y roles (sin PINs)' },
-  { id: 'market', label: 'Market (stock)', icon: ShoppingCart, table: 'pos_market_stock', select: 'menu_item_id,stock,reorder_point', desc: 'Stock de productos Market' },
-  { id: 'wansoft_recipes', label: 'Recetas Wansoft', icon: ChefHat, table: 'wansoft_recipes', select: 'saucer_id,saucer_name,budget_cost,ingredients', desc: '574 recetas originales de Wansoft' },
+  { id: 'ingredients', label: 'Ingredientes', icon: Package, table: 'pos_ingredients', select: '*', filter: true, desc: 'Catálogo completo de insumos con costos' },
+  { id: 'inventory', label: 'Inventario (stocks)', icon: Layers, table: 'pos_inventory', select: '*', filter: true, desc: 'Stock actual de cada ingrediente' },
+  { id: 'recipes', label: 'Recetas', icon: ChefHat, table: 'pos_recipes_old', select: '*', filter: true, desc: 'Recetas con ingredientes y cantidades' },
+  { id: 'menu', label: 'Menú (platillos)', icon: FileSpreadsheet, table: 'pos_menu_items', select: '*', filter: true, desc: 'Todos los platillos con precios' },
+  { id: 'categories', label: 'Categorías', icon: Layers, table: 'pos_menu_categories', select: '*', filter: true, desc: 'Categorías del menú' },
+  { id: 'staff', label: 'Staff', icon: Users, table: 'pos_staff', select: 'id,name,role,active', filter: true, desc: 'Empleados y roles (sin PINs)' },
+  { id: 'market', label: 'Market (stock)', icon: ShoppingCart, table: 'pos_market_stock', select: '*', filter: true, desc: 'Stock de productos Market' },
+  { id: 'wansoft_recipes', label: 'Recetas Wansoft', icon: ChefHat, table: 'wansoft_recipes', select: 'saucer_id,saucer_name,budget_cost', filter: false, desc: '574 recetas originales de Wansoft' },
 ]
 
 export default function ExportarPage() {
@@ -28,21 +28,23 @@ export default function ExportarPage() {
   async function downloadCSV(exp: typeof EXPORTS[0]) {
     setDownloading(exp.id)
     try {
-      const url = `${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&client_id=eq.${_cid()}&limit=10000`
-      const res = await fetch(url, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'text/csv' },
-      })
-      if (!res.ok) {
-        // Try without client_id filter (for tables like wansoft_recipes)
-        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, {
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'text/csv' },
-        })
-        if (!res2.ok) { alert('Error al exportar'); setDownloading(null); return }
-        const csv = await res2.text()
-        downloadFile(csv, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
+      const clientFilter = exp.filter ? `&client_id=eq.${_cid()}` : ''
+      const url = `${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}${clientFilter}&limit=10000`
+      const headers: Record<string, string> = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'text/csv' }
+      const res = await fetch(url, { headers })
+      const text = await res.text()
+      if (!res.ok || text.includes('"code"')) {
+        // Retry without client_id filter
+        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers })
+        const text2 = await res2.text()
+        if (!res2.ok || text2.includes('"code"')) {
+          alert(`Error exportando ${exp.label}: ${text2.slice(0, 100)}`)
+          setDownloading(null)
+          return
+        }
+        downloadFile(text2, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
       } else {
-        const csv = await res.text()
-        downloadFile(csv, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
+        downloadFile(text, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
       }
     } catch (e) {
       alert('Error: ' + (e instanceof Error ? e.message : 'desconocido'))
