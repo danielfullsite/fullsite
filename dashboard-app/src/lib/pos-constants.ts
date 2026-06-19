@@ -108,8 +108,11 @@ const CATEGORY_NAME_TO_STATION: Array<{ keywords: string[]; station: StationName
   { keywords: ['signature'], station: 'barra' },
   { keywords: ['ice cream', 'helado', 'nieve'], station: 'barra' },
   { keywords: ['bakery', 'panadería', 'panaderia'], station: 'caja' },
-  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia'], station: 'caja' },
+  { keywords: ['croissant'], station: 'caja' },
+  { keywords: ['toast', 'bagel'], station: 'caja' },
+  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'amalay'], station: 'caja' },
   { keywords: ['dessert', 'postre'], station: 'caja' },
+  { keywords: ['vino'], station: 'barra' },
 ]
 
 function getStationFromCategoryName(catName: string): StationName | null {
@@ -156,6 +159,8 @@ const CAJA_KEYWORDS = [
   'toast', 'bagel', 'concha', 'bakery', 'crunchy', 'galleta', 'brownie',
   'cheesecake', 'carrot cake', 'tiramisu', 'tiramisú', 'pastel de choc',
   'cafe grano', 'cafe molido', 'vaso cafe refill', 'semilla', 'dulce',
+  'croissant', 'muffin', 'scone', 'pan de', 'amalay -', 'ramekin',
+  'taza de ceramica', 'termo', 'vela', 'gift card', 'tarjeta de regalo',
 ]
 
 /**

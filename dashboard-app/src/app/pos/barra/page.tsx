@@ -182,10 +182,13 @@ export default function BarraPage() {
               const isUrgent = elapsed > 10 && order.status !== 'lista'
               const allItems: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
               // Filter items based on station filter
+              // Use saved station from POS first, fallback to name-based detection
               const beverageItems = allItems.filter(item => {
+                if ((item as BarraItem & { cancelled?: boolean }).cancelled) return false
                 const name = item.nombre || item.name || ''
                 if (stationFilter === 'todo') return true
-                return getStationByName(name) === stationFilter
+                const station = (item as { station?: string }).station || getStationByName(name)
+                return station === stationFilter
               })
 
               return (
