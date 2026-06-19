@@ -370,8 +370,9 @@ export default function MesasPage() {
         className={`border-2 p-3 transition-all active:scale-95 flex flex-col justify-between w-full h-full ${shapeClass} ${
           mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/50' :
           mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/50' :
-          statusColor[mesa.status]
+          getMesaColor(mesa)
         }`}
+        style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
       >
         <div className="flex items-start justify-between">
           <span className={`${compact ? 'text-xl' : 'text-2xl'} font-bold`}>{mesa.number}</span>
