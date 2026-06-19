@@ -395,11 +395,17 @@ export default function FoodCostPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Food Cost</h2>
-        <p className="text-sm text-[var(--text-3)]">
-          Costo y margen por platillo {source && `· ${source}`}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Food Cost</h2>
+          <p className="text-sm text-[var(--text-3)]">
+            Costo y margen por platillo {source && `· ${source}`}
+          </p>
+        </div>
+        <a href="/pos/recetas" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition-colors">
+          <ChefHat size={16} />
+          Gestionar recetas
+        </a>
       </div>
 
       {/* KPI cards */}
