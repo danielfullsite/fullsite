@@ -323,7 +323,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               {quitarOptions.map(mod => (
                 <label
                   key={mod}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
+                  className={`flex items-center gap-3 px-4 py-4 rounded-xl cursor-pointer transition-colors min-h-[52px] ${
                     quitarChecked.has(mod)
                       ? 'bg-red-900/40 border border-red-700/60'
                       : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
@@ -335,7 +335,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     onChange={() => toggleQuitar(mod)}
                     className="sr-only"
                   />
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     quitarChecked.has(mod)
                       ? 'bg-red-500 border-red-500'
                       : 'border-[var(--line-soft)]0'
@@ -382,7 +382,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     return (
                       <label
                         key={opt.name}
-                        className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors min-h-[44px] ${
+                        className={`flex items-center gap-3 px-4 py-4 rounded-xl transition-colors min-h-[52px] ${
                           checked
                             ? 'bg-emerald-900/40 border border-emerald-700/60 cursor-pointer'
                             : blocked
@@ -397,7 +397,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                           onChange={() => toggleGroupOption(group, opt.name)}
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 ${group.maxSelections === 1 ? 'rounded-full' : 'rounded'} border-2 flex items-center justify-center flex-shrink-0 ${
+                        <div className={`w-6 h-6 ${group.maxSelections === 1 ? 'rounded-full' : 'rounded'} border-2 flex items-center justify-center flex-shrink-0 ${
                           checked ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--line-soft)]0'
                         }`}>
                           {checked && (
@@ -427,7 +427,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               {agregarOptions.map(mod => (
                 <label
                   key={mod.name}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors min-h-[44px] ${
+                  className={`flex items-center gap-3 px-4 py-4 rounded-xl cursor-pointer transition-colors min-h-[52px] ${
                     agregarChecked.has(mod.name)
                       ? 'bg-emerald-900/40 border border-emerald-700/60'
                       : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
@@ -439,7 +439,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     onChange={() => toggleAgregar(mod.name)}
                     className="sr-only"
                   />
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     agregarChecked.has(mod.name)
                       ? 'bg-emerald-500 border-emerald-500'
                       : 'border-[var(--line-soft)]0'
@@ -656,7 +656,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                     }`}
                   >
                     <input type="checkbox" checked={checked} onChange={() => togglePromoItem(it.id)} className="sr-only" />
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                    <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                       checked ? 'bg-amber-500 border-amber-500' : 'border-[var(--line-soft)]0'
                     }`}>
                       {checked && (
