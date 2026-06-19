@@ -294,19 +294,17 @@ export default function CocinaPage() {
   // isBebida imported from shared constants at top of file
 
   const AREA_KEYWORDS: Record<string, string[]> = {
-    'Caliente': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque'],
-    'Fría': ['bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
+    'Cocina': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque', 'bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
     'Panadería': ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
   }
 
   const AREA_COLORS: Record<string, string> = {
-    'Caliente': 'bg-red-500',
-    'Fría': 'bg-cyan-500',
+    'Cocina': 'bg-amber-500',
     'Panadería': 'bg-orange-400',
   }
 
   const areaCounts = (() => {
-    const counts: Record<string, number> = { 'Caliente': 0, 'Fría': 0, 'Panadería': 0 }
+    const counts: Record<string, number> = { 'Cocina': 0, 'Panadería': 0 }
     const pendingOrders = orders.filter(o => o.status === 'enviada' || o.status === 'preparando')
     for (const order of pendingOrders) {
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
@@ -324,7 +322,7 @@ export default function CocinaPage() {
             break
           }
         }
-        if (!matched) counts['Caliente'] += qty // default to hot kitchen
+        if (!matched) counts['Cocina'] += qty // default to kitchen
       }
     }
     return counts
