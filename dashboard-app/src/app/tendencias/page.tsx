@@ -768,7 +768,7 @@ export default function TendenciasPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000000).toFixed(1)}M`} width={55} />
-              <Tooltip formatter={(v) => [formatCurrency(Number(v)), '']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip formatter={(v, name) => [formatCurrency(Number(v)), name]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
               <Legend verticalAlign="top" height={30} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: 'var(--text-2)' }} />
               {yoyYears.map((yr, i) => (
                 <Bar key={yr} dataKey={yr} fill={YOY_COLORS[i % YOY_COLORS.length]} radius={[4, 4, 0, 0]} />
@@ -788,7 +788,7 @@ export default function TendenciasPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={55} />
-              <Tooltip formatter={(v) => [formatCurrency(Number(v)), '']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip formatter={(v, name) => [formatCurrency(Number(v)), name]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
               <Legend verticalAlign="top" height={30} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: 'var(--text-2)' }} />
               <Area type="monotone" dataKey="Tarjeta" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
               <Area type="monotone" dataKey="Efectivo" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
