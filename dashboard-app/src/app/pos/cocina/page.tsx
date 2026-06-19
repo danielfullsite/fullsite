@@ -50,7 +50,7 @@ export default function CocinaPage() {
   }
 
   // Station filter
-  const [stationFilter, setStationFilter] = useState<'todo' | StationName>('cocina')
+  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('cocina')
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -378,8 +378,8 @@ export default function CocinaPage() {
       {/* Station filter tabs */}
       <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">
         {([
-          { key: 'todo', label: 'Todo', color: 'bg-white text-black' },
           { key: 'cocina', label: 'Cocina', color: 'bg-amber-500 text-black' },
+          { key: 'panaderia', label: 'Panadería', color: 'bg-orange-400 text-black' },
           { key: 'barra', label: 'Barra', color: 'bg-purple-500 text-white' },
           { key: 'caja', label: 'Market', color: 'bg-cyan-500 text-black' },
         ] as const).map(tab => (
@@ -435,14 +435,16 @@ export default function CocinaPage() {
               const isUrgent = elapsed > 15 && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
               // Filter items based on station filter
+              const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
               const activeItems = items.filter(i => {
                 if (i.cancelled) return false
-                // Skip tiempo separators — they belong to no station
                 if (i.menuItemId === '__tiempo__') return stationFilter === 'todo'
-                const name = i.nombre || i.name || ''
+                const name = (i.nombre || i.name || '').toLowerCase()
                 if (stationFilter === 'todo') return true
-                // Use saved station first, fallback to name-based detection
+                if (stationFilter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
                 const itemStation = i.station || getStationByName(name)
+                // If filtering cocina, exclude panadería items
+                if (stationFilter === 'cocina' && PANADERIA_KW.some(kw => name.includes(kw))) return false
                 return itemStation === stationFilter
               })
 
