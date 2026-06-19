@@ -2671,10 +2671,13 @@ function POSContent() {
                         </button>
                       </div>
 
-                      {/* Item name + modifiers */}
+                      {/* Item name + modifiers + KDS status */}
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm leading-tight ${isVoided ? 'line-through text-slate-500' : isCancelled ? 'line-through text-red-400' : ''}`}>
                           {item.nombre}
+                          {!isCancelled && !isVoided && (item as OrderItem & { kds_done?: boolean }).kds_done && (
+                            <span className="ml-2 inline-block bg-emerald-500/20 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full">LISTO</span>
+                          )}
                         </p>
                         {isVoided && (
                           <span className="inline-block bg-slate-600/60 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded">ANULADO</span>

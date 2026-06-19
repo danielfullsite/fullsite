@@ -112,6 +112,15 @@ export default function KDSPage() {
 
     setOrders(fresh)
     setLastUpdate(new Date())
+    // Restore done items from DB (kds_done flag on each item)
+    const restored = new Set<string>()
+    for (const order of fresh) {
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      items.forEach((item, idx) => {
+        if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
+      })
+    }
+    if (restored.size > 0) setDoneItems(prev => new Set([...prev, ...restored]))
   }, [])
 
   useEffect(() => {
@@ -146,7 +155,7 @@ export default function KDSPage() {
         // Check if all active items are now done — auto-advance to "lista"
         const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
         const allDone = items.every((item, idx) => {
-          if (item.cancelled) return true // skip cancelled items
+          if (item.cancelled) return true
           const k = `${orderId}-${idx}`
           return k === key || prev.has(k)
         })
@@ -154,6 +163,25 @@ export default function KDSPage() {
           advance(orderId, order.status, order.mesa, order.mesero)
         }
       }
+
+      // Persist item statuses to Supabase so POS can see them
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      const updatedItems = items.map((item, idx) => {
+        const k = `${orderId}-${idx}`
+        const isDone = k === key ? !prev.has(key) : next.has(k)
+        return { ...item, kds_done: isDone }
+      })
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ items: JSON.stringify(updatedItems) }),
+      }).catch(() => {})
+
       return next
     })
   }
