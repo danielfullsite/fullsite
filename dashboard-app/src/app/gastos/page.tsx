@@ -59,15 +59,22 @@ export default function GastosPage() {
     fecha: new Date().toISOString().slice(0, 10), categoria: 'Alimentos', notas: '', status: 'pendiente' as GastoStatus,
   })
 
+  const [proveedores, setProveedores] = useState<string[]>([])
+
   const loadGastos = useCallback(async () => {
     setLoading(true)
     try {
       const { from, to } = getMonthRange()
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_gastos?client_id=eq.${_cid()}&fecha=gte.${from}&fecha=lte.${to}&order=fecha.desc&limit=500`,
-        { headers: hdrs() }
-      )
-      if (res.ok) setGastos(await res.json())
+      const [gastosRes, provRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/pos_gastos?client_id=eq.${_cid()}&fecha=gte.${from}&fecha=lte.${to}&order=fecha.desc&limit=500`, { headers: hdrs() }),
+        fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?select=supplier&client_id=eq.${_cid()}&limit=1000`, { headers: hdrs() }),
+      ])
+      if (gastosRes.ok) setGastos(await gastosRes.json())
+      if (provRes.ok) {
+        const data = await provRes.json()
+        const unique = [...new Set(data.map((d: { supplier: string }) => d.supplier).filter(Boolean))] as string[]
+        setProveedores(unique.sort())
+      }
     } catch { /* */ }
     setLoading(false)
   }, [])
@@ -324,8 +331,12 @@ export default function GastosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-[var(--text-3)] mb-1">Proveedor *</label>
-                  <input type="text" value={form.proveedor} onChange={e => setForm({ ...form, proveedor: e.target.value })}
+                  <input type="text" list="proveedores-list" value={form.proveedor} onChange={e => setForm({ ...form, proveedor: e.target.value })}
+                    placeholder="Escribe o selecciona..."
                     className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-sm text-[var(--text-1)]" />
+                  <datalist id="proveedores-list">
+                    {proveedores.map(p => <option key={p} value={p} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-xs text-[var(--text-3)] mb-1">Fecha</label>
