@@ -192,6 +192,15 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
 
+  // Collapsible sections — auto-expand section containing current page
+  const activeSection = navSections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href))))
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(() => new Set(activeSection >= 0 ? [activeSection, 0] : [0]))
+  const toggleSection = (idx: number) => setExpandedSections(prev => {
+    const next = new Set(prev)
+    if (next.has(idx)) next.delete(idx); else next.add(idx)
+    return next
+  })
+
   const sidebarContent = (
     <aside className="flex flex-col h-screen sticky top-0 w-full lg:border-r lg:border-[var(--line)]" style={{ background: 'var(--surface)' }}>
       {/* Logo — with safe-area padding on mobile for iPhone notch */}
@@ -214,14 +223,28 @@ export default function Sidebar() {
 
       {/* Navigation sections */}
       <nav className="flex-1 px-3 py-2 overflow-y-auto">
-        {navSections.map((section) => {
+        {navSections.map((section, sectionIdx) => {
           const visibleItems = section.items.filter(item =>
             canAccessPage(role, item.href) && canPlanAccessPage(clientConfig?.plan, item.href)
           )
           if (visibleItems.length === 0) return null
+          const isExpanded = expandedSections.has(sectionIdx)
+          const hasActive = visibleItems.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href)))
           return (
           <div key={section.label}>
-            <div className="sidebar-section-label">{section.label}</div>
+            <button
+              onClick={() => toggleSection(sectionIdx)}
+              className="sidebar-section-label w-full flex items-center justify-between cursor-pointer hover:text-[var(--text-2)] transition-colors"
+            >
+              <span>{section.label}</span>
+              <span className="flex items-center gap-1">
+                {hasActive && !isExpanded && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                <svg width="12" height="12" viewBox="0 0 12 12" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                  <path d="M4 2L8 6L4 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </span>
+            </button>
+            {isExpanded && (
             <div className="space-y-0.5">
               {visibleItems.map((item) => {
                 const isActive =
@@ -241,6 +264,7 @@ export default function Sidebar() {
                 )
               })}
             </div>
+            )}
           </div>
           )
         })}
