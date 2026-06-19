@@ -1228,27 +1228,48 @@ function POSContent() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
 
-  // When URL mesa param changes (e.g. from plano), reset order for new mesa
-  // Use window.location directly because Next.js searchParams may be stale
+  // When URL mesa param changes (e.g. from plano), switch to new mesa and load its order
   useEffect(() => {
+    const loadOrderForMesa = async (newMesa: number) => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        )
+        if (res.ok) {
+          const rows = await res.json()
+          if (rows.length > 0) {
+            const order = rows[0]
+            const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+            setOrderItems(items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled))
+            setOrderId(order.id)
+            setMesero(order.mesero || MESEROS[0])
+            setPersonas(order.personas || 2)
+            setDiscount(order.descuento || 0)
+            setLoadedOrderId(order.id)
+            setLoadedUpdatedAt(order.updated_at || order.created_at || null)
+          } else {
+            setOrderItems([])
+            setOrderId(generateId())
+            setLoadedOrderId(null)
+            setLoadedUpdatedAt(null)
+          }
+        }
+      } catch { /* */ }
+      setCancelledItems(new Set())
+      setVoidedItems(new Set())
+    }
+
     const checkUrlMesa = () => {
       const params = new URLSearchParams(window.location.search)
       const urlMesa = Number(params.get('mesa')) || 0
       if (urlMesa > 0 && urlMesa !== mesa) {
         setMesa(urlMesa)
-        setOrderItems([])
-        setOrderId(generateId())
-        setLoadedOrderId(null)
-        setLoadedUpdatedAt(null)
-        setCancelledItems(new Set())
-        setVoidedItems(new Set())
-        setDiscount(0)
+        loadOrderForMesa(urlMesa)
       }
     }
-    // Check on popstate (browser back/forward) and on focus (returning from plano)
     window.addEventListener('popstate', checkUrlMesa)
     window.addEventListener('focus', checkUrlMesa)
-    // Also check periodically for router.push changes
     const interval = setInterval(checkUrlMesa, 500)
     return () => {
       window.removeEventListener('popstate', checkUrlMesa)
