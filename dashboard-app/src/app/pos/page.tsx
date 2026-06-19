@@ -1229,19 +1229,33 @@ function POSContent() {
   const [mesa, setMesa] = useState<number>(initialMesa)
 
   // When URL mesa param changes (e.g. from plano), reset order for new mesa
-  const urlMesa = Number(searchParams.get('mesa')) || 0
+  // Use window.location directly because Next.js searchParams may be stale
   useEffect(() => {
-    if (urlMesa > 0 && urlMesa !== mesa) {
-      setMesa(urlMesa)
-      setOrderItems([])
-      setOrderId(generateId())
-      setLoadedOrderId(null)
-      setLoadedUpdatedAt(null)
-      setCancelledItems(new Set())
-      setVoidedItems(new Set())
-      setDiscount(0)
+    const checkUrlMesa = () => {
+      const params = new URLSearchParams(window.location.search)
+      const urlMesa = Number(params.get('mesa')) || 0
+      if (urlMesa > 0 && urlMesa !== mesa) {
+        setMesa(urlMesa)
+        setOrderItems([])
+        setOrderId(generateId())
+        setLoadedOrderId(null)
+        setLoadedUpdatedAt(null)
+        setCancelledItems(new Set())
+        setVoidedItems(new Set())
+        setDiscount(0)
+      }
     }
-  }, [urlMesa])
+    // Check on popstate (browser back/forward) and on focus (returning from plano)
+    window.addEventListener('popstate', checkUrlMesa)
+    window.addEventListener('focus', checkUrlMesa)
+    // Also check periodically for router.push changes
+    const interval = setInterval(checkUrlMesa, 500)
+    return () => {
+      window.removeEventListener('popstate', checkUrlMesa)
+      window.removeEventListener('focus', checkUrlMesa)
+      clearInterval(interval)
+    }
+  }, [mesa])
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
     if (typeof window !== 'undefined') {
