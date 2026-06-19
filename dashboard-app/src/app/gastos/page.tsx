@@ -99,6 +99,21 @@ export default function GastosPage() {
     return true
   })
 
+  const [costAlert, setCostAlert] = useState('')
+
+  // Check cost against historical average for this proveedor
+  function validateCost(proveedor: string, subtotal: number) {
+    const historico = gastos.filter(g => g.proveedor === proveedor && g.subtotal > 0)
+    if (historico.length < 2) { setCostAlert(''); return }
+    const avg = historico.reduce((s, g) => s + g.subtotal, 0) / historico.length
+    const diff = Math.abs(subtotal - avg) / avg
+    if (diff > 0.3) {
+      setCostAlert(`⚠️ ${proveedor}: $${subtotal.toLocaleString()} es ${diff > 0 ? (subtotal > avg ? 'más caro' : 'más barato') : 'diferente'} que el promedio ($${Math.round(avg).toLocaleString()}). Diferencia: ${(diff * 100).toFixed(0)}%`)
+    } else {
+      setCostAlert('')
+    }
+  }
+
   async function handleSave() {
     const subtotal = parseFloat(form.subtotal) || 0
     const iva = parseFloat(form.iva) || subtotal * 0.16
@@ -361,7 +376,10 @@ export default function GastosPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-[var(--text-3)] mb-1">Subtotal</label>
-                  <input type="number" step="0.01" value={form.subtotal} onChange={e => setForm({ ...form, subtotal: e.target.value })}
+                  <input type="number" step="0.01" value={form.subtotal} onChange={e => {
+                    setForm({ ...form, subtotal: e.target.value })
+                    if (form.proveedor && e.target.value) validateCost(form.proveedor, parseFloat(e.target.value) || 0)
+                  }}
                     className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-sm text-[var(--text-1)]" />
                 </div>
                 <div>
@@ -399,8 +417,13 @@ export default function GastosPage() {
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-sm text-[var(--text-1)] resize-none" />
               </div>
             </div>
+            {costAlert && (
+              <div className="mx-6 mb-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-500">
+                {costAlert}
+              </div>
+            )}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--line)]">
-              <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm text-[var(--text-3)]">Cancelar</button>
+              <button onClick={() => { setShowAdd(false); setCostAlert('') }} className="px-4 py-2 text-sm text-[var(--text-3)]">Cancelar</button>
               <button onClick={handleSave} disabled={!form.proveedor}
                 className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 disabled:opacity-40">
                 Guardar
