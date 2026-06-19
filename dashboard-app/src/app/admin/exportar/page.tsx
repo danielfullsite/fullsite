@@ -14,7 +14,7 @@ function _cid() {
 const EXPORTS = [
   { id: 'ingredients', label: 'Ingredientes', icon: Package, table: 'pos_ingredients', select: '*', filter: true, desc: 'Catálogo completo de insumos con costos' },
   { id: 'inventory', label: 'Inventario (stocks)', icon: Layers, table: 'pos_inventory', select: '*', filter: true, desc: 'Stock actual de cada ingrediente' },
-  { id: 'recipes', label: 'Recetas', icon: ChefHat, table: 'pos_recipes_old', select: '*', filter: true, desc: 'Recetas con ingredientes y cantidades' },
+  { id: 'recipes', label: 'Recetas', icon: ChefHat, table: 'pos_recipes_old', select: 'menu_item_id,menu_item_name,ingredient_id,quantity,unit', filter: true, desc: 'Recetas con ingredientes y cantidades' },
   { id: 'menu', label: 'Menú (platillos)', icon: FileSpreadsheet, table: 'pos_menu_items', select: '*', filter: true, desc: 'Todos los platillos con precios' },
   { id: 'categories', label: 'Categorías', icon: Layers, table: 'pos_menu_categories', select: '*', filter: true, desc: 'Categorías del menú' },
   { id: 'staff', label: 'Staff', icon: Users, table: 'pos_staff', select: 'id,name,role,active', filter: true, desc: 'Empleados y roles (sin PINs)' },
@@ -25,27 +25,57 @@ const EXPORTS = [
 export default function ExportarPage() {
   const [downloading, setDownloading] = useState<string | null>(null)
 
+  function jsonToCsv(data: Record<string, unknown>[]): string {
+    if (data.length === 0) return ''
+    const keys = Object.keys(data[0])
+    const header = keys.join(',')
+    const rows = data.map(row => keys.map(k => {
+      const v = row[k]
+      if (v === null || v === undefined) return ''
+      const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }).join(','))
+    return [header, ...rows].join('\n')
+  }
+
   async function downloadCSV(exp: typeof EXPORTS[0]) {
     setDownloading(exp.id)
     try {
       const clientFilter = exp.filter ? `&client_id=eq.${_cid()}` : ''
-      const url = `${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}${clientFilter}&limit=10000`
-      const headers: Record<string, string> = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'text/csv' }
-      const res = await fetch(url, { headers })
+      const baseHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+
+      // Try CSV first
+      const csvUrl = `${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}${clientFilter}&limit=10000`
+      const res = await fetch(csvUrl, { headers: { ...baseHeaders, Accept: 'text/csv' } })
       const text = await res.text()
-      if (!res.ok || text.includes('"code"')) {
-        // Retry without client_id filter
-        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers })
-        const text2 = await res2.text()
-        if (!res2.ok || text2.includes('"code"')) {
-          alert(`Error exportando ${exp.label}: ${text2.slice(0, 100)}`)
-          setDownloading(null)
-          return
-        }
-        downloadFile(text2, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
-      } else {
+
+      if (res.ok && !text.includes('"code"') && text.length > 5) {
         downloadFile(text, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
+        setDownloading(null)
+        return
       }
+
+      // Retry without client_id
+      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers: { ...baseHeaders, Accept: 'text/csv' } })
+      const text2 = await res2.text()
+      if (res2.ok && !text2.includes('"code"') && text2.length > 5) {
+        downloadFile(text2, `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
+        setDownloading(null)
+        return
+      }
+
+      // Fallback: fetch as JSON and convert to CSV
+      const res3 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}${clientFilter}&limit=10000`, { headers: { ...baseHeaders, Accept: 'application/json' } })
+      if (!res3.ok) {
+        const res4 = await fetch(`${SUPABASE_URL}/rest/v1/${exp.table}?select=${exp.select}&limit=10000`, { headers: { ...baseHeaders, Accept: 'application/json' } })
+        if (!res4.ok) { alert(`Error exportando ${exp.label}`); setDownloading(null); return }
+        const json4 = await res4.json()
+        downloadFile(jsonToCsv(json4), `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
+        setDownloading(null)
+        return
+      }
+      const json3 = await res3.json()
+      downloadFile(jsonToCsv(json3), `${exp.id}_${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (e) {
       alert('Error: ' + (e instanceof Error ? e.message : 'desconocido'))
     }
