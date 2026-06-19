@@ -298,7 +298,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
 
       {/* Modal */}
-      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl mx-4">
+      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl mx-4 [&::-webkit-scrollbar]:w-4 [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
         {/* Header */}
         <div className="sticky top-0 bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <div>
@@ -3068,7 +3068,7 @@ function POSContent() {
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => setSelectedCategory('')} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
-                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain [&::-webkit-scrollbar]:w-4 [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-4">
                 {activeCategory.items.filter(item => item.price > 0).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
@@ -3106,7 +3106,7 @@ function POSContent() {
                       <h3 className="text-white font-bold text-lg">Combos <span className="text-white/60 text-sm font-normal ml-2">{allCombos.length} disponibles</span></h3>
                       <button onClick={() => setShowComboModal(false)} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
-                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain [&::-webkit-scrollbar]:w-4 [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
                       <div className="space-y-3">
                         {allCombos.map(combo => {
                           const menuPrices = new Map<string, number>()
