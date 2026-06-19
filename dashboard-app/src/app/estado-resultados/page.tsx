@@ -123,11 +123,14 @@ export default function EstadoResultadosPage() {
       .sort((a, b) => b.mes.localeCompare(a.mes))
   }, [data, effectiveFoodCostPct, periodoView])
 
-  const totalBrutas = data.reduce((s, d) => s + (d.ventas_brutas || 0), 0)
-  const totalDescuentos = data.reduce((s, d) => s + (d.descuentos || 0), 0)
-  const totalNetas = data.reduce((s, d) => s + (d.ventas_dia || 0), 0)
-  const totalCostoEstimado = totalNetas * effectiveFoodCostPct
-  const totalMargenBruto = totalNetas - totalCostoEstimado
+  // KPIs show the most recent period (first row of table)
+  const currentPeriod = monthlyPL[0]
+  const totalBrutas = currentPeriod?.ventasBrutas || 0
+  const totalDescuentos = currentPeriod?.descuentos || 0
+  const totalNetas = currentPeriod?.ventasNetas || 0
+  const totalCostoEstimado = currentPeriod?.costoEstimado || 0
+  const totalMargenBruto = currentPeriod?.margenBruto || 0
+  const kpiLabel = currentPeriod?.mesLabel || ''
   const foodCostLabel = isRealFoodCost
     ? `Food cost real ${(effectiveFoodCostPct * 100).toFixed(1)}%`
     : 'Food cost estimado al 35%'
@@ -162,21 +165,21 @@ export default function EstadoResultadosPage() {
             <KPICard
               label="Ventas brutas"
               value={formatCurrency(totalBrutas)}
-              subtitle="Total historico"
+              subtitle={kpiLabel}
               icon={DollarSign}
               accentClass="kpi-accent-blue"
             />
             <KPICard
               label="Descuentos"
               value={formatCurrency(totalDescuentos)}
-              subtitle={totalBrutas > 0 ? `${((totalDescuentos / totalBrutas) * 100).toFixed(1)}% de ventas brutas` : ''}
+              subtitle={totalBrutas > 0 ? `${((totalDescuentos / totalBrutas) * 100).toFixed(1)}% de brutas · ${kpiLabel}` : kpiLabel}
               icon={TrendingDown}
               accentClass="kpi-accent-amber"
             />
             <KPICard
               label="Ventas netas"
               value={formatCurrency(totalNetas)}
-              subtitle="Despues de descuentos"
+              subtitle={kpiLabel}
               icon={TrendingUp}
               accentClass="kpi-accent-green"
             />
