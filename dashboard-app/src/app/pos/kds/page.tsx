@@ -35,36 +35,29 @@ interface ParsedItem {
   station?: string  // 'cocina' | 'barra' | 'caja' — fijada por el POS al agregar (por categoría)
 }
 
-type Station = 'caliente' | 'fria' | 'panaderia' | 'barra'
+type Station = 'cocina' | 'panaderia' | 'barra'
 
 const STATION_KEYWORDS: Record<string, string[]> = {
   barra: ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
-  fria: ['bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
   panaderia: ['croissant', 'concha', 'bakery', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
 }
 
 function getStation(item: ParsedItem): string {
-  // Estación explícita del POS (ruteo por categoría) — fuente de verdad
   if (item.station === 'barra') return 'barra'
   if (item.station === 'caja') return 'panaderia'
   const name = (item.nombre || item.name || '').toLowerCase()
   if (item.station === 'cocina') {
-    // Dentro de cocina, separar fría/panadería por keywords; nunca barra
-    for (const st of ['fria', 'panaderia']) {
-      if (STATION_KEYWORDS[st].some(kw => name.includes(kw))) return st
-    }
-    return 'caliente'
+    if (STATION_KEYWORDS.panaderia.some(kw => name.includes(kw))) return 'panaderia'
+    return 'cocina'
   }
-  // Órdenes viejas sin station: clasificación por nombre (legacy)
   for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
     if (keywords.some(kw => name.includes(kw))) return station
   }
-  return 'caliente'
+  return 'cocina'
 }
 
 const STATION_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  caliente: { label: 'Cocina', color: 'text-red-400', bg: 'bg-red-600' },
-  fria: { label: 'Fria', color: 'text-cyan-400', bg: 'bg-cyan-600' },
+  cocina: { label: 'Cocina', color: 'text-amber-400', bg: 'bg-amber-600' },
   panaderia: { label: 'Panaderia', color: 'text-orange-400', bg: 'bg-orange-600' },
   barra: { label: 'Barra', color: 'text-blue-400', bg: 'bg-blue-600' },
 }
@@ -94,7 +87,7 @@ function playAlert() {
 
 export default function KDSPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
-  const [station, setStation] = useState<Station>('caliente')
+  const [station, setStation] = useState<Station>('cocina')
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
@@ -181,7 +174,7 @@ export default function KDSPage() {
     })
 
   // Station counts
-  const stationCounts: Record<string, number> = { caliente: 0, fria: 0, panaderia: 0, barra: 0 }
+  const stationCounts: Record<string, number> = { cocina: 0, panaderia: 0, barra: 0 }
   for (const o of orders.filter(o => o.status === 'enviada' || o.status === 'preparando')) {
     const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
     for (const item of items) {
