@@ -235,6 +235,23 @@ export default function MesasPage() {
 
   const mesas = Array.from(mesaMap.values())
 
+  // Assign consistent colors to meseros
+  const MESERO_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#06b6d4', '#84cc16', '#f43f5e', '#a855f7', '#14b8a6', '#eab308']
+  const uniqueMeseros = Array.from(new Set(mesas.filter(m => m.mesero).map(m => m.mesero as string)))
+  const meseroColorMap: Record<string, string> = {}
+  uniqueMeseros.forEach((m, i) => { meseroColorMap[m] = MESERO_COLORS[i % MESERO_COLORS.length] })
+
+  const getMesaColor = (mesa: Mesa): string => {
+    if (mesa.status === 'disponible') return 'bg-emerald-900/40 border-emerald-600/60 hover:bg-emerald-800/50'
+    if (mesa.status === 'cuenta') return 'bg-amber-900/40 border-amber-500/60 hover:bg-amber-800/50'
+    return 'bg-blue-900/40 border-blue-500/60 hover:bg-blue-800/50'
+  }
+  const getMeseroBorderStyle = (mesa: Mesa): React.CSSProperties => {
+    if (mesa.status === 'disponible' || !mesa.mesero) return {}
+    const color = meseroColorMap[mesa.mesero]
+    return color ? { borderColor: color, boxShadow: `0 0 8px ${color}40` } : {}
+  }
+
   const statusColor: Record<string, string> = {
     disponible: 'bg-emerald-900/40 border-emerald-600/60 hover:bg-emerald-800/50',
     ocupada: 'bg-blue-900/40 border-blue-500/60 hover:bg-blue-800/50',
@@ -473,12 +490,18 @@ export default function MesasPage() {
             } ${
               mergeSource === mesa.number ? 'ring-4 ring-amber-400 border-amber-400 bg-amber-900/60' :
               mergeTarget === mesa.number ? 'ring-4 ring-emerald-400 border-emerald-400 bg-emerald-900/60' :
-              statusColor[mesa.status]
+              getMesaColor(mesa)
             }`}
+            style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
           >
             <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-xl' : 'text-base'}`}>{mesa.number}</span>
+            {order && mesa.mesero && (
+              <span className="text-[7px] font-medium leading-tight mt-0.5 text-[var(--text-3)] truncate max-w-[90%]">
+                {mesa.mesero.split(' ')[0]}
+              </span>
+            )}
             {order && (
-              <span className={`text-[9px] font-mono font-bold leading-tight mt-0.5 ${
+              <span className={`text-[9px] font-mono font-bold leading-tight ${
                 isAlert ? 'text-red-400 animate-pulse' : isWarning ? 'text-amber-400' : 'text-[var(--text-3)]'
               }`}>
                 {mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60}` : `${mins}m`}
