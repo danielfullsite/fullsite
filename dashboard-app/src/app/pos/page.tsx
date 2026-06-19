@@ -1588,6 +1588,7 @@ function POSContent() {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
             setOrderItems(items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled))
+            setOrderId(order.id)
             setMesero(order.mesero || MESEROS[0])
             setPersonas(order.personas || 2)
             setDiscount(order.descuento || 0)
@@ -1597,7 +1598,12 @@ function POSContent() {
         }
       } catch { /* */ }
     }
-    if (orderItems.length === 0) loadMesaOrder()
+    if (orderItems.length === 0) {
+      setOrderId(generateId())
+      setLoadedOrderId(null)
+      setLoadedUpdatedAt(null)
+      loadMesaOrder()
+    }
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
 
@@ -1618,7 +1624,7 @@ function POSContent() {
   const [voidedItems, setVoidedItems] = useState<Set<string>>(new Set())
 
   // Order ID for audit trail (generated once per order)
-  const [orderId] = useState(() => generateId())
+  const [orderId, setOrderId] = useState(() => generateId())
 
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
@@ -2098,6 +2104,8 @@ function POSContent() {
       // Print per-station tickets (splits order by cocina/barra/caja)
       printByStation(order)
 
+      setLoadedOrderId(orderId)
+      setLoadedUpdatedAt(new Date().toISOString())
       setSentToKitchen(true)
       setTimeout(() => setSentToKitchen(false), 2000)
     } else {
