@@ -170,10 +170,11 @@ export default function MesasPage() {
       const el = planoWrapRef.current
       if (el) {
         const scaleW = el.clientWidth / PLANO_BASE_W
-        // Available height: viewport minus header (~130px)
-        const availH = window.innerHeight - 140
+        // Available height: viewport minus header (~130px) and alert bar (~50px)
+        const availH = window.innerHeight - 190
         const scaleH = availH / PLANO_BASE_H
-        setPlanoScale(Math.min(1, scaleW, scaleH))
+        // Fill available space — no max cap, let it grow to fit the screen
+        setPlanoScale(Math.min(scaleW, scaleH))
       }
     }
     update()
