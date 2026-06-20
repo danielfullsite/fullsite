@@ -161,8 +161,8 @@ export default function MesasPage() {
   }, [])
 
   // Escala del plano: se ajusta al ancho Y alto disponible para que quepa sin scroll
-  const PLANO_BASE_W = 1400
-  const PLANO_BASE_H = 1400 * 0.65
+  const PLANO_BASE_W = 1200
+  const PLANO_BASE_H = 1200 * 0.75
   const planoWrapRef = useRef<HTMLDivElement>(null)
   const [planoScale, setPlanoScale] = useState(1)
   useEffect(() => {
