@@ -161,8 +161,8 @@ export default function MesasPage() {
   }, [])
 
   // Escala del plano: se ajusta al ancho Y alto disponible para que quepa sin scroll
-  const PLANO_BASE_W = 1100
-  const PLANO_BASE_H = 1100 * 0.65
+  const PLANO_BASE_W = 1400
+  const PLANO_BASE_H = 1400 * 0.65
   const planoWrapRef = useRef<HTMLDivElement>(null)
   const [planoScale, setPlanoScale] = useState(1)
   useEffect(() => {
@@ -526,7 +526,7 @@ export default function MesasPage() {
     return (
       <div className="pb-2">
         {/* Wrapper que mide el ancho disponible; el plano se escala para caber sin scroll */}
-        <div ref={planoWrapRef} className="max-w-6xl mx-auto" style={{ height: PLANO_BASE_H * planoScale }}>
+        <div ref={planoWrapRef} className="max-w-[95vw] mx-auto" style={{ height: PLANO_BASE_H * planoScale }}>
         <div
           className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl"
           style={{ width: PLANO_BASE_W, height: PLANO_BASE_H, transform: `scale(${planoScale})`, transformOrigin: 'top left' }}
