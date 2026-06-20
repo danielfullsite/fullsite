@@ -26,10 +26,10 @@ interface FloorTable {
 }
 
 const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
-  round: { w: 62, h: 62 },
-  'round-lg': { w: 82, h: 82 },
-  square: { w: 64, h: 60 },
-  'rect-h': { w: 96, h: 56 },
+  round: { w: 80, h: 80 },
+  'round-lg': { w: 105, h: 105 },
+  square: { w: 84, h: 78 },
+  'rect-h': { w: 124, h: 72 },
 }
 
 // Posiciones calcadas del plano físico
@@ -428,7 +428,7 @@ export default function MesasPage() {
   // Sillas alrededor de una mesa, según forma y capacidad
   const Chairs = ({ shape, capacity, status }: { shape: TableShape; capacity: number; status: string }) => {
     const { w, h } = TABLE_SIZE[shape]
-    const chairClass = `absolute w-[13px] h-[13px] rounded-full ${
+    const chairClass = `absolute w-[16px] h-[16px] rounded-full ${
       status === 'ocupada' ? 'bg-blue-500/70' :
       status === 'cuenta' ? 'bg-amber-500/70' : 'bg-slate-500/60'
     }`
@@ -495,7 +495,7 @@ export default function MesasPage() {
             }`}
             style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
           >
-            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-xl' : 'text-base'}`}>{mesa.number}</span>
+            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-2xl' : 'text-xl'}`}>{mesa.number}</span>
             {order && mesa.mesero && (
               <span className="text-[7px] font-medium leading-tight mt-0.5 text-[var(--text-3)] truncate max-w-[90%]">
                 {mesa.mesero.split(' ')[0]}
