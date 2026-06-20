@@ -14,14 +14,29 @@ const quickQuestions = [
   '¿Cómo vamos vs la semana pasada?',
 ]
 
-// Renderiza **texto** como negritas (el LLM responde con markdown básico)
-function renderBold(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((part, i) =>
-    part.startsWith('**') && part.endsWith('**')
-      ? <strong key={i}>{part.slice(2, -2)}</strong>
-      : part
-  )
+// Renderiza markdown básico: **negritas** y [links](url)
+function renderMarkdown(text: string) {
+  // First split by links [text](url)
+  const linkParts = text.split(/(\[[^\]]+\]\([^)]+\))/g)
+  return linkParts.map((part, i) => {
+    const linkMatch = part.match(/\[([^\]]+)\]\(([^)]+)\)/)
+    if (linkMatch) {
+      const [, label, href] = linkMatch
+      return (
+        <a key={i} href={href} className="text-emerald-400 hover:text-emerald-300 underline font-medium"
+          onClick={(e) => { e.preventDefault(); window.location.href = href }}>
+          {label}
+        </a>
+      )
+    }
+    // Then handle **bold** within non-link parts
+    const boldParts = part.split(/(\*\*[^*]+\*\*)/g)
+    return boldParts.map((bp, j) =>
+      bp.startsWith('**') && bp.endsWith('**')
+        ? <strong key={`${i}-${j}`}>{bp.slice(2, -2)}</strong>
+        : <span key={`${i}-${j}`}>{bp}</span>
+    )
+  })
 }
 
 export default function ChatWidget() {
@@ -196,7 +211,7 @@ export default function ChatWidget() {
                     : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
                 }`}
               >
-                <div className="whitespace-pre-wrap">{renderBold(msg.content)}</div>
+                <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
               </div>
             </div>
           </div>
