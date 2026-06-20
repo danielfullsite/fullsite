@@ -4,8 +4,8 @@ export const IVA_RATE = 0.16
 
 export const KITCHEN_ARCHIVE_HOURS = 4
 
-export const POLL_INTERVAL_KITCHEN = 5000  // 5 seconds
-export const POLL_INTERVAL_KDS = 3000
+export const POLL_INTERVAL_KITCHEN = 2000  // 2 seconds — fast for real-time feel
+export const POLL_INTERVAL_KDS = 1500     // 1.5 seconds — near-instant for cocina
 
 // Beverage keywords — used by both Cocina (to exclude) and Barra (to include)
 export const BEBIDA_KEYWORDS = [

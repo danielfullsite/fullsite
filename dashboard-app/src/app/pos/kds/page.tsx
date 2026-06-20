@@ -126,7 +126,7 @@ export default function KDSPage() {
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, 3000)
+    const interval = setInterval(fetchOrders, 1500)
     const timerInterval = setInterval(() => setTick(t => t + 1), 10000)
     return () => { clearInterval(interval); clearInterval(timerInterval) }
   }, [fetchOrders])

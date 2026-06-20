@@ -2116,6 +2116,14 @@ function POSContent() {
       notas: orderNotes || undefined,
       createdAt: new Date(),
     }
+    // Optimistic UI: show toast immediately, save in background
+    showToast('Orden enviada a cocina')
+    setSentToKitchen(true)
+    setTimeout(() => setSentToKitchen(false), 2000)
+
+    // Print immediately (don't wait for save)
+    printByStation(order)
+
     const ok = await saveOrder(order)
     if (ok) {
       logAudit({
@@ -2123,21 +2131,15 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      showToast('Orden enviada a cocina')
-
       // Auto-deduct ingredients from inventory (fire-and-forget, don't block UI)
       deductIngredientsForOrder(activeItems, orderId, mesero).then(result => {
         if (result.alerts.length > 0) {
           showToast(`${result.alerts.length} alertas de inventario`)
         }
       }).catch(() => {})
-      // Print per-station tickets (splits order by cocina/barra/caja)
-      printByStation(order)
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
-      setSentToKitchen(true)
-      setTimeout(() => setSentToKitchen(false), 2000)
     } else {
       showToast('Error al guardar orden')
     }
