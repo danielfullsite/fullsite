@@ -66,9 +66,9 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 63, x: 94, y: 66, shape: 'rect-h' },
   // ── Fila 5: 43 pasillo · 42 41 40 terraza · 12 barra · 60 62 (PRIVADO)
   { number: 43, x: 8, y: 80, shape: 'round' },
-  { number: 42, x: 25, y: 80, shape: 'rect-h' },
-  { number: 41, x: 36, y: 80, shape: 'rect-h' },
-  { number: 40, x: 44, y: 80, shape: 'rect-h' },
+  { number: 42, x: 24, y: 80, shape: 'rect-h' },
+  { number: 41, x: 35, y: 80, shape: 'rect-h' },
+  { number: 40, x: 46, y: 80, shape: 'rect-h' },
   { number: 12, x: 57, y: 80, shape: 'square' },
   { number: 60, x: 84, y: 84, shape: 'rect-h' },
   { number: 62, x: 94, y: 84, shape: 'rect-h' },
