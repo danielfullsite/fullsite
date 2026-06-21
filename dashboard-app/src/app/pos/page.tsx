@@ -233,6 +233,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
   )
   const [notas, setNotas] = useState(existingOrder?.notas ?? '')
   const [cantidad, setCantidad] = useState(existingOrder?.cantidad ?? 1)
+  const [showQuitar, setShowQuitar] = useState(quitarChecked.size > 0)
 
   const toggleQuitar = (mod: string) => {
     setQuitarChecked(prev => {
@@ -313,17 +314,23 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-5 flex-1 overflow-y-auto pos-fat-scroll">
-          {/* Quitar section — dynamic from recipe ingredients */}
+        <div className="px-5 py-3 space-y-3 flex-1 overflow-y-auto pos-fat-scroll">
+          {/* Quitar section — collapsed by default, expand on tap */}
           {quitarOptions.length > 0 && <div>
-            <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">
-              Quitar {recipeIngredients.length > 0 && <span className="text-[var(--text-2)] normal-case font-normal">({recipeIngredients.length} ingredientes)</span>}
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setShowQuitar(prev => !prev)}
+              className="w-full flex items-center justify-between py-2 text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide"
+            >
+              <span>Quitar {quitarChecked.size > 0 && <span className="text-red-400">({quitarChecked.size})</span>}</span>
+              <span className="text-xs normal-case text-[var(--text-4)]">{showQuitar ? '▲ Cerrar' : '▼ Abrir'}</span>
+            </button>
+            {showQuitar && (
+            <div className="grid grid-cols-2 gap-1.5">
               {quitarOptions.map(mod => (
                 <label
                   key={mod}
-                  className={`flex items-center gap-3 px-4 py-4 rounded-xl cursor-pointer transition-colors min-h-[52px] ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                     quitarChecked.has(mod)
                       ? 'bg-red-900/40 border border-red-700/60'
                       : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
@@ -335,10 +342,10 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     onChange={() => toggleQuitar(mod)}
                     className="sr-only"
                   />
-                  <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                     quitarChecked.has(mod)
                       ? 'bg-red-500 border-red-500'
-                      : 'border-[var(--line-soft)]0'
+                      : 'border-slate-500'
                   }`}>
                     {quitarChecked.has(mod) && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -350,6 +357,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                 </label>
               ))}
             </div>
+            )}
           </div>}
 
           {/* Grupos multinivel (Wansoft) */}
@@ -375,14 +383,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     </span>
                   )}
                 </h4>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   {group.options.map(opt => {
                     const checked = sel.has(opt.name)
                     const blocked = !checked && group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
                     return (
                       <label
                         key={opt.name}
-                        className={`flex items-center gap-3 px-4 py-4 rounded-xl transition-colors min-h-[52px] ${
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
                           checked
                             ? 'bg-emerald-900/40 border border-emerald-700/60 cursor-pointer'
                             : blocked
@@ -461,59 +469,28 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             </div>
           </div>}
 
-          {/* Notas por item */}
-          <div>
-            <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Notas del platillo</h4>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {['Termino medio', 'Bien cocido', 'Tres cuartos', 'Sin picante', 'Extra caliente', 'Para llevar', 'Urgente', 'Alergia'].map(tag => {
-                const isActive = notas.includes(tag)
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => {
-                      if (isActive) {
-                        setNotas(notas.replace(tag, '').replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '').trim())
-                      } else {
-                        setNotas(prev => prev ? `${prev}, ${tag}` : tag)
-                      }
-                    }}
-                    className={`px-4 min-h-[48px] rounded-lg text-sm font-semibold transition-colors ${
-                      isActive
-                        ? 'bg-amber-600/40 border border-amber-500/60 text-amber-200'
-                        : 'bg-[var(--line)]/50 border border-slate-600/50 text-slate-300 hover:bg-[var(--line)]'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                )
-              })}
-            </div>
+          {/* Notas + Cantidad — compact row */}
+          <div className="flex items-center gap-3">
             <input
               type="text"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
-              placeholder="Instrucciones especiales: sin cebolla, termino medio..."
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[44px]"
+              placeholder="Notas: sin cebolla, termino medio..."
+              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500"
             />
-          </div>
-
-          {/* Cantidad */}
-          <div>
-            <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Cantidad</h4>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                className="w-12 h-12 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-white transition-colors"
+                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white"
               >
-                <Minus size={20} />
+                <Minus size={18} />
               </button>
-              <span className="text-2xl font-bold text-white w-12 text-center">{cantidad}</span>
+              <span className="text-xl font-bold text-white w-8 text-center">{cantidad}</span>
               <button
                 onClick={() => setCantidad(cantidad + 1)}
-                className="w-12 h-12 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center text-white transition-colors"
+                className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white"
               >
-                <Plus size={20} />
+                <Plus size={18} />
               </button>
             </div>
           </div>
