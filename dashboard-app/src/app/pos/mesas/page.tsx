@@ -551,6 +551,8 @@ export default function MesasPage() {
           ))}
           {/* Divisor vertical interior / exterior (toldo + privado a la derecha) */}
           <div className="absolute top-[2%] bottom-[2%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
+          {/* Divisor horizontal entre Toldo y Privado */}
+          <div className="absolute border-t-2 border-dashed border-[var(--line)]" style={{ left: '77%', right: '1%', top: '55%' }} />
           {/* Marca AMALAY */}
           <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '93%' }}>
             AMALAY
