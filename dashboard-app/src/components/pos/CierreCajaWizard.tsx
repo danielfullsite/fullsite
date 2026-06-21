@@ -77,6 +77,8 @@ export default function CierreCajaWizard({
     cancelaciones: 0,
     descuentos: 0,
     propinas: 0,
+    depositos: 0,
+    retiros: 0,
   })
 
   // Fetch system sales data for this shift
@@ -114,7 +116,23 @@ export default function CierreCajaWizard({
             }
           }
 
-          setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas })
+          // Fetch cash movements (depositos / retiros) for this turno
+          let depositos = 0, retiros = 0
+          try {
+            const movRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=tipo,monto`,
+              { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+            )
+            if (movRes.ok) {
+              const movements = await movRes.json()
+              for (const m of movements) {
+                if (m.tipo === 'deposito') depositos += Number(m.monto) || 0
+                else if (m.tipo === 'retiro') retiros += Number(m.monto) || 0
+              }
+            }
+          } catch { /* */ }
+
+          setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas, depositos, retiros })
         }
       } catch { /* */ }
       setLoading(false)
@@ -125,7 +143,7 @@ export default function CierreCajaWizard({
   const totalBilletes = Object.entries(billetes).reduce((sum, [denom, qty]) => sum + (Number(denom) * qty), 0)
   const totalMonedas = Object.entries(monedas).reduce((sum, [denom, qty]) => sum + (Number(denom) * qty), 0)
   const totalContado = totalBilletes + totalMonedas
-  const efectivoEsperado = fondoInicial + systemData.efectivo
+  const efectivoEsperado = fondoInicial + systemData.efectivo + systemData.depositos - systemData.retiros
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
@@ -365,6 +383,18 @@ export default function CierreCajaWizard({
                   <span className="text-[var(--text-3)]">Ventas en efectivo</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.efectivo)}</span>
                 </div>
+                {systemData.depositos > 0 && (
+                  <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-3)]">Depósitos</span>
+                    <span className="text-emerald-400 font-medium">+{formatMXN(systemData.depositos)}</span>
+                  </div>
+                )}
+                {systemData.retiros > 0 && (
+                  <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                    <span className="text-[var(--text-3)]">Retiros</span>
+                    <span className="text-red-400 font-medium">-{formatMXN(systemData.retiros)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-2 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Ventas tarjeta</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.tarjeta)}</span>

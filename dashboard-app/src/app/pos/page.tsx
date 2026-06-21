@@ -1233,7 +1233,7 @@ function POSContent() {
     const loadOrderForMesa = async (newMesa: number) => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (res.ok) {
@@ -1248,6 +1248,7 @@ function POSContent() {
             setDiscount(order.descuento || 0)
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
+            setOrderNotes(order.notas || '')
           } else {
             setOrderItems([])
             setOrderId(generateId())
@@ -1628,7 +1629,7 @@ function POSContent() {
           ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
           : `mesa=eq.${mesa}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (cancelled) return // mesa changed while fetching
@@ -1644,6 +1645,7 @@ function POSContent() {
             setDiscount(order.descuento || 0)
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
+            setOrderNotes(order.notas || '')
           }
         }
       } catch { /* */ }
@@ -1687,7 +1689,7 @@ function POSContent() {
       const saved = sessionStorage.getItem('pos_staff')
       if (saved) {
         const s = JSON.parse(saved)
-        setStaffRole(s.role || 'admin')
+        setStaffRole(s.role || 'cajero')
         setStaffName(s.name || '')
       }
     } catch { /* */ }
@@ -2480,7 +2482,7 @@ function POSContent() {
           <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px]">
             {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
-          <select value={mesero} onChange={(e) => { setMesero(e.target.value); try { localStorage.setItem('pos_mesero', e.target.value) } catch {} }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
+          <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }) } }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
@@ -3785,9 +3787,9 @@ function POSContent() {
                 {[0, 10, 15, 20].map(pct => (
                   <button
                     key={pct}
-                    onClick={() => setPropina(pct === 0 ? 0 : Math.round(total * pct / 100))}
+                    onClick={() => setPropina(pct === 0 ? 0 : Math.round(payTotal * pct / 100))}
                     className={`flex-1 min-h-[52px] rounded-lg text-base font-bold transition-colors ${
-                      (pct === 0 && propina === 0) || (pct > 0 && propina === Math.round(total * pct / 100))
+                      (pct === 0 && propina === 0) || (pct > 0 && propina === Math.round(payTotal * pct / 100))
                         ? 'bg-emerald-600 text-white'
                         : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
                     }`}
