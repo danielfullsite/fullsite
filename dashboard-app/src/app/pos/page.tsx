@@ -298,8 +298,8 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
 
-      {/* Modal — full height, max-width for large screens */}
-      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full max-w-2xl h-[calc(100vh-2rem)] rounded-2xl shadow-2xl flex flex-col mx-auto my-4">
+      {/* Modal — full height, wide for POS touch */}
+      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full max-w-4xl h-[calc(100vh-2rem)] rounded-2xl shadow-2xl flex flex-col mx-auto my-4">
         {/* Header */}
         <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
           <div>
@@ -326,7 +326,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               <span className="text-xs normal-case text-[var(--text-4)]">{showQuitar ? '▲ Cerrar' : '▼ Abrir'}</span>
             </button>
             {showQuitar && (
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {quitarOptions.map(mod => (
                 <label
                   key={mod}
@@ -383,7 +383,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     </span>
                   )}
                 </h4>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                   {group.options.map(opt => {
                     const checked = sel.has(opt.name)
                     const blocked = !checked && group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
@@ -431,7 +431,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           {/* Agregar section */}
           {agregarOptions.length > 0 && <div>
             <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Agregar</h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {agregarOptions.map(mod => (
                 <label
                   key={mod.name}
