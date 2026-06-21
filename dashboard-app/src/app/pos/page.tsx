@@ -297,10 +297,10 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
 
-      {/* Modal — full height on touch, centered card on desktop */}
-      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] sm:rounded-2xl sm:mx-4 shadow-2xl flex flex-col">
-        {/* Header — sticky */}
-        <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between sm:rounded-t-2xl flex-shrink-0">
+      {/* Modal — full height, max-width for large screens */}
+      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full max-w-2xl h-[calc(100vh-2rem)] rounded-2xl shadow-2xl flex flex-col mx-auto my-4">
+        {/* Header */}
+        <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
           <div>
             <h3 className="text-lg font-bold text-white">{item.name}</h3>
             <p className="text-emerald-400 font-semibold">{formatMXN(item.price)}</p>
@@ -520,7 +520,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
         </div>
 
         {/* Footer buttons — always visible */}
-        <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 sm:rounded-b-2xl flex-shrink-0">
+        <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 rounded-b-2xl flex-shrink-0">
           <button
             onClick={onCancel}
             className="flex-1 py-3.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]"
