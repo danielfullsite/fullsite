@@ -60,7 +60,7 @@ const FLOOR_TABLES: FloorTable[] = [
   // ── Fila 4: 32 31 30 terraza · 11 barra · 61 63 (PRIVADO)
   { number: 32, x: 25, y: 62, shape: 'round' },
   { number: 31, x: 35, y: 62, shape: 'round' },
-  { number: 30, x: 46, y: 62, shape: 'round-lg' },
+  { number: 30, x: 43, y: 62, shape: 'round-lg' },
   { number: 11, x: 57, y: 62, shape: 'square' },
   { number: 61, x: 84, y: 62, shape: 'rect-h' },
   { number: 63, x: 94, y: 62, shape: 'rect-h' },
@@ -68,7 +68,7 @@ const FLOOR_TABLES: FloorTable[] = [
   { number: 43, x: 8, y: 80, shape: 'round' },
   { number: 42, x: 25, y: 80, shape: 'rect-h' },
   { number: 41, x: 36, y: 80, shape: 'rect-h' },
-  { number: 40, x: 47, y: 80, shape: 'rect-h' },
+  { number: 40, x: 44, y: 80, shape: 'rect-h' },
   { number: 12, x: 57, y: 80, shape: 'square' },
   { number: 60, x: 84, y: 80, shape: 'rect-h' },
   { number: 62, x: 94, y: 80, shape: 'rect-h' },
@@ -541,8 +541,8 @@ export default function MesasPage() {
           {FLOOR_LABELS.map(label => (
             <span
               key={label.text}
-              className={`absolute font-bold uppercase text-[var(--text-4)] opacity-60 pointer-events-none tracking-[0.25em] ${
-                label.vertical ? '[writing-mode:vertical-rl] text-sm' : 'text-sm'
+              className={`absolute font-bold uppercase text-[var(--text-3)] opacity-80 pointer-events-none tracking-[0.3em] ${
+                label.vertical ? '[writing-mode:vertical-rl] text-base' : 'text-base'
               }`}
               style={{ left: `${label.x}%`, top: `${label.y}%`, transform: `translate(-50%, -50%)${label.vertical ? ' rotate(180deg)' : ''}` }}
             >
