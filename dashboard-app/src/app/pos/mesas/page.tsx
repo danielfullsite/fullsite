@@ -26,10 +26,10 @@ interface FloorTable {
 }
 
 const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
-  round: { w: 62, h: 62 },
-  'round-lg': { w: 78, h: 78 },
-  square: { w: 66, h: 62 },
-  'rect-h': { w: 96, h: 52 },
+  round: { w: 70, h: 70 },
+  'round-lg': { w: 90, h: 90 },
+  square: { w: 74, h: 68 },
+  'rect-h': { w: 108, h: 58 },
 }
 
 // Posiciones calcadas del plano físico
@@ -160,21 +160,15 @@ export default function MesasPage() {
       .catch(() => { /* */ })
   }, [])
 
-  // Escala del plano: JS puro, calcula desde window dimensions
+  // Escala del plano: cabe en ancho Y alto sin scroll
   const PLANO_BASE_W = 1200
   const PLANO_BASE_H = 696
-  const [planoScale, setPlanoScale] = useState(0.65)
-  const [debugInfo, setDebugInfo] = useState('')
+  const [planoScale, setPlanoScale] = useState(0.75)
   useEffect(() => {
     const compute = () => {
-      const iw = window.innerWidth
-      const ih = window.innerHeight
-      const availW = iw - 32
-      const availH = ih - 240
-      const sW = availW / PLANO_BASE_W
-      const sH = availH / PLANO_BASE_H
-      const s = Math.min(sW, sH)
-      setDebugInfo(`iw=${iw} ih=${ih} aW=${availW} aH=${availH} sW=${sW.toFixed(2)} sH=${sH.toFixed(2)} → ${s.toFixed(2)}`)
+      const availW = window.innerWidth - 32
+      const availH = window.innerHeight - 170
+      const s = Math.min(availW / PLANO_BASE_W, availH / PLANO_BASE_H)
       if (s > 0.2) setPlanoScale(s)
     }
     compute()
@@ -429,7 +423,7 @@ export default function MesasPage() {
   // Sillas alrededor de una mesa, según forma y capacidad
   const Chairs = ({ shape, capacity, status }: { shape: TableShape; capacity: number; status: string }) => {
     const { w, h } = TABLE_SIZE[shape]
-    const chairClass = `absolute w-[10px] h-[10px] rounded-full ${
+    const chairClass = `absolute w-[12px] h-[12px] rounded-full ${
       status === 'ocupada' ? 'bg-blue-500/70' :
       status === 'cuenta' ? 'bg-amber-500/70' : 'bg-slate-500/60'
     }`
@@ -493,7 +487,7 @@ export default function MesasPage() {
             }`}
             style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
           >
-            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-xl' : 'text-lg'}`}>{mesa.number}</span>
+            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-2xl' : 'text-xl'}`}>{mesa.number}</span>
             {order && mesa.mesero && (
               <span className="text-[7px] font-medium leading-tight mt-0.5 text-[var(--text-3)] truncate max-w-[90%]">
                 {mesa.mesero.split(' ')[0]}
@@ -523,8 +517,6 @@ export default function MesasPage() {
     const unassigned = mesas.filter(m => !floorNumbers.has(m.number))
     return (
       <div>
-        {/* Debug overlay — remove after fixing */}
-        {debugInfo && <div className="text-[10px] text-yellow-400 font-mono mb-1">{debugInfo}</div>}
         {/* Scaled plano container */}
         <div className="mx-auto" style={{ width: PLANO_BASE_W * planoScale, height: PLANO_BASE_H * planoScale }}>
 
