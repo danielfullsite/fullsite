@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign } from 'lucide-react'
-import { formatMXN, verifyManagerPin, logAudit } from '@/lib/pos-data'
+import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
+import { hasPermission } from '@/lib/pos-permissions'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -128,11 +129,16 @@ export default function CierreCajaWizard({
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
-    const manager = await verifyManagerPin(pin)
-    if (!manager) {
+    const result = await verifyManagerPinWithRole(pin)
+    if (!result) {
       setPinError('PIN invalido')
       return
     }
+    if (!hasPermission(result.role, 'corte_z')) {
+      setPinError('Este PIN no tiene permiso para cerrar turno')
+      return
+    }
+    const manager = result.name
     setManagerName(manager)
     setPinError('')
     setSaving(true)

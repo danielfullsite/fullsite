@@ -1325,7 +1325,7 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
       if (staff?.name) {
         try {
           const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[pin] = { name: staff.name, cached_at: Date.now() }
+          cached[pin] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
           localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
         } catch { /* ignore */ }
         return staff.name as string
@@ -1340,6 +1340,42 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
     const entry = cached[pin]
     if (entry?.name && Date.now() - (entry.cached_at || 0) < 7 * 24 * 60 * 60 * 1000) {
       return entry.name as string
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+/** Like verifyManagerPin but also returns the role — used for permission checks */
+export async function verifyManagerPinWithRole(pin: string): Promise<{ name: string; role: string } | null> {
+  if (!pin) return null
+  try {
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, client_id: _getClientId(), manager: true }),
+    })
+    if (res.ok) {
+      const { staff } = await res.json()
+      if (staff?.name) {
+        const role = staff.role || 'gerente'
+        try {
+          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+          cached[pin] = { name: staff.name, role, cached_at: Date.now() }
+          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
+        } catch { /* ignore */ }
+        return { name: staff.name, role }
+      }
+      return null
+    }
+    if (res.status === 401 || res.status === 400) return null
+  } catch { /* offline → fallback al cache */ }
+  // Fallback offline
+  try {
+    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+    const entry = cached[pin]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 7 * 24 * 60 * 60 * 1000) {
+      return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
   return null
