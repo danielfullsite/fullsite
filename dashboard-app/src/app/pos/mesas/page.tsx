@@ -26,66 +26,66 @@ interface FloorTable {
 }
 
 const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
-  round: { w: 80, h: 80 },
-  'round-lg': { w: 105, h: 105 },
-  square: { w: 84, h: 78 },
-  'rect-h': { w: 124, h: 72 },
+  round: { w: 62, h: 62 },
+  'round-lg': { w: 78, h: 78 },
+  square: { w: 66, h: 62 },
+  'rect-h': { w: 96, h: 52 },
 }
 
 // Posiciones calcadas del plano físico
 const FLOOR_TABLES: FloorTable[] = [
   // ── Fila superior: 45 | divisor | 1 2 3 (ENTRADA) · 5 6 7 (LÁMPARAS)
-  { number: 45, x: 9, y: 9, shape: 'round' },
-  { number: 1, x: 22, y: 9, shape: 'round' },
-  { number: 2, x: 30, y: 9, shape: 'round' },
-  { number: 3, x: 38, y: 9, shape: 'round' },
-  { number: 5, x: 56, y: 9, shape: 'rect-h' },
-  { number: 6, x: 65, y: 9, shape: 'rect-h' },
-  { number: 7, x: 74, y: 9, shape: 'rect-h' },
+  { number: 45, x: 8, y: 10, shape: 'round' },
+  { number: 1, x: 21, y: 10, shape: 'round' },
+  { number: 2, x: 30, y: 10, shape: 'round' },
+  { number: 3, x: 39, y: 10, shape: 'round' },
+  { number: 5, x: 55, y: 10, shape: 'rect-h' },
+  { number: 6, x: 64, y: 10, shape: 'rect-h' },
+  { number: 7, x: 73, y: 10, shape: 'rect-h' },
   // ── Segunda fila: 4 (entrada) · 9 8 (lámparas)
-  { number: 4, x: 31, y: 22, shape: 'round' },
-  { number: 9, x: 60, y: 22, shape: 'round' },
-  { number: 8, x: 69, y: 22, shape: 'round' },
+  { number: 4, x: 30, y: 27, shape: 'round' },
+  { number: 9, x: 59, y: 27, shape: 'round' },
+  { number: 8, x: 68, y: 27, shape: 'round' },
   // ── Pasillo (columna izquierda)
-  { number: 44, x: 9, y: 35, shape: 'round' },
-  { number: 43, x: 9, y: 58, shape: 'round' },
+  { number: 44, x: 8, y: 46, shape: 'round' },
+  { number: 43, x: 8, y: 76, shape: 'round' },
   // ── Terraza
-  { number: 21, x: 27, y: 35, shape: 'square' },
-  { number: 20, x: 37, y: 35, shape: 'round' },
-  { number: 32, x: 26, y: 47, shape: 'round' },
-  { number: 31, x: 35, y: 47, shape: 'round' },
-  { number: 30, x: 45, y: 47, shape: 'round-lg' },
-  { number: 42, x: 27, y: 59, shape: 'rect-h' },
-  { number: 41, x: 36.5, y: 59, shape: 'rect-h' },
-  { number: 40, x: 46, y: 59, shape: 'rect-h' },
+  { number: 21, x: 25, y: 46, shape: 'square' },
+  { number: 20, x: 36, y: 46, shape: 'round' },
+  { number: 32, x: 25, y: 63, shape: 'round' },
+  { number: 31, x: 35, y: 63, shape: 'round' },
+  { number: 30, x: 46, y: 63, shape: 'round-lg' },
+  { number: 42, x: 25, y: 80, shape: 'rect-h' },
+  { number: 41, x: 36, y: 80, shape: 'rect-h' },
+  { number: 40, x: 47, y: 80, shape: 'rect-h' },
   // ── Barra (columna)
-  { number: 10, x: 57, y: 34, shape: 'square' },
-  { number: 11, x: 57, y: 46, shape: 'square' },
-  { number: 12, x: 57, y: 58, shape: 'square' },
-  // ── Toldo (derecha superior — reubicado para evitar scroll)
-  { number: 50, x: 85, y: 7, shape: 'rect-h' },
-  { number: 53, x: 95, y: 7, shape: 'rect-h' },
-  { number: 51, x: 85, y: 20, shape: 'rect-h' },
-  { number: 52, x: 95, y: 20, shape: 'rect-h' },
-  { number: 55, x: 85, y: 33, shape: 'rect-h' },
-  { number: 54, x: 95, y: 33, shape: 'rect-h' },
-  // ── Privado (derecha inferior — reubicado para evitar scroll)
-  { number: 61, x: 85, y: 55, shape: 'rect-h' },
-  { number: 63, x: 95, y: 55, shape: 'rect-h' },
-  { number: 60, x: 85, y: 68, shape: 'rect-h' },
-  { number: 62, x: 95, y: 68, shape: 'rect-h' },
+  { number: 10, x: 57, y: 46, shape: 'square' },
+  { number: 11, x: 57, y: 63, shape: 'square' },
+  { number: 12, x: 57, y: 80, shape: 'square' },
+  // ── Toldo (derecha superior)
+  { number: 50, x: 84, y: 10, shape: 'rect-h' },
+  { number: 53, x: 94, y: 10, shape: 'rect-h' },
+  { number: 51, x: 84, y: 27, shape: 'rect-h' },
+  { number: 52, x: 94, y: 27, shape: 'rect-h' },
+  { number: 55, x: 84, y: 44, shape: 'rect-h' },
+  { number: 54, x: 94, y: 44, shape: 'rect-h' },
+  // ── Privado (derecha inferior)
+  { number: 61, x: 84, y: 68, shape: 'rect-h' },
+  { number: 63, x: 94, y: 68, shape: 'rect-h' },
+  { number: 60, x: 84, y: 85, shape: 'rect-h' },
+  { number: 62, x: 94, y: 85, shape: 'rect-h' },
 ]
 
 interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
 
 const FLOOR_LABELS: FloorLabel[] = [
-  { text: 'ENTRADA', x: 30, y: 16 },
-  { text: 'LÁMPARAS', x: 65, y: 16 },
-  { text: 'PASILLO', x: 3, y: 46, vertical: true },
-  { text: 'TERRAZA', x: 35, y: 41 },
-  { text: 'BARRA', x: 64, y: 41 },
-  { text: 'TOLDO', x: 89, y: 1 },
-  { text: 'PRIVADO', x: 89, y: 48 },
+  { text: 'ENTRADA', x: 30, y: 19 },
+  { text: 'LÁMPARAS', x: 64, y: 19 },
+  { text: 'PASILLO', x: 2.5, y: 60, vertical: true },
+  { text: 'TERRAZA', x: 35, y: 54 },
+  { text: 'BARRA', x: 64, y: 54 },
+  { text: 'TOLDO', x: 89, y: 2 },
+  { text: 'PRIVADO', x: 89, y: 58 },
 ]
 
 // Paredes / muros del plano (verde = muro terraza, vino = barra física)
@@ -93,17 +93,17 @@ interface FloorWall { x: number; y: number; w: number; h: number; color: 'green'
 
 const FLOOR_WALLS: FloorWall[] = [
   // Divisor verde junto a mesa 45 (entrada)
-  { x: 15.5, y: 3.5, w: 0.7, h: 11, color: 'green' },
+  { x: 14.5, y: 3, w: 0.6, h: 14, color: 'green' },
   // Muro terraza: vertical izquierdo (superior), horizontal superior, bloque vino esquina, vertical derecho
-  { x: 19.5, y: 28.5, w: 0.7, h: 14, color: 'green' },
-  { x: 19.5, y: 28.5, w: 23, h: 1.2, color: 'green' },
-  { x: 42.5, y: 27.8, w: 7.5, h: 2.6, color: 'maroon' },
-  { x: 50.5, y: 30.5, w: 0.7, h: 33, color: 'green' },
+  { x: 18, y: 37, w: 0.6, h: 18, color: 'green' },
+  { x: 18, y: 37, w: 23, h: 1.5, color: 'green' },
+  { x: 41, y: 36, w: 7.5, h: 3, color: 'maroon' },
+  { x: 49, y: 39, w: 0.6, h: 50, color: 'green' },
   // Muro terraza: vertical izquierdo (inferior, junto a 42)
-  { x: 19.5, y: 52, w: 0.7, h: 12, color: 'green' },
-  // Barra física en L (vino) con texto vertical — acortada para no chocar con Toldo
-  { x: 71, y: 31, w: 7, h: 4, color: 'maroon' },
-  { x: 71, y: 31, w: 4.5, h: 30, color: 'maroon' },
+  { x: 18, y: 70, w: 0.6, h: 19, color: 'green' },
+  // Barra física en L (vino)
+  { x: 70, y: 39, w: 7, h: 4, color: 'maroon' },
+  { x: 70, y: 39, w: 4, h: 48, color: 'maroon' },
 ]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -160,24 +160,27 @@ export default function MesasPage() {
       .catch(() => { /* */ })
   }, [])
 
-  // Escala del plano: se ajusta al ancho Y alto disponible para que quepa sin scroll
+  // Escala del plano: JS puro, calcula desde window dimensions
   const PLANO_BASE_W = 1200
-  const PLANO_BASE_H = 1200 * 0.75
-  const planoWrapRef = useRef<HTMLDivElement>(null)
-  const [planoScale, setPlanoScale] = useState(1)
+  const PLANO_BASE_H = 696
+  const [planoScale, setPlanoScale] = useState(0.65)
+  const [debugInfo, setDebugInfo] = useState('')
   useEffect(() => {
-    const update = () => {
-      const el = planoWrapRef.current
-      if (el) {
-        // Scale to fill width — let height scroll if needed
-        const scaleW = el.clientWidth / PLANO_BASE_W
-        setPlanoScale(scaleW)
-      }
+    const compute = () => {
+      const iw = window.innerWidth
+      const ih = window.innerHeight
+      const availW = iw - 32
+      const availH = ih - 240
+      const sW = availW / PLANO_BASE_W
+      const sH = availH / PLANO_BASE_H
+      const s = Math.min(sW, sH)
+      setDebugInfo(`iw=${iw} ih=${ih} aW=${availW} aH=${availH} sW=${sW.toFixed(2)} sH=${sH.toFixed(2)} → ${s.toFixed(2)}`)
+      if (s > 0.2) setPlanoScale(s)
     }
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [viewMode, loading, PLANO_BASE_W])
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -426,32 +429,29 @@ export default function MesasPage() {
   // Sillas alrededor de una mesa, según forma y capacidad
   const Chairs = ({ shape, capacity, status }: { shape: TableShape; capacity: number; status: string }) => {
     const { w, h } = TABLE_SIZE[shape]
-    const chairClass = `absolute w-[16px] h-[16px] rounded-full ${
+    const chairClass = `absolute w-[10px] h-[10px] rounded-full ${
       status === 'ocupada' ? 'bg-blue-500/70' :
       status === 'cuenta' ? 'bg-amber-500/70' : 'bg-slate-500/60'
     }`
     const chairs: { left: number; top: number }[] = []
 
     if (shape === 'rect-h') {
-      // Mitad arriba, mitad abajo
       const top = Math.ceil(capacity / 2)
       const bottom = capacity - top
-      for (let i = 0; i < top; i++) chairs.push({ left: ((i + 0.5) / top) * w - 6.5, top: -17 })
-      for (let i = 0; i < bottom; i++) chairs.push({ left: ((i + 0.5) / bottom) * w - 6.5, top: h + 4 })
+      for (let i = 0; i < top; i++) chairs.push({ left: ((i + 0.5) / top) * w - 5, top: -12 })
+      for (let i = 0; i < bottom; i++) chairs.push({ left: ((i + 0.5) / bottom) * w - 5, top: h + 2 })
     } else if (shape === 'square') {
-      // Una por lado
       const sides = [
-        { left: w / 2 - 6.5, top: -17 }, { left: w / 2 - 6.5, top: h + 4 },
-        { left: -17, top: h / 2 - 6.5 }, { left: w + 4, top: h / 2 - 6.5 },
+        { left: w / 2 - 5, top: -12 }, { left: w / 2 - 5, top: h + 2 },
+        { left: -12, top: h / 2 - 5 }, { left: w + 2, top: h / 2 - 5 },
       ]
       for (let i = 0; i < Math.min(capacity, 4); i++) chairs.push(sides[i])
     } else {
-      // Redondas: distribuidas en círculo (4 → diagonales como en el plano)
-      const r = w / 2 + 10
+      const r = w / 2 + 7
       const offset = capacity === 4 ? Math.PI / 4 : -Math.PI / 2
       for (let i = 0; i < capacity; i++) {
         const angle = offset + (i * 2 * Math.PI) / capacity
-        chairs.push({ left: w / 2 + r * Math.cos(angle) - 6.5, top: h / 2 + r * Math.sin(angle) - 6.5 })
+        chairs.push({ left: w / 2 + r * Math.cos(angle) - 5, top: h / 2 + r * Math.sin(angle) - 5 })
       }
     }
 
@@ -493,7 +493,7 @@ export default function MesasPage() {
             }`}
             style={mergeSource !== mesa.number && mergeTarget !== mesa.number ? getMeseroBorderStyle(mesa) : {}}
           >
-            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-2xl' : 'text-xl'}`}>{mesa.number}</span>
+            <span className={`font-bold leading-none ${ft.shape === 'round-lg' ? 'text-xl' : 'text-lg'}`}>{mesa.number}</span>
             {order && mesa.mesero && (
               <span className="text-[7px] font-medium leading-tight mt-0.5 text-[var(--text-3)] truncate max-w-[90%]">
                 {mesa.mesero.split(' ')[0]}
@@ -509,7 +509,7 @@ export default function MesasPage() {
           </button>
           {/* Total debajo de la mesa ocupada */}
           {order && mesa.total != null && mesa.total > 0 && (
-            <span className="absolute left-1/2 -translate-x-1/2 z-20 text-[9px] font-semibold text-white bg-black/60 px-1.5 py-px rounded-full whitespace-nowrap" style={{ top: h + 18 }}>
+            <span className="absolute left-1/2 -translate-x-1/2 z-20 text-[9px] font-semibold text-white bg-black/60 px-1.5 py-px rounded-full whitespace-nowrap" style={{ top: h + 14 }}>
               {formatMXN(mesa.total)}
             </span>
           )}
@@ -522,11 +522,14 @@ export default function MesasPage() {
     const floorNumbers = new Set(FLOOR_TABLES.map(t => t.number))
     const unassigned = mesas.filter(m => !floorNumbers.has(m.number))
     return (
-      <div className="pb-2">
-        {/* Wrapper que mide el ancho disponible; el plano se escala para caber sin scroll */}
-        <div ref={planoWrapRef} className="max-w-[95vw] mx-auto" style={{ height: PLANO_BASE_H * planoScale }}>
+      <div>
+        {/* Debug overlay — remove after fixing */}
+        {debugInfo && <div className="text-[10px] text-yellow-400 font-mono mb-1">{debugInfo}</div>}
+        {/* Scaled plano container */}
+        <div className="mx-auto" style={{ width: PLANO_BASE_W * planoScale, height: PLANO_BASE_H * planoScale }}>
+
         <div
-          className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-3xl"
+          className="relative bg-[var(--surface)] border-2 border-[var(--line)] rounded-2xl"
           style={{ width: PLANO_BASE_W, height: PLANO_BASE_H, transform: `scale(${planoScale})`, transformOrigin: 'top left' }}
         >
           {/* Paredes / muros */}
@@ -540,7 +543,7 @@ export default function MesasPage() {
           {/* Texto BARRA vertical sobre la barra física */}
           <span
             className="absolute text-white/80 font-bold text-xs tracking-[0.35em] [writing-mode:vertical-rl] pointer-events-none"
-            style={{ left: '72.2%', top: '38%' }}
+            style={{ left: '71%', top: '50%' }}
           >
             BARRA
           </span>
@@ -549,7 +552,7 @@ export default function MesasPage() {
             <span
               key={label.text}
               className={`absolute font-bold uppercase text-[var(--text-4)] opacity-60 pointer-events-none tracking-[0.25em] ${
-                label.vertical ? '[writing-mode:vertical-rl] text-lg' : 'text-lg'
+                label.vertical ? '[writing-mode:vertical-rl] text-sm' : 'text-sm'
               }`}
               style={{ left: `${label.x}%`, top: `${label.y}%`, transform: `translate(-50%, -50%)${label.vertical ? ' rotate(180deg)' : ''}` }}
             >
@@ -557,9 +560,9 @@ export default function MesasPage() {
             </span>
           ))}
           {/* Divisor vertical interior / exterior (toldo + privado a la derecha) */}
-          <div className="absolute top-[3%] bottom-[3%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
+          <div className="absolute top-[2%] bottom-[2%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
           {/* Marca AMALAY */}
-          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '68%' }}>
+          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '92%' }}>
             AMALAY
           </span>
           {/* Mesas con sillas */}
@@ -711,7 +714,7 @@ export default function MesasPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'planograma' ? 'p-2' : 'p-6'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
