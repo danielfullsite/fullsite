@@ -149,8 +149,10 @@ export default function CortePage() {
         reason: 'Cuenta reabierta por gerente',
         approved_by: manager,
       })
-      setToast(`Cuenta Mesa ${reopenTarget.mesa} reabierta — aprobado por ${manager}`)
-      setTimeout(() => setToast(null), 3000)
+      const mesa = reopenTarget.mesa
+      setToast(`Cuenta Mesa ${mesa} reabierta — ve a Mesa ${mesa} en el POS`)
+      setTimeout(() => setToast(null), 5000)
+      window.open(`/pos?mesa=${mesa}`, '_blank')
       fetchData()
     }
     setReopenTarget(null)

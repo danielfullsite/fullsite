@@ -54,7 +54,7 @@ function CorteXModal({ turno, onClose }: CorteXModalProps) {
     async function fetchData() {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${turno.opened_at}`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&turno_id=eq.${encodeURIComponent(turno.id)}`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (res.ok) {

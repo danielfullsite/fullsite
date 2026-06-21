@@ -1046,7 +1046,7 @@ export function printKitchenTicketCSS(order: Order) {
   const itemRows = items.map(i => `
     <div style="font-size:14px;font-weight:bold;margin:4px 0">
       ${i.cantidad}x ${i.nombre}
-      ${i.modificadores ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${i.modificadores}</div>` : ''}
+      ${i.modificadores && i.modificadores.length > 0 ? `<div style="font-size:11px;font-weight:normal;color:#666;margin-left:16px">${Array.isArray(i.modificadores) ? i.modificadores.join(', ') : i.modificadores}</div>` : ''}
     </div>
   `).join('')
 
