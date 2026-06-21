@@ -161,7 +161,7 @@ export default function CocinaPage() {
 
     // Play sound if new 'enviada' orders appeared (skip first load)
     const newEnviadas = fresh.filter(o => o.status === 'enviada').length
-    if (prevOrderCountRef.current >= 0 && newEnviadas > prevOrderCountRef.current) {
+    if (prevOrderCountRef.current > 0 && newEnviadas > prevOrderCountRef.current) {
       playNotificationSound()
     }
     prevOrderCountRef.current = newEnviadas
@@ -509,7 +509,7 @@ export default function CocinaPage() {
                       className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                         order.status === 'enviada' ? 'bg-amber-500 hover:bg-amber-400 text-black' :
                         order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
-                        'bg-slate-600 hover:bg-[var(--surface-2)]0 text-white'
+                        'bg-slate-600 hover:bg-slate-500 text-white'
                       }`}
                     >
                       <Check size={18} />

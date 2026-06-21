@@ -233,7 +233,7 @@ export default function BarraPage() {
                     className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                       order.status === 'enviada' ? 'bg-purple-500 hover:bg-purple-400 text-white' :
                       order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
-                      'bg-slate-600 hover:bg-[var(--surface-2)]0 text-white'
+                      'bg-slate-600 hover:bg-slate-500 text-white'
                     }`}
                   >
                     <Check size={18} />

@@ -120,13 +120,14 @@ export default function KDSPage() {
         if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
       })
     }
-    if (restored.size > 0) setDoneItems(prev => new Set([...prev, ...restored]))
+    // Replace entire set from DB truth — handles un-done from other devices
+    if (restored.size > 0 || doneItems.size > 0) setDoneItems(restored)
   }, [])
 
   useEffect(() => {
     setMounted(true)
     fetchOrders()
-    const interval = setInterval(fetchOrders, 1500)
+    const interval = setInterval(fetchOrders, 2000)
     const timerInterval = setInterval(() => setTick(t => t + 1), 10000)
     return () => { clearInterval(interval); clearInterval(timerInterval) }
   }, [fetchOrders])
@@ -279,7 +280,7 @@ export default function KDSPage() {
             <div className="text-center text-[var(--text-2)]">
               <p className="text-6xl mb-4">👨‍🍳</p>
               <p className="text-2xl font-bold">Sin ordenes</p>
-              <p className="text-sm mt-1">Actualizando cada 3 segundos</p>
+              <p className="text-sm mt-1">Actualizando cada 2 segundos</p>
             </div>
           </div>
         ) : (
