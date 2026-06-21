@@ -1705,7 +1705,7 @@ function POSContent() {
       return getPermissions(staffRole)
     } catch { return null }
   })()
-  const can = (perm: string) => _perms ? (_perms as unknown as Record<string, boolean>)[perm] ?? true : true
+  const can = (perm: string) => _perms ? (_perms as unknown as Record<string, boolean>)[perm] ?? false : staffRole === 'admin'
 
   // Section visibility (maps nav sections to granular permissions)
   const canSee = (section: string) => {
@@ -1714,6 +1714,7 @@ function POSContent() {
       cocina: 'registro_comanda',
       kds: 'registro_comanda',
       barra: 'registro_comanda',
+      panaderia: 'registro_comanda',
       recetas: 'control_existencias_pos',
       compras: 'control_existencias_pos',
       inventario: 'control_existencias_pos',
@@ -2726,6 +2727,7 @@ function POSContent() {
                           </button>
 
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
+                          {can('cancelar_ordenes') && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setCancellingItem(item) }}
                             className="w-11 h-11 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
@@ -2733,6 +2735,7 @@ function POSContent() {
                           >
                             <Ban size={18} />
                           </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -2790,9 +2793,9 @@ function POSContent() {
             <div className="flex items-center gap-1 mb-1">
               <button
                 onClick={() => setShowDiscount(true)}
-                disabled={orderItems.length === 0 || isMobileRestricted}
+                disabled={orderItems.length === 0 || !can('descuentos_ordenes_pct')}
                 className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-lg bg-[var(--line)] hover:bg-[var(--line)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-4)] text-sm font-semibold transition-colors"
-                title={isMobileRestricted ? 'Solo disponible en terminal de caja' : 'Aplicar descuento'}
+                title={!can('descuentos_ordenes_pct') ? 'Sin permiso para descuentos' : 'Aplicar descuento'}
               >
                 <Percent size={16} />
                 {discount > 0 ? `-${formatMXN(discount)}` : 'Desc'}
@@ -2945,20 +2948,20 @@ function POSContent() {
             </button>
             <button
               onClick={() => { if (activeItems.length >= 2) { setSplitMode(null); setSplitCount(0); setSplitParejoN(0); setSplitAssignments({}); setShowSplit(true) } else handleCloseOrder() }}
-              disabled={activeItems.length === 0 || saving || isMobileRestricted}
+              disabled={activeItems.length === 0 || saving || !can('cerrar_cuentas')}
               className="flex-[0.4] flex items-center justify-center bg-purple-600 hover:bg-purple-500 active:bg-purple-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-              title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
+              title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               Split
             </button>
             <button
               onClick={handleCloseOrder}
-              disabled={activeItems.length === 0 || saving || isMobileRestricted}
+              disabled={activeItems.length === 0 || saving || !can('cerrar_cuentas')}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
-              title={isMobileRestricted ? 'Solo disponible en terminal de caja' : ''}
+              title={!can('cerrar_cuentas') ? 'Sin permiso para cobrar' : ''}
             >
               <CreditCard size={18} />
-              {isMobileRestricted ? 'Solo caja' : 'Cobrar'}
+              {!can('cerrar_cuentas') ? 'Sin permiso' : 'Cobrar'}
             </button>
           </div>
         </div>
