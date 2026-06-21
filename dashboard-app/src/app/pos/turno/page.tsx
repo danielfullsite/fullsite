@@ -329,9 +329,14 @@ export default function TurnoPage() {
     if (res.ok) {
       logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo: Number(fondoInicial) } })
       showToast(`Turno abierto — Fondo: ${formatMXN(Number(fondoInicial))}`)
+      // Set turno immediately (no re-fetch delay)
+      setActiveTurno({
+        id, opened_by: openedBy, fondo_inicial: Number(fondoInicial),
+        opened_at: new Date().toISOString(), closed_by: null, fondo_final: null,
+        efectivo_sistema: null, diferencia: null, closed_at: null, notas: null,
+      })
       setFondoInicial('')
       setOpenedBy('')
-      fetchTurno()
     }
   }
 
