@@ -34,58 +34,56 @@ const TABLE_SIZE: Record<TableShape, { w: number; h: number }> = {
 
 // Posiciones calcadas del plano físico
 const FLOOR_TABLES: FloorTable[] = [
-  // ── Fila superior: 45 | divisor | 1 2 3 (ENTRADA) · 5 6 7 (LÁMPARAS)
-  { number: 45, x: 8, y: 10, shape: 'round' },
-  { number: 1, x: 21, y: 10, shape: 'round' },
-  { number: 2, x: 30, y: 10, shape: 'round' },
-  { number: 3, x: 39, y: 10, shape: 'round' },
-  { number: 5, x: 55, y: 10, shape: 'rect-h' },
-  { number: 6, x: 64, y: 10, shape: 'rect-h' },
-  { number: 7, x: 73, y: 10, shape: 'rect-h' },
-  // ── Segunda fila: 4 (entrada) · 9 8 (lámparas)
-  { number: 4, x: 30, y: 27, shape: 'round' },
-  { number: 9, x: 59, y: 27, shape: 'round' },
-  { number: 8, x: 68, y: 27, shape: 'round' },
-  // ── Pasillo (columna izquierda)
-  { number: 44, x: 8, y: 46, shape: 'round' },
-  { number: 43, x: 8, y: 76, shape: 'round' },
-  // ── Terraza
-  { number: 21, x: 25, y: 46, shape: 'square' },
-  { number: 20, x: 36, y: 46, shape: 'round' },
-  { number: 32, x: 25, y: 63, shape: 'round' },
-  { number: 31, x: 35, y: 63, shape: 'round' },
-  { number: 30, x: 46, y: 63, shape: 'round-lg' },
+  // ── Fila 1: 45 | divisor | 1 2 3 (ENTRADA) · 5 6 7 (LÁMPARAS) · 50 53 (TOLDO)
+  { number: 45, x: 8, y: 8, shape: 'round' },
+  { number: 1, x: 21, y: 8, shape: 'round' },
+  { number: 2, x: 30, y: 8, shape: 'round' },
+  { number: 3, x: 39, y: 8, shape: 'round' },
+  { number: 5, x: 55, y: 8, shape: 'rect-h' },
+  { number: 6, x: 64, y: 8, shape: 'rect-h' },
+  { number: 7, x: 73, y: 8, shape: 'rect-h' },
+  { number: 50, x: 84, y: 8, shape: 'rect-h' },
+  { number: 53, x: 94, y: 8, shape: 'rect-h' },
+  // ── Fila 2: 4 (entrada) · 9 8 (lámparas) · 51 52 (TOLDO)
+  { number: 4, x: 30, y: 26, shape: 'round' },
+  { number: 9, x: 59, y: 26, shape: 'round' },
+  { number: 8, x: 68, y: 26, shape: 'round' },
+  { number: 51, x: 84, y: 26, shape: 'rect-h' },
+  { number: 52, x: 94, y: 26, shape: 'rect-h' },
+  // ── Fila 3: 44 pasillo · 21 20 terraza · 10 barra · 55 54 (TOLDO)
+  { number: 44, x: 8, y: 44, shape: 'round' },
+  { number: 21, x: 25, y: 44, shape: 'square' },
+  { number: 20, x: 36, y: 44, shape: 'round' },
+  { number: 10, x: 57, y: 44, shape: 'square' },
+  { number: 55, x: 84, y: 44, shape: 'rect-h' },
+  { number: 54, x: 94, y: 44, shape: 'rect-h' },
+  // ── Fila 4: 32 31 30 terraza · 11 barra · 61 63 (PRIVADO)
+  { number: 32, x: 25, y: 62, shape: 'round' },
+  { number: 31, x: 35, y: 62, shape: 'round' },
+  { number: 30, x: 46, y: 62, shape: 'round-lg' },
+  { number: 11, x: 57, y: 62, shape: 'square' },
+  { number: 61, x: 84, y: 62, shape: 'rect-h' },
+  { number: 63, x: 94, y: 62, shape: 'rect-h' },
+  // ── Fila 5: 43 pasillo · 42 41 40 terraza · 12 barra · 60 62 (PRIVADO)
+  { number: 43, x: 8, y: 80, shape: 'round' },
   { number: 42, x: 25, y: 80, shape: 'rect-h' },
   { number: 41, x: 36, y: 80, shape: 'rect-h' },
   { number: 40, x: 47, y: 80, shape: 'rect-h' },
-  // ── Barra (columna)
-  { number: 10, x: 57, y: 46, shape: 'square' },
-  { number: 11, x: 57, y: 63, shape: 'square' },
   { number: 12, x: 57, y: 80, shape: 'square' },
-  // ── Toldo (derecha superior)
-  { number: 50, x: 84, y: 10, shape: 'rect-h' },
-  { number: 53, x: 94, y: 10, shape: 'rect-h' },
-  { number: 51, x: 84, y: 27, shape: 'rect-h' },
-  { number: 52, x: 94, y: 27, shape: 'rect-h' },
-  { number: 55, x: 84, y: 44, shape: 'rect-h' },
-  { number: 54, x: 94, y: 44, shape: 'rect-h' },
-  // ── Privado (derecha inferior)
-  { number: 61, x: 84, y: 68, shape: 'rect-h' },
-  { number: 63, x: 94, y: 68, shape: 'rect-h' },
-  { number: 60, x: 84, y: 85, shape: 'rect-h' },
-  { number: 62, x: 94, y: 85, shape: 'rect-h' },
+  { number: 60, x: 84, y: 80, shape: 'rect-h' },
+  { number: 62, x: 94, y: 80, shape: 'rect-h' },
 ]
 
 interface FloorLabel { text: string; x: number; y: number; vertical?: boolean }
 
 const FLOOR_LABELS: FloorLabel[] = [
-  { text: 'ENTRADA', x: 30, y: 19 },
-  { text: 'LÁMPARAS', x: 64, y: 19 },
+  { text: 'ENTRADA', x: 30, y: 18 },
+  { text: 'LÁMPARAS', x: 64, y: 18 },
   { text: 'PASILLO', x: 2.5, y: 60, vertical: true },
-  { text: 'TERRAZA', x: 35, y: 54 },
-  { text: 'BARRA', x: 64, y: 54 },
-  { text: 'TOLDO', x: 89, y: 2 },
-  { text: 'PRIVADO', x: 89, y: 58 },
+  { text: 'TERRAZA', x: 35, y: 53 },
+  { text: 'BARRA', x: 64, y: 53 },
+  { text: 'TOLDO', x: 89, y: 1.5 },
+  { text: 'PRIVADO', x: 89, y: 54 },
 ]
 
 // Paredes / muros del plano (verde = muro terraza, vino = barra física)
@@ -93,17 +91,17 @@ interface FloorWall { x: number; y: number; w: number; h: number; color: 'green'
 
 const FLOOR_WALLS: FloorWall[] = [
   // Divisor verde junto a mesa 45 (entrada)
-  { x: 14.5, y: 3, w: 0.6, h: 14, color: 'green' },
+  { x: 14.5, y: 2, w: 0.6, h: 14, color: 'green' },
   // Muro terraza: vertical izquierdo (superior), horizontal superior, bloque vino esquina, vertical derecho
-  { x: 18, y: 37, w: 0.6, h: 18, color: 'green' },
-  { x: 18, y: 37, w: 23, h: 1.5, color: 'green' },
-  { x: 41, y: 36, w: 7.5, h: 3, color: 'maroon' },
-  { x: 49, y: 39, w: 0.6, h: 50, color: 'green' },
+  { x: 18, y: 35, w: 0.6, h: 20, color: 'green' },
+  { x: 18, y: 35, w: 23, h: 1.5, color: 'green' },
+  { x: 41, y: 34, w: 7.5, h: 3, color: 'maroon' },
+  { x: 49, y: 37, w: 0.6, h: 53, color: 'green' },
   // Muro terraza: vertical izquierdo (inferior, junto a 42)
-  { x: 18, y: 70, w: 0.6, h: 19, color: 'green' },
+  { x: 18, y: 72, w: 0.6, h: 18, color: 'green' },
   // Barra física en L (vino)
-  { x: 70, y: 39, w: 7, h: 4, color: 'maroon' },
-  { x: 70, y: 39, w: 4, h: 48, color: 'maroon' },
+  { x: 70, y: 36, w: 7, h: 5, color: 'maroon' },
+  { x: 70, y: 36, w: 4, h: 52, color: 'maroon' },
 ]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -162,12 +160,12 @@ export default function MesasPage() {
 
   // Escala del plano: cabe en ancho Y alto sin scroll
   const PLANO_BASE_W = 1200
-  const PLANO_BASE_H = 696
-  const [planoScale, setPlanoScale] = useState(0.75)
+  const PLANO_BASE_H = 500
+  const [planoScale, setPlanoScale] = useState(0.85)
   useEffect(() => {
     const compute = () => {
       const availW = window.innerWidth - 32
-      const availH = window.innerHeight - 170
+      const availH = window.innerHeight - 180
       const s = Math.min(availW / PLANO_BASE_W, availH / PLANO_BASE_H)
       if (s > 0.2) setPlanoScale(s)
     }
@@ -535,7 +533,7 @@ export default function MesasPage() {
           {/* Texto BARRA vertical sobre la barra física */}
           <span
             className="absolute text-white/80 font-bold text-xs tracking-[0.35em] [writing-mode:vertical-rl] pointer-events-none"
-            style={{ left: '71%', top: '50%' }}
+            style={{ left: '71%', top: '52%' }}
           >
             BARRA
           </span>
@@ -554,7 +552,7 @@ export default function MesasPage() {
           {/* Divisor vertical interior / exterior (toldo + privado a la derecha) */}
           <div className="absolute top-[2%] bottom-[2%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
           {/* Marca AMALAY */}
-          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '92%' }}>
+          <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '93%' }}>
             AMALAY
           </span>
           {/* Mesas con sillas */}
