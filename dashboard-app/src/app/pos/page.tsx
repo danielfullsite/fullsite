@@ -3790,12 +3790,13 @@ function POSContent() {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setShowCashFlow(!showCashFlow)}
-                className="w-full flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
               >
-                <Banknote size={24} />
+                <Banknote size={20} />
                 Efectivo
               </button>
               {showCashFlow && (() => {
@@ -3903,11 +3904,12 @@ function POSContent() {
                   }
                 }}
                 disabled={saving}
-                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
               >
-                <CreditCard size={24} />
-                {saving ? 'Esperando terminal...' : 'Tarjeta'}
+                <CreditCard size={20} />
+                {saving ? 'Terminal...' : 'Tarjeta'}
               </button>
+              </div>
               {showCardConfirm && (
                 <div className="bg-[var(--surface-2)] border border-blue-600/50 rounded-xl p-4 space-y-3">
                   <p className="text-blue-300 text-sm font-bold text-center uppercase tracking-wide">Teclea en la terminal bancaria</p>
@@ -3936,20 +3938,20 @@ function POSContent() {
                   return (
                     <button
                       onClick={() => handlePayment('Transferencia electronica')}
-                      className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                      className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[44px]"
                     >
-                      <Send size={22} />
+                      <Send size={18} />
                       Transferencia
                     </button>
                   )
                 }
                 return (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {customMethods.map(m => (
                       <button
                         key={m.id}
                         onClick={() => handlePayment(m.name)}
-                        className="flex items-center justify-center gap-2 bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-4 rounded-xl text-base transition-colors min-h-[60px]"
+                        className="flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-2.5 rounded-lg text-sm transition-colors min-h-[42px]"
                       >
                         {m.name}
                       </button>
@@ -3959,9 +3961,9 @@ function POSContent() {
               })()}
               <button
                 onClick={() => { setShowMixto(!showMixto); setMixtoPagos([]); setMixtoMonto(''); setMixtoForma('Efectivo') }}
-                className={`w-full flex items-center justify-center gap-3 ${showMixto ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)]'} font-bold py-4 rounded-xl text-base transition-colors min-h-[60px]`}
+                className={`w-full flex items-center justify-center gap-2 ${showMixto ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)]'} font-bold py-2.5 rounded-lg text-sm transition-colors min-h-[42px]`}
               >
-                Pago mixto (varias formas)
+                Pago mixto
               </button>
               {showMixto && (() => {
                 const totalConPropina = payTotal + propina
