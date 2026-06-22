@@ -3799,51 +3799,6 @@ function POSContent() {
                 <Banknote size={20} />
                 Efectivo
               </button>
-              {showCashFlow && (() => {
-                const totalConPropina = payTotal + propina
-                const cashReceived = parseFloat(cashAmount) || 0
-                const cambio = cashReceived - totalConPropina
-                return (
-                  <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-4 space-y-3">
-                    <p className="text-emerald-400 text-sm font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
-                    <div>
-                      <label className="text-[var(--text-3)] text-xs mb-1 block">Cliente paga con:</label>
-                      <div className="flex gap-2 mb-2">
-                        {[100, 200, 500, 1000].map(bill => (
-                          <button key={bill} onClick={() => setCashAmount(String(bill))}
-                            className={`flex-1 min-h-[52px] rounded-lg text-base font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
-                          >${bill}</button>
-                        ))}
-                      </div>
-                      <input
-                        type="number" inputMode="decimal" value={cashAmount}
-                        onChange={e => setCashAmount(e.target.value)}
-                        placeholder="Monto recibido" autoFocus
-                        className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-3 text-white text-2xl text-center font-bold focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    {cashReceived > 0 && (
-                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
-                        {cambio >= 0 ? (
-                          <>
-                            <p className="text-[var(--text-3)] text-xs">Cambio</p>
-                            <p className="text-3xl font-black text-emerald-400">{formatMXN(cambio)}</p>
-                          </>
-                        ) : (
-                          <p className="text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
-                        )}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
-                      disabled={cashReceived < totalConPropina}
-                      className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-lg transition-colors"
-                    >
-                      {cashReceived >= totalConPropina ? `Cobrar — Cambio ${formatMXN(cambio)}` : 'Ingresa el monto recibido'}
-                    </button>
-                  </div>
-                )
-              })()}
               <button
                 onClick={async () => {
                   // Try MP Point Smart first
@@ -3910,6 +3865,45 @@ function POSContent() {
                 {saving ? 'Terminal...' : 'Tarjeta'}
               </button>
               </div>
+              {showCashFlow && (() => {
+                const totalConPropina = payTotal + propina
+                const cashReceived = parseFloat(cashAmount) || 0
+                const cambio = cashReceived - totalConPropina
+                return (
+                  <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-3 space-y-2">
+                    <p className="text-emerald-400 text-sm font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
+                    <div className="flex gap-2">
+                      {[100, 200, 500, 1000].map(bill => (
+                        <button key={bill} onClick={() => setCashAmount(String(bill))}
+                          className={`flex-1 min-h-[44px] rounded-lg text-sm font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                        >${bill}</button>
+                      ))}
+                    </div>
+                    <input
+                      type="number" inputMode="decimal" value={cashAmount}
+                      onChange={e => setCashAmount(e.target.value)}
+                      placeholder="Monto recibido" autoFocus
+                      className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-2.5 text-white text-xl text-center font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                    {cashReceived > 0 && (
+                      <div className={`text-center py-2 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
+                        {cambio >= 0 ? (
+                          <p className="text-2xl font-black text-emerald-400">Cambio: {formatMXN(cambio)}</p>
+                        ) : (
+                          <p className="text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
+                      disabled={cashReceived < totalConPropina}
+                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-lg transition-colors"
+                    >
+                      {cashReceived >= totalConPropina ? `Cobrar — Cambio ${formatMXN(cambio)}` : 'Ingresa el monto recibido'}
+                    </button>
+                  </div>
+                )
+              })()}
               {showCardConfirm && (
                 <div className="bg-[var(--surface-2)] border border-blue-600/50 rounded-xl p-4 space-y-3">
                   <p className="text-blue-300 text-sm font-bold text-center uppercase tracking-wide">Teclea en la terminal bancaria</p>
