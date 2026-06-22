@@ -185,6 +185,12 @@ export async function incrementRetry(id: string): Promise<void> {
   }
 }
 
+export async function clearAllPending(): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('sync_queue', 'readwrite')
+  tx.objectStore('sync_queue').clear()
+}
+
 export async function clearSyncedItems(): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('sync_queue', 'readwrite')

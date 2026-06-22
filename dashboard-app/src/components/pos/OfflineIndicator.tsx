@@ -9,6 +9,7 @@ interface OfflineIndicatorProps {
   lastSyncTime: string | null
   connectedDevices: number
   onSync: () => void
+  onClear?: () => void
 }
 
 export default function OfflineIndicator({
@@ -18,6 +19,7 @@ export default function OfflineIndicator({
   lastSyncTime,
   connectedDevices,
   onSync,
+  onClear,
 }: OfflineIndicatorProps) {
   const formatTime = (iso: string) => {
     const d = new Date(iso)
@@ -53,6 +55,14 @@ export default function OfflineIndicator({
         >
           <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
           <span>{isSyncing ? 'Sincronizando...' : `${pendingCount} pendiente${pendingCount > 1 ? 's' : ''}`}</span>
+        </button>
+      )}
+      {pendingCount > 5 && onClear && (
+        <button
+          onClick={onClear}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+        >
+          Limpiar cola
         </button>
       )}
 

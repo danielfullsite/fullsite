@@ -2341,6 +2341,11 @@ function POSContent() {
                 try { await syncAll(); setLastSyncTime(new Date().toISOString()) } catch {}
                 setIsSyncing(false)
               }}
+              onClear={async () => {
+                const { clearAllPending } = await import('@/lib/pos-offline-db')
+                await clearAllPending()
+                setPendingSync(0)
+              }}
             />
             {readyOrders > 0 && (
               <Link href="/pos/cocina" className="flex items-center gap-1 bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
