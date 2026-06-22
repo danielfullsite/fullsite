@@ -3697,8 +3697,8 @@ function POSContent() {
 
       {/* Payment Modal */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-full max-w-md border border-[var(--line)] max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2">
+          <div className="bg-[var(--surface-2)] rounded-2xl p-5 w-full max-w-3xl border border-[var(--line)] max-h-[96vh] overflow-y-auto">
             {(() => {
               // Calculate total for current split cuenta or full order
               const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
@@ -3747,28 +3747,28 @@ function POSContent() {
               </div>
             )}
 
-            <div className="text-center mb-4">
-              <p className="text-[var(--text-3)] text-sm mb-1">
-                Mesa {mesa} · {mesero}
-              </p>
-              <p className="text-4xl font-bold text-white">{formatMXN(payTotal)}</p>
+            <div className="text-center mb-3">
+              <p className="text-[var(--text-3)] text-sm">Mesa {mesa} · {mesero}</p>
+              <p className="text-5xl font-black text-white">{formatMXN(payTotal)}</p>
               {discount > 0 && splitPayingCuenta === 0 && (
                 <p className="text-red-400 text-sm mt-1">Descuento: -{formatMXN(discount)}</p>
+              )}
+              {propina > 0 && (
+                <p className="text-emerald-400 text-lg font-bold">+ propina {formatMXN(propina)} = {formatMXN(payTotal + propina)}</p>
               )}
             </div>
 
             {/* Propina */}
-            <div className="mb-4">
-              <p className="text-[var(--text-3)] text-sm mb-2">Propina</p>
+            <div className="mb-3">
               <div className="flex gap-2">
                 {[0, 10, 15, 20].map(pct => (
                   <button
                     key={pct}
                     onClick={() => setPropina(pct === 0 ? 0 : Math.round(payTotal * pct / 100))}
-                    className={`flex-1 min-h-[52px] rounded-lg text-base font-bold transition-colors ${
+                    className={`flex-1 min-h-[56px] rounded-xl text-lg font-bold transition-colors ${
                       (pct === 0 && propina === 0) || (pct > 0 && propina === Math.round(payTotal * pct / 100))
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-[var(--line)] text-[var(--text-4)] hover:bg-[var(--line)]'
+                        : 'bg-[var(--line)] text-[var(--text-4)]'
                     }`}
                   >
                     {pct === 0 ? 'Sin' : `${pct}%`}
@@ -3780,21 +3780,16 @@ function POSContent() {
                   value={propina || ''}
                   onChange={e => setPropina(Number(e.target.value) || 0)}
                   placeholder="$"
-                  className="w-24 min-h-[52px] bg-[var(--line)] border border-slate-600 rounded-lg px-2 text-white text-base text-center focus:outline-none focus:border-emerald-500"
+                  className="w-28 min-h-[56px] bg-[var(--line)] border border-slate-600 rounded-xl px-3 text-white text-lg text-center focus:outline-none focus:border-emerald-500"
                 />
               </div>
-              {propina > 0 && (
-                <p className="text-emerald-400 text-sm mt-2 text-center">
-                  Total + propina: {formatMXN(total + propina)}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setShowCashFlow(!showCashFlow)}
-                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
+                className="flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-5 rounded-xl text-xl transition-colors min-h-[72px]"
               >
                 <Banknote size={20} />
                 Efectivo
@@ -3859,9 +3854,9 @@ function POSContent() {
                   }
                 }}
                 disabled={saving}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[48px]"
+                className="flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-5 rounded-xl text-xl transition-colors min-h-[72px]"
               >
-                <CreditCard size={20} />
+                <CreditCard size={24} />
                 {saving ? 'Terminal...' : 'Tarjeta'}
               </button>
               </div>
@@ -3870,12 +3865,12 @@ function POSContent() {
                 const cashReceived = parseFloat(cashAmount) || 0
                 const cambio = cashReceived - totalConPropina
                 return (
-                  <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-3 space-y-2">
-                    <p className="text-emerald-400 text-sm font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
-                    <div className="flex gap-2">
+                  <div className="bg-[var(--surface-2)] border border-emerald-700/40 rounded-xl p-4 space-y-3">
+                    <p className="text-emerald-400 text-lg font-bold text-center">Total a cobrar: {formatMXN(totalConPropina)}</p>
+                    <div className="flex gap-3">
                       {[100, 200, 500, 1000].map(bill => (
                         <button key={bill} onClick={() => setCashAmount(String(bill))}
-                          className={`flex-1 min-h-[44px] rounded-lg text-sm font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
+                          className={`flex-1 min-h-[60px] rounded-xl text-lg font-bold transition-colors ${cashAmount === String(bill) ? 'bg-emerald-600 text-white' : 'bg-[var(--line)] text-[var(--text-3)]'}`}
                         >${bill}</button>
                       ))}
                     </div>
@@ -3883,21 +3878,21 @@ function POSContent() {
                       type="number" inputMode="decimal" value={cashAmount}
                       onChange={e => setCashAmount(e.target.value)}
                       placeholder="Monto recibido" autoFocus
-                      className="w-full bg-[var(--bg)] border border-slate-600 rounded-lg px-4 py-2.5 text-white text-xl text-center font-bold focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-[var(--bg)] border-2 border-slate-600 rounded-xl px-4 py-4 text-white text-3xl text-center font-black focus:outline-none focus:border-emerald-500"
                     />
                     {cashReceived > 0 && (
-                      <div className={`text-center py-2 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
+                      <div className={`text-center py-3 rounded-xl ${cambio >= 0 ? 'bg-emerald-900/40 border border-emerald-700/40' : 'bg-red-900/40 border border-red-700/40'}`}>
                         {cambio >= 0 ? (
-                          <p className="text-2xl font-black text-emerald-400">Cambio: {formatMXN(cambio)}</p>
+                          <p className="text-3xl font-black text-emerald-400">Cambio: {formatMXN(cambio)}</p>
                         ) : (
-                          <p className="text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
+                          <p className="text-xl text-red-400 font-bold">Falta {formatMXN(Math.abs(cambio))}</p>
                         )}
                       </div>
                     )}
                     <button
                       onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
                       disabled={cashReceived < totalConPropina}
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-lg transition-colors"
+                      className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-xl transition-colors min-h-[60px]"
                     >
                       {cashReceived >= totalConPropina ? `Cobrar — Cambio ${formatMXN(cambio)}` : 'Ingresa el monto recibido'}
                     </button>
@@ -3932,7 +3927,7 @@ function POSContent() {
                   return (
                     <button
                       onClick={() => handlePayment('Transferencia electronica')}
-                      className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl text-base transition-colors min-h-[44px]"
+                      className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
                     >
                       <Send size={18} />
                       Transferencia
@@ -3940,12 +3935,12 @@ function POSContent() {
                   )
                 }
                 return (
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-2">
                     {customMethods.map(m => (
                       <button
                         key={m.id}
                         onClick={() => handlePayment(m.name)}
-                        className="flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-2.5 rounded-lg text-sm transition-colors min-h-[42px]"
+                        className="flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-3 rounded-xl text-base transition-colors min-h-[56px]"
                       >
                         {m.name}
                       </button>
@@ -3955,9 +3950,9 @@ function POSContent() {
               })()}
               <button
                 onClick={() => { setShowMixto(!showMixto); setMixtoPagos([]); setMixtoMonto(''); setMixtoForma('Efectivo') }}
-                className={`w-full flex items-center justify-center gap-2 ${showMixto ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)]'} font-bold py-2.5 rounded-lg text-sm transition-colors min-h-[42px]`}
+                className={`w-full flex items-center justify-center gap-2 ${showMixto ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-[var(--line)] hover:bg-[var(--line-soft)] text-[var(--text-2)]'} font-bold py-3 rounded-xl text-base transition-colors min-h-[52px]`}
               >
-                Pago mixto
+                Pago mixto (varias formas)
               </button>
               {showMixto && (() => {
                 const totalConPropina = payTotal + propina
