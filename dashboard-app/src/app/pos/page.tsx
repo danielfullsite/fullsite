@@ -1242,8 +1242,7 @@ function POSContent() {
       const params = new URLSearchParams(window.location.search)
       const urlMesa = Number(params.get('mesa')) || 0
       if (urlMesa > 0 && urlMesa !== mesa) {
-        setMesa(urlMesa)
-        loadOrderForMesa(urlMesa)
+        setMesa(urlMesa) // triggers [mesa] effect which handles loading
       }
     }
     window.addEventListener('popstate', checkUrlMesa)
@@ -1627,12 +1626,16 @@ function POSContent() {
         }
       } catch { /* */ }
     }
-    if (orderItems.length === 0) {
-      setOrderId(generateId())
-      setLoadedOrderId(null)
-      setLoadedUpdatedAt(null)
-      loadMesaOrder()
-    }
+    // Always reset and load fresh order for this mesa
+    setOrderItems([])
+    setOrderId(generateId())
+    setLoadedOrderId(null)
+    setLoadedUpdatedAt(null)
+    setDiscount(0)
+    setOrderNotes('')
+    setCancelledItems(new Set())
+    setVoidedItems(new Set())
+    loadMesaOrder()
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
 
