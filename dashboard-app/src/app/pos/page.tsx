@@ -299,7 +299,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
       <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
 
       {/* Modal — full height, wide for POS touch */}
-      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full max-w-4xl h-[calc(100vh-2rem)] rounded-2xl shadow-2xl flex flex-col mx-auto my-4">
+      <div className="relative bg-[var(--surface-2)] border border-[var(--line)] w-full max-w-5xl h-[calc(100vh-2rem)] rounded-2xl shadow-2xl flex flex-col mx-auto my-4">
         {/* Header */}
         <div className="bg-[var(--surface-2)] border-b border-[var(--line)] px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
           <div>
@@ -330,7 +330,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
               {quitarOptions.map(mod => (
                 <label
                   key={mod}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-3 rounded-xl cursor-pointer transition-colors min-h-[48px] ${
                     quitarChecked.has(mod)
                       ? 'bg-red-900/40 border border-red-700/60'
                       : 'bg-[var(--line)]/50 border border-slate-600/50 hover:bg-[var(--line)]'
@@ -390,7 +390,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                     return (
                       <label
                         key={opt.name}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
+                        className={`flex items-center gap-2 px-3 py-3 rounded-xl transition-colors min-h-[48px] ${
                           checked
                             ? 'bg-emerald-900/40 border border-emerald-700/60 cursor-pointer'
                             : blocked
@@ -500,14 +500,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
         <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 rounded-b-2xl flex-shrink-0">
           <button
             onClick={onCancel}
-            className="flex-1 py-3.5 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-semibold transition-colors min-h-[48px]"
+            className="flex-1 py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-bold text-lg transition-colors min-h-[56px]"
           >
             Cancelar
           </button>
           <button
             onClick={handleConfirm}
             disabled={unmetGroups.length > 0}
-            className="flex-[2] py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold transition-colors min-h-[48px]"
+            className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
           >
             {unmetGroups.length > 0
               ? `Elige ${unmetGroups[0].name}`
