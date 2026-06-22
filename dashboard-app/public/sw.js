@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -20,6 +20,8 @@ const STATIC_ASSETS = [
   '/pos/compras',
   '/pos/recetas',
   '/pos/turno',
+  '/pos/panaderia',
+  '/pos/delivery',
   '/pos/cliente',
   '/pos/facturacion',
   '/pos/auditoria',
