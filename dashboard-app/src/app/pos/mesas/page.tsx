@@ -341,7 +341,7 @@ export default function MesasPage() {
   }
 
   const handleMesaClick = (mesaNum: number) => {
-    if (!mergeMode) { window.location.href = `/pos?mesa=${mesaNum}`; return }
+    if (!mergeMode) { router.push(`/pos?mesa=${mesaNum}`); return }
     if (!mergeSource) setMergeSource(mesaNum)
     else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
   }

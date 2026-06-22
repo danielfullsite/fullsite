@@ -682,7 +682,7 @@ export default function PlanoPage() {
 
                   {/* Open in POS button */}
                   <button
-                    onClick={() => { window.location.href = `/pos?mesa=${selectedInfo.number}` }}
+                    onClick={() => router.push(`/pos?mesa=${selectedInfo.number}`)}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       padding: '12px 20px',
@@ -708,7 +708,7 @@ export default function PlanoPage() {
                     Capacidad: {selectedInfo.capacity} personas
                   </p>
                   <button
-                    onClick={() => { window.location.href = `/pos?mesa=${selectedInfo.number}` }}
+                    onClick={() => router.push(`/pos?mesa=${selectedInfo.number}`)}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       padding: '12px 20px',

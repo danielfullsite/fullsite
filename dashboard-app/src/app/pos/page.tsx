@@ -1205,6 +1205,14 @@ function POSContent() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
 
+  // Sync mesa state when searchParams change (client-side navigation from mesas/plano)
+  const urlMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 0)
+  useEffect(() => {
+    if (urlMesa > 0 && urlMesa !== mesa) {
+      setMesa(urlMesa)
+    }
+  }, [urlMesa])
+
   // When URL mesa param changes (e.g. from plano), switch to new mesa and load its order
   useEffect(() => {
     const loadOrderForMesa = async (newMesa: number) => {
@@ -1238,21 +1246,7 @@ function POSContent() {
       setVoidedItems(new Set())
     }
 
-    const checkUrlMesa = () => {
-      const params = new URLSearchParams(window.location.search)
-      const urlMesa = Number(params.get('mesa')) || 0
-      if (urlMesa > 0 && urlMesa !== mesa) {
-        setMesa(urlMesa) // triggers [mesa] effect which handles loading
-      }
-    }
-    window.addEventListener('popstate', checkUrlMesa)
-    window.addEventListener('focus', checkUrlMesa)
-    const interval = setInterval(checkUrlMesa, 500)
-    return () => {
-      window.removeEventListener('popstate', checkUrlMesa)
-      window.removeEventListener('focus', checkUrlMesa)
-      clearInterval(interval)
-    }
+    // Mesa sync now handled by useSearchParams effect above — no polling needed
   }, [mesa])
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
