@@ -319,24 +319,30 @@ export default function TurnoPage() {
   const handleOpenTurno = async () => {
     if (!openedBy.trim() || !fondoInicial) return
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos`, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        id, client_id: _cid(), opened_by: openedBy, fondo_inicial: Number(fondoInicial),
-      }),
-    })
-    if (res.ok) {
-      logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo: Number(fondoInicial) } })
-      showToast(`Turno abierto — Fondo: ${formatMXN(Number(fondoInicial))}`)
-      // Set turno immediately (no re-fetch delay)
-      setActiveTurno({
-        id, opened_by: openedBy, fondo_inicial: Number(fondoInicial),
-        opened_at: new Date().toISOString(), closed_by: null, fondo_final: null,
-        efectivo_sistema: null, diferencia: null, closed_at: null, notas: null,
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          id, client_id: _cid(), opened_by: openedBy, fondo_inicial: Number(fondoInicial),
+        }),
       })
-      setFondoInicial('')
-      setOpenedBy('')
+      if (res.ok) {
+        logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo: Number(fondoInicial) } })
+        showToast(`Turno abierto — Fondo: ${formatMXN(Number(fondoInicial))}`)
+        setActiveTurno({
+          id, opened_by: openedBy, fondo_inicial: Number(fondoInicial),
+          opened_at: new Date().toISOString(), closed_by: null, fondo_final: null,
+          efectivo_sistema: null, diferencia: null, closed_at: null, notas: null,
+        })
+        setFondoInicial('')
+        setOpenedBy('')
+      } else {
+        const err = await res.text().catch(() => res.statusText)
+        showToast(`Error al abrir turno: ${res.status} — ${err}`)
+      }
+    } catch (e) {
+      showToast(`Error de red: ${e instanceof Error ? e.message : 'sin conexion'}`)
     }
   }
 
