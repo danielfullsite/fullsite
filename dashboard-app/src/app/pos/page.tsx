@@ -3052,11 +3052,11 @@ function POSContent() {
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
               <div className="flex-1 overflow-y-auto bg-[var(--surface-2)]/50 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 p-2 auto-rows-fr pb-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-2 p-2 auto-rows-fr pb-4">
                   {allCombos.length > 0 && (
                     <button
                       onClick={() => setShowComboModal(true)}
-                      className="px-2 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[58px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
+                      className="px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-amber-600 to-orange-600 text-white hover:opacity-100 active:scale-95 ring-2 ring-amber-400/30"
                     >
                       <Layers size={18} />
                       <span>Combos</span>
@@ -3072,7 +3072,7 @@ function POSContent() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-2 py-2 rounded-xl text-xs font-bold text-center transition-all min-h-[58px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
+                          className={`px-3 py-3 rounded-xl text-sm font-bold text-center transition-all min-h-[72px] leading-tight flex flex-col items-center justify-center gap-0.5 ${catColor} opacity-85 text-white hover:opacity-100 active:scale-95`}
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] font-normal opacity-70">{itemCount}</span>
@@ -3085,12 +3085,12 @@ function POSContent() {
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
-                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[95vw] max-w-[900px] max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-5 py-3 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
                       <button onClick={() => setSelectedCategory('')} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
-                    <div className="overflow-y-auto p-4 max-h-[65vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="overflow-y-auto p-4 max-h-[72vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-4">
                 {activeCategory.items.filter(item => item.price > 0).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
