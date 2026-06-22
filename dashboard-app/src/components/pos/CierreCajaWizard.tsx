@@ -279,8 +279,8 @@ export default function CierreCajaWizard({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-      <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2">
+      <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-3xl max-h-[96vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line)]">
           <div className="flex items-center gap-3">
@@ -303,7 +303,7 @@ export default function CierreCajaWizard({
           />
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
           {/* Step 1: Count bills */}
           {step === 1 && (
             <div>
@@ -372,50 +372,50 @@ export default function CierreCajaWizard({
           {/* Step 3: System summary & discrepancy */}
           {step === 3 && (
             <div>
-              <h3 className="font-bold text-[var(--text-1)] mb-4">Resumen del sistema</h3>
+              <h3 className="font-bold text-[var(--text-1)] mb-2">Resumen del sistema</h3>
 
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+              <div className="space-y-1 mb-3">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Fondo inicial</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(fondoInicial)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Ventas en efectivo</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.efectivo)}</span>
                 </div>
                 {systemData.depositos > 0 && (
-                  <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                  <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                     <span className="text-[var(--text-3)]">Depósitos</span>
                     <span className="text-emerald-400 font-medium">+{formatMXN(systemData.depositos)}</span>
                   </div>
                 )}
                 {systemData.retiros > 0 && (
-                  <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                  <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                     <span className="text-[var(--text-3)]">Retiros</span>
                     <span className="text-red-400 font-medium">-{formatMXN(systemData.retiros)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Ventas tarjeta</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.tarjeta)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Transferencias</span>
                   <span className="text-[var(--text-1)] font-medium">{formatMXN(systemData.transferencias)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Tickets cerrados</span>
                   <span className="text-[var(--text-1)] font-medium">{systemData.ticketsCount}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Cancelaciones</span>
                   <span className="text-red-400 font-medium">{systemData.cancelaciones}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)]">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)]">
                   <span className="text-[var(--text-3)]">Descuentos</span>
                   <span className="text-amber-400 font-medium">{formatMXN(systemData.descuentos)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[var(--line)] text-lg">
+                <div className="flex justify-between py-1.5 border-b border-[var(--line)] text-lg">
                   <span className="font-bold text-[var(--text-1)]">Total ventas</span>
                   <span className="font-bold text-emerald-400">{formatMXN(systemData.totalVentas)}</span>
                 </div>
