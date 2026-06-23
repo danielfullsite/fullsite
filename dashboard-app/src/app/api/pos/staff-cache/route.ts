@@ -1,11 +1,18 @@
-// GET /api/pos/staff-cache — returns all staff PINs for offline cache pre-population.
-// Uses service key (server-side only) so PINs never travel through the browser network tab.
-// The client stores them hashed in localStorage for offline PIN verification.
+// GET /api/pos/staff-cache — returns staff list with HASHED PINs for offline cache.
+// PINs are hashed server-side with SHA-256 before sending to the client.
+// The client hashes the entered PIN and compares locally for offline auth.
 
 import { NextResponse } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(pin + '_fullsite_salt')
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
 export async function GET(request: Request) {
   const clientId = request.headers.get('x-client-id') || 'amalay'
@@ -18,7 +25,16 @@ export async function GET(request: Request) {
     if (!res.ok) return NextResponse.json({ staff: [] })
 
     const staff = await res.json()
-    return NextResponse.json({ staff })
+    // Hash PINs server-side — never send raw PINs to client
+    const safeStaff = await Promise.all(
+      staff.map(async (s: { id: string; name: string; role: string; pin: string }) => ({
+        id: s.id,
+        name: s.name,
+        role: s.role,
+        pinHash: await hashPin(s.pin),
+      }))
+    )
+    return NextResponse.json({ staff: safeStaff })
   } catch {
     return NextResponse.json({ staff: [] })
   }
