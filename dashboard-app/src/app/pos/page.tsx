@@ -1553,6 +1553,7 @@ function POSContent() {
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null)
   const [allPromos, setAllPromos] = useState<Awaited<ReturnType<typeof getActivePromos>>>([])
   const categoryMapRef = useRef(new Map<string, string>())
+  const mpPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [allCombos, setAllCombos] = useState<Combo[]>([])
   const [showComboModal, setShowComboModal] = useState(false)
 
@@ -3742,7 +3743,7 @@ function POSContent() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Cerrar cuenta{cuentaLabel}</h3>
               <button
-                onClick={() => { setShowPayment(false); setShowCardConfirm(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
+                onClick={() => { if (mpPollRef.current) { clearInterval(mpPollRef.current); mpPollRef.current = null } setShowPayment(false); setShowCardConfirm(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
                 className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={20} />
@@ -3829,7 +3830,7 @@ function POSContent() {
                         // Poll for payment completion
                         const intentId = result.data.id
                         let attempts = 0
-                        const poll = setInterval(async () => {
+                        mpPollRef.current = setInterval(async () => {
                           attempts++
                           try {
                             const statusRes = await fetch(apiUrl('/api/mp-point'), {
@@ -3839,10 +3840,10 @@ function POSContent() {
                             })
                             const statusData = await statusRes.json()
                             if (statusData.state === 'FINISHED') {
-                              clearInterval(poll)
+                              clearInterval(mpPollRef.current!); mpPollRef.current = null
                               handlePayment('Tarjeta de credito')
                             } else if (statusData.state === 'CANCELED' || statusData.state === 'ERROR' || attempts > 60) {
-                              clearInterval(poll)
+                              clearInterval(mpPollRef.current!); mpPollRef.current = null
                               setSaving(false)
                               showToast(statusData.state === 'CANCELED' ? 'Pago cancelado' : 'Error en terminal')
                             }
@@ -4178,7 +4179,10 @@ function POSAlerts({ role }: { role: string }) {
 
     fetchAlerts()
     const interval = setInterval(fetchAlerts, 60000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      // mpPollRef cleanup handled in payment modal close
+    }
   }, [role])
 
   const visibleAlerts = alerts.filter(a => !dismissed.has(a.id))

@@ -2,6 +2,14 @@ import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth gate: require either a Supabase session cookie or the x-pos-staff header
+    // that the POS sets from sessionStorage after PIN login.
+    const hasPosStaff = !!request.headers.get('x-pos-staff')
+    const hasSession = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+    if (!hasPosStaff && !hasSession) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { action, accessToken, deviceId, amount, orderId, paymentIntentId, paymentId, installments, installments_cost, tip_enabled, print_on_terminal, mode } = await request.json()
 
     if (!accessToken) {

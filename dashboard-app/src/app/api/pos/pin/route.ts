@@ -4,8 +4,8 @@ import { NextRequest } from 'next/server'
 // El cliente ya no lee pos_staff directamente (anon revocado por RLS);
 // este endpoint consulta con service key y aplica rate limit por IP.
 
-const MAX_ATTEMPTS = 10
-const WINDOW_MS = 60_000
+const MAX_ATTEMPTS = 5
+const WINDOW_MS = 300_000 // 5 minutes
 
 const attemptsByIp = new Map<string, { count: number; resetAt: number }>()
 
