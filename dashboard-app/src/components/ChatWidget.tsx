@@ -70,20 +70,21 @@ function MiniChart({ chart }: { chart: ChartData }) {
     )
   }
 
-  // Bar or Line chart
-  const barW = Math.min(40, Math.floor(260 / chart.data.length) - 4)
+  // Bar or Line chart — limit to 14 points max for readability
+  const displayData = chart.data.length > 14 ? chart.data.slice(-14) : chart.data
+  const barW = Math.max(8, Math.min(24, Math.floor(240 / displayData.length) - 2))
   return (
-    <div className="mt-2 p-3 bg-black/20 rounded-xl">
-      <p className="text-xs font-semibold text-[var(--text-2)] mb-2">{chart.title}</p>
-      <div className="flex items-end gap-1 h-24">
-        {chart.data.map((d, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 flex-1">
-            <span className="text-[9px] text-emerald-400 font-medium">${(d.value / 1000).toFixed(0)}k</span>
+    <div className="mt-2 p-2 bg-black/20 rounded-xl overflow-hidden">
+      <p className="text-[10px] font-semibold text-[var(--text-2)] mb-1">{chart.title}</p>
+      <div className="flex items-end gap-px h-20 overflow-hidden">
+        {displayData.map((d, i) => (
+          <div key={i} className="flex flex-col items-center gap-px flex-1 min-w-0">
+            <span className="text-[7px] text-emerald-400 font-medium truncate w-full text-center">${(d.value / 1000).toFixed(0)}k</span>
             <div
-              className="rounded-t transition-all"
-              style={{ width: barW, height: `${Math.max(4, (d.value / max) * 80)}px`, background: colors[i % colors.length] }}
+              className="rounded-t w-full max-w-[20px] mx-auto"
+              style={{ height: `${Math.max(3, (d.value / max) * 60)}px`, background: colors[i % colors.length] }}
             />
-            <span className="text-[9px] text-[var(--text-3)] truncate max-w-[40px]">{d.label}</span>
+            <span className="text-[6px] text-[var(--text-3)] truncate w-full text-center">{d.label}</span>
           </div>
         ))}
       </div>

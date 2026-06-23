@@ -994,7 +994,7 @@ ${dailyContext}`
       const valid = rows.filter((d: Record<string, unknown>) => Number(d?.ventas_dia || 0) > 0)
         .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
       if (valid.length > 0) {
-        const data = valid.slice(-30).map((d: Record<string, unknown>) => ({
+        const data = valid.slice(-14).map((d: Record<string, unknown>) => ({
           label: String(d.fecha || '').slice(5, 10).replace('-', '/'),
           value: Math.round(Number(d.ventas_dia)),
         }))
