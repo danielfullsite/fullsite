@@ -60,6 +60,7 @@ import {
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
 import { syncAll, getPendingQueue } from '@/lib/pos-offline-db'
+import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
   ChefHat,
@@ -4098,6 +4099,8 @@ function POSContent() {
 function POSAlerts({ role }: { role: string }) {
   const [alerts, setAlerts] = useState<{ id: string; type: 'warning' | 'info' | 'success'; message: string; dismissible: boolean }[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  // Track which alert IDs have already fired a push notification (survives re-renders, resets on unmount)
+  const notifiedRef = useRef<Set<string>>(new Set())
 
   // Fetch smart alerts every 60 seconds
   useEffect(() => {
@@ -4173,6 +4176,31 @@ function POSAlerts({ role }: { role: string }) {
         } catch { /* ignore */ }
 
       } catch { /* ignore all errors */ }
+
+      // Fire push notifications for alerts that are NEW (not yet notified)
+      for (const alert of newAlerts) {
+        if (!notifiedRef.current.has(alert.id)) {
+          notifiedRef.current.add(alert.id)
+          // Map alert to a human-readable push notification
+          let title = 'Fullsite POS'
+          let body = alert.message.replace(/^[\p{Emoji}\s]+/u, '').trim()
+          if (alert.id === 'anomaly-critical') {
+            title = 'Anomalía detectada'
+          } else if (alert.id === 'ready-orders') {
+            title = 'Órdenes listas'
+          } else if (alert.id.startsWith('del-')) {
+            title = 'Nuevo pedido delivery'
+          } else if (alert.id === 'turno-largo') {
+            title = 'Turno abierto >12h'
+          }
+          sendNotification(title, body, '/pos').catch(() => {})
+        }
+      }
+      // Remove IDs that are no longer present so they can re-notify if they reappear
+      const currentIds = new Set(newAlerts.map(a => a.id))
+      for (const id of notifiedRef.current) {
+        if (!currentIds.has(id)) notifiedRef.current.delete(id)
+      }
 
       setAlerts(newAlerts)
     }

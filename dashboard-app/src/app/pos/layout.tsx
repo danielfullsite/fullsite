@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { registerServiceWorker } from '@/lib/service-worker'
+import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
@@ -242,6 +242,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setAttempts(0)
           sessionStorage.setItem('pos_staff', JSON.stringify(member))
           sessionStorage.setItem('pos_last_activity', Date.now().toString())
+          // Ask for notification permission after biometric login
+          requestNotificationPermission().catch(() => {})
         }
       }
     } catch (e) {
@@ -262,6 +264,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
+      // Ask for notification permission after login (non-blocking, user gesture context)
+      requestNotificationPermission().catch(() => {})
     }
 
     try {

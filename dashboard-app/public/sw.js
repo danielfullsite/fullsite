@@ -221,7 +221,22 @@ async function syncPendingOrders() {
   }
 }
 
-// ─── Push Notifications (future) ───────────────────────────────────────────
+// ─── Notification click handler ───────────────────────────────────────────
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data?.url || '/pos'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing window if open
+      for (const client of clientList) {
+        if (client.url.includes(url) && 'focus' in client) return client.focus()
+      }
+      // Otherwise open a new tab
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+    })
+  )
+})
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
