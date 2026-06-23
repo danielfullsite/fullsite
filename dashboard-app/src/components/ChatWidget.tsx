@@ -18,12 +18,16 @@ const quickQuestions = [
 interface ChartData { type: 'bar' | 'line' | 'pie'; title: string; data: { label: string; value: number }[] }
 
 function extractChart(text: string): { clean: string; chart: ChartData | null } {
-  const match = text.match(/<!--chart\s*([\s\S]*?)\s*chart-->/)
+  const match = text.match(/<!--\s*chart\s*([\s\S]*?)\s*chart\s*-->/)
   if (!match) return { clean: text, chart: null }
   try {
-    const chart = JSON.parse(match[1]) as ChartData
+    const jsonStr = match[1].trim()
+    const chart = JSON.parse(jsonStr) as ChartData
     return { clean: text.replace(match[0], '').trim(), chart }
-  } catch { return { clean: text, chart: null } }
+  } catch {
+    // If JSON parse fails, still strip the raw markers from display
+    return { clean: text.replace(match[0], '').trim(), chart: null }
+  }
 }
 
 function MiniChart({ chart }: { chart: ChartData }) {
