@@ -79,7 +79,7 @@ function MiniChart({ chart }: { chart: ChartData }) {
       {displayData.map((d, i) => (
         <div key={i} className="flex flex-col items-center gap-px flex-1 min-w-0">
           <span className={`${valueSize} text-emerald-400 font-medium truncate w-full text-center`}>
-            ${d.value >= 1000 ? `${(d.value / 1000).toFixed(0)}k` : d.value.toLocaleString()}
+            {d.value >= 10000 ? `$${(d.value / 1000).toFixed(0)}k` : `$${Math.round(d.value).toLocaleString()}`}
           </span>
           <div
             className="rounded-t w-full mx-auto"
