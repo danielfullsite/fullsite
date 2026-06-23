@@ -985,12 +985,11 @@ ${dailyContext}`
       maxTokens: 4000,
     })
 
-    // Auto-inject chart if user asked for one and AI didn't generate it
-    // Chart injection — always try if user mentions graph-related words
+    // Auto-inject chart ONLY if AI didn't already generate one
     const qNorm = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const wantsChart = /graf|chart|muestra|hazme/.test(qNorm)
     let finalText = text
-    if (wantsChart) {
+    if (wantsChart && !text.includes('<!--chart')) {
       const rows = Array.isArray(recentDays) ? recentDays : []
       const valid = rows.filter((d: Record<string, unknown>) => Number(d?.ventas_dia || 0) > 0)
         .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.fecha || '').localeCompare(String(b.fecha || '')))

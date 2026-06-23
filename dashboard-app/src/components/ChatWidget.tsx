@@ -18,16 +18,18 @@ const quickQuestions = [
 interface ChartData { type: 'bar' | 'line' | 'pie'; title: string; data: { label: string; value: number }[] }
 
 function extractChart(text: string): { clean: string; chart: ChartData | null } {
-  const match = text.match(/<!--\s*chart\s*([\s\S]*?)\s*chart\s*-->/)
-  if (!match) return { clean: text, chart: null }
-  try {
-    const jsonStr = match[1].trim()
-    const chart = JSON.parse(jsonStr) as ChartData
-    return { clean: text.replace(match[0], '').trim(), chart }
-  } catch {
-    // If JSON parse fails, still strip the raw markers from display
-    return { clean: text.replace(match[0], '').trim(), chart: null }
+  // Strip ALL chart blocks and parse the first valid one
+  let chart: ChartData | null = null
+  let clean = text
+  const regex = /<!--\s*chart\s*([\s\S]*?)\s*chart\s*-->/g
+  let match
+  while ((match = regex.exec(text)) !== null) {
+    if (!chart) {
+      try { chart = JSON.parse(match[1].trim()) as ChartData } catch { /* skip invalid */ }
+    }
+    clean = clean.replace(match[0], '')
   }
+  return { clean: clean.trim(), chart }
 }
 
 function MiniChart({ chart }: { chart: ChartData }) {
