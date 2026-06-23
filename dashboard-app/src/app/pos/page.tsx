@@ -2958,13 +2958,13 @@ function POSContent() {
         {/* Right Panel -- Menu (50% on tablet, full on mobile when active) */}
         <div className={`md:w-[50%] lg:w-[55%] md:flex flex-col ${mobileView === 'menu' ? 'flex w-full' : 'hidden'}`} style={{background:'#0d0d12'}}>
           {/* Search bar — touch target + barcode scanner */}
-          <div className="px-3 pt-1.5 pb-1 flex-shrink-0 flex gap-2">
+          <div className="px-2 pt-1 pb-0.5 flex-shrink-0 flex gap-2">
             <input
               type="text"
               value={menuSearch}
               onChange={(e) => setMenuSearch(e.target.value)}
               placeholder="Buscar platillo..."
-              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[44px]"
+              className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-1.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-emerald-500 min-h-[36px]"
             />
             <button
               onClick={() => setShowBarcodeScanner(true)}
@@ -2977,7 +2977,7 @@ function POSContent() {
 
           {/* Seat tabs — PoloTab style */}
           {personas > 1 && (
-            <div className="px-3 pb-1 flex-shrink-0 flex items-center gap-1.5 overflow-x-auto">
+            <div className="px-2 pb-0.5 flex-shrink-0 flex items-center gap-1 overflow-x-auto">
               <button
                 onClick={() => setSillaActual(0)}
                 className={`px-4 min-h-[40px] rounded-xl text-sm font-bold transition-all flex-shrink-0 ${
@@ -3061,8 +3061,8 @@ function POSContent() {
           ) : (
             <>
               {/* Category grid — full area, alphabetical left→right, large touch targets */}
-              <div className="flex-1 bg-[var(--surface-2)]/50 p-1.5">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 h-full" style={{ gridAutoRows: '1fr' }}>
+              <div className="flex-1 bg-[var(--surface-2)]/50 p-1 overflow-hidden">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 h-full" style={{ gridAutoRows: '1fr' }}>
                   {allCombos.length > 0 && (
                     <button
                       onClick={() => setShowComboModal(true)}
