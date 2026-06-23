@@ -897,6 +897,7 @@ Rutas disponibles:
 - Coach IA → [Ver coach →](/coach)
 - Exportar datos → [Exportar →](/admin/exportar)
 - Carga masiva → [Carga masiva →](/admin/carga-masiva)
+- Chat logs/conversaciones IA → [Ver chat logs →](/admin/chat-logs)
 - Formas de pago → [Formas de pago →](/admin/formas-pago)
 - Modificadores POS → [Modificadores →](/admin/modificadores)
 - POS (punto de venta) → [Abrir POS →](/pos)
@@ -1018,6 +1019,22 @@ ${dailyContext}`
         })
       } catch { /* non-blocking */ }
     }
+
+    // Log conversation to chat_logs (non-blocking)
+    const hadError = finalText.toLowerCase().includes('no tengo') || finalText.toLowerCase().includes('no puedo') || finalText.toLowerCase().includes('no cuento')
+    fetch(`${sbUrl}/rest/v1/chat_logs`, {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        client_id: client_id || 'amalay',
+        user_id: userId || null,
+        user_message: message.slice(0, 2000),
+        ai_response: finalText.slice(0, 5000),
+        model: 'groq',
+        had_error: hadError,
+        error_type: hadError ? (finalText.includes('no tengo') ? 'no_data' : finalText.includes('no puedo') ? 'cant_do' : 'other') : null,
+      }),
+    }).catch(() => {})
 
     return Response.json({ response: finalText })
   } catch (error) {
