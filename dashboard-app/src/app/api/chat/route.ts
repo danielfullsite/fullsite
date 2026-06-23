@@ -999,7 +999,12 @@ ${dailyContext}`
           value: Math.round(Number(d.ventas_dia)),
         }))
         finalText += '\n\n<!--chart\n' + JSON.stringify({ type: 'bar', title: 'Ventas diarias', data }) + '\nchart-->'
+      } else {
+        // Debug: show what we got
+        finalText += `\n\n[DEBUG: recentDays=${rows.length} rows, valid=${valid.length}]`
       }
+    } else {
+      finalText += `\n\n[DEBUG: wantsChart=false, qNorm="${qNorm.slice(0,50)}"]`
     }
 
     // Hermes feedback: log if response contains "no tengo" for improvement
