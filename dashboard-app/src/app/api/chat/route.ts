@@ -985,24 +985,21 @@ ${dailyContext}`
     })
 
     // Auto-inject chart if user asked for one and AI didn't generate it
-    const qNorm = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
-    const wantsChart = ['grafica', 'chart', 'muestrame', 'muestra', 'hazme una'].some(kw => qNorm.includes(kw))
+    // Chart injection — always try if user mentions graph-related words
+    const qNorm = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const wantsChart = /graf|chart|muestra|hazme/.test(qNorm)
     let finalText = text
-    if (wantsChart && !text.includes('<!--chart')) {
-      try {
-        const chartRows = (recentDays as Record<string, unknown>[])
-          .filter(d => Number(d.ventas_dia) > 0)
-          .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
-        if (chartRows.length > 0) {
-          const chartData = chartRows.slice(-30).map(d => {
-            const f = String(d.fecha)
-            const label = f.length >= 10 ? `${f.slice(8,10)}/${f.slice(5,7)}` : f
-            return { label, value: Math.round(Number(d.ventas_dia)) }
-          })
-          const chartJson = JSON.stringify({ type: 'bar', title: 'Ventas diarias', data: chartData })
-          finalText = finalText + `\n\n<!--chart\n${chartJson}\nchart-->`
-        }
-      } catch { /* chart injection failed silently */ }
+    if (wantsChart) {
+      const rows = Array.isArray(recentDays) ? recentDays : []
+      const valid = rows.filter((d: Record<string, unknown>) => Number(d?.ventas_dia || 0) > 0)
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
+      if (valid.length > 0) {
+        const data = valid.slice(-30).map((d: Record<string, unknown>) => ({
+          label: String(d.fecha || '').slice(5, 10).replace('-', '/'),
+          value: Math.round(Number(d.ventas_dia)),
+        }))
+        finalText += '\n\n<!--chart\n' + JSON.stringify({ type: 'bar', title: 'Ventas diarias', data }) + '\nchart-->'
+      }
     }
 
     // Hermes feedback: log if response contains "no tengo" for improvement
