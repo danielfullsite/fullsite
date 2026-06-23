@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, ArrowLeft, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
@@ -123,12 +123,37 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<(ChatMessage & { timestamp?: Date })[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  // Typewriter state: the partial text being animated in for the latest assistant message
+  const [typingContent, setTypingContent] = useState<string | null>(null)
+  const typingFullRef = useRef<string>('')      // full target text
+  const typingIndexRef = useRef(0)              // chars revealed so far
+  const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Finish the typewriter animation immediately (skip to end)
+  const skipAnimation = useCallback(() => {
+    if (typingTimerRef.current !== null) {
+      clearInterval(typingTimerRef.current)
+      typingTimerRef.current = null
+      const full = typingFullRef.current
+      setTypingContent(null)
+      setMessages((prev) => {
+        // Replace the last assistant message (which was added as a placeholder) with the full text
+        const copy = [...prev]
+        const lastIdx = copy.length - 1
+        if (copy[lastIdx]?.role === 'assistant') {
+          copy[lastIdx] = { ...copy[lastIdx], content: full }
+        }
+        return copy
+      })
+    }
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isLoading])
+  }, [messages, isLoading, typingContent])
 
   // Close on Escape key
   useEffect(() => {
@@ -172,10 +197,46 @@ export default function ChatWidget() {
       if (!res.ok) throw new Error('Error en la respuesta')
 
       const data = await res.json()
+      const fullText: string = data.response || ''
+
+      // Add placeholder message immediately (empty), then animate
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: data.response, timestamp: new Date() },
+        { role: 'assistant', content: '', timestamp: new Date() },
       ])
+
+      // Kick off typewriter
+      typingFullRef.current = fullText
+      typingIndexRef.current = 0
+      setTypingContent('')
+
+      const CHARS_PER_TICK = 4
+      const TICK_MS = 15
+
+      typingTimerRef.current = setInterval(() => {
+        typingIndexRef.current = Math.min(
+          typingIndexRef.current + CHARS_PER_TICK,
+          fullText.length
+        )
+        const partial = fullText.slice(0, typingIndexRef.current)
+        setTypingContent(partial)
+
+        // Update the placeholder message so extractChart / renderMarkdown work correctly
+        setMessages((prev) => {
+          const copy = [...prev]
+          const lastIdx = copy.length - 1
+          if (copy[lastIdx]?.role === 'assistant') {
+            copy[lastIdx] = { ...copy[lastIdx], content: partial }
+          }
+          return copy
+        })
+
+        if (typingIndexRef.current >= fullText.length) {
+          clearInterval(typingTimerRef.current!)
+          typingTimerRef.current = null
+          setTypingContent(null)
+        }
+      }, TICK_MS)
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -245,7 +306,12 @@ export default function ChatWidget() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[var(--surface-2)]/30">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[var(--surface-2)]/30"
+        onScroll={() => { if (typingTimerRef.current !== null) skipAnimation() }}
+        onClick={() => { if (typingTimerRef.current !== null) skipAnimation() }}
+      >
         {/* Empty state */}
         {!hasMessages && !isLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-4">
