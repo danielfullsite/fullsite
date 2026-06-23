@@ -28,8 +28,50 @@ function corsHeaders(origin: string): Record<string, string> {
   }
 }
 
+// ─── Rate limiter (anti-scraping) ────────────────────────────────────────────
+const rateMap = new Map<string, { count: number; reset: number }>()
+const RATE_LIMIT = 60 // requests per minute
+const RATE_WINDOW = 60_000
+
+function checkRate(ip: string, pathname: string): { ok: boolean; remaining: number } {
+  // POS pages poll frequently — exempt
+  if (pathname.startsWith('/pos') || pathname.startsWith('/api/pos') || pathname.startsWith('/_next')) {
+    return { ok: true, remaining: RATE_LIMIT }
+  }
+  const now = Date.now()
+  const entry = rateMap.get(ip)
+  if (!entry || now > entry.reset) {
+    rateMap.set(ip, { count: 1, reset: now + RATE_WINDOW })
+    return { ok: true, remaining: RATE_LIMIT - 1 }
+  }
+  entry.count++
+  if (entry.count > RATE_LIMIT) {
+    // Log suspicious activity (100+ req/min)
+    if (entry.count === 101) {
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (sbUrl && sbKey) {
+        fetch(`${sbUrl}/rest/v1/agent_runs`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ agent_id: `anti-scraping`, trigger_type: 'auto', status: 'alert', output_summary: `${ip} | ${entry.count}req/min | ${pathname}`, tentacle: 'security' }),
+        }).catch(() => {})
+      }
+    }
+    return { ok: false, remaining: 0 }
+  }
+  return { ok: true, remaining: RATE_LIMIT - entry.count }
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // Rate limiting
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const rate = checkRate(ip, pathname)
+  if (!rate.ok) {
+    return new NextResponse('Too many requests', { status: 429, headers: { 'Retry-After': '60' } })
+  }
 
   // CORS para /api desde la app nativa (capacitor://localhost). Same-origin no se afecta.
   if (pathname.startsWith('/api')) {

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Package, ChefHat, Users, ShoppingCart, Layers, FileSpreadsheet } from 'lucide-react'
+import { Download, Package, ChefHat, Users, ShoppingCart, Layers, FileSpreadsheet, ShieldAlert } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -23,7 +24,26 @@ const EXPORTS = [
 ]
 
 export default function ExportarPage() {
+  const { role } = useAuth()
   const [downloading, setDownloading] = useState<string | null>(null)
+
+  // Only dueño/admin can export bulk data
+  if (role !== 'dueño') {
+    return (
+      <>
+        <PageHeader
+          title="Exportar datos"
+          subtitle="Acceso restringido"
+          eyebrow="Admin"
+        />
+        <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+          <ShieldAlert size={48} className="text-red-400" />
+          <p className="text-lg font-semibold text-[var(--text-1)]">Acceso restringido</p>
+          <p className="text-sm text-[var(--text-3)]">Solo el dueño puede exportar datos del sistema.</p>
+        </div>
+      </>
+    )
+  }
 
   function jsonToCsv(data: Record<string, unknown>[]): string {
     if (data.length === 0) return ''
