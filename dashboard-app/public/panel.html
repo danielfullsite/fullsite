@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fullsite Internal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #e5e5e5; min-height: 100vh; }
+    .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-box { background: #111118; border: 1px solid #222; border-radius: 16px; padding: 32px; width: 100%; max-width: 360px; }
+    .login-box h1 { font-size: 20px; margin-bottom: 4px; }
+    .login-box p { color: #666; font-size: 14px; margin-bottom: 24px; }
+    .login-box input { width: 100%; background: #1a1a24; border: 1px solid #333; border-radius: 8px; padding: 12px; color: white; font-size: 18px; text-align: center; outline: none; }
+    .login-box input:focus { border-color: #10b981; }
+    .login-box button { width: 100%; background: #10b981; color: white; border: none; border-radius: 12px; padding: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 16px; }
+    .login-box button:hover { background: #059669; }
+    .error { color: #ef4444; font-size: 13px; text-align: center; margin-top: 8px; }
+
+    /* Panel styles */
+    .panel { max-width: 1000px; margin: 0 auto; padding: 32px 24px; display: none; }
+    .panel.active { display: block; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .panel-header h1 { font-size: 24px; font-weight: bold; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+    .tabs button { padding: 10px 20px; border-radius: 10px; border: 1px solid #333; background: #111118; color: #999; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .tabs button.active { background: #10b981; color: white; border-color: #10b981; }
+    .search { width: 100%; background: #111118; border: 1px solid #222; border-radius: 10px; padding: 10px 16px; color: white; font-size: 14px; outline: none; margin-bottom: 16px; }
+    .search:focus { border-color: #10b981; }
+    .stats { display: flex; gap: 12px; margin-bottom: 20px; }
+    .stat { background: #111118; border: 1px solid #222; border-radius: 10px; padding: 12px 20px; font-size: 14px; }
+    .stat b { font-size: 18px; }
+
+    /* Chat log items */
+    .log-item { background: #111118; border: 1px solid #222; border-radius: 12px; margin-bottom: 8px; overflow: hidden; cursor: pointer; }
+    .log-item.error { border-color: rgba(239,68,68,0.3); }
+    .log-header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+    .log-header:hover { background: #1a1a24; }
+    .log-q { flex: 1; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-time { font-size: 12px; color: #666; white-space: nowrap; }
+    .log-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .log-badge.err { background: rgba(239,68,68,0.1); color: #ef4444; }
+    .log-detail { display: none; padding: 0 16px 16px; border-top: 1px solid #222; }
+    .log-detail.open { display: block; padding-top: 12px; }
+    .log-detail .q { background: rgba(16,185,129,0.1); border-radius: 10px; padding: 12px; font-size: 13px; margin-bottom: 8px; white-space: pre-wrap; }
+    .log-detail .a { background: #1a1a24; border-radius: 10px; padding: 12px; font-size: 13px; white-space: pre-wrap; }
+    .log-detail .a.err { background: rgba(239,68,68,0.1); }
+    .log-detail .meta { font-size: 11px; color: #666; margin-top: 8px; }
+
+    /* Vault */
+    .vault-cat { background: #111118; border: 1px solid #222; border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+    .vault-cat-header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    .vault-cat-header:hover { background: #1a1a24; }
+    .vault-item { padding: 10px 16px; border-top: 1px solid #1a1a24; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .vault-item .name { font-weight: 500; }
+    .vault-item .user { color: #666; }
+    .vault-item .pw { font-family: monospace; background: #1a1a24; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .vault-item button { background: none; border: 1px solid #333; border-radius: 6px; padding: 4px 8px; color: #999; cursor: pointer; font-size: 11px; }
+    .vault-item button:hover { border-color: #10b981; color: #10b981; }
+    .spacer { flex: 1; }
+    .btn-add { background: #10b981; color: white; border: none; border-radius: 10px; padding: 10px 20px; font-weight: bold; cursor: pointer; }
+    .btn-add:hover { background: #059669; }
+    .btn-logout { background: none; border: 1px solid #333; border-radius: 8px; padding: 8px 16px; color: #999; cursor: pointer; font-size: 13px; }
+    .btn-logout:hover { border-color: #ef4444; color: #ef4444; }
+    .empty { text-align: center; padding: 60px 20px; color: #666; }
+  </style>
+</head>
+<body>
+  <!-- Login -->
+  <div id="login" class="login-wrap">
+    <div class="login-box">
+      <h1>Fullsite Internal</h1>
+      <p>Panel de administracion</p>
+      <input type="password" id="pw" placeholder="Contraseña" autofocus>
+      <div id="err" class="error"></div>
+      <button onclick="doLogin()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div id="panel" class="panel">
+    <div class="panel-header">
+      <h1 id="panel-title">Chat Logs</h1>
+      <div style="display:flex;gap:8px">
+        <button class="btn-logout" onclick="logout()">Cerrar sesion</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button id="tab-logs" class="active" onclick="switchTab('logs')">Chat Logs</button>
+      <button id="tab-vault" onclick="switchTab('vault')">Vault</button>
+    </div>
+
+    <!-- Chat Logs Tab -->
+    <div id="section-logs">
+      <div class="stats">
+        <div class="stat">Total: <b id="stat-total">0</b></div>
+        <div class="stat" style="color:#ef4444">Errores: <b id="stat-errors">0</b></div>
+        <div class="stat" style="color:#10b981">Hoy: <b id="stat-today">0</b></div>
+      </div>
+      <input class="search" placeholder="Buscar en preguntas..." oninput="filterLogs(this.value)">
+      <div id="logs-list"></div>
+    </div>
+
+    <!-- Vault Tab -->
+    <div id="section-vault" style="display:none">
+      <div id="vault-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const SB_URL = 'https://qjiomlvudfmzuvqvhwpk.supabase.co'
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaW9tbHZ1ZGZtenV2cXZod3BrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODQ5MTUsImV4cCI6MjA5MTM2MDkxNX0.nv1ctxRJbc8kzD5gPypoxZ4uLtxOX61Me2ype5GBXyU'
+    const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+
+    let allLogs = []
+
+    // Auth
+    function doLogin() {
+      const pw = document.getElementById('pw').value
+      fetch('/api/internal-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) })
+        .then(r => { if (r.ok) { sessionStorage.setItem('fs_internal', '1'); showPanel() } else document.getElementById('err').textContent = 'Contraseña incorrecta' })
+    }
+    document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+
+    function logout() { sessionStorage.removeItem('fs_internal'); location.reload() }
+
+    function showPanel() {
+      document.getElementById('login').style.display = 'none'
+      document.getElementById('panel').classList.add('active')
+      loadLogs()
+    }
+
+    if (sessionStorage.getItem('fs_internal') === '1') showPanel()
+
+    // Tabs
+    function switchTab(tab) {
+      document.getElementById('tab-logs').className = tab === 'logs' ? 'active' : ''
+      document.getElementById('tab-vault').className = tab === 'vault' ? 'active' : ''
+      document.getElementById('section-logs').style.display = tab === 'logs' ? 'block' : 'none'
+      document.getElementById('section-vault').style.display = tab === 'vault' ? 'block' : 'none'
+      document.getElementById('panel-title').textContent = tab === 'logs' ? 'Chat Logs' : 'Credentials Vault'
+      if (tab === 'vault') loadVault()
+    }
+
+    // Chat Logs
+    async function loadLogs() {
+      const res = await fetch(`${SB_URL}/rest/v1/chat_logs?order=created_at.desc&limit=100`, { headers })
+      allLogs = res.ok ? await res.json() : []
+      renderLogs(allLogs)
+    }
+
+    function filterLogs(q) {
+      const f = q.toLowerCase()
+      renderLogs(f ? allLogs.filter(l => l.user_message.toLowerCase().includes(f) || l.ai_response.toLowerCase().includes(f)) : allLogs)
+    }
+
+    function renderLogs(logs) {
+      const today = new Date().toISOString().split('T')[0]
+      document.getElementById('stat-total').textContent = logs.length
+      document.getElementById('stat-errors').textContent = logs.filter(l => l.had_error).length
+      document.getElementById('stat-today').textContent = logs.filter(l => l.created_at?.startsWith(today)).length
+
+      if (logs.length === 0) {
+        document.getElementById('logs-list').innerHTML = '<div class="empty">No hay conversaciones registradas</div>'
+        return
+      }
+
+      document.getElementById('logs-list').innerHTML = logs.map(l => {
+        const d = new Date(l.created_at)
+        const time = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+        return `<div class="log-item ${l.had_error ? 'error' : ''}" onclick="this.querySelector('.log-detail').classList.toggle('open')">
+          <div class="log-header">
+            ${l.had_error ? '<span class="log-badge err">error</span>' : ''}
+            <span class="log-q">${esc(l.user_message)}</span>
+            <span class="log-time">${time}</span>
+          </div>
+          <div class="log-detail">
+            <div class="q">${esc(l.user_message)}</div>
+            <div class="a ${l.had_error ? 'err' : ''}">${esc(l.ai_response)}</div>
+            <div class="meta">Modelo: ${l.model || 'groq'} · Cliente: ${l.client_id}</div>
+          </div>
+        </div>`
+      }).join('')
+    }
+
+    // Vault
+    async function loadVault() {
+      const res = await fetch(`${SB_URL}/rest/v1/credentials_vault?order=category.asc,name.asc`, { headers })
+      const creds = res.ok ? await res.json() : []
+      renderVault(creds)
+    }
+
+    function renderVault(creds) {
+      const cats = {}
+      creds.forEach(c => { if (!cats[c.category]) cats[c.category] = []; cats[c.category].push(c) })
+
+      if (Object.keys(cats).length === 0) {
+        document.getElementById('vault-list').innerHTML = '<div class="empty">No hay credenciales guardadas</div>'
+        return
+      }
+
+      document.getElementById('vault-list').innerHTML = Object.entries(cats).map(([cat, items]) => `
+        <div class="vault-cat">
+          <div class="vault-cat-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span>${cat}</span>
+            <span style="color:#666;font-size:12px">${items.length}</span>
+            <span class="spacer"></span>
+            <span style="color:#666;font-size:12px">▼</span>
+          </div>
+          <div style="display:none" class="vault-items">
+            ${items.map(c => `<div class="vault-item">
+              <span class="name">${esc(c.name)}</span>
+              ${c.username ? `<span class="user">${esc(c.username)}</span>` : ''}
+              <span class="spacer"></span>
+              ${c.password_encrypted ? `<span class="pw" id="pw-${c.id}">••••••</span>
+              <button onclick="event.stopPropagation();togglePw('${c.id}','${c.password_encrypted}')">Ver</button>
+              <button onclick="event.stopPropagation();copyPw('${c.password_encrypted}')">Copiar</button>` : ''}
+            </div>`).join('')}
+          </div>
+        </div>
+      `).join('')
+
+      // Toggle expanded
+      document.querySelectorAll('.vault-cat').forEach(el => {
+        el.querySelector('.vault-cat-header').addEventListener('click', () => {
+          const items = el.querySelector('.vault-items')
+          items.style.display = items.style.display === 'none' ? 'block' : 'none'
+        })
+      })
+    }
+
+    // Decrypt (matches the XOR+base64 in vault page)
+    function decrypt(enc) {
+      try {
+        const decoded = atob(enc)
+        const key = 'fullsite_vault_2026'
+        let result = ''
+        for (let i = 0; i < decoded.length; i++) result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length))
+        return result
+      } catch { return '***' }
+    }
+
+    function togglePw(id, enc) {
+      const el = document.getElementById('pw-' + id)
+      el.textContent = el.textContent === '••••••' ? decrypt(enc) : '••••••'
+    }
+
+    function copyPw(enc) {
+      navigator.clipboard.writeText(decrypt(enc))
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML }
+  </script>
+</body>
+</html>
