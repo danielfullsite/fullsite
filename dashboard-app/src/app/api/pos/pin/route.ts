@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server'
 
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 300_000 // 5 minutes
+const SUCCESS_RESETS = true // Successful PIN entry resets the counter
 
 const attemptsByIp = new Map<string, { count: number; resetAt: number }>()
 
@@ -45,6 +46,8 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
+        // Successful login — reset rate limit for this IP
+        attemptsByIp.delete(ip)
         return Response.json({ staff: { id: rows[0].id, name: rows[0].name, role: rows[0].role } })
       }
     }
