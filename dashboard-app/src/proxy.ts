@@ -8,6 +8,7 @@ function isPublic(pathname: string): boolean {
   return (
     PUBLIC_PAGES.includes(pathname) ||
     pathname.startsWith('/pos') || // gate propio por PIN
+    pathname.startsWith('/internal') || // gate propio por password
     pathname.startsWith('/demo') ||
     pathname.startsWith('/menu') || // QR de mesa (cliente final)
     pathname.startsWith('/encuesta')
