@@ -1915,6 +1915,8 @@ function POSContent() {
 
   // Void entire order
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
+    if (saving) return
+    setSaving(true)
     const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
     logAudit({
       order_id: orderId, action: 'order_cancelled', actor: mesero, mesa,
@@ -1950,7 +1952,8 @@ function POSContent() {
     setOrderNotes('')
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
-  }, [orderId, mesero, mesa, orderItems, loadedOrderId])
+    setSaving(false)
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving])
 
   // Cash movement confirmed (already saved to Supabase in modal)
   const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
@@ -2071,6 +2074,8 @@ function POSContent() {
             const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
             if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
               showToast('Esta orden fue modificada por otro usuario')
+              setSaving(false)
+              return
             }
           }
         }
@@ -2270,28 +2275,31 @@ function POSContent() {
 
       // Fully done (no split, or last cuenta paid)
       showToast(`Todas las cuentas cobradas — ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
+
+      setSaving(false)
+      setOrderItems([])
+      setCancelledItems(new Set())
+      setDiscount(0)
+      setPropina(0)
+      setOrderNotes('')
+      setShowPayment(false)
+      setShowCashFlow(false)
+      setCashAmount('')
+      setShowMixto(false)
+      setMixtoPagos([])
+      setMixtoMonto('')
+      setSillaActual(1)
+      setTiempoFired(0)
+      setSplitPayingCuenta(0)
+      setSplitAssignments({})
+      setSplitCount(0)
+      setSplitMode(null)
+      setSplitParejoN(0)
+      setOrderId(generateId())
     } else {
       showToast('Error al cerrar cuenta')
+      setSaving(false)
     }
-    setSaving(false)
-    setOrderItems([])
-    setCancelledItems(new Set())
-    setDiscount(0)
-    setPropina(0)
-    setOrderNotes('')
-    setShowPayment(false)
-    setShowCashFlow(false)
-    setCashAmount('')
-    setShowMixto(false)
-    setMixtoPagos([])
-    setMixtoMonto('')
-    setSillaActual(1)
-    setTiempoFired(0)
-    setSplitPayingCuenta(0)
-    setSplitAssignments({})
-    setSplitCount(0)
-    setSplitMode(null)
-    setSplitParejoN(0)
   }
 
   const handleApplyDiscount = (amount: number, reason: string | undefined, approvedBy: string) => {
