@@ -985,7 +985,8 @@ ${dailyContext}`
     })
 
     // Auto-inject chart if user asked for one and AI didn't generate it
-    const wantsChart = ['gráfica', 'grafica', 'chart', 'muéstrame', 'muestrame', 'muestra'].some(kw => q.includes(kw))
+    const qNorm = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
+    const wantsChart = ['grafica', 'chart', 'muestrame', 'muestra', 'hazme una'].some(kw => qNorm.includes(kw))
     let finalText = text
     if (wantsChart && !text.includes('<!--chart')) {
       try {
