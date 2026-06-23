@@ -14,6 +14,77 @@ const quickQuestions = [
   '¿Cómo vamos vs la semana pasada?',
 ]
 
+// Parse chart data from <!--chart ... chart--> markers
+interface ChartData { type: 'bar' | 'line' | 'pie'; title: string; data: { label: string; value: number }[] }
+
+function extractChart(text: string): { clean: string; chart: ChartData | null } {
+  const match = text.match(/<!--chart\s*([\s\S]*?)\s*chart-->/)
+  if (!match) return { clean: text, chart: null }
+  try {
+    const chart = JSON.parse(match[1]) as ChartData
+    return { clean: text.replace(match[0], '').trim(), chart }
+  } catch { return { clean: text, chart: null } }
+}
+
+function MiniChart({ chart }: { chart: ChartData }) {
+  const max = Math.max(...chart.data.map(d => d.value), 1)
+  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+
+  if (chart.type === 'pie') {
+    const total = chart.data.reduce((s, d) => s + d.value, 0)
+    let angle = 0
+    return (
+      <div className="mt-2 p-3 bg-black/20 rounded-xl">
+        <p className="text-xs font-semibold text-[var(--text-2)] mb-2">{chart.title}</p>
+        <div className="flex items-center gap-3">
+          <svg viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
+            {chart.data.map((d, i) => {
+              const pct = d.value / total
+              const start = angle
+              angle += pct * 360
+              const r = 45, cx = 50, cy = 50
+              const startRad = (start - 90) * Math.PI / 180
+              const endRad = (start + pct * 360 - 90) * Math.PI / 180
+              const large = pct > 0.5 ? 1 : 0
+              const path = `M${cx},${cy} L${cx + r * Math.cos(startRad)},${cy + r * Math.sin(startRad)} A${r},${r} 0 ${large} 1 ${cx + r * Math.cos(endRad)},${cy + r * Math.sin(endRad)} Z`
+              return <path key={i} d={path} fill={colors[i % colors.length]} />
+            })}
+          </svg>
+          <div className="space-y-1">
+            {chart.data.map((d, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colors[i % colors.length] }} />
+                <span className="text-[var(--text-3)]">{d.label}</span>
+                <span className="text-white font-medium">${d.value.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Bar or Line chart
+  const barW = Math.min(40, Math.floor(260 / chart.data.length) - 4)
+  return (
+    <div className="mt-2 p-3 bg-black/20 rounded-xl">
+      <p className="text-xs font-semibold text-[var(--text-2)] mb-2">{chart.title}</p>
+      <div className="flex items-end gap-1 h-24">
+        {chart.data.map((d, i) => (
+          <div key={i} className="flex flex-col items-center gap-1 flex-1">
+            <span className="text-[9px] text-emerald-400 font-medium">${(d.value / 1000).toFixed(0)}k</span>
+            <div
+              className="rounded-t transition-all"
+              style={{ width: barW, height: `${Math.max(4, (d.value / max) * 80)}px`, background: colors[i % colors.length] }}
+            />
+            <span className="text-[9px] text-[var(--text-3)] truncate max-w-[40px]">{d.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // Renderiza markdown básico: **negritas** y [links](url)
 function renderMarkdown(text: string) {
   // First split by links [text](url)
@@ -211,7 +282,10 @@ export default function ChatWidget() {
                     : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
                 }`}
               >
-                <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
+                <div className="whitespace-pre-wrap">{renderMarkdown(msg.role === 'assistant' ? extractChart(msg.content).clean : msg.content)}</div>
+                {msg.role === 'assistant' && extractChart(msg.content).chart && (
+                  <MiniChart chart={extractChart(msg.content).chart!} />
+                )}
               </div>
             </div>
           </div>
