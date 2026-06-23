@@ -984,6 +984,24 @@ ${dailyContext}`
       maxTokens: 4000,
     })
 
+    // Auto-inject chart if user asked for one and AI didn't generate it
+    const wantsChart = ['gráfica', 'grafica', 'chart', 'muéstrame', 'muestrame'].some(kw => q.includes(kw))
+    let finalText = text
+    if (wantsChart && !text.includes('<!--chart')) {
+      // Build chart from dailyData
+      const chartRows = (recentDays as { fecha: string; ventas_dia: number }[])
+        .filter(d => d.ventas_dia > 0)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      if (chartRows.length > 0) {
+        const chartData = chartRows.slice(-30).map(d => ({
+          label: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
+          value: Math.round(d.ventas_dia),
+        }))
+        const chartJson = JSON.stringify({ type: 'bar', title: 'Ventas diarias', data: chartData })
+        finalText = text.replace(/[¿?].*$/, '').trim() + `\n\n<!--chart\n${chartJson}\nchart-->`
+      }
+    }
+
     // Hermes feedback: log if response contains "no tengo" for improvement
     if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {
       try {
@@ -1001,7 +1019,7 @@ ${dailyContext}`
       } catch { /* non-blocking */ }
     }
 
-    return Response.json({ response: text })
+    return Response.json({ response: finalText })
   } catch (error) {
     console.error('Chat API error:', error)
     const msg = error instanceof Error && error.message.includes('GROQ_API_KEY')
