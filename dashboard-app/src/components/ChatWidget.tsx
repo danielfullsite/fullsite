@@ -70,25 +70,53 @@ function MiniChart({ chart }: { chart: ChartData }) {
     )
   }
 
-  // Bar or Line chart — limit to 14 points max for readability
-  const displayData = chart.data.length > 14 ? chart.data.slice(-14) : chart.data
-  const barW = Math.max(8, Math.min(24, Math.floor(240 / displayData.length) - 2))
-  return (
-    <div className="mt-2 p-2 bg-black/20 rounded-xl overflow-hidden">
-      <p className="text-[10px] font-semibold text-[var(--text-2)] mb-1">{chart.title}</p>
-      <div className="flex items-end gap-px h-20 overflow-hidden">
-        {displayData.map((d, i) => (
-          <div key={i} className="flex flex-col items-center gap-px flex-1 min-w-0">
-            <span className="text-[7px] text-emerald-400 font-medium truncate w-full text-center">${(d.value / 1000).toFixed(0)}k</span>
-            <div
-              className="rounded-t w-full max-w-[20px] mx-auto"
-              style={{ height: `${Math.max(3, (d.value / max) * 60)}px`, background: colors[i % colors.length] }}
-            />
-            <span className="text-[6px] text-[var(--text-3)] truncate w-full text-center">{d.label}</span>
-          </div>
-        ))}
-      </div>
+  // Bar or Line chart
+  const [expanded, setExpanded] = useState(false)
+  const displayData = chart.data.length > 14 && !expanded ? chart.data.slice(-14) : chart.data
+
+  const renderBars = (h: number, maxW: number, labelSize: string, valueSize: string, gap: string) => (
+    <div className={`flex items-end ${gap} overflow-hidden`} style={{ height: h }}>
+      {displayData.map((d, i) => (
+        <div key={i} className="flex flex-col items-center gap-px flex-1 min-w-0">
+          <span className={`${valueSize} text-emerald-400 font-medium truncate w-full text-center`}>
+            ${d.value >= 1000 ? `${(d.value / 1000).toFixed(0)}k` : d.value.toLocaleString()}
+          </span>
+          <div
+            className="rounded-t w-full mx-auto"
+            style={{ maxWidth: maxW, height: `${Math.max(3, (d.value / max) * (h * 0.75))}px`, background: colors[i % colors.length] }}
+          />
+          <span className={`${labelSize} text-[var(--text-3)] truncate w-full text-center`}>{d.label}</span>
+        </div>
+      ))}
     </div>
+  )
+
+  return (
+    <>
+      <div className="mt-2 p-2 bg-black/20 rounded-xl overflow-hidden cursor-pointer hover:bg-black/30 transition-colors" onClick={() => setExpanded(true)}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] font-semibold text-[var(--text-2)]">{chart.title}</p>
+          <span className="text-[8px] text-[var(--text-3)]">Click para expandir</span>
+        </div>
+        {renderBars(80, 20, 'text-[6px]', 'text-[7px]', 'gap-px')}
+      </div>
+      {expanded && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setExpanded(false)}>
+          <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-4xl max-h-[80vh] p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">{chart.title}</h3>
+              <button onClick={() => setExpanded(false)} className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white hover:bg-[var(--line-soft)]">✕</button>
+            </div>
+            {renderBars(300, 40, 'text-xs', 'text-sm', 'gap-1')}
+            <div className="flex items-center justify-between mt-4 text-sm text-[var(--text-3)]">
+              <span>{displayData.length} datos</span>
+              <span>Total: ${displayData.reduce((s, d) => s + d.value, 0).toLocaleString()}</span>
+              <span>Promedio: ${Math.round(displayData.reduce((s, d) => s + d.value, 0) / displayData.length).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
