@@ -329,7 +329,10 @@ def build_message(consolidated, users, groups, saucers, order_types, monthly_avg
     hora = now_mx.strftime("%H:%M")
     fecha = now_mx.strftime("%d/%m/%Y")
 
-    ventas_netas = consolidated.get("TotalSales", 0)
+    # Fix: API TotalSales excludes Market staff. Use max(API, UserSum) to capture all.
+    api_ventas = consolidated.get("TotalSales", 0) or 0
+    user_sum = sum(float(str(u.get("total", "0")).replace(",", "").replace("$", "")) for u in users) if users else 0
+    ventas_netas = max(api_ventas, user_sum)
 
     tickets = order_types.get("total_ordenes", 0)
     personas = order_types.get("total_personas", 0)
