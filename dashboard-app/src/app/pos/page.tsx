@@ -3123,7 +3123,7 @@ function POSContent() {
                     <button
                       key={item.id}
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-xl text-left transition-all flex min-h-[60px] overflow-hidden relative shadow-sm ${
+                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-xl text-left transition-all flex min-h-[80px] overflow-hidden relative shadow-sm ${
                         isOOS
                           ? 'border-red-500/30 opacity-50 cursor-not-allowed'
                           : (item as MenuItem & { promo?: boolean }).promo
@@ -3133,9 +3133,9 @@ function POSContent() {
                     >
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
                       {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
-                      <div className="flex flex-col justify-between px-2.5 py-2 flex-1">
-                        <span className={`font-semibold text-xs leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
-                        <span className={`font-bold text-sm mt-0.5 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
+                      <div className="flex flex-col justify-between px-3 py-2.5 flex-1">
+                        <span className={`font-semibold text-sm leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
+                        <span className={`font-bold text-base mt-1 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
                       </div>
                     </button>
                     )
