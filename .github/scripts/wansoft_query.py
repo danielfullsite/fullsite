@@ -779,6 +779,8 @@ def fetch_historical(days=90):
 # ── Groq response ──────────────────────────────────────────────────────────
 _exclude_names = (CLIENT.get("staff_exclude_meseros") or []) + (CLIENT.get("staff_market") or [])
 _exclude_str = ", ".join(_exclude_names) if _exclude_names else "ninguno"
+_supervisor_names = CLIENT.get("staff_supervisors") or []
+_supervisor_str = ", ".join(_supervisor_names) if _supervisor_names else "ninguno configurado"
 
 SYSTEM_PROMPT = f"""Eres el copiloto operativo de {CLIENT['display_name']} ({CLIENT.get('city', '')}). Consultor senior con 20 años de experiencia en restaurantes. Entiendes INTENCIÓN, no solo palabras.
 
@@ -879,6 +881,9 @@ Lo que NO tienes:
 - Ventas acumuladas a una hora especifica del pasado → "Solo tengo el consolidado del dia. No tengo snapshots por hora."
 - Detalle de una orden especifica → "Revisa en Wansoft > Reportes > Ingresos > Detalle de ticket"
 - Promociones activas → "Revisa en Wansoft > Punto de venta > Restaurante > Promociones"
+
+SUPERVISORES: {_supervisor_str}
+Cuando pregunten por "supervisores" o "encargados", filtrar SOLO estos nombres de los datos de meseros/ventas. Un supervisor también vende — sus ventas aparecen en ventas_por_mesero y waiter_categories igual que cualquier mesero. Si preguntan "ticket promedio por supervisor", calcular usando SOLO los datos de estos nombres.
 
 FORMATO: Moneda SIEMPRE en pesos mexicanos MXN. Usa $ sin decimales. NUNCA JAMAS digas "dólares", "USD", "dollars" — todo es PESOS MEXICANOS. Texto plano para Telegram, sin markdown, sin asteriscos, sin ##, sin **. EXCLUIR de rankings: {_exclude_str}
 """
@@ -1032,6 +1037,19 @@ def ask_groq(question, wansoft_data, historical_data):
             for m, qty, total in post_rank:
                 if qty > 0:
                     rankings.append(f"  {m}: {qty} pzas (${total:,})")
+
+            # Supervisor summary (if configured)
+            if _supervisor_names:
+                _sup_lower = [s.lower() for s in _supervisor_names]
+                sup_data = {m: d for m, d in all_meseros.items()
+                            if any(s in m.lower() for s in _sup_lower)}
+                if sup_data:
+                    rankings.append("\nRESUMEN SUPERVISORES:")
+                    for m, d in sorted(sup_data.items(), key=lambda x: -x[1].get("ticket_promedio", 0)):
+                        tp = d.get("ticket_promedio", 0)
+                        tickets = d.get("tickets", 0)
+                        personas = d.get("personas", 0)
+                        rankings.append(f"  {m}: TP ${tp:,.0f}, {tickets} tickets, {personas} personas")
 
             # Put rankings as plain text FIRST — insert at position 0
             blocks.insert(0, "\n".join(rankings))

@@ -1279,7 +1279,7 @@ export interface AuditLogEntry {
 
 export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntry[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_audit_log?order=created_at.desc&limit=${limit}&offset=${offset}`,
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}&order=created_at.desc&limit=${limit}&offset=${offset}`,
     {
       headers: {
         apikey: SUPABASE_KEY,
@@ -1294,7 +1294,7 @@ export async function getAuditLog(limit = 100, offset = 0): Promise<AuditLogEntr
 
 export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntry[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_audit_log?order_id=eq.${orderId}&order=created_at.asc`,
+    `${SUPABASE_URL}/rest/v1/pos_audit_log?client_id=eq.${_getClientId()}&order_id=eq.${orderId}&order=created_at.asc`,
     {
       headers: {
         apikey: SUPABASE_KEY,
@@ -2304,7 +2304,7 @@ export async function getRecipeDetail(name: string): Promise<RecipeDetail | null
 
 export async function getClosedOrders(date: string): Promise<{ id: string; mesa: number; mesero: string; total: number; metodo_pago: string; closed_at: string; items: string }[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?status=eq.cerrada&created_at=gte.${date}T00:00:00&created_at=lte.${date}T23:59:59&order=closed_at.desc&limit=50`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_getClientId()}&status=eq.cerrada&created_at=gte.${date}T00:00:00&created_at=lte.${date}T23:59:59&order=closed_at.desc&limit=50`,
     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
   )
   if (!res.ok) return []
@@ -2313,7 +2313,7 @@ export async function getClosedOrders(date: string): Promise<{ id: string; mesa:
 
 export async function reopenOrder(orderId: string): Promise<boolean> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`,
+    `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&client_id=eq.${_getClientId()}`,
     {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },

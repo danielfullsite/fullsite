@@ -26,12 +26,12 @@ describe('POS Constants', () => {
     expect(KITCHEN_ARCHIVE_HOURS).toBe(4)
   })
 
-  it('POLL_INTERVAL_KITCHEN is 5000ms', () => {
-    expect(POLL_INTERVAL_KITCHEN).toBe(5000)
+  it('POLL_INTERVAL_KITCHEN is 2000ms', () => {
+    expect(POLL_INTERVAL_KITCHEN).toBe(2000)
   })
 
-  it('POLL_INTERVAL_KDS is 3000ms', () => {
-    expect(POLL_INTERVAL_KDS).toBe(3000)
+  it('POLL_INTERVAL_KDS is 1500ms', () => {
+    expect(POLL_INTERVAL_KDS).toBe(1500)
   })
 })
 

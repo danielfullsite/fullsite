@@ -37,7 +37,7 @@ def get_client(client_id: str = None) -> dict:
     client = rows[0]
     # Parse JSONB fields if they came as strings
     for field in ["telegram_chat_ids", "staff_exclude_meseros", "staff_market",
-                  "menu_categories", "bebida_groups", "report_recipients"]:
+                  "staff_supervisors", "menu_categories", "bebida_groups", "report_recipients"]:
         if isinstance(client.get(field), str):
             client[field] = json.loads(client[field])
 
@@ -82,6 +82,12 @@ def is_mesero(name: str, client: dict) -> bool:
     market = client.get("staff_market") or []
     all_excluded = [e.lower() for e in exclude + market]
     return not any(ex in name.lower() for ex in all_excluded)
+
+
+def is_supervisor(name: str, client: dict) -> bool:
+    """Check if a name is a supervisor."""
+    supervisors = client.get("staff_supervisors") or []
+    return any(s.lower() in name.lower() for s in supervisors)
 
 
 def is_market(name: str, client: dict) -> bool:

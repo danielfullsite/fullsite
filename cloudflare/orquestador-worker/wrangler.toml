@@ -1,7 +1,7 @@
 name            = "telegram-orquestador-warroom"
 main            = "src/index.ts"
 compatibility_date = "2025-01-01"
-account_id      = "fd00e9e6edd331e0abe6d1e796f38172"
+account_id      = "c49c0b851a9e213f0b30f4f40ca2fb80"
 
 [observability]
 enabled = true   # logs visibles en wrangler tail
