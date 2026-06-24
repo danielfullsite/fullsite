@@ -36,6 +36,9 @@ function MiniChart({ chart }: { chart: ChartData }) {
   const max = Math.max(...chart.data.map(d => d.value), 1)
   const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
+  // Bar or Line chart — hook must be called before any early return (Rules of Hooks)
+  const [expanded, setExpanded] = useState(false)
+
   if (chart.type === 'pie') {
     const total = chart.data.reduce((s, d) => s + d.value, 0)
     let angle = 0
@@ -69,9 +72,6 @@ function MiniChart({ chart }: { chart: ChartData }) {
       </div>
     )
   }
-
-  // Bar or Line chart
-  const [expanded, setExpanded] = useState(false)
   const displayData = chart.data.length > 14 && !expanded ? chart.data.slice(-14) : chart.data
 
   const renderBars = (h: number, maxW: number, labelSize: string, valueSize: string, gap: string) => (
@@ -249,20 +249,19 @@ export default function ChatWidget() {
         const partial = fullText.slice(0, typingIndexRef.current)
         setTypingContent(partial)
 
-        // Update the placeholder message so extractChart / renderMarkdown work correctly
-        setMessages((prev) => {
-          const copy = [...prev]
-          const lastIdx = copy.length - 1
-          if (copy[lastIdx]?.role === 'assistant') {
-            copy[lastIdx] = { ...copy[lastIdx], content: partial }
-          }
-          return copy
-        })
-
         if (typingIndexRef.current >= fullText.length) {
           clearInterval(typingTimerRef.current!)
           typingTimerRef.current = null
           setTypingContent(null)
+          // Write the full text into the messages array only once, at animation end
+          setMessages((prev) => {
+            const copy = [...prev]
+            const lastIdx = copy.length - 1
+            if (copy[lastIdx]?.role === 'assistant') {
+              copy[lastIdx] = { ...copy[lastIdx], content: fullText }
+            }
+            return copy
+          })
         }
       }, TICK_MS)
     } catch {
@@ -365,32 +364,45 @@ export default function ChatWidget() {
         )}
 
         {/* Message bubbles */}
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex gap-2.5 animate-message-in ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-          >
-            {msg.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles size={12} className="text-white" />
-              </div>
-            )}
-            <div className={`max-w-[82%] ${msg.role === 'user' ? 'ml-auto' : ''}`}>
-              <div
-                className={`rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-emerald-500 text-white rounded-tr-md'
-                    : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
-                }`}
-              >
-                <div className="whitespace-pre-wrap">{renderMarkdown(msg.role === 'assistant' ? extractChart(msg.content).clean : msg.content)}</div>
-                {msg.role === 'assistant' && extractChart(msg.content).chart && (
-                  <MiniChart chart={extractChart(msg.content).chart!} />
-                )}
+        {messages.map((msg, i) => {
+          // For the last assistant message during animation, use typingContent for display
+          const isAnimating = typingContent !== null && i === messages.length - 1 && msg.role === 'assistant'
+          const displayContent = isAnimating ? typingContent! : msg.content
+          return (
+            <div
+              key={i}
+              className={`flex gap-2.5 animate-message-in ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+            >
+              {msg.role === 'assistant' && (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles size={12} className="text-white" />
+                </div>
+              )}
+              <div className={`max-w-[82%] ${msg.role === 'user' ? 'ml-auto' : ''}`}>
+                <div
+                  className={`rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-emerald-500 text-white rounded-tr-md'
+                      : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
+                  }`}
+                >
+                  {(() => {
+                    if (msg.role !== 'assistant') {
+                      return <div className="whitespace-pre-wrap">{renderMarkdown(displayContent)}</div>
+                    }
+                    const { clean, chart } = extractChart(displayContent)
+                    return (
+                      <>
+                        <div className="whitespace-pre-wrap">{renderMarkdown(clean)}</div>
+                        {chart && <MiniChart chart={chart} />}
+                      </>
+                    )
+                  })()}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Typing indicator */}
         {isLoading && (

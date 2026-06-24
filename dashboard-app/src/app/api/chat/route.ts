@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const fetches: Promise<unknown>[] = [
       // 0: Daily data (always)
-      fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(client_id || 'amalay')}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
       // 1: Waiter categories (conditional)
       wantsMeseros ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 2: Food cost (conditional)
@@ -976,10 +976,12 @@ ${dailyContext}`
     const text = await groqChat({
       messages: [
         { role: 'system', content: systemPrompt },
-        ...history.slice(-8).map((h: { role: string; content: string }) => ({
-          role: h.role as 'system' | 'user' | 'assistant',
-          content: h.content,
-        })),
+        ...history.slice(-8)
+          .filter((h: { role: string; content: string }) => h.role !== 'system')
+          .map((h: { role: string; content: string }) => ({
+            role: h.role as 'user' | 'assistant',
+            content: h.content,
+          })),
         { role: 'user', content: message },
       ],
       maxTokens: 4000,
