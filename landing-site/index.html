@@ -533,7 +533,7 @@ ul { list-style: none; }
 }
 @keyframes slideLogos {
   from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  to { transform: translateX(calc(-100% / 3)); }
 }
 .integrations-grid:hover .integrations-track {
   animation-play-state: paused;
@@ -954,14 +954,18 @@ ul { list-style: none; }
     <p class="integrations-sub reveal">Conectamos tu operación con las plataformas que mueven tu negocio.</p>
     <div class="integrations-grid">
       <div class="integrations-track">
-        <!-- Set 1 -->
         <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
         <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
         <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633">Didi Food</span></div>
         <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
         <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
         <div class="int-card"><span style="font-size:18px;font-weight:700;color:#25D366">WhatsApp</span></div>
-        <!-- Set 2 (duplicate for seamless loop) -->
+        <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
+        <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
+        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633">Didi Food</span></div>
+        <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
+        <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
+        <div class="int-card"><span style="font-size:18px;font-weight:700;color:#25D366">WhatsApp</span></div>
         <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
         <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
         <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633">Didi Food</span></div>
@@ -1026,32 +1030,44 @@ ul { list-style: none; }
     </div>
     <div class="reveal" style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:900px;margin:0 auto">
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">📉</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-6"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Predicción de ventas</div>
-        <div style="font-size:14px;color:#666;line-height:1.6">A las 2pm ya sabes cuánto vas a cerrar. Si vas abajo de la meta, te dice qué empujar.</div>
+        <div style="font-size:14px;color:#666;line-height:1.6">Sabes cuánto vas a cerrar antes de que termine el día. Si vas abajo, te dice qué empujar.</div>
       </div>
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">🔍</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Detección de fraude</div>
         <div style="font-size:14px;color:#666;line-height:1.6">Cancelaciones sospechosas, descuentos excesivos, cortesías sin autorizar. Te avisa al momento.</div>
       </div>
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">👥</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Control de meseros</div>
         <div style="font-size:14px;color:#666;line-height:1.6">Quién vende, quién no. Ticket promedio por mesero. Propinas. Todo en tiempo real.</div>
       </div>
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">🍽️</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Ingeniería de menú</div>
         <div style="font-size:14px;color:#666;line-height:1.6">Qué platillos quitar, cuáles subir de precio, cuáles promocionar. Basado en datos, no intuición.</div>
       </div>
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">📦</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Inventario automático</div>
         <div style="font-size:14px;color:#666;line-height:1.6">Se descuenta solo al vender. Te avisa cuando algo se va a acabar. Sin contar a mano.</div>
       </div>
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
-        <div style="font-size:36px;margin-bottom:12px">📱</div>
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        </div>
         <div style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Todo al celular</div>
         <div style="font-size:14px;color:#666;line-height:1.6">Alertas, reportes y respuestas directo a tu teléfono. Sin abrir computadora. Sin esperar al cierre.</div>
       </div>
