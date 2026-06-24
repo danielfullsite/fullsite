@@ -521,20 +521,19 @@ ul { list-style: none; }
   margin-bottom: 48px;
 }
 .integrations-grid {
-  display: flex;
-  gap: 32px;
   overflow: hidden;
   padding: 20px 0;
+  position: relative;
 }
 .integrations-track {
   display: flex;
-  gap: 32px;
+  gap: 40px;
   width: max-content;
-  animation: slideLogos 25s linear infinite;
+  animation: slideLogos 20s linear infinite;
 }
 @keyframes slideLogos {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(calc(-100% / 3)); }
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 .integrations-grid:hover .integrations-track {
   animation-play-state: paused;
@@ -955,21 +954,20 @@ ul { list-style: none; }
     <p class="integrations-sub reveal">Conectamos tu operacion con las plataformas que mueven tu negocio.</p>
     <div class="integrations-grid">
       <div class="integrations-track">
+        <!-- Set 1 -->
         <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
         <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
+        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633">Didi Food</span></div>
         <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
         <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
-        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633;letter-spacing:-0.02em;">Didi Food</span></div>
+        <div class="int-card"><span style="font-size:18px;font-weight:700;color:#25D366">WhatsApp</span></div>
+        <!-- Set 2 (duplicate for seamless loop) -->
         <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
         <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
+        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633">Didi Food</span></div>
         <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
         <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
-        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633;letter-spacing:-0.02em;">Didi Food</span></div>
-        <div class="int-card"><img src="/logo-ubereats.png" alt="Uber Eats"></div>
-        <div class="int-card"><img src="/logo-rappi.png" alt="Rappi"></div>
-        <div class="int-card"><img src="/logo-sat.jpg" alt="SAT"></div>
-        <div class="int-card"><img src="/logo-mercadopago.svg" alt="Mercado Pago"></div>
-        <div class="int-card"><span style="font-size:20px;font-weight:800;color:#FF6633;letter-spacing:-0.02em;">Didi Food</span></div>
+        <div class="int-card"><span style="font-size:18px;font-weight:700;color:#25D366">WhatsApp</span></div>
       </div>
     </div>
   </div>
