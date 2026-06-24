@@ -1,0 +1,6554 @@
+[
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON006",
+    "producto": "PECHUGA DE POLLO",
+    "unidad": "Kilogramo",
+    "existencia": 133.09,
+    "saldo": 14997.72,
+    "costo_promedio": 112.69
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON009",
+    "producto": "SALMON AHUMADO",
+    "unidad": "Kilogramo",
+    "existencia": 27.0715789219,
+    "saldo": 14889.36840705,
+    "costo_promedio": 550.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC011",
+    "producto": "QUESO PANELA",
+    "unidad": "Kilogramo",
+    "existencia": 81.98,
+    "saldo": 10762.99,
+    "costo_promedio": 131.29
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC008",
+    "producto": "MANTEQUILLA EUGENIA",
+    "unidad": "Kilogramo",
+    "existencia": 48.0,
+    "saldo": 8822.4,
+    "costo_promedio": 183.8
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV054",
+    "producto": "TOMATE GUAJE",
+    "unidad": "Kilogramo",
+    "existencia": 155.8657142857,
+    "saldo": 8572.61428571,
+    "costo_promedio": 55.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA071",
+    "producto": "LECHE DE AVENA",
+    "unidad": "Litro",
+    "existencia": 194.14,
+    "saldo": 8338.313,
+    "costo_promedio": 42.95
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC020",
+    "producto": "QUESO CREMA",
+    "unidad": "Kilogramo",
+    "existencia": 43.2,
+    "saldo": 7641.6,
+    "costo_promedio": 176.89
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "LMNTDIS1001",
+    "producto": "LMNT - ELECTROLYTE (DIF SABORES), PZA.",
+    "unidad": "Pieza",
+    "existencia": 248.0,
+    "saldo": 6734.44,
+    "costo_promedio": 27.15
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA057",
+    "producto": "HARINA ESPECIAL PANADERIA",
+    "unidad": "Kilogramo",
+    "existencia": 166.086,
+    "saldo": 8653.25199952,
+    "costo_promedio": 52.1
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON010",
+    "producto": "SALMON FRESCO",
+    "unidad": "Kilogramo",
+    "existencia": 16.1625,
+    "saldo": 6110.0625,
+    "costo_promedio": 378.04
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA024",
+    "producto": "CARNE SECA",
+    "unidad": "Kilogramo",
+    "existencia": 5.72,
+    "saldo": 6006.0,
+    "costo_promedio": 1050.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC022",
+    "producto": "QUESO SUIZO",
+    "unidad": "Kilogramo",
+    "existencia": 22.46,
+    "saldo": 5929.44,
+    "costo_promedio": 264.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "AMAABA16022601",
+    "producto": "HARINA ELIZONDO DORADA",
+    "unidad": "Kilogramo",
+    "existencia": 22.87,
+    "saldo": 5429.06,
+    "costo_promedio": 237.39
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA089",
+    "producto": "NUTELLA",
+    "unidad": "Kilogramo",
+    "existencia": 24.0,
+    "saldo": 5186.86432,
+    "costo_promedio": 216.12
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAK066",
+    "producto": "AMALAY - CAFE MOLIDO BOLSA 500G",
+    "unidad": "Pieza",
+    "existencia": 23.0,
+    "saldo": 5180.0,
+    "costo_promedio": 225.22
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV022",
+    "producto": "FLOR COMESTIBLE",
+    "unidad": "Pieza",
+    "existencia": 1000.6,
+    "saldo": 5003.0,
+    "costo_promedio": 5.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA063",
+    "producto": "HARINA BOBS REDMILL S/GLUTEN",
+    "unidad": "Kilogramo",
+    "existencia": 20.8936842107,
+    "saldo": 4977.61300068,
+    "costo_promedio": 238.24
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB022",
+    "producto": "JUGO DE NARANJA NATURAL BOTE",
+    "unidad": "Litro",
+    "existencia": 123.2202702702,
+    "saldo": 4883.23397402,
+    "costo_promedio": 39.63
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA075",
+    "producto": "LECHE ENTERA",
+    "unidad": "Litro",
+    "existencia": 336.1665263158,
+    "saldo": 8067.99663158,
+    "costo_promedio": 24.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA070",
+    "producto": "LECHE DE ALMENDRA SIN AZUCAR",
+    "unidad": "Litro",
+    "existencia": 111.25,
+    "saldo": 4670.7875,
+    "costo_promedio": 41.98
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA069",
+    "producto": "CONSOME DE POLLO POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 34.4457142857,
+    "saldo": 4422.08492905,
+    "costo_promedio": 128.38
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV001",
+    "producto": "AGUACATE",
+    "unidad": "Kilogramo",
+    "existencia": 57.3944444379,
+    "saldo": 5165.49999941,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL002",
+    "producto": "PULPA DE FRUTOS ROJOS",
+    "unidad": "Litro",
+    "existencia": 32.17,
+    "saldo": 4230.6767,
+    "costo_promedio": 131.51
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "AMAPAN25052601",
+    "producto": "MANTEQUILLA DOBLE AA (SIN SAL)",
+    "unidad": "Kilogramo",
+    "existencia": 27.24,
+    "saldo": 3899.99999544,
+    "costo_promedio": 143.17
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1702",
+    "producto": "SUB SALSA MAMAROSA",
+    "unidad": "Kilogramo",
+    "existencia": 19.25,
+    "saldo": 3856.0567549,
+    "costo_promedio": 200.31
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA022",
+    "producto": "CAFE DESCAFEINADO",
+    "unidad": "Kilogramo",
+    "existencia": 11.2,
+    "saldo": 3808.0,
+    "costo_promedio": 340.0
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL004",
+    "producto": "PULPA MANGO SIN AZUCAR",
+    "unidad": "Litro",
+    "existencia": 51.84,
+    "saldo": 3556.79999424,
+    "costo_promedio": 68.61
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA028",
+    "producto": "CHIPS DE PEPINO",
+    "unidad": "Kilogramo",
+    "existencia": 6.9,
+    "saldo": 3450.0,
+    "costo_promedio": 500.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA088",
+    "producto": "NUEZ GRANILLO",
+    "unidad": "Kilogramo",
+    "existencia": 14.6603333333,
+    "saldo": 3371.87666666,
+    "costo_promedio": 230.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR800",
+    "producto": "AMALAY - CAFE EN GRANO BOLSA 300G",
+    "unidad": "Pieza",
+    "existencia": 30.0,
+    "saldo": 3300.0,
+    "costo_promedio": 110.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB50202410",
+    "producto": "JUGO DE TORONJA GALON",
+    "unidad": "Galon",
+    "existencia": 77.7019371388,
+    "saldo": 3284.62615491,
+    "costo_promedio": 42.27
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA125",
+    "producto": "CHIPS DE BETABEL",
+    "unidad": "Kilogramo",
+    "existencia": 6.0,
+    "saldo": 3245.500002,
+    "costo_promedio": 540.92
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC00202",
+    "producto": "JAMON DE PIERNA",
+    "unidad": "Kilogramo",
+    "existencia": 12.613,
+    "saldo": 3005.1000002,
+    "costo_promedio": 238.25
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC018",
+    "producto": "QUESO GOUDA",
+    "unidad": "Kilogramo",
+    "existencia": 21.44,
+    "saldo": 2980.16,
+    "costo_promedio": 139.0
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL007500",
+    "producto": "PULPA PEPINO",
+    "unidad": "Litro",
+    "existencia": 27.73,
+    "saldo": 2824.99549865,
+    "costo_promedio": 101.88
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC50131700",
+    "producto": "MANTEQUILLA SIN SAL",
+    "unidad": "Kilogramo",
+    "existencia": 19.5810877194,
+    "saldo": 3132.9740351,
+    "costo_promedio": 160.0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS003",
+    "producto": "CHAI BASE EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 4.055,
+    "saldo": 2805.95328862,
+    "costo_promedio": 691.97
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC017",
+    "producto": "QUESO FETFA",
+    "unidad": "Kilogramo",
+    "existencia": 9.86,
+    "saldo": 2760.8,
+    "costo_promedio": 280.0
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON1232314",
+    "producto": "ATUN FRESCO",
+    "unidad": "Kilogramo",
+    "existencia": 13.12,
+    "saldo": 2755.2,
+    "costo_promedio": 210.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV004",
+    "producto": "ARUGULA",
+    "unidad": "Kilogramo",
+    "existencia": 17.847,
+    "saldo": 2880.84999964,
+    "costo_promedio": 161.42
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "SEC021",
+    "producto": "HUEVO BLANCO",
+    "unidad": "Kilogramo",
+    "existencia": 86.4666842107,
+    "saldo": 2896.01136093,
+    "costo_promedio": 33.49
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA034",
+    "producto": "CHURRITOS DE AMARANTO",
+    "unidad": "Kilogramo",
+    "existencia": 13.2,
+    "saldo": 2640.0,
+    "costo_promedio": 200.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR801",
+    "producto": "AMALAY - CAFE MOLIDO BOLSA 300G",
+    "unidad": "Pieza",
+    "existencia": 44.0,
+    "saldo": 4840.0,
+    "costo_promedio": 110.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA122",
+    "producto": "VINAGRE BALSAMICO CON CHAMPANGE",
+    "unidad": "Litro",
+    "existencia": 5.2,
+    "saldo": 2631.2,
+    "costo_promedio": 506.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA072",
+    "producto": "LECHE DE COCO",
+    "unidad": "Litro",
+    "existencia": 54.88,
+    "saldo": 2646.046,
+    "costo_promedio": 48.22
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV006",
+    "producto": "BLUEBERRYS",
+    "unidad": "Kilogramo",
+    "existencia": 10.237,
+    "saldo": 3802.31428136,
+    "costo_promedio": 371.43
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA084",
+    "producto": "MIEL DE MAPLE ORGANICA",
+    "unidad": "Kilogramo",
+    "existencia": 13.93624,
+    "saldo": 3264.62071867,
+    "costo_promedio": 234.25
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB021",
+    "producto": "JUGO DE LIMON BOTE",
+    "unidad": "Litro",
+    "existencia": 51.185,
+    "saldo": 2569.39235895,
+    "costo_promedio": 50.2
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR142",
+    "producto": "HABITS - VAINILLA LATA 488G",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 2516.074284,
+    "costo_promedio": 419.35
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV055",
+    "producto": "TOMATILLO VERDE",
+    "unidad": "Kilogramo",
+    "existencia": 81.733,
+    "saldo": 2451.99,
+    "costo_promedio": 30.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC12354638",
+    "producto": "MOZARELA RALLADO",
+    "unidad": "Kilogramo",
+    "existencia": 13.538,
+    "saldo": 2419.51982862,
+    "costo_promedio": 178.72
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON008",
+    "producto": "PROCCIUTO",
+    "unidad": "Kilogramo",
+    "existencia": 6.4,
+    "saldo": 3731.2,
+    "costo_promedio": 583.0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS002",
+    "producto": "CHAI MASALA",
+    "unidad": "Kilogramo",
+    "existencia": 1.25,
+    "saldo": 2375.0,
+    "costo_promedio": 1900.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA065",
+    "producto": "HORADISH",
+    "unidad": "Kilogramo",
+    "existencia": 1.735,
+    "saldo": 2369.17241315,
+    "costo_promedio": 1365.52
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA030",
+    "producto": "CHIPS JICAMA",
+    "unidad": "Kilogramo",
+    "existencia": 5.91,
+    "saldo": 2300.0,
+    "costo_promedio": 389.17
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV034",
+    "producto": "LIMON AMARILLO",
+    "unidad": "Kilogramo",
+    "existencia": 24.2515789234,
+    "saldo": 2303.89999773,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA003",
+    "producto": "ACEITE OLIVA",
+    "unidad": "Kilogramo",
+    "existencia": 18.7784934286,
+    "saldo": 2215.86222457,
+    "costo_promedio": 118.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR139",
+    "producto": "HABITS - MACA-CACAO 488G",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 2208.760667,
+    "costo_promedio": 441.75
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV023",
+    "producto": "FRAMBUESA",
+    "unidad": "Kilogramo",
+    "existencia": 8.9226666667,
+    "saldo": 3314.13332956,
+    "costo_promedio": 371.43
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV024",
+    "producto": "FRESAS FRESCAS",
+    "unidad": "Kilogramo",
+    "existencia": 17.7061666667,
+    "saldo": 2925.02753506,
+    "costo_promedio": 165.2
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC016",
+    "producto": "QUESO CHEDDAR",
+    "unidad": "Kilogramo",
+    "existencia": 13.64,
+    "saldo": 2168.76,
+    "costo_promedio": 159.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB010",
+    "producto": "UNICORP - JUGO DR D TOX 1 LT",
+    "unidad": "Litro",
+    "existencia": 26.0,
+    "saldo": 2129.589342,
+    "costo_promedio": 81.91
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS001",
+    "producto": "AIYA  TE VERDE MATCHA POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 1.95,
+    "saldo": 2082.3075,
+    "costo_promedio": 1067.85
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB27022501",
+    "producto": "SUB CARNE PARA SMASH BURGER",
+    "unidad": "Kilogramo",
+    "existencia": 5.8,
+    "saldo": 2058.4983928,
+    "costo_promedio": 354.91
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC005",
+    "producto": "QUESO PARMESANO",
+    "unidad": "Kilogramo",
+    "existencia": 8.3269528571,
+    "saldo": 2040.10344999,
+    "costo_promedio": 245.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA118",
+    "producto": "TORTILLA DE MAIZ",
+    "unidad": "Kilogramo",
+    "existencia": 60.72,
+    "saldo": 2003.76,
+    "costo_promedio": 33.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA054",
+    "producto": "FRIJOL NEGRO",
+    "unidad": "Kilogramo",
+    "existencia": 46.45,
+    "saldo": 1876.200004,
+    "costo_promedio": 40.39
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "PRO27022502",
+    "producto": "RIB EYE",
+    "unidad": "Kilogramo",
+    "existencia": 5.9200000015,
+    "saldo": 1864.80000047,
+    "costo_promedio": 315.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB012",
+    "producto": "UNICORP - JUGO U GLOW 1 LT",
+    "unidad": "Litro",
+    "existencia": 22.5,
+    "saldo": 1842.9000075,
+    "costo_promedio": 81.91
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "7501055300075",
+    "producto": "COCA COLA REGULAR 355ML",
+    "unidad": "Pieza",
+    "existencia": 102.0,
+    "saldo": 1783.623612,
+    "costo_promedio": 17.49
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL003",
+    "producto": "PULPA JAMAICA",
+    "unidad": "Litro",
+    "existencia": 28.56,
+    "saldo": 1705.2888972,
+    "costo_promedio": 59.71
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL006",
+    "producto": "PULPA PARA ACAI",
+    "unidad": "Kilogramo",
+    "existencia": 4.6666666667,
+    "saldo": 1691.66666668,
+    "costo_promedio": 362.5
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA031",
+    "producto": "CHOCOCHIPS",
+    "unidad": "Kilogramo",
+    "existencia": 4.0,
+    "saldo": 1680.0,
+    "costo_promedio": 420.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7501468148738",
+    "producto": "HABITS - CACAO LATA 488G",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 1677.38182,
+    "costo_promedio": 419.35
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA007",
+    "producto": "ALCAPARRAS",
+    "unidad": "Kilogramo",
+    "existencia": 6.646,
+    "saldo": 1669.31828538,
+    "costo_promedio": 251.18
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV053",
+    "producto": "TOMATE CHERRY",
+    "unidad": "Kilogramo",
+    "existencia": 9.182,
+    "saldo": 1652.76,
+    "costo_promedio": 180.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA085",
+    "producto": "MONK FRUIT",
+    "unidad": "Kilogramo",
+    "existencia": 6.1799298246,
+    "saldo": 1637.68140352,
+    "costo_promedio": 265.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA059",
+    "producto": "HARINA DE ALMENDRA",
+    "unidad": "Kilogramo",
+    "existencia": 11.986,
+    "saldo": 2304.63784527,
+    "costo_promedio": 192.28
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "LAC012",
+    "producto": "PECHUGA DE PAVO",
+    "unidad": "Kilogramo",
+    "existencia": 5.745,
+    "saldo": 2091.9100007,
+    "costo_promedio": 364.13
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB019",
+    "producto": "COCA COLA LIGHT 355ML",
+    "unidad": "Pieza",
+    "existencia": 86.0,
+    "saldo": 1534.496636,
+    "costo_promedio": 17.84
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABAAMA06062501",
+    "producto": "CHIPS DE PAPA",
+    "unidad": "Kilogramo",
+    "existencia": 6.103,
+    "saldo": 1517.29470644,
+    "costo_promedio": 248.61
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA014",
+    "producto": "AZUCAR MASCABADO",
+    "unidad": "Kilogramo",
+    "existencia": 34.0523333333,
+    "saldo": 1482.09334134,
+    "costo_promedio": 43.52
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA008",
+    "producto": "AMARANTO",
+    "unidad": "Kilogramo",
+    "existencia": 21.77,
+    "saldo": 1480.36,
+    "costo_promedio": 68.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA197538245",
+    "producto": "HARINA PARA PIZZA (CAPUTO)",
+    "unidad": "Kilogramo",
+    "existencia": 25.0,
+    "saldo": 1480.0,
+    "costo_promedio": 59.2
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON0036901M",
+    "producto": "CARNE MOLIDA 80/20",
+    "unidad": "Kilogramo",
+    "existencia": 9.9,
+    "saldo": 1475.1,
+    "costo_promedio": 149.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503035248025",
+    "producto": "YOOJU - BARRA 35G (DIF SABORES)",
+    "unidad": "Pieza",
+    "existencia": 54.0,
+    "saldo": 1458.0,
+    "costo_promedio": 27.0
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL005",
+    "producto": "PULPA MARACUYA SIN AZUCAR",
+    "unidad": "Litro",
+    "existencia": 8.11,
+    "saldo": 1417.3847,
+    "costo_promedio": 174.77
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV009",
+    "producto": "CEBOLLA BCA",
+    "unidad": "Kilogramo",
+    "existencia": 74.1737894667,
+    "saldo": 1409.35983354,
+    "costo_promedio": 19.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA081",
+    "producto": "MAYONESA NATURAL",
+    "unidad": "Kilogramo",
+    "existencia": 16.14,
+    "saldo": 1396.5934139,
+    "costo_promedio": 86.53
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV036",
+    "producto": "MANGO ATAULFO",
+    "unidad": "Kilogramo",
+    "existencia": 18.0833333333,
+    "saldo": 1386.25,
+    "costo_promedio": 76.66
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR155",
+    "producto": "LA NONA - DORADITAS  KETO/ALMENDRAS 120 GR",
+    "unidad": "Pieza",
+    "existencia": 18.0,
+    "saldo": 1386.072,
+    "costo_promedio": 77.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA0111",
+    "producto": "SEMOLINA",
+    "unidad": "Kilogramo",
+    "existencia": 25.0,
+    "saldo": 1350.0,
+    "costo_promedio": 54.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "788115833149",
+    "producto": "ROJAMAICA - CHIPS DE ROJAMAICA  40 GR",
+    "unidad": "Pieza",
+    "existencia": 26.0,
+    "saldo": 1343.750005,
+    "costo_promedio": 51.68
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV020",
+    "producto": "ESPINACA BABY",
+    "unidad": "Kilogramo",
+    "existencia": 4.1616666667,
+    "saldo": 1340.98148057,
+    "costo_promedio": 322.22
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA0002222",
+    "producto": "AZUCAR REFINADA",
+    "unidad": "Kilogramo",
+    "existencia": 91.4072,
+    "saldo": 2449.71296,
+    "costo_promedio": 26.8
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR151",
+    "producto": "HEALTY CRUNCH - CHIPS PEPINO LIMON Y SAL 200GR",
+    "unidad": "Pieza",
+    "existencia": 13.0,
+    "saldo": 1326.0,
+    "costo_promedio": 102.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA029",
+    "producto": "CHIPS DE ROJAMAICA",
+    "unidad": "Kilogramo",
+    "existencia": 1.082,
+    "saldo": 1332.48792,
+    "costo_promedio": 1231.5
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB007",
+    "producto": "UNICORP - JUGO ALERT 1LT",
+    "unidad": "Litro",
+    "existencia": 16.0,
+    "saldo": 1310.500002,
+    "costo_promedio": 81.91
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA074",
+    "producto": "LECHE DESLACTOSADA LIGHT",
+    "unidad": "Litro",
+    "existencia": 54.45,
+    "saldo": 1306.8,
+    "costo_promedio": 24.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV037",
+    "producto": "MANZANA GOLDEN",
+    "unidad": "Kilogramo",
+    "existencia": 26.8,
+    "saldo": 1896.0,
+    "costo_promedio": 70.75
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA102",
+    "producto": "POLVO  PARA HORNEAR",
+    "unidad": "Kilogramo",
+    "existencia": 8.09224,
+    "saldo": 1213.83600001,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA011",
+    "producto": "AVENA ORGANICA",
+    "unidad": "Kilogramo",
+    "existencia": 2.95,
+    "saldo": 1203.83333315,
+    "costo_promedio": 408.08
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC025",
+    "producto": "YOGURTH GRIEGO LIGHT",
+    "unidad": "Kilogramo",
+    "existencia": 11.56,
+    "saldo": 1171.744,
+    "costo_promedio": 101.36
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA077",
+    "producto": "LEVADURA INSTANTANEA",
+    "unidad": "Kilogramo",
+    "existencia": 2.1048,
+    "saldo": 1159.03083711,
+    "costo_promedio": 550.66
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC023",
+    "producto": "QUESO PANELA WALLANDER",
+    "unidad": "Kilogramo",
+    "existencia": 4.733,
+    "saldo": 1139.375,
+    "costo_promedio": 240.73
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS010",
+    "producto": "EUROTE - TISANA PONCHE DE GUAYABA",
+    "unidad": "Kilogramo",
+    "existencia": 1.26,
+    "saldo": 1111.32,
+    "costo_promedio": 882.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA079",
+    "producto": "MANGO ENCHILADO",
+    "unidad": "Kilogramo",
+    "existencia": 3.62,
+    "saldo": 1106.3748,
+    "costo_promedio": 305.63
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA8904",
+    "producto": "PASTA PENNE",
+    "unidad": "Kilogramo",
+    "existencia": 23.1,
+    "saldo": 1085.7,
+    "costo_promedio": 47.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA096",
+    "producto": "PESTO DE ALBAHACAR",
+    "unidad": "Kilogramo",
+    "existencia": 3.4908,
+    "saldo": 1081.58857835,
+    "costo_promedio": 309.84
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB003",
+    "producto": "AGUA MINERAL",
+    "unidad": "Litro",
+    "existencia": 67.34964,
+    "saldo": 1070.8935184,
+    "costo_promedio": 15.9
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC024",
+    "producto": "NUEZ  LIMPIA",
+    "unidad": "Kilogramo",
+    "existencia": 3.52,
+    "saldo": 1232.0,
+    "costo_promedio": 350.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "781584330638",
+    "producto": "SMARTY CHIPS JICAMA NATURAL 170 GR",
+    "unidad": "Pieza",
+    "existencia": 11.0,
+    "saldo": 1045.0,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB051",
+    "producto": "JARABE  AVELLANAS MONIN",
+    "unidad": "Litro",
+    "existencia": 3.73,
+    "saldo": 1044.15133209,
+    "costo_promedio": 279.93
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON0002",
+    "producto": "CHICHARRON DE LA RAMOS",
+    "unidad": "Kilogramo",
+    "existencia": 3.635,
+    "saldo": 1017.8,
+    "costo_promedio": 280.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA108",
+    "producto": "SALSA ROJAMAICA LT",
+    "unidad": "Litro",
+    "existencia": 11.6933333329,
+    "saldo": 1923.55333326,
+    "costo_promedio": 164.5
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV50414000",
+    "producto": "PEREJIL CHINO",
+    "unidad": "Kilogramo",
+    "existencia": 2.4366666666,
+    "saldo": 979.66666674,
+    "costo_promedio": 402.05
+  },
+  {
+    "departamento": "PANADERIA",
+    "codigo": "02052026",
+    "producto": "AZUCAR ISOMALT",
+    "unidad": "Kilogramo",
+    "existencia": 2.0,
+    "saldo": 970.0,
+    "costo_promedio": 485.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "790910296913",
+    "producto": "SMARTY CHIPS JICAMA TORITO 170 GR",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 950.0,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV016",
+    "producto": "CILANTRO",
+    "unidad": "Kilogramo",
+    "existencia": 14.235,
+    "saldo": 1018.95,
+    "costo_promedio": 71.58
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA061",
+    "producto": "HARINA INTEGRAL",
+    "unidad": "Kilogramo",
+    "existencia": 34.96,
+    "saldo": 943.92,
+    "costo_promedio": 27.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB001",
+    "producto": "AGUA DE PIEDRA NATURAL",
+    "unidad": "Pieza",
+    "existencia": 63.0,
+    "saldo": 920.43,
+    "costo_promedio": 14.61
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503032931555",
+    "producto": "RAICES DEL HUERTO - TE MATCHA MIX 125G",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 910.0,
+    "costo_promedio": 227.5
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "26548312589",
+    "producto": "AJO PELADO BOTE 1KG",
+    "unidad": "Kilogramo",
+    "existencia": 3.2140178571,
+    "saldo": 883.8549107,
+    "costo_promedio": 275.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR140",
+    "producto": "HABITS - MATCHA-VAINILLA 488G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 878.02,
+    "costo_promedio": 439.01
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV021",
+    "producto": "ESPINACA REGULAR",
+    "unidad": "Kilogramo",
+    "existencia": 10.9032432432,
+    "saldo": 872.25945946,
+    "costo_promedio": 80.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "790910285658",
+    "producto": "SMARTY CHIPS JICAMA HABANERO  170 GR",
+    "unidad": "Pieza",
+    "existencia": 9.0,
+    "saldo": 855.0,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7501468148745",
+    "producto": "HABITS - NATURAL 488G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 838.693334,
+    "costo_promedio": 419.35
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV044",
+    "producto": "PEPINO",
+    "unidad": "Kilogramo",
+    "existencia": 34.1900558108,
+    "saldo": 1538.57751123,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV013",
+    "producto": "CHAMPIÑONES",
+    "unidad": "Kilogramo",
+    "existencia": 8.6,
+    "saldo": 946.0,
+    "costo_promedio": 110.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "732535850224",
+    "producto": "SANUTRI - CHURRITOS AMARANTO NOPAL DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 831.6,
+    "costo_promedio": 83.16
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "BEB243517",
+    "producto": "EUROTE - TISANA HONEY BEE",
+    "unidad": "Kilogramo",
+    "existencia": 0.67,
+    "saldo": 822.76,
+    "costo_promedio": 1228.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV025",
+    "producto": "FRUTA DEL DRAGON",
+    "unidad": "Kilogramo",
+    "existencia": 5.4666666667,
+    "saldo": 820.00000001,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON002",
+    "producto": "CHORIZO DE CERDO",
+    "unidad": "Kilogramo",
+    "existencia": 5.52,
+    "saldo": 811.44,
+    "costo_promedio": 147.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500326414411",
+    "producto": "LA NONA - DORADITAS DE AVENA/STEVIA 130 GR",
+    "unidad": "Pieza",
+    "existencia": 19.0,
+    "saldo": 798.0,
+    "costo_promedio": 42.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "ABAMKT10092503",
+    "producto": "GUAYABATE - TABLETAS GUAYABATE 100G",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 795.0,
+    "costo_promedio": 79.5
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "MAR218",
+    "producto": "UNICORP - JUGO U GLOW 473 ML",
+    "unidad": "Pieza",
+    "existencia": 18.0,
+    "saldo": 792.695944,
+    "costo_promedio": 44.04
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7501468119943",
+    "producto": "HABITS - PEPTIDOS DE COLAGENO, BOLSA 250G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 787.124,
+    "costo_promedio": 393.56
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA060",
+    "producto": "HARINA DE TAPIOCA",
+    "unidad": "Kilogramo",
+    "existencia": 1.55,
+    "saldo": 751.75,
+    "costo_promedio": 485.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA117",
+    "producto": "TORTILLA DE HARINA",
+    "unidad": "Kilogramo",
+    "existencia": 9.84,
+    "saldo": 738.0,
+    "costo_promedio": 75.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA082",
+    "producto": "MIEL DE ABEJA",
+    "unidad": "Kilogramo",
+    "existencia": 4.28335,
+    "saldo": 734.8086925,
+    "costo_promedio": 171.55
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA001",
+    "producto": "ACEITE VEGETAL",
+    "unidad": "Litro",
+    "existencia": 20.1811219047,
+    "saldo": 807.24487619,
+    "costo_promedio": 40.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN007",
+    "producto": "SUB CHEESE CAKE NEW YORK (REB)",
+    "unidad": "Pieza",
+    "existencia": 22.0,
+    "saldo": 711.021256,
+    "costo_promedio": 32.32
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "MAR214",
+    "producto": "UNICORP - JUGO BE INMUNE 473 ML",
+    "unidad": "Pieza",
+    "existencia": 16.0,
+    "saldo": 704.618736,
+    "costo_promedio": 44.04
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB002",
+    "producto": "AGUA DE PIEDRA MINERAL",
+    "unidad": "Pieza",
+    "existencia": 45.0,
+    "saldo": 694.8,
+    "costo_promedio": 15.44
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA113",
+    "producto": "TAHINI",
+    "unidad": "Kilogramo",
+    "existencia": 2.1,
+    "saldo": 693.0,
+    "costo_promedio": 330.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB030",
+    "producto": "KOMBUCHA MANZANA-JENGIBRE 377 ML",
+    "unidad": "Pieza",
+    "existencia": 15.0,
+    "saldo": 675.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500464816726",
+    "producto": "ROJAMAICA - SALSA ROJAMAICA 520 GR",
+    "unidad": "Pieza",
+    "existencia": 8.0,
+    "saldo": 672.0,
+    "costo_promedio": 84.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1705",
+    "producto": "SUB SALSA BECHAMEL",
+    "unidad": "Kilogramo",
+    "existencia": 12.02,
+    "saldo": 665.331176,
+    "costo_promedio": 55.35
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503032931234",
+    "producto": "RAICES DEL HUERTO - GOLDEN MANE MIX 250G",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 661.5,
+    "costo_promedio": 220.5
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "MAR213",
+    "producto": "UNICORP - JUGO ALERT 473 ML",
+    "unidad": "Pieza",
+    "existencia": 15.0,
+    "saldo": 661.0986,
+    "costo_promedio": 44.07
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV199",
+    "producto": "PAPAYA",
+    "unidad": "Kilogramo",
+    "existencia": 17.04,
+    "saldo": 645.02,
+    "costo_promedio": 37.85
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMA26092503",
+    "producto": "EXCEED - PASTA DENTAL S/FLOUR 108 G",
+    "unidad": "Pieza",
+    "existencia": 8.0,
+    "saldo": 640.0,
+    "costo_promedio": 80.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB1745398000",
+    "producto": "JARABE ROSE MONIN",
+    "unidad": "Litro",
+    "existencia": 2.405,
+    "saldo": 628.186,
+    "costo_promedio": 261.2
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS005",
+    "producto": "EUROTE - TE VERDE SABOR MENTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.645,
+    "saldo": 626.94,
+    "costo_promedio": 972.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB010014789",
+    "producto": "JARABE SANDIA DA VINCI",
+    "unidad": "Litro",
+    "existencia": 2.0,
+    "saldo": 625.173334,
+    "costo_promedio": 312.59
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA115",
+    "producto": "TOTOPO DE NOPAL",
+    "unidad": "Kilogramo",
+    "existencia": 6.73,
+    "saldo": 615.31428283,
+    "costo_promedio": 91.43
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA120",
+    "producto": "VINAGRE BLANCO",
+    "unidad": "Litro",
+    "existencia": 32.35,
+    "saldo": 606.643375,
+    "costo_promedio": 18.75
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV047",
+    "producto": "PLATANO",
+    "unidad": "Kilogramo",
+    "existencia": 18.3458333333,
+    "saldo": 642.10416667,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV046",
+    "producto": "PIÑA",
+    "unidad": "Kilogramo",
+    "existencia": 26.5835135135,
+    "saldo": 903.83945946,
+    "costo_promedio": 34.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503050539047",
+    "producto": "VAMARA - CIRUELA ENCHILADA 250 GR",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 597.24,
+    "costo_promedio": 149.31
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV028",
+    "producto": "HIGO",
+    "unidad": "Kilogramo",
+    "existencia": 2.851,
+    "saldo": 596.57488893,
+    "costo_promedio": 209.25
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB049",
+    "producto": "JARABE ALMENDRAS MONIN",
+    "unidad": "Litro",
+    "existencia": 2.84,
+    "saldo": 596.258,
+    "costo_promedio": 209.95
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA111",
+    "producto": "SPLENDA EN SOBRE",
+    "unidad": "Paquete",
+    "existencia": 2.68,
+    "saldo": 766.24,
+    "costo_promedio": 285.91
+  },
+  {
+    "departamento": "PANADERIA",
+    "codigo": "3004263",
+    "producto": "CHOCOLATE SICAO BLANCO 32 %",
+    "unidad": "Kilogramo",
+    "existencia": 1.52,
+    "saldo": 585.197568,
+    "costo_promedio": 385.0
+  },
+  {
+    "departamento": "CONGELADOS",
+    "codigo": "MAR176",
+    "producto": "NIEVE VAINILLA DE PAPANTLA GRANEL",
+    "unidad": "Kilogramo",
+    "existencia": 0.9,
+    "saldo": 585.0,
+    "costo_promedio": 650.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR079",
+    "producto": "SANUTRI - CHURRITOS AMARANTO SAL Y LIMON DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 7.0,
+    "saldo": 582.12,
+    "costo_promedio": 83.16
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA013",
+    "producto": "AZUCAR GLASS",
+    "unidad": "Kilogramo",
+    "existencia": 6.83,
+    "saldo": 580.55,
+    "costo_promedio": 85.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503037273940",
+    "producto": "BIRDMAN - CREATINE ELECTROLITS GOLDEN PEACH, LATA 300G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 577.586206,
+    "costo_promedio": 288.79
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR050",
+    "producto": "RENEW - LOCION HIDRATANTE 237 ML",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 576.0,
+    "costo_promedio": 144.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "732535850194",
+    "producto": "SANUTRI CHURRITOS AMARANTO HABANERO DE 300 G",
+    "unidad": "Pieza",
+    "existencia": 7.0,
+    "saldo": 575.96,
+    "costo_promedio": 82.28
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "MAR217",
+    "producto": "UNICORP - JUGO GREEN ALCHEMIST 473 ML",
+    "unidad": "Pieza",
+    "existencia": 13.0,
+    "saldo": 572.514956,
+    "costo_promedio": 44.04
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA112",
+    "producto": "STEVIA  EN SOBRE",
+    "unidad": "Paquete",
+    "existencia": 3.0,
+    "saldo": 753.0,
+    "costo_promedio": 251.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR047",
+    "producto": "RENEW - JABON CORPORAL 355 ML",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 568.92,
+    "costo_promedio": 94.82
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA002",
+    "producto": "ACEITE DE COCO",
+    "unidad": "Kilogramo",
+    "existencia": 1.7,
+    "saldo": 566.98750389,
+    "costo_promedio": 333.52
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN001",
+    "producto": "SUB BISKET TRADICIONAL",
+    "unidad": "Pieza",
+    "existencia": 52.0,
+    "saldo": 562.09998,
+    "costo_promedio": 10.81
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV032",
+    "producto": "LECHUGA  BOLA",
+    "unidad": "Kilogramo",
+    "existencia": 22.02,
+    "saldo": 550.5,
+    "costo_promedio": 25.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500326414428",
+    "producto": "LA NONA - GORDITAS DE AVENA /STEVIA 270 GR",
+    "unidad": "Pieza",
+    "existencia": 13.0,
+    "saldo": 546.0,
+    "costo_promedio": 42.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA056",
+    "producto": "GOMA XANTANA",
+    "unidad": "Kilogramo",
+    "existencia": 0.79,
+    "saldo": 538.69836693,
+    "costo_promedio": 681.9
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV057",
+    "producto": "UVA ROJA",
+    "unidad": "Kilogramo",
+    "existencia": 5.65,
+    "saldo": 536.75,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV04858",
+    "producto": "MELON CHINO",
+    "unidad": "Kilogramo",
+    "existencia": 15.12,
+    "saldo": 529.2,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA104722",
+    "producto": "DULCE DE LECHE",
+    "unidad": "Kilogramo",
+    "existencia": 4.5,
+    "saldo": 520.92,
+    "costo_promedio": 115.76
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAMKT23092501",
+    "producto": "MALI - COCONUT SELF TANNING FOAM 200 ML",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 516.59,
+    "costo_promedio": 516.59
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAMKT18092501",
+    "producto": "MALI - TONE DARK SPRAY 200 ML",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 516.59,
+    "costo_promedio": 516.59
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC004",
+    "producto": "ALMENDRA EN LAJA",
+    "unidad": "Kilogramo",
+    "existencia": 4.205,
+    "saldo": 796.03469572,
+    "costo_promedio": 189.31
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA0031237",
+    "producto": "CEREZA MARRANCHINO",
+    "unidad": "Kilogramo",
+    "existencia": 5.05,
+    "saldo": 509.24698285,
+    "costo_promedio": 100.84
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV033",
+    "producto": "LECH SANGRIA",
+    "unidad": "Kilogramo",
+    "existencia": 17.46,
+    "saldo": 506.34,
+    "costo_promedio": 29.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR077",
+    "producto": "SANUTRI - CHURRITOS AMARANTO MIX CRUNCH 300 GR",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 498.96,
+    "costo_promedio": 83.16
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV043",
+    "producto": "PAPA DE GALEANA",
+    "unidad": "Kilogramo",
+    "existencia": 13.76,
+    "saldo": 481.6,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA044",
+    "producto": "CREMA DE ALMENDRA",
+    "unidad": "Kilogramo",
+    "existencia": 3.21,
+    "saldo": 778.10056349,
+    "costo_promedio": 242.4
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA0000210",
+    "producto": "CHIPOTLE ADOBADO ENLATADO",
+    "unidad": "Kilogramo",
+    "existencia": 3.22,
+    "saldo": 479.4636361,
+    "costo_promedio": 148.9
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500464492753",
+    "producto": "MANGLO - MANGO ENCHILADO DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 474.0,
+    "costo_promedio": 158.0
+  },
+  {
+    "departamento": "GRANEL",
+    "codigo": "GRA008",
+    "producto": "PEPITA DE CALABAZA",
+    "unidad": "Kilogramo",
+    "existencia": 3.837,
+    "saldo": 723.90000019,
+    "costo_promedio": 188.66
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "ABAMKT10092501",
+    "producto": "GUAYABATE - GUAYABA ENCHILADA 100G",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 455.4,
+    "costo_promedio": 75.9
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062601",
+    "producto": "AMALAY - CRUNCHY CHIPS, PEPINO NATURAL 170 G",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 450.0,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062603",
+    "producto": "AMALAY - CRUNCHY CHIPS, JICAMA NATURAL 170 G",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 450.0,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "AMALIB17032602",
+    "producto": "AMALAY - VELITA DECORACION PZ",
+    "unidad": "Pieza",
+    "existencia": 9.0,
+    "saldo": 450.0,
+    "costo_promedio": 50.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "MAR216",
+    "producto": "UNICORP - JUGO DR DETOX 473 ML",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 440.03857,
+    "costo_promedio": 44.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "00574",
+    "producto": "SALSA KETCHUP",
+    "unidad": "Kilogramo",
+    "existencia": 8.0,
+    "saldo": 438.371491,
+    "costo_promedio": 54.8
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV007",
+    "producto": "BROCOLI",
+    "unidad": "Kilogramo",
+    "existencia": 9.92,
+    "saldo": 486.08,
+    "costo_promedio": 49.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA106",
+    "producto": "SALSA DE SOYA",
+    "unidad": "Litro",
+    "existencia": 2.47,
+    "saldo": 430.39423219,
+    "costo_promedio": 174.25
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL014",
+    "producto": "TEQUILA CUERVO TRADICIONAL",
+    "unidad": "Litro",
+    "existencia": 1.34,
+    "saldo": 425.741316,
+    "costo_promedio": 317.72
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN002",
+    "producto": "SUB BISKETO",
+    "unidad": "Pieza",
+    "existencia": 15.0,
+    "saldo": 421.032765,
+    "costo_promedio": 28.07
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500464816740",
+    "producto": "ROJAMAICA - DIP DE ROJAMAICA 320 GR",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 420.0,
+    "costo_promedio": 70.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC007",
+    "producto": "CANELA",
+    "unidad": "Kilogramo",
+    "existencia": 0.44,
+    "saldo": 417.78,
+    "costo_promedio": 949.5
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "ABAMKT10092502",
+    "producto": "GUAYABATE - TEJOCOTE ENCHILADO 100G",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 417.5,
+    "costo_promedio": 83.5
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV031",
+    "producto": "LECH OREJONA",
+    "unidad": "Kilogramo",
+    "existencia": 11.913,
+    "saldo": 416.99095344,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503050539009",
+    "producto": "VAMARA - DATIL ENCHILADO 220 GR",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 416.67,
+    "costo_promedio": 138.89
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR073",
+    "producto": "SANUTRI -CHURRITOS AMARANTO CHILE LIMON  DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 415.8,
+    "costo_promedio": 83.16
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "732535850200",
+    "producto": "SANUTRI - CHURRITOS AMARANTO CHIPOTLE DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 415.8,
+    "costo_promedio": 83.16
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV049",
+    "producto": "PORTOBELLO",
+    "unidad": "Kilogramo",
+    "existencia": 2.15,
+    "saldo": 408.5,
+    "costo_promedio": 190.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MB21112502",
+    "producto": "M BITES - BARRA PZ DIF SABORES, 25G",
+    "unidad": "Pieza",
+    "existencia": 24.0,
+    "saldo": 408.0,
+    "costo_promedio": 17.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUPA28052601",
+    "producto": "SUB CARROT CAKE REBANADA",
+    "unidad": "Pieza",
+    "existencia": 20.81,
+    "saldo": 420.80279742,
+    "costo_promedio": 20.22
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV011",
+    "producto": "CEBOLLA MORADA",
+    "unidad": "Kilogramo",
+    "existencia": 10.6342857143,
+    "saldo": 404.10285714,
+    "costo_promedio": 38.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR020",
+    "producto": "LIBRO - KIDNESS",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 400.0,
+    "costo_promedio": 400.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7501468172849",
+    "producto": "HABITS - CREATINA MONOHIDRATADA  300G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 398.382,
+    "costo_promedio": 398.38
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL020",
+    "producto": "VINO - TINTO MADERO 3V",
+    "unidad": "Litro",
+    "existencia": 0.735,
+    "saldo": 397.46634176,
+    "costo_promedio": 540.77
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB039",
+    "producto": "SUB TOMATO BASIL SOUP",
+    "unidad": "Kilogramo",
+    "existencia": 15.557345,
+    "saldo": 397.07083207,
+    "costo_promedio": 25.52
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA09042501",
+    "producto": "MALI - ACEITE BRONCEADOR CACAO TANING 100 ML",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 381.46,
+    "costo_promedio": 381.46
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV029",
+    "producto": "JICAMA",
+    "unidad": "Kilogramo",
+    "existencia": 12.7105263156,
+    "saldo": 381.31578947,
+    "costo_promedio": 30.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV008",
+    "producto": "CALABACITA",
+    "unidad": "Kilogramo",
+    "existencia": 10.84,
+    "saldo": 379.4,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500464816719",
+    "producto": "ROJAMAICA - SALSA ROJAMAICA  250 GR",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 378.0,
+    "costo_promedio": 63.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB052",
+    "producto": "JARABE DE CARAMELO",
+    "unidad": "Litro",
+    "existencia": 1.35,
+    "saldo": 377.90999955,
+    "costo_promedio": 279.93
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA023",
+    "producto": "CANELA EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 2.18,
+    "saldo": 377.73201312,
+    "costo_promedio": 173.27
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV003",
+    "producto": "APIO",
+    "unidad": "Kilogramo",
+    "existencia": 19.76,
+    "saldo": 691.6,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV048",
+    "producto": "PORO",
+    "unidad": "Kilogramo",
+    "existencia": 10.6,
+    "saldo": 371.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV039",
+    "producto": "MORRON AMARILLO",
+    "unidad": "Kilogramo",
+    "existencia": 4.267,
+    "saldo": 362.74999996,
+    "costo_promedio": 85.01
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV0055",
+    "producto": "PILONCILLO",
+    "unidad": "Kilogramo",
+    "existencia": 4.9,
+    "saldo": 362.3493013,
+    "costo_promedio": 73.95
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB85042",
+    "producto": "KOMBUCHA MORA FEROZ 377 ML.",
+    "unidad": "Pieza",
+    "existencia": 8.0,
+    "saldo": 360.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062605",
+    "producto": "AMALAY - CRUNCHY CHIPS, PEPINO NATURAL 50 G",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 360.0,
+    "costo_promedio": 36.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062607",
+    "producto": "AMALAY - CRUNCHY CHIPS, JICAMA NATURAL 50 G",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 360.0,
+    "costo_promedio": 36.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062608",
+    "producto": "AMALAY - CRUNCHY CHIPS, PEPINO FUEGO 50 G",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 360.0,
+    "costo_promedio": 36.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "400050",
+    "producto": "HARINA DE MAIZ (MASECA)",
+    "unidad": "Kilogramo",
+    "existencia": 15.0,
+    "saldo": 359.26,
+    "costo_promedio": 23.95
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC015",
+    "producto": "QUESO CABRA",
+    "unidad": "Kilogramo",
+    "existencia": 1.11,
+    "saldo": 355.2,
+    "costo_promedio": 320.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA0001",
+    "producto": "VINO BLANCO COCINA",
+    "unidad": "Litro",
+    "existencia": 5.6428571429,
+    "saldo": 355.115,
+    "costo_promedio": 62.93
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500326414473",
+    "producto": "LA NONA - DORADITAS DE CHOCOLATE /AVENA 130 GR",
+    "unidad": "Pieza",
+    "existencia": 7.0,
+    "saldo": 350.0,
+    "costo_promedio": 50.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "781584330560",
+    "producto": "SMARTY CHIPS JICAMA LIMON 50 GR",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 350.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "790910285634",
+    "producto": "SMARTY CHIPS JICAMA TORITO 50 GR",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 350.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA109",
+    "producto": "SALSA TABASCO",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 427.0,
+    "costo_promedio": 42.7
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA093",
+    "producto": "PAPRIKA",
+    "unidad": "Kilogramo",
+    "existencia": 1.0,
+    "saldo": 344.04213884,
+    "costo_promedio": 344.04
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS006",
+    "producto": "EUROTE - TISANA BORA BORA",
+    "unidad": "Kilogramo",
+    "existencia": 0.31,
+    "saldo": 340.38,
+    "costo_promedio": 1098.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB004",
+    "producto": "AGUA PERSONALIZADA AMALAY 500ML",
+    "unidad": "Pieza",
+    "existencia": 41.0,
+    "saldo": 338.25,
+    "costo_promedio": 8.25
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "BEB1243538",
+    "producto": "EUROTE - TISANA DATIL CITUS",
+    "unidad": "Kilogramo",
+    "existencia": 0.3,
+    "saldo": 329.4,
+    "costo_promedio": 1098.0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL009",
+    "producto": "GINEBRA BEEFEATER",
+    "unidad": "Litro",
+    "existencia": 0.71,
+    "saldo": 327.4591,
+    "costo_promedio": 461.21
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503007798183",
+    "producto": "BAITZ - DARK OAT CLUSTER 75 G",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 325.64,
+    "costo_promedio": 81.41
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB006",
+    "producto": "SUB BASE PARA ACAI",
+    "unidad": "Kilogramo",
+    "existencia": 4.25,
+    "saldo": 320.9665705,
+    "costo_promedio": 75.52
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL024",
+    "producto": "MEZCAL - VERDE MOMENTO AMARAS",
+    "unidad": "Litro",
+    "existencia": 0.82,
+    "saldo": 315.202342,
+    "costo_promedio": 384.39
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "781584330621",
+    "producto": "SMARTY CHIPS JICAMA NATURAL 50 GR",
+    "unidad": "Pieza",
+    "existencia": 9.0,
+    "saldo": 315.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV019",
+    "producto": "ENELDO",
+    "unidad": "Kilogramo",
+    "existencia": 19.59488,
+    "saldo": 313.51808,
+    "costo_promedio": 16.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV059",
+    "producto": "ZANAHORIA",
+    "unidad": "Kilogramo",
+    "existencia": 18.55,
+    "saldo": 371.0,
+    "costo_promedio": 20.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA048",
+    "producto": "ESENCIA DE VAINILLA",
+    "unidad": "Litro",
+    "existencia": 5.5156,
+    "saldo": 561.03196746,
+    "costo_promedio": 101.72
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA018",
+    "producto": "BICARBONATO DE SODIO",
+    "unidad": "Kilogramo",
+    "existencia": 4.2164,
+    "saldo": 308.42399993,
+    "costo_promedio": 73.15
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA100458",
+    "producto": "CALIFORNIA VINO TINTO P/COCINA",
+    "unidad": "Litro",
+    "existencia": 4.6905,
+    "saldo": 308.35699989,
+    "costo_promedio": 65.74
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV058",
+    "producto": "HIERBABUENA",
+    "unidad": "Kilogramo",
+    "existencia": 0.997,
+    "saldo": 398.8,
+    "costo_promedio": 400.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC012",
+    "producto": "CHILE GUAJILLO",
+    "unidad": "Kilogramo",
+    "existencia": 1.83,
+    "saldo": 301.95,
+    "costo_promedio": 165.0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES027",
+    "producto": "PAPEL ESTRELLA",
+    "unidad": "Pieza",
+    "existencia": 50.0,
+    "saldo": 301.72,
+    "costo_promedio": 6.03
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500464492746",
+    "producto": "MANGLO - MANGO ENCHILADO DE 120 GR",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 300.0,
+    "costo_promedio": 60.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA086",
+    "producto": "MOSTAZA DIJON",
+    "unidad": "Kilogramo",
+    "existencia": 2.0833333334,
+    "saldo": 299.64052325,
+    "costo_promedio": 143.83
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA114",
+    "producto": "TOMATES DESHIDRATADOS",
+    "unidad": "Kilogramo",
+    "existencia": 1.064,
+    "saldo": 297.23960286,
+    "costo_promedio": 279.36
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA092",
+    "producto": "PAN DE BARRA SIN GLUTEN (PAN GABRIEL)",
+    "unidad": "Pieza",
+    "existencia": 1.8,
+    "saldo": 293.4,
+    "costo_promedio": 163.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA012",
+    "producto": "AZUCAR ESTANDAR",
+    "unidad": "Kilogramo",
+    "existencia": 13.0,
+    "saldo": 382.88,
+    "costo_promedio": 29.45
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV014",
+    "producto": "CHILE JALAPEÑO",
+    "unidad": "Kilogramo",
+    "existencia": 9.683,
+    "saldo": 290.49999924,
+    "costo_promedio": 30.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA017",
+    "producto": "CHOCOLATE SICAO 46% (BARRA)",
+    "unidad": "Kilogramo",
+    "existencia": 0.89,
+    "saldo": 289.25,
+    "costo_promedio": 325.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503037273926",
+    "producto": "BIRDMAN - CREATINE ELECTROLITS LEMON TWIST, LATA 300G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 288.793103,
+    "costo_promedio": 288.79
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CRAM10062606",
+    "producto": "AMALAY - CRUNCHY CHIPS , JICAMA FUEGO 50 G",
+    "unidad": "Pieza",
+    "existencia": 8.0,
+    "saldo": 288.0,
+    "costo_promedio": 36.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB011",
+    "producto": "UNICORP - JUGO GREEN ALCHEMIST 1 LT",
+    "unidad": "Litro",
+    "existencia": 3.5,
+    "saldo": 286.673338,
+    "costo_promedio": 81.91
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB028",
+    "producto": "SUB SALSA DE LA CASA",
+    "unidad": "Kilogramo",
+    "existencia": 4.34,
+    "saldo": 280.8703912,
+    "costo_promedio": 64.72
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC025",
+    "producto": "NUEZ DE LA INDIA",
+    "unidad": "Kilogramo",
+    "existencia": 0.56,
+    "saldo": 280.0,
+    "costo_promedio": 500.0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS008",
+    "producto": "EUROTE - TISANA FRESA Y KIWI",
+    "unidad": "Kilogramo",
+    "existencia": 0.25,
+    "saldo": 274.5,
+    "costo_promedio": 1098.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031225440",
+    "producto": "AMARANTH - CHARRIS HABANERO 142G",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 270.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA004",
+    "producto": "ACEITUNA VERDE S/HUESO",
+    "unidad": "Kilogramo",
+    "existencia": 3.2,
+    "saldo": 265.82107,
+    "costo_promedio": 83.07
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV041",
+    "producto": "MORRON VERDE",
+    "unidad": "Kilogramo",
+    "existencia": 2.7347,
+    "saldo": 259.79937415,
+    "costo_promedio": 95.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV0000001111",
+    "producto": "RABANO",
+    "unidad": "Kilogramo",
+    "existencia": 7.3,
+    "saldo": 255.5,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV056",
+    "producto": "TORONJA",
+    "unidad": "Kilogramo",
+    "existencia": 6.48,
+    "saldo": 246.24,
+    "costo_promedio": 38.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB050",
+    "producto": "JARABE KIWI DA VINCI",
+    "unidad": "Kilogramo",
+    "existencia": 0.867,
+    "saldo": 242.70219971,
+    "costo_promedio": 279.93
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB203546",
+    "producto": "MACA AMARILLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.32,
+    "saldo": 240.0,
+    "costo_promedio": 750.0
+  },
+  {
+    "departamento": "GRANEL",
+    "codigo": "GRA009",
+    "producto": "PEPITA DE GIRASOL",
+    "unidad": "Kilogramo",
+    "existencia": 2.44,
+    "saldo": 465.94,
+    "costo_promedio": 190.96
+  },
+  {
+    "departamento": "CERVEZAS",
+    "codigo": "BEB020",
+    "producto": "HEINEKEN",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 232.99667,
+    "costo_promedio": 23.3
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC029",
+    "producto": "PIMIENTA NEGRA MOLIDA",
+    "unidad": "Kilogramo",
+    "existencia": 1.2121354763,
+    "saldo": 230.3057405,
+    "costo_promedio": 190.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV015",
+    "producto": "CHILE SERRANO",
+    "unidad": "Kilogramo",
+    "existencia": 6.435,
+    "saldo": 225.24999968,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB27022504",
+    "producto": "SUB SALSA TATEMADA",
+    "unidad": "Kilogramo",
+    "existencia": 5.6,
+    "saldo": 223.5209704,
+    "costo_promedio": 39.91
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC005",
+    "producto": "ALMENDRA ENTERA",
+    "unidad": "Kilogramo",
+    "existencia": 0.68,
+    "saldo": 221.0,
+    "costo_promedio": 325.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "fyl27022501",
+    "producto": "CHILE JALAPEÑO ROJO",
+    "unidad": "Kilogramo",
+    "existencia": 3.0,
+    "saldo": 220.0,
+    "costo_promedio": 73.33
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA068",
+    "producto": "JUGO DE ARANDANO",
+    "unidad": "Litro",
+    "existencia": 4.46,
+    "saldo": 218.317,
+    "costo_promedio": 48.95
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "3223430",
+    "producto": "LA NONA - GORDITAS DE CHOCOLATE/AVENA 270 GR",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 216.0,
+    "costo_promedio": 54.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "196458213146",
+    "producto": "CHILE PIQUIN",
+    "unidad": "Kilogramo",
+    "existencia": 0.25,
+    "saldo": 212.5,
+    "costo_promedio": 850.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN010",
+    "producto": "SUB CROISSANT NATURAL",
+    "unidad": "Pieza",
+    "existencia": 28.0,
+    "saldo": 210.670264,
+    "costo_promedio": 7.52
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031525501",
+    "producto": "AMARANTH - CACAHUATE ORIG SAL DEL HIM 142G",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 207.36,
+    "costo_promedio": 51.84
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN008",
+    "producto": "SUB CHOCOLATIN",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 204.62618,
+    "costo_promedio": 20.46
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB017",
+    "producto": "SUB HUMMUS DE BETABEL",
+    "unidad": "Kilogramo",
+    "existencia": 3.06,
+    "saldo": 204.07604202,
+    "costo_promedio": 66.69
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "CONSUMIBLE",
+    "producto": "GASTOS DE ENVIO",
+    "unidad": "PZA",
+    "existencia": 2.0,
+    "saldo": 350.452414,
+    "costo_promedio": 175.23
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA046",
+    "producto": "ENDULZANTE FRUTA DEL MONJE SOBRE",
+    "unidad": "Paquete",
+    "existencia": 1.0,
+    "saldo": 188.01,
+    "costo_promedio": 188.01
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB024",
+    "producto": "SPRITE",
+    "unidad": "Pieza",
+    "existencia": 11.0,
+    "saldo": 184.520413,
+    "costo_promedio": 16.77
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA027",
+    "producto": "JALAPEÑOS EN ESCABECHE",
+    "unidad": "Kilogramo",
+    "existencia": 5.9714285713,
+    "saldo": 182.93897788,
+    "costo_promedio": 30.64
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA091",
+    "producto": "PAN INTEGRAL",
+    "unidad": "Kilogramo",
+    "existencia": 1.868,
+    "saldo": 181.2050001,
+    "costo_promedio": 97.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB029",
+    "producto": "KOMBUCHA JAMAICA SALVAJE  377 ML",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 180.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "PLA23062601",
+    "producto": "PLANTA GRANDE",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 180.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV50435532",
+    "producto": "CHILE POBLANO",
+    "unidad": "Kilogramo",
+    "existencia": 2.3,
+    "saldo": 172.5,
+    "costo_promedio": 75.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC010",
+    "producto": "MOZARELA FRESCO",
+    "unidad": "Kilogramo",
+    "existencia": 0.445,
+    "saldo": 168.96247231,
+    "costo_promedio": 379.69
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN021",
+    "producto": "SUB PAN PARA PANINI (BRIOCHE)",
+    "unidad": "Pieza",
+    "existencia": 32.0,
+    "saldo": 164.197104,
+    "costo_promedio": 5.13
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB019",
+    "producto": "SUB HUMMUS NATURAL",
+    "unidad": "Kilogramo",
+    "existencia": 2.2,
+    "saldo": 162.1972,
+    "costo_promedio": 73.73
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB175894",
+    "producto": "JARABE VAINILLA SUGAR FREE",
+    "unidad": "Litro",
+    "existencia": 0.575,
+    "saldo": 160.96166648,
+    "costo_promedio": 279.93
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL007",
+    "producto": "PULPA TAMARINDO",
+    "unidad": "Litro",
+    "existencia": 1.7,
+    "saldo": 160.7137035,
+    "costo_promedio": 94.54
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA103",
+    "producto": "SAL DE MESA",
+    "unidad": "Kilogramo",
+    "existencia": 8.8645601905,
+    "saldo": 159.66208333,
+    "costo_promedio": 18.01
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV042",
+    "producto": "NARANJA",
+    "unidad": "Kilogramo",
+    "existencia": 4.26,
+    "saldo": 159.62,
+    "costo_promedio": 37.47
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAN09252",
+    "producto": "MANGO SECO NATURAL 300 G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 158.0,
+    "costo_promedio": 158.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN018",
+    "producto": "SUB PAN BRIOCHE (1.050KG)",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 154.6272,
+    "costo_promedio": 51.54
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB85066",
+    "producto": "KOMBUCHA ORIGINAL 377 ML.",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 150.0,
+    "costo_promedio": 30.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "00502",
+    "producto": "MOSTAZA ORIGINAL",
+    "unidad": "Kilogramo",
+    "existencia": 1.504,
+    "saldo": 145.23929464,
+    "costo_promedio": 96.57
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "781584330607",
+    "producto": "SMARTY CHIPS JICAMA ADOBADA 50 GR",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 140.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC010",
+    "producto": "CHILE DE ARBOL",
+    "unidad": "Kilogramo",
+    "existencia": 0.8025714285,
+    "saldo": 136.43714285,
+    "costo_promedio": 170.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "PLA23062603",
+    "producto": "PLANTA CHICA",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 135.0,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV017",
+    "producto": "COL MORADA",
+    "unidad": "Kilogramo",
+    "existencia": 2.965,
+    "saldo": 133.425,
+    "costo_promedio": 45.0
+  },
+  {
+    "departamento": "PANADERIA",
+    "codigo": "AMA15122501",
+    "producto": "PAN DE PAPA",
+    "unidad": "Pieza",
+    "existencia": 14.0,
+    "saldo": 133.0,
+    "costo_promedio": 9.5
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC006",
+    "producto": "ARANDANOS",
+    "unidad": "Kilogramo",
+    "existencia": 1.28,
+    "saldo": 188.1,
+    "costo_promedio": 146.95
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA121",
+    "producto": "VINAGRE DE MANZANA",
+    "unidad": "Litro",
+    "existencia": 6.0,
+    "saldo": 112.515,
+    "costo_promedio": 18.75
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV002",
+    "producto": "ALBAHACA REGULAR",
+    "unidad": "Kilogramo",
+    "existencia": 0.14,
+    "saldo": 111.86,
+    "costo_promedio": 799.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA055",
+    "producto": "GALLETA SUSALIA",
+    "unidad": "Kilogramo",
+    "existencia": 0.4,
+    "saldo": 105.2777776,
+    "costo_promedio": 263.19
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL010",
+    "producto": "LICOR 43",
+    "unidad": "Litro",
+    "existencia": 0.305,
+    "saldo": 105.2774905,
+    "costo_promedio": 345.17
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC024",
+    "producto": "YOGURTH DE COCO",
+    "unidad": "Kilogramo",
+    "existencia": 1.0,
+    "saldo": 105.0,
+    "costo_promedio": 105.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC023",
+    "producto": "LINAZA",
+    "unidad": "Kilogramo",
+    "existencia": 0.67,
+    "saldo": 100.5,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA006",
+    "producto": "AJO EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 1.0866666666,
+    "saldo": 97.79999999,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV040",
+    "producto": "MORRON ROJO",
+    "unidad": "Kilogramo",
+    "existencia": 2.15,
+    "saldo": 182.75,
+    "costo_promedio": 85.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "AMAABA10092501",
+    "producto": "CHILE ANCHO",
+    "unidad": "Kilogramo",
+    "existencia": 0.5,
+    "saldo": 95.0,
+    "costo_promedio": 190.0
+  },
+  {
+    "departamento": "GRANEL",
+    "codigo": "GRA001",
+    "producto": "CACAHUATE NATURAL A GRANEL",
+    "unidad": "Kilogramo",
+    "existencia": 0.58,
+    "saldo": 92.8,
+    "costo_promedio": 160.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN055",
+    "producto": "SUB CINNAMMON ROLL BUTTER GLASS PZ",
+    "unidad": "Pieza",
+    "existencia": 15.0,
+    "saldo": 90.47067,
+    "costo_promedio": 6.03
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR025",
+    "producto": "AMALAY - MIX SALUD OMEGA 3, 100G",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 90.0,
+    "costo_promedio": 30.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR035",
+    "producto": "YOGI - ICHINACEA INMUNE SUPORT 16PZ (BED)",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 90.0,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV026",
+    "producto": "JENGIBRE FRESCO",
+    "unidad": "Kilogramo",
+    "existencia": 0.5459459459,
+    "saldo": 87.35135134,
+    "costo_promedio": 160.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC009",
+    "producto": "CHIA",
+    "unidad": "Kilogramo",
+    "existencia": 0.72,
+    "saldo": 86.4,
+    "costo_promedio": 120.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN022",
+    "producto": "SUB TARTA DE MANZANA",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 84.489555,
+    "costo_promedio": 16.9
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503007798145",
+    "producto": "BAITZ - PECAN CLUSTERS 75G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 81.41,
+    "costo_promedio": 81.41
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA076",
+    "producto": "POLVO LEMON PEPPER",
+    "unidad": "Kilogramo",
+    "existencia": 1.0,
+    "saldo": 80.0,
+    "costo_promedio": 80.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMARET25032601",
+    "producto": "JARRA INFUSORA PZ",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 80.0,
+    "costo_promedio": 80.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB020",
+    "producto": "SUB LECHUGAS MIXTAS",
+    "unidad": "Kilogramo",
+    "existencia": 1.395,
+    "saldo": 79.3759757,
+    "costo_promedio": 56.9
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA1014",
+    "producto": "TOMATE PELATI",
+    "unidad": "Kilogramo",
+    "existencia": 0.2514285714,
+    "saldo": 77.25556104,
+    "costo_promedio": 307.27
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC016",
+    "producto": "COMINO MOLIDO",
+    "unidad": "Kilogramo",
+    "existencia": 1.31478,
+    "saldo": 117.01948099,
+    "costo_promedio": 89.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC030",
+    "producto": "QUINOA BLANCA",
+    "unidad": "Kilogramo",
+    "existencia": 0.45,
+    "saldo": 74.25,
+    "costo_promedio": 165.0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL004",
+    "producto": "VINO - BLANCO MADERO 2V",
+    "unidad": "Litro",
+    "existencia": 0.18,
+    "saldo": 70.604352,
+    "costo_promedio": 392.25
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC020",
+    "producto": "GARBANZO",
+    "unidad": "Kilogramo",
+    "existencia": 2.0,
+    "saldo": 70.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "GIFT01",
+    "producto": "AMALAY - GIFT CARD",
+    "unidad": "Pieza",
+    "existencia": 14.0,
+    "saldo": 70.0,
+    "costo_promedio": 5.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA053",
+    "producto": "FECULA DE MAIZ",
+    "unidad": "Kilogramo",
+    "existencia": 0.92,
+    "saldo": 69.00000001,
+    "costo_promedio": 75.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB25102402",
+    "producto": "SUB PAN BAGEL",
+    "unidad": "Pieza",
+    "existencia": 18.0,
+    "saldo": 66.936618,
+    "costo_promedio": 3.72
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC002",
+    "producto": "AJONJOLI BLANCO",
+    "unidad": "Kilogramo",
+    "existencia": 0.994,
+    "saldo": 119.28,
+    "costo_promedio": 120.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC003",
+    "producto": "AJONJOLI NEGRO",
+    "unidad": "Kilogramo",
+    "existencia": 0.994,
+    "saldo": 119.28,
+    "costo_promedio": 120.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "7501055320622",
+    "producto": "COCA COLA SIN AZUCAR 355ML",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 61.8,
+    "costo_promedio": 20.6
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV018",
+    "producto": "EJOTE",
+    "unidad": "Kilogramo",
+    "existencia": 0.99,
+    "saldo": 59.4,
+    "costo_promedio": 60.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503028419104",
+    "producto": "AMARANTH - PAPAS DESH JALAPEÑO Y SAL DEL HIM 100G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 58.32,
+    "costo_promedio": 58.32
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA010",
+    "producto": "AVENA",
+    "unidad": "Kilogramo",
+    "existencia": 2.7933333333,
+    "saldo": 103.68666667,
+    "costo_promedio": 37.12
+  },
+  {
+    "departamento": "CERVEZAS",
+    "codigo": "BEB006",
+    "producto": "AMSTEL ULTRA",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 56.893332,
+    "costo_promedio": 14.22
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL018",
+    "producto": "VINO ESPUMOSO CINZANO PRO SPRITZ",
+    "unidad": "Litro",
+    "existencia": 0.51,
+    "saldo": 53.93103477,
+    "costo_promedio": 105.75
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS011",
+    "producto": "TE DE MANZANILLA SOBRE",
+    "unidad": "Pieza",
+    "existencia": 52.0,
+    "saldo": 52.62963,
+    "costo_promedio": 1.01
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031225464",
+    "producto": "AMARANTH - CHARRIS ORIG SAL DEL HIM 142G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 51.84,
+    "costo_promedio": 51.84
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031525488",
+    "producto": "AMARANTH - CACAHUATE HABANERO 142G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 51.84,
+    "costo_promedio": 51.84
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC015",
+    "producto": "COCO RALLADO",
+    "unidad": "Kilogramo",
+    "existencia": 0.564,
+    "saldo": 84.6,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "AMASUB25102401",
+    "producto": "SUB SALMON CURADO",
+    "unidad": "Kilogramo",
+    "existencia": 0.09,
+    "saldo": 44.4915,
+    "costo_promedio": 494.35
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN004",
+    "producto": "SUB BROWNIE EVENTOS",
+    "unidad": "Pieza",
+    "existencia": 30.0,
+    "saldo": 42.96551,
+    "costo_promedio": 1.43
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503021919403",
+    "producto": "LA CASA DEL JUGO  - COCO DESHIDRATADO ORGANICO 150G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 42.0,
+    "costo_promedio": 21.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV038",
+    "producto": "MENTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.183,
+    "saldo": 73.2,
+    "costo_promedio": 400.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA50112013",
+    "producto": "HARINA DE AVENA",
+    "unidad": "Kilogramo",
+    "existencia": 0.74,
+    "saldo": 36.926,
+    "costo_promedio": 49.9
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV005",
+    "producto": "BETABEL",
+    "unidad": "Kilogramo",
+    "existencia": 1.0,
+    "saldo": 35.0,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV035",
+    "producto": "LIMON VERDE",
+    "unidad": "Kilogramo",
+    "existencia": 1.005,
+    "saldo": 35.175,
+    "costo_promedio": 35.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN016",
+    "producto": "SUB PAN BAGUETE (400G)",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 25.605,
+    "costo_promedio": 8.54
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN017",
+    "producto": "SUB PAN BRIOCHE P/BENEDICT (50G)",
+    "unidad": "Pieza",
+    "existencia": 10.0,
+    "saldo": 25.43816,
+    "costo_promedio": 2.54
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN009",
+    "producto": "SUB CONCHAS DE MANTEQUILLA",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 21.509252,
+    "costo_promedio": 5.38
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA042",
+    "producto": "PROTEINA HABITS VAINILLA KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.02,
+    "saldo": 17.385,
+    "costo_promedio": 869.25
+  },
+  {
+    "departamento": "CONGELADOS",
+    "codigo": "MAR166",
+    "producto": "NIEVE DE  PAY DE LIMON GRANEL",
+    "unidad": "Kilogramo",
+    "existencia": 0.1,
+    "saldo": 17.1,
+    "costo_promedio": 171.0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS019",
+    "producto": "MATCHA CEREMONIAL",
+    "unidad": "Kilogramo",
+    "existencia": 0.004,
+    "saldo": 16.0,
+    "costo_promedio": 4000.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA107",
+    "producto": "SALSA INGLESA",
+    "unidad": "Litro",
+    "existencia": 0.0888888889,
+    "saldo": 15.22105262,
+    "costo_promedio": 171.24
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "jugo01",
+    "producto": "JUGO VERDE DE LA CASA",
+    "unidad": "Litro",
+    "existencia": 0.48,
+    "saldo": 14.04928032,
+    "costo_promedio": 29.27
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB002",
+    "producto": "SUB ADEREZO VERDE DE LA CASA",
+    "unidad": "Kilogramo",
+    "existencia": 0.06,
+    "saldo": 10.08,
+    "costo_promedio": 168.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC001",
+    "producto": "QUESO CHIHUAHUA",
+    "unidad": "Kilogramo",
+    "existencia": 0.06,
+    "saldo": 9.18,
+    "costo_promedio": 153.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "AQS028",
+    "producto": "AGUA TONICA",
+    "unidad": "Botella",
+    "existencia": 0.592,
+    "saldo": 8.93103454,
+    "costo_promedio": 15.09
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL002",
+    "producto": "APEROL",
+    "unidad": "Litro",
+    "existencia": 0.03,
+    "saldo": 8.6637,
+    "costo_promedio": 288.79
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA036",
+    "producto": "PROTEINA HABITS CACAO KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.01,
+    "saldo": 8.2805,
+    "costo_promedio": 828.05
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA043",
+    "producto": "COLD BREW  DARK",
+    "unidad": "Litro",
+    "existencia": 0.05,
+    "saldo": 7.5,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB047",
+    "producto": "JARABE VAINILLA",
+    "unidad": "Litro",
+    "existencia": 0.025,
+    "saldo": 6.99833333,
+    "costo_promedio": 279.93
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB023",
+    "producto": "SUB MEZCLA PANCAKES",
+    "unidad": "Kilogramo",
+    "existencia": 0.09,
+    "saldo": 6.7768218,
+    "costo_promedio": 75.3
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC027",
+    "producto": "OREGANO",
+    "unidad": "Kilogramo",
+    "existencia": 0.039,
+    "saldo": 6.24,
+    "costo_promedio": 160.0
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON005",
+    "producto": "LOMO CANADIENSE",
+    "unidad": "Kilogramo",
+    "existencia": 0.02,
+    "saldo": 5.84,
+    "costo_promedio": 292.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC004",
+    "producto": "CREMA PARA BATIR",
+    "unidad": "Kilogramo",
+    "existencia": 0.016,
+    "saldo": 5.55652174,
+    "costo_promedio": 347.28
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC013",
+    "producto": "CHILE MORITA",
+    "unidad": "Kilogramo",
+    "existencia": 0.032,
+    "saldo": 4.8,
+    "costo_promedio": 150.0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS017",
+    "producto": "BASE BIG TRAIN DRAGON FLY TARO",
+    "unidad": "Kilogramo",
+    "existencia": 0.005,
+    "saldo": 2.96185,
+    "costo_promedio": 592.37
+  },
+  {
+    "departamento": "CONGELADOS",
+    "codigo": "CONG27022501",
+    "producto": "PAPA CORTE FRANCES",
+    "unidad": "Kilogramo",
+    "existencia": 0.014,
+    "saldo": 2.92818639,
+    "costo_promedio": 209.16
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV027",
+    "producto": "GUAYABA",
+    "unidad": "Kilogramo",
+    "existencia": 0.056,
+    "saldo": 2.8,
+    "costo_promedio": 50.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA116",
+    "producto": "TOTOPO DE MAIZ",
+    "unidad": "Kilogramo",
+    "existencia": 0.03,
+    "saldo": 2.7,
+    "costo_promedio": 90.0
+  },
+  {
+    "departamento": "PROTEINA ANIMAL",
+    "codigo": "CON007",
+    "producto": "PEPERONI",
+    "unidad": "Kilogramo",
+    "existencia": 0.02,
+    "saldo": 2.66,
+    "costo_promedio": 133.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB044",
+    "producto": "SUB POLLO COCIDO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0161290187,
+    "saldo": 1.94569728,
+    "costo_promedio": 120.63
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB014",
+    "producto": "SUB GRANOLA DE LA CASA",
+    "unidad": "Kilogramo",
+    "existencia": 0.008,
+    "saldo": 1.384,
+    "costo_promedio": 173.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB041",
+    "producto": "SUB VINAGRETA DE CHAMPAÑA",
+    "unidad": "Kilogramo",
+    "existencia": 0.005,
+    "saldo": 1.2288459,
+    "costo_promedio": 245.77
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA073",
+    "producto": "LECHE DESLACTOSADA",
+    "unidad": "Litro",
+    "existencia": 0.05,
+    "saldo": 1.2,
+    "costo_promedio": 24.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA032",
+    "producto": "CHOCOLATE EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 0.005,
+    "saldo": 1.2,
+    "costo_promedio": 240.0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC002",
+    "producto": "CREMA ACIDA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0142857143,
+    "saldo": 0.88571429,
+    "costo_promedio": 62.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA045",
+    "producto": "DURAZNOS EN ALMIBAR",
+    "unidad": "Kilogramo",
+    "existencia": 0.01,
+    "saldo": 0.71640683,
+    "costo_promedio": 71.64
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB012",
+    "producto": "SUB FRIJOLES COCIDOS REFRITOS",
+    "unidad": "Kilogramo",
+    "existencia": 0.025,
+    "saldo": 0.5959396,
+    "costo_promedio": 23.84
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA083",
+    "producto": "MIEL DE AGAVE",
+    "unidad": "Kilogramo",
+    "existencia": 0.005,
+    "saldo": 0.561,
+    "costo_promedio": 112.2
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB035",
+    "producto": "SUB SALSA VERDE PARA CHILAQUILES",
+    "unidad": "Kilogramo",
+    "existencia": 0.015,
+    "saldo": 0.31443552,
+    "costo_promedio": 20.96
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "BEB066",
+    "producto": "SUB JARABE NATURAL",
+    "unidad": "Litro",
+    "existencia": 0.005,
+    "saldo": 0.134,
+    "costo_promedio": 26.8
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA094",
+    "producto": "PASTA ALFELTRA PACHERY",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA095",
+    "producto": "PEPINILLOS REBANADOS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA104",
+    "producto": "SAL DEL HIMALAYA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "ABA105",
+    "producto": "SALSA DE CHOCOLATE MONIN",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA099",
+    "producto": "MINI PRETZEL",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA101",
+    "producto": "PYSILIUM",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA119",
+    "producto": "VINAGRE BALSAMICO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA110",
+    "producto": "SAWERKRAUT",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA062",
+    "producto": "HARINA DE TRIGO REGULAR",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA064",
+    "producto": "HIERBAS FINAS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA080",
+    "producto": "MANTECA VEGETAL",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA078",
+    "producto": "MAIZ PALOMERO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA087",
+    "producto": "NIBS DE CACAO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA037",
+    "producto": "PROTEINA HABITS CACAO HIGH PERFORMANCE KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.02,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA038",
+    "producto": "COLAGENO HIDROLIZADO HABITS KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.02,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA039",
+    "producto": "PROTEINA HABITS MACA-CACAO KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.01,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA040",
+    "producto": "PROTEINA HABITS MATCHA-VAINILLA KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.1,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA041",
+    "producto": "PROTEINA HABITS NATURAL KG",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA035",
+    "producto": "COCOA",
+    "unidad": "Kilogramo",
+    "existencia": 0.9,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA033",
+    "producto": "CHOCOLATE SEMIAMARGO CALLEBAUT 54%",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA020",
+    "producto": "HARINA BUTERMILK S/GLUTEN",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA021",
+    "producto": "CAFE EN GRANO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV012",
+    "producto": "CEBOLLIN",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC014",
+    "producto": "QUESO BRIE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC021",
+    "producto": "QUESO RICOTTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC019",
+    "producto": "QUESO MANCHEGO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV010",
+    "producto": "CEBOLLA CAMBRAY",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC003",
+    "producto": "PRODUCTO ELIMINADO 050326 CREMA PARA BATIR",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC007",
+    "producto": "MANTEQUILLA  NOCHE BUENA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "CONGELADOS",
+    "codigo": "CON003",
+    "producto": "CORNEED BEEF",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS012",
+    "producto": "TE MATE MANGO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS013",
+    "producto": "TE PETALO MIO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PULPAS",
+    "codigo": "PUL001",
+    "producto": "PULPA DE FRESA",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS009",
+    "producto": "EUROTE - TISANA MORAS DE LA SELVA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS007",
+    "producto": "EUROTE - TISANA FANTASIA TROPICAL",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB008",
+    "producto": "UNICORP - JUGO BE INMUNE 1 LT",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB013",
+    "producto": "VELVET MARACUYA 275 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB015",
+    "producto": "VELVET GUANABANA 275 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB016",
+    "producto": "VELVET LYCHEE 275 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "CERVEZAS",
+    "codigo": "BEB025",
+    "producto": "XX LAGGER",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB023",
+    "producto": "REFRESCO GINGER PARASOL",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUB037",
+    "producto": "SUB STRUSSEL PARA TARTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB029",
+    "producto": "SUB  HOLANDESA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB031",
+    "producto": "SUB SALSA MACHA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUB032",
+    "producto": "SUB SALSA PARA PIZZA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB033",
+    "producto": "SUB SALSA ROJA PARA CHILAQUILES",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB042",
+    "producto": "SUB VINAGRETA DE LA CASA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES050",
+    "producto": "BOLSA PAPEL KRAFT BLANCA IMPRESA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR212",
+    "producto": "AMALAY - VASO PARA CAFE REFILL",
+    "unidad": "Pieza",
+    "existencia": 29.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB018",
+    "producto": "SUB HUMMUS DE CHIPOTLE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB040",
+    "producto": "SUB VINAGRETA DE ALBAHACA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB013",
+    "producto": "SUB GALLETA PARA TARTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB015",
+    "producto": "SUB GUISO GARDEN OMELLET",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB016",
+    "producto": "SUB HEALTY SALMON",
+    "unidad": "PZA",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB007",
+    "producto": "SUB BASE PARA ACAI LOVE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB008",
+    "producto": "SUB BASE PARA SOPA DE CEBOLLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB009",
+    "producto": "SUB BUTERMILK PARA PANCAKES",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB011",
+    "producto": "SUB CULIS DE FRUTOS ROJOS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB024",
+    "producto": "SUB PESTO ALBAHACA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB025",
+    "producto": "SUB REDUCCION BALSAMICA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB026",
+    "producto": "SUB RELLENO DE QUESO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB027",
+    "producto": "SUB RELLENO TARTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB021",
+    "producto": "SUB MASA MADRE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB022",
+    "producto": "SUB MEZCLA GREEN WAFFLE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB003",
+    "producto": "SUB AGUACATE PARA AVOTOAST",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB001",
+    "producto": "SUB ADERESO CLASSIC RUBENS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN019",
+    "producto": "SUB PAN MARMOLEADO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN020",
+    "producto": "SUB PAN CAMPESINO (MASA MADRE)",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL019",
+    "producto": "VINO - CHIVITE ROSADO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL021",
+    "producto": "VODKA SMIRNOFF",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES019",
+    "producto": "FAJILLA PARA VASO DE CAFE IMPRESA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN011",
+    "producto": "SUB GALLETAS CHOCO CHIPS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN012",
+    "producto": "SUB MASA DE PIZZA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN013",
+    "producto": "SUB MUFFIN DE BLUE BERRYS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN015",
+    "producto": "SUB MUFFIN SALUDABLE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL005",
+    "producto": "CONTROY",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL006",
+    "producto": "TEQUILA MTRO. TEQ DOBEL DIAMANTE",
+    "unidad": "Litro",
+    "existencia": 1.2,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL007",
+    "producto": "VINO - BORNOS FRIZZANTE ROSADO",
+    "unidad": "Litro",
+    "existencia": 0.75,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL008",
+    "producto": "VINO - BORNOS FRIZZANTE VERDEJO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL012",
+    "producto": "RON BACARDI BLANCO",
+    "unidad": "Litro",
+    "existencia": 1.42,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL013",
+    "producto": "VINO - ROSADO MADERO V",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL001",
+    "producto": "MEZCAL - 400 CONEJOS",
+    "unidad": "Litro",
+    "existencia": 1.92,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC026",
+    "producto": "NUEZ GARAMPIÑADA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES034",
+    "producto": "TAPA BLANCA PLA /PARA 12 ONZAS",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES035",
+    "producto": "TAPA DOMO PARA VASO TRASLUCIDO",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES036",
+    "producto": "TAPA P/CONTENEDOR DE 24 ONZAS",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES037",
+    "producto": "TAPA P/CONTENEDOR DE 44 ONZAS",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES038",
+    "producto": "TAPA PARA CONTENEDOR OVALADO 32 ONZAS",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES039",
+    "producto": "TAPA PARA VASO DE CAFE NEGRA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES040",
+    "producto": "TAPA PL200",
+    "unidad": "PZA",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES042",
+    "producto": "TAPA PLANA PARA VASO TRANSLUCIDO",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES046",
+    "producto": "VASO 16 ONZAS TRASLUCIDO IMPRESO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES047",
+    "producto": "VASO PARA CAFE 10 ONZAS IMPRESO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES048",
+    "producto": "VASO PARA CAFE 12 ONZAS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES049",
+    "producto": "VASO PARA CAFE 16 ONZAS IMPRESO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC017",
+    "producto": "CURCUMA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC018",
+    "producto": "ESPIRULINA VERDE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC019",
+    "producto": "FLOR DE JAMAICA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC028",
+    "producto": "PEPITA VERDE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC022",
+    "producto": "LAUREL",
+    "unidad": "Kilogramo",
+    "existencia": 0.227,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC008",
+    "producto": "CHABACANOS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "SEC011",
+    "producto": "CHILE EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 1.5,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV045",
+    "producto": "PEREJIL LISO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV050",
+    "producto": "ROMERO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV051",
+    "producto": "ZARZAMORA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB026",
+    "producto": "AGUA PURIFICADA",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB027",
+    "producto": "HIELO BOLSA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL025",
+    "producto": "VINO TINTO FINCA LAS MORAS (BATEO)",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "CEB1234",
+    "producto": "SUB CEBOLLA CARAMELIZADA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "PAPITA1200",
+    "producto": "SUB PAPITA GALEANA COCIDA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "GUACAMOL1200",
+    "producto": "SUB GUACAMOLE AMALAY",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503029691097",
+    "producto": "BINNY BRUN BARRA KETOCHOC CHOCOLATE 22 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503029691059",
+    "producto": "BINNY BRUN BARRA CHOCOLATE 72% CACAO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503029691004",
+    "producto": "BINNY BRUN SUPERCHOC BOLSA 186 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR210",
+    "producto": "AMALAY - TAZA TERMICA",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR211",
+    "producto": "AMALAY - TERMO GRANDE 1.2 ML",
+    "unidad": "Pieza",
+    "existencia": 4.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA015",
+    "producto": "AZUCAR MOSCABADO EN SOBRE",
+    "unidad": "Caja",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL022",
+    "producto": "BAILEYS CREMA IRLANDESA",
+    "unidad": "Litro",
+    "existencia": 0.44,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "781584330614",
+    "producto": "SMARTY CHIPS JICAMA ADOBADA 170 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR203",
+    "producto": "SMARTY CHIPS JICAMA LIMON 170 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "CONGELADOS",
+    "codigo": "MAR162",
+    "producto": "NIEVE  FRUTOS ROJOS CUBETA 4 LT",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR153",
+    "producto": "HEALTY CRUNCH - CHIPS PEPINO SALSA 200GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7501468149636",
+    "producto": "HABITS - HIGH PERFORMANCE CACAO 578G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "658010118323",
+    "producto": "GARDEN OF LIFE - PROB WOM 50 BILL 30 CAP",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503007798152",
+    "producto": "BAITZ - ALMOND CLUSTER 75 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR021",
+    "producto": "LIBRO - HUMAN KIND",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503050539023",
+    "producto": "VAMARA - MIX ENCHILAD 220 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR005",
+    "producto": "BARRA CACAO BLUE 30 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR012",
+    "producto": "AMALAY - GALLETAS BOTE CHICO 20 PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "0739802436570",
+    "producto": "AMALAY - GALLETAS BOTE DE 420G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR014",
+    "producto": "AMALAY - GALLETAS BOTE MEDIANO 180G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "0763331041462",
+    "producto": "AMALAY - GALLETAS PQ DE 3 PZS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR017",
+    "producto": "LIBRO - THE WAR FOR KIDNESS",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR018",
+    "producto": "LIBRO - THE HIDDEN POWER",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR019",
+    "producto": "LIBRO - ENCUENTRA TU PERSONA VITAMINA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR058",
+    "producto": "NUTRICION AVANZADA-CHERRY EPIC 60 ML",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR063",
+    "producto": "NUTRICION AVANZADA - JAMAICA FIT 60 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR064",
+    "producto": "NUTRICION AVANZADA - MORA FIT 60 ML",
+    "unidad": "Pieza",
+    "existencia": 6.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR048",
+    "producto": "RENEW - TRATAMIENTO PIEL LAVANDA  207ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "732535850248",
+    "producto": "SANUTRI - CHURRITOS AMARANTO FUEGO DE 300 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR084",
+    "producto": "NAT VIT - CALM MAGNESIUM SUPLEMENT ORANGE 453 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "X00453IB9B",
+    "producto": "NAT VIT - CALM GUMMIES MAGNESIUM RASPBERRY 60PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "070074688190",
+    "producto": "PEDIALYTE - ELECTROLYTE DRINK ZERO SUGAR 8PZ 27.2G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR090",
+    "producto": "EMERGEN-C",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "858158005077",
+    "producto": "OLLY - UNDENIABLE BEAUTY, 60 GUM",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "858158005015",
+    "producto": "OLLY-WOMENS MULTI BLISSFUL BERRY 90PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "850004462645",
+    "producto": "OLLY - WOMENS MULTI +OMEGA 3, 60 CAP",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR109",
+    "producto": "RAW REV - BARRA CHOCOLATE CARAMELO SAE 46 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR110",
+    "producto": "RX BAR - CHOCOLATE RASPBERRY 52 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR111",
+    "producto": "RX BAR - CHOCOLATE SEA SALT 52 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR127",
+    "producto": "GREEN PEACH - MACA EN POLVO 100 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "TIS015",
+    "producto": "TISANA FRUTAL ARANDANO FRESA Y PETALOS AMOR  EN RO",
+    "unidad": "Kilogramo",
+    "existencia": 0.2,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "GRA012",
+    "producto": "BOLSA EMPAQUE PRODUCTO MARKET GRANDE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "GRA015",
+    "producto": "SUB GALLETA AMALAY A GRANEL",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES060",
+    "producto": "BOTE CILINDRO GALLETAS GRANDE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES061",
+    "producto": "BOTE CILINDRO GALLETAS MEDIANO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "JAR001",
+    "producto": "CONCENTRADO LYCHEE",
+    "unidad": "Litro",
+    "existencia": 7.51,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB0034658",
+    "producto": "JARABE CEREZA MONIN",
+    "unidad": "Litro",
+    "existencia": 0.75,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB00405",
+    "producto": "JARABE BLUE CURACAO MONIN",
+    "unidad": "Litro",
+    "existencia": 2.735,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB005054689",
+    "producto": "JARABE DA VINCI CHOCOLATE",
+    "unidad": "Litro",
+    "existencia": 2.7,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR230",
+    "producto": "AMALAY - TAZA CERAMICA IMPRESA BLANCA",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA126",
+    "producto": "ESENCIA DE MANTEQUILLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "GRANEL",
+    "codigo": "GRA006",
+    "producto": "UVA PASA",
+    "unidad": "Kilogramo",
+    "existencia": 0.26,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "GRANEL",
+    "codigo": "GRA007",
+    "producto": "ARANDANO DESHIDRATADO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB031",
+    "producto": "KAMBUCHA VERDE MISTICO 377 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL026",
+    "producto": "VINO -LAUS MERLOT-SYRAH",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL027",
+    "producto": "VINO - PINOT NOIR ARROGANT FROG",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB036",
+    "producto": "VELVET DAMASCO 275 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES052",
+    "producto": "DOMO PARA SANDWICH",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA123",
+    "producto": "JARABE LYCHEE DA VINCI",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "NUUNDIFS1001",
+    "producto": "NUUN - SPORT HYDRATATION (DIF SAB), 10 TAB",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR224",
+    "producto": "OLLY SLEEP EXTRA STRENGTH 50 GUMMIES.",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "858158005466",
+    "producto": "OLLY - KIDS IMMUNITY CHERRY BERRY 50 GUM",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB028",
+    "producto": "COCA COLA DESCAFEINADA 235 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES067",
+    "producto": "BOTE CILINDRO GALLETAS CHICO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "GRA020",
+    "producto": "SUB GALLETA AMALAY A GRANEL CHICA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "EMPAQUE",
+    "codigo": "DES069",
+    "producto": "CAJA EMPAQUE GALLETAS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "899587003241",
+    "producto": "RAW REV - BARRA DOUBLE CHOCOLATE BROWNIE 46g",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "502017",
+    "producto": "CAFE AMERICANO MOLIDO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL029",
+    "producto": "VINO - FLOR DE ABA ROBLE",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL030",
+    "producto": "VINO - LAUS ROSADO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL031",
+    "producto": "VINO TINTO - LUCIA & JAIME MURIA VERDEJO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA999",
+    "producto": "AZUCAR REFINADA SOBRE",
+    "unidad": "Caja",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYV064",
+    "producto": "PAPA BLANCA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "818594019472",
+    "producto": "FORCE FACTOR - COLLAGEN BOOSTING SUPERFOODS 60 CAP",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "818594019519",
+    "producto": "FORCE FACTOR - MODERN MUSHROOMS 60 PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "818594017348",
+    "producto": "FORCE FACTOR - AMAZING ASHWA + SFOODS, 60 PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "076314608607",
+    "producto": "EMERGEN C- KIDS CRYSTALS SPARKLY STRAWBERRY 56G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "858158005428",
+    "producto": "OLLY  - GLOWING SKIN, PLUMP BERRY, 50 GUM",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR317",
+    "producto": "BREAKFAST PROTEIN KIND BOX",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "602652203015",
+    "producto": "KIND BREAKFAST PROTEIN BAR 50G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "658010122481",
+    "producto": "GARDEN OF LIFE - PROB WOM 40 BILL, 30 CAP",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMT047",
+    "producto": "CALM MAGNESIUM SUPLEMENT ORIGINAL UNFLAVORED 4OZ",
+    "unidad": "PZA",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "850004462065",
+    "producto": "OLLY - KIDS SLEEP RAZZZBERRY 50 GUM",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMT049",
+    "producto": "OLLY KIDS SLEEP RASPBERRY 60 GUMMIES",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABACH001",
+    "producto": "CICHARRON DE LA RAMOS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMT097",
+    "producto": "EXCEED - PASTA DENTAL 93.5g",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503007798220",
+    "producto": "BAITZ - CHOCO DATES 135G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB85080",
+    "producto": "KOMBUCHA SANDIA FRESA 377 ML.",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB985028",
+    "producto": "KOMBUCHA UVA LOCA  377ML.",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "BEB85011",
+    "producto": "KOMBUCHA VERDE MISTICO 377 ML.",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB27022502",
+    "producto": "SUB CEBOLLA ENCURTIDA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB27022503",
+    "producto": "SUB ADEREZO CHIPOTLE PEPINILLO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "2345681237",
+    "producto": "QUESO MOZZARELLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032501",
+    "producto": "EL DURAZNERO - DURAZNO/CHILE 250G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032502",
+    "producto": "EL DURAZNERO - MANGO/CHILE 250G",
+    "unidad": "Pieza",
+    "existencia": 5.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032503",
+    "producto": "EL DURAZNERO - FRESA/CHILE 250G",
+    "unidad": "Pieza",
+    "existencia": 11.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032504",
+    "producto": "EL DURAZNERO - ROLLITOSCHILE 250G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "AMAPROMA29032505",
+    "producto": "SUBAMALAY - HEALTHY CRUNCH MIX 60G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "AMAPROMA29032506",
+    "producto": "SUBAMALAY - HEALTHY CRUNCH MIX 300G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032509",
+    "producto": "AMALAY - TOTEBAG",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032510",
+    "producto": "MIEL INFINITA - FRASCO GOURMET 600G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA29032511",
+    "producto": "MIEL INFINITA - PANAL DE ABEJA 250G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "AMA080425021",
+    "producto": "SUB AMALAY - GALLETA SIN GLUTEN",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUBPAN09042501",
+    "producto": "SUB MUFFIN VEGANO",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB09042502",
+    "producto": "SUB MINI MUFFIN BLUEBERRYS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB13032502",
+    "producto": "SUB BRIOCHE HAMBURGUESA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL15032501",
+    "producto": "TEQUILA MTRO. TEQ REPOSADO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "VINOS Y LICORES",
+    "codigo": "VYL15032503",
+    "producto": "WHISKY - JOHNNIE WALKER ETIQUETA NEGRA",
+    "unidad": "Litro",
+    "existencia": 1.3,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "500464",
+    "producto": "FLOR DE JAMAICA ENCHILADA POUCH",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB24032501",
+    "producto": "SUB BUTTER GLASS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUBAMA24032502",
+    "producto": "SUB BRIOCHE 500G (CAMPESINO)",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUBAMA24032503",
+    "producto": "SUB BRIOCHE 150G (PANINI)",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "50171832",
+    "producto": "JUGO MAGGI",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR26032501",
+    "producto": "AMALAY - RAMEKIN CORAZON PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "9634582",
+    "producto": "ESTRAGON",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031225457",
+    "producto": "AMARANTH - CHARRIS LIM Y SAL DEL HIM 142G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031225471",
+    "producto": "AMARANTH - CACAHUATE CHIPOTLE 142G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031525495",
+    "producto": "AMARANTH - CACAHUATE LIMON 142G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SECOS",
+    "codigo": "AMAABA10092502",
+    "producto": "CHILE PASILLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "850180006077",
+    "producto": "HU - NUT BUTTER FILLE D 60G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAMKT180925023",
+    "producto": "MALI - GUANTE DE APLICACION PZ",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAMKT18092503",
+    "producto": "MALI - ACEITE BRONCEADOR SUN DROPS 100 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "102240",
+    "producto": "HOJA DE ENELDO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA09042502",
+    "producto": "MALI - ACEITE BRONCEADOR CARROT DROPS 100 ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAPROMA09042503",
+    "producto": "MALI - ACEITE BRONCEADOR WATERMELON DROPS 100 ML",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMAROJ19042501",
+    "producto": "ROJAMAICA - FLOR DE JAMAICA ENCHILADA BOLSA 50G",
+    "unidad": "Pieza",
+    "existencia": 9.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMALIB19042501",
+    "producto": "LIBRO - RECUPERA TU MENTE",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "LIBAMA19042502",
+    "producto": "LIBRO - LAS COSAS QUE NO NOS DIJERON",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "LIBAMA19042503",
+    "producto": "LIBRO - COMO HACER QUE TE PASEN COSAS BUENAS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "183405043602",
+    "producto": "ULTIMA REPLENISHER, ELECTROLITOS CAJA 8 STICKS.",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "85321800001",
+    "producto": "NATURAL VITALITY - SLEEP FRASCO 60 CAPSULAS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "SUBAMAPAN21052501",
+    "producto": "SUB PAY DE NUEZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUBPAN21052502",
+    "producto": "SUB MASA SABLE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503028419281",
+    "producto": "AMARANTH - PAPAS DESH CHIPOTLE 100G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503028419088",
+    "producto": "AMARANTH - PAPAS DESH LIM Y SAL DE MAR 100G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503031225043",
+    "producto": "AMARANTH - CHARRIS CHIPOTLE 142G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503032931128",
+    "producto": "RAICES DEL HUERTO - REISHI CACAO MIX 250G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "SUBAMA06042601",
+    "producto": "SUB AMALAY - TE PETALO MIO PZ - 100G",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "SUBAMA06042602",
+    "producto": "SUB AMALAY - TE PONCHE GUAYABA PZ - 150G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "SUBAMA06042604",
+    "producto": "SUB AMALAY - TE JENGIBRE LIMON PZ - 100G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PANADERIA",
+    "codigo": "PAN3004261",
+    "producto": "GLUCOSA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR27052026",
+    "producto": "VELAS",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "AMAFYL19122501",
+    "producto": "TEJOCOTE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "AMAFYL19122502",
+    "producto": "CAÑA DE AZUCAR",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "AMAFYL19122503",
+    "producto": "TAMARINDO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "AMASUB19122501",
+    "producto": "SUB PONCHE NAVIDEÑO",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMASUO23122501",
+    "producto": "NATURE MADE - MEGNESIUM GLICINATED 200 MG",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMASUO23122502",
+    "producto": "ULTIMA - 6 ESSENCIAL ELECTROLYTES 90 PORCIONES",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMASUO23122503",
+    "producto": "NATROL - MELATONINE FAST DISSOLVE 150 TAB",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMASUO23122504",
+    "producto": "CALM - MAGNESIUM CITRATE 453G POLVO (DIF SABORES)",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR300",
+    "producto": "BRULE - BROWNIE BRITTLE",
+    "unidad": "Pieza",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUBPAN29012601",
+    "producto": "SUB BRIOCHE 750G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR3005",
+    "producto": "BRULE - GALLETA GLUTEN FREE CHOCOLATE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "CKAMA14102501",
+    "producto": "AMALAY - OBLEAS DIF SABORES PAQ 58G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB03112501",
+    "producto": "SUB MEZCLA CHEESECAKE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB03112502",
+    "producto": "SUB COMPOTA DE MANZANA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "SUBAMA06032601",
+    "producto": "SUB AMALAY - GRANOLA 250G",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500326414404",
+    "producto": "LA NONA - DORADITAS  VEGANA /PLATANO 130 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "AMALIB17032601",
+    "producto": "AMALAY - LIBRETA C/ PLUMA PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "AMA26092502",
+    "producto": "NATURAL VITALITY - CALM GUMMIES 240 GUM",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "MAI2909",
+    "producto": "MAIZENA ATOLE",
+    "unidad": "Paquete",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAN3025",
+    "producto": "MANGO SECO NATURAL 120 G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PAN030",
+    "producto": "SUB PASTEL CUMPLEAÑOS CHOCOLATE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR399",
+    "producto": "AMALAY - TAZA CERAMICA VERDE",
+    "unidad": "Pieza",
+    "existencia": 12.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "MAR30007",
+    "producto": "AMALAY - CAFE EN GRANO BOLSA 500G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR335",
+    "producto": "OLLY SLEEP CYCLE 50 GUMMIES (DIF SABORES)",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "VARAMA1701",
+    "producto": "AMALAY - TARJETA P/ REGALO PZ",
+    "unidad": "Pieza",
+    "existencia": 124.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "VARAMA1702",
+    "producto": "AMALAY - TERMO VIDRIO PZ 1.25L",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "TISANAS",
+    "codigo": "BEB1923546",
+    "producto": "EUROTE - TISANA JENGIBRE LIMON",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA9997869",
+    "producto": "LECHE CONDENSADA (LA LECHERA)",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "N1300",
+    "producto": "SUB NUEZ CARAMELIZADA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUBAMA1605",
+    "producto": "SUB MERMELADA DE FRESA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1703",
+    "producto": "SUB SALSA BOLOGNESA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1704",
+    "producto": "SUB SALSA ENCHILADAS SUIZAS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA500069",
+    "producto": "MICRODYN DESINFECTANTE 1 L",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR408",
+    "producto": "NUGO BARRA CHOCOLATE PRETZEL",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "VAR055",
+    "producto": "TERMO CHICO P/CAFE",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA625062",
+    "producto": "GALLETAS MARIAS",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR427",
+    "producto": "NUBITS - TAMARINDO SIN AZUCAR PZ 30 G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500462648077",
+    "producto": "OKKO - RICE CAKES CACAO 33g",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500327047878",
+    "producto": "OKKO - RICE CAKE QUINOA 140G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA8902",
+    "producto": "VINAGRE DE JEREZ",
+    "unidad": "Litro",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "818594019526",
+    "producto": "FORCE FACTOR - MODERN MUSHROOMS 90 CAP",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "818594019786",
+    "producto": "FORCE FACTOR - MODERN MUSHROOMS LIONS MANE 30 PZ",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "VAR0110",
+    "producto": "AMALAY - HAND WASH 500 ml",
+    "unidad": "Pieza",
+    "existencia": 3.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "MARCA PROPIA",
+    "codigo": "VAR111",
+    "producto": "AMALAY - HAND & BODY LOTION 500ML",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1706",
+    "producto": "SUB ADERESO MAYO LIMON",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1707",
+    "producto": "SUB ENSALADA DE PAPA PARA TORTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1708",
+    "producto": "SUB CRUTONS MASA MADRE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1710",
+    "producto": "SUB ADERESO PARA TORTA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "PROT1903",
+    "producto": "QUESO PARMESANO EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS COCINA",
+    "codigo": "SUB1701",
+    "producto": "SUB MEZCLA DE FRENCH TOAST",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PNA016",
+    "producto": "SUB CROISSANT C/ALMENDRA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA123465734930",
+    "producto": "LEVADURA FRESCA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMSUB020906",
+    "producto": "SUB CREMA DE MASCARPONE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LACAM020901",
+    "producto": "QUESO MASCARPONE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA5030|88067",
+    "producto": "PSYLLIUM HUSK",
+    "unidad": "Kilogramo",
+    "existencia": 0.29,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503050539061",
+    "producto": "VAMARA -MANZANA ENCHILADA,180 G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "X000NWVP9B",
+    "producto": "VITAL PROTEINS-COLLAGEN PEPTIDE 567 GR",
+    "unidad": "Bolsa",
+    "existencia": 1.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "070074560915",
+    "producto": "PEDIALYTE - VARIETY PACK 8PZ 68G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA9661910769",
+    "producto": "PISTACHE SIN CASCARA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA521000201201",
+    "producto": "PIMENTO  TRITURADO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA002131230",
+    "producto": "PIMENTON TRITURADO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA230465890",
+    "producto": "ARROZ  BLANCO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PANSUB301124",
+    "producto": "SUB CHEESECAKE VASCO Y QUESO DE OVEJA",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "LACTEOS",
+    "codigo": "LAC30112401",
+    "producto": "QUESO DE OVEJA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "AMASUB04122401",
+    "producto": "SUB PASTEL DE PISTACHE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA04122401",
+    "producto": "NUEZ DE MACADAMIA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "503021368591",
+    "producto": "ECHINACEA EN POLVO",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "750302136898",
+    "producto": "SEMILLAS DE HEMP",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "FRUTAS Y VERDURAS",
+    "codigo": "FYL220225",
+    "producto": "PERA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "SUBS PANADERIA",
+    "codigo": "PNA010",
+    "producto": "SUB CRUFFIN DULCE DE LECHE",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "MAR28102401",
+    "producto": "HABITS - HIGH PERFORMANCE VAINILLA 578G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA30102401",
+    "producto": "PROTEINA BIRDMAN FITMINGO VAINILLA",
+    "unidad": "Kilogramo",
+    "existencia": 0.24,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  },
+  {
+    "departamento": "ABARROTES",
+    "codigo": "ABA30102402",
+    "producto": "CREATINA BIRDMAN MONOHIDRATADA",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500327047854",
+    "producto": "OKKO RICE CAKE BROWN 140G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "857777004195",
+    "producto": "RX BAR - BLUEBERRY 52 GR",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7500462648060",
+    "producto": "OKKO - RICE CAKE HONEY 40G",
+    "unidad": "Pieza",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "BEBIDAS",
+    "codigo": "PIST01",
+    "producto": "SUB CREMA DE PISTACHE",
+    "unidad": "Kilogramo",
+    "existencia": 0.0,
+    "saldo": 0.0,
+    "costo_promedio": 0
+  },
+  {
+    "departamento": "PRODUCTOS MARKET",
+    "codigo": "7503037273377",
+    "producto": "BIRDMAN FITMINGO PROTEIN MOKA 510G",
+    "unidad": "Pieza",
+    "existencia": 2.0,
+    "saldo": 0.0,
+    "costo_promedio": 0.0
+  }
+]
