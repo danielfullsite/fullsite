@@ -528,11 +528,12 @@ ul { list-style: none; }
 .integrations-track {
   display: flex;
   gap: 32px;
-  animation: slideLogos 20s linear infinite;
+  width: max-content;
+  animation: slideLogos 25s linear infinite;
 }
 @keyframes slideLogos {
   0% { transform: translateX(0); }
-  100% { transform: translateX(calc(-33.333% - 11px)); }
+  100% { transform: translateX(calc(-100% / 3)); }
 }
 .integrations-grid:hover .integrations-track {
   animation-play-state: paused;
