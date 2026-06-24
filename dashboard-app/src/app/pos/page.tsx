@@ -1203,6 +1203,7 @@ function POSContent() {
 
   const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
   const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [categorySearch, setCategorySearch] = useState('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [mesa, setMesa] = useState<number>(initialMesa)
 
@@ -3096,15 +3097,27 @@ function POSContent() {
 
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setSelectedCategory(''); setCategorySearch('') }}>
                   <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[96vw] max-w-[1200px] max-h-[92vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
-                      <button onClick={() => setSelectedCategory('')} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                      <button onClick={() => { setSelectedCategory(''); setCategorySearch('') }} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
+                    {activeCategory.items.filter(i => i.price > 0).length > 12 && (
+                      <div className="px-3 pt-2">
+                        <input
+                          type="text"
+                          value={categorySearch}
+                          onChange={e => setCategorySearch(e.target.value)}
+                          placeholder="Buscar en esta categoría..."
+                          className="w-full bg-[#1a1a24] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-emerald-500/50"
+                          autoFocus
+                        />
+                      </div>
+                    )}
                     <div className="overflow-y-auto p-2 max-h-[85vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 pb-2">
-                {activeCategory.items.filter(item => item.price > 0).map((item) => {
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-1.5 pb-2">
+                {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
                     return (
                     <button
