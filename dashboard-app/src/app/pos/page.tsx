@@ -3097,20 +3097,20 @@ function POSContent() {
               {/* Menu items — centered modal overlay on category tap */}
               {selectedCategory && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCategory('')}>
-                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[95vw] max-w-[1100px] max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className={`flex items-center justify-between px-5 py-2.5 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
+                  <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[96vw] max-w-[1200px] max-h-[92vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className={`flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.08)] ${(activeCategory as { color?: string }).color || 'bg-emerald-600'}`}>
                       <h3 className="text-white font-bold text-lg">{activeCategory.name} <span className="text-white/60 text-sm font-normal ml-2">{activeCategory.items.filter(i => i.price > 0).length} platillos</span></h3>
-                      <button onClick={() => setSelectedCategory('')} className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
+                      <button onClick={() => setSelectedCategory('')} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30 active:scale-95">&times;</button>
                     </div>
-                    <div className="overflow-y-auto p-3 max-h-[82vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="grid grid-cols-3 md:grid-cols-4 gap-2 pb-3">
+                    <div className="overflow-y-auto p-2 max-h-[85vh] overscroll-contain pos-fat-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 pb-2">
                 {activeCategory.items.filter(item => item.price > 0).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
                     return (
                     <button
                       key={item.id}
                       onClick={() => { if (isOOS) { showToast(`${item.name} — AGOTADO`); return } handleMenuItemTap(item, activeCategory.id); setSelectedCategory(''); setMobileView('order') }}
-                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-xl text-left transition-all flex min-h-[72px] overflow-hidden relative shadow-sm ${
+                      className={`bg-[#1a1a24] hover:bg-[#222230] active:scale-[0.97] border rounded-xl text-left transition-all flex min-h-[60px] overflow-hidden relative shadow-sm ${
                         isOOS
                           ? 'border-red-500/30 opacity-50 cursor-not-allowed'
                           : (item as MenuItem & { promo?: boolean }).promo
@@ -3120,9 +3120,9 @@ function POSContent() {
                     >
                       <div className={`w-1.5 flex-shrink-0 rounded-l-2xl ${isOOS ? 'bg-red-500' : (activeCategory as { color?: string }).color || 'bg-emerald-600'}`} />
                       {isOOS && <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase">Agotado</span>}
-                      <div className="flex flex-col justify-between px-3 py-3 flex-1">
-                        <span className={`font-bold text-sm leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
-                        <span className={`font-bold text-base mt-1 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
+                      <div className="flex flex-col justify-between px-2.5 py-2 flex-1">
+                        <span className={`font-semibold text-xs leading-snug ${isOOS ? 'text-gray-500 line-through' : 'text-white'}`}>{item.name}</span>
+                        <span className={`font-bold text-sm mt-0.5 ${isOOS ? 'text-red-400' : 'text-emerald-400'}`}>${Math.round(item.price)}</span>
                       </div>
                     </button>
                     )
