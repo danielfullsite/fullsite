@@ -2140,8 +2140,8 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
-      // After sending, go back to table map
-      setTimeout(() => { window.location.href = '/pos' }, 800)
+      // After sending, go to table map
+      setTimeout(() => { window.location.href = '/pos/mesas' }, 800)
     } else {
       showToast('Error al guardar orden')
     }
