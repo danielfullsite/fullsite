@@ -279,6 +279,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
+      // Always go to table map after login
+      if (window.location.pathname === '/pos') {
+        window.location.href = '/pos/mesas'
+      }
       // Ask for notification permission after login (non-blocking, user gesture context)
       requestNotificationPermission().catch(() => {})
     }
