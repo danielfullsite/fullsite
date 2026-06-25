@@ -242,7 +242,7 @@ export default function MesasPage() {
   const getMeseroBorderStyle = (mesa: Mesa): React.CSSProperties => {
     if (mesa.status === 'disponible' || !mesa.mesero) return {}
     const color = meseroColorMap[mesa.mesero]
-    return color ? { borderColor: color, boxShadow: `0 0 8px ${color}40` } : {}
+    return color ? { borderColor: color, boxShadow: `0 0 12px ${color}50`, backgroundColor: `${color}20` } : {}
   }
 
   const statusColor: Record<string, string> = {
