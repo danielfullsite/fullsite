@@ -1230,7 +1230,8 @@ function POSContent() {
           if (rows.length > 0) {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-            setOrderItems(items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled))
+            const loadedItems = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
+            setOrderItems(loadedItems)
             setOrderId(order.id)
             setMesero(order.mesero || MESEROS[0])
             setPersonas(order.personas || 2)
@@ -1238,11 +1239,16 @@ function POSContent() {
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
             setOrderNotes(order.notas || '')
+            // Mark loaded items as already sent so they don't re-print
+            if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
+              setSentItemIds(new Set(loadedItems.map((i: OrderItem) => i.id)))
+            }
           } else {
             setOrderItems([])
             setOrderId(generateId())
             setLoadedOrderId(null)
             setLoadedUpdatedAt(null)
+            setSentItemIds(new Set())
           }
         }
       } catch { /* */ }
@@ -1615,7 +1621,8 @@ function POSContent() {
           if (rows.length > 0 && rows[0].id !== loadedOrderId) {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-            setOrderItems(items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled))
+            const loadedItems2 = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
+            setOrderItems(loadedItems2)
             setOrderId(order.id)
             setMesero(order.mesero || MESEROS[0])
             setPersonas(order.personas || 2)
@@ -1623,6 +1630,10 @@ function POSContent() {
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
             setOrderNotes(order.notas || '')
+            // Mark loaded items as already sent
+            if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
+              setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
+            }
           }
         }
       } catch { /* */ }
