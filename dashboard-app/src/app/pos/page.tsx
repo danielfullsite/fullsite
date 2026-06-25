@@ -1618,7 +1618,7 @@ function POSContent() {
         if (cancelled) return // mesa changed while fetching
         if (res.ok) {
           const rows = await res.json()
-          if (rows.length > 0 && rows[0].id !== loadedOrderId) {
+          if (rows.length > 0) {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
             const loadedItems2 = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
@@ -1634,19 +1634,22 @@ function POSContent() {
             if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
               setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
             }
+          } else {
+            // No existing order — start fresh
+            setOrderItems([])
+            setOrderId(generateId())
+            setLoadedOrderId(null)
+            setLoadedUpdatedAt(null)
+            setDiscount(0)
+            setOrderNotes('')
           }
         }
       } catch { /* */ }
     }
-    // Always reset and load fresh order for this mesa
-    setOrderItems([])
-    setOrderId(generateId())
-    setLoadedOrderId(null)
-    setLoadedUpdatedAt(null)
-    setDiscount(0)
-    setOrderNotes('')
+    // Load order for this mesa
     setCancelledItems(new Set())
     setVoidedItems(new Set())
+    setSentItemIds(new Set())
     loadMesaOrder()
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
