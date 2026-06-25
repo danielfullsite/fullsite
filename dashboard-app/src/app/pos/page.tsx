@@ -1564,6 +1564,7 @@ function POSContent() {
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
+  const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set())
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
   const [splitPayingCuenta, setSplitPayingCuenta] = useState(0) // 0 = no split, 1-6 = which cuenta paying now
   const [splitCount, setSplitCount] = useState(0) // 0 = no split, 2-6 = number of cuentas
@@ -2104,13 +2105,24 @@ function POSContent() {
       notas: orderNotes || undefined,
       createdAt: new Date(),
     }
-    // Optimistic UI: show toast immediately, save in background
-    showToast('Orden enviada a cocina')
+    // Only print NEW items (not already sent to kitchen)
+    const newItems = activeItems.filter(i => !sentItemIds.has(i.id))
+    if (newItems.length > 0) {
+      const printOrder: Order = { ...order, items: newItems }
+      printByStation(printOrder)
+    }
+
+    // Track all items as sent
+    setSentItemIds(prev => {
+      const next = new Set(prev)
+      activeItems.forEach(i => next.add(i.id))
+      return next
+    })
+
+    // Optimistic UI
+    showToast(newItems.length > 0 ? `${newItems.length} items enviados` : 'Orden actualizada')
     setSentToKitchen(true)
     setTimeout(() => setSentToKitchen(false), 2000)
-
-    // Print immediately (don't wait for save)
-    printByStation(order)
 
     const ok = await saveOrder(order)
     if (ok) {
@@ -2128,6 +2140,8 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
+      // After sending, go back to table map
+      setTimeout(() => { window.location.href = '/pos/mesas' }, 800)
     } else {
       showToast('Error al guardar orden')
     }
@@ -2943,7 +2957,7 @@ function POSContent() {
               className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               <Send size={18} />
-              {saving ? '...' : sentToKitchen ? 'Enviado' : 'Cocina'}
+              {saving ? '...' : sentToKitchen ? 'Enviado' : 'Enviar'}
             </button>
             <button
               onClick={handlePreTicket}
@@ -3409,7 +3423,7 @@ function POSContent() {
                   className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base flex items-center justify-center gap-2 transition-colors"
                 >
                   <Send size={18} />
-                  Mandar a Cocina
+                  Enviar
                 </button>
               </div>
             </div>
