@@ -1646,11 +1646,29 @@ function POSContent() {
         }
       } catch { /* */ }
     }
-    // Load order for this mesa (small delay to ensure Supabase has latest data)
+    // Load cached order instantly, then refresh from Supabase
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setSentItemIds(new Set())
-    setTimeout(() => { if (!cancelled) loadMesaOrder() }, 200)
+    try {
+      const cached = localStorage.getItem(`pos_order_${mesa}`)
+      if (cached) {
+        const c = JSON.parse(cached)
+        // Only use cache if less than 5 min old
+        if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) {
+          setOrderItems(c.items)
+          setOrderId(c.id)
+          if (c.mesero) setMesero(c.mesero)
+          if (c.personas) setPersonas(c.personas)
+          if (c.discount) setDiscount(c.discount)
+          if (c.notas) setOrderNotes(c.notas)
+          setLoadedOrderId(c.id)
+          setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
+        }
+      }
+    } catch {}
+    // Then load fresh from Supabase (will overwrite cache if different)
+    setTimeout(() => { if (!cancelled) loadMesaOrder() }, 300)
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
 
@@ -2155,8 +2173,8 @@ function POSContent() {
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
       setSaving(false)
-      // After sending, go to table map (delay to show toast)
-      // After sending, go to table map
+      // Cache order locally so it loads instantly when returning to this mesa
+      try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() })) } catch {}
       // Clear session to force PIN, then go to mesas
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
