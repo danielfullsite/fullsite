@@ -1806,7 +1806,7 @@ function POSContent() {
       setEditingOrderItem(orderItem)
       setModifierItem(menuItem)
     }
-  }, [])
+  }, [menuCategories])
 
   // Handle barcode scan — look up product by barcode in menu
   const handleBarcodeScan = useCallback((code: string) => {
@@ -3297,56 +3297,92 @@ function POSContent() {
         </div>
       )}
 
-      {/* Verificar Orden Modal */}
+      {/* Verificar Orden Modal — tabla con columnas de modificadores */}
       {showVerify && (() => {
-        // Group items by name + modifiers for summary view
-        const groups: Record<string, { name: string; modifiers: string; qty: number; unitPrice: number; items: typeof activeItems }> = {}
+        // Group items by base product name (without modifiers)
+        const byProduct: Record<string, typeof activeItems> = {}
         for (const item of activeItems) {
-          const mods = Array.isArray(item.modificadores) ? item.modificadores.join(' · ') : (item.modificadores || '')
-          const key = `${item.nombre}|||${mods}`
-          if (!groups[key]) {
-            groups[key] = { name: item.nombre, modifiers: mods, qty: 0, unitPrice: item.precio, items: [] as typeof activeItems }
-          }
-          groups[key].qty += item.cantidad
-          groups[key].items.push(item)
+          const base = item.nombre
+          if (!byProduct[base]) byProduct[base] = []
+          byProduct[base].push(item)
         }
-        const grouped = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))
+        const products = Object.entries(byProduct).sort(([a], [b]) => a.localeCompare(b))
+
+        // Collect all unique modifier names across all items for column headers
+        const allMods = new Set<string>()
+        for (const item of activeItems) {
+          const mods = Array.isArray(item.modificadores) ? item.modificadores : (item.modificadores ? [item.modificadores] : [])
+          mods.forEach((m: string) => {
+            // Split compound modifiers like "VERDES · AGUACATE +$55 · CHICHARRON 50..."
+            m.split(/\s*[·]\s*/).forEach(part => {
+              const clean = part.replace(/\+?\$[\d,.]+/g, '').trim()
+              if (clean) allMods.add(clean)
+            })
+          })
+        }
+        const modColumns = Array.from(allMods).sort()
 
         return (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowVerify(false)}>
-            <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="bg-cyan-600 px-5 py-3 flex items-center justify-between">
-                <h3 className="text-white font-bold text-lg">Verificar Orden — Mesa {mesa}</h3>
+            <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[96vw] max-w-[1000px] max-h-[88vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="bg-cyan-600 px-5 py-3 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-white font-bold text-lg">Verificar Orden — Mesa {mesa} <span className="text-white/60 font-normal ml-2">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span></h3>
                 <button onClick={() => setShowVerify(false)} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30">&times;</button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-[rgba(255,255,255,0.1)] text-left">
-                      <th className="py-2 text-[var(--text-3)] text-sm font-medium w-12">Qty</th>
-                      <th className="py-2 text-[var(--text-3)] text-sm font-medium">Producto</th>
-                      <th className="py-2 text-[var(--text-3)] text-sm font-medium text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grouped.map((g, i) => (
-                      <tr key={i} className="border-b border-[rgba(255,255,255,0.05)]">
-                        <td className="py-3 text-white font-bold text-xl">{g.qty}</td>
-                        <td className="py-3">
-                          <div className="text-white font-semibold text-base">{g.name}</div>
-                          {g.modifiers && <div className="text-emerald-400 text-sm mt-0.5">{g.modifiers}</div>}
-                        </td>
-                        <td className="py-3 text-right text-white font-bold text-base">${Math.round(g.unitPrice * g.qty).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="flex justify-between items-center mt-4 pt-3 border-t border-[rgba(255,255,255,0.1)]">
+              <div className="flex-1 overflow-auto p-3">
+                {products.map(([productName, items]) => (
+                  <div key={productName} className="mb-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-white font-bold text-base">{productName}</span>
+                      <span className="text-[var(--text-3)] text-sm">×{items.reduce((s, i) => s + i.cantidad, 0)}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[rgba(255,255,255,0.1)]">
+                            <th className="py-1.5 text-left text-[var(--text-3)] font-medium w-10">#</th>
+                            {modColumns.filter(mc => items.some(item => {
+                              const mods = Array.isArray(item.modificadores) ? item.modificadores.join(' · ') : (item.modificadores || '')
+                              return mods.toUpperCase().includes(mc.toUpperCase())
+                            })).map(mc => (
+                              <th key={mc} className="py-1.5 text-center text-[var(--text-3)] font-medium px-2 text-xs">{mc}</th>
+                            ))}
+                            <th className="py-1.5 text-right text-[var(--text-3)] font-medium">Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((item, idx) => {
+                            const itemMods = Array.isArray(item.modificadores) ? item.modificadores.join(' · ') : (item.modificadores || '')
+                            const relevantMods = modColumns.filter(mc => items.some(it => {
+                              const m = Array.isArray(it.modificadores) ? it.modificadores.join(' · ') : (it.modificadores || '')
+                              return m.toUpperCase().includes(mc.toUpperCase())
+                            }))
+                            return (
+                              <tr key={item.id || idx} className="border-b border-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.03)]">
+                                <td className="py-2 text-white font-bold">{item.cantidad}</td>
+                                {relevantMods.map(mc => (
+                                  <td key={mc} className="py-2 text-center">
+                                    {itemMods.toUpperCase().includes(mc.toUpperCase())
+                                      ? <span className="text-emerald-400 text-lg">✓</span>
+                                      : <span className="text-[var(--text-4)]">—</span>
+                                    }
+                                  </td>
+                                ))}
+                                <td className="py-2 text-right text-white font-semibold">${Math.round(item.precio).toLocaleString()}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center mt-2 pt-3 border-t border-[rgba(255,255,255,0.1)]">
                   <span className="text-[var(--text-3)] text-lg">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span>
                   <span className="text-white font-bold text-2xl">${Math.round(activeItems.reduce((s, i) => s + i.precio * i.cantidad, 0)).toLocaleString()}</span>
                 </div>
               </div>
-              <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.1)] flex gap-3">
+              <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.1)] flex gap-3 flex-shrink-0">
                 <button
                   onClick={() => setShowVerify(false)}
                   className="flex-1 py-3 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-white font-bold text-base hover:bg-[var(--line)] transition-colors"
