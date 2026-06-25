@@ -1646,11 +1646,11 @@ function POSContent() {
         }
       } catch { /* */ }
     }
-    // Load order for this mesa
+    // Load order for this mesa (small delay to ensure Supabase has latest data)
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setSentItemIds(new Set())
-    loadMesaOrder()
+    setTimeout(() => { if (!cancelled) loadMesaOrder() }, 200)
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
 
