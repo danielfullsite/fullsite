@@ -104,6 +104,7 @@ import {
   DollarSign,
   ArrowDownUp,
   Layers,
+  ClipboardCheck,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -1561,6 +1562,7 @@ function POSContent() {
 
   // Split de cuenta
   const [showSplit, setShowSplit] = useState(false)
+  const [showVerify, setShowVerify] = useState(false)
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
   const [splitPayingCuenta, setSplitPayingCuenta] = useState(0) // 0 = no split, 1-6 = which cuenta paying now
   const [splitCount, setSplitCount] = useState(0) // 0 = no split, 2-6 = number of cuentas
@@ -2923,6 +2925,14 @@ function POSContent() {
           {/* Action buttons — compact for tablets */}
           <div className="px-3 py-1 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
             <button
+              onClick={() => setShowVerify(true)}
+              disabled={activeItems.length === 0}
+              className="flex-[0.5] flex items-center justify-center gap-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-sm transition-all min-h-[52px]"
+            >
+              <ClipboardCheck size={16} />
+              Verificar
+            </button>
+            <button
               onClick={handleSendToKitchen}
               disabled={activeItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
@@ -3286,6 +3296,76 @@ function POSContent() {
           {toast}
         </div>
       )}
+
+      {/* Verificar Orden Modal */}
+      {showVerify && (() => {
+        // Group items by name + modifiers for summary view
+        const groups: Record<string, { name: string; modifiers: string; qty: number; unitPrice: number; items: typeof activeItems }> = {}
+        for (const item of activeItems) {
+          const mods = Array.isArray(item.modificadores) ? item.modificadores.join(' · ') : (item.modificadores || '')
+          const key = `${item.nombre}|||${mods}`
+          if (!groups[key]) {
+            groups[key] = { name: item.nombre, modifiers: mods, qty: 0, unitPrice: item.precio, items: [] as typeof activeItems }
+          }
+          groups[key].qty += item.cantidad
+          groups[key].items.push(item)
+        }
+        const grouped = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))
+
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowVerify(false)}>
+            <div className="bg-[#111118] rounded-2xl border border-[rgba(255,255,255,0.1)] shadow-2xl w-[90vw] max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="bg-cyan-600 px-5 py-3 flex items-center justify-between">
+                <h3 className="text-white font-bold text-lg">Verificar Orden — Mesa {mesa}</h3>
+                <button onClick={() => setShowVerify(false)} className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white text-2xl font-bold hover:bg-white/30">&times;</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[rgba(255,255,255,0.1)] text-left">
+                      <th className="py-2 text-[var(--text-3)] text-sm font-medium w-12">Qty</th>
+                      <th className="py-2 text-[var(--text-3)] text-sm font-medium">Producto</th>
+                      <th className="py-2 text-[var(--text-3)] text-sm font-medium text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grouped.map((g, i) => (
+                      <tr key={i} className="border-b border-[rgba(255,255,255,0.05)]">
+                        <td className="py-3 text-white font-bold text-xl">{g.qty}</td>
+                        <td className="py-3">
+                          <div className="text-white font-semibold text-base">{g.name}</div>
+                          {g.modifiers && <div className="text-emerald-400 text-sm mt-0.5">{g.modifiers}</div>}
+                        </td>
+                        <td className="py-3 text-right text-white font-bold text-base">${Math.round(g.unitPrice * g.qty).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-between items-center mt-4 pt-3 border-t border-[rgba(255,255,255,0.1)]">
+                  <span className="text-[var(--text-3)] text-lg">{activeItems.reduce((s, i) => s + i.cantidad, 0)} items</span>
+                  <span className="text-white font-bold text-2xl">${Math.round(activeItems.reduce((s, i) => s + i.precio * i.cantidad, 0)).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.1)] flex gap-3">
+                <button
+                  onClick={() => setShowVerify(false)}
+                  className="flex-1 py-3 rounded-xl bg-[var(--surface)] border border-[var(--line)] text-white font-bold text-base hover:bg-[var(--line)] transition-colors"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => { setShowVerify(false); handleSendToKitchen() }}
+                  disabled={saving}
+                  className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Send size={18} />
+                  Mandar a Cocina
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Split de Cuenta Modal */}
       {showSplit && (
