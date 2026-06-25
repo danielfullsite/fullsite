@@ -48,31 +48,23 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
     document.addEventListener('contextmenu', blockCtx)
 
-    // 3. Auto-fullscreen — try on every interaction until it sticks
+    // 3. Auto-fullscreen — only on first interaction, only if not in kiosk/PWA
     const goFullscreen = () => {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
         document.documentElement.requestFullscreen().catch(() => {})
       }
+      // Remove after first successful attempt
+      document.removeEventListener('click', goFullscreen)
+      document.removeEventListener('touchstart', goFullscreen)
     }
-    // Try immediately (works if already has gesture permission)
-    goFullscreen()
-    // Also try on first interaction
-    document.addEventListener('click', goFullscreen)
-    document.addEventListener('touchstart', goFullscreen)
-    // Re-enter fullscreen if user exits (ESC)
-    const onFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        setTimeout(goFullscreen, 500)
-      }
-    }
-    document.addEventListener('fullscreenchange', onFullscreenChange)
+    document.addEventListener('click', goFullscreen, { once: true })
+    document.addEventListener('touchstart', goFullscreen, { once: true })
 
     return () => {
       if (link && prevManifest) link.href = prevManifest
       document.removeEventListener('contextmenu', blockCtx)
       document.removeEventListener('click', goFullscreen)
       document.removeEventListener('touchstart', goFullscreen)
-      document.removeEventListener('fullscreenchange', onFullscreenChange)
     }
   }, [])
 
