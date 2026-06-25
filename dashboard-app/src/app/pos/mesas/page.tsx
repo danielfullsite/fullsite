@@ -294,9 +294,9 @@ export default function MesasPage() {
     setMerging(true)
     try {
       const [srcRes, tgtRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeSource}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeSource}&status=in.(abierta,enviada,preparando,lista,entregada)&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
-        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeTarget}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${mergeTarget}&status=in.(abierta,enviada,preparando,lista,entregada)&order=created_at.desc&limit=1`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }),
       ])
       if (!srcRes.ok || !tgtRes.ok) { showToast('Error al cargar ordenes'); setMerging(false); return }

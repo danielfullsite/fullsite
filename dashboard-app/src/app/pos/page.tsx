@@ -1222,7 +1222,7 @@ function POSContent() {
     const loadOrderForMesa = async (newMesa: number) => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(abierta,enviada,preparando,lista,entregada)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (res.ok) {
@@ -1612,7 +1612,7 @@ function POSContent() {
           ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
           : `mesa=eq.${mesa}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(abierta,enviada,preparando,lista,entregada)&order=created_at.desc&limit=1`,
           { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
         )
         if (cancelled) return // mesa changed while fetching
