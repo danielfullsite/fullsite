@@ -1217,47 +1217,7 @@ function POSContent() {
     }
   }, [urlMesa])
 
-  // When URL mesa param changes (e.g. from plano), switch to new mesa and load its order
-  useEffect(() => {
-    const loadOrderForMesa = async (newMesa: number) => {
-      try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${newMesa}&status=in.(abierta,enviada,preparando,lista,entregada)&order=created_at.desc&limit=1`,
-          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
-        )
-        if (res.ok) {
-          const rows = await res.json()
-          if (rows.length > 0) {
-            const order = rows[0]
-            const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-            const loadedItems = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
-            setOrderItems(loadedItems)
-            setOrderId(order.id)
-            setMesero(order.mesero || MESEROS[0])
-            setPersonas(order.personas || 2)
-            setDiscount(order.descuento || 0)
-            setLoadedOrderId(order.id)
-            setLoadedUpdatedAt(order.updated_at || order.created_at || null)
-            setOrderNotes(order.notas || '')
-            // Mark loaded items as already sent so they don't re-print
-            if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
-              setSentItemIds(new Set(loadedItems.map((i: OrderItem) => i.id)))
-            }
-          } else {
-            setOrderItems([])
-            setOrderId(generateId())
-            setLoadedOrderId(null)
-            setLoadedUpdatedAt(null)
-            setSentItemIds(new Set())
-          }
-        }
-      } catch { /* */ }
-      setCancelledItems(new Set())
-      setVoidedItems(new Set())
-    }
-
-    if (mesa > 0) loadOrderForMesa(mesa)
-  }, [mesa])
+  // Order loading is handled by the useEffect below (mesa + clienteNombre dependency)
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -2141,7 +2101,10 @@ function POSContent() {
     const newItems = activeItems.filter(i => !sentItemIds.has(i.id))
     if (newItems.length > 0) {
       const printOrder: Order = { ...order, items: newItems }
-      printByStation(printOrder)
+      const printResult = await printByStation(printOrder)
+      if (printResult.failed.length > 0) {
+        showToast(`⚠ Impresora sin conexión: ${printResult.failed.join(', ')}`)
+      }
     }
 
     // Track all items as sent
@@ -2350,8 +2313,11 @@ function POSContent() {
       setSaving(false)
       setOrderItems([])
       setCancelledItems(new Set())
+      setSentItemIds(new Set())
       setDiscount(0)
       setPropina(0)
+      // Clear localStorage cache for this mesa
+      try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
       setOrderNotes('')
       setShowPayment(false)
       setShowCashFlow(false)
@@ -2911,9 +2877,11 @@ function POSContent() {
                       if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
                       const oldMesa = mesa
                       setMesa(newMesa)
-                      // Persist to Supabase
-                      if (orderId) {
-                        await updateOrderStatus(orderId, sentToKitchen ? 'enviada' : 'nueva', { mesa: newMesa })
+                      // Persist to Supabase — keep current status (or 'enviada' if unknown)
+                      if (orderId && loadedOrderId) {
+                        await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
+                      } else if (orderId) {
+                        // New unsaved order — save it first, then it'll have the right mesa
                       }
                       logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
                       showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)

@@ -1262,14 +1262,15 @@ export function setComandasMuted(muted: boolean) {
  * Print per-station tickets: splits the order and prints a separate ticket
  * for each station that has items. Adds 200ms delay between tickets.
  */
-export async function printByStation(order: Order) {
+export async function printByStation(order: Order): Promise<{ printed: boolean; failed: string[] }> {
   if (comandasMuted()) {
     console.log('[printer] printByStation OMITIDO — modo piloto (comandas muteadas)')
-    return
+    return { printed: false, failed: [] }
   }
   const split = splitOrderByStation(order)
   const stations: StationName[] = ['cocina', 'barra', 'caja']
   let printed = false
+  const failedStations: string[] = []
 
   console.log('[printer] printByStation called. BT connected:', isBluetoothConnected(), 'characteristic:', !!btCharacteristic)
   console.log('[printer] Split:', { cocina: split.cocina.length, barra: split.barra.length, caja: split.caja.length })
@@ -1304,19 +1305,16 @@ export async function printByStation(order: Order) {
         printed = true
         continue
       } catch (e) {
-        console.warn(`[printer] Bluetooth station print (${station}) FAILED, CSS fallback:`, e)
+        console.warn(`[printer] Bluetooth station print (${station}) FAILED:`, e)
       }
     } else {
-      console.log(`[printer] No BT connection for ${station}, skipping CSS fallback`)
+      console.log(`[printer] No BT connection for ${station}`)
     }
-    // Skip CSS fallback — it opens a print dialog which breaks kiosk mode
-    // Instead, queue for retry and show warning
+    // Queue for retry — no CSS fallback (breaks kiosk)
     console.warn(`[printer] ${station}: no bridge, no BT — comanda NOT printed`)
     enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda')
-    printed = true
+    failedStations.push(station)
   }
 
-  if (!printed) {
-    console.warn('[printer] No items to print in any station')
-  }
+  return { printed, failed: failedStations }
 }

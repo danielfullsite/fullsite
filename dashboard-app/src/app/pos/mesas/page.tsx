@@ -184,7 +184,7 @@ export default function MesasPage() {
     try {
       const [ordersRes, resRes] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta)&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta,entregada)&order=created_at.desc&limit=50`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         ),
         fetch(
