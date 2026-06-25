@@ -2521,24 +2521,8 @@ function POSContent() {
               className="w-14 bg-transparent text-white text-base font-bold text-center border-none outline-none"
             />
           </div>
-          <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-1 border border-slate-600 min-h-[48px]">
-            <span className="text-teal-400 text-sm font-medium">#</span>
-            <input
-              type="text"
-              value={clienteNombre}
-              onChange={(e) => {
-                const name = e.target.value.toUpperCase()
-                setClienteNombre(name)
-                if (name && mesa !== 0) setMesa(0)
-                if (!name && mesa === 0) setMesa(1)
-              }}
-              placeholder="Cliente"
-              maxLength={30}
-              className="w-28 bg-transparent text-teal-300 text-base font-bold border-none outline-none placeholder:text-[var(--text-4)] placeholder:font-normal"
-            />
-          </div>
-          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px]">
-            {Array.from({ length: 12 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
+          <select value={personas} onChange={(e) => setPersonas(Number(e.target.value))} className="bg-[var(--line)] text-white rounded-lg px-4 py-2 text-lg font-bold border border-slate-600 min-h-[48px]">
+            {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
           <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }) } }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
             {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
