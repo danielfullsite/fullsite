@@ -31,6 +31,7 @@ import {
   type ModifierGroupDef,
   type PaymentMethodDB,
   type PagoForma,
+  updateOrderStatus,
 } from '@/lib/pos-data'
 import { IVA_RATE, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
@@ -2856,11 +2857,15 @@ function POSContent() {
                   setPinInput('')
                   setPinPrompt({
                     title: 'Transferir a mesa #:',
-                    onSubmit: (input: string) => {
+                    onSubmit: async (input: string) => {
                       const newMesa = parseInt(input, 10)
                       if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
                       const oldMesa = mesa
                       setMesa(newMesa)
+                      // Persist to Supabase
+                      if (orderId) {
+                        await updateOrderStatus(orderId, sentToKitchen ? 'enviada' : 'nueva', { mesa: newMesa })
+                      }
                       logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
                       showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)
                       setPinPrompt(null)
