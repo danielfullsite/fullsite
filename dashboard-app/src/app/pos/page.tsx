@@ -3116,7 +3116,7 @@ function POSContent() {
                       </div>
                     )}
                     <div className="flex-1 overflow-y-auto p-2 overscroll-contain pos-fat-scroll flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      <div className="grid grid-cols-3 md:grid-cols-5 gap-2 flex-1" style={{ gridAutoRows: '1fr', minHeight: 0 }}>
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-2 flex-1" style={{ gridAutoRows: 'minmax(80px, 1fr)', minHeight: 0 }}>
                 {activeCategory.items.filter(item => item.price > 0 && (!categorySearch || item.name.toLowerCase().includes(categorySearch.toLowerCase()))).map((item) => {
                     const isOOS = outOfStockItems.has(item.id)
                     return (
