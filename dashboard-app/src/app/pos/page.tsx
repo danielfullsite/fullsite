@@ -1667,8 +1667,8 @@ function POSContent() {
         }
       }
     } catch {}
-    // Then load fresh from Supabase (will overwrite cache if different)
-    setTimeout(() => { if (!cancelled) loadMesaOrder() }, 300)
+    // Load fresh from Supabase immediately
+    loadMesaOrder()
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
 
