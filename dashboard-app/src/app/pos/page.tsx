@@ -1256,7 +1256,7 @@ function POSContent() {
       setVoidedItems(new Set())
     }
 
-    // Mesa sync now handled by useSearchParams effect above — no polling needed
+    if (mesa > 0) loadOrderForMesa(mesa)
   }, [mesa])
   const [clienteNombre, setClienteNombre] = useState<string>(initialCuenta)
   const [mesero, setMesero] = useState<string>(() => {
