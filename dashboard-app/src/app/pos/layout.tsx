@@ -48,9 +48,24 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
     document.addEventListener('contextmenu', blockCtx)
 
+    // 3. Auto-fullscreen on first user interaction (Chrome requires gesture)
+    const goFullscreen = () => {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {})
+      }
+      document.removeEventListener('click', goFullscreen)
+      document.removeEventListener('touchstart', goFullscreen)
+    }
+    if (!document.fullscreenElement) {
+      document.addEventListener('click', goFullscreen, { once: true })
+      document.addEventListener('touchstart', goFullscreen, { once: true })
+    }
+
     return () => {
       if (link && prevManifest) link.href = prevManifest
       document.removeEventListener('contextmenu', blockCtx)
+      document.removeEventListener('click', goFullscreen)
+      document.removeEventListener('touchstart', goFullscreen)
     }
   }, [])
 
