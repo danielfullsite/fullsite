@@ -356,12 +356,26 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-8">
-          {/* Restaurant logo — /logos/{clientId}.png per client */}
+          {/* Restaurant logo — tap 5x to exit kiosk mode */}
           <img
             src={`/logos/${_cid()}.png`}
             alt=""
             className="h-24 mx-auto mb-4 object-contain"
             onError={(e) => { const el = e.target as HTMLImageElement; el.style.display = 'none' }}
+            onClick={() => {
+              const key = 'pos_exit_taps'
+              const now = Date.now()
+              const taps = JSON.parse(sessionStorage.getItem(key) || '[]').filter((t: number) => now - t < 3000)
+              taps.push(now)
+              sessionStorage.setItem(key, JSON.stringify(taps))
+              if (taps.length >= 5) {
+                sessionStorage.removeItem(key)
+                if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+                window.close()
+                // Fallback if window.close doesn't work in kiosk
+                window.location.href = 'about:blank'
+              }
+            }}
           />
           <p className="text-slate-400 text-sm mt-2">
             {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}

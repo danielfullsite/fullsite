@@ -2151,12 +2151,23 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
-      // After sending, go to table map
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 800)
+      setSaving(false)
+      // After sending, go to table map (delay to show toast)
+      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
     } else {
-      showToast('Error al guardar orden')
+      showToast('Error al guardar — reintentando...')
+      // Retry once
+      const retry = await saveOrder(order)
+      if (retry) {
+        setLoadedOrderId(orderId)
+        setLoadedUpdatedAt(new Date().toISOString())
+        setSaving(false)
+        setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      } else {
+        showToast('Error al guardar orden — revisa conexión')
+        setSaving(false)
+      }
     }
-    setSaving(false)
   }
 
   // Pre-ticket (precuenta — antes de cobrar)

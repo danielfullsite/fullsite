@@ -6,6 +6,7 @@
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
 import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
+import { enqueueFailedPrint } from './print-queue'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -416,11 +417,12 @@ export async function printPreTicket(order: Order) {
       await printPreTicketBluetooth(order)
       return
     } catch (e) {
-      console.warn('[printer] Bluetooth pre-ticket failed, CSS fallback:', e)
+      console.warn('[printer] Bluetooth pre-ticket failed:', e)
     }
   }
-  // 3) CSS
-  printPreTicketCSS(order)
+  // 3) Queue for retry instead of CSS (avoids print dialog in kiosk)
+  console.warn('[printer] No bridge, no BT — pre-ticket queued for retry')
+  enqueueFailedPrint(buildPreTicketBytes(order, COLS_BRIDGE), 'tickets', 'preticket')
 }
 
 // ─── WEBBLUETOOTH ESC/POS (Android Chrome) ──────────────────────────────────
@@ -1027,10 +1029,12 @@ export async function printTicket(order: Order) {
       await printTicketBluetooth(order)
       return
     } catch (e) {
-      console.warn('[printer] Bluetooth print failed, falling back to CSS:', e)
+      console.warn('[printer] Bluetooth print failed:', e)
     }
   }
-  printTicketCSS(order)
+  // 3) Queue for retry instead of CSS fallback (avoids print dialog in kiosk)
+  console.warn('[printer] No bridge, no BT — ticket queued for retry')
+  enqueueFailedPrint(buildESCPOS(order, COLS_BRIDGE), 'tickets', 'ticket')
 }
 
 // ─── KITCHEN TICKET CSS FALLBACK ────────────────────────────────────────────
@@ -1301,14 +1305,16 @@ export async function printByStation(order: Order) {
         console.warn(`[printer] Bluetooth station print (${station}) FAILED, CSS fallback:`, e)
       }
     } else {
-      console.log(`[printer] No BT connection for ${station}, using CSS`)
+      console.log(`[printer] No BT connection for ${station}, skipping CSS fallback`)
     }
-    printStationTicketCSS(order, station, items)
+    // Skip CSS fallback — it opens a print dialog which breaks kiosk mode
+    // Instead, queue for retry and show warning
+    console.warn(`[printer] ${station}: no bridge, no BT — comanda NOT printed`)
+    enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda')
     printed = true
   }
 
   if (!printed) {
-    console.warn('[printer] No items to print in any station, falling back to full kitchen ticket')
-    printKitchenTicketCSS(order)
+    console.warn('[printer] No items to print in any station')
   }
 }
