@@ -107,8 +107,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           try {
             setStaff(JSON.parse(saved))
             setUnlocked(true)
-            // Auto-redirect to mesas if on /pos
-            if (window.location.pathname === '/pos') {
+            // Auto-redirect to mesas if on /pos (but not if opening a specific mesa)
+            if (window.location.pathname === '/pos' && !window.location.search.includes('mesa=')) {
               window.location.href = '/pos/mesas'
             }
           } catch { /* ignore */ }
@@ -282,8 +282,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
-      // Always go to table map after login
-      if (window.location.pathname === '/pos') {
+      // Always go to table map after login (but not if opening a specific mesa)
+      if (window.location.pathname === '/pos' && !window.location.search.includes('mesa=')) {
         window.location.href = '/pos/mesas'
       }
       // Ask for notification permission after login (non-blocking, user gesture context)
