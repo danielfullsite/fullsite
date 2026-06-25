@@ -2153,7 +2153,10 @@ function POSContent() {
       setLoadedUpdatedAt(new Date().toISOString())
       setSaving(false)
       // After sending, go to table map (delay to show toast)
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      // Clear session so PIN screen shows, then redirect
+      sessionStorage.removeItem('pos_staff')
+      sessionStorage.removeItem('pos_last_activity')
+      setTimeout(() => { window.location.href = '/pos' }, 600)
     } else {
       showToast('Error al guardar — reintentando...')
       // Retry once
@@ -2162,7 +2165,10 @@ function POSContent() {
         setLoadedOrderId(orderId)
         setLoadedUpdatedAt(new Date().toISOString())
         setSaving(false)
-        setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+        // Clear session so PIN screen shows, then redirect
+      sessionStorage.removeItem('pos_staff')
+      sessionStorage.removeItem('pos_last_activity')
+      setTimeout(() => { window.location.href = '/pos' }, 600)
       } else {
         showToast('Error al guardar orden — revisa conexión')
         setSaving(false)
