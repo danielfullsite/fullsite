@@ -110,7 +110,7 @@ const CATEGORY_NAME_TO_STATION: Array<{ keywords: string[]; station: StationName
   { keywords: ['bakery', 'panadería', 'panaderia'], station: 'caja' },
   { keywords: ['croissant'], station: 'caja' },
   { keywords: ['toast', 'bagel'], station: 'caja' },
-  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'amalay'], station: 'caja' },
+  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'amalay'], station: 'barra' },
   { keywords: ['dessert', 'postre'], station: 'caja' },
   { keywords: ['vino'], station: 'barra' },
 ]
