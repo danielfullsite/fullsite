@@ -2178,7 +2178,7 @@ function POSContent() {
       // Clear session to force PIN, then go to mesas
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
     } else {
       showToast('Error al guardar — reintentando...')
       // Retry once
@@ -2191,7 +2191,7 @@ function POSContent() {
       // Clear session to force PIN, then go to mesas
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
       } else {
         showToast('Error al guardar orden — revisa conexión')
         setSaving(false)
