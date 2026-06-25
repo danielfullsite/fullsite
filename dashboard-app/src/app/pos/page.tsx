@@ -3348,6 +3348,7 @@ function POSContent() {
                               <th key={mc} className="py-1.5 text-center text-[var(--text-3)] font-medium px-2 text-xs">{mc}</th>
                             ))}
                             <th className="py-1.5 text-right text-[var(--text-3)] font-medium">Precio</th>
+                            <th className="py-1.5 w-10"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3369,6 +3370,14 @@ function POSContent() {
                                   </td>
                                 ))}
                                 <td className="py-2 text-right text-white font-semibold">${Math.round(item.precio).toLocaleString()}</td>
+                                <td className="py-2 text-center">
+                                  <button
+                                    onClick={() => { setShowVerify(false); handleEditOrderItem(item) }}
+                                    className="w-8 h-8 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                </td>
                               </tr>
                             )
                           })}
