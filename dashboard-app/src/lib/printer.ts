@@ -71,7 +71,10 @@ export function printTicketCSS(order: Order) {
   </table>
   <div class="line"></div>
 
-  <div class="center small" style="margin-top:2px">${order.metodoPago || ''}</div>
+  ${order.pagos && order.pagos.length > 1
+    ? `<table style="width:100%;margin-top:4px"><tr><td colspan="2" style="font-weight:bold;font-size:10px">PAGOS:</td></tr>${order.pagos.map((p: { metodo: string; monto: number }) => `<tr><td style="font-size:10px">${p.metodo}</td><td class="right" style="font-size:10px">${formatMXN(p.monto)}</td></tr>`).join('')}</table>`
+    : `<div class="center small" style="margin-top:2px">${order.metodoPago || ''}</div>`
+  }
 
   <div class="center" style="margin-top:8px">
     <div style="font-size:9px;font-weight:bold;margin-bottom:4px">FACTURA ELECTRÓNICA</div>
@@ -495,9 +498,16 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
 
   cmds.push(...textToBytes(dashedLine(cols)))
 
-  // Center
+  // Center — payment method(s)
   cmds.push(ESC, 0x61, 0x01)
-  if (order.metodoPago) {
+  if (order.pagos && order.pagos.length > 1) {
+    cmds.push(...textToBytes('PAGOS:\n'))
+    cmds.push(ESC, 0x61, 0x00) // left
+    for (const p of order.pagos) {
+      cmds.push(...textToBytes(padLine(p.metodo, formatMXN(p.monto), cols)))
+    }
+    cmds.push(ESC, 0x61, 0x01) // center
+  } else if (order.metodoPago) {
     cmds.push(...textToBytes(`${order.metodoPago}\n`))
   }
   cmds.push(LF)

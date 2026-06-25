@@ -2852,13 +2852,16 @@ function POSContent() {
               <button
                 onClick={() => {
                   const reprintOrder: Order = {
-                    id: generateId(), items: activeItems, mesa: Number(mesa) || 0, mesero,
+                    id: orderId, items: activeItems, mesa: Number(mesa) || 0, mesero,
                     subtotal: Number(subtotal), descuento: Number(discount), iva: Number(iva), total: Number(total), propina: 0,
                     metodoPago: 'efectivo', status: 'cerrada',
                     personas: Number(personas) || 2,
                     createdAt: new Date(),
+                    notas: '*** REIMPRESIÓN ***',
                   }
                   handlePrintTicket(reprintOrder)
+                  logAudit({ order_id: orderId, action: 'ticket_reprinted', actor: mesero, mesa, details: { total } })
+                  showToast('Reimpresión de ticket')
                 }}
                 disabled={orderItems.length === 0}
                 className="w-12 min-h-[48px] flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-3)] transition-colors"

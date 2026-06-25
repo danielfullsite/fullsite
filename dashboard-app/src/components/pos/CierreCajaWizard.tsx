@@ -120,14 +120,14 @@ export default function CierreCajaWizard({
           let depositos = 0, retiros = 0
           try {
             const movRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=tipo,monto`,
+              `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
               { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
             )
             if (movRes.ok) {
               const movements = await movRes.json()
               for (const m of movements) {
-                if (m.tipo === 'deposito') depositos += Number(m.monto) || 0
-                else if (m.tipo === 'retiro') retiros += Number(m.monto) || 0
+                if (m.type === 'deposito') depositos += Number(m.amount) || 0
+                else if (m.type === 'retiro') retiros += Number(m.amount) || 0
               }
             }
           } catch { /* */ }
@@ -244,24 +244,33 @@ export default function CierreCajaWizard({
         .total{font-weight:bold;font-size:14px}
         .diff{font-size:16px;font-weight:bold;text-align:center;padding:8px;margin:8px 0;border:2px solid ${diferencia >= 0 ? '#16a34a' : '#dc2626'};color:${diferencia >= 0 ? '#16a34a' : '#dc2626'}}
       </style></head><body>
-      <h2>CIERRE DE CAJA</h2>
+      <h2>AMALAY</h2>
+      <p style="text-align:center;margin:0">Coffee & Market</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0 8px">CIERRE DE CAJA</p>
       <p style="text-align:center">${now.toLocaleDateString('es-MX')} ${now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
       <div class="line"></div>
-      <div class="row"><span>Fondo inicial:</span><span>${formatMXN(fondoInicial)}</span></div>
-      <div class="row"><span>Ventas efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
-      <div class="row"><span>Ventas tarjeta:</span><span>${formatMXN(systemData.tarjeta)}</span></div>
-      <div class="row"><span>Transferencias:</span><span>${formatMXN(systemData.transferencias)}</span></div>
-      <div class="line"></div>
+      <p style="font-weight:bold;margin:4px 0">VENTAS POR FORMA DE PAGO</p>
+      <div class="row"><span>Efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
+      <div class="row"><span>Tarjeta:</span><span>${formatMXN(systemData.tarjeta)}</span></div>
+      <div class="row"><span>Transferencia:</span><span>${formatMXN(systemData.transferencias)}</span></div>
       <div class="row total"><span>Total ventas:</span><span>${formatMXN(systemData.totalVentas)}</span></div>
+      <div class="line"></div>
+      <p style="font-weight:bold;margin:4px 0">CONTROL DE EFECTIVO</p>
+      <div class="row"><span>Fondo inicial:</span><span>${formatMXN(fondoInicial)}</span></div>
+      <div class="row"><span>+ Ventas efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
+      <div class="row"><span>+ Propinas efectivo:</span><span>${formatMXN(systemData.propinas)}</span></div>
+      ${systemData.depositos > 0 ? `<div class="row"><span>+ Depósitos:</span><span>${formatMXN(systemData.depositos)}</span></div>` : ''}
+      ${systemData.retiros > 0 ? `<div class="row"><span>- Retiros:</span><span>${formatMXN(systemData.retiros)}</span></div>` : ''}
+      <div class="row total"><span>= Efectivo esperado:</span><span>${formatMXN(efectivoEsperado)}</span></div>
+      <div class="row"><span>Efectivo contado:</span><span>${formatMXN(totalContado)}</span></div>
+      <div class="diff">Diferencia: ${diferencia >= 0 ? '+' : ''}${formatMXN(diferencia)}</div>
+      <div class="line"></div>
+      <p style="font-weight:bold;margin:4px 0">OPERACIÓN</p>
       <div class="row"><span>Tickets:</span><span>${systemData.ticketsCount}</span></div>
       <div class="row"><span>Cancelaciones:</span><span>${systemData.cancelaciones}</span></div>
       <div class="row"><span>Descuentos:</span><span>${formatMXN(systemData.descuentos)}</span></div>
       <div class="row"><span>Propinas:</span><span>${formatMXN(systemData.propinas)}</span></div>
-      <div class="line"></div>
-      <div class="row"><span>Efectivo esperado:</span><span>${formatMXN(efectivoEsperado)}</span></div>
-      <div class="row"><span>Efectivo contado:</span><span>${formatMXN(totalContado)}</span></div>
-      <div class="diff">Diferencia: ${diferencia >= 0 ? '+' : ''}${formatMXN(diferencia)}</div>
-      ${notas ? `<p>Notas: ${notas}</p>` : ''}
+      ${notas ? `<div class="line"></div><p>Notas: ${notas}</p>` : ''}
       <div class="line"></div>
       <p style="text-align:center;font-size:10px">Cerrado por: ${managerName || '---'}</p>
       </body></html>
