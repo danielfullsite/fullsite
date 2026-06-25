@@ -1146,6 +1146,7 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
   cmds.push(ESC, 0x61, 0x00)
   cmds.push(ESC, 0x45, 0x01)
 
+  let lineNum = 0
   for (const item of items) {
     // Separador de tiempo (Wansoft): línea centrada e invertida "XX TIEMPO: N XX"
     if (isTiempoItem(item)) {
@@ -1156,9 +1157,10 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
       cmds.push(ESC, 0x61, 0x00) // back to left
       continue
     }
+    lineNum++
     cmds.push(GS, 0x21, 0x01)
     const sillaTag = item.silla && item.silla > 0 ? ` [S${item.silla}]` : ''
-    cmds.push(...textToBytes(`${item.cantidad}x ${item.nombre}${sillaTag}\n`))
+    cmds.push(...textToBytes(`${lineNum} - ${item.cantidad}x ${item.nombre}${sillaTag}\n`))
     cmds.push(GS, 0x21, 0x00)
     if (item.modificadores && item.modificadores.length > 0) {
       cmds.push(...textToBytes(`  >> ${item.modificadores.join(', ')}\n`))
