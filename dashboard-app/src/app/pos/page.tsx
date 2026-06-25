@@ -2157,7 +2157,7 @@ function POSContent() {
       setSaving(false)
       // After sending, go to table map (delay to show toast)
       // After sending, go to table map
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      setTimeout(() => { window.location.href = '/pos/mesas?t=' + Date.now() }, 600)
     } else {
       showToast('Error al guardar — reintentando...')
       // Retry once
@@ -2167,7 +2167,7 @@ function POSContent() {
         setLoadedUpdatedAt(new Date().toISOString())
         setSaving(false)
         // After sending, go to table map
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 600)
+      setTimeout(() => { window.location.href = '/pos/mesas?t=' + Date.now() }, 600)
       } else {
         showToast('Error al guardar orden — revisa conexión')
         setSaving(false)
