@@ -107,6 +107,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           try {
             setStaff(JSON.parse(saved))
             setUnlocked(true)
+            // Auto-redirect to mesas if on /pos
+            if (window.location.pathname === '/pos') {
+              window.location.href = '/pos/mesas'
+            }
           } catch { /* ignore */ }
         } else {
           // Session expired
