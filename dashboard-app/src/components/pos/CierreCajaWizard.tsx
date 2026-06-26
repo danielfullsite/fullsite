@@ -85,7 +85,7 @@ export default function CierreCajaWizard({
   useEffect(() => {
     async function fetchShiftData() {
       try {
-        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${turnoOpenedAt}`
+        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${encodeURIComponent(turnoOpenedAt)}`
         console.log('[CierreCaja] Fetching orders:', queryUrl)
         console.log('[CierreCaja] turnoOpenedAt:', turnoOpenedAt)
         console.log('[CierreCaja] Using key:', SUPABASE_KEY?.substring(0, 20) + '...')
