@@ -259,6 +259,7 @@ export function registerAutoSync() {
   if (autoSyncRegistered || typeof window === 'undefined') return
   autoSyncRegistered = true
 
+  // 1. On reconnect: sync pending
   window.addEventListener('online', async () => {
     if (isSyncing) {
       console.log('[offline-sync] Sync already in progress — skipping')
@@ -275,4 +276,24 @@ export function registerAutoSync() {
       isSyncing = false
     }
   })
+
+  // 2. On mount: if online and queue has items, sync immediately
+  // Covers the case where page reloaded while offline, then came back online
+  if (navigator.onLine) {
+    setTimeout(async () => {
+      if (isSyncing) return
+      try {
+        const queue = await getPendingQueue()
+        if (queue.length > 0) {
+          isSyncing = true
+          console.log(`[offline-sync] Found ${queue.length} pending items on mount — syncing...`)
+          const { synced, failed } = await syncAll()
+          console.log(`[offline-sync] Mount sync complete: ${synced} synced, ${failed} failed`)
+          isSyncing = false
+        }
+      } catch {
+        isSyncing = false
+      }
+    }, 2000) // small delay to let the app initialize
+  }
 }

@@ -2175,10 +2175,15 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // Clear session to force PIN, then go to mesas
-      sessionStorage.removeItem('pos_staff')
-      sessionStorage.removeItem('pos_last_activity')
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
+      // Clear session to force PIN, then go to mesas — but NOT if offline
+      if (navigator.onLine) {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
+      } else {
+        showToast('Offline — orden guardada localmente, pendiente de sincronizar')
+        // Stay on current page, don't redirect (would fail with "No connection")
+      }
   }
 
   // Pre-ticket (precuenta — antes de cobrar)
