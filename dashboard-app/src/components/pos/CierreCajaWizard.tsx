@@ -188,14 +188,19 @@ export default function CierreCajaWizard({
 
     try {
       // Save cierre
-      await fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
+      const cierreRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify(cierreData),
       })
+      if (!cierreRes.ok) {
+        setPinError(`Error al guardar cierre (${cierreRes.status})`)
+        setSaving(false)
+        return
+      }
 
       // Close the turno
-      await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${turnoId}`, {
+      const turnoRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${turnoId}`, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
@@ -207,6 +212,11 @@ export default function CierreCajaWizard({
           notas: notas || null,
         }),
       })
+      if (!turnoRes.ok) {
+        setPinError(`Error al cerrar turno (${turnoRes.status}). El cierre se registró pero el turno no se cerró.`)
+        setSaving(false)
+        return
+      }
 
       // Audit log
       logAudit({
@@ -225,7 +235,7 @@ export default function CierreCajaWizard({
 
       onComplete()
     } catch {
-      setPinError('Error al guardar')
+      setPinError('Error de conexión al guardar cierre')
     }
     setSaving(false)
   }
