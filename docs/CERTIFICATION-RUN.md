@@ -1,11 +1,48 @@
 # Fullsite Certification Run — AMALAY
 
-```
-Versión: 48d7bdb (2026-06-25)
-Restaurante: AMALAY Coffee & Market
-Fecha: _______________
-Ejecutado por: Daniel Ramonfaur
-```
+> **Regla:** Un PASS sin evidencia no cuenta como PASS.
+> **Regla:** Si un P0 falla, se detiene la ejecución, se corrige, y se re-ejecuta la fase.
+> **Regla:** Nunca decir "ya quedó". Solo existe: código listo para certificarse, o código certificado.
+
+## Registro de versión
+
+| Campo | Valor |
+|---|---|
+| Git Commit | `41e74c2` |
+| Vercel Deployment | _______________ |
+| Bridge Version | `1.1.0-node` |
+| printers.json | 5 estaciones (cocina×2, barra, caja, tickets) |
+| Fecha inicio | _______________ |
+| Hardware | Terminal AMALAY (Windows 10, touch) |
+
+> Si cualquiera de estos cambia, la certificación se invalida.
+
+## Plan de ejecución
+
+| Día | Fase | Tests | Regla |
+|---|---|---|---|
+| **Día 1** | Fase 1: Core Flow | ~40 tests | Si P0 FAIL → detener, corregir, re-ejecutar |
+| **Día 2** | Fase 2: Caos + Fase 3: Caja | ~25 tests | Si P0 FAIL → detener, corregir, re-ejecutar |
+| **Día 3** | Fase 4: Seguridad + Fase 5: P1/P2 | ~30 tests | P1 FAILs se documentan como observaciones |
+
+## Evidencia requerida (P0)
+
+Cada test P0 PASS requiere AL MENOS una:
+- 📸 Screenshot
+- 🎟️ Ticket impreso (foto)
+- 🗄️ Registro en Supabase (query result)
+- 📋 Audit log entry
+- 🎥 Video corto
+
+Sin evidencia = NO PASS.
+
+## Estados de certificación
+
+| Estado | Significado |
+|---|---|
+| 🟢 **CERTIFICADO** | Todos los P0 PASS con evidencia |
+| 🟡 **CERTIFICADO CON OBSERVACIONES** | Todos los P0 PASS, algunos P1 pendientes |
+| 🔴 **NO CERTIFICADO** | Al menos un P0 FAIL |
 
 ---
 
@@ -233,7 +270,10 @@ Ejecutado por: Daniel Ramonfaur
 ║ P0 TOTAL:           ___/99  PASS             ║
 ║ Bugs P0 abiertos:   ___                      ║
 ║                                              ║
-║ RESULTADO: □ CERTIFICADO  □ NO CERTIFICADO   ║
+║ RESULTADO:                                   ║
+║  □ 🟢 CERTIFICADO                            ║
+║  □ 🟡 CERTIFICADO CON OBSERVACIONES          ║
+║  □ 🔴 NO CERTIFICADO                         ║
 ║                                              ║
 ║ Firma: _________________________________     ║
 ╚══════════════════════════════════════════════╝
