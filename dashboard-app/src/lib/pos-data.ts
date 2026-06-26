@@ -1018,11 +1018,16 @@ export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
 }))
 
 export function formatMXN(amount: number): string {
-  return `$${amount.toFixed(2)}`
+  const safe = typeof amount === 'number' && !isNaN(amount) ? Math.round(amount * 100) / 100 : 0
+  return `$${safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function generateId(): string {
-  return Math.random().toString(36).substring(2, 11)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for older browsers
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`
 }
 
 // ─── Supabase persistence ───────────────────────────────────────────────────
@@ -1347,7 +1352,7 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) {
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) { // 15 min TTL
       return entry.name as string
     }
   } catch { /* ignore */ }
@@ -1383,7 +1388,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) {
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) { // 15 min TTL
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }

@@ -115,23 +115,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           sessionStorage.removeItem('pos_last_activity')
         }
       }
-      // Pre-populate PIN cache for offline-first: fetch all staff PINs once when online
-      // This ensures the terminal can authenticate even if internet drops on first use
-      ;(async () => {
-        try {
-          const res = await fetch(apiUrl('/api/pos/staff-cache'), { headers: { 'x-client-id': _cid() } })
-          if (res.ok) {
-            const { staff: allStaff } = await res.json()
-            if (Array.isArray(allStaff) && allStaff.length > 0) {
-              const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
-              for (const s of allStaff) {
-                if (s.pin && s.id) cached[s.pin] = { id: s.id, name: s.name, role: s.role, cached_at: Date.now() }
-              }
-              localStorage.setItem('pos_pin_cache', JSON.stringify(cached))
-            }
-          }
-        } catch { /* offline — use existing cache */ }
-      })()
+      // PIN validation is now server-side only via /api/pos/pin
+      // No PINs cached in localStorage (security: prevents PIN theft via DevTools)
     }
   }, [])
 
@@ -297,22 +282,25 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (res.ok) {
         const { staff: member } = await res.json()
         if (member?.id) {
-          // Cache PIN for offline auth
+          // Cache auth token for offline (15 min TTL, no PIN stored)
           try {
-            const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
-            cached[pin] = { ...member, cached_at: Date.now() }
-            localStorage.setItem('pos_pin_cache', JSON.stringify(cached))
+            const pinHash = btoa(pin).slice(0, 8) // short non-reversible token, NOT the PIN
+            const cached = JSON.parse(localStorage.getItem('pos_auth_cache') || '{}')
+            cached[pinHash] = { id: member.id, name: member.name, role: member.role, exp: Date.now() + 900_000 }
+            localStorage.setItem('pos_auth_cache', JSON.stringify(cached))
           } catch { /* ignore */ }
           unlock(member)
           return
         }
       }
     } catch {
-      // Sin red (modo offline) — check cached PINs
+      // Sin red (modo offline) — check cached auth tokens (15 min TTL)
       try {
-        const cached = JSON.parse(localStorage.getItem('pos_pin_cache') || '{}')
-        if (cached[pin]) {
-          unlock({ id: cached[pin].id, name: cached[pin].name, role: cached[pin].role })
+        const pinHash = btoa(pin).slice(0, 8)
+        const cached = JSON.parse(localStorage.getItem('pos_auth_cache') || '{}')
+        const entry = cached[pinHash]
+        if (entry && entry.exp > Date.now()) {
+          unlock({ id: entry.id, name: entry.name, role: entry.role })
           return
         }
       } catch { /* ignore */ }

@@ -1595,7 +1595,22 @@ function POSContent() {
               setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
             }
           } else {
-            // No existing order — start fresh
+            // No existing order — check for unsaved draft
+            try {
+              const draft = localStorage.getItem(`pos_draft_${mesa}`)
+              if (draft) {
+                const d = JSON.parse(draft)
+                if (d.items?.length > 0 && d.ts && Date.now() - d.ts < 1800000) { // 30 min TTL
+                  setOrderItems(d.items)
+                  setOrderId(d.orderId || generateId())
+                  if (d.mesero) setMesero(d.mesero)
+                  if (d.personas) setPersonas(d.personas)
+                  setLoadedOrderId(null)
+                  setLoadedUpdatedAt(null)
+                  return // draft restored, don't reset
+                }
+              }
+            } catch {}
             setOrderItems([])
             setOrderId(generateId())
             setLoadedOrderId(null)
@@ -1650,6 +1665,15 @@ function POSContent() {
 
   // Order ID for audit trail (generated once per order)
   const [orderId, setOrderId] = useState(() => generateId())
+
+  // Auto-save draft items to localStorage on every change (prevents loss on refresh)
+  useEffect(() => {
+    if (mesa > 0 && orderItems.length > 0) {
+      try { localStorage.setItem(`pos_draft_${mesa}`, JSON.stringify({ items: orderItems, orderId, mesero, personas, ts: Date.now() })) } catch {}
+    } else if (mesa > 0) {
+      try { localStorage.removeItem(`pos_draft_${mesa}`) } catch {}
+    }
+  }, [orderItems, mesa, orderId, mesero, personas])
 
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
@@ -1752,6 +1776,8 @@ function POSContent() {
   // Toast state
   const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const operationLock = useRef(false)
+  const genOpId = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -1951,7 +1977,7 @@ function POSContent() {
     setOrderNotes('')
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
-    setSaving(false)
+    setSaving(false); operationLock.current = false
   }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving])
 
   // Cash movement confirmed (already saved to Supabase in modal)
@@ -2052,13 +2078,15 @@ function POSContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItems.length, subtotal, allPromos.length])
 
-  const subtotalAfterDiscount = Math.max(0, subtotal - discount)
-  const iva = subtotalAfterDiscount * IVA_RATE
-  const total = subtotalAfterDiscount + iva
+  const subtotalAfterDiscount = Math.round(Math.max(0, subtotal - discount) * 100) / 100
+  const iva = Math.round(subtotalAfterDiscount * IVA_RATE * 100) / 100
+  const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
   const handleSendToKitchen = async () => {
-    if (activeItems.length === 0 || saving) return
+    if (activeItems.length === 0 || operationLock.current) return
+    operationLock.current = true
     setSaving(true)
+    const opId = genOpId()
 
     // Multi-user conflict check: if we loaded an existing order, verify it hasn't been modified since
     if (loadedOrderId && loadedUpdatedAt) {
@@ -2073,7 +2101,7 @@ function POSContent() {
             const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
             if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
               showToast('Esta orden fue modificada por otro usuario')
-              setSaving(false)
+              setSaving(false); operationLock.current = false
               return
             }
           }
@@ -2097,6 +2125,14 @@ function POSContent() {
       notas: orderNotes || undefined,
       createdAt: new Date(),
     }
+    // SAVE FIRST — confirm persistence before printing
+    const ok = await saveOrder(order)
+    if (!ok) {
+      showToast('Error al guardar orden — NO se imprimió')
+      setSaving(false); operationLock.current = false
+      return
+    }
+
     // Only print NEW items (not already sent to kitchen)
     const newItems = activeItems.filter(i => !sentItemIds.has(i.id))
     if (newItems.length > 0) {
@@ -2114,14 +2150,13 @@ function POSContent() {
       return next
     })
 
-    // Optimistic UI
+    // UI feedback
     showToast(newItems.length > 0 ? `${newItems.length} items enviados` : 'Orden actualizada')
     setSentToKitchen(true)
     setTimeout(() => setSentToKitchen(false), 2000)
 
-    const ok = await saveOrder(order)
-    if (ok) {
-      logAudit({
+    // Post-save actions
+    logAudit({
         order_id: orderId, action: 'order_sent_kitchen', actor: mesero, mesa,
         details: { items_count: activeItems.length, total },
       })
@@ -2135,31 +2170,16 @@ function POSContent() {
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())
-      setSaving(false)
+      setSaving(false); operationLock.current = false
       // Cache order locally so it loads instantly when returning to this mesa
-      try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() })) } catch {}
+      try {
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() }))
+        localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
+      } catch {}
       // Clear session to force PIN, then go to mesas
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
       setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
-    } else {
-      showToast('Error al guardar — reintentando...')
-      // Retry once
-      const retry = await saveOrder(order)
-      if (retry) {
-        setLoadedOrderId(orderId)
-        setLoadedUpdatedAt(new Date().toISOString())
-        setSaving(false)
-        // After sending, go to table map
-      // Clear session to force PIN, then go to mesas
-      sessionStorage.removeItem('pos_staff')
-      sessionStorage.removeItem('pos_last_activity')
-      setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
-      } else {
-        showToast('Error al guardar orden — revisa conexión')
-        setSaving(false)
-      }
-    }
   }
 
   // Pre-ticket (precuenta — antes de cobrar)
@@ -2193,7 +2213,10 @@ function POSContent() {
   }
 
   const handlePayment = async (method: string) => {
+    if (operationLock.current) return
+    operationLock.current = true
     setSaving(true)
+    const opId = genOpId()
 
     // Determine which items to pay based on split state
     let payingItems = activeItems
@@ -2303,14 +2326,14 @@ function POSContent() {
         setPropina(0)
         setShowCashFlow(false)
         setCashAmount('')
-        setSaving(false)
+        setSaving(false); operationLock.current = false
         return // Don't reset order yet
       }
 
       // Fully done (no split, or last cuenta paid)
       showToast(`Todas las cuentas cobradas — ${method}${propina > 0 ? ` + propina ${formatMXN(propina)}` : ''}`)
 
-      setSaving(false)
+      setSaving(false); operationLock.current = false
       setOrderItems([])
       setCancelledItems(new Set())
       setSentItemIds(new Set())
@@ -2335,7 +2358,7 @@ function POSContent() {
       setOrderId(generateId())
     } else {
       showToast('Error al cerrar cuenta')
-      setSaving(false)
+      setSaving(false); operationLock.current = false
     }
   }
 
@@ -4008,18 +4031,18 @@ function POSContent() {
                               handlePayment('Tarjeta de credito')
                             } else if (statusData.state === 'CANCELED' || statusData.state === 'ERROR' || attempts > 60) {
                               clearInterval(mpPollRef.current!); mpPollRef.current = null
-                              setSaving(false)
+                              setSaving(false); operationLock.current = false
                               showToast(statusData.state === 'CANCELED' ? 'Pago cancelado' : 'Error en terminal')
                             }
                           } catch { /* keep polling */ }
                         }, 3000)
                       } else {
                         // MP failed, fall back to manual
-                        setSaving(false)
+                        setSaving(false); operationLock.current = false
                         handlePayment('Tarjeta de credito')
                       }
                     } catch {
-                      setSaving(false)
+                      setSaving(false); operationLock.current = false
                       handlePayment('Tarjeta de credito')
                     }
                   } else {

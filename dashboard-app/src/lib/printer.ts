@@ -153,7 +153,7 @@ function textToBytes(text: string): number[] {
 // responde se cae a Bluetooth y luego a CSS.
 
 const BRIDGE_URL = 'http://127.0.0.1:7717'
-const BRIDGE_HEALTH_TTL_MS = 30_000
+const BRIDGE_HEALTH_TTL_MS = 5_000
 
 let bridgeAvailable: boolean | null = null
 let bridgeLastCheck = 0
@@ -232,6 +232,7 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
     })
     if (!res.ok) {
       console.warn(`[printer] Bridge /print HTTP ${res.status}`)
+      bridgeAvailable = false // invalidate cache on failure
       // Enqueue failed print for retry
       try {
         const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
