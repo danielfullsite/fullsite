@@ -25,7 +25,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
 
-  // Register service worker for offline support
+  // Register service worker + start background queues on mount
   const swRegistered = useRef(false)
   useEffect(() => {
     if (!swRegistered.current) {
@@ -33,6 +33,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       registerServiceWorker()
       // Auto-sync offline queue when internet returns
       import('@/lib/pos-offline-db').then(m => m.registerAutoSync()).catch(() => {})
+      // Start print retry loop — processes any queued print jobs from previous sessions
+      import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
     }
   }, [])
 

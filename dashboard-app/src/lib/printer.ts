@@ -6,7 +6,7 @@
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
 import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
-import { enqueueFailedPrint, startRetryLoop } from './print-queue'
+import { enqueueFailedPrint } from './print-queue'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -1304,9 +1304,10 @@ export async function printByStation(order: Order): Promise<{ printed: boolean; 
       console.log(`[printer] No BT connection for ${station}`)
     }
     // Queue for retry — single enqueue point for failed comandas
+    // Don't start retry loop here — it runs from layout mount to avoid
+    // race conditions with page navigation (window.location.href kills pending writes)
     console.warn(`[printer] ${station}: no bridge, no BT — comanda NOT printed`)
     enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda', { mesa: order.mesa, mesero: order.mesero, orderId: order.id })
-    startRetryLoop()
     failedStations.push(station)
   }
 
