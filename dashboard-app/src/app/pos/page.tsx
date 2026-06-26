@@ -1396,6 +1396,19 @@ function POSContent() {
     return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval) }
   }, [])
 
+  // Print queue needs_attention tracking
+  const [printNeedsAttention, setPrintNeedsAttention] = useState(0)
+  useEffect(() => {
+    const update = (e?: Event) => {
+      const detail = (e as CustomEvent)?.detail
+      setPrintNeedsAttention(detail?.needsAttention ?? 0)
+    }
+    // Check on mount
+    import('@/lib/print-queue').then(m => setPrintNeedsAttention(m.getNeedsAttentionCount())).catch(() => {})
+    window.addEventListener('print-queue-updated', update)
+    return () => window.removeEventListener('print-queue-updated', update)
+  }, [])
+
   // Multi-device presence counter
   const [connectedDevices, setConnectedDevices] = useState(0)
 
@@ -2537,6 +2550,22 @@ function POSContent() {
           </button>
         </div>
       </header>
+
+      {/* Print queue needs_attention banner — persistent until resolved */}
+      {printNeedsAttention > 0 && (
+        <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between flex-shrink-0 text-sm font-bold">
+          <span>{printNeedsAttention} comanda{printNeedsAttention > 1 ? 's' : ''} sin imprimir</span>
+          <button
+            onClick={async () => {
+              const { retryAllNeedsAttention } = await import('@/lib/print-queue')
+              retryAllNeedsAttention()
+            }}
+            className="bg-white text-red-600 px-3 py-1 rounded font-bold text-xs"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       {/* Nav overlay */}

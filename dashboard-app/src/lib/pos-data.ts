@@ -83,16 +83,19 @@
 // CREATE TABLE pos_inventory_movements (
 //   id BIGSERIAL PRIMARY KEY,
 //   client_id TEXT DEFAULT 'amalay',
-//   ingredient_id TEXT NOT NULL REFERENCES pos_ingredients(id),
-//   movement_type TEXT NOT NULL,    -- 'deduction', 'restock', 'adjustment', 'waste'
+//   product_id BIGINT REFERENCES pos_inventory_products(id),  -- target column (nullable during compat bridge)
+//   ingredient_id TEXT,              -- COMPAT BRIDGE: temporary, maps to pos_ingredients.id
+//   movement_type TEXT NOT NULL,     -- 'deduction', 'restock', 'adjustment', 'waste'
 //   quantity NUMERIC NOT NULL,
-//   order_id TEXT,
+//   order_id UUID,
 //   actor TEXT,
 //   notes TEXT,
 //   created_at TIMESTAMPTZ DEFAULT NOW()
 // );
-// CREATE INDEX idx_inv_mov_ingredient ON pos_inventory_movements(ingredient_id);
+// CREATE INDEX idx_inv_mov_product ON pos_inventory_movements(product_id);
 // CREATE INDEX idx_inv_mov_created ON pos_inventory_movements(created_at DESC);
+// CREATE INDEX idx_inv_mov_type ON pos_inventory_movements(movement_type);
+// -- See docs/INVENTORY-MIGRATION.md for migration plan
 //
 // -- COMPRAS: Purchase Orders + Facturas
 // CREATE TABLE pos_purchase_orders (
@@ -1560,6 +1563,11 @@ export async function updateInventoryStock(ingredientId: string, newStock: numbe
   }
 }
 
+// COMPAT BRIDGE: ingredient_id (TEXT) is a temporary compatibility column.
+// pos_inventory_movements was migrated to product_id (BIGINT → pos_inventory_products),
+// but all POS code still operates on the legacy pos_ingredients model.
+// When the full inventory migration is complete, replace ingredient_id with product_id.
+// See docs/INVENTORY-MIGRATION.md for the migration plan.
 export async function logInventoryMovement(movement: {
   ingredient_id: string; movement_type: string; quantity: number;
   order_id?: string; actor?: string; notes?: string;

@@ -1,13 +1,18 @@
 // Print Queue — cola de impresión offline con retry automático.
 // Si el bridge o la impresora fallan, el job se encola y se reintenta
 // automáticamente. Persiste en localStorage para sobrevivir recargas.
+//
+// Comandas de cocina/barra son P0: nunca se marcan como 'failed'.
+// Después de agotar retries pasan a 'needs_attention' y dejan de
+// golpear el bridge hasta que alguien las reintente manualmente o
+// el bridge vuelva online (health check).
 
 export interface PrintJob {
   id: string
   station: string
   data: string          // base64 ESC/POS bytes
   type: 'comanda' | 'ticket' | 'preticket' | 'drawer'
-  status: 'pending' | 'retrying' | 'printed' | 'failed'
+  status: 'pending' | 'retrying' | 'printed' | 'failed' | 'needs_attention'
   retries: number
   maxRetries: number
   createdAt: string
@@ -24,6 +29,7 @@ const STORAGE_KEY = 'pos_print_queue'
 const MAX_RETRIES = 5
 const RETRY_INTERVAL_MS = 15_000 // 15 seconds
 const BRIDGE_URL = 'http://127.0.0.1:7717'
+const BRIDGE_HEALTH_TIMEOUT_MS = 800
 
 // ── Storage ─────────────────────────────────────────────────────────────
 
@@ -67,6 +73,14 @@ export function getPendingCount(): number {
   return loadQueue().filter(j => j.status === 'pending' || j.status === 'retrying').length
 }
 
+export function getNeedsAttentionCount(): number {
+  return loadQueue().filter(j => j.status === 'needs_attention').length
+}
+
+export function getNeedsAttentionJobs(): PrintJob[] {
+  return loadQueue().filter(j => j.status === 'needs_attention')
+}
+
 export function clearCompleted() {
   const queue = loadQueue().filter(j => j.status !== 'printed')
   saveQueue(queue)
@@ -79,6 +93,38 @@ export function clearAll() {
 export function removeJob(id: string) {
   const queue = loadQueue().filter(j => j.id !== id)
   saveQueue(queue)
+}
+
+/** Retry a specific job (manual retry from UI). Resets status to pending. */
+export function retryJob(id: string) {
+  const queue = loadQueue()
+  const job = queue.find(j => j.id === id)
+  if (job && (job.status === 'needs_attention' || job.status === 'failed')) {
+    job.status = 'pending'
+    job.retries = 0
+    job.error = null
+    saveQueue(queue)
+    // Trigger immediate processing
+    processQueue()
+  }
+}
+
+/** Retry all needs_attention jobs at once (e.g. after bridge comes back). */
+export function retryAllNeedsAttention() {
+  const queue = loadQueue()
+  let changed = false
+  for (const job of queue) {
+    if (job.status === 'needs_attention') {
+      job.status = 'pending'
+      job.retries = 0
+      job.error = null
+      changed = true
+    }
+  }
+  if (changed) {
+    saveQueue(queue)
+    processQueue()
+  }
 }
 
 // ── Cloud sync (optional persistence to Supabase) ──────────────────────
@@ -117,6 +163,31 @@ async function syncJobToCloud(job: PrintJob) {
   }
 }
 
+// ── Bridge health check ────────────────────────────────────────────────
+// Cached to avoid hammering the bridge every processQueue() cycle.
+
+let _bridgeUp: boolean | null = null
+let _bridgeCheckedAt = 0
+const BRIDGE_HEALTH_TTL_MS = 10_000 // cache health for 10s
+
+async function isBridgeHealthy(): Promise<boolean> {
+  const now = Date.now()
+  if (_bridgeUp !== null && now - _bridgeCheckedAt < BRIDGE_HEALTH_TTL_MS) {
+    return _bridgeUp
+  }
+  _bridgeCheckedAt = now
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), BRIDGE_HEALTH_TIMEOUT_MS)
+    const res = await fetch(`${BRIDGE_URL}/health`, { signal: ctrl.signal })
+    clearTimeout(t)
+    _bridgeUp = res.ok
+  } catch {
+    _bridgeUp = false
+  }
+  return _bridgeUp
+}
+
 // ── Retry engine ────────────────────────────────────────────────────────
 
 async function attemptPrint(job: PrintJob): Promise<boolean> {
@@ -143,9 +214,27 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
 
 async function processQueue() {
   const queue = loadQueue()
+  // Only process pending/retrying — needs_attention waits for manual retry or bridge recovery
   const pending = queue.filter(j => j.status === 'pending' || j.status === 'retrying')
 
-  if (pending.length === 0) return
+  if (pending.length === 0) {
+    // If bridge came back up and there are needs_attention comandas, auto-recover them
+    const stuck = queue.filter(j => j.status === 'needs_attention')
+    if (stuck.length > 0 && await isBridgeHealthy()) {
+      console.log(`[print-queue] Bridge is back — recovering ${stuck.length} needs_attention job(s)`)
+      retryAllNeedsAttention()
+    }
+    notifyListeners()
+    return
+  }
+
+  // Don't attempt prints if bridge is down — avoids useless requests
+  const bridgeUp = await isBridgeHealthy()
+  if (!bridgeUp) {
+    console.log(`[print-queue] Bridge DOWN — skipping ${pending.length} job(s), will retry when healthy`)
+    notifyListeners()
+    return
+  }
 
   let changed = false
   for (const job of pending) {
@@ -161,9 +250,16 @@ async function processQueue() {
       console.log(`[print-queue] ✓ ${job.type} ${job.station} printed (${job.id}, attempt ${job.retries})`)
       syncJobToCloud(job)
     } else if (job.retries >= job.maxRetries) {
-      job.status = 'failed'
-      job.error = `Failed after ${job.retries} attempts`
-      console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED permanently (${job.id})`)
+      if (job.type === 'comanda') {
+        // Comandas are P0 — never silently fail. Escalate to needs_attention.
+        job.status = 'needs_attention'
+        job.error = `${job.retries} intentos fallidos — requiere atención`
+        console.warn(`[print-queue] ⚠ COMANDA ${job.station} needs attention (${job.id}) — mesa ${job.meta?.mesa ?? '?'}`)
+      } else {
+        job.status = 'failed'
+        job.error = `Failed after ${job.retries} attempts`
+        console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED permanently (${job.id})`)
+      }
       syncJobToCloud(job)
     } else {
       job.status = 'pending'
@@ -174,10 +270,17 @@ async function processQueue() {
   }
 
   if (changed) saveQueue(queue)
+  notifyListeners()
+}
 
-  // Notify listeners
+function notifyListeners() {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('print-queue-updated', { detail: { pending: getPendingCount() } }))
+    window.dispatchEvent(new CustomEvent('print-queue-updated', {
+      detail: {
+        pending: getPendingCount(),
+        needsAttention: getNeedsAttentionCount(),
+      },
+    }))
   }
 }
 

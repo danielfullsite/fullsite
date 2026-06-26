@@ -15,7 +15,7 @@ const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', c
 interface MonitorData {
   orders: { total: number; cerradas: number; abiertas: number; ventasHoy: number }
   payments: { efectivo: number; tarjeta: number; otros: number; propinas: number }
-  prints: { pending: number; printed: number; failed: number }
+  prints: { pending: number; printed: number; failed: number; needsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] }
   bridge: { online: boolean; uptime: number; stations: string[] }
   sync: { pending: number; failed: number }
   errors: string[]
@@ -74,6 +74,13 @@ export default function MonitorPage() {
         syncFailed = queue.filter((i: { retries?: number }) => (i.retries || 0) >= 5).length
       } catch { /* */ }
 
+      // Local print queue (needs_attention comandas)
+      let localPrintNeedsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] = []
+      try {
+        const { getNeedsAttentionJobs } = await import('@/lib/print-queue')
+        localPrintNeedsAttention = getNeedsAttentionJobs()
+      } catch { /* */ }
+
       setData({
         orders: {
           total: orders.length,
@@ -86,6 +93,7 @@ export default function MonitorPage() {
           pending: prints.filter((p: { status: string }) => p.status === 'pending' || p.status === 'retrying').length,
           printed: prints.filter((p: { status: string }) => p.status === 'printed').length,
           failed: prints.filter((p: { status: string }) => p.status === 'failed').length,
+          needsAttention: localPrintNeedsAttention,
         },
         bridge: {
           online: !!bridgeData?.ok,
@@ -166,6 +174,7 @@ export default function MonitorPage() {
               <p className="text-lg font-bold text-emerald-400">{data.prints.printed} <span className="text-[var(--text-3)] text-sm font-normal">impresas</span></p>
               {data.prints.pending > 0 && <p className="text-xs text-amber-400">{data.prints.pending} en cola</p>}
               {data.prints.failed > 0 && <p className="text-xs text-red-400">{data.prints.failed} fallidas</p>}
+              {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atención</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -176,6 +185,46 @@ export default function MonitorPage() {
               <p className="text-xs text-[var(--text-3)]">sin resolver</p>
             </div>
           </div>
+
+          {/* Comandas needs_attention */}
+          {data.prints.needsAttention.length > 0 && (
+            <div className="bg-red-950 border border-red-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-red-400">Comandas sin imprimir</h3>
+                <button
+                  onClick={async () => {
+                    const { retryAllNeedsAttention } = await import('@/lib/print-queue')
+                    retryAllNeedsAttention()
+                    setTimeout(refresh, 1000)
+                  }}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold"
+                >
+                  Reintentar todas
+                </button>
+              </div>
+              <div className="space-y-2">
+                {data.prints.needsAttention.map((job: { id: string; station: string; error: string | null; meta?: { mesa?: number; mesero?: string } }) => (
+                  <div key={job.id} className="flex items-center justify-between bg-red-900/40 rounded-lg px-3 py-2 text-sm">
+                    <div>
+                      <span className="text-red-300 font-bold">{job.station}</span>
+                      {job.meta?.mesa != null && <span className="text-red-400 ml-2">Mesa {job.meta.mesa}</span>}
+                      {job.meta?.mesero && <span className="text-red-500 ml-2">{job.meta.mesero}</span>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const { retryJob } = await import('@/lib/print-queue')
+                        retryJob(job.id)
+                        setTimeout(refresh, 1000)
+                      }}
+                      className="text-white bg-red-700 px-2 py-0.5 rounded text-xs"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Sales */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
