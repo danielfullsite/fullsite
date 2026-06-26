@@ -2224,6 +2224,11 @@ function POSContent() {
 
   const handleCloseOrder = () => {
     if (orderItems.length === 0) return
+    // Block payment if order was never sent to kitchen (no items sent, no loaded order from DB)
+    if (sentItemIds.size === 0 && !loadedOrderId) {
+      showToast('Primero envía la orden a cocina antes de cobrar')
+      return
+    }
     setVerifiedPersonas(personas)
     setCustomPersonas('')
     setShowPersonVerify(true)
