@@ -47,6 +47,7 @@ function loadQueue(): PrintJob[] {
 function saveQueue(queue: PrintJob[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue))
+    console.log(`[print-queue] SAVE ${queue.length} jobs: ${queue.map(j => j.status).join(', ') || 'empty'}`)
   } catch { /* private mode */ }
 }
 
@@ -93,7 +94,9 @@ export function getBridgeUnavailableCount(): number {
 }
 
 export function clearCompleted() {
-  const queue = loadQueue().filter(j => j.status !== 'printed')
+  const before = loadQueue()
+  const queue = before.filter(j => j.status !== 'printed')
+  console.log(`[print-queue] CLEAR_COMPLETED ${before.length} → ${queue.length}`)
   saveQueue(queue)
 }
 
@@ -225,6 +228,7 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
 
 async function processQueue() {
   const queue = loadQueue()
+  console.log(`[print-queue] PROCESS ${queue.length} jobs: ${queue.map(j => j.status).join(', ') || 'empty'}`)
   const bridgeUp = await isBridgeHealthy()
   const now = Date.now()
   let changed = false
@@ -358,9 +362,12 @@ export function enqueueFailedPrint(
   type: PrintJob['type'],
   meta?: PrintJob['meta'],
 ) {
+  console.log(`[print-queue] ENQUEUE_FAILED type=${type} station=${station} bytes=${bytes.length}`)
   const data = typeof btoa !== 'undefined'
     ? btoa(String.fromCharCode(...bytes))
     : Buffer.from(bytes).toString('base64')
 
-  return enqueue({ station, data, type, meta })
+  const job = enqueue({ station, data, type, meta })
+  console.log(`[print-queue] ENQUEUE_FAILED done id=${job.id} queueSize=${loadQueue().length}`)
+  return job
 }

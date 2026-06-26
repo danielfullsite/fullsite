@@ -308,11 +308,15 @@ export default function Sidebar() {
           </p>
         )}
 
-        {/* Logout — always visible, nukes all storage */}
+        {/* Logout — clear auth state but preserve operational queues (print queue, sync queue) */}
         <button
           onClick={() => {
             try { signOut() } catch {}
+            // Never use localStorage.clear() — it destroys print queue and offline sync data
+            const preserveKeys = ['pos_print_queue', 'fullsite_offline_queue', 'fullsite_client_id']
+            const preserved = preserveKeys.map(k => [k, localStorage.getItem(k)] as const)
             localStorage.clear()
+            for (const [k, v] of preserved) { if (v !== null) localStorage.setItem(k, v) }
             sessionStorage.clear()
             window.location.href = '/login'
           }}
