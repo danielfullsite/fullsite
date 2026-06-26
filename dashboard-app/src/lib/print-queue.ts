@@ -47,35 +47,7 @@ function loadQueue(): PrintJob[] {
 function saveQueue(queue: PrintJob[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue))
-    console.log(`[print-queue] SAVE ${queue.length} jobs: ${queue.map(j => j.status).join(', ') || 'empty'}`)
-    console.trace('[print-queue] SAVE stacktrace')
   } catch { /* private mode */ }
-}
-
-// Detect external modifications to the print queue (other tabs, extensions, etc.)
-if (typeof window !== 'undefined') {
-  // storage event fires when ANOTHER tab modifies localStorage
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY || e.key === null) {
-      console.warn(`[print-queue] EXTERNAL STORAGE CHANGE key=${e.key} oldLen=${e.oldValue?.length ?? 'null'} newLen=${e.newValue?.length ?? 'null'}`)
-    }
-  })
-  // Override localStorage.removeItem to detect deletion
-  const origRemove = localStorage.removeItem.bind(localStorage)
-  localStorage.removeItem = function(key: string) {
-    if (key === STORAGE_KEY) {
-      console.warn('[print-queue] REMOVE_ITEM called!')
-      console.trace('[print-queue] REMOVE_ITEM stacktrace')
-    }
-    return origRemove(key)
-  }
-  // Override localStorage.clear to detect nuclear option
-  const origClear = localStorage.clear.bind(localStorage)
-  localStorage.clear = function() {
-    console.warn('[print-queue] localStorage.clear() called!')
-    console.trace('[print-queue] CLEAR stacktrace')
-    return origClear()
-  }
 }
 
 // ── Queue operations ────────────────────────────────────────────────────
@@ -121,9 +93,7 @@ export function getBridgeUnavailableCount(): number {
 }
 
 export function clearCompleted() {
-  const before = loadQueue()
-  const queue = before.filter(j => j.status !== 'printed')
-  console.log(`[print-queue] CLEAR_COMPLETED ${before.length} → ${queue.length}`)
+  const queue = loadQueue().filter(j => j.status !== 'printed')
   saveQueue(queue)
 }
 
@@ -255,7 +225,7 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
 
 async function processQueue() {
   const queue = loadQueue()
-  console.log(`[print-queue] PROCESS ${queue.length} jobs: ${queue.map(j => j.status).join(', ') || 'empty'}`)
+  // processQueue runs every 15s — only log when there's something to do
   const bridgeUp = await isBridgeHealthy()
   const now = Date.now()
   let changed = false
@@ -267,7 +237,7 @@ async function processQueue() {
         // Bridge came back — return to pending for real retry
         job.status = 'pending'
         job.error = null
-        console.log(`[print-queue] Bridge back — ${job.type} ${job.station} returning to pending (${job.id})`)
+        // Bridge recovered — job returns to pending silently
         changed = true
       } else {
         // Still down — check if we've waited long enough to escalate
@@ -296,7 +266,7 @@ async function processQueue() {
         job.status = 'pending'
         job.retries = 0
         job.error = null
-        console.log(`[print-queue] Bridge back — recovering ${job.type} ${job.station} (${job.id})`)
+        console.log(`[print-queue] Bridge back — recovering ${job.type} ${job.station}`)
         changed = true
       }
     }
@@ -389,12 +359,9 @@ export function enqueueFailedPrint(
   type: PrintJob['type'],
   meta?: PrintJob['meta'],
 ) {
-  console.log(`[print-queue] ENQUEUE_FAILED type=${type} station=${station} bytes=${bytes.length}`)
   const data = typeof btoa !== 'undefined'
     ? btoa(String.fromCharCode(...bytes))
     : Buffer.from(bytes).toString('base64')
 
-  const job = enqueue({ station, data, type, meta })
-  console.log(`[print-queue] ENQUEUE_FAILED done id=${job.id} queueSize=${loadQueue().length}`)
-  return job
+  return enqueue({ station, data, type, meta })
 }
