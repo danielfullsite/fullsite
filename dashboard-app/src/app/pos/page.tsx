@@ -1962,13 +1962,12 @@ function POSContent() {
     }
     // Mark order as cancelled in database (if it was already saved)
     if (loadedOrderId) {
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
-          method: 'PATCH',
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ status: 'cancelada', notas: `ANULADA: ${reason} (por ${managerName})` }),
-        })
-      } catch { /* offline - will be caught by sync */ }
+      const voidOk = await updateOrderStatus(loadedOrderId, 'cancelada', { notas: `ANULADA: ${reason} (por ${managerName})` })
+      if (!voidOk) {
+        showToast('Error al anular — la orden NO se anuló. Reintenta.')
+        setSaving(false); operationLock.current = false
+        return // DO NOT clear UI if DB update failed
+      }
     }
     setOrderItems([])
     setCancelledItems(new Set())
