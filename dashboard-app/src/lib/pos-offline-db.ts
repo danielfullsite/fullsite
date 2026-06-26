@@ -248,3 +248,21 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
   await clearSyncedItems()
   return { synced, failed }
 }
+
+// ─── Auto-sync on reconnect ──────────────────────────────────────────────────
+// When internet returns, automatically sync pending operations.
+
+let autoSyncRegistered = false
+
+export function registerAutoSync() {
+  if (autoSyncRegistered || typeof window === 'undefined') return
+  autoSyncRegistered = true
+
+  window.addEventListener('online', async () => {
+    console.log('[offline-sync] Internet restored — syncing pending operations...')
+    const { synced, failed } = await syncAll()
+    if (synced > 0 || failed > 0) {
+      console.log(`[offline-sync] Sync complete: ${synced} synced, ${failed} failed`)
+    }
+  })
+}

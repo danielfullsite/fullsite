@@ -31,6 +31,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     if (!swRegistered.current) {
       swRegistered.current = true
       registerServiceWorker()
+      // Auto-sync offline queue when internet returns
+      import('@/lib/pos-offline-db').then(m => m.registerAutoSync()).catch(() => {})
     }
   }, [])
 
