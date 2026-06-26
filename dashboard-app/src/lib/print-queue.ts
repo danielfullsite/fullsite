@@ -48,7 +48,34 @@ function saveQueue(queue: PrintJob[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue))
     console.log(`[print-queue] SAVE ${queue.length} jobs: ${queue.map(j => j.status).join(', ') || 'empty'}`)
+    console.trace('[print-queue] SAVE stacktrace')
   } catch { /* private mode */ }
+}
+
+// Detect external modifications to the print queue (other tabs, extensions, etc.)
+if (typeof window !== 'undefined') {
+  // storage event fires when ANOTHER tab modifies localStorage
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY || e.key === null) {
+      console.warn(`[print-queue] EXTERNAL STORAGE CHANGE key=${e.key} oldLen=${e.oldValue?.length ?? 'null'} newLen=${e.newValue?.length ?? 'null'}`)
+    }
+  })
+  // Override localStorage.removeItem to detect deletion
+  const origRemove = localStorage.removeItem.bind(localStorage)
+  localStorage.removeItem = function(key: string) {
+    if (key === STORAGE_KEY) {
+      console.warn('[print-queue] REMOVE_ITEM called!')
+      console.trace('[print-queue] REMOVE_ITEM stacktrace')
+    }
+    return origRemove(key)
+  }
+  // Override localStorage.clear to detect nuclear option
+  const origClear = localStorage.clear.bind(localStorage)
+  localStorage.clear = function() {
+    console.warn('[print-queue] localStorage.clear() called!')
+    console.trace('[print-queue] CLEAR stacktrace')
+    return origClear()
+  }
 }
 
 // ── Queue operations ────────────────────────────────────────────────────
