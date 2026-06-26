@@ -86,22 +86,15 @@ export default function CierreCajaWizard({
     async function fetchShiftData() {
       try {
         const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${encodeURIComponent(turnoOpenedAt)}`
-        console.log('[CierreCaja] Fetching orders:', queryUrl)
-        console.log('[CierreCaja] turnoOpenedAt:', turnoOpenedAt)
-        console.log('[CierreCaja] Using key:', SUPABASE_KEY?.substring(0, 20) + '...')
         const res = await fetch(queryUrl,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         )
-        console.log('[CierreCaja] Response status:', res.status)
         if (res.ok) {
           const orders = await res.json()
-          console.log('[CierreCaja] Orders received:', orders.length)
-          console.log('[CierreCaja] Orders detail:', JSON.stringify(orders))
           let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
           let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
 
           for (const order of orders) {
-            console.log('[CierreCaja] Processing order:', order.status, order.total, order.metodo_pago)
             if (order.status === 'cancelada') {
               cancelaciones++
               continue
@@ -122,7 +115,7 @@ export default function CierreCajaWizard({
               }
             }
           }
-          console.log('[CierreCaja] Final calc:', { efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones })
+
 
           // Fetch cash movements (depositos / retiros) for this turno
           let depositos = 0, retiros = 0
