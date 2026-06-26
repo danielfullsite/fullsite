@@ -1,18 +1,22 @@
-// Print Queue — cola de impresión offline con retry automático.
-// Si el bridge o la impresora fallan, el job se encola y se reintenta
-// automáticamente. Persiste en localStorage para sobrevivir recargas.
+// Print Queue — cola de impresión con retry automático.
+// Persiste en localStorage para sobrevivir recargas de página.
 //
-// Comandas de cocina/barra son P0: nunca se marcan como 'failed'.
-// Después de agotar retries pasan a 'needs_attention' y dejan de
-// golpear el bridge hasta que alguien las reintente manualmente o
-// el bridge vuelva online (health check).
+// State machine:
+//   pending → retrying → printed           (happy path, bridge UP)
+//   pending → bridge_unavailable           (bridge DOWN, no retries consumed)
+//   bridge_unavailable → pending → printed (bridge comes back within 120s)
+//   bridge_unavailable → needs_attention   (bridge DOWN >120s, comanda only)
+//   retrying → needs_attention             (5 real retries failed, comanda only)
+//   retrying → failed                      (5 real retries failed, ticket/other)
+//
+// Retries only count real print attempts. Bridge-down skips don't consume retries.
 
 export interface PrintJob {
   id: string
   station: string
   data: string          // base64 ESC/POS bytes
   type: 'comanda' | 'ticket' | 'preticket' | 'drawer'
-  status: 'pending' | 'retrying' | 'printed' | 'failed' | 'needs_attention'
+  status: 'pending' | 'retrying' | 'printed' | 'failed' | 'needs_attention' | 'bridge_unavailable'
   retries: number
   maxRetries: number
   createdAt: string
@@ -30,6 +34,7 @@ const MAX_RETRIES = 5
 const RETRY_INTERVAL_MS = 15_000 // 15 seconds
 const BRIDGE_URL = 'http://127.0.0.1:7717'
 const BRIDGE_HEALTH_TIMEOUT_MS = 800
+const BRIDGE_UNAVAILABLE_ESCALATION_MS = 120_000 // 2 minutes → needs_attention
 
 // ── Storage ─────────────────────────────────────────────────────────────
 
@@ -70,7 +75,9 @@ export function getQueue(): PrintJob[] {
 }
 
 export function getPendingCount(): number {
-  return loadQueue().filter(j => j.status === 'pending' || j.status === 'retrying').length
+  return loadQueue().filter(j =>
+    j.status === 'pending' || j.status === 'retrying' || j.status === 'bridge_unavailable'
+  ).length
 }
 
 export function getNeedsAttentionCount(): number {
@@ -79,6 +86,10 @@ export function getNeedsAttentionCount(): number {
 
 export function getNeedsAttentionJobs(): PrintJob[] {
   return loadQueue().filter(j => j.status === 'needs_attention')
+}
+
+export function getBridgeUnavailableCount(): number {
+  return loadQueue().filter(j => j.status === 'bridge_unavailable').length
 }
 
 export function clearCompleted() {
@@ -99,22 +110,21 @@ export function removeJob(id: string) {
 export function retryJob(id: string) {
   const queue = loadQueue()
   const job = queue.find(j => j.id === id)
-  if (job && (job.status === 'needs_attention' || job.status === 'failed')) {
+  if (job && (job.status === 'needs_attention' || job.status === 'failed' || job.status === 'bridge_unavailable')) {
     job.status = 'pending'
     job.retries = 0
     job.error = null
     saveQueue(queue)
-    // Trigger immediate processing
     processQueue()
   }
 }
 
-/** Retry all needs_attention jobs at once (e.g. after bridge comes back). */
-export function retryAllNeedsAttention() {
+/** Retry all needs_attention + bridge_unavailable jobs at once. */
+export function retryAllStuck() {
   const queue = loadQueue()
   let changed = false
   for (const job of queue) {
-    if (job.status === 'needs_attention') {
+    if (job.status === 'needs_attention' || job.status === 'bridge_unavailable') {
       job.status = 'pending'
       job.retries = 0
       job.error = null
@@ -126,6 +136,9 @@ export function retryAllNeedsAttention() {
     processQueue()
   }
 }
+
+// Keep old name as alias for backward compat with UI code
+export const retryAllNeedsAttention = retryAllStuck
 
 // ── Cloud sync (optional persistence to Supabase) ──────────────────────
 
@@ -158,17 +171,15 @@ async function syncJobToCloud(job: PrintJob) {
       }),
     })
   } catch {
-    // Cloud sync is best-effort — never block local queue
     console.warn(`[print-queue] Cloud sync failed for ${job.id}`)
   }
 }
 
 // ── Bridge health check ────────────────────────────────────────────────
-// Cached to avoid hammering the bridge every processQueue() cycle.
 
 let _bridgeUp: boolean | null = null
 let _bridgeCheckedAt = 0
-const BRIDGE_HEALTH_TTL_MS = 10_000 // cache health for 10s
+const BRIDGE_HEALTH_TTL_MS = 10_000
 
 async function isBridgeHealthy(): Promise<boolean> {
   const now = Date.now()
@@ -214,59 +225,95 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
 
 async function processQueue() {
   const queue = loadQueue()
-  // Only process pending/retrying — needs_attention waits for manual retry or bridge recovery
+  const bridgeUp = await isBridgeHealthy()
+  const now = Date.now()
+  let changed = false
+
+  // ── Phase 1: Handle bridge_unavailable jobs ─────────────────────────
+  for (const job of queue) {
+    if (job.status === 'bridge_unavailable') {
+      if (bridgeUp) {
+        // Bridge came back — return to pending for real retry
+        job.status = 'pending'
+        job.error = null
+        console.log(`[print-queue] Bridge back — ${job.type} ${job.station} returning to pending (${job.id})`)
+        changed = true
+      } else {
+        // Still down — check if we've waited long enough to escalate
+        const waitingMs = now - new Date(job.createdAt).getTime()
+        if (job.type === 'comanda' && waitingMs >= BRIDGE_UNAVAILABLE_ESCALATION_MS) {
+          job.status = 'needs_attention'
+          job.error = `Bridge no disponible por ${Math.floor(waitingMs / 1000)}s — requiere atención`
+          console.warn(`[print-queue] ⚠ COMANDA ${job.station} needs attention — bridge down >2min (${job.id}) — mesa ${job.meta?.mesa ?? '?'}`)
+          syncJobToCloud(job)
+          changed = true
+        } else if (job.type !== 'comanda' && waitingMs >= BRIDGE_UNAVAILABLE_ESCALATION_MS) {
+          job.status = 'failed'
+          job.error = `Bridge no disponible por ${Math.floor(waitingMs / 1000)}s`
+          console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED — bridge down >2min (${job.id})`)
+          syncJobToCloud(job)
+          changed = true
+        }
+      }
+    }
+  }
+
+  // ── Phase 2: Handle needs_attention auto-recovery ───────────────────
+  if (bridgeUp) {
+    for (const job of queue) {
+      if (job.status === 'needs_attention') {
+        job.status = 'pending'
+        job.retries = 0
+        job.error = null
+        console.log(`[print-queue] Bridge back — recovering ${job.type} ${job.station} (${job.id})`)
+        changed = true
+      }
+    }
+  }
+
+  // ── Phase 3: Process pending/retrying jobs ──────────────────────────
   const pending = queue.filter(j => j.status === 'pending' || j.status === 'retrying')
 
-  if (pending.length === 0) {
-    // If bridge came back up and there are needs_attention comandas, auto-recover them
-    const stuck = queue.filter(j => j.status === 'needs_attention')
-    if (stuck.length > 0 && await isBridgeHealthy()) {
-      console.log(`[print-queue] Bridge is back — recovering ${stuck.length} needs_attention job(s)`)
-      retryAllNeedsAttention()
+  if (pending.length > 0 && !bridgeUp) {
+    // Bridge is down — transition pending to bridge_unavailable (no retries consumed)
+    for (const job of pending) {
+      job.status = 'bridge_unavailable'
+      job.error = 'Bridge no disponible'
+      changed = true
     }
-    notifyListeners()
-    return
-  }
+    console.log(`[print-queue] Bridge DOWN — ${pending.length} job(s) marked bridge_unavailable`)
+  } else if (pending.length > 0 && bridgeUp) {
+    // Bridge is up — attempt real prints (retries count here)
+    for (const job of pending) {
+      job.status = 'retrying'
+      job.lastAttempt = new Date().toISOString()
+      job.retries++
 
-  // Don't attempt prints if bridge is down — avoids useless requests
-  const bridgeUp = await isBridgeHealthy()
-  if (!bridgeUp) {
-    console.log(`[print-queue] Bridge DOWN — skipping ${pending.length} job(s), will retry when healthy`)
-    notifyListeners()
-    return
-  }
+      const success = await attemptPrint(job)
 
-  let changed = false
-  for (const job of pending) {
-    job.status = 'retrying'
-    job.lastAttempt = new Date().toISOString()
-    job.retries++
-
-    const success = await attemptPrint(job)
-
-    if (success) {
-      job.status = 'printed'
-      job.error = null
-      console.log(`[print-queue] ✓ ${job.type} ${job.station} printed (${job.id}, attempt ${job.retries})`)
-      syncJobToCloud(job)
-    } else if (job.retries >= job.maxRetries) {
-      if (job.type === 'comanda') {
-        // Comandas are P0 — never silently fail. Escalate to needs_attention.
-        job.status = 'needs_attention'
-        job.error = `${job.retries} intentos fallidos — requiere atención`
-        console.warn(`[print-queue] ⚠ COMANDA ${job.station} needs attention (${job.id}) — mesa ${job.meta?.mesa ?? '?'}`)
+      if (success) {
+        job.status = 'printed'
+        job.error = null
+        console.log(`[print-queue] ✓ ${job.type} ${job.station} printed (${job.id}, attempt ${job.retries})`)
+        syncJobToCloud(job)
+      } else if (job.retries >= job.maxRetries) {
+        if (job.type === 'comanda') {
+          job.status = 'needs_attention'
+          job.error = `${job.retries} intentos fallidos — requiere atención`
+          console.warn(`[print-queue] ⚠ COMANDA ${job.station} needs attention (${job.id}) — mesa ${job.meta?.mesa ?? '?'}`)
+        } else {
+          job.status = 'failed'
+          job.error = `Failed after ${job.retries} attempts`
+          console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED permanently (${job.id})`)
+        }
+        syncJobToCloud(job)
       } else {
-        job.status = 'failed'
-        job.error = `Failed after ${job.retries} attempts`
-        console.warn(`[print-queue] ✗ ${job.type} ${job.station} FAILED permanently (${job.id})`)
+        job.status = 'pending'
+        job.error = `Attempt ${job.retries}/${job.maxRetries} failed`
+        console.log(`[print-queue] ↻ ${job.type} ${job.station} retry ${job.retries}/${job.maxRetries} (${job.id})`)
       }
-      syncJobToCloud(job)
-    } else {
-      job.status = 'pending'
-      job.error = `Attempt ${job.retries}/${job.maxRetries} failed`
-      console.log(`[print-queue] ↻ ${job.type} ${job.station} retry ${job.retries}/${job.maxRetries} (${job.id})`)
+      changed = true
     }
-    changed = true
   }
 
   if (changed) saveQueue(queue)
@@ -279,6 +326,7 @@ function notifyListeners() {
       detail: {
         pending: getPendingCount(),
         needsAttention: getNeedsAttentionCount(),
+        bridgeUnavailable: getBridgeUnavailableCount(),
       },
     }))
   }
@@ -290,9 +338,7 @@ let retryInterval: ReturnType<typeof setInterval> | null = null
 
 export function startRetryLoop() {
   if (retryInterval) return
-  // Process immediately on start
   processQueue()
-  // Then every RETRY_INTERVAL_MS
   retryInterval = setInterval(processQueue, RETRY_INTERVAL_MS)
   console.log(`[print-queue] Retry loop started (every ${RETRY_INTERVAL_MS / 1000}s)`)
 }
@@ -305,7 +351,6 @@ export function stopRetryLoop() {
 }
 
 // ── Integration with printer.ts ─────────────────────────────────────────
-// When bridgePrint fails, call enqueueFailedPrint to add to retry queue.
 
 export function enqueueFailedPrint(
   bytes: Uint8Array,
@@ -313,7 +358,6 @@ export function enqueueFailedPrint(
   type: PrintJob['type'],
   meta?: PrintJob['meta'],
 ) {
-  // Convert bytes to base64
   const data = typeof btoa !== 'undefined'
     ? btoa(String.fromCharCode(...bytes))
     : Buffer.from(bytes).toString('base64')

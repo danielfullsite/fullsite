@@ -6,7 +6,7 @@
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
 import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
-import { enqueueFailedPrint } from './print-queue'
+import { enqueueFailedPrint, startRetryLoop } from './print-queue'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -213,17 +213,11 @@ function bytesToBase64(data: Uint8Array): string {
   return btoa(bin)
 }
 
-/** Imprime vía bridge. Si falla, encola para retry automático. */
+/** Imprime vía bridge. Retorna true si se imprimió, false si no.
+ *  NO encola para retry — el caller (printByStation) decide si encolar
+ *  después de agotar todas las opciones (bridge + BT). */
 async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<boolean> {
-  if (!(await isBridgeAvailable())) {
-    // Bridge not available — enqueue for retry
-    try {
-      const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
-      enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
-      startRetryLoop()
-    } catch { /* print-queue not available */ }
-    return false
-  }
+  if (!(await isBridgeAvailable())) return false
   try {
     const res = await fetch(`${BRIDGE_URL}/print`, {
       method: 'POST',
@@ -232,13 +226,7 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
     })
     if (!res.ok) {
       console.warn(`[printer] Bridge /print HTTP ${res.status}`)
-      bridgeAvailable = false // invalidate cache on failure
-      // Enqueue failed print for retry
-      try {
-        const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
-        enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
-        startRetryLoop()
-      } catch { /* */ }
+      bridgeAvailable = false
       return false
     }
     console.log(`[printer] Bridge imprimió ${bytes.length} bytes${station ? ` (${station})` : ''}`)
@@ -246,12 +234,6 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
   } catch (e) {
     console.warn('[printer] Bridge print falló:', e)
     bridgeAvailable = false
-    // Enqueue for retry
-    try {
-      const { enqueueFailedPrint, startRetryLoop } = await import('./print-queue')
-      enqueueFailedPrint(bytes, station || 'tickets', 'comanda')
-      startRetryLoop()
-    } catch { /* */ }
     return false
   }
 }
@@ -1321,9 +1303,10 @@ export async function printByStation(order: Order): Promise<{ printed: boolean; 
     } else {
       console.log(`[printer] No BT connection for ${station}`)
     }
-    // Queue for retry — no CSS fallback (breaks kiosk)
+    // Queue for retry — single enqueue point for failed comandas
     console.warn(`[printer] ${station}: no bridge, no BT — comanda NOT printed`)
-    enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda')
+    enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda', { mesa: order.mesa, mesero: order.mesero, orderId: order.id })
+    startRetryLoop()
     failedStations.push(station)
   }
 

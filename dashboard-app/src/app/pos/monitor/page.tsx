@@ -15,7 +15,7 @@ const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', c
 interface MonitorData {
   orders: { total: number; cerradas: number; abiertas: number; ventasHoy: number }
   payments: { efectivo: number; tarjeta: number; otros: number; propinas: number }
-  prints: { pending: number; printed: number; failed: number; needsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] }
+  prints: { pending: number; printed: number; failed: number; bridgeUnavailable: number; needsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] }
   bridge: { online: boolean; uptime: number; stations: string[] }
   sync: { pending: number; failed: number }
   errors: string[]
@@ -74,11 +74,13 @@ export default function MonitorPage() {
         syncFailed = queue.filter((i: { retries?: number }) => (i.retries || 0) >= 5).length
       } catch { /* */ }
 
-      // Local print queue (needs_attention comandas)
+      // Local print queue (needs_attention + bridge_unavailable)
       let localPrintNeedsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] = []
+      let localBridgeUnavailable = 0
       try {
-        const { getNeedsAttentionJobs } = await import('@/lib/print-queue')
+        const { getNeedsAttentionJobs, getBridgeUnavailableCount } = await import('@/lib/print-queue')
         localPrintNeedsAttention = getNeedsAttentionJobs()
+        localBridgeUnavailable = getBridgeUnavailableCount()
       } catch { /* */ }
 
       setData({
@@ -93,6 +95,7 @@ export default function MonitorPage() {
           pending: prints.filter((p: { status: string }) => p.status === 'pending' || p.status === 'retrying').length,
           printed: prints.filter((p: { status: string }) => p.status === 'printed').length,
           failed: prints.filter((p: { status: string }) => p.status === 'failed').length,
+          bridgeUnavailable: localBridgeUnavailable,
           needsAttention: localPrintNeedsAttention,
         },
         bridge: {
@@ -174,6 +177,7 @@ export default function MonitorPage() {
               <p className="text-lg font-bold text-emerald-400">{data.prints.printed} <span className="text-[var(--text-3)] text-sm font-normal">impresas</span></p>
               {data.prints.pending > 0 && <p className="text-xs text-amber-400">{data.prints.pending} en cola</p>}
               {data.prints.failed > 0 && <p className="text-xs text-red-400">{data.prints.failed} fallidas</p>}
+              {data.prints.bridgeUnavailable > 0 && <p className="text-xs text-amber-400">{data.prints.bridgeUnavailable} esperando bridge</p>}
               {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atención</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
