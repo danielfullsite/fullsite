@@ -1244,6 +1244,16 @@ export interface AuditEvent {
 }
 
 export async function logAudit(event: AuditEvent): Promise<boolean> {
+  const payload = {
+    client_id: event.client_id || _getClientId(),
+    order_id: event.order_id || null,
+    action: event.action,
+    actor: event.actor,
+    mesa: event.mesa ?? null,
+    details: event.details ? JSON.stringify(event.details) : null,
+    reason: event.reason || null,
+    approved_by: event.approved_by || null,
+  }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_audit_log`, {
       method: 'POST',
@@ -1253,22 +1263,21 @@ export async function logAudit(event: AuditEvent): Promise<boolean> {
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify({
-        client_id: event.client_id || _getClientId(),
-        order_id: event.order_id,
-        action: event.action,
-        actor: event.actor,
-        mesa: event.mesa,
-        details: event.details ? JSON.stringify(event.details) : null,
-        reason: event.reason,
-        approved_by: event.approved_by,
-      }),
+      body: JSON.stringify(payload),
     })
-    if (!res.ok) {
-      console.warn(`[audit] Failed to log "${event.action}" for order ${event.order_id}: ${res.status} ${res.statusText}`)
-    }
-    return res.ok
+    if (res.ok) return true
+    // HTTP error — queue for offline sync
+    throw new Error(`${res.status}`)
   } catch {
+    // Network error or HTTP error — queue for sync so audit events are never lost
+    if (typeof window !== 'undefined') {
+      try {
+        const { queueOperation } = await import('@/lib/pos-offline-db')
+        await queueOperation('pos_audit_log', 'POST', payload)
+        console.log(`[audit] Queued for offline sync: ${event.action}`)
+        return true
+      } catch { /* IndexedDB unavailable */ }
+    }
     return false
   }
 }
