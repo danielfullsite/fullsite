@@ -253,16 +253,26 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
 // When internet returns, automatically sync pending operations.
 
 let autoSyncRegistered = false
+let isSyncing = false
 
 export function registerAutoSync() {
   if (autoSyncRegistered || typeof window === 'undefined') return
   autoSyncRegistered = true
 
   window.addEventListener('online', async () => {
+    if (isSyncing) {
+      console.log('[offline-sync] Sync already in progress — skipping')
+      return
+    }
+    isSyncing = true
     console.log('[offline-sync] Internet restored — syncing pending operations...')
-    const { synced, failed } = await syncAll()
-    if (synced > 0 || failed > 0) {
-      console.log(`[offline-sync] Sync complete: ${synced} synced, ${failed} failed`)
+    try {
+      const { synced, failed } = await syncAll()
+      if (synced > 0 || failed > 0) {
+        console.log(`[offline-sync] Sync complete: ${synced} synced, ${failed} failed`)
+      }
+    } finally {
+      isSyncing = false
     }
   })
 }
