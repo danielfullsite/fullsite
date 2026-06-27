@@ -3024,8 +3024,8 @@ function POSContent() {
               disabled={activeItems.length === 0 || saving}
               className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
-              <Send size={18} />
-              {saving ? '...' : sentToKitchen ? 'Enviado' : 'Enviar'}
+              {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
+              {saving ? 'Enviando' : sentToKitchen ? 'Enviado' : 'Enviar'}
             </button>
             <button
               onClick={handlePreTicket}
@@ -3935,7 +3935,7 @@ function POSContent() {
       {/* Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2">
-          <div className="bg-[var(--surface-2)] rounded-2xl p-5 w-full max-w-3xl border border-[var(--line)] max-h-[96vh] overflow-y-auto">
+          <div className="bg-[var(--surface-2)] rounded-2xl p-5 w-full max-w-3xl border border-[var(--line)] max-h-[96vh] min-h-[420px] overflow-y-auto">
             {(() => {
               // Calculate total for current split cuenta or full order
               const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
