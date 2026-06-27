@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 
@@ -17,6 +18,7 @@ interface StaffMember {
 }
 
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter()
   const [unlocked, setUnlocked] = useState(false)
   const [staff, setStaff] = useState<StaffMember | null>(null)
   const [pin, setPin] = useState('')
@@ -52,23 +54,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
     document.addEventListener('contextmenu', blockCtx)
 
-    // 3. Auto-fullscreen — only on first interaction, only if not in kiosk/PWA
-    const goFullscreen = () => {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
-        document.documentElement.requestFullscreen().catch(() => {})
-      }
-      // Remove after first successful attempt
-      document.removeEventListener('click', goFullscreen)
-      document.removeEventListener('touchstart', goFullscreen)
-    }
-    document.addEventListener('click', goFullscreen, { once: true })
-    document.addEventListener('touchstart', goFullscreen, { once: true })
+    // 3. Fullscreen: triggered on login, not on first tap (see enterFullscreen below)
 
     return () => {
       if (link && prevManifest) link.href = prevManifest
       document.removeEventListener('contextmenu', blockCtx)
-      document.removeEventListener('click', goFullscreen)
-      document.removeEventListener('touchstart', goFullscreen)
     }
   }, [])
 
@@ -246,7 +236,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setAttempts(0)
           sessionStorage.setItem('pos_staff', JSON.stringify(member))
           sessionStorage.setItem('pos_last_activity', Date.now().toString())
-          // Ask for notification permission after biometric login
+          // Enter fullscreen on biometric login
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
+            document.documentElement.requestFullscreen().catch(() => {})
+          }
           requestNotificationPermission().catch(() => {})
         }
       }
@@ -268,9 +261,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
+      // Enter fullscreen on login (user gesture context — required by browser API)
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
+        document.documentElement.requestFullscreen().catch(() => {})
+      }
       // Go to table map after login (only if on bare /pos without mesa param)
       if (window.location.pathname === '/pos' && !window.location.search) {
-        window.location.href = '/pos/mesas'
+        router.push('/pos/mesas')
       }
       // Ask for notification permission after login (non-blocking, user gesture context)
       requestNotificationPermission().catch(() => {})

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   getKitchenOrders, updateOrderStatus, logAudit,
   type KitchenOrderFromDB,
@@ -86,6 +87,7 @@ function playAlert() {
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function KDSPage() {
+  const router = useRouter()
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [station, setStation] = useState<Station>('cocina')
   const [mounted, setMounted] = useState(false)
@@ -223,7 +225,7 @@ export default function KDSPage() {
         {/* Back button + Station filter tabs */}
         <div className="flex gap-1.5 items-center">
           <button
-            onClick={() => { window.location.href = '/pos' }}
+            onClick={() => { router.push('/pos') }}
             className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 flex items-center justify-center mr-2 text-white"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>

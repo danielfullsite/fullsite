@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MENU_CATEGORIES,
   MESEROS,
@@ -1199,6 +1199,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
 
 function POSContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
@@ -2192,7 +2193,7 @@ function POSContent() {
       if (navigator.onLine) {
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { window.location.href = '/pos/mesas' }, 1200)
+        setTimeout(() => { router.push('/pos/mesas') }, 1200)
       } else {
         showToast('Offline — orden guardada localmente, pendiente de sincronizar')
         // Stay on current page, don't redirect (would fail with "No connection")
