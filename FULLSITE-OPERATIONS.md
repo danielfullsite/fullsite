@@ -1,7 +1,23 @@
-# FULLSITE OPERATIONS — Fuente de verdad
+# FULLSITE OPERATIONS
 
-Ultima actualizacion: 2026-06-27
-Solo hechos verificados. Sin hipotesis. Consultar antes de cualquier recomendacion.
+Solo hechos verificados. Sin hipotesis.
+No modificar salvo cambio de estado, riesgo, decision o leccion aprendida.
+
+## Executive Summary
+
+**Estado:** Pre-cutover. Software CORE certificado. Implementacion fisica pendiente.
+**Clientes activos:** AMALAY Coffee & Market (San Pedro, Monterrey)
+**Siguiente hito:** Shadow Day en AMALAY
+**Ultima actualizacion:** 2026-06-27
+
+**Top 5 blockers (ordenados por riesgo operativo):**
+1. Facturama no activado — $1,650 pendiente de pago
+2. Bridge sin autoarranque — NSSM pendiente in situ
+3. Staff sin capacitacion — ninguna sesion realizada
+4. 9 items con precio no verificado — esperando Monica
+5. Shadow Day no programado
+
+**Proxima accion:** Pagar Facturama. Agendar visita in situ.
 
 ---
 
@@ -245,3 +261,26 @@ Todos deben ser GO:
 | L6 | Service Worker cache puede servir bundle viejo despues de deploy | Multiples deploys sin efecto hasta unregister SW | 2026-06-26 |
 | L7 | Bridge sin autoarranque = primera comanda del dia no sale | Analisis print bridge | 2026-06-27 |
 | L8 | No asumir causas de discrepancias de datos — verificar contra fuente fisica | Price mismatch analysis | 2026-06-27 |
+
+---
+
+# CHANGELOG
+
+Solo decisiones, certificaciones, incidentes y cambios de estado.
+
+| Fecha | Evento |
+|-------|--------|
+| 2026-06-26 | OFF-02 certificado E2E: offline sync funciona en produccion |
+| 2026-06-26 | BUG-005 certificado: print queue con state machine time-based |
+| 2026-06-26 | A3 certificado: audit queue con fallback a sync_queue |
+| 2026-06-26 | COBRO-00 a COBRO-10 certificados: flujo completo de cobro |
+| 2026-06-26 | Inventory movements: compatibility bridge (ingredient_id TEXT) activado en produccion |
+| 2026-06-26 | RLS fix: policies para authenticated agregadas a pos_inventory_movements |
+| 2026-06-26 | 7 zombie sync items resueltos (inventory movements acumulados) |
+| 2026-06-26 | localStorage.clear reemplazado por clear selectivo en Sidebar logout |
+| 2026-06-26 | startRetryLoop movido de enqueue a layout mount (fix localStorage race) |
+| 2026-06-27 | Migration diff: 9 items P0 Price Mismatch detectados, pendientes verificacion |
+| 2026-06-27 | Migration diff: 154 items en Wansoft no en Fullsite, causa pendiente |
+| 2026-06-27 | Bridge: autoarranque NSSM definido como requisito de certificacion |
+| 2026-06-27 | FULLSITE-OPERATIONS.md creado como fuente unica de verdad |
+| 2026-06-27 | Framework de producto cerrado: evidencia > hipotesis, ejecucion > diseno |
