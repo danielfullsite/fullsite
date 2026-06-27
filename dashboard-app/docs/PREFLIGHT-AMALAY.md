@@ -5,49 +5,42 @@ Minimizar tiempo in situ. Maximizar probabilidad de exito.
 
 ---
 
-## 0. REPORTE DE DIFERENCIAS WANSOFT vs FULLSITE
+## 0. MIGRATION DIFF REPORT — Wansoft vs Fullsite
 
-### Precios
+### P0 — Price Mismatch (verificar contra menu fisico)
 
-Fullsite almacena precios SIN IVA. El POS agrega 16% al cobrar.
-Wansoft reporta precio promedio real cobrado (CON IVA, incluye descuentos y cortesias).
+Discrepancia detectada entre precio observado en Wansoft y precio en Fullsite.
+Causa desconocida hasta verificar contra menu fisico. No asumir.
 
-Por eso los numeros no matchean directamente, pero el precio final al cliente
-deberia ser comparable.
+| # | Item | Fullsite (sin IVA) | Fullsite (con IVA) | Wansoft observado | Diferencia | Menu fisico | Explicacion |
+|---|------|--------------------|--------------------|-------------------|------------|-------------|-------------|
+| PM1 | Enchiladas Suizas | $255 | $295.80 | $225.60 | -$70.20 | PENDIENTE | PENDIENTE |
+| PM2 | Combo Fit | $250 | $290.00 | $222.71 | -$67.29 | PENDIENTE | PENDIENTE |
+| PM3 | Egg and Pancake Combo | $250 | $290.00 | $224.90 | -$65.10 | PENDIENTE | PENDIENTE |
+| PM4 | Avocado Toast | $240 | $278.40 | $218.32 | -$60.08 | PENDIENTE | PENDIENTE |
+| PM5 | Machacado con Huevo | $240 | $278.40 | $227.99 | -$50.41 | PENDIENTE | PENDIENTE |
+| PM6 | Croissant Nutella | $99 | $114.84 | $83.12 | -$31.72 | PENDIENTE | PENDIENTE |
+| PM7 | Coca Cola Regular | $60 | $69.60 | $39.59 | -$30.01 | PENDIENTE | PENDIENTE |
+| PM8 | Jugo Verde de la Casa | $95 | $110.20 | $82.78 | -$27.42 | PENDIENTE | PENDIENTE |
+| PM9 | Concha de Mantequilla | $52 | $60.32 | $34.10 | -$26.22 | PENDIENTE | PENDIENTE |
 
-**Items con diferencia significativa (verificar contra menu fisico):**
+**Accion:** verificar cada item contra el menu fisico del restaurante.
+Llenar columnas "Menu fisico" y "Explicacion" durante la visita.
+Si el precio de Fullsite no coincide con el menu fisico, corregir antes del cutover.
 
-| Item | Wansoft promedio | Fullsite + IVA | Diferencia |
-|------|-----------------|---------------|------------|
-| Enchiladas Suizas | $225.60 | $295.80 | -$70.20 |
-| Combo Fit | $222.71 | $290.00 | -$67.29 |
-| Egg and Pancake Combo | $224.90 | $290.00 | -$65.10 |
-| Avocado Toast | $218.32 | $278.40 | -$60.08 |
-| Machacado con Huevo | $227.99 | $278.40 | -$50.41 |
-| Coca Cola Regular | $39.59 | $69.60 | -$30.01 |
-| Croissant Nutella | $83.12 | $114.84 | -$31.72 |
-| Jugo Verde de la Casa | $82.78 | $110.20 | -$27.42 |
-| Concha de Mantequilla | $34.10 | $60.32 | -$26.22 |
+### Items — Diferencias de catalogo
 
-**Nota:** las diferencias de Wansoft pueden ser por descuentos frecuentes,
-cortesias, o precios de evento que bajan el promedio. El precio de Fullsite
-debe coincidir con el menu fisico del restaurante, no con el promedio de Wansoft.
+| Metrica | Valor | Accion |
+|---------|-------|--------|
+| Items en Fullsite | 522 activos | — |
+| Items en Wansoft (con ventas) | 517 | — |
+| Items que matchean por nombre | 363 | OK |
+| Items solo en Fullsite | 1 | Verificar que es correcto |
+| Items solo en Wansoft | 154 | P1: verificar con Monica que ningun item activo falta |
 
-**Accion:** llevar menu fisico al restaurante y verificar los 9 items de arriba.
-
-### Items
-
-| Metrica | Valor |
-|---------|-------|
-| Items en Fullsite | 522 activos |
-| Items en Wansoft (con ventas) | 517 |
-| Items que matchean por nombre | 363 |
-| Items solo en Fullsite | 1 |
-| Items solo en Wansoft | 154 |
-
-**154 items en Wansoft no estan en Fullsite.** Probablemente son items
-descontinuados, temporales o de evento. Verificar con Monica que ningun
-item activo del menu falte.
+**Causa de los 154 items faltantes:** desconocida. Pueden ser items
+descontinuados, temporales, de evento, o items activos que no se importaron.
+No asumir — verificar con Monica.
 
 ### Staff
 
