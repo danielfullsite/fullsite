@@ -135,30 +135,91 @@ Criterio de cada item:
 
 ---
 
-## Resumen de readiness
+## GO / NO-GO
 
-| Area | Status | % | Blocker principal |
-|------|--------|---|-------------------|
-| Core POS | PASS | 100% | — |
-| Offline/Sync | PASS | 100% | — |
-| Payments | PASS | 100% | — |
-| KDS | PASS | 95% | Legibilidad a distancia (P2, LATER) |
-| Print Bridge | PENDIENTE | 20% | No instalado en hardware real |
-| Facturacion | PENDIENTE | 20% | Facturama no activado |
-| Hardware/Red | PENDIENTE | 30% | No verificado in situ |
-| Capacitacion | PENDIENTE | 10% | Ninguna sesion realizada |
-| Datos/Migracion | PARCIAL | 70% | Precios, PINs, metodos de pago |
-| Rollback Plan | PENDIENTE | 20% | Criterios no definidos |
-| Soporte Dia D | PENDIENTE | 10% | Horario y logistica no definidos |
+Criterio: si hoy iniciaramos un turno usando unicamente Fullsite,
+este punto nos obligaria a volver a abrir Wansoft?
 
-**TOTAL READINESS: ~55%**
+Si algun item dice NO-GO, no hacemos cutover.
 
-Los items PASS son los que certificamos E2E en esta sesion.
-Todo lo PENDIENTE es trabajo de implementacion, no de desarrollo.
+| # | Criterio | Status | Responsable |
+|---|----------|--------|-------------|
+| G1 | Facturacion CFDI funcionando (Facturama activo, timbrado probado) | NO-GO | Daniel |
+| G2 | Print bridge instalado y probado en hardware real de AMALAY | NO-GO | Daniel |
+| G3 | Todas las impresoras configuradas (cocina, barra, caja, ticket) | NO-GO | Daniel |
+| G4 | Staff capacitado en flujo basico (mesa, enviar, cobrar, corte) | NO-GO | Daniel + Monica |
+| G5 | PINs de todo el staff configurados | NO-GO | Daniel |
+| G6 | Metodos de pago configurados (efectivo, tarjeta, Rappi, UberEats) | NO-GO | Daniel |
+| G7 | Precios verificados contra menu actual | NO-GO | Monica |
+| G8 | Red WiFi verificada in situ (salon, cocina, barra) | NO-GO | Daniel |
+| G9 | Plan de rollback definido (criterio, tiempo, responsable) | NO-GO | Daniel |
+| G10 | Shadow Day completado sin incidentes criticos | NO-GO | Daniel + staff |
+
+**Decision: GO solo cuando todos los items esten en GO.**
 
 ---
 
-## P0 criticos (ordenados por riesgo)
+## Shadow Day
+
+Ultimo hito antes del cutover definitivo.
+
+**Que es:** un turno completo donde toda la operacion se ejecuta en
+Fullsite, mientras Wansoft queda encendido unicamente como respaldo.
+
+**Duracion:** 1 turno completo (apertura a cierre).
+
+**Reglas:**
+- Todo se hace en Fullsite: ordenes, cobros, comandas, corte.
+- Wansoft solo se abre si Fullsite falla y no se puede resolver en <5 min.
+- Cada vez que se abra Wansoft, documentar: que fallo, cuanto tardo,
+  como se resolvio.
+- Al final del turno, recopilar feedback de cada rol.
+
+**Documentar al cierre del Shadow Day:**
+
+1. Incidentes (que fallo y cuando)
+2. Dudas del personal (que no supieron hacer)
+3. Errores del sistema (bugs encontrados)
+4. Tiempo de resolucion por incidente
+5. Feedback del chef
+6. Feedback de cajeros
+7. Feedback de meseros
+8. Feedback del gerente
+9. Cuantas veces se abrio Wansoft y por que
+10. Ventas totales en Fullsite vs Wansoft del mismo dia anterior
+
+**Criterio de exito del Shadow Day:**
+- Wansoft se abrio 0 veces durante el turno.
+- Ningun incidente duro mas de 5 minutos.
+- El staff no pide regresar a Wansoft.
+- El corte de caja cuadra.
+
+**Si el Shadow Day no pasa:** documentar los fallos, corregir, repetir.
+No hacer cutover definitivo sin Shadow Day exitoso.
+
+---
+
+## Secuencia hacia el cutover
+
+```
+1. Activar Facturama                    ← pago, 1 dia
+2. Visita in situ: print bridge +       ← medio dia en AMALAY
+   impresoras + red + hardware
+3. Configurar PINs + metodos de pago    ← 1 hora
+4. Verificar precios contra menu        ← Monica, 1-2 horas
+5. Capacitacion staff (turno simulado)  ← 2-3 horas
+6. Definir plan de rollback             ← 30 min
+7. Shadow Day                           ← 1 turno completo
+8. Documentar Shadow Day                ← 1 hora post-cierre
+9. GO / NO-GO final                     ← decision
+10. Cutover definitivo                  ← apagar Wansoft
+```
+
+Tiempo estimado total: 3-5 dias de trabajo, no de desarrollo.
+
+---
+
+## P0 criticos (ordenados por riesgo operativo)
 
 1. **Facturama** — sin facturacion, clientes reclaman dia 1
 2. **Print bridge en terminal real** — sin comanda impresa, cocina no opera
