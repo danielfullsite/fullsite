@@ -68,15 +68,15 @@ export const STATION_CATEGORIES: Record<StationName, string[]> = {
     'pizzas', 'bowls', 'ceviche',
     // Grupos Wansoft (AMALAY): comida → cocina
     'promos', 'keto', 'kids', 'soups', 'munchies', 'extras', 'envios',
-    'enchiladas-tacos', 'salads-ceviche', 'appetizers', 'evento',
+    'enchiladas-tacos', 'salads-ceviche', 'appetizers', 'evento', 'signature',
   ],
   barra: [
-    'coffee', 'signature', 'jugos', 'fresh', 'smoothies', 'frappes',
+    'coffee', 'jugos', 'fresh', 'smoothies', 'frappes',
     'sodas', 'tea', 'alcohol', 'activaciones',
-    'vinos', 'cerveza', 'licores', 'icecream',
+    'vinos', 'cerveza', 'licores',
   ],
   caja: [
-    'toast', 'bakery', 'postres', 'mkt-cafe',
+    'toast', 'bakery', 'postres', 'icecream', 'desserts', 'mkt-cafe',
     // Market consolidado Wansoft (junio 2026)
     'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay',
   ],
@@ -105,12 +105,12 @@ const CATEGORY_NAME_TO_STATION: Array<{ keywords: string[]; station: StationName
   { keywords: ['frappe'], station: 'barra' },
   { keywords: ['soda'], station: 'barra' },
   { keywords: ['tea', 'tisana'], station: 'barra' },
-  { keywords: ['signature'], station: 'barra' },
-  { keywords: ['ice cream', 'helado', 'nieve'], station: 'barra' },
+  { keywords: ['signature'], station: 'cocina' },
+  { keywords: ['ice cream', 'helado', 'nieve'], station: 'caja' },
   { keywords: ['bakery', 'panadería', 'panaderia'], station: 'caja' },
   { keywords: ['croissant'], station: 'caja' },
   { keywords: ['toast', 'bagel'], station: 'caja' },
-  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia', 'amalay'], station: 'barra' },
+  { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia'], station: 'caja' },
   { keywords: ['dessert', 'postre'], station: 'caja' },
   { keywords: ['vino'], station: 'barra' },
 ]
@@ -161,6 +161,7 @@ const CAJA_KEYWORDS = [
   'cafe grano', 'cafe molido', 'vaso cafe refill', 'semilla', 'dulce',
   'croissant', 'muffin', 'scone', 'pan de', 'amalay -', 'ramekin',
   'taza de ceramica', 'termo', 'vela', 'gift card', 'tarjeta de regalo',
+  'ice cream', 'helado', 'nieve', 'dessert',
 ]
 
 /**
