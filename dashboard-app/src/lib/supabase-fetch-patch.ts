@@ -22,12 +22,15 @@ export function patchSupabaseFetch() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 
-    // Only patch Supabase REST API calls
-    if (url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
+    // Only patch Supabase REST API calls — but NOT from POS pages.
+    // POS uses anon key with RLS policies for anon role. Replacing it
+    // with a user JWT that may be expired causes 401 errors (AUTH-01).
+    const isPosPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/pos')
+    if (!isPosPage && url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
       const headers = new Headers(init?.headers)
       const currentAuth = headers.get('Authorization')
 
-      // If using bare anon key, replace with user's JWT
+      // If using bare anon key, replace with user's JWT (dashboard pages only)
       if (currentAuth === `Bearer ${SUPABASE_KEY}`) {
         try {
           const hostname = new URL(SUPABASE_URL).hostname.split('.')[0]
