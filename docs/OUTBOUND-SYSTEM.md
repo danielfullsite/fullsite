@@ -370,12 +370,67 @@ Rastrear semanalmente:
 
 ---
 
-# PARTE 5 — REGLAS
+# PARTE 5 — MENSAJES FINALES (versiones aprobadas por Daniel)
 
-1. No enviar hasta despues del cutover de AMALAY
-2. Personalizar CADA mensaje — no copy-paste masivo
-3. No pedir dinero en el primer mensaje — construir relacion
-4. No ofrecer equity en el primer contacto — primero conocerse
-5. Siempre mostrar el producto real, no slides
-6. Seguir el proceso de 4 etapas para co-founders
-7. Actualizar FULLSITE-OPERATIONS.md con cada relacion relevante
+Estos reemplazan los templates anteriores como mensajes principales.
+Las variantes por perfil (Parte 3) siguen siendo utiles como
+personalizacion adicional dentro de estos mensajes.
+
+## Mensaje principal — Co-founders
+
+```
+Hola {{nombre}},
+
+Vi tu trayectoria en {{empresa}} y me llamo mucho la atencion.
+
+Estoy construyendo Fullsite, un AI Operating System para restaurantes.
+
+Hasta ahora he construido practicamente toda la plataforma: POS,
+operaciones de cocina, pagos, inventario, dashboards y agentes de IA.
+Hoy ya estamos reemplazando un POS legacy de mas de 20 anos en un
+restaurante real en Monterrey.
+
+No te escribo para ofrecerte un trabajo.
+
+Simplemente creo que tu experiencia es inusualmente relevante para lo
+que estamos construyendo y me gustaria conocerte. Con o sin cofounder
+voy a seguir construyendo Fullsite, pero si encuentro a la persona
+correcta creo que podemos construir algo enorme.
+
+Te animas a una llamada de 20 minutos esta semana?
+```
+
+## Mensaje principal — Inversionistas
+
+```
+Hola {{nombre}},
+
+He seguido parte de tu trabajo invirtiendo en tecnologia y startups
+en LATAM, asi que queria escribirte.
+
+Soy fundador de Fullsite. Estamos construyendo un AI Operating System
+para restaurantes. Hoy ya estamos reemplazando un POS legacy completo
+en un restaurante en produccion.
+
+No estoy levantando capital en este momento.
+
+Lo que busco es empezar a construir relaciones con personas que
+entienden software vertical y companias de largo plazo. Me encantaria
+mostrarte el producto funcionando y escuchar tu opinion.
+
+Si te hace sentido, feliz de coordinar una llamada corta cuando
+tengas tiempo.
+```
+
+---
+
+# PARTE 6 — REGLAS
+
+1. Personalizar CADA mensaje — no copy-paste masivo
+2. No pedir dinero en el primer mensaje — construir relacion
+3. No ofrecer equity en el primer contacto — primero conocerse
+4. Siempre mostrar el producto real, no slides
+5. Seguir el proceso de 4 etapas para co-founders
+6. Actualizar FULLSITE-OPERATIONS.md con cada relacion relevante
+7. Outreach masivo: despues del cutover
+8. Perfiles excepcionales: contactar cuando los encuentres, no esperar
