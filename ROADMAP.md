@@ -15,6 +15,7 @@
 - [x] Concurrencia: updated_at en handlePayment ✓ 2026-06-30
 - [x] Concurrencia: fix 409 en sync offline ✓ 2026-06-30
 - [x] Concurrencia: separar KDS writes del campo items ✓ 2026-06-30
+- [x] INV-1: Deduccion idempotente (solo items nuevos + deltas) ✓ 2026-06-30
 - [ ] Huella digital (verificar Windows Hello con lector DP4500)
 - [ ] Cajon (fix EC TICKET o mover RJ-11)
 - [ ] Shadow Day
@@ -22,6 +23,10 @@
 ## P1 — Primera semana post-cutover
 
 - [ ] Normalizar items a pos_order_items (ADR Opcion B)
+- [ ] INV-2: RPC atomico para deducciones (stock -= delta, no valor absoluto)
+- [ ] INV-3: Offline deltas (resuelto con INV-2)
+- [ ] INV-4: Reversal al cancelar item enviado no preparado
+- [ ] INV-5: Revertir market stock al reabrir orden
 - [ ] Supabase Realtime entre terminales
 - [ ] Corte Z formal con reglas de negocio
 - [ ] Fondo de propinas (recoleccion, reparto, retiro)
@@ -67,12 +72,12 @@
 | Impresion | 85% | Production PASS (AMALAY) |
 | Corte/Caja | 85% | Code PASS |
 | Facturacion | 0% | Bloqueado (IEPS + Facturama) |
-| Inventario | 80% | Code PASS |
+| Inventario | 82% | Code PASS (INV-1 fixed, INV-2/3/4/5 P1) |
 | Auditoria | 85% | Code PASS |
 | Offline | 75% | Code PASS (409 fix) |
 | Concurrencia | 70% | Code PASS (3 parches) |
 | Hardware | 50% | Parcial (bridge OK, cajon/huella pendiente) |
-| **Global** | **73%** | |
+| **Global** | **74%** | |
 
 ---
 
