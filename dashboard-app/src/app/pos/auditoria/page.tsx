@@ -19,6 +19,7 @@ const ACTION_CONFIG: Record<string, { icon: typeof ShieldCheck; color: string; l
   status_changed: { icon: ChefHat, color: 'text-blue-400', label: 'Estado cambiado' },
   payment_processed: { icon: CreditCard, color: 'text-emerald-400', label: 'Pago procesado' },
   preticket_printed: { icon: FileText, color: 'text-purple-400', label: 'Pre-cuenta impresa' },
+  kitchen_item_updated: { icon: Pencil, color: 'text-orange-400', label: 'Item actualizado en cocina' },
 }
 
 function formatTime(dateStr: string): string {

@@ -45,6 +45,9 @@ import {
   printPreTicket,
   printTicket,
   printTicketCSS,
+  printUpdateByStation,
+  detectItemChanges,
+  type ItemChange,
   openCashDrawer,
   isBluetoothAvailable,
   isBluetoothConnected,
@@ -1545,6 +1548,7 @@ function POSContent() {
   const [showSplit, setShowSplit] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
   const [sentItemIds, setSentItemIds] = useState<Set<string>>(new Set())
+  const [sentItemSnapshots, setSentItemSnapshots] = useState<Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }>>({})
   const [splitAssignments, setSplitAssignments] = useState<Record<string, number>>({}) // itemId → cuenta (1-6)
   const [splitPayingCuenta, setSplitPayingCuenta] = useState(0) // 0 = no split, 1-6 = which cuenta paying now
   const [splitCount, setSplitCount] = useState(0) // 0 = no split, 2-6 = number of cuentas
@@ -1604,9 +1608,14 @@ function POSContent() {
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
             setOrderNotes(order.notas || '')
-            // Mark loaded items as already sent
+            // Mark loaded items as already sent + snapshot for change detection (H-7)
             if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
               setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
+              const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
+              for (const item of loadedItems2) {
+                snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+              }
+              setSentItemSnapshots(snaps)
             }
           } else {
             // No existing order — check for unsaved draft
@@ -1639,6 +1648,7 @@ function POSContent() {
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setSentItemIds(new Set())
+    setSentItemSnapshots({})
     try {
       const cached = localStorage.getItem(`pos_order_${mesa}`)
       if (cached) {
@@ -1653,6 +1663,11 @@ function POSContent() {
           if (c.notas) setOrderNotes(c.notas)
           setLoadedOrderId(c.id)
           setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
+          const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
+          for (const item of c.items) {
+            snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+          }
+          setSentItemSnapshots(snaps)
         }
       }
     } catch {}
@@ -2156,10 +2171,43 @@ function POSContent() {
       }
     }
 
-    // Track all items as sent
+    // Detect CHANGES in already-sent items (H-7: update comanda)
+    const changedItems: ItemChange[] = []
+    for (const item of activeItems) {
+      if (!sentItemIds.has(item.id)) continue // new item, already handled above
+      const snapshot = sentItemSnapshots[item.id]
+      if (!snapshot) continue
+      const changes = detectItemChanges(snapshot, item)
+      if (changes.length > 0) {
+        const station = item.station ?? 'cocina'
+        changedItems.push({ itemId: item.id, nombre: item.nombre, station, changes })
+        logAudit({
+          order_id: orderId, action: 'kitchen_item_updated', actor: mesero, mesa,
+          details: {
+            item_id: item.id, item: item.nombre,
+            before: snapshot, after: { cantidad: item.cantidad, modificadores: item.modificadores, notas: item.notas, silla: item.silla },
+          },
+        })
+      }
+    }
+    if (changedItems.length > 0) {
+      const updateResult = await printUpdateByStation(order, changedItems)
+      if (updateResult.failed.length > 0) {
+        showToast(`⚠ Actualización no impresa: ${updateResult.failed.join(', ')}`)
+      }
+    }
+
+    // Track all items as sent + update snapshots
     setSentItemIds(prev => {
       const next = new Set(prev)
       activeItems.forEach(i => next.add(i.id))
+      return next
+    })
+    setSentItemSnapshots(prev => {
+      const next = { ...prev }
+      for (const item of activeItems) {
+        next[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+      }
       return next
     })
 
@@ -2360,6 +2408,7 @@ function POSContent() {
       setOrderItems([])
       setCancelledItems(new Set())
       setSentItemIds(new Set())
+      setSentItemSnapshots({})
       setDiscount(0)
       setPropina(0)
       // Clear localStorage cache for this mesa

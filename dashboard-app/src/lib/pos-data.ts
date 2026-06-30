@@ -1231,6 +1231,7 @@ export type AuditAction =
   | 'item_voided'
   | 'combo_added'
   | 'ticket_reprinted'
+  | 'kitchen_item_updated'
 
 export interface AuditEvent {
   client_id?: string

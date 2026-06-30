@@ -1251,6 +1251,148 @@ export function setComandasMuted(muted: boolean) {
   } catch { /* private mode */ }
 }
 
+// ─── UPDATE COMANDA (H-7: re-print when sent item changes) ───────────────────
+
+export interface ItemChange {
+  itemId: string
+  nombre: string
+  station: StationName
+  changes: { field: string; from: string; to: string }[]
+}
+
+/** Normalize modifiers for comparison: sort, lowercase, trim */
+function normalizeModifiers(mods: string[] | undefined): string {
+  if (!mods || mods.length === 0) return ''
+  return [...mods].map(m => m.trim().toLowerCase()).sort().join('|')
+}
+
+/** Compare a sent snapshot against current item, return changes */
+export function detectItemChanges(
+  sent: { cantidad: number; modificadores: string[]; notas: string; silla?: number },
+  current: OrderItem
+): { field: string; from: string; to: string }[] {
+  const changes: { field: string; from: string; to: string }[] = []
+  if (sent.cantidad !== current.cantidad) {
+    changes.push({ field: 'Cantidad', from: String(sent.cantidad), to: String(current.cantidad) })
+  }
+  if (normalizeModifiers(sent.modificadores) !== normalizeModifiers(current.modificadores)) {
+    changes.push({
+      field: 'Modificadores',
+      from: sent.modificadores.length > 0 ? sent.modificadores.join(', ') : '(ninguno)',
+      to: (current.modificadores?.length > 0) ? current.modificadores.join(', ') : '(ninguno)',
+    })
+  }
+  if ((sent.notas || '') !== (current.notas || '')) {
+    changes.push({ field: 'Notas', from: sent.notas || '(sin notas)', to: current.notas || '(sin notas)' })
+  }
+  if ((sent.silla || 0) !== (current.silla || 0)) {
+    changes.push({ field: 'Silla', from: sent.silla ? `S${sent.silla}` : '-', to: current.silla ? `S${current.silla}` : '-' })
+  }
+  return changes
+}
+
+/** Build ESC/POS bytes for an update comanda */
+function buildUpdateTicketBytes(
+  order: Order,
+  station: StationName,
+  itemChanges: ItemChange[],
+  cols: TicketCols = COLS_BT
+): Uint8Array {
+  const cmds: number[] = []
+  const now = new Date()
+  const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+  // Initialize
+  cmds.push(ESC, 0x40)
+
+  // Center + Bold + Big — ACTUALIZACIÓN header
+  cmds.push(ESC, 0x61, 0x01)
+  cmds.push(GS, 0x42, 0x01) // inverted (white on black)
+  cmds.push(ESC, 0x45, 0x01)
+  cmds.push(GS, 0x21, 0x11)
+  cmds.push(...textToBytes(' ACTUALIZACION \n'))
+  cmds.push(GS, 0x21, 0x00)
+  cmds.push(ESC, 0x45, 0x00)
+  cmds.push(GS, 0x42, 0x00)
+
+  cmds.push(...textToBytes(`Mesa ${order.mesa} - ${order.mesero}\n`))
+  cmds.push(...textToBytes(`${timeStr}\n`))
+  cmds.push(...textToBytes(dashedLine(cols)))
+
+  // Left align, changes
+  cmds.push(ESC, 0x61, 0x00)
+
+  for (const change of itemChanges) {
+    // Item name bold
+    cmds.push(ESC, 0x45, 0x01)
+    cmds.push(GS, 0x21, 0x01)
+    cmds.push(...textToBytes(`${change.nombre}\n`))
+    cmds.push(GS, 0x21, 0x00)
+    cmds.push(ESC, 0x45, 0x00)
+
+    // Each field change
+    for (const c of change.changes) {
+      cmds.push(...textToBytes(`  ${c.field}: ${c.from} -> ${c.to}\n`))
+    }
+    cmds.push(LF)
+  }
+
+  cmds.push(...textToBytes(dashedLine(cols)))
+
+  // Feed + cut
+  cmds.push(LF, LF, LF, LF)
+  cmds.push(GS, 0x56, 0x00)
+
+  return new Uint8Array(cmds)
+}
+
+/** Print update comandas to the correct stations */
+export async function printUpdateByStation(
+  order: Order,
+  allChanges: ItemChange[]
+): Promise<{ printed: boolean; failed: string[] }> {
+  if (comandasMuted() || allChanges.length === 0) return { printed: false, failed: [] }
+
+  // Group changes by station
+  const byStation: Record<StationName, ItemChange[]> = { cocina: [], barra: [], caja: [] }
+  for (const change of allChanges) {
+    byStation[change.station].push(change)
+  }
+
+  let printed = false
+  const failedStations: string[] = []
+  const stations: StationName[] = ['cocina', 'barra', 'caja']
+
+  for (const station of stations) {
+    const changes = byStation[station]
+    if (changes.length === 0) continue
+
+    if (printed) await new Promise(r => setTimeout(r, 200))
+
+    const bytes = buildUpdateTicketBytes(order, station, changes, COLS_BRIDGE)
+    if (await bridgePrint(bytes, station)) {
+      printed = true
+      continue
+    }
+
+    const char = await getCharForStation(station)
+    if (char) {
+      try {
+        const btBytes = buildUpdateTicketBytes(order, station, changes)
+        await writeToPrinter(char, btBytes)
+        printed = true
+        continue
+      } catch { /* fall through */ }
+    }
+
+    console.warn(`[printer] ${station}: update comanda NOT printed`)
+    enqueueFailedPrint(bytes, station, 'comanda', { mesa: order.mesa, mesero: order.mesero, orderId: order.id })
+    failedStations.push(station)
+  }
+
+  return { printed, failed: failedStations }
+}
+
 /**
  * Print per-station tickets: splits the order and prints a separate ticket
  * for each station that has items. Adds 200ms delay between tickets.
