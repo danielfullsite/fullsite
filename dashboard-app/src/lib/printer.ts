@@ -1014,11 +1014,8 @@ export async function printKitchenTicket(order: Order) {
 }
 
 export async function printTicket(order: Order) {
-  console.log('[printer] printTicket called for order', order.id, 'mesa', order.mesa)
   // 1) Bridge local (impresora de caja en la terminal Windows)
-  const bridgeOk = await bridgePrint(buildESCPOS(order, COLS_BRIDGE))
-  console.log('[printer] printTicket bridgePrint result:', bridgeOk, 'bridgeAvailable:', bridgeAvailable)
-  if (bridgeOk) return
+  if (await bridgePrint(buildESCPOS(order, COLS_BRIDGE))) return
   // 2) Bluetooth (reconecta si la impresora se durmió)
   if (await ensureConnected('default')) {
     try {
