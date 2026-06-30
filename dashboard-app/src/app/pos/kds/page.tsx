@@ -197,7 +197,11 @@ export default function KDSPage() {
           Prefer: 'return=minimal',
         },
         body: JSON.stringify({ kds_item_status: JSON.stringify(kdsStatus) }),
-      }).catch(() => {})
+      }).then(res => {
+        if (!res.ok) console.error(`[KDS] Failed to persist item status for order ${orderId}: HTTP ${res.status}`)
+      }).catch(err => {
+        console.error(`[KDS] Network error persisting item status for order ${orderId}:`, err)
+      })
 
       return next
     })
