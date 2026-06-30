@@ -132,7 +132,23 @@ La pregunta correcta nunca es "cuantos kilos quedan." La pregunta
 correcta es "cuantos platillos puedo vender antes de quedarme sin
 inventario."
 
-## 14. No copiamos. Aprendemos y superamos.
+## 14. Pensamos como empresa de categoria mundial
+
+Cada decision responde: esto sirve para 10,000 restaurantes o solo
+para un caso puntual? Es un moat o algo que un competidor copia en
+un ano? Nos acerca a una empresa de categoria YC?
+
+No construimos features porque un competidor las tenga. Las
+construimos si resuelven un problema operativo importante,
+fortalecen el moat, o aumentan la capacidad de escalar.
+
+Cada recomendacion tiene dos perspectivas: que necesita AMALAY
+para operar impecablemente (corto plazo) y que necesita Fullsite
+para ser la plataforma lider (largo plazo). Nunca sacrificar
+el largo plazo por una feature tactica. Nunca sacrificar el
+primer cliente por una vision demasiado lejana.
+
+## 15. No copiamos. Aprendemos y superamos.
 
 Wansoft opero restaurantes 20 anos. Respetamos eso. Estudiamos
 su modelo de datos, sus 822 stored procedures, sus 47 formatos
