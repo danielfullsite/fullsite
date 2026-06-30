@@ -2240,12 +2240,32 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Auto-deduct ingredients from inventory (fire-and-forget, don't block UI)
-      deductIngredientsForOrder(activeItems, orderId, mesero).then(result => {
-        if (result.alerts.length > 0) {
-          showToast(`${result.alerts.length} alertas de inventario`)
+      // Auto-deduct ingredients from inventory — IDEMPOTENT (Principle #12)
+      // Only deduct NEW items + quantity DELTAS of already-sent items
+      const itemsToDeduct: typeof activeItems = []
+      for (const item of activeItems) {
+        if (!sentItemIds.has(item.id)) {
+          // New item: deduct full quantity
+          itemsToDeduct.push(item)
+        } else {
+          // Already sent: check if quantity increased (deduct only the delta)
+          const snapshot = sentItemSnapshots[item.id]
+          if (snapshot && item.cantidad > snapshot.cantidad) {
+            const delta = item.cantidad - snapshot.cantidad
+            itemsToDeduct.push({ ...item, cantidad: delta, subtotal: (item.precio + item.precioExtra) * delta })
+          }
+          // If quantity decreased or unchanged, don't deduct (reversal is separate)
         }
-      }).catch(() => {})
+      }
+      if (itemsToDeduct.length > 0) {
+        deductIngredientsForOrder(itemsToDeduct, orderId, mesero).then(result => {
+          if (result.alerts.length > 0) {
+            showToast(`${result.alerts.length} alertas de inventario`)
+          }
+        }).catch(err => {
+          console.error('[inventory] Deduction failed:', err)
+        })
+      }
 
       setLoadedOrderId(orderId)
       setLoadedUpdatedAt(new Date().toISOString())

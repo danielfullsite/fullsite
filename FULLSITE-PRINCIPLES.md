@@ -110,7 +110,18 @@ y el gerente atendiendo una queja?
 
 Si la respuesta es "probablemente" o "no se," no esta listo.
 
-## 12. No copiamos. Aprendemos y superamos.
+## 12. Las deducciones de inventario son idempotentes
+
+Enviar la misma orden dos veces nunca produce una segunda
+deduccion. Cancelar y reabrir no duplica ni pierde stock.
+Cada operacion de inventario es un delta sobre el estado
+actual, no un valor absoluto que sobreescribe.
+
+Si el sistema no puede garantizar idempotencia, es preferible
+no descontar que descontar de mas. El conteo fisico corrige;
+el stock fantasma confunde.
+
+## 13. No copiamos. Aprendemos y superamos.
 
 Wansoft opero restaurantes 20 anos. Respetamos eso. Estudiamos
 su modelo de datos, sus 822 stored procedures, sus 47 formatos
