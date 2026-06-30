@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `reference/wansoft/CAJA-SPEC.md`
+>
+> This document is kept for historical reference only.
+
 # Fullsite POS — Lógica operativa observada en Wansoft / NetSilver
 
 ## Objetivo

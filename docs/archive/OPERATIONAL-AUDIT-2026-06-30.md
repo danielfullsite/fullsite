@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/EXECUTIVE-REPORT.md`
+>
+> This document is kept for historical reference only.
+
 # AUDITORIA OPERATIVA COMPLETA — FULLSITE POS
 
 > Fecha: 2026-06-30

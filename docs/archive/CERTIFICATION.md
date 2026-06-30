@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/GO-LIVE-CHECKLIST.md`
+>
+> This document is kept for historical reference only.
+
 # Fullsite POS — Certification Checklist v2.0
 
 > **Estándar:** No "funciona". **Sobrevive al caos operativo de un restaurante real.**

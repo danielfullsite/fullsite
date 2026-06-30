@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `deployment/CUTOVER-PLAYBOOK.md`
+>
+> This document is kept for historical reference only.
+
 # Manual de migración: Wansoft → Fullsite POS (AMALAY)
 
 > Para: Daniel. Última actualización: 2026-06-12.

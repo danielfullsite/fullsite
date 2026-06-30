@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/MANUAL-OPERATIVO.md`
+>
+> This document is kept for historical reference only.
+
 # Fullsite POS — Manual de lógica del sistema
 
 > Última actualización: 2026-06-12. Fuente de verdad: el código en `dashboard-app/`.

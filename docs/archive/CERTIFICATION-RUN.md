@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/GO-LIVE-CHECKLIST.md`
+>
+> This document is kept for historical reference only.
+
 # Fullsite Certification Run — AMALAY
 
 > **Regla:** Un PASS sin evidencia no cuenta como PASS.

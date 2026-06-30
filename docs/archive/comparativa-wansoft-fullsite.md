@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/EXECUTIVE-REPORT.md`
+>
+> This document is kept for historical reference only.
+
 # Fullsite vs Wansoft — Comparativa para restaurantes
 
 *Actualizado: 2026-06-11*

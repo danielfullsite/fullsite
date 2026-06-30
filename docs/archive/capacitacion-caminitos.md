@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `(client-specific)`
+>
+> This document is kept for historical reference only.
+
 # Manual de Caminitos — Wansoft vs Fullsite POS
 
 > Referencia para capacitación del staff de AMALAY.

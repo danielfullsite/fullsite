@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/GO-LIVE-CHECKLIST.md`
+>
+> This document is kept for historical reference only.
+
 # AMALAY BLOCKERS
 
 > Cada fix debe cumplir 4 condiciones:

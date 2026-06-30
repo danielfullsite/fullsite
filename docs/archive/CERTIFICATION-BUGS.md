@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/GO-LIVE-CHECKLIST.md`
+>
+> This document is kept for historical reference only.
+
 # Bugs encontrados durante certificación
 
 ---

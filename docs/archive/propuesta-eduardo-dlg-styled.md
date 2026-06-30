@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `(final version in archive)`
+>
+> This document is kept for historical reference only.
+
 ---
 pdf_options:
   format: Letter

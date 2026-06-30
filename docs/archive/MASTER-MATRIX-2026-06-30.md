@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/EXECUTIVE-REPORT.md`
+>
+> This document is kept for historical reference only.
+
 # MATRIZ MAESTRA — FULLSITE vs OPERACION REAL DE RESTAURANTE
 
 > Auditoria definitiva. 97 procesos en 10 dominios.

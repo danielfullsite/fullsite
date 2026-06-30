@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/MANUAL-OPERATIVO.md`
+>
+> This document is kept for historical reference only.
+
 # Dashboard v2 — Client Portal Spec
 
 **Fecha:** 2026-05-10

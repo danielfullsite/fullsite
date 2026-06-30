@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `operations/MANUAL-OPERATIVO.md`
+>
+> This document is kept for historical reference only.
+
 # FULLSITE OPERATIONS
 
 Solo hechos verificados. Sin hipotesis.

@@ -1,3 +1,7 @@
+> **ARCHIVED.** Replaced by: `deployment/CUTOVER-PLAYBOOK.md`
+>
+> This document is kept for historical reference only.
+
 # Cutover Checklist — Wansoft → Fullsite POS
 
 ## PRE-CUTOVER (1 semana antes)
