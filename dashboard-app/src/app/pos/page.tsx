@@ -2339,7 +2339,7 @@ function POSContent() {
       })
 
       // Print ticket for THIS cuenta
-      handlePrintTicket(order)
+      await handlePrintTicket(order)
 
       // If split and more cuentas remaining, advance to next
       const totalCuentas = splitMode === 'parejo' ? splitParejoN : splitCount
