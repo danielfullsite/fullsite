@@ -1150,6 +1150,7 @@ export interface KitchenOrderFromDB {
   mesero: string
   status: string
   items: string // JSON string of OrderItem[]
+  kds_item_status: string | null // JSON string of Record<string, boolean> — separate from items to avoid race condition
   created_at: string
   notas: string | null
 }

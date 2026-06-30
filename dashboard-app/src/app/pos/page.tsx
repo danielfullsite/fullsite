@@ -2110,31 +2110,49 @@ function POSContent() {
   const iva = Math.round(subtotalAfterDiscount * IVA_RATE * 100) / 100
   const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
+  // Concurrency check: verify order hasn't been modified by another terminal
+  const checkOrderConflict = async (context: string): Promise<boolean> => {
+    if (!loadedOrderId || !loadedUpdatedAt) return false // no conflict possible
+    try {
+      const checkRes = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at,status&limit=1`,
+        { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+      )
+      if (checkRes.ok) {
+        const rows = await checkRes.json()
+        if (rows.length > 0) {
+          // Check if already closed (prevents double payment)
+          if (rows[0].status === 'cerrada' || rows[0].status === 'cancelada') {
+            showToast(`Esta orden ya fue ${rows[0].status} por otro usuario`)
+            return true
+          }
+          const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
+          if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
+            showToast('Esta orden fue modificada por otro usuario. Recarga la mesa.')
+            return true
+          }
+        }
+      }
+    } catch {
+      // Network error during conflict check — block payment (safe side), allow kitchen send
+      if (context === 'payment') {
+        showToast('No se pudo verificar el estado de la orden. Reintenta.')
+        return true
+      }
+    }
+    return false
+  }
+
   const handleSendToKitchen = async () => {
     if (activeItems.length === 0 || operationLock.current) return
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
 
-    // Multi-user conflict check: if we loaded an existing order, verify it hasn't been modified since
-    if (loadedOrderId && loadedUpdatedAt) {
-      try {
-        const checkRes = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at&limit=1`,
-          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
-        )
-        if (checkRes.ok) {
-          const rows = await checkRes.json()
-          if (rows.length > 0) {
-            const currentUpdatedAt = rows[0].updated_at || rows[0].created_at
-            if (currentUpdatedAt && currentUpdatedAt !== loadedUpdatedAt) {
-              showToast('Esta orden fue modificada por otro usuario')
-              setSaving(false); operationLock.current = false
-              return
-            }
-          }
-        }
-      } catch { /* proceed anyway */ }
+    // Multi-user conflict check
+    if (await checkOrderConflict('kitchen')) {
+      setSaving(false); operationLock.current = false
+      return
     }
 
     const order: Order = {
@@ -2288,6 +2306,12 @@ function POSContent() {
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
+
+    // Concurrency check: prevent double payment or payment on modified order
+    if (await checkOrderConflict('payment')) {
+      setSaving(false); operationLock.current = false
+      return
+    }
 
     // Determine which items to pay based on split state
     let payingItems = activeItems

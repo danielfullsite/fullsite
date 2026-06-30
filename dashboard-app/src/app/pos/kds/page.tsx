@@ -114,13 +114,25 @@ export default function KDSPage() {
 
     setOrders(fresh)
     setLastUpdate(new Date())
-    // Restore done items from DB (kds_done flag on each item)
+    // Restore done items from kds_item_status (separate field, no race with POS items writes)
     const restored = new Set<string>()
     for (const order of fresh) {
-      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-      items.forEach((item, idx) => {
-        if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
-      })
+      // Read from kds_item_status field (new) with fallback to kds_done in items (legacy)
+      let kdsStatus: Record<string, boolean> = {}
+      if (order.kds_item_status) {
+        try { kdsStatus = typeof order.kds_item_status === 'string' ? JSON.parse(order.kds_item_status) : order.kds_item_status } catch { /* */ }
+      }
+      if (Object.keys(kdsStatus).length > 0) {
+        for (const [idx, done] of Object.entries(kdsStatus)) {
+          if (done) restored.add(`${order.id}-${idx}`)
+        }
+      } else {
+        // Legacy fallback: read kds_done from items
+        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        items.forEach((item, idx) => {
+          if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
+        })
+      }
     }
     // Replace entire set from DB truth — handles un-done from other devices
     if (restored.size > 0 || doneItems.size > 0) setDoneItems(restored)
@@ -167,12 +179,14 @@ export default function KDSPage() {
         }
       }
 
-      // Persist item statuses to Supabase so POS can see them
+      // Persist KDS item statuses to a SEPARATE field (not items) to avoid
+      // race condition with POS writes. KDS writes kds_item_status, POS writes items.
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-      const updatedItems = items.map((item, idx) => {
+      const kdsStatus: Record<string, boolean> = {}
+      items.forEach((item, idx) => {
+        if (item.cancelled) return
         const k = `${orderId}-${idx}`
-        const isDone = k === key ? !prev.has(key) : next.has(k)
-        return { ...item, kds_done: isDone }
+        kdsStatus[`${idx}`] = k === key ? !prev.has(key) : next.has(k)
       })
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
         method: 'PATCH',
@@ -182,7 +196,7 @@ export default function KDSPage() {
           'Content-Type': 'application/json',
           Prefer: 'return=minimal',
         },
-        body: JSON.stringify({ items: JSON.stringify(updatedItems) }),
+        body: JSON.stringify({ kds_item_status: JSON.stringify(kdsStatus) }),
       }).catch(() => {})
 
       return next

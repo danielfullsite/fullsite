@@ -231,9 +231,43 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
         },
         body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
       })
-      if (res.ok || res.status === 409) {
+      if (res.ok) {
         await markSynced(item.id)
         synced++
+      } else if (res.status === 409) {
+        // Conflict: another terminal already modified this order.
+        // Try PATCH (merge) instead of POST (create) to apply our changes
+        if (item.method === 'POST' && item.table === 'pos_orders') {
+          try {
+            const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}`, {
+              method: 'PATCH',
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal',
+              },
+              body: JSON.stringify(item.data),
+            })
+            if (patchRes.ok) {
+              console.warn(`[offline-sync] 409 resolved via PATCH for order ${item.data.id}`)
+              await markSynced(item.id)
+              synced++
+            } else {
+              console.error(`[offline-sync] 409 PATCH failed for order ${item.data.id}: ${patchRes.status}`)
+              await incrementRetry(item.id)
+              failed++
+            }
+          } catch {
+            await incrementRetry(item.id)
+            failed++
+          }
+        } else {
+          // Non-order 409: log and retry (don't silently discard)
+          console.error(`[offline-sync] 409 conflict on ${item.table} — data NOT synced, will retry`)
+          await incrementRetry(item.id)
+          failed++
+        }
       } else {
         await incrementRetry(item.id)
         failed++
