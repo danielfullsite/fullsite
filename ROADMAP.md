@@ -47,7 +47,14 @@
 - [ ] Multi-tenant onboarding automatizado
 - [ ] Integracion Uber Eats API
 - [ ] Consumo interno (tipo de orden)
-- [ ] Produccion/batch cooking
+
+## Estrategico — Vision del Restaurant OS
+
+- [ ] Produccion/batch cooking (ADR pendiente — core del OS, no feature)
+- [ ] Sub-recetas (receta como ingrediente de otra receta)
+- [ ] Existencias por platillo ("puedo servir 12 milanesas mas")
+- [ ] Stock comprometido vs disponible
+- [ ] Compras sugeridas por IA basadas en recetas + ventas historicas
 
 ## P3 — Primeros 100 restaurantes
 
@@ -55,7 +62,6 @@
 - [ ] API publica
 - [ ] App nativa comandero (React Native)
 - [ ] Lealtad/puntos
-- [ ] Compras y proveedores
 - [ ] Traspasos inter-sucursal
 - [ ] Analytics benchmarks
 - [ ] SOC 2 / compliance

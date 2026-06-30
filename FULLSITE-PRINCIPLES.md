@@ -121,7 +121,18 @@ Si el sistema no puede garantizar idempotencia, es preferible
 no descontar que descontar de mas. El conteo fisico corrige;
 el stock fantasma confunde.
 
-## 13. No copiamos. Aprendemos y superamos.
+## 13. La receta es la unidad fundamental del negocio
+
+El POS no es el centro del Restaurant Operating System. La receta
+lo es. Todo se deriva de ella: ingredientes, proveedores, costos,
+inventario, produccion, food cost, disponibilidad, compras, y
+rentabilidad.
+
+La pregunta correcta nunca es "cuantos kilos quedan." La pregunta
+correcta es "cuantos platillos puedo vender antes de quedarme sin
+inventario."
+
+## 14. No copiamos. Aprendemos y superamos.
 
 Wansoft opero restaurantes 20 anos. Respetamos eso. Estudiamos
 su modelo de datos, sus 822 stored procedures, sus 47 formatos
