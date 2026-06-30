@@ -3,7 +3,7 @@
 > Estado real. No aspiracional.
 > Ningun P1 se toca mientras exista un P0 abierto.
 > Actualizar despues de cada sesion.
-> Ultima actualizacion: 2026-06-30
+> Ultima actualizacion: 2026-06-30 (concurrencia completada)
 
 ---
 
@@ -12,9 +12,9 @@
 - [ ] IEPS modelo fiscal (bloqueado: necesita XML de Wansoft)
 - [ ] Facturama produccion (bloqueado: pago $1,650)
 - [ ] XML CFDI validado contra Wansoft
-- [ ] Concurrencia: updated_at en handlePayment
-- [ ] Concurrencia: fix 409 en sync offline
-- [ ] Concurrencia: separar KDS writes del campo items
+- [x] Concurrencia: updated_at en handlePayment ✓ 2026-06-30
+- [x] Concurrencia: fix 409 en sync offline ✓ 2026-06-30
+- [x] Concurrencia: separar KDS writes del campo items ✓ 2026-06-30
 - [ ] Huella digital (verificar Windows Hello con lector DP4500)
 - [ ] Cajon (fix EC TICKET o mover RJ-11)
 - [ ] Shadow Day
@@ -69,10 +69,10 @@
 | Facturacion | 0% | Bloqueado (IEPS + Facturama) |
 | Inventario | 80% | Code PASS |
 | Auditoria | 85% | Code PASS |
-| Offline | 60% | Parcial (409 bug) |
-| Concurrencia | 30% | No implementado |
+| Offline | 75% | Code PASS (409 fix) |
+| Concurrencia | 70% | Code PASS (3 parches) |
 | Hardware | 50% | Parcial (bridge OK, cajon/huella pendiente) |
-| **Global** | **67%** | |
+| **Global** | **73%** | |
 
 ---
 
