@@ -494,15 +494,8 @@ export default function CocinaPage() {
                             <p className="text-sky-400 text-xs italic">{item.notas}</p>
                           )}
                         </div>
-                        {!item.cancelled && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setCancelTarget({ orderId: order.id, itemIndex: i, itemName: (item.nombre || item.name || ''), mesa: order.mesa, mesero: order.mesero }) }}
-                            className="w-7 h-7 rounded-lg bg-red-900/30 hover:bg-red-800/50 text-red-400 flex items-center justify-center flex-shrink-0"
-                            title="Cancelar item"
-                          >
-                            <Ban size={12} />
-                          </button>
-                        )}
+                        {/* Cancel buttons removed from KDS — cancellation must happen from POS with manager PIN.
+                            Kitchen staff should not be able to cancel items accidentally. */}
                       </div>
                     ))}
                   </div>
