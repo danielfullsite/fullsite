@@ -290,8 +290,32 @@ export default function CocinaPage() {
   // Item-level status tracking: 1 click = preparando, 2 clicks = listo (disappears)
   const [itemStatus, setItemStatus] = useState<Record<string, 'preparando' | 'listo'>>({})
 
+  // Auto-advance orders where all items are marked listo (runs as effect, not during render)
+  useEffect(() => {
+    for (const order of orders) {
+      if (order.status === 'lista' || order.status === 'entregada') continue
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      const active = items.filter(i => !i.cancelled)
+      if (active.length === 0) continue
+      const allListo = active.every((_, idx) => {
+        const globalIdx = items.indexOf(active[idx])
+        return itemStatus[`${order.id}-${globalIdx}`] === 'listo'
+      })
+      if (allListo) {
+        advanceStatus(order.id, order.status, order.mesa, order.mesero)
+      }
+    }
+  }, [itemStatus])
+
+  const lastClickTime = useRef<Record<string, number>>({})
+
   const handleItemClick = (orderId: string, itemIndex: number, itemName: string) => {
     const key = `${orderId}-${itemIndex}`
+    const now = Date.now()
+    // Debounce: minimum 500ms between state transitions to prevent accidental double-click
+    if (lastClickTime.current[key] && now - lastClickTime.current[key] < 500) return
+    lastClickTime.current[key] = now
+
     setItemStatus(prev => {
       const current = prev[key]
       if (!current) {
@@ -529,12 +553,8 @@ export default function CocinaPage() {
                 const key = `${order.id}-${globalIdx}`
                 return itemStatus[key] !== 'listo'
               })
-              // If all items are listo, auto-advance the order
+              // If all items are listo, skip rendering (auto-advance handled by effect below)
               if (visibleItems.length === 0 && activeItems.length > 0) {
-                // All items done — advance on next render
-                if (order.status !== 'lista') {
-                  advanceStatus(order.id, order.status, order.mesa, order.mesero)
-                }
                 return null
               }
 
