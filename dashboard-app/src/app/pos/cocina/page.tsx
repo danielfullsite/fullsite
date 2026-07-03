@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X } from 'lucide-react'
+import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X, Settings } from 'lucide-react'
 import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
@@ -284,11 +284,51 @@ export default function CocinaPage() {
     }
   }
 
+  // KDS Settings (configurable alert threshold)
+  const [alertMinutes, setAlertMinutes] = useState(10)
+  const [showSettings, setShowSettings] = useState(false)
+  // Item-level status tracking: 1 click = preparando, 2 clicks = listo (disappears)
+  const [itemStatus, setItemStatus] = useState<Record<string, 'preparando' | 'listo'>>({})
+
+  const handleItemClick = (orderId: string, itemIndex: number, itemName: string) => {
+    const key = `${orderId}-${itemIndex}`
+    setItemStatus(prev => {
+      const current = prev[key]
+      if (!current) {
+        // First click: preparando
+        return { ...prev, [key]: 'preparando' }
+      } else if (current === 'preparando') {
+        // Second click: listo (will be filtered out)
+        return { ...prev, [key]: 'listo' }
+      }
+      return prev
+    })
+  }
+
   const statusConfig: Record<string, { bg: string; border: string; badge: string; badgeText: string; label: string; nextLabel: string }> = {
     enviada: { bg: 'bg-[var(--surface-2)]', border: 'border-white/20', badge: 'bg-[var(--surface)]', badgeText: 'text-[var(--text-1)]', label: 'NUEVA', nextLabel: 'Preparando' },
     preparando: { bg: 'bg-amber-950/40', border: 'border-amber-500/40', badge: 'bg-amber-500', badgeText: 'text-black', label: 'PREPARANDO', nextLabel: 'Lista' },
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
+
+  // Batch counter: count pending items by name
+  const batchCounts = (() => {
+    const counts: Record<string, { total: number; listo: number }> = {}
+    const pendingOrders = orders.filter(o => o.status === 'enviada' || o.status === 'preparando')
+    for (const order of pendingOrders) {
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      items.forEach((item, idx) => {
+        if (item.cancelled) return
+        const name = item.nombre || item.name || '?'
+        const qty = item.cantidad || item.quantity || 1
+        if (!counts[name]) counts[name] = { total: 0, listo: 0 }
+        counts[name].total += qty
+        const key = `${order.id}-${idx}`
+        if (itemStatus[key] === 'listo') counts[name].listo += qty
+      })
+    }
+    return counts
+  })()
 
   // Production area classification for summary bar
   // isBebida imported from shared constants at top of file
@@ -397,19 +437,51 @@ export default function CocinaPage() {
         ))}
       </div>
 
-      {/* Production area summary bar */}
-      {totalPendingItems > 0 && (
-        <div className="flex items-center gap-4 px-6 py-2.5 bg-[var(--surface-2)]/60 border-b border-slate-700/50 flex-shrink-0">
-          {Object.entries(areaCounts).map(([area, count]) => (
-            <div key={area} className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${AREA_COLORS[area]}`} />
-              <span className="text-sm text-[var(--text-4)]">
-                {area}: <span className={`font-bold ${count > 0 ? 'text-white' : 'text-[var(--text-2)]'}`}>{count}</span>
+      {/* Batch counter — how many of each dish are pending */}
+      {Object.keys(batchCounts).length > 0 && (
+        <div className="flex items-center gap-3 px-6 py-2 bg-[var(--surface-2)]/60 border-b border-slate-700/50 flex-shrink-0 overflow-x-auto">
+          {Object.entries(batchCounts)
+            .filter(([, v]) => v.total - v.listo > 0)
+            .sort((a, b) => (b[1].total - b[1].listo) - (a[1].total - a[1].listo))
+            .slice(0, 15)
+            .map(([name, { total, listo }]) => (
+            <div key={name} className="flex items-center gap-1.5 bg-[var(--line)]/40 rounded-lg px-2.5 py-1 whitespace-nowrap">
+              <span className="text-white text-xs font-bold">{name.length > 18 ? name.slice(0, 18) + '…' : name}</span>
+              <span className={`text-xs font-bold ${listo > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {listo}/{total}
               </span>
             </div>
           ))}
-          <div className="ml-auto text-xs text-[var(--text-2)]">
-            {totalPendingItems} items pendientes
+          <button
+            onClick={() => setShowSettings(true)}
+            className="ml-auto text-xs text-[var(--text-3)] hover:text-white px-2 py-1 rounded-lg hover:bg-[var(--line)]"
+          >
+            ⚙ Settings
+          </button>
+        </div>
+      )}
+
+      {/* Settings modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSettings(false)} />
+          <div className="relative bg-[var(--surface-2)] border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl mx-4 p-5">
+            <h3 className="text-lg font-bold text-white mb-4">Settings KDS</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-[var(--text-3)] block mb-2">Alerta de tiempo (minutos)</label>
+                <input
+                  type="number"
+                  value={alertMinutes}
+                  onChange={e => setAlertMinutes(Math.max(1, Number(e.target.value)))}
+                  className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white text-center text-xl focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-xs text-[var(--text-4)] mt-1">Las órdenes se ponen en rojo después de {alertMinutes} minutos</p>
+              </div>
+            </div>
+            <button onClick={() => setShowSettings(false)} className="w-full mt-4 py-3 rounded-xl bg-emerald-500 text-black font-bold">
+              Guardar
+            </button>
           </div>
         </div>
       )}
@@ -432,7 +504,7 @@ export default function CocinaPage() {
             {sortedOrders.map(order => {
               const config = statusConfig[order.status] || statusConfig.enviada
               const elapsed = getElapsedMinutes(order.created_at)
-              const isUrgent = elapsed > 15 && order.status !== 'lista'
+              const isUrgent = elapsed >= alertMinutes && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
               // Filter items based on station filter
               const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
@@ -451,56 +523,85 @@ export default function CocinaPage() {
               // Skip orders with no items matching the filter
               if (activeItems.length === 0) return null
 
+              // Filter out items marked as "listo" by the chef
+              const visibleItems = activeItems.filter((_, idx) => {
+                const globalIdx = items.indexOf(activeItems[idx])
+                const key = `${order.id}-${globalIdx}`
+                return itemStatus[key] !== 'listo'
+              })
+              // If all items are listo, auto-advance the order
+              if (visibleItems.length === 0 && activeItems.length > 0) {
+                // All items done — advance on next render
+                if (order.status !== 'lista') {
+                  advanceStatus(order.id, order.status, order.mesa, order.mesero)
+                }
+                return null
+              }
+
+              const isOverAlert = elapsed >= alertMinutes && order.status !== 'lista'
+              const entryTime = new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
               return (
-                <div key={order.id} className={`rounded-2xl border-2 p-5 flex flex-col ${config.bg} ${config.border}`}>
-                  <div className="flex items-start justify-between mb-4">
+                <div key={order.id} className={`rounded-2xl border-2 p-4 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
+                  <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-3xl font-black">{order.mesa}</span>
+                        <span className="text-4xl font-black">{order.mesa}</span>
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${config.badge} ${config.badgeText}`}>
                           {config.label}
                         </span>
                       </div>
                       <p className="text-[var(--text-3)] text-sm">{order.mesero}</p>
                     </div>
-                    <div className={`flex items-center gap-1 ${isUrgent ? 'text-red-400' : 'text-[var(--text-3)]'}`}>
-                      {isUrgent ? <Flame size={16} /> : <Clock size={16} />}
-                      <span className="text-sm font-mono font-semibold">{elapsed}m</span>
+                    <div className="text-right">
+                      <div className={`flex items-center gap-1 ${isOverAlert ? 'text-red-400 animate-pulse' : elapsed >= alertMinutes * 0.7 ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
+                        {isOverAlert ? <Flame size={18} /> : <Clock size={16} />}
+                        <span className="text-lg font-mono font-bold">{elapsed}m</span>
+                      </div>
+                      <p className="text-[var(--text-4)] text-xs font-mono">{entryTime}</p>
                     </div>
                   </div>
 
-                  <div className="flex-1 space-y-2 mb-4">
-                    {activeItems.map((item, i) => (
-                      <div key={i} className={`flex items-start gap-2 ${item.cancelled ? 'opacity-40' : ''}`}>
-                        <span className={`font-bold text-sm min-w-[24px] ${item.cancelled ? 'text-red-500' : 'text-emerald-400'}`}>
-                          {item.cancelled ? '✕' : `${item.cantidad || item.quantity || 1}x`}
+                  <div className="flex-1 space-y-2.5 mb-3">
+                    {visibleItems.map((item, i) => {
+                      const globalIdx = items.indexOf(item)
+                      const key = `${order.id}-${globalIdx}`
+                      const status = itemStatus[key]
+                      return (
+                      <div
+                        key={i}
+                        onClick={() => { if (!item.cancelled) handleItemClick(order.id, globalIdx, item.nombre || item.name || '') }}
+                        className={`flex items-start gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${
+                          status === 'preparando' ? 'bg-amber-900/30 border border-amber-500/30' : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <span className={`font-bold text-lg min-w-[32px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {`${item.cantidad || item.quantity || 1}x`}
                         </span>
                         <div className="flex-1">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); if (!item.cancelled) showRecipeDetail(item.nombre || item.name || '') }}
-                            className={`text-sm text-left ${item.cancelled ? 'line-through text-red-400' : 'text-white underline decoration-dotted underline-offset-2 hover:text-emerald-400'}`}
-                          >{item.nombre || item.name}</button>
-                          {item.cancelled && (
-                            <p className="text-red-500 text-[10px]">Cancelado: {item.cancelReason} — {item.cancelledBy}</p>
-                          )}
-                          {!item.cancelled && item.modificadores && item.modificadores.length > 0 && (
-                            <div className="mt-0.5">
+                          <p className={`text-lg font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
+                            {item.nombre || item.name}
+                          </p>
+                          {item.modificadores && item.modificadores.length > 0 && (
+                            <div className="mt-1">
                               {(typeof item.modificadores === 'string' ? (item.modificadores as string).split(/\s*·\s*/) : (item.modificadores as string[])).map((mod: string, mi: number) => (
-                                <div key={mi} className="text-amber-300 text-xs leading-tight">▸ {mod}</div>
+                                <div key={mi} className="text-amber-300 text-sm leading-snug font-medium">▸ {mod}</div>
                               ))}
                             </div>
                           )}
-                          {!item.cancelled && item.notas && (
-                            <p className="text-sky-400 text-xs italic">{item.notas}</p>
+                          {item.notas && (
+                            <p className="text-sky-400 text-sm italic mt-0.5">{item.notas}</p>
+                          )}
+                          {status === 'preparando' && (
+                            <p className="text-amber-400 text-xs mt-1 font-semibold">⏳ Preparando — toca para marcar listo</p>
                           )}
                         </div>
-                        {/* Cancel buttons removed from KDS — cancellation must happen from POS with manager PIN.
-                            Kitchen staff should not be able to cancel items accidentally. */}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
-                  {activeItems.length > 0 && (
+                  {visibleItems.length > 0 && (
                     <button
                       onClick={() => advanceStatus(order.id, order.status, order.mesa, order.mesero)}
                       className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
