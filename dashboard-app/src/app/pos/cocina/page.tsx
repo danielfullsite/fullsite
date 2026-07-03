@@ -284,11 +284,55 @@ export default function CocinaPage() {
     }
   }
 
-  // KDS Settings (configurable alert threshold)
-  const [alertMinutes, setAlertMinutes] = useState(10)
+  // KDS Settings (configurable alert threshold) — persist in localStorage
+  const [alertMinutes, setAlertMinutes] = useState(() => {
+    try { const v = localStorage.getItem('kds_alert_minutes'); return v ? Number(v) : 10 } catch { return 10 }
+  })
   const [showSettings, setShowSettings] = useState(false)
+
+  // Persist alert setting
+  useEffect(() => {
+    try { localStorage.setItem('kds_alert_minutes', String(alertMinutes)) } catch {}
+  }, [alertMinutes])
+
   // Item-level status tracking: 1 click = preparando, 2 clicks = listo (disappears)
-  const [itemStatus, setItemStatus] = useState<Record<string, 'preparando' | 'listo'>>({})
+  // Persisted in localStorage so refresh doesn't reset chef's progress
+  const KDS_STATUS_KEY = 'kds_item_status'
+
+  const loadItemStatus = (): Record<string, 'preparando' | 'listo'> => {
+    try {
+      const raw = localStorage.getItem(KDS_STATUS_KEY)
+      if (!raw) return {}
+      const parsed = JSON.parse(raw)
+      // Clean entries older than 4 hours (same as order auto-archive)
+      const now = Date.now()
+      const fourHours = 4 * 60 * 60 * 1000
+      const cleaned: Record<string, 'preparando' | 'listo'> = {}
+      for (const [key, val] of Object.entries(parsed)) {
+        if (typeof val === 'object' && val !== null && 'status' in val && 'ts' in val) {
+          const entry = val as { status: 'preparando' | 'listo'; ts: number }
+          if (now - entry.ts < fourHours) {
+            cleaned[key] = entry.status
+          }
+        }
+      }
+      return cleaned
+    } catch { return {} }
+  }
+
+  const [itemStatus, setItemStatus] = useState<Record<string, 'preparando' | 'listo'>>(loadItemStatus)
+
+  // Persist itemStatus to localStorage on every change
+  useEffect(() => {
+    try {
+      const now = Date.now()
+      const toStore: Record<string, { status: string; ts: number }> = {}
+      for (const [key, status] of Object.entries(itemStatus)) {
+        toStore[key] = { status, ts: now }
+      }
+      localStorage.setItem(KDS_STATUS_KEY, JSON.stringify(toStore))
+    } catch {}
+  }, [itemStatus])
 
   // Auto-advance orders where all items are marked listo (runs as effect, not during render)
   useEffect(() => {
