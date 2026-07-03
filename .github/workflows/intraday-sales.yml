@@ -5,8 +5,10 @@ on:
     # Hourly during AMALAY hours: 10am-11pm MX = 16:00-05:00 UTC
     - cron: '0 16,17,18,19,20,21,22,23 * * *'   # 10am-5pm MX
     - cron: '0 0,1,2,3,4 * * *'                   # 6pm-10pm MX
-    # Final cierre capture: 11:30pm MX (Thu-Sat close late)
-    - cron: '30 5 * * 0,5,6'                      # 11:30pm MX Fri/Sat + Sun morning catchup
+    # Final cierre capture: 11:30pm MX EVERY DAY (not just Fri/Sat)
+    - cron: '30 5 * * *'                           # 11:30pm MX daily
+    # Extra late capture for Thu-Sat (midnight MX)
+    - cron: '0 6 * * 5,6,0'                        # 12:00am MX Fri/Sat/Sun
   workflow_dispatch:
     inputs:
       client_id:
