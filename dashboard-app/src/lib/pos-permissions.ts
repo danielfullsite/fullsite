@@ -143,7 +143,7 @@ export const PERMISSION_PROFILES: Record<string, POSPermissions> = {
   },
 
   cajero: {
-    abrir_cuentas_restaurante: true, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: false,
+    abrir_cuentas_restaurante: false, abrir_cuentas_llevar: true, abrir_cuentas_domicilio: true,
     abrir_cuentas_recoger: true, cerrar_cuentas: true, cancelar_ordenes: false,
     cancelar_facturas: false, cambio_mesa: false, cambio_mesero: false, cambio_forma_pago: true,
     cambio_tipo_cuenta: false, cambio_personas: false, juntar_mesas: false, liberar_ordenes: false,

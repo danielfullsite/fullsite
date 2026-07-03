@@ -340,10 +340,22 @@ export default function MesasPage() {
     setMerging(false)
   }
 
+  // Get staff role for permission checks
+  const staffRole = (() => {
+    try { const s = sessionStorage.getItem('pos_staff'); return s ? JSON.parse(s).role || 'mesero' : 'mesero' } catch { return 'mesero' }
+  })()
+
   const handleMesaClick = (mesaNum: number) => {
-    if (!mergeMode) { router.push(`/pos?mesa=${mesaNum}`); return }
-    if (!mergeSource) setMergeSource(mesaNum)
-    else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
+    if (mergeMode) {
+      if (!mergeSource) setMergeSource(mesaNum)
+      else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
+      return
+    }
+    // Cajero can only open occupied tables (to charge), not empty ones
+    if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
+      return // silently ignore — cajero can't open new restaurant tables
+    }
+    router.push(`/pos?mesa=${mesaNum}`)
   }
 
   // ─── Mesa Card (shared between views) ─────────────────────────────────────

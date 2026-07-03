@@ -1738,7 +1738,7 @@ function POSContent() {
   // Section visibility (maps nav sections to granular permissions)
   const canSee = (section: string) => {
     const sectionMap: Record<string, string> = {
-      mesas: 'abrir_cuentas_restaurante',
+      mesas: 'ver_todas_cuentas',  // cajero can see mesas (to charge) but not open new ones
       cocina: 'registro_comanda',
       kds: 'registro_comanda',
       barra: 'registro_comanda',
@@ -2275,15 +2275,20 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // Clear session to force PIN, then go to mesas — but NOT if offline
-      if (navigator.onLine) {
-        sessionStorage.removeItem('pos_staff')
-        sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { router.push('/pos/mesas') }, 1200)
-      } else {
-        showToast('Offline — orden guardada localmente, pendiente de sincronizar')
-        // Stay on current page, don't redirect (would fail with "No connection")
+      // Mode-dependent behavior after sending to kitchen:
+      // Comandero (mesero): clear session, return to mesas
+      // Caja (cajero/gerente/admin): stay on order to charge
+      if (staffRole === 'mesero' || staffRole === 'capitan') {
+        // Modo Comandero: regresa a mesas para tomar siguiente orden
+        if (navigator.onLine) {
+          sessionStorage.removeItem('pos_staff')
+          sessionStorage.removeItem('pos_last_activity')
+          setTimeout(() => { router.push('/pos/mesas') }, 1200)
+        } else {
+          showToast('Offline — orden guardada localmente')
+        }
       }
+      // Modo Caja (cajero/gerente/admin): se queda en la orden para cobrar
   }
 
   // Pre-ticket (precuenta — antes de cobrar)
