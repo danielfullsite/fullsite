@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MENU_CATEGORIES,
   MESEROS,
+  fetchMeseros,
   verifyManagerPin,
   RECIPE_ALIASES,
   formatMXN,
@@ -1240,6 +1241,31 @@ function POSContent() {
     }
     return MESEROS[0]
   })
+  // Dynamic meseros list from pos_staff (replaces hardcoded MESEROS for dropdown)
+  const [meserosList, setMeserosList] = useState<string[]>(MESEROS)
+  useEffect(() => {
+    fetchMeseros().then(list => {
+      setMeserosList(list)
+      // If current mesero is not in the new list, update to first available
+      if (list.length > 0 && !list.includes(mesero)) {
+        const saved = localStorage.getItem('pos_mesero')
+        if (saved && list.includes(saved)) {
+          setMesero(saved)
+        } else {
+          // Try matching by first name from staff session
+          try {
+            const s = sessionStorage.getItem('pos_staff')
+            if (s) {
+              const staff = JSON.parse(s)
+              const match = list.find(m => m.toLowerCase().includes(staff.name?.toLowerCase()?.split(' ')[0] || ''))
+              if (match) { setMesero(match); return }
+            }
+          } catch { /* */ }
+        }
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [personas, setPersonas] = useState<number>(2)
   const [clock, setClock] = useState<string>('')
   const [showPayment, setShowPayment] = useState(false)
@@ -1602,7 +1628,7 @@ function POSContent() {
             const loadedItems2 = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
             setOrderItems(loadedItems2)
             setOrderId(order.id)
-            setMesero(order.mesero || MESEROS[0])
+            setMesero(order.mesero || meserosList[0] || MESEROS[0])
             setPersonas(order.personas || 2)
             setDiscount(order.descuento || 0)
             setLoadedOrderId(order.id)
@@ -2155,6 +2181,46 @@ function POSContent() {
       return
     }
 
+    // Phantom order prevention: if this is a NEW order (not loaded from DB),
+    // re-check Supabase to see if another terminal already created one for this mesa
+    if (!loadedOrderId && mesa) {
+      try {
+        const filter = clienteNombre
+          ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
+          : `mesa=eq.${mesa}`
+        const raceRes = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(abierta,enviada,preparando)&order=created_at.desc&limit=1`,
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        )
+        if (raceRes.ok) {
+          const raceRows = await raceRes.json()
+          if (raceRows.length > 0) {
+            const existing = raceRows[0]
+            // Another terminal already created an order — load it instead of creating a duplicate
+            const items = typeof existing.items === 'string' ? JSON.parse(existing.items) : (existing.items || [])
+            const loadedItems = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
+            setOrderItems(loadedItems)
+            setOrderId(existing.id)
+            setLoadedOrderId(existing.id)
+            setLoadedUpdatedAt(existing.updated_at || existing.created_at || null)
+            if (existing.mesero) setMesero(existing.mesero)
+            if (existing.personas) setPersonas(existing.personas)
+            if (existing.status === 'enviada' || existing.status === 'preparando') {
+              setSentItemIds(new Set(loadedItems.map((i: OrderItem) => i.id)))
+              const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
+              for (const item of loadedItems) {
+                snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+              }
+              setSentItemSnapshots(snaps)
+            }
+            showToast(`Mesa ${mesa} ya tiene una orden abierta. Cargando...`)
+            setSaving(false); operationLock.current = false
+            return
+          }
+        }
+      } catch { /* network error — proceed with creation */ }
+    }
+
     const order: Order = {
       id: orderId,
       mesa,
@@ -2635,7 +2701,7 @@ function POSContent() {
             {Array.from({ length: 20 }, (_, i) => (<option key={i + 1} value={i + 1}>{i + 1}p</option>))}
           </select>
           <select value={mesero} onChange={(e) => { const newMesero = e.target.value; setMesero(newMesero); try { localStorage.setItem('pos_mesero', newMesero) } catch {} if (loadedOrderId) { fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, { method: 'PATCH', headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ mesero: newMesero }) }) } }} className="bg-[var(--line)] text-white rounded-lg px-3 py-2 text-base font-medium border border-slate-600 min-h-[48px] flex-1 min-w-0">
-            {MESEROS.map((m) => (<option key={m} value={m}>{m}</option>))}
+            {meserosList.map((m) => (<option key={m} value={m}>{m}</option>))}
           </select>
         </div>
         {/* Row 3: Mobile tab toggle (only visible on mobile) */}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X } from 'lucide-react'
-import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, type AuditLogEntry, type PagoForma } from '@/lib/pos-data'
+import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -101,6 +101,7 @@ export default function CortePage() {
 
   const [cardPct, setCardPct] = useState(0)
   const [cashMovements, setCashMovements] = useState<CashMovement[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodDB[]>([])
   const [declarado, setDeclarado] = useState(0)
   const [turno, setTurno] = useState<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null>(null)
   // 'turno' = corte del turno activo (por turno_id); 'dia' = corte histórico por fecha
@@ -108,10 +109,11 @@ export default function CortePage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [a, pct, t] = await Promise.all([
+    const [a, pct, t, pm] = await Promise.all([
       getAuditLog(200),
       getCardCommissionPct(),
       getActiveTurno(),
+      getPaymentMethodsFromDB(),
     ])
     // Por turno si hay turno abierto; si no, fallback a fecha
     const o = corteMode === 'turno' && t
@@ -125,6 +127,7 @@ export default function CortePage() {
     setAuditLog(a)
     setCardPct(pct)
     setTurno(t)
+    setPaymentMethods(pm)
     setLoading(false)
   }
 
@@ -217,6 +220,33 @@ export default function CortePage() {
       }
     }
 
+    // ── Agrupación por tipo de forma de pago (usando catálogo pos_payment_methods) ──
+    // Build a name->type lookup from the DB catalog (case-insensitive)
+    const methodTypeMap: Record<string, string> = {}
+    for (const pm of paymentMethods) {
+      methodTypeMap[pm.name.toLowerCase()] = pm.type
+    }
+    const getMethodType = (name: string): string => {
+      return methodTypeMap[name.toLowerCase()] || 'other'
+    }
+
+    // Group labels by type
+    const typeLabels: Record<string, string> = {
+      cash: 'Efectivo',
+      card: 'Tarjeta',
+      terminal: 'Tarjeta',  // terminal (Clip) groups with card
+      transfer: 'Transferencia',
+      platform: 'Plataformas',
+      other: 'Otros',
+    }
+
+    const byPaymentGroup: Record<string, number> = {}
+    for (const [method, amount] of Object.entries(byPayment)) {
+      const type = getMethodType(method)
+      const label = typeLabels[type] || 'Otros'
+      byPaymentGroup[label] = (byPaymentGroup[label] || 0) + amount
+    }
+
     // By mesero
     const byMesero: Record<string, { ventas: number; ordenes: number; personas: number; propinas: number }> = {}
     for (const o of closed) {
@@ -232,14 +262,14 @@ export default function CortePage() {
       e.action === 'item_cancelled' || e.action === 'order_cancelled'
     )
 
-    // Comisión estimada sobre lo cobrado con tarjeta (incluye propina — la terminal cobra comisión sobre el monto completo)
+    // Comisión estimada sobre lo cobrado con tarjeta/terminal (incluye propina — la terminal cobra comisión sobre el monto completo)
     const totalTarjeta = Object.entries(byPayment)
-      .filter(([m]) => m.toLowerCase().includes('tarjeta'))
+      .filter(([m]) => { const t = getMethodType(m); return t === 'card' || t === 'terminal' })
       .reduce((s, [, v]) => s + v, 0)
     const comisionTarjeta = totalTarjeta * cardPct / 100
 
     // ── Arqueo de efectivo (formato Wansoft, spec 14.2) ──
-    const isEfectivo = (m: string) => m.toLowerCase().includes('efectivo')
+    const isEfectivo = (m: string) => getMethodType(m) === 'cash'
     const ventasEfectivo = Object.entries(ventasPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
     const propinaEfectivo = Object.entries(propinaPorForma).filter(([m]) => isEfectivo(m)).reduce((s, [, v]) => s + v, 0)
     // Propinas cobradas por formas NO efectivo (se pagan al mesero en efectivo desde caja)
@@ -275,10 +305,11 @@ export default function CortePage() {
       ordenesAbiertas: all.filter(o => o.status === 'enviada' || o.status === 'abierta').length,
       ordenesCanceladas: cancelled.length,
       byPayment,
+      byPaymentGroup,
       byMesero: Object.entries(byMesero).sort((a, b) => b[1].ventas - a[1].ventas),
       cancellations: cancellations.length,
     }
-  }, [orders, auditLog, cardPct, cashMovements])
+  }, [orders, auditLog, cardPct, cashMovements, paymentMethods])
 
   if (!accessGranted) {
     return (
@@ -469,22 +500,39 @@ export default function CortePage() {
                 <CreditCard size={18} className="text-blue-400" />
                 Métodos de pago
               </h3>
-              <div className="space-y-3">
-                {Object.entries(stats.byPayment).map(([method, total]) => (
-                  <div key={method} className="flex items-center justify-between">
+              {/* Grouped by type */}
+              <div className="space-y-3 mb-4">
+                {Object.entries(stats.byPaymentGroup)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([group, total]) => (
+                  <div key={group} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {method === 'efectivo' ? <Banknote size={16} className="text-emerald-400" /> :
-                       method === 'tarjeta' ? <CreditCard size={16} className="text-blue-400" /> :
+                      {group === 'Efectivo' ? <Banknote size={16} className="text-emerald-400" /> :
+                       group === 'Tarjeta' ? <CreditCard size={16} className="text-blue-400" /> :
                        <DollarSign size={16} className="text-[var(--text-3)]" />}
-                      <span className="text-[var(--text-4)] capitalize">{method}</span>
+                      <span className="text-[var(--text-4)]">{group}</span>
                     </div>
-                    <span className="text-white font-medium">{formatMXN(total)}</span>
+                    <span className="text-white font-semibold">{formatMXN(total)}</span>
                   </div>
                 ))}
-                {Object.keys(stats.byPayment).length === 0 && (
+                {Object.keys(stats.byPaymentGroup).length === 0 && (
                   <p className="text-[var(--text-2)] text-sm">Sin pagos registrados</p>
                 )}
               </div>
+              {/* Detail by individual method */}
+              {Object.keys(stats.byPayment).length > 0 && (
+                <div className="border-t border-slate-700 pt-3 space-y-2">
+                  <p className="text-[var(--text-2)] text-xs font-semibold tracking-wider mb-2">DETALLE</p>
+                  {Object.entries(stats.byPayment)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([method, total]) => (
+                    <div key={method} className="flex items-center justify-between">
+                      <span className="text-[var(--text-3)] text-sm capitalize">{method}</span>
+                      <span className="text-[var(--text-4)] text-sm">{formatMXN(total)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Reporte Corte Turno — formato Wansoft (spec 14.2) */}
