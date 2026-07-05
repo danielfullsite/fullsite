@@ -387,13 +387,28 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
       }
     }
 
+    // 5a. Fetch active meseros from pos_staff
+    let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
+    try {
+      const staffRes = await fetch(
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.amalay&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      )
+      if (staffRes.ok) {
+        const staffRows: { name: string }[] = await staffRes.json()
+        if (staffRows.length > 0) {
+          activeMeserosStr = staffRows.map(r => r.name).join(', ')
+        }
+      }
+    } catch { /* use fallback */ }
+
     // 5. System prompt — voice-optimized
     const systemPrompt = `Eres el copiloto operativo de AMALAY Coffee & Market (San Pedro Garza Garcia, Monterrey). Consultor senior con 20 anos de experiencia en restaurantes.
 
 MEMORIA DEL NEGOCIO:
 - AMALAY Coffee & Market, San Pedro Garza Garcia, Monterrey
 - Categorias principales: CHILAQUILES & ENCHILADAS, EGGS & KETO, COFFEE, TOAST & BAGELS, PANINIS, BOWLS, SMOOTHIES, PANCAKES & WAFFLES, BAKERY, DESSERTS
-- Meseros activos: Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia
+- Meseros activos: ${activeMeserosStr}
 - Precio Fullsite: $4,999 MXN/mes por sucursal + $4,999 setup
 - 30 agentes de IA operando 24/7
 - Briefing diario a las 7 AM por Telegram
@@ -428,7 +443,7 @@ REGLAS DE BUSQUEDA:
 - SOLO di "no tengo ese dato" como ULTIMO RECURSO.
 - Si preguntan "hoy" y no hay datos de hoy: di "aun no hay datos de hoy, te doy el ultimo dia disponible"
 
-EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chavez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Hector Enrique SI es mesero desde 2026-06.)
+EXCLUIR (no son meseros): cualquier nombre que NO aparezca en la lista de "Meseros activos" de arriba. APLICACIONES y MESERO EVENTO no son personas.
 
 FECHA DE HOY: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}.
 

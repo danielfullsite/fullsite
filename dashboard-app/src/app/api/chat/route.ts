@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting por usuario
     if (!checkRateLimit(userId)) {
-      return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 200 })
+      return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 429 })
     }
 
     const { message, history = [], client_id } = await request.json()
@@ -754,6 +754,21 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
       }
     }
 
+    // 4a. Fetch active meseros from pos_staff
+    let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
+    try {
+      const staffRes = await fetch(
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(client_id || 'amalay')}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        { headers: sbHeaders, cache: 'no-store' }
+      )
+      if (staffRes.ok) {
+        const staffRows: { name: string }[] = await staffRes.json()
+        if (staffRows.length > 0) {
+          activeMeserosStr = staffRows.map(r => r.name).join(', ')
+        }
+      }
+    } catch { /* use fallback */ }
+
     // 4. System prompt — Unified sharp copilot (same as Telegram)
     const systemPrompt = `Eres el copiloto operativo de AMALAY Coffee & Market (San Pedro Garza García, Monterrey). Consultor senior con 20 años de experiencia en restaurantes. Entiendes INTENCIÓN, no solo palabras.
 
@@ -853,7 +868,8 @@ FORMATO DE DATOS (lee esto para saber dónde buscar):
 6. DESGLOSE POR DÍA = solo H&H/Pan/Postres/2da Bebida (upselling).
 7. VENTAS POR HORA: si preguntan "hora pico" o "a qué hora vendemos más", busca en VENTAS POR HORA.
 
-EXCLUIR (no son meseros): Oscar Ricardo, Rodrigo Chávez, APLICACIONES, MESERO EVENTO, Fany Elizabeth, Ericka Tamara, Frida Vianney, Jorge Antonio. (Héctor Enrique SÍ es mesero desde 2026-06.)
+EXCLUIR (no son meseros): cualquier nombre que NO aparezca en la lista de "Meseros activos" más abajo. APLICACIONES y MESERO EVENTO no son personas.
+MESEROS ACTIVOS: ${activeMeserosStr}
 
 LINKS DEL DASHBOARD — REGLA IMPORTANTE:
 Cuando tu respuesta mencione un tema que tiene una página en el dashboard, SIEMPRE agrega un link al final con formato: [Ver detalle →](/ruta)

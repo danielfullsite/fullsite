@@ -983,7 +983,9 @@ export const MENU_CATEGORIES: MenuCategory[] = [
   },
 ]
 
-export const MESEROS = [
+// MESEROS — fetched dynamically from pos_staff table
+// Fallback used only when DB is unreachable (offline mode)
+const MESEROS_FALLBACK = [
   'Omar Aguilera',
   'Hector Enrique Rodriguez Lopez',
   'Brayan Berlanga Solis',
@@ -997,6 +999,34 @@ export const MESEROS = [
   'Mario García Ramírez',
   'MESERO EVENTO',
 ]
+
+// Dynamic meseros — populated by fetchMeseros(), falls back to hardcoded if offline
+export let MESEROS: string[] = [...MESEROS_FALLBACK]
+
+// Fetch active meseros from pos_staff (roles: mesero, cajero, barra, supervisor)
+// Call this on POS init — updates the module-level MESEROS array
+export async function fetchMeseros(clientId?: string): Promise<string[]> {
+  const cid = clientId || getClientId()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return MESEROS
+
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/pos_staff?client_id=eq.${cid}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store' }
+    )
+    if (res.ok) {
+      const rows: { name: string }[] = await res.json()
+      if (rows.length > 0) {
+        MESEROS = rows.map(r => r.name)
+        return MESEROS
+      }
+    }
+  } catch { /* offline — use fallback */ }
+
+  return MESEROS
+}
 
 // IVA_RATE lives in pos-constants.ts (single source of truth)
 
