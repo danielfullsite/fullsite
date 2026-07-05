@@ -110,8 +110,8 @@ export default function MeserosPage() {
   const meseros = aggregateMeseros(periodData)
 
   const totalVentas = meseros.reduce((sum, m) => sum + m.total, 0)
-  const totalTicketDays = meseros.reduce((sum, m) => sum + m.dias, 0)
-  const avgDaily = totalTicketDays > 0 ? Math.round(totalVentas / totalTicketDays) : 0
+  const calendarDays = periodData.filter(d => (d.ventas_dia || 0) > 0).length || 1
+  const avgDaily = Math.round(totalVentas / calendarDays)
   const topMesero = meseros[0]
   const topMeseroMax = topMesero?.total || 1
 
@@ -178,10 +178,7 @@ export default function MeserosPage() {
           map[nombre].totalVentas += kpis.total_ventas || 0
           map[nombre].totalMesas += kpis.mesas || 0
           map[nombre].totalPersonas += kpis.personas || 0
-          if (kpis.ticket_promedio) {
-            map[nombre].ticketSums += kpis.ticket_promedio
-            map[nombre].ticketCount += 1
-          }
+          // ticketPromedio is computed as totalVentas/totalMesas (weighted), not averaged daily
         }
         map[nombre].hh += (w['H&H'] as number) || 0
         map[nombre].pan += (w.Pan as number) || 0
@@ -215,7 +212,7 @@ export default function MeserosPage() {
         postres: d.postres,
         bebida2: d.bebida2,
         dias: d.dias,
-        ticketPromedio: d.ticketCount > 0 ? Math.round(d.ticketSums / d.ticketCount) : 0,
+        ticketPromedio: d.totalMesas > 0 ? Math.round(d.totalVentas / d.totalMesas) : 0,
         bebidasPorPersona: d.totalPersonas > 0 ? d.hh / d.totalPersonas : 0,
         alimentosPorPersona: d.totalPersonas > 0 ? d.totalVentas / d.totalPersonas : 0,
         pctSegundaBebida: d.totalPersonas > 0 ? (d.bebida2 / d.totalPersonas) * 100 : 0,

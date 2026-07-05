@@ -9,6 +9,13 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth: require admin secret or valid session
+    const adminSecret = process.env.ONBOARDING_SECRET
+    const providedSecret = request.headers.get('x-onboarding-secret')
+    if (!adminSecret || providedSecret !== adminSecret) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { email, password, clientId, displayName } = await request.json()
 
     if (!email || !password || !clientId) {

@@ -194,8 +194,8 @@ export async function getMonthlyData(clientSlug: string = getActiveClientSlug(),
   return getDashboardFromPosOrders(365, clientSlug)
 }
 
-export async function getWaiterCategories(days: number = 7) {
-  return sbFetch('wansoft_waiter_categories', `select=*&order=fecha.desc&limit=${days}`)
+export async function getWaiterCategories(days: number = 7, clientSlug: string = getActiveClientSlug()) {
+  return sbFetch('wansoft_waiter_categories', `select=*&client_slug=eq.${clientSlug}&order=fecha.desc&limit=${days}`)
 }
 
 // Aggregate mesero data across multiple days

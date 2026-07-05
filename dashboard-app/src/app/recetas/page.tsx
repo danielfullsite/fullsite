@@ -183,7 +183,7 @@ export default function RecetasPage() {
             <div className="text-center">
               <BookOpen size={48} className="mx-auto mb-3 opacity-50" />
               <p className="text-xl">Sin recetas</p>
-              <p className="text-sm mt-1">Corre el SQL seed en Supabase</p>
+              <p className="text-sm mt-1">Agrega recetas desde el botón de arriba</p>
             </div>
           </div>
         ) : (

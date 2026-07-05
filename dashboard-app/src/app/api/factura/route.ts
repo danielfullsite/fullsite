@@ -2,6 +2,9 @@
 // pos_cfdi_requests tiene RLS sin policy de INSERT anon — este route inserta
 // con la service key, con validación server-side de los campos.
 
+import { requireAuth } from '@/lib/api-auth'
+import { NextRequest } from 'next/server'
+
 const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/
 
 function sbHeaders() {
@@ -13,8 +16,10 @@ function sbHeaders() {
   }
 }
 
-// Lista de solicitudes para el admin (/facturas). La página está detrás de auth.
-export async function GET() {
+// Lista de solicitudes para el admin (/facturas).
+export async function GET(request: NextRequest) {
+  const authErr = await requireAuth(request)
+  if (authErr) return authErr
   try {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const res = await fetch(
@@ -32,7 +37,9 @@ export async function GET() {
 }
 
 // Actualiza status de una solicitud (pendiente → facturada / error).
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
+  const authErr = await requireAuth(req)
+  if (authErr) return authErr
   try {
     const body = await req.json()
     const id = String(body.id || '')

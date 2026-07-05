@@ -253,12 +253,14 @@ export default function DashboardPage() {
     }
     if (period === 'semana') {
       const now = new Date()
+      const dow = now.getDay()
+      const mondayOffset = dow === 0 ? 6 : dow - 1
       const weekStart = new Date(now)
-      weekStart.setDate(now.getDate() - now.getDay() + 1 - weekOffset * 7)
+      weekStart.setDate(now.getDate() - mondayOffset - weekOffset * 7)
       const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
       const prevWeekStart = new Date(weekStart); prevWeekStart.setDate(prevWeekStart.getDate() - 7)
       const prevWeekEnd = new Date(prevWeekStart); prevWeekEnd.setDate(prevWeekStart.getDate() + 6)
-      const fmt = (d: Date) => d.toISOString().slice(0, 10)
+      const fmt = (d: Date) => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}` }
       const thisWeek = recentData.filter(d => d.fecha >= fmt(weekStart) && d.fecha <= fmt(weekEnd))
       const prevWeek = recentData.filter(d => d.fecha >= fmt(prevWeekStart) && d.fecha <= fmt(prevWeekEnd))
       const sum = (arr: WansoftDaily[], key: keyof WansoftDaily) => arr.reduce((s, d) => s + (Number(d[key]) || 0), 0)
@@ -322,7 +324,9 @@ export default function DashboardPage() {
     const thisMonthData = recentData.filter(d => d.fecha.slice(0, 7) === targetPrefix)
     const monthVentas = thisMonthData.reduce((s, d) => s + (d.ventas_dia || 0), 0)
     const daysInMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate()
-    const dayOfMonth = thisMonthData.length
+    const dayOfMonth = thisMonthData.length > 0
+      ? new Date(thisMonthData[thisMonthData.length - 1].fecha + 'T12:00:00').getDate()
+      : new Date().getDate()
     const daysLeft = daysInMonth - dayOfMonth
     const dailyAvg = dayOfMonth > 0 ? monthVentas / dayOfMonth : 0
     const projected = monthVentas + (dailyAvg * daysLeft)
@@ -352,9 +356,9 @@ export default function DashboardPage() {
   // Same day last week comparison
   const sameDayLastWeek = (() => {
     if (!latestDay || recentData.length < 8) return null
-    const latestDate = new Date(latestDay.fecha)
-    const targetDate = new Date(latestDate.getTime() - 7 * 86400000)
-    const targetStr = targetDate.toISOString().split('T')[0]
+    const latestDate = new Date(latestDay.fecha + 'T12:00:00')
+    const targetDate = new Date(latestDate); targetDate.setDate(latestDate.getDate() - 7)
+    const targetStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}`
     return recentData.find(d => d.fecha === targetStr) || null
   })()
 
@@ -427,8 +431,10 @@ export default function DashboardPage() {
             }
             if (period === 'semana') {
               const now = new Date()
+              const dow2 = now.getDay()
+              const mondayOff = dow2 === 0 ? 6 : dow2 - 1
               const weekStart = new Date(now)
-              weekStart.setDate(now.getDate() - now.getDay() + 1 - weekOffset * 7)
+              weekStart.setDate(now.getDate() - mondayOff - weekOffset * 7)
               const weekEnd = new Date(weekStart)
               weekEnd.setDate(weekStart.getDate() + 6)
               const label = `${weekStart.getDate()} ${MESES[weekStart.getMonth()].slice(0,3)} - ${weekEnd.getDate()} ${MESES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getFullYear()}`
@@ -686,9 +692,10 @@ export default function DashboardPage() {
         const todayDate = today ? new Date(today + 'T12:00:00') : new Date()
         const todayDow = todayDate.getDay()
         const yesterdayDate = new Date(todayDate); yesterdayDate.setDate(todayDate.getDate() - 1)
-        const yesterdayStr = yesterdayDate.toISOString().slice(0, 10)
+        const fmtLocal = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+        const yesterdayStr = fmtLocal(yesterdayDate)
         const lastWeekDate = new Date(todayDate); lastWeekDate.setDate(todayDate.getDate() - 7)
-        const lastWeekStr = lastWeekDate.toISOString().slice(0, 10)
+        const lastWeekStr = fmtLocal(lastWeekDate)
 
         const yesterdayData = recentData.find(d => d.fecha === yesterdayStr)
         const lastWeekData = recentData.find(d => d.fecha === lastWeekStr)

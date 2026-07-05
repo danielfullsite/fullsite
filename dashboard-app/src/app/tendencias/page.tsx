@@ -97,21 +97,23 @@ export default function TendenciasPage() {
     const weeks: Record<string, { ventas: number; tickets: number; personas: number }> = {}
     for (const d of allData) {
       const dt = new Date(d.fecha + 'T12:00:00')
-      const weekStart = new Date(dt); weekStart.setDate(dt.getDate() - dt.getDay() + 1)
-      const key = weekStart.toISOString().slice(0, 10)
+      const dow = dt.getDay()
+      const mondayOffset = dow === 0 ? 6 : dow - 1
+      const weekStart = new Date(dt); weekStart.setDate(dt.getDate() - mondayOffset)
+      const key = `${weekStart.getFullYear()}-${String(weekStart.getMonth()+1).padStart(2,'0')}-${String(weekStart.getDate()).padStart(2,'0')}`
       if (!weeks[key]) weeks[key] = { ventas: 0, tickets: 0, personas: 0 }
       weeks[key].ventas += d.ventas_dia || 0
       weeks[key].tickets += d.tickets_count || 0
       weeks[key].personas += d.personas_restaurant || 0
     }
     return Object.entries(weeks)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-20)
       .map(([key, w]) => ({
         label: (() => { const dt = new Date(key + 'T12:00:00'); return `${dt.getDate()}/${dt.getMonth()+1}` })(),
         ticketPromedio: w.tickets > 0 ? Math.round(w.ventas / w.tickets) : 0,
         ticketPromedioPersona: w.personas > 0 ? Math.round(w.ventas / w.personas) : 0,
       }))
-      .sort((a, b) => a.label.localeCompare(b.label))
-      .slice(-20)
   }, [allData])
 
   const tpChartData = tpPeriod === 'dia' ? dailyTP : tpPeriod === 'semana' ? weeklyTP : monthlyAgg
@@ -171,7 +173,7 @@ export default function TendenciasPage() {
       const plats = typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : d.platillos_top
       if (!Array.isArray(plats)) continue
       for (const p of plats) {
-        allPlatillos[p.nombre] = (allPlatillos[p.nombre] || 0) + (p.cantidad || 0)
+        allPlatillos[p.nombre] = (allPlatillos[p.nombre] || 0) + (p.cantidad || p.total || 0)
       }
     }
     const top5 = Object.entries(allPlatillos).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n]) => n)
@@ -186,7 +188,7 @@ export default function TendenciasPage() {
           const plats = typeof d.platillos_top === 'string' ? JSON.parse(d.platillos_top) : d.platillos_top
           if (!Array.isArray(plats)) continue
           const found = plats.find((p: { nombre: string }) => p.nombre === name)
-          if (found) qty += found.cantidad || 0
+          if (found) qty += found.cantidad || found.total || 0
         }
         row[name] = qty
       }

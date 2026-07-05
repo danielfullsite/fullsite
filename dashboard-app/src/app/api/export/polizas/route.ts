@@ -2,7 +2,8 @@
 // Exporta pólizas contables en CSV compatible con CONTPAQi / Aspel / Excel.
 // Cada venta cerrada genera un asiento: Debe (Caja/Banco) / Haber (Ingreso + IVA).
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -33,7 +34,9 @@ function accountForMethod(method: string): { code: string; name: string } {
   return { code: '1099', name: `Otros - ${method}` }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const authErr = await requireAuth(request)
+  if (authErr) return authErr
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from') || new Date().toISOString().slice(0, 8) + '01'
   const to = searchParams.get('to') || new Date().toISOString().slice(0, 10)

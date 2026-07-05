@@ -65,11 +65,16 @@ export default function IngresosPage() {
 
   // Daily cash flow chart
   const dailyChart = useMemo(() => {
-    return data.map(d => ({
-      fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
-      efectivo: d.efectivo || 0,
-      tarjeta: d.tarjeta || 0,
-    }))
+    return data.map(d => {
+      const ventas = d.ventas_dia || 0
+      const rawEf = d.efectivo || 0
+      const rawTj = d.tarjeta || 0
+      return {
+        fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
+        efectivo: rawEf < 100 ? Math.round((rawEf / 100) * ventas) : rawEf,
+        tarjeta: rawTj < 100 ? Math.round((rawTj / 100) * ventas) : rawTj,
+      }
+    })
   }, [data])
 
   return (

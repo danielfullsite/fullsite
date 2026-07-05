@@ -3,6 +3,7 @@
 // Generates daily accounting entries (pólizas) for Mexican restaurant
 
 import { NextRequest } from 'next/server'
+import { requireAuth } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -118,6 +119,8 @@ async function fetchWansoftDaily(fecha: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAuth(request)
+  if (authErr) return authErr
   try {
     const { searchParams } = new URL(request.url)
     const fecha = searchParams.get('fecha') || new Date().toISOString().slice(0, 10)
