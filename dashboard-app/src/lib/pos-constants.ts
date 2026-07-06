@@ -1,6 +1,8 @@
 // Shared POS constants — single source of truth
 
-export const IVA_RATE = 0.16
+// AMALAY: precios en BD ya incluyen IVA (menu fisico = precio en BD)
+// Para facturacion CFDI se desglosa internamente: precio/1.16 + IVA
+export const IVA_RATE = 0
 
 export const KITCHEN_ARCHIVE_HOURS = 4
 
