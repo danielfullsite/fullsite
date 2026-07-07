@@ -160,24 +160,30 @@ function locationFilter(locationId?: string | null): string {
 }
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
-  // Always try wansoft_daily first (fast, indexed)
+  // Try pos_orders first for recent data (last 7 days) — this is the live POS data
+  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug)
+  // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
-  const filtered = dedupeByFecha(data).slice(0, days)
-  if (filtered.length > 0) return filtered.reverse().map(parseRow)
-  // Fallback: if no wansoft_daily data, try pos_orders (capped at 90 days to avoid timeout)
-  const posDays = Math.min(days, 90)
-  const posData = await getDashboardFromPosOrders(posDays, clientSlug)
-  if (posData.length > 0) return posData
+  const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
+  // Merge: for dates that exist in both, prefer pos_orders (live POS data)
+  const posDateSet = new Set(posRecent.map(d => d.fecha))
+  const merged = [
+    ...wansoftData.filter(d => !posDateSet.has(d.fecha)),
+    ...posRecent,
+  ].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  if (merged.length > 0) return merged.slice(-days)
   return []
 }
 
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
+  // Try pos_orders first — live POS data takes priority
+  const posData = await getDashboardFromPosOrders(7, clientSlug)
+  if (posData.length > 0) return posData[posData.length - 1]
+  // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
   if (deduped.length > 0) return parseRow(deduped[0])
-  // POS fallback
-  const posData = await getDashboardFromPosOrders(7, clientSlug)
-  return posData.length > 0 ? posData[posData.length - 1] : null
+  return null
 }
 
 export async function getDayData(fecha: string, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
