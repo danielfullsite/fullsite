@@ -166,8 +166,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
 
-  // Check if fingerprint reader is available (DigitalPersona service on port 7718)
-  const FINGERPRINT_URL = 'http://127.0.0.1:7718'
+  // Check if fingerprint reader is available (via bridge proxy on port 7717)
+  const FINGERPRINT_URL = 'http://127.0.0.1:7717/fp'
   useEffect(() => {
     fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
       .then(r => r.ok ? r.json() : null)
