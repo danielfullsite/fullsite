@@ -190,6 +190,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // Register fingerprint for current staff member
   const handleBiometricRegister = async (staffMember: StaffMember) => {
     try {
+      // Exit kiosk mode temporarily so Windows Hello dialog can appear on top
+      const fApp = (window as unknown as { fullsiteApp?: { exitKiosk: () => void; enterKiosk: () => void } }).fullsiteApp
+      if (fApp?.exitKiosk) fApp.exitKiosk()
+
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
       const credential = await navigator.credentials.create({
@@ -221,10 +225,17 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
         stored[credId] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
         localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
+        // Re-enter kiosk mode
+        if (fApp?.enterKiosk) fApp.enterKiosk()
         return true
       }
+      // Re-enter kiosk if no credential
+      if (fApp?.enterKiosk) fApp.enterKiosk()
     } catch (e) {
       console.warn('[biometric] Registration failed:', e)
+      // Re-enter kiosk on error
+      const fApp2 = (window as unknown as { fullsiteApp?: { enterKiosk: () => void } }).fullsiteApp
+      if (fApp2?.enterKiosk) fApp2.enterKiosk()
     }
     return false
   }
@@ -239,6 +250,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         setBiometricChecking(false)
         return
       }
+
+      // Exit kiosk mode temporarily so Windows Hello dialog can appear
+      const fApp = (window as unknown as { fullsiteApp?: { exitKiosk: () => void; enterKiosk: () => void } }).fullsiteApp
+      if (fApp?.exitKiosk) fApp.exitKiosk()
 
       const challenge = new Uint8Array(32)
       crypto.getRandomValues(challenge)
