@@ -7,6 +7,7 @@ import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
 import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
 import { enqueueFailedPrint } from './print-queue'
+import { getPosConfigSync } from './pos-config'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -42,9 +43,9 @@ export function printTicketCSS(order: Order) {
   .small { font-size: 9px; color: #666; }
 </style>
 </head><body>
-  <div class="center bold" style="font-size:14px;margin-bottom:4px">AMALAY</div>
-  <div class="center small">Coffee & Market</div>
-  <div class="center small">San Pedro Garza García, NL</div>
+  <div class="center bold" style="font-size:14px;margin-bottom:4px">${getPosConfigSync().name}</div>
+  <div class="center small">${getPosConfigSync().subtitle}</div>
+  <div class="center small">${getPosConfigSync().address}</div>
   <div class="line"></div>
 
   <div style="display:flex;justify-content:space-between;font-size:10px">
@@ -83,7 +84,7 @@ export function printTicketCSS(order: Order) {
   </div>
 
   <div class="line"></div>
-  <div class="center" style="margin-top:4px;font-size:10px">¡Gracias por tu visita!</div>
+  <div class="center" style="margin-top:4px;font-size:10px">${getPosConfigSync().receiptFooter}</div>
   <div class="center small">fullsite.mx</div>
 
   <script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>
@@ -288,8 +289,8 @@ export function printPreTicketCSS(order: Order) {
 </style>
 </head><body>
   <div class="center bold" style="font-size:14px;margin-bottom:2px">*** PRE-CUENTA ***</div>
-  <div class="center bold" style="font-size:13px;margin-bottom:4px">AMALAY</div>
-  <div class="center" style="font-size:9px">Coffee & Market</div>
+  <div class="center bold" style="font-size:13px;margin-bottom:4px">${getPosConfigSync().name}</div>
+  <div class="center" style="font-size:9px">${getPosConfigSync().subtitle}</div>
   <div class="line"></div>
 
   <div style="display:flex;justify-content:space-between;font-size:10px">
@@ -338,10 +339,10 @@ function buildPreTicketBytes(order: Order, cols: TicketCols = COLS_BT): Uint8Arr
   cmds.push(GS, 0x21, 0x01)
   cmds.push(...textToBytes('*** PRE-CUENTA ***\n'))
   cmds.push(GS, 0x21, 0x11)
-  cmds.push(...textToBytes('AMALAY\n'))
+  cmds.push(...textToBytes(getPosConfigSync().name + '\n'))
   cmds.push(GS, 0x21, 0x00)
   cmds.push(ESC, 0x45, 0x00)
-  cmds.push(...textToBytes('Coffee & Market\n'))
+  if (getPosConfigSync().subtitle) cmds.push(...textToBytes(getPosConfigSync().subtitle + '\n'))
   cmds.push(...textToBytes(dashedLine(cols)))
 
   // Left align
@@ -425,11 +426,12 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   // Bold on + double height
   cmds.push(ESC, 0x45, 0x01) // ESC E 1 — bold on
   cmds.push(GS, 0x21, 0x11) // GS ! 0x11 — double width+height
-  cmds.push(...textToBytes('AMALAY\n'))
+  const _rc = getPosConfigSync()
+  cmds.push(...textToBytes(_rc.name + '\n'))
   cmds.push(GS, 0x21, 0x00) // normal size
   cmds.push(ESC, 0x45, 0x00) // bold off
-  cmds.push(...textToBytes('Coffee & Market\n'))
-  cmds.push(...textToBytes('San Pedro Garza Garcia, NL\n'))
+  if (_rc.subtitle) cmds.push(...textToBytes(_rc.subtitle + '\n'))
+  if (_rc.address) cmds.push(...textToBytes(_rc.address + '\n'))
 
   // Dashed line
   cmds.push(...textToBytes(dashedLine(cols)))
@@ -515,7 +517,7 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   cmds.push(...textToBytes('Escanea para tu factura\n'))
 
   cmds.push(...textToBytes(dashedLine(cols)))
-  cmds.push(...textToBytes('Gracias por tu visita!\n'))
+  cmds.push(...textToBytes(getPosConfigSync().receiptFooter + '\n'))
   cmds.push(...textToBytes('fullsite.mx\n'))
 
   // Feed + cut

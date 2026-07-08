@@ -1,8 +1,13 @@
 // Shared POS constants — single source of truth
 
-// AMALAY: precios en BD ya incluyen IVA (menu fisico = precio en BD)
-// Para facturacion CFDI se desglosa internamente: precio/1.16 + IVA
+// Default IVA rate — AMALAY: precios ya incluyen IVA (= 0)
+// For dynamic IVA per client, use getIvaRate() instead of IVA_RATE directly
 export const IVA_RATE = 0
+
+// Dynamic IVA — set from client config at POS startup
+let _dynamicIvaRate: number | null = null
+export function setIvaRate(rate: number) { _dynamicIvaRate = rate }
+export function getIvaRate(): number { return _dynamicIvaRate ?? IVA_RATE }
 
 export const KITCHEN_ARCHIVE_HOURS = 4
 

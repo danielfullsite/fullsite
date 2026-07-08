@@ -43,6 +43,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       import('@/lib/pos-offline-db').then(m => m.registerAutoSync()).catch(() => {})
       // Start print retry loop — processes any queued print jobs from previous sessions
       import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
+      // Load client config for receipts, IVA, branding (cached singleton)
+      import('@/lib/pos-config').then(m => m.getPosClientConfig()).catch(() => {})
     }
   }, [])
 

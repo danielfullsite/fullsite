@@ -45,6 +45,11 @@ export interface ClientConfig {
   bebida_groups?: string[]
   // Business context for AI agents
   business_context?: string
+  // Restaurant info (for receipts, invoicing)
+  address?: string
+  phone?: string
+  rfc?: string
+  receipt_footer?: string
 }
 
 // Default features for new clients
@@ -101,6 +106,10 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
           menu_categories: row.menu_categories,
           bebida_groups: row.bebida_groups,
           business_context: row.business_context,
+          address: row.address,
+          phone: row.phone,
+          rfc: row.rfc,
+          receipt_footer: row.receipt_footer,
         }
         _cache[clientId] = config
         _cacheTime = Date.now()
@@ -119,9 +128,13 @@ function getClientConfigFallback(clientId: string): ClientConfig {
     amalay: {
       display_name: 'AMALAY Coffee & Market',
       city: 'Monterrey, NL',
-      type: 'Brunch & Café',
+      type: 'Coffee & Market',
       mesas: 16,
       meseros: ['Omar Aguilera', 'Hector Enrique Rodriguez Lopez', 'Brayan Berlanga Solis', 'Daniela Edith Rico Segura', 'Julio Cesar Hernández Hernández', 'Mauricio Rodriguez Rodriguez', 'Oscar Rios Alvarado', 'Alexis Alejandro Ocampo Vera', 'Aldo Ruiz Ramirez', 'Mariana Carolina Salas Alva', 'Mario García Ramírez'],
+      address: 'San Pedro Garza Garcia, NL',
+      phone: '8115324371',
+      rfc: 'AFO200806JI0',
+      receipt_footer: 'Gracias por tu visita!',
     },
     demo: {
       display_name: 'Casa Montaña',
