@@ -4,7 +4,7 @@
   "description": "Punto de venta inteligente para restaurantes. 30 agentes de IA, dashboard, WhatsApp bot.",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#0a0a0b",
   "theme_color": "#0a0a0b",
   "orientation": "any",
