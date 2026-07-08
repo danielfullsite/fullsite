@@ -293,16 +293,23 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       requestNotificationPermission().catch(() => {})
 
       // Check if this staff member has a fingerprint registered
-      const hasFingerprint = () => {
-        try {
-          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-          return !!fpMap[member.id]
-        } catch { return false }
-      }
-      if (biometricAvailable && !hasFingerprint()) {
-        // Show fingerprint registration prompt (don't unlock yet)
-        setShowFingerprintRegister(true)
-        return // Don't setUnlocked yet — show registration screen first
+      // Verify with BOTH localStorage AND the fingerprint service
+      if (biometricAvailable) {
+        const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+        const localHas = !!fpMap[member.id]
+        if (!localHas) {
+          // Also check if service has ANY templates — if not, clear stale local data
+          try {
+            const listRes = await fetch('http://127.0.0.1:7717/fp/list', { signal: AbortSignal.timeout(2000) })
+            const listData = await listRes.json()
+            if (listData.count === 0) {
+              // Service has no templates, clear any stale local mappings
+              localStorage.removeItem('pos_fingerprint_staff')
+            }
+          } catch {}
+          setShowFingerprintRegister(true)
+          return
+        }
       }
 
       setUnlocked(true)
