@@ -376,6 +376,44 @@ export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: num
   } catch { return null }
 }
 
+/** Turno activo + detección de turno stale (>18h sin cerrar = probablemente del día anterior) */
+export async function getActiveTurnoWithStaleCheck(): Promise<{ turno: { id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null; isStale: boolean }> {
+  const turno = await getActiveTurno()
+  if (!turno) return { turno: null, isStale: false }
+  const hoursSinceOpen = (Date.now() - new Date(turno.opened_at).getTime()) / (1000 * 60 * 60)
+  return { turno, isStale: hoursSinceOpen > 18 }
+}
+
+/** Cerrar turno stale automáticamente (sin wizard de conteo) */
+export async function autoCloseStaleTurno(turnoId: string, closedBy: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${_SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(turnoId)}`,
+      { method: 'PATCH', headers: { ..._SB_HEADERS, Prefer: 'return=minimal' },
+        body: JSON.stringify({ closed_at: new Date().toISOString(), closed_by: closedBy, notas: 'Auto-cerrado (turno del dia anterior)' }) }
+    )
+    return res.ok
+  } catch { return false }
+}
+
+/** Abrir turno nuevo */
+export async function openTurno(fondoInicial: number, openedBy: string): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
+  // Guard: verificar que no exista turno activo (race condition)
+  const existing = await getActiveTurno()
+  if (existing) return existing // Ya hay uno abierto, retornarlo
+
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  try {
+    const res = await fetch(`${_SUPABASE_URL}/rest/v1/pos_turnos`, {
+      method: 'POST', headers: { ..._SB_HEADERS, Prefer: 'return=representation' },
+      body: JSON.stringify({ id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial }),
+    })
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows[0] || null
+  } catch { return null }
+}
+
 // ── Modificadores multinivel (estilo Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
 
 export interface ModifierGroupDef {

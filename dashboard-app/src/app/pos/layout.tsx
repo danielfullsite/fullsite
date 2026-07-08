@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
+import TurnoGate from '@/components/pos/TurnoGate'
 
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
@@ -474,7 +475,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
       '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
       '--text-4':'rgba(255,255,255,0.25)',
-    }}>{children}</div>
+    }}>
+      <TurnoGate staff={staff!}>
+        {children}
+      </TurnoGate>
+    </div>
   )
 
   const remainingAttempts = MAX_ATTEMPTS - attempts

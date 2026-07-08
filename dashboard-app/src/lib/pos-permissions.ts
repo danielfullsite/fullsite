@@ -154,7 +154,7 @@ export const PERMISSION_PROFILES: Record<string, POSPermissions> = {
     cajero: true, corte_turno: true, corte_x: true, corte_z: false, corte_mesero: false,
     retiros_programados: false, propinas: true, tipo_cambio: false, vales: true,
     ventas_mesero: false, ventas_globales: false, reportes: false,
-    abrir_dia_operaciones: false, administrar_cliente: false, borrar_platillos: false,
+    abrir_dia_operaciones: true, administrar_cliente: false, borrar_platillos: false,
     actualizar_informacion: false, actualizar_estatus_orden: false,
     configurar_datos_terminal: false, configurar_funciones_terminal: false,
     configurar_impresora: false, configurar_huella_digital: false,
