@@ -2775,6 +2775,7 @@ function POSContent() {
                 { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
                 { href: '/pos/monitor', icon: Monitor, label: 'Monitor', section: 'configuracion' },
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
+                { href: '/pos/staff', icon: Users, label: 'Empleados', section: 'configuracion' },
                 { href: '/pos/huella', icon: Lock, label: 'Huellas', section: 'configuracion' },
                 { href: '/pos/configuracion', icon: Settings, label: 'Configuracion', section: 'configuracion' },
               ].filter(item => canSee(item.section)).map(item => (
