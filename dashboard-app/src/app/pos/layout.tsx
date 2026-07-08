@@ -417,10 +417,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
           </svg>
           <h2 className="text-xl font-bold mb-2">{staff.name}</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            Registra tu huella para entrar sin PIN la proxima vez.
-            Coloca tu dedo en el lector cuando se te pida.
+          <p className="text-slate-400 text-sm mb-2">
+            Registra tu huella para entrar sin PIN.
           </p>
+          <div className="text-slate-500 text-xs mb-6 space-y-1">
+            <p>1. Toca el boton y pon tu dedo firme y plano en el lector</p>
+            <p>2. Quita el dedo cuando la luz parpadee</p>
+            <p>3. Vuelve a poner el dedo (4 veces en total)</p>
+            <p>4. Espera ~20 segundos</p>
+          </div>
           <button
             onClick={doRegister}
             disabled={registeringFingerprint}
@@ -432,7 +437,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               <path d="M19.5 12.5c0 4-3.5 7.5-7.5 7.5-2 0-3.5-.5-5-2" />
               <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
             </svg>
-            {registeringFingerprint ? 'Coloca tu dedo en el lector...' : 'Registrar huella'}
+            {registeringFingerprint ? 'Pon tu dedo... quita y pon 4 veces' : 'Registrar huella'}
           </button>
           <button
             onClick={skipRegister}
