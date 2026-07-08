@@ -389,7 +389,7 @@ export async function autoCloseStaleTurno(turnoId: string, closedBy: string): Pr
   try {
     const res = await fetch(
       `${_SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${encodeURIComponent(turnoId)}`,
-      { method: 'PATCH', headers: { ..._SB_HEADERS, Prefer: 'return=minimal' },
+      { method: 'PATCH', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ closed_at: new Date().toISOString(), closed_by: closedBy, notas: 'Auto-cerrado (turno del dia anterior)' }) }
     )
     return res.ok
@@ -405,7 +405,7 @@ export async function openTurno(fondoInicial: number, openedBy: string): Promise
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   try {
     const res = await fetch(`${_SUPABASE_URL}/rest/v1/pos_turnos`, {
-      method: 'POST', headers: { ..._SB_HEADERS, Prefer: 'return=representation' },
+      method: 'POST', headers: { ..._SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ id, client_id: _getClientId(), opened_by: openedBy, fondo_inicial: fondoInicial }),
     })
     if (!res.ok) return null
