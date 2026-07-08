@@ -319,6 +319,26 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(false)
   }
 
+  // Auto-fullscreen: request fullscreen on first user interaction
+  // This is the REAL solution — works on PWA, Chrome, any browser
+  useEffect(() => {
+    if (!unlocked) return
+    const requestFullscreen = () => {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {})
+      }
+      // Only need to do it once
+      document.removeEventListener('click', requestFullscreen)
+      document.removeEventListener('touchstart', requestFullscreen)
+    }
+    document.addEventListener('click', requestFullscreen)
+    document.addEventListener('touchstart', requestFullscreen)
+    return () => {
+      document.removeEventListener('click', requestFullscreen)
+      document.removeEventListener('touchstart', requestFullscreen)
+    }
+  }, [unlocked])
+
   if (unlocked) return (
     <div className="pos-kiosk" style={{
       background:'#0a0a0f', color:'#fff', height:'100dvh', overflow:'hidden',
@@ -335,7 +355,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const remainingAttempts = MAX_ATTEMPTS - attempts
 
   return (
-    <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
+    <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}
+      onClick={() => {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {})
+        }
+      }}
+    >
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-8">
           {/* Restaurant logo — tap 5x to exit kiosk mode */}
