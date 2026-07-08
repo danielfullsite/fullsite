@@ -166,139 +166,97 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
 
-  // Check if WebAuthn/biometric is available
-  // NOTE: We check for WebAuthn support broadly (not just platform authenticators)
-  // because the HID DigitalPersona 4500 USB reader works through Windows Hello
-  // (WBF driver -> Windows Hello -> WebAuthn platform authenticator).
-  // If Windows Hello isn't configured yet, isUserVerifyingPlatformAuthenticatorAvailable
-  // returns false even though the reader is plugged in. So we also check for any
-  // stored credentials — if someone registered before, the reader is available.
+  // Check if fingerprint reader is available (DigitalPersona service on port 7718)
+  const FINGERPRINT_URL = 'http://127.0.0.1:7718'
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.PublicKeyCredential) return
-    const hasStoredCredentials = () => {
-      try {
-        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-        return Object.keys(stored).length > 0
-      } catch { return false }
-    }
-    // Platform authenticator available (Windows Hello w/ DP4500, Touch ID, etc.)
-    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
-      .then(ok => setBiometricAvailable(ok || hasStoredCredentials()))
-      .catch(() => setBiometricAvailable(hasStoredCredentials()))
+    fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.ok) setBiometricAvailable(true) })
+      .catch(() => setBiometricAvailable(false))
   }, [])
 
-  // Register fingerprint for current staff member
+  // Register fingerprint via DigitalPersona service (port 7718)
   const handleBiometricRegister = async (staffMember: StaffMember) => {
     try {
-      // Exit kiosk mode temporarily so Windows Hello dialog can appear on top
-      const fApp = (window as unknown as { fullsiteApp?: { exitKiosk: () => void; enterKiosk: () => void } }).fullsiteApp
-      if (fApp?.exitKiosk) fApp.exitKiosk()
-
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'Fullsite POS', id: window.location.hostname },
-          user: {
-            id: new TextEncoder().encode(staffMember.id),
-            name: staffMember.name,
-            displayName: staffMember.name,
-          },
-          pubKeyCredParams: [
-            { alg: -7, type: 'public-key' },   // ES256
-            { alg: -257, type: 'public-key' },  // RS256 (Windows Hello uses RSA)
-          ],
-          authenticatorSelection: {
-            // No authenticatorAttachment — allows BOTH platform (Windows Hello
-            // w/ DigitalPersona 4500 USB reader) and cross-platform (FIDO2 keys).
-            // The DP4500 works as: USB reader -> WBF driver -> Windows Hello -> WebAuthn.
-            userVerification: 'required',
-            residentKey: 'discouraged', // Don't require discoverable credentials
-          },
-          timeout: 60000,
-        },
+      // Call fingerprint service to enroll (captures 4 samples)
+      const res = await fetch(`${FINGERPRINT_URL}/enroll?id=${encodeURIComponent(staffMember.id)}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(90000), // 90 sec for 4 captures
       })
-      if (credential) {
-        // Save credential ID linked to staff member
-        const credId = btoa(String.fromCharCode(...new Uint8Array((credential as PublicKeyCredential).rawId)))
-        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-        stored[credId] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
-        localStorage.setItem('pos_biometric_credentials', JSON.stringify(stored))
-        // Re-enter kiosk mode
-        if (fApp?.enterKiosk) fApp.enterKiosk()
+      const data = await res.json()
+
+      if (data.ok) {
+        // Save mapping: staffId → staff member info (for fingerprint login)
+        const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+        fpMap[staffMember.id] = { id: staffMember.id, name: staffMember.name, role: staffMember.role }
+        localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
         return true
       }
-      // Re-enter kiosk if no credential
-      if (fApp?.enterKiosk) fApp.enterKiosk()
+      console.warn('[fingerprint] Enrollment failed:', data.error)
     } catch (e) {
-      console.warn('[biometric] Registration failed:', e)
-      // Re-enter kiosk on error
-      const fApp2 = (window as unknown as { fullsiteApp?: { enterKiosk: () => void } }).fullsiteApp
-      if (fApp2?.enterKiosk) fApp2.enterKiosk()
+      console.warn('[fingerprint] Registration failed:', e)
     }
     return false
   }
 
-  // Authenticate with fingerprint
+  // Authenticate with fingerprint via DigitalPersona service (port 7718)
   const handleBiometricLogin = async () => {
     setBiometricChecking(true)
     try {
-      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-      const credIds = Object.keys(stored)
-      if (credIds.length === 0) {
-        setBiometricChecking(false)
-        return
-      }
+      const res = await fetch(`${FINGERPRINT_URL}/identify`, { method: 'GET', signal: AbortSignal.timeout(20000) })
+      const data = await res.json()
 
-      // Exit kiosk mode temporarily so Windows Hello dialog can appear
-      const fApp = (window as unknown as { fullsiteApp?: { exitKiosk: () => void; enterKiosk: () => void } }).fullsiteApp
-      if (fApp?.exitKiosk) fApp.exitKiosk()
+      if (data.ok && data.staffId) {
+        // Look up staff member by ID from pos_staff via API
+        const staffRes = await fetch(apiUrl('/api/pos/pin'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId }),
+        })
 
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          rpId: window.location.hostname,
-          allowCredentials: credIds.map(id => ({
-            id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
-            type: 'public-key' as const,
-          })),
-          userVerification: 'required',
-          timeout: 30000,
-        },
-      })
+        // If API doesn't support fingerprint_id yet, look up from local cache
+        let member: StaffMember | null = null
+        try {
+          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+          if (fpMap[data.staffId]) member = fpMap[data.staffId]
+        } catch {}
 
-      if (assertion) {
-        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
-        const member = stored[credId]
-        if (member) {
-          // ── Session locking on biometric login ──
-          setSessionError('')
-          const conflict = await checkActiveSession(member.id)
-          if (conflict) {
-            setSessionError('Usuario activo en otra terminal. Cierra esa sesion primero.')
-            setBiometricChecking(false)
-            return
-          }
-          await registerSession(member.id, member.name)
-          startHeartbeat(member.id)
-
-          setStaff(member)
-          setUnlocked(true)
-          setAttempts(0)
-          sessionStorage.setItem('pos_staff', JSON.stringify(member))
-          sessionStorage.setItem('pos_last_activity', Date.now().toString())
-          // Enter fullscreen on biometric login
-          if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
-            document.documentElement.requestFullscreen().catch(() => {})
-          }
-          requestNotificationPermission().catch(() => {})
+        if (!member) {
+          setSessionError('Huella reconocida pero usuario no vinculado. Entra con PIN primero.')
+          setBiometricChecking(false)
+          return
         }
+
+        // Session locking
+        setSessionError('')
+        const conflict = await checkActiveSession(member.id)
+        if (conflict) {
+          setSessionError('Usuario activo en otra terminal.')
+          setBiometricChecking(false)
+          return
+        }
+        await registerSession(member.id, member.name)
+        startHeartbeat(member.id)
+
+        setStaff(member)
+        setUnlocked(true)
+        setAttempts(0)
+        sessionStorage.setItem('pos_staff', JSON.stringify(member))
+        sessionStorage.setItem('pos_last_activity', Date.now().toString())
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
+          document.documentElement.requestFullscreen().catch(() => {})
+        }
+        requestNotificationPermission().catch(() => {})
+        // Go to mesas after fingerprint login
+        if (window.location.pathname === '/pos' && !window.location.search) {
+          router.push('/pos/mesas')
+        }
+      } else {
+        setSessionError(data.error || 'Huella no reconocida')
       }
     } catch (e) {
-      console.warn('[biometric] Auth failed:', e)
+      console.warn('[fingerprint] Login failed:', e)
+      setSessionError('Error al leer huella. Intenta de nuevo.')
     }
     setBiometricChecking(false)
   }
