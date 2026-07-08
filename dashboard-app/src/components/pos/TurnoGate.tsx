@@ -43,16 +43,23 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const canCloseTurno = permissions.corte_turno
 
   const checkTurno = useCallback(async () => {
-    const result = await getActiveTurnoWithStaleCheck()
-    if (result.turno) {
-      if (result.isStale) {
-        setTurno(result.turno)
-        setStatus('stale')
+    try {
+      const result = await getActiveTurnoWithStaleCheck()
+      if (result.turno) {
+        if (result.isStale) {
+          setTurno(result.turno)
+          setStatus('stale')
+        } else {
+          setTurno(result.turno)
+          setStatus('active')
+        }
       } else {
-        setTurno(result.turno)
-        setStatus('active')
+        setTurno(null)
+        setStatus('none')
       }
-    } else {
+    } catch (err) {
+      console.error('[TurnoGate] Error verificando turno:', err)
+      // On error, treat as no turno (safe default — blocks operations)
       setTurno(null)
       setStatus('none')
     }

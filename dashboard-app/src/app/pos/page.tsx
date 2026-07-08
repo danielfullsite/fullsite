@@ -2173,6 +2173,7 @@ function POSContent() {
 
   const handleSendToKitchen = async () => {
     if (activeItems.length === 0 || operationLock.current) return
+    if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
@@ -2384,6 +2385,7 @@ function POSContent() {
 
   const handleCloseOrder = () => {
     if (orderItems.length === 0) return
+    if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
     // Block payment if order was never sent to kitchen (no items sent, no loaded order from DB)
     if (sentItemIds.size === 0 && !loadedOrderId) {
       showToast('Primero envía la orden a cocina antes de cobrar')

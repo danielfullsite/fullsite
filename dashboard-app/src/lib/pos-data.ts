@@ -1107,6 +1107,12 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function saveOrder(order: Order): Promise<boolean> {
+  // ── Turno enforcement: orders MUST have a turno_id ──
+  if (!order.turnoId) {
+    console.error('[saveOrder] BLOCKED: turno_id is required. No active turno.')
+    return false
+  }
+
   const orderData: Record<string, unknown> = {
     client_id: _getClientId(),
     mesa: order.mesa,
@@ -1121,7 +1127,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
     propina: order.propina ?? 0,
     metodo_pago: order.metodoPago ?? null,
     pagos: order.pagos && order.pagos.length > 0 ? order.pagos : null,
-    turno_id: order.turnoId ?? null,
+    turno_id: order.turnoId,
     notas: order.notas ?? null,
     items: JSON.stringify(order.items),
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
