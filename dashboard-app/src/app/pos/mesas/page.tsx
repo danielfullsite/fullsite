@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon } from 'lucide-react'
-import { MESAS_CONFIG, formatMXN, logAudit } from '@/lib/pos-data'
+import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
+import { MESAS_CONFIG, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -344,6 +344,10 @@ export default function MesasPage() {
   const staffRole = (() => {
     try { const s = sessionStorage.getItem('pos_staff'); return s ? JSON.parse(s).role || 'mesero' : 'mesero' } catch { return 'mesero' }
   })()
+
+  // PIN prompt for protected actions (cerrar app)
+  const [pinPrompt, setPinPrompt] = useState<{ title: string; onSubmit: (pin: string) => void } | null>(null)
+  const [pinInput, setPinInput] = useState('')
 
   const handleMesaClick = (mesaNum: number) => {
     if (mergeMode) {
@@ -694,6 +698,32 @@ export default function MesasPage() {
           >
             <LockIcon size={14} /> Bloquear
           </button>
+          {(staffRole === 'admin' || staffRole === 'gerente') && (
+            <button
+              onClick={() => {
+                setPinInput('')
+                setPinPrompt({
+                  title: 'PIN de gerente para cerrar la app:',
+                  onSubmit: async (pin: string) => {
+                    const managerName = await verifyManagerPin(pin)
+                    if (!managerName) { alert('PIN incorrecto'); return }
+                    setPinPrompt(null)
+                    logAudit({ action: 'cerrar_app', actor: managerName, mesa: 0, details: {} })
+                    if ((window as any).fullsiteApp?.quit) {
+                      ;(window as any).fullsiteApp.quit()
+                    } else {
+                      try { document.exitFullscreen?.() } catch {}
+                      window.location.href = 'about:blank'
+                    }
+                  },
+                })
+              }}
+              title="Cerrar app"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 transition-colors"
+            >
+              <Power size={14} /> Cerrar
+            </button>
+          )}
         </div>
         <div className="hidden md:flex items-center gap-6">
           {Object.entries(counts).map(([status, count]) => (
@@ -855,6 +885,38 @@ export default function MesasPage() {
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--surface-2)] border border-[var(--line)] text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
           {toast}
+        </div>
+      )}
+
+      {/* PIN Prompt Modal */}
+      {pinPrompt && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70" onClick={() => setPinPrompt(null)}>
+          <div className="bg-[var(--surface-2)] rounded-2xl p-6 w-80 shadow-2xl border border-[var(--line)]" onClick={e => e.stopPropagation()}>
+            <p className="text-white font-bold text-center mb-4">{pinPrompt.title}</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={pinInput}
+              onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={e => { if (e.key === 'Enter' && pinInput) { pinPrompt.onSubmit(pinInput) } }}
+              maxLength={6}
+              className="w-full bg-[var(--line)] border border-slate-600 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.3em] font-bold focus:outline-none focus:border-emerald-500 mb-4"
+              placeholder="****"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setPinPrompt(null); setPinInput('') }} className="flex-1 py-3 rounded-xl bg-[var(--line)] text-[var(--text-2)] font-medium">
+                Cancelar
+              </button>
+              <button
+                onClick={() => { if (pinInput) pinPrompt.onSubmit(pinInput) }}
+                disabled={!pinInput}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
+import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
 
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
@@ -26,6 +27,10 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
+  const [showFingerprintRegister, setShowFingerprintRegister] = useState(false)
+  const [registeringFingerprint, setRegisteringFingerprint] = useState(false)
+  const [fingerprintMsg, setFingerprintMsg] = useState('')
+  const [sessionError, setSessionError] = useState('')
 
   // Register service worker + start background queues on mount
   const swRegistered = useRef(false)
@@ -99,14 +104,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const elapsed = Date.now() - parseInt(lastActivity)
         if (elapsed < IDLE_TIMEOUT_MS) {
           try {
-            setStaff(JSON.parse(saved))
+            const parsed = JSON.parse(saved)
+            setStaff(parsed)
             setUnlocked(true)
+            // Restart heartbeat for restored session
+            registerSession(parsed.id, parsed.name).then(() => startHeartbeat(parsed.id)).catch(() => {})
             // Don't auto-redirect — let the page handle navigation
           } catch { /* ignore */ }
         } else {
-          // Session expired
+          // Session expired — clean up server session too
           sessionStorage.removeItem('pos_staff')
           sessionStorage.removeItem('pos_last_activity')
+          removeSession().catch(() => {})
         }
       }
       // PIN validation is now server-side only via /api/pos/pin
@@ -136,7 +145,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
         if (elapsed >= IDLE_TIMEOUT_MS) {
-          // Lock the POS
+          // Lock the POS + clean up server session
+          removeSession().catch(() => {})
           setUnlocked(false)
           setStaff(null)
           setPin('')
@@ -157,12 +167,24 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [biometricChecking, setBiometricChecking] = useState(false)
 
   // Check if WebAuthn/biometric is available
+  // NOTE: We check for WebAuthn support broadly (not just platform authenticators)
+  // because the HID DigitalPersona 4500 USB reader works through Windows Hello
+  // (WBF driver -> Windows Hello -> WebAuthn platform authenticator).
+  // If Windows Hello isn't configured yet, isUserVerifyingPlatformAuthenticatorAvailable
+  // returns false even though the reader is plugged in. So we also check for any
+  // stored credentials — if someone registered before, the reader is available.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
-        .then(ok => setBiometricAvailable(ok))
-        .catch(() => {})
+    if (typeof window === 'undefined' || !window.PublicKeyCredential) return
+    const hasStoredCredentials = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+        return Object.keys(stored).length > 0
+      } catch { return false }
     }
+    // Platform authenticator available (Windows Hello w/ DP4500, Touch ID, etc.)
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.()
+      .then(ok => setBiometricAvailable(ok || hasStoredCredentials()))
+      .catch(() => setBiometricAvailable(hasStoredCredentials()))
   }, [])
 
   // Register fingerprint for current staff member
@@ -179,10 +201,16 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
             name: staffMember.name,
             displayName: staffMember.name,
           },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' },   // ES256
+            { alg: -257, type: 'public-key' },  // RS256 (Windows Hello uses RSA)
+          ],
           authenticatorSelection: {
-            authenticatorAttachment: 'platform',
+            // No authenticatorAttachment — allows BOTH platform (Windows Hello
+            // w/ DigitalPersona 4500 USB reader) and cross-platform (FIDO2 keys).
+            // The DP4500 works as: USB reader -> WBF driver -> Windows Hello -> WebAuthn.
             userVerification: 'required',
+            residentKey: 'discouraged', // Don't require discoverable credentials
           },
           timeout: 60000,
         },
@@ -231,6 +259,17 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
         const member = stored[credId]
         if (member) {
+          // ── Session locking on biometric login ──
+          setSessionError('')
+          const conflict = await checkActiveSession(member.id)
+          if (conflict) {
+            setSessionError('Usuario activo en otra terminal. Cierra esa sesion primero.')
+            setBiometricChecking(false)
+            return
+          }
+          await registerSession(member.id, member.name)
+          startHeartbeat(member.id)
+
           setStaff(member)
           setUnlocked(true)
           setAttempts(0)
@@ -254,9 +293,21 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(true)
     setError(false)
 
-    const unlock = (member: StaffMember) => {
+    const unlock = async (member: StaffMember) => {
+      // ── Session locking: prevent concurrent login on multiple terminals ──
+      setSessionError('')
+      const conflict = await checkActiveSession(member.id)
+      if (conflict) {
+        setSessionError('Usuario activo en otra terminal. Cierra esa sesion primero.')
+        setChecking(false)
+        setPin('')
+        return
+      }
+      // Register session and start heartbeat
+      await registerSession(member.id, member.name)
+      startHeartbeat(member.id)
+
       setStaff(member)
-      setUnlocked(true)
       setAttempts(0)
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
@@ -265,12 +316,28 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
         document.documentElement.requestFullscreen().catch(() => {})
       }
+      // Ask for notification permission after login (non-blocking, user gesture context)
+      requestNotificationPermission().catch(() => {})
+
+      // Check if this staff member has a fingerprint registered
+      // If WebAuthn is available and they don't have one, offer registration
+      const hasFingerprint = () => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+          return Object.values(stored).some((v: unknown) => (v as StaffMember).id === member.id)
+        } catch { return false }
+      }
+      if (window.PublicKeyCredential && !hasFingerprint()) {
+        // Show fingerprint registration prompt (don't unlock yet)
+        setShowFingerprintRegister(true)
+        return // Don't setUnlocked yet — show registration screen first
+      }
+
+      setUnlocked(true)
       // Go to table map after login (only if on bare /pos without mesa param)
       if (window.location.pathname === '/pos' && !window.location.search) {
         router.push('/pos/mesas')
       }
-      // Ask for notification permission after login (non-blocking, user gesture context)
-      requestNotificationPermission().catch(() => {})
     }
 
     try {
@@ -339,6 +406,78 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
   }, [unlocked])
 
+  // Fingerprint registration screen — shown after PIN login when no fingerprint is registered
+  if (showFingerprintRegister && staff) {
+    const doRegister = async () => {
+      setRegisteringFingerprint(true)
+      setFingerprintMsg('')
+      const ok = await handleBiometricRegister(staff)
+      setRegisteringFingerprint(false)
+      if (ok) {
+        setFingerprintMsg('Huella registrada')
+        setTimeout(() => {
+          setShowFingerprintRegister(false)
+          setFingerprintMsg('')
+          setUnlocked(true)
+          if (window.location.pathname === '/pos' && !window.location.search) {
+            router.push('/pos/mesas')
+          }
+        }, 1200)
+      } else {
+        setFingerprintMsg('No se pudo registrar. Intenta de nuevo o salta este paso.')
+      }
+    }
+    const skipRegister = () => {
+      setShowFingerprintRegister(false)
+      setFingerprintMsg('')
+      setUnlocked(true)
+      if (window.location.pathname === '/pos' && !window.location.search) {
+        router.push('/pos/mesas')
+      }
+    }
+    return (
+      <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}>
+        <div className="text-center w-full max-w-xs mx-4">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-6">
+            <path d="M12 10v4M7.5 7.5C9 6 10.5 5.5 12 5.5c3.5 0 6.5 3 6.5 6.5 0 1.5-.5 3-1.5 4" />
+            <path d="M4.5 12.5c0-4 3.5-7.5 7.5-7.5" />
+            <path d="M19.5 12.5c0 4-3.5 7.5-7.5 7.5-2 0-3.5-.5-5-2" />
+            <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
+          </svg>
+          <h2 className="text-xl font-bold mb-2">{staff.name}</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            Registra tu huella para entrar sin PIN la proxima vez.
+            Coloca tu dedo en el lector cuando se te pida.
+          </p>
+          <button
+            onClick={doRegister}
+            disabled={registeringFingerprint}
+            className="w-full py-5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.97] disabled:bg-blue-800 text-white font-bold text-lg transition-all min-h-[64px] mb-3 flex items-center justify-center gap-3"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 10v4M7.5 7.5C9 6 10.5 5.5 12 5.5c3.5 0 6.5 3 6.5 6.5 0 1.5-.5 3-1.5 4" />
+              <path d="M4.5 12.5c0-4 3.5-7.5 7.5-7.5" />
+              <path d="M19.5 12.5c0 4-3.5 7.5-7.5 7.5-2 0-3.5-.5-5-2" />
+              <path d="M12 14.5c1.5 0 2.5-1 2.5-2.5S13.5 9.5 12 9.5 9.5 10.5 9.5 12" />
+            </svg>
+            {registeringFingerprint ? 'Coloca tu dedo en el lector...' : 'Registrar huella'}
+          </button>
+          <button
+            onClick={skipRegister}
+            className="w-full py-3 rounded-xl bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-300 text-sm transition-all"
+          >
+            Saltar por ahora
+          </button>
+          {fingerprintMsg && (
+            <p className={`text-sm mt-3 ${fingerprintMsg.includes('registrada') ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {fingerprintMsg}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (unlocked) return (
     <div className="pos-kiosk" style={{
       background:'#0a0a0f', color:'#fff', height:'100dvh', overflow:'hidden',
@@ -378,9 +517,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               sessionStorage.setItem(key, JSON.stringify(taps))
               if (taps.length >= 5) {
                 sessionStorage.removeItem(key)
+                // Electron app: quit via IPC bridge
+                const fApp = (window as unknown as { fullsiteApp?: { quit: () => void } }).fullsiteApp
+                if (fApp?.quit) { fApp.quit(); return }
+                // Browser fallback
                 if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
                 window.close()
-                // Fallback if window.close doesn't work in kiosk
                 window.location.href = 'about:blank'
               }
             }}
@@ -430,6 +572,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           {checking ? 'Verificando...' : isLocked ? 'Bloqueado (1 min)' : 'Entrar con PIN'}
         </button>
 
+        {sessionError && (
+          <p className="text-amber-400 text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+            {sessionError}
+          </p>
+        )}
         {error && !isLocked && (
           <p className="text-red-400 text-sm mt-3">
             PIN incorrecto {remainingAttempts > 0 && remainingAttempts <= 3 && `(${remainingAttempts} intentos restantes)`}

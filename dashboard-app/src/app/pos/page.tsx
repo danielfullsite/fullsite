@@ -106,10 +106,12 @@ import {
   Armchair,
   Tag,
   ArrowRightLeft,
+  ArrowLeft,
   DollarSign,
   ArrowDownUp,
   Layers,
   ClipboardCheck,
+  Power,
 } from 'lucide-react'
 import {
   getMPConfig,
@@ -2662,8 +2664,13 @@ function POSContent() {
               <span className="text-xs font-mono">{clock}</span>
             </div>
             <button
-              onClick={() => {
+              onClick={async () => {
                 // Bloquear: regresa a la pantalla de PIN sin perder la orden en BD
+                // Clean up server session
+                try {
+                  const { removeSession: _removeSession } = await import('@/lib/pos-sessions')
+                  _removeSession().catch(() => {})
+                } catch { /* */ }
                 try {
                   sessionStorage.removeItem('pos_staff')
                   sessionStorage.removeItem('pos_last_activity')
@@ -2786,6 +2793,37 @@ function POSContent() {
               <MeseroLeaderboard currentMesero={mesero} compact />
               <KitchenTimer />
             </div>
+
+            {/* Cerrar app — admin/gerente only */}
+            {(staffRole === 'admin' || staffRole === 'gerente') && (
+              <div className="mt-4 pt-4 border-t border-[var(--line)]">
+                <button
+                  onClick={() => {
+                    setShowNav(false)
+                    setPinInput('')
+                    setPinPrompt({
+                      title: 'PIN de gerente para cerrar la app:',
+                      onSubmit: async (pin: string) => {
+                        const managerName = await verifyManagerPin(pin)
+                        if (!managerName) { alert('PIN incorrecto'); return }
+                        setPinPrompt(null)
+                        logAudit({ action: 'cerrar_app', actor: managerName, mesa: 0, details: {} })
+                        if ((window as any).fullsiteApp?.quit) {
+                          ;(window as any).fullsiteApp.quit()
+                        } else {
+                          try { document.exitFullscreen?.() } catch {}
+                          window.location.href = 'about:blank'
+                        }
+                      },
+                    })
+                  }}
+                  className="flex items-center gap-3 px-4 py-2 rounded-xl w-full text-red-400 hover:bg-red-900/30 hover:text-red-300 transition-colors min-h-[40px]"
+                >
+                  <Power size={18} />
+                  <span className="text-sm font-medium">Cerrar app</span>
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex-1 bg-black/50" />
         </div>
@@ -3175,6 +3213,15 @@ function POSContent() {
 
           {/* Action buttons — compact for tablets */}
           <div className="px-3 py-1 border-t border-[var(--line)] flex gap-2 flex-shrink-0">
+            {orderItems.length === 0 ? (
+              <button
+                onClick={() => router.push('/pos/mesas')}
+                className="flex-1 flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-500 active:bg-slate-700 active:scale-[0.97] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
+              >
+                <ArrowLeft size={18} />
+                Salir
+              </button>
+            ) : (<>
             <button
               onClick={() => setShowVerify(true)}
               disabled={activeItems.length === 0}
@@ -3216,6 +3263,7 @@ function POSContent() {
               <CreditCard size={18} />
               {!can('cerrar_cuentas') ? 'Sin permiso' : 'Cobrar'}
             </button>
+            </>)}
           </div>
         </div>
 
