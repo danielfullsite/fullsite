@@ -166,6 +166,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
 
   // ── Grupos multinivel (Wansoft: "NIVEL 1: PROTEINA, opcional, máx 2") ──
   const [modGroups, setModGroups] = useState<ModifierGroupDef[]>([])
+  const [currentLevel, setCurrentLevel] = useState(0)
   const [groupChecked, setGroupChecked] = useState<Map<string, Set<string>>>(() => {
     // Restore selections when editing: match existing modifier strings to options later
     return new Map()
@@ -324,7 +325,21 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
         </div>
 
         <div className="px-5 py-3 space-y-3 flex-1 overflow-y-auto pos-fat-scroll">
-          {/* Quitar section — collapsed by default, expand on tap */}
+          {/* Step indicator (only for stepped flow) */}
+          {hasGroups && modGroups.length > 0 && (
+            <div className="flex items-center justify-between pb-1">
+              <h4 className="text-sm font-bold text-white">
+                {modGroups[currentLevel]?.name ?? 'Confirmar'} ({currentLevel + 1}/{modGroups.length})
+              </h4>
+              <div className="flex gap-1">
+                {modGroups.map((_, i) => (
+                  <div key={i} className={`w-2.5 h-2.5 rounded-full ${i === currentLevel ? 'bg-emerald-500' : i < currentLevel ? 'bg-emerald-800' : 'bg-slate-600'}`} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quitar section — collapsed by default, shows on ALL steps */}
           {quitarOptions.length > 0 && <div>
             <button
               type="button"
@@ -369,8 +384,10 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             )}
           </div>}
 
-          {/* Grupos multinivel (Wansoft) */}
-          {modGroups.map(group => {
+          {/* Stepped modifier groups (one at a time) */}
+          {hasGroups && modGroups.length > 0 && (() => {
+            const group = modGroups[currentLevel]
+            if (!group) return null
             const sel = groupChecked.get(group.id) || new Set<string>()
             const min = group.required ? Math.max(1, group.minSelections) : group.minSelections
             const maxReached = group.maxSelections !== null && group.maxSelections > 1 && sel.size >= group.maxSelections
@@ -381,14 +398,14 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                   <span className="text-[var(--text-3)]">Nivel {group.level}: {group.name}</span>
                   {min > 0 ? (
                     <span className={`text-[11px] normal-case font-bold px-2 py-0.5 rounded-full ${unmet ? 'bg-red-900/50 text-red-300 border border-red-700/60' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/50'}`}>
-                      Obligatorio{min > 1 ? ` (mín ${min})` : ''}
+                      Obligatorio{min > 1 ? ` (min ${min})` : ''}
                     </span>
                   ) : (
                     <span className="text-[11px] normal-case font-medium px-2 py-0.5 rounded-full bg-[var(--line)]/60 text-[var(--text-3)]">Opcional</span>
                   )}
                   {group.maxSelections !== null && (
                     <span className={`text-[11px] normal-case font-medium px-2 py-0.5 rounded-full ${maxReached ? 'bg-amber-900/40 text-amber-300 border border-amber-700/50' : 'bg-[var(--line)]/60 text-[var(--text-3)]'}`}>
-                      Máx {group.maxSelections}{group.maxSelections > 1 ? ` (${sel.size}/${group.maxSelections})` : ''}
+                      Max {group.maxSelections}{group.maxSelections > 1 ? ` (${sel.size}/${group.maxSelections})` : ''}
                     </span>
                   )}
                 </h4>
@@ -435,9 +452,9 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
                 </div>
               </div>
             )
-          })}
+          })()}
 
-          {/* Agregar section */}
+          {/* Legacy Agregar section (only when no groups) */}
           {agregarOptions.length > 0 && <div>
             <h4 className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2">Agregar</h4>
             <div className="grid grid-cols-3 gap-1.5">
@@ -478,7 +495,7 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
             </div>
           </div>}
 
-          {/* Notas + Cantidad — compact row */}
+          {/* Notas + Cantidad — always visible on every step */}
           <div className="flex items-center gap-3">
             <input
               type="text"
@@ -505,24 +522,102 @@ function ModifierModal({ item, existingOrder, recipeIngredients, categoryId, onC
           </div>
         </div>
 
-        {/* Footer buttons — always visible */}
-        <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 rounded-b-2xl flex-shrink-0">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-bold text-lg transition-colors min-h-[56px]"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={unmetGroups.length > 0}
-            className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
-          >
-            {unmetGroups.length > 0
-              ? `Elige ${unmetGroups[0].name}`
-              : <>{existingOrder ? 'Actualizar' : 'Agregar'} {formatMXN(subtotal)}</>}
-          </button>
-        </div>
+        {/* Footer buttons */}
+        {!hasGroups ? (
+          /* Legacy footer — Cancel / Add */
+          <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 rounded-b-2xl flex-shrink-0">
+            <button
+              onClick={onCancel}
+              className="flex-1 py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-bold text-lg transition-colors min-h-[56px]"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={unmetGroups.length > 0}
+              className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+            >
+              {unmetGroups.length > 0
+                ? `Elige ${unmetGroups[0].name}`
+                : <>{existingOrder ? 'Actualizar' : 'Agregar'} {formatMXN(subtotal)}</>}
+            </button>
+          </div>
+        ) : (
+          /* Stepped footer — Back / Skip / Next / Add */
+          <div className="bg-[var(--surface-2)] border-t border-[var(--line)] px-5 py-4 flex gap-3 rounded-b-2xl flex-shrink-0">
+            {/* Back / Cancel */}
+            <button
+              onClick={currentLevel > 0 ? () => setCurrentLevel(currentLevel - 1) : onCancel}
+              className="flex-1 py-4 rounded-xl bg-[var(--line)] hover:bg-[var(--line)] text-[var(--text-4)] font-bold text-lg transition-colors min-h-[56px]"
+            >
+              {currentLevel > 0 ? '\u2190 Atras' : 'Cancelar'}
+            </button>
+
+            {currentLevel < modGroups.length - 1 ? (
+              /* Not last level: Siguiente + optional Omitir */
+              <>
+                {/* Omitir — only on optional groups */}
+                {(() => {
+                  const g = modGroups[currentLevel]
+                  const isOptional = !g.required && g.minSelections === 0
+                  return isOptional ? (
+                    <button
+                      onClick={() => setCurrentLevel(currentLevel + 1)}
+                      className="flex-1 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
+                    >
+                      Omitir &rarr;
+                    </button>
+                  ) : null
+                })()}
+                {/* Siguiente — disabled if current required group is unmet */}
+                <button
+                  onClick={() => setCurrentLevel(currentLevel + 1)}
+                  disabled={(() => {
+                    const g = modGroups[currentLevel]
+                    const count = groupChecked.get(g.id)?.size || 0
+                    const min = g.required ? Math.max(1, g.minSelections) : g.minSelections
+                    return count < min
+                  })()}
+                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+                >
+                  {(() => {
+                    const g = modGroups[currentLevel]
+                    const count = groupChecked.get(g.id)?.size || 0
+                    const min = g.required ? Math.max(1, g.minSelections) : g.minSelections
+                    return count < min ? `Elige ${g.name}` : 'Siguiente \u2192'
+                  })()}
+                </button>
+              </>
+            ) : (
+              /* Last level: Agregar button */
+              <>
+                {/* Omitir on last level if optional */}
+                {(() => {
+                  const g = modGroups[currentLevel]
+                  const isOptional = !g.required && g.minSelections === 0
+                  const count = groupChecked.get(g.id)?.size || 0
+                  return isOptional && count === 0 ? (
+                    <button
+                      onClick={handleConfirm}
+                      className="flex-1 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-[var(--text-3)] font-bold text-lg transition-colors min-h-[56px]"
+                    >
+                      Omitir &rarr;
+                    </button>
+                  ) : null
+                })()}
+                <button
+                  onClick={handleConfirm}
+                  disabled={unmetGroups.length > 0}
+                  className="flex-[2] py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold text-lg transition-colors min-h-[56px]"
+                >
+                  {unmetGroups.length > 0
+                    ? `Elige ${unmetGroups[0].name}`
+                    : <>{existingOrder ? 'Actualizar' : 'Agregar'} &#10003; {formatMXN(subtotal)}</>}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
