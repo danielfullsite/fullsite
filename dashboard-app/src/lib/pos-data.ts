@@ -1263,6 +1263,7 @@ export type AuditAction =
   | 'combo_added'
   | 'ticket_reprinted'
   | 'kitchen_item_updated'
+  | 'cerrar_app'
 
 export interface AuditEvent {
   client_id?: string
