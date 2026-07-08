@@ -293,14 +293,13 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       requestNotificationPermission().catch(() => {})
 
       // Check if this staff member has a fingerprint registered
-      // If WebAuthn is available and they don't have one, offer registration
       const hasFingerprint = () => {
         try {
-          const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
-          return Object.values(stored).some((v: unknown) => (v as StaffMember).id === member.id)
+          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+          return !!fpMap[member.id]
         } catch { return false }
       }
-      if (window.PublicKeyCredential && !hasFingerprint()) {
+      if (biometricAvailable && !hasFingerprint()) {
         // Show fingerprint registration prompt (don't unlock yet)
         setShowFingerprintRegister(true)
         return // Don't setUnlocked yet — show registration screen first
