@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X } from 'lucide-react'
+import { ArrowLeft, Receipt, RefreshCw, Clock, DollarSign, Users, CreditCard, Banknote, Ban, Percent, ChefHat, RotateCcw, ShieldAlert, AlertTriangle, X, Download } from 'lucide-react'
 import { formatMXN, getAuditLog, reopenOrder, logAudit, getClientId, verifyManagerPin, getActiveTurno, getPaymentMethodsFromDB, type AuditLogEntry, type PagoForma, type PaymentMethodDB } from '@/lib/pos-data'
 import { isTiempoItem } from '@/lib/pos-constants'
 
@@ -311,6 +311,31 @@ export default function CortePage() {
     }
   }, [orders, auditLog, cardPct, cashMovements, paymentMethods])
 
+  const exportCSV = () => {
+    const headers = ['Fecha','Orden','Mesa','Mesero','Subtotal','Descuento','IVA','Propina','Total','MetodoPago','Status']
+    const rows = orders.map(o => [
+      new Date(o.created_at).toLocaleDateString('es-MX'),
+      o.id.slice(0, 8),
+      o.mesa,
+      o.mesero,
+      o.subtotal,
+      o.descuento || 0,
+      o.iva || 0,
+      o.propina || 0,
+      o.total,
+      o.metodo_pago || '',
+      o.status
+    ])
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `corte-${selectedDate}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (!accessGranted) {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--surface)] text-white p-4">
@@ -356,6 +381,10 @@ export default function CortePage() {
           </div>
           <button onClick={fetchData} className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center">
             <RefreshCw size={14} />
+          </button>
+          <button onClick={exportCSV} className="h-11 px-4 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center gap-2 text-sm font-semibold text-[var(--text-4)]">
+            <Download size={14} />
+            Exportar CSV
           </button>
         </div>
         <div className="flex items-center gap-3">

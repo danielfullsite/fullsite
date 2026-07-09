@@ -14,10 +14,21 @@
 <meta property="og:url" content="https://fullsite.mx/">
 <meta property="og:locale" content="es_MX">
 <meta property="og:site_name" content="Fullsite">
+<meta property="og:image" content="https://fullsite.mx/img-dashboard.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Fullsite — POS completo + Dashboard + IA para Restaurantes">
 <meta name="twitter:description" content="No construimos otro POS. POS completo, dashboard en tiempo real e IA — todo en un solo sistema. Ya en produccion en Monterrey.">
+<meta name="twitter:image" content="https://fullsite.mx/img-dashboard.png">
 <link rel="canonical" href="https://fullsite.mx/">
+
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png">
+<link rel="apple-touch-icon" href="/favicon-512.png">
 
 <!-- Schema.org JSON-LD -->
 <script type="application/ld+json">
@@ -25,19 +36,33 @@
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "Fullsite",
+  "alternateName": "Fullsite Technologies",
+  "legalName": "Fullsite Technologies S.A.S.",
   "url": "https://fullsite.mx",
-  "description": "POS completo + Dashboard en tiempo real + Inteligencia Artificial para restaurantes. Mesas, cocina, cobro, inventario, food cost, prediccion de ventas, deteccion de fraude. Todo en un solo sistema. Monterrey, Mexico.",
+  "logo": "https://fullsite.mx/logo-fullsite.png",
+  "description": "Software para restaurantes con inteligencia artificial. POS completo, dashboard en tiempo real, agentes de IA autonomos. Sistema operativo para restaurantes en Mexico. Alternativa a Wansoft, Soft Restaurant, Parrot.",
+  "foundingDate": "2026",
+  "founder": {
+    "@type": "Person",
+    "name": "Daniel Ramonfaur"
+  },
   "address": {
     "@type": "PostalAddress",
-    "addressLocality": "Monterrey",
+    "addressLocality": "San Pedro Garza Garcia",
     "addressRegion": "Nuevo Leon",
+    "postalCode": "66260",
     "addressCountry": "MX"
   },
   "contactPoint": {
     "@type": "ContactPoint",
     "contactType": "sales",
-    "url": "https://wa.me/528115324371"
-  }
+    "url": "https://wa.me/528115324371",
+    "availableLanguage": ["es", "en"]
+  },
+  "sameAs": [
+    "https://www.linkedin.com/company/fullsite-mx"
+  ],
+  "knowsAbout": ["software para restaurantes", "POS con inteligencia artificial", "sistema operativo restaurantes Mexico", "punto de venta restaurante", "alternativa Wansoft", "alternativa Soft Restaurant"]
 }
 </script>
 <script type="application/ld+json">
@@ -51,7 +76,7 @@
   "description": "Sistema completo para restaurantes: punto de venta (POS), dashboard en tiempo real, inteligencia artificial. Incluye mesas, cocina KDS, cobro, split, inventario, food cost, prediccion de ventas, deteccion de fraude, alertas al celular, facturacion CFDI, delivery integrado (Uber Eats, Rappi, DiDi Food). Funciona offline. Reemplaza Wansoft, Soft Restaurant y cualquier POS tradicional.",
   "offers": {
     "@type": "Offer",
-    "price": "4999",
+    "price": "1999",
     "priceCurrency": "MXN",
     "priceValidUntil": "2027-12-31",
     "availability": "https://schema.org/InStock",
@@ -790,41 +815,50 @@ ul { list-style: none; }
   .nav-links, .nav-right { display: none; }
   .hamburger { display: flex; }
 
-  .hero { padding-top: 100px; padding-bottom: 48px; }
+  .hero { padding-top: 80px; padding-bottom: 40px; }
   .hero-grid {
     grid-template-columns: 1fr;
-    gap: 40px;
+    gap: 32px;
     text-align: center;
   }
-  .hero-heading { font-size: 34px; }
-  .hero-sub { max-width: 100%; margin-left: auto; margin-right: auto; }
-  .hero-buttons { justify-content: center; }
+  .hero-heading { font-size: 32px; }
+  .hero-sub { max-width: 100%; margin-left: auto; margin-right: auto; font-size: 15px; }
+  .hero-buttons { justify-content: center; flex-wrap: wrap; }
+  .hero-buttons .btn { width: 100%; text-align: center; }
 
   .feature-row {
     grid-template-columns: 1fr;
-    gap: 32px;
-    padding: 56px 0;
+    gap: 24px;
+    padding: 48px 0;
   }
   .feature-row.reverse .feature-text { order: 2; }
   .feature-row.reverse .feature-visual { order: 1; }
+  .feature-title { font-size: 24px; }
+  .feature-desc { font-size: 14px; }
 
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
-  .stat-number { font-size: 32px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .stat-number { font-size: 28px; }
 
-  .integrations-grid { grid-template-columns: 1fr 1fr; }
   .photos-grid { grid-template-columns: 1fr; }
 
-  .section { padding: 64px 0; }
-  .cta-heading { font-size: 28px; }
+  .section { padding: 56px 0; }
+  .cta-heading { font-size: 26px; }
 
   .footer-inner { flex-direction: column; text-align: center; }
+
+  /* Benefit cards: 1 column on mobile */
+  .benefits-grid { grid-template-columns: 1fr !important; }
+
+  /* FAQ */
+  .faq-heading { font-size: 26px; }
 }
 
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr 1fr; }
-  .integrations-grid { grid-template-columns: 1fr; }
-  .hero-heading { font-size: 28px; }
+  .hero-heading { font-size: 26px; line-height: 1.15; }
+  .hero-sub { font-size: 14px; }
   .logos-row { gap: 28px; }
+  .container { padding: 0 16px; }
 }
 </style>
 </head>
@@ -833,7 +867,7 @@ ul { list-style: none; }
 <!-- ===== NAV ===== -->
 <nav class="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo"><img src="/logo-fullsite.png" alt="fullsite" style="height:36px;mix-blend-mode:multiply;"></a>
+    <a href="/" class="nav-logo"><img src="/logo-fullsite.png" alt="fullsite" style="height:52px;mix-blend-mode:multiply;"></a>
     <div class="nav-links">
       <a href="#features">Producto</a>
       <a href="#integrations">Integraciones</a>
@@ -1028,7 +1062,7 @@ ul { list-style: none; }
       <h2 style="font-size:clamp(32px,5vw,48px);font-weight:600;letter-spacing:-0.03em;line-height:1.1;margin-bottom:16px;color:#111;">Lo que ningún POS <em style="font-family:'Fraunces',serif;font-style:italic;color:#10b981;font-weight:400;">te da.</em></h2>
       <p style="font-size:16px;color:#666;line-height:1.6;">Tu POS actual te da números. Fullsite te dice qué significan y qué hacer con ellos — mientras todavía puedes hacer algo.</p>
     </div>
-    <div class="reveal" style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:900px;margin:0 auto">
+    <div class="reveal benefits-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:900px;margin:0 auto">
       <div style="background:#fff;padding:36px 28px;border:1px solid #eee;border-radius:16px;text-align:center">
         <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-6"/></svg>

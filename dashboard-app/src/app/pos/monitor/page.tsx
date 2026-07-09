@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Activity, Printer, Wifi, WifiOff, AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Activity, Printer, Wifi, WifiOff, AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, Fingerprint, Database, Globe, Server, User } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -16,8 +16,12 @@ interface MonitorData {
   orders: { total: number; cerradas: number; abiertas: number; ventasHoy: number }
   payments: { efectivo: number; tarjeta: number; otros: number; propinas: number }
   prints: { pending: number; printed: number; failed: number; bridgeUnavailable: number; needsAttention: { id: string; station: string; type: string; error: string | null; meta?: { mesa?: number; mesero?: string } }[] }
-  bridge: { online: boolean; uptime: number; stations: string[] }
-  sync: { pending: number; failed: number }
+  bridge: { online: boolean; uptime: number; stations: string[]; hostname: string }
+  fingerprint: { online: boolean }
+  supabase: { online: boolean }
+  internet: { online: boolean }
+  sync: { pending: number; failed: number; lastSyncTime: string | null }
+  turno: { active: boolean; opened_by: string; opened_at: string; fondo: number } | null
   errors: string[]
   inventory: { deductions: number; alerts: number }
   cfdi: { emitidas: number; fallidas: number }
@@ -36,12 +40,15 @@ export default function MonitorPage() {
       const today = new Date().toISOString().slice(0, 10)
       const cid = _cid()
 
-      const [ordersRes, printRes, bridgeRes, alertsRes, cfdiRes] = await Promise.all([
+      const [ordersRes, printRes, bridgeRes, fpRes, supabaseRes, alertsRes, cfdiRes, turnoRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status,total,propina,metodo_pago,pagos`, { headers: H }),
         fetch(`${SUPABASE_URL}/rest/v1/pos_print_jobs?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status`, { headers: H }).catch(() => null),
         fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+        fetch(`${BRIDGE_URL}/fp/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+        fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${cid}&select=id&limit=1`, { headers: H }).catch(() => null),
         fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_alerts?client_id=eq.${cid}&resolved=eq.false&select=id`, { headers: H }).catch(() => null),
         fetch(`${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status`, { headers: H }).catch(() => null),
+        fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${cid}&closed_at=is.null&select=id,opened_by,opened_at,fondo_inicial&order=opened_at.desc&limit=1`, { headers: H }).catch(() => null),
       ])
 
       const orders = ordersRes.ok ? await ordersRes.json() : []
@@ -62,16 +69,25 @@ export default function MonitorPage() {
 
       const prints = printRes?.ok ? await printRes.json() : []
       const bridgeData = bridgeRes?.ok ? await bridgeRes.json() : null
+      const fpOk = fpRes?.ok ?? false
+
+      const supabaseOk = supabaseRes?.ok ?? false
 
       const cfdis = cfdiRes?.ok ? await cfdiRes.json() : []
       const alerts = alertsRes?.ok ? await alertsRes.json() : []
 
+      // Turno activo
+      const turnoRows = turnoRes?.ok ? await turnoRes.json() : []
+      const activeTurno = turnoRows.length > 0 ? turnoRows[0] : null
+
       // Sync queue (localStorage)
-      let syncPending = 0, syncFailed = 0
+      let syncPending = 0, syncFailed = 0, lastSyncTime: string | null = null
       try {
         const queue = JSON.parse(localStorage.getItem('pos_offline_queue') || '[]')
         syncPending = queue.filter((i: { synced?: boolean }) => !i.synced).length
         syncFailed = queue.filter((i: { retries?: number }) => (i.retries || 0) >= 5).length
+        const lastSync = localStorage.getItem('pos_last_sync')
+        if (lastSync) lastSyncTime = new Date(lastSync).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })
       } catch { /* */ }
 
       // Local print queue (needs_attention + bridge_unavailable)
@@ -102,8 +118,18 @@ export default function MonitorPage() {
           online: !!bridgeData?.ok,
           uptime: bridgeData?.uptime || 0,
           stations: bridgeData?.stations || [],
+          hostname: bridgeData?.hostname || '',
         },
-        sync: { pending: syncPending, failed: syncFailed },
+        fingerprint: { online: fpOk },
+        supabase: { online: supabaseOk },
+        internet: { online: typeof navigator !== 'undefined' ? navigator.onLine : true },
+        sync: { pending: syncPending, failed: syncFailed, lastSyncTime },
+        turno: activeTurno ? {
+          active: true,
+          opened_by: activeTurno.opened_by,
+          opened_at: activeTurno.opened_at,
+          fondo: Number(activeTurno.fondo_inicial) || 0,
+        } : null,
         errors: [],
         inventory: { deductions: 0, alerts: alerts.length },
         cfdi: {
@@ -117,14 +143,14 @@ export default function MonitorPage() {
       setError('')
     } catch (e) {
       console.error(e)
-      setError('Sin conexión — datos no actualizados')
+      setError('Sin conexion — datos no actualizados')
     }
     setLoading(false)
   }
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 30000) // refresh every 30s
+    const interval = setInterval(refresh, 10000) // refresh every 10s
     return () => clearInterval(interval)
   }, [])
 
@@ -139,8 +165,8 @@ export default function MonitorPage() {
           <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
           <Activity size={24} className="text-emerald-400" />
           <div>
-            <h1 className="text-2xl font-bold text-[var(--text-1)]">Monitor — Primer Dia</h1>
-            <p className="text-sm text-[var(--text-3)]">Ultima actualización: {lastRefresh || '...'} (auto cada 30s)</p>
+            <h1 className="text-2xl font-bold text-[var(--text-1)]">Monitor</h1>
+            <p className="text-sm text-[var(--text-3)]">Ultima actualizacion: {lastRefresh || '...'} (auto cada 10s)</p>
             {error && <p className="text-sm text-red-400">{error}</p>}
           </div>
         </div>
@@ -151,6 +177,82 @@ export default function MonitorPage() {
 
       {data && (
         <div className="space-y-4">
+          {/* Health Check Panel */}
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
+            <h3 className="font-bold text-[var(--text-1)] mb-3 flex items-center gap-2">
+              <CheckCircle size={18} className="text-emerald-400" />
+              Health Checks
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {[
+                { label: 'Print Bridge', ok: data.bridge.online, detail: data.bridge.online ? `Online · ${data.bridge.stations.length} estaciones · uptime ${Math.floor(data.bridge.uptime / 60)}min` : 'No responde en 127.0.0.1:7717', icon: Server },
+                { label: 'Huella Digital', ok: data.fingerprint.online, detail: data.fingerprint.online ? 'Servicio activo' : 'No responde en /fp/health', icon: Fingerprint },
+                { label: 'Supabase', ok: data.supabase.online, detail: data.supabase.online ? 'Conectado' : 'Sin conexion a Supabase', icon: Database },
+                { label: 'Internet', ok: data.internet.online, detail: data.internet.online ? 'Conectado' : 'Sin conexion a internet', icon: Globe },
+                { label: 'Sync Queue', ok: data.sync.pending === 0, detail: data.sync.pending === 0 ? 'Sin pendientes' : `${data.sync.pending} operaciones en cola`, icon: RefreshCw },
+                { label: 'Print Queue', ok: data.prints.failed === 0 && data.prints.needsAttention.length === 0, detail: data.prints.failed > 0 ? `${data.prints.failed} fallidas` : data.prints.needsAttention.length > 0 ? `${data.prints.needsAttention.length} requieren atencion` : `${data.prints.printed} impresas hoy`, icon: Printer },
+              ].map(h => {
+                const Icon = h.icon
+                return (
+                  <div key={h.label} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--surface-2)]/40">
+                    <StatusDot ok={h.ok} />
+                    <Icon size={14} className="text-[var(--text-3)]" />
+                    <span className="text-sm text-[var(--text-1)] w-28 font-medium">{h.label}</span>
+                    <span className={`text-xs ${h.ok ? 'text-[var(--text-3)]' : 'text-red-400 font-semibold'}`}>{h.detail}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Terminal + Turno Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
+              <h3 className="font-bold text-[var(--text-1)] mb-3 flex items-center gap-2">
+                <Server size={16} className="text-blue-400" />
+                Terminal
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-3)]">Hostname</span>
+                  <span className="text-[var(--text-1)] font-mono">{data.bridge.hostname || '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-3)]">Estaciones</span>
+                  <span className="text-[var(--text-1)]">{data.bridge.stations.length > 0 ? data.bridge.stations.join(', ') : '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-3)]">Ultimo sync</span>
+                  <span className="text-[var(--text-1)]">{data.sync.lastSyncTime || '—'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
+              <h3 className="font-bold text-[var(--text-1)] mb-3 flex items-center gap-2">
+                <User size={16} className="text-amber-400" />
+                Turno activo
+              </h3>
+              {data.turno ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-3)]">Abierto por</span>
+                    <span className="text-[var(--text-1)] font-semibold">{data.turno.opened_by}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-3)]">Desde</span>
+                    <span className="text-[var(--text-1)]">{new Date(data.turno.opened_at).toLocaleString('es-MX', { timeZone: 'America/Monterrey' })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-3)]">Fondo de caja</span>
+                    <span className="text-emerald-400 font-semibold">{fmt(data.turno.fondo)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-amber-400">Sin turno abierto</p>
+              )}
+            </div>
+          </div>
+
           {/* Status row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
@@ -178,7 +280,7 @@ export default function MonitorPage() {
               {data.prints.pending > 0 && <p className="text-xs text-amber-400">{data.prints.pending} en cola</p>}
               {data.prints.failed > 0 && <p className="text-xs text-red-400">{data.prints.failed} fallidas</p>}
               {data.prints.bridgeUnavailable > 0 && <p className="text-xs text-amber-400">{data.prints.bridgeUnavailable} esperando bridge</p>}
-              {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atención</p>}
+              {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atencion</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -270,26 +372,6 @@ export default function MonitorPage() {
                 <p className="text-xs text-[var(--text-3)]">Facturas fallidas</p>
                 <p className={`text-xl font-bold ${data.cfdi.fallidas > 0 ? 'text-red-400' : 'text-[var(--text-1)]'}`}>{data.cfdi.fallidas}</p>
               </div>
-            </div>
-          </div>
-
-          {/* Health checks */}
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
-            <h3 className="font-bold text-[var(--text-1)] mb-3">Health Checks</h3>
-            <div className="space-y-2">
-              {[
-                { label: 'Print Bridge', ok: data.bridge.online, detail: data.bridge.online ? `${data.bridge.stations.length} estaciones` : 'No responde en 127.0.0.1:7717' },
-                { label: 'Supabase', ok: true, detail: 'Conectado' },
-                { label: 'Sync Queue', ok: data.sync.pending === 0, detail: data.sync.pending === 0 ? 'Sin pendientes' : `${data.sync.pending} operaciones en cola` },
-                { label: 'Print Queue', ok: data.prints.failed === 0, detail: data.prints.failed === 0 ? `${data.prints.printed} impresas hoy` : `${data.prints.failed} fallidas` },
-                { label: 'Inventario', ok: data.inventory.alerts === 0, detail: data.inventory.alerts === 0 ? 'Sin alertas' : `${data.inventory.alerts} alertas de stock bajo` },
-              ].map(h => (
-                <div key={h.label} className="flex items-center gap-3 py-1.5">
-                  <StatusDot ok={h.ok} />
-                  <span className="text-sm text-[var(--text-1)] w-32">{h.label}</span>
-                  <span className={`text-xs ${h.ok ? 'text-[var(--text-3)]' : 'text-red-400'}`}>{h.detail}</span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
