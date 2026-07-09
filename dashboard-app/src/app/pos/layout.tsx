@@ -446,7 +446,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   if (unlocked) return (
     <div className="pos-kiosk" style={{
-      background:'#0a0a0f', color:'#fff', height:'100dvh', overflow:'hidden',
+      background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
       colorScheme:'dark',
       // Force all CSS variables to dark values for POS
       // @ts-expect-error CSS custom properties
