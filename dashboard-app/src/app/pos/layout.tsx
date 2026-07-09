@@ -246,9 +246,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         setAttempts(0)
         sessionStorage.setItem('pos_staff', JSON.stringify(member))
         sessionStorage.setItem('pos_last_activity', Date.now().toString())
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
-          document.documentElement.requestFullscreen().catch(() => {})
-        }
+        // Fullscreen handled by Electron kiosk mode
         requestNotificationPermission().catch(() => {})
         // Go to mesas after fingerprint login
         if (window.location.pathname === '/pos' && !window.location.search) {
@@ -288,10 +286,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       sessionStorage.setItem('pos_staff', JSON.stringify(member))
       sessionStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
-      // Enter fullscreen on login (user gesture context — required by browser API)
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen && !window.matchMedia('(display-mode: standalone)').matches) {
-        document.documentElement.requestFullscreen().catch(() => {})
-      }
+      // Fullscreen handled by Electron kiosk mode
       // Ask for notification permission after login (non-blocking, user gesture context)
       requestNotificationPermission().catch(() => {})
 
@@ -370,25 +365,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     setChecking(false)
   }
 
-  // Auto-fullscreen: request fullscreen on first user interaction
-  // This is the REAL solution — works on PWA, Chrome, any browser
-  useEffect(() => {
-    if (!unlocked) return
-    const requestFullscreen = () => {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {})
-      }
-      // Only need to do it once
-      document.removeEventListener('click', requestFullscreen)
-      document.removeEventListener('touchstart', requestFullscreen)
-    }
-    document.addEventListener('click', requestFullscreen)
-    document.addEventListener('touchstart', requestFullscreen)
-    return () => {
-      document.removeEventListener('click', requestFullscreen)
-      document.removeEventListener('touchstart', requestFullscreen)
-    }
-  }, [unlocked])
+  // Fullscreen is handled by Electron kiosk mode — no browser fullscreen needed
 
   // Fingerprint registration screen — shown after PIN login when no fingerprint is registered
   if (showFingerprintRegister && staff) {
@@ -488,11 +465,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
   return (
     <div className="pos-kiosk h-dvh flex items-center justify-center bg-slate-900 text-white select-none" style={{background: 'linear-gradient(180deg, #0a0a14 0%, #111827 100%)'}}
-      onClick={() => {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {})
-        }
-      }}
+      onClick={() => { /* Fullscreen handled by Electron kiosk mode */ }}
     >
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-8">
