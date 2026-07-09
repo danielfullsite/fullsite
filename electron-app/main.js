@@ -307,6 +307,13 @@ function createWindow() {
   mainWindow.setMenu(null);
   mainWindow.loadURL(POS_URL);
 
+  // Save last successful boot time for offline.html display
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.executeJavaScript(
+      `localStorage.setItem('pos_last_boot', '${new Date().toISOString()}')`
+    ).catch(() => {});
+  });
+
   // Listen for IPC from renderer (via preload bridge)
   const { ipcMain } = require('electron');
   ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
@@ -361,6 +368,11 @@ app.whenReady().then(() => {
     // Allow all permissions needed for POS (notifications, clipboard, etc.)
     callback(true);
   });
+
+  // Auto-start on Windows login (creates startup shortcut)
+  if (process.platform === 'win32') {
+    app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
+  }
 
   startFingerprintService(); // Fingerprint service starts FIRST
   startBridge();             // Print bridge starts SECOND

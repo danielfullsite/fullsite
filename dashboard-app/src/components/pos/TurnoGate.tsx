@@ -42,10 +42,20 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
   const canOpenTurno = permissions.abrir_dia_operaciones
   const canCloseTurno = permissions.corte_turno
 
+  const [isOfflineMode, setIsOfflineMode] = useState(false)
+  const [offlineSince, setOfflineSince] = useState<string | null>(null)
+
   const checkTurno = useCallback(async () => {
     try {
       const result = await getActiveTurnoWithStaleCheck()
       if (result.turno) {
+        // Online + turno found → cache it for offline use
+        try {
+          localStorage.setItem('pos_cached_turno', JSON.stringify(result.turno))
+          localStorage.setItem('pos_last_turno_sync', new Date().toISOString())
+        } catch {}
+        setIsOfflineMode(false)
+        setOfflineSince(null)
         if (result.isStale) {
           setTurno(result.turno)
           setStatus('stale')
@@ -54,12 +64,33 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           setStatus('active')
         }
       } else {
+        // Online + no turno → clear cache
+        try { localStorage.removeItem('pos_cached_turno') } catch {}
+        setIsOfflineMode(false)
         setTurno(null)
         setStatus('none')
       }
     } catch (err) {
-      console.error('[TurnoGate] Error verificando turno:', err)
-      // On error, treat as no turno (safe default — blocks operations)
+      console.error('[TurnoGate] Error verificando turno (offline?):', err)
+      // Offline fallback: try cached turno from localStorage
+      try {
+        const cached = localStorage.getItem('pos_cached_turno')
+        if (cached) {
+          const cachedTurno = JSON.parse(cached)
+          const openedAt = new Date(cachedTurno.opened_at)
+          const now = new Date()
+          const sameDay = openedAt.toDateString() === now.toDateString()
+          if (sameDay) {
+            // Same day → use cached turno (offline mode)
+            setTurno(cachedTurno)
+            setStatus('active')
+            setIsOfflineMode(true)
+            setOfflineSince(prev => prev || new Date().toISOString())
+            return
+          }
+        }
+      } catch {}
+      // No valid cache → block
       setTurno(null)
       setStatus('none')
     }
@@ -83,6 +114,16 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     return () => clearInterval(interval)
   }, [status])
 
+  // Revalidate turno immediately when internet comes back
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[TurnoGate] Internet restored — revalidating turno')
+      checkTurno()
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [checkTurno])
+
   // Allow ungated paths (turno page itself, config)
   if (UNGATED_PATHS.some(p => pathname.startsWith(p))) {
     return <>{children}</>
@@ -97,8 +138,33 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     )
   }
 
-  // Active turno — pass through
+  // Active turno — pass through (with offline banner if applicable)
   if (status === 'active') {
+    if (isOfflineMode) {
+      const offlineMinutes = offlineSince ? Math.floor((Date.now() - new Date(offlineSince).getTime()) / 60000) : 0
+      const lastSync = typeof window !== 'undefined' ? localStorage.getItem('pos_last_turno_sync') : null
+      return (
+        <>
+          <div className="bg-amber-900/80 text-amber-200 px-4 py-2 flex items-center justify-between text-sm flex-shrink-0 z-50">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="font-bold">Modo Offline</span>
+              <span className="text-amber-300/70">— Operando con informacion local</span>
+              {offlineMinutes > 0 && <span className="text-amber-400/60">({offlineMinutes} min)</span>}
+            </div>
+            <div className="text-xs text-amber-300/50">
+              {lastSync && `Ultimo sync: ${new Date(lastSync).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`}
+            </div>
+          </div>
+          {offlineMinutes > 120 && (
+            <div className="bg-red-900/80 text-red-200 px-4 py-2 text-center text-sm font-bold flex-shrink-0">
+              Llevas {Math.floor(offlineMinutes / 60)}h offline. Verifica la conexion a internet.
+            </div>
+          )}
+          {children}
+        </>
+      )
+    }
     return <>{children}</>
   }
 

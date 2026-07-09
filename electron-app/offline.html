@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Fullsite POS — Sin conexion</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    .container { max-width: 400px; }
+    .icon { font-size: 64px; margin-bottom: 24px; }
+    h1 { font-size: 28px; margin-bottom: 12px; color: #10b981; }
+    p { font-size: 18px; color: #9ca3af; line-height: 1.5; }
+    .dot { animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">&#128268;</div>
+    <h1>Sin conexion al servidor</h1>
+    <p>Fullsite POS no puede conectarse. Verifica tu conexion a internet.</p>
+
+    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin:24px 0;text-align:left">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></span>
+        <span style="font-size:13px;color:#aaa">Impresion disponible</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></span>
+        <span style="font-size:13px;color:#aaa">POS local disponible</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;animation:pulse 2s infinite"></span>
+        <span style="font-size:13px;color:#eab308">Sin conexion al servidor</span>
+      </div>
+    </div>
+
+    <p style="font-size:11px;color:#555;margin-bottom:16px" id="lastBoot"></p>
+
+    <button onclick="window.location.reload()" style="padding:14px 32px;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer">Reintentar</button>
+    <p style="font-size:11px;color:#444;margin-top:16px">Reintentando automaticamente cada 10 segundos</p>
+  </div>
+  <script>
+    // Show last successful boot time
+    var last = localStorage.getItem('pos_last_boot');
+    if (last) {
+      document.getElementById('lastBoot').textContent = 'Ultimo inicio exitoso: ' + new Date(last).toLocaleString('es-MX');
+    }
+    // Auto-retry every 10 seconds
+    setInterval(function() {
+      fetch('https://app.fullsite.mx/pos', { mode: 'no-cors', cache: 'no-store' })
+        .then(function() { window.location.reload(); })
+        .catch(function() {});
+    }, 10000);
+  </script>
+</body>
+</html>
