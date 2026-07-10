@@ -1,8 +1,10 @@
-# FULLSITE — Decisiones Estratégicas
+# FULLSITE — Decisiones Estratégicas v1.0
 
 > Derivado de: COMPETITIVE-INTELLIGENCE.md + ICP-PLAYBOOK.md
 > No es investigación. Son decisiones.
-> Última actualización: 2026-07-10
+> Versión: 1.0 — 2026-07-10
+>
+> **Regla de actualización:** Este documento solo se modifica cuando aparece evidencia nueva del mercado — no por opiniones. Ejemplos: perdemos una venta, ganamos un cliente, cambia el ICP, descubrimos un competidor, cambia la estrategia.
 
 ---
 
@@ -140,6 +142,77 @@ No teóricos. Escenarios que podrían pasar en los próximos 12-24 meses.
 
 ## 5. Recomendación ejecutiva
 
+---
+
+## 6. Product Principles
+
+Cinco principios que nunca vamos a romper. Válidos hoy y dentro de cinco años.
+
+**1. El restaurante siempre puede seguir operando.**
+Si se cae internet, si se cae Supabase, si se cae Vercel — el POS sigue funcionando. Offline siempre gana sobre cloud. Nunca jamás un restaurante para por culpa nuestra.
+
+**2. La velocidad es más importante que la estética.**
+Un mesero hace esto cientos de veces al día. Un tap de más = miles de taps desperdiciados al mes. Optimizamos para velocidad de operación, no para screenshots bonitos.
+
+**3. Nunca obligamos al cliente a cambiar su operación sin razón.**
+Si el restaurante lleva 10 años haciendo cortes de cierta manera, no les decimos "ahora hazlo así". Nos adaptamos a ellos primero, mejoramos después.
+
+**4. Una implementación nunca debe requerir consultoría.**
+Si necesitas un consultor para instalar Fullsite, fallamos. Máximo 4 horas, una sola tarde, sin parar la operación.
+
+**5. Cada dato que mostramos debe generar una acción.**
+No dashboards decorativos. Si un número aparece en pantalla, el operador debe poder hacer algo con él. Si no puede → no lo mostramos.
+
+---
+
+## 7. ¿Cómo pierde Fullsite?
+
+No cómo nos matarían desde afuera. Cómo perdemos desde adentro.
+
+### ¿Por qué un cliente cancelaría?
+
+| Razón | Probabilidad | Señal temprana | Prevención |
+|-------|:------------:|----------------|------------|
+| Comanda no imprimió en hora pico | Alta | Primer reporte de "no imprimió" | Monitor de print queue, alerta proactiva, soporte <2 min |
+| El gerente nunca adoptó el dashboard | Media | No abre dashboard después de semana 2 | Check-in semanal, mostrarle UN dato que le cambie una decisión |
+| Los meseros odian el sistema | Media | Quejas repetidas al gerente | Simplificar lo que duele, no agregar features |
+| Fallo de impresión repetido | Alta | 3+ fallos en una semana | P0 absoluto — ir físicamente si es necesario |
+| El contador no puede sacar datos | Media | Contador llama a Daniel | Export CSV, integración CONTPAQi |
+| Promesa incumplida en la venta | Baja | "Me dijeron que hacía X y no lo hace" | Never over-promise. Demo con producto real, no mockups |
+
+### ¿Por qué regresaría a Wansoft?
+
+| Razón | Cómo evitarlo |
+|-------|---------------|
+| "Wansoft era más estable" | Que nunca falle la impresión. Nunca. |
+| "Mi contador ya sabía sacar todo de Wansoft" | Darle al contador un reporte igual o mejor en la primera semana |
+| "Los meseros se quejaron mucho" | Capacitación el día 1, soporte los primeros 7 días |
+| "No podía facturar" | Facturama producción activado ANTES de implementar |
+| "El sistema estaba caído cuando lo necesitaba" | Offline-first. El POS nunca para. |
+
+### ¿Por qué nunca nos recomendaría?
+
+| Razón | Cómo evitarlo |
+|-------|---------------|
+| Implementación fue un desastre | Smoke test ANTES de go-live, nunca en hora pico |
+| Le prometieron IA y no vio resultados | No vender IA — vender "te dice dónde pierdes dinero" con ejemplo real |
+| Soporte tardó más de 10 minutos | Mientras seamos <50 clientes, soporte en <2 min siempre |
+| Le cobré sin darle valor primero | Primeros 3 meses gratis para los primeros 5 clientes |
+
+### Riesgos internos
+
+| Riesgo | Probabilidad | Impacto | Mitigación |
+|--------|:------------:|:-------:|------------|
+| Daniel burnout (solo, sin equipo técnico) | 35% | Existencial | Claude como multiplicador. Buscar co-founder técnico antes de 50 clientes |
+| Dependencia de Eduardo para conocimiento operativo | 25% | Alto | Todo documentado en playbooks. Eduardo Ezquivel como backup operativo |
+| Over-engineering (construir features que nadie pidió) | 30% | Medio | Product principle #5: si no genera acción, no lo construimos |
+| Vender antes de que el producto esté listo | 20% | Alto | AMALAY primero. No salir a vender hasta que la semana sin Wansoft pase |
+| No cobrar por miedo a perder clientes | 40% | Alto | Los primeros 5 gratis. A partir del 6, $1,999 sin negociar |
+
+---
+
+## 8. Recomendación ejecutiva
+
 **Si un inversionista leyera solo esta página:**
 
 ### Dónde competimos
@@ -174,8 +247,21 @@ Reemplazar POS legacy (Wansoft, Soft Restaurant) en restaurantes full-service co
 
 **¿Puede AMALAY operar una semana completa sin Wansoft y sin incidentes críticos?**
 
-Si la respuesta es SÍ después del lunes → tenemos product-market fit demostrado y todo lo demás es ejecución comercial.
+Si la respuesta es SÍ → tenemos **Operational Validation**. El producto funciona en un restaurante real. Podemos salir a buscar el restaurante #2.
 
 Si la respuesta es NO → arreglamos lo que falle y no salimos a vender hasta que sea SÍ.
 
-**Esa es nuestra única prioridad.**
+**Operational Validation ≠ Product-Market Fit.**
+
+PMF requiere evidencia de clientes independientes que pagan, permanecen, recomiendan, y volverían a comprarnos. Eso viene después. Hoy la meta es demostrar que el producto funciona en producción real.
+
+### Hitos de validación
+
+| Hito | Qué demuestra | Cuándo |
+|------|---------------|--------|
+| AMALAY opera 1 semana sin Wansoft | **Operational Validation** | Julio 2026 |
+| 5 restaurantes pagando y usando activamente | **Early Traction** | Sep 2026 |
+| 15 restaurantes, churn <5%, NPS >50 | **Product-Market Fit** | Dic 2026 |
+| 50 restaurantes, revenue $100K MRR | **Scalable Business** | Jun 2027 |
+
+**Esa es nuestra única prioridad: avanzar al siguiente hito.**
