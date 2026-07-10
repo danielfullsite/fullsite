@@ -55,10 +55,10 @@
     if (last) {
       document.getElementById('lastBoot').textContent = 'Ultimo inicio exitoso: ' + new Date(last).toLocaleString('es-MX');
     }
-    // Auto-retry every 10 seconds
+    // Auto-retry every 10 seconds — use cors mode so we get a real status
     setInterval(function() {
-      fetch('https://app.fullsite.mx/pos', { mode: 'no-cors', cache: 'no-store' })
-        .then(function() { window.location.reload(); })
+      fetch('https://app.fullsite.mx/pos', { cache: 'no-store' })
+        .then(function(res) { if (res.ok) window.location.href = 'https://app.fullsite.mx/pos'; })
         .catch(function() {});
     }, 10000);
   </script>

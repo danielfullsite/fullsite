@@ -63,18 +63,36 @@ export default function BarraPage() {
     return () => clearInterval(interval)
   }, [])
 
+  const STATUS_ORDER: Record<string, number> = { enviada: 1, preparando: 2, lista: 3, entregada: 4 }
+  const [toast, setToast] = useState<string | null>(null)
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
   const advanceStatus = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     let newStatus = ''
     if (currentStatus === 'enviada') newStatus = 'preparando'
     else if (currentStatus === 'preparando') newStatus = 'lista'
     else if (currentStatus === 'lista') newStatus = 'entregada'
-    if (newStatus) {
+    if (!newStatus) return
+
+    // Forward-only guard: verify the order hasn't already been advanced by another device.
+    const orderInState = orders.find(o => o.id === id)
+    const dbStatusRank = STATUS_ORDER[orderInState?.status ?? currentStatus] ?? 0
+    const newStatusRank = STATUS_ORDER[newStatus] ?? 0
+    if (newStatusRank <= dbStatusRank) {
+      // Already at or past this status — skip to avoid going backward
+      return
+    }
+
+    try {
       await updateOrderStatus(id, newStatus)
       logAudit({
         order_id: id, action: 'status_changed', actor: 'Barra', mesa,
         details: { from: currentStatus, to: newStatus, mesero },
       })
       fetchOrders()
+    } catch (err) {
+      console.error('Error advancing status:', err)
+      showToast('Error al cambiar estado. Intenta de nuevo.')
     }
   }
 
@@ -245,6 +263,13 @@ export default function BarraPage() {
           </div>
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[var(--line)] border border-slate-600 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-medium">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

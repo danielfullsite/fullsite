@@ -72,7 +72,7 @@ export function getPayingItems(
 
 /**
  * Calculate totals for a specific split cuenta payment.
- * During split, discount is NOT applied (only on full-order payments).
+ * Discount is prorated proportionally to each cuenta's share of the subtotal.
  */
 export function calcSplitPayment(
   items: Pick<OrderItem, 'id' | 'subtotal'>[],
@@ -81,8 +81,14 @@ export function calcSplitPayment(
   discount = 0,
 ): OrderTotals {
   const payingItems = getPayingItems(items, assignments, cuenta)
-  // Discount only applies when paying full order (cuenta === 0)
-  const effectiveDiscount = cuenta === 0 ? discount : 0
+  if (cuenta === 0 || discount === 0) {
+    return calcOrderTotals(payingItems, cuenta === 0 ? discount : 0)
+  }
+  // Prorate discount by cuenta's share of total subtotal
+  const fullSubtotal = items.reduce((s, i) => s + (i.subtotal ?? 0), 0)
+  const cuentaSubtotal = payingItems.reduce((s, i) => s + (i.subtotal ?? 0), 0)
+  const ratio = fullSubtotal > 0 ? cuentaSubtotal / fullSubtotal : 0
+  const effectiveDiscount = Math.round(discount * ratio * 100) / 100
   return calcOrderTotals(payingItems, effectiveDiscount)
 }
 

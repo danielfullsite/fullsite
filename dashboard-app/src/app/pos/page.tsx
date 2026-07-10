@@ -2121,6 +2121,13 @@ function POSContent() {
         return // DO NOT clear UI if DB update failed
       }
     }
+    // Reverse inventory deductions for items already sent to kitchen
+    for (const item of orderItems) {
+      if (sentItemIds.has(item.id)) {
+        reverseIngredientDeduction(item, orderId, managerName, reason)
+          .catch(() => { /* inventory reversal failed but void proceeds */ })
+      }
+    }
     setOrderItems([])
     setCancelledItems(new Set())
     setVoidedItems(new Set())
@@ -2129,7 +2136,7 @@ function POSContent() {
     setShowVoidOrder(false)
     showToast(`Orden anulada — aprobado por ${managerName}`)
     setSaving(false); operationLock.current = false
-  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving])
+  }, [orderId, mesero, mesa, orderItems, loadedOrderId, saving, sentItemIds])
 
   // Cash movement confirmed (already saved to Supabase in modal)
   const handleCashMovement = useCallback((type: 'retiro' | 'deposito', amount: number, reason: string, managerName: string) => {
@@ -2218,6 +2225,11 @@ function POSContent() {
     }
     const results = evaluatePromos(allPromos, activeItems, subtotal, categoryMapRef.current)
     setAvailablePromos(results)
+    // Clamp discount if items were removed and discount now exceeds subtotal
+    if (discount > subtotal) {
+      setDiscount(Math.min(discount, subtotal))
+      showToast('Descuento ajustado al nuevo subtotal')
+    }
     // Auto-apply the best auto_apply promo if no manual discount
     if (discount === 0 && !appliedPromo) {
       const auto = results.find(r => r.promo.auto_apply)
@@ -2272,6 +2284,7 @@ function POSContent() {
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
+    try {
 
     // Multi-user conflict check
     if (await checkOrderConflict('kitchen')) {
@@ -2453,6 +2466,10 @@ function POSContent() {
         }
       }
       // Modo Caja (cajero/gerente/admin): se queda en la orden para cobrar
+    } finally {
+      operationLock.current = false
+      setSaving(false)
+    }
   }
 
   // Pre-ticket (precuenta — antes de cobrar)
@@ -2496,6 +2513,13 @@ function POSContent() {
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
+    try {
+
+    // Turno must still be active at payment time
+    if (!turnoId) {
+      showToast('No hay turno activo. No se puede cobrar.')
+      return
+    }
 
     // Concurrency check: prevent double payment or payment on modified order
     if (await checkOrderConflict('payment')) {
@@ -2645,6 +2669,10 @@ function POSContent() {
     } else {
       showToast('Error al cerrar cuenta')
       setSaving(false); operationLock.current = false
+    }
+    } finally {
+      operationLock.current = false
+      setSaving(false)
     }
   }
 
@@ -3245,8 +3273,12 @@ function POSContent() {
                       // Persist to Supabase — keep current status (or 'enviada' if unknown)
                       if (orderId && loadedOrderId) {
                         await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
-                      } else if (orderId) {
-                        // New unsaved order — save it first, then it'll have the right mesa
+                      } else {
+                        // New unsaved order — block transfer, must send to kitchen first
+                        setMesa(Number(oldMesa))
+                        showToast('Envia la orden a cocina antes de transferir mesa')
+                        setPinPrompt(null)
+                        return
                       }
                       logAudit({ order_id: orderId, action: 'mesa_transferred', actor: mesero, mesa: newMesa, details: { from: oldMesa, to: newMesa } })
                       showToast(`Mesa transferida: ${oldMesa} → ${newMesa}`)
@@ -4279,7 +4311,7 @@ function POSContent() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Cerrar cuenta{cuentaLabel}</h3>
               <button
-                onClick={() => { if (mpPollRef.current) { clearInterval(mpPollRef.current); mpPollRef.current = null } setShowPayment(false); setShowCardConfirm(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0) }}
+                onClick={() => { if (mpPollRef.current) { clearInterval(mpPollRef.current); mpPollRef.current = null } operationLock.current = false; setSaving(false); setShowPayment(false); setShowCardConfirm(false); setSplitPayingCuenta(0); setSplitCount(0); setSplitMode(null); setSplitParejoN(0); setCashAmount('') }}
                 className="w-11 h-11 rounded-lg bg-[var(--line)] hover:bg-[var(--line)] flex items-center justify-center"
               >
                 <X size={20} />
@@ -4438,7 +4470,7 @@ function POSContent() {
                     )}
                     <button
                       onClick={() => { if (cashReceived >= totalConPropina) handlePayment('Efectivo') }}
-                      disabled={cashReceived < totalConPropina}
+                      disabled={saving || cashReceived < totalConPropina}
                       className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-[var(--line)] disabled:text-[var(--text-3)] text-white font-black text-xl transition-colors min-h-[60px]"
                     >
                       {cashReceived >= totalConPropina ? `Cobrar — Cambio ${formatMXN(cambio)}` : 'Ingresa el monto recibido'}
@@ -4460,7 +4492,8 @@ function POSContent() {
                     </button>
                     <button
                       onClick={() => { setShowCardConfirm(false); handlePayment('Tarjeta de credito') }}
-                      className="flex-[2] py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-lg min-h-[56px] transition-colors"
+                      disabled={saving}
+                      className="flex-[2] py-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-black text-lg min-h-[56px] transition-colors"
                     >
                       Pago aprobado
                     </button>
@@ -4474,7 +4507,8 @@ function POSContent() {
                   return (
                     <button
                       onClick={() => handlePayment('Transferencia electronica')}
-                      className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[56px]"
                     >
                       <Send size={18} />
                       Transferencia
@@ -4487,7 +4521,8 @@ function POSContent() {
                       <button
                         key={m.id}
                         onClick={() => handlePayment(m.name)}
-                        className="flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 text-white font-bold py-3 rounded-xl text-base transition-colors min-h-[56px]"
+                        disabled={saving}
+                        className="flex items-center justify-center bg-purple-600/80 hover:bg-purple-500 disabled:bg-purple-900 text-white font-bold py-3 rounded-xl text-base transition-colors min-h-[56px]"
                       >
                         {m.name}
                       </button>
@@ -4573,7 +4608,7 @@ function POSContent() {
                     </div>
                     <button
                       onClick={() => handlePayment('Mixto')}
-                      disabled={mixtoPagos.length === 0 || restante > 0.009}
+                      disabled={saving || mixtoPagos.length === 0 || restante > 0.009}
                       className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl text-lg transition-colors min-h-[60px]"
                     >
                       {restante > 0.009 ? `Faltan ${formatMXN(restante)}` : 'Confirmar pago mixto'}

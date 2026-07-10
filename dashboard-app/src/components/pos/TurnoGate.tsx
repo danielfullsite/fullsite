@@ -329,6 +329,10 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
     )
   }
 
-  // Fallback
-  return <>{children}</>
+  // Fallback — should not reach here; show safe loading state instead of passing children unprotected
+  return (
+    <div className="h-dvh flex items-center justify-center" style={{ background: '#0a0a14' }}>
+      <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 }

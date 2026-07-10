@@ -264,23 +264,36 @@ export default function CocinaPage() {
     fetchOrders()
   }
 
+  const STATUS_ORDER: Record<string, number> = { enviada: 1, preparando: 2, lista: 3, entregada: 4 }
+
   const advanceStatus = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     let newStatus = ''
     if (currentStatus === 'enviada') newStatus = 'preparando'
     else if (currentStatus === 'preparando') newStatus = 'lista'
     else if (currentStatus === 'lista') newStatus = 'entregada'
-    if (newStatus) {
-      try {
-        await updateOrderStatus(id, newStatus)
-        logAudit({
-          order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
-          details: { from: currentStatus, to: newStatus, mesero },
-        })
-        fetchOrders()
-      } catch (err) {
-        console.error('Error advancing status:', err)
-        alert('Error al cambiar estado. Intenta de nuevo.')
-      }
+    if (!newStatus) return
+
+    // Forward-only guard: check current DB status from orders state before advancing.
+    // This prevents a stale localStorage itemStatus on one device from flipping an order
+    // backward when another device already advanced it.
+    const orderInState = orders.find(o => o.id === id)
+    const dbStatusRank = STATUS_ORDER[orderInState?.status ?? currentStatus] ?? 0
+    const newStatusRank = STATUS_ORDER[newStatus] ?? 0
+    if (newStatusRank <= dbStatusRank) {
+      // Already at or past this status — skip to avoid going backward
+      return
+    }
+
+    try {
+      await updateOrderStatus(id, newStatus)
+      logAudit({
+        order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
+        details: { from: currentStatus, to: newStatus, mesero },
+      })
+      fetchOrders()
+    } catch (err) {
+      console.error('Error advancing status:', err)
+      alert('Error al cambiar estado. Intenta de nuevo.')
     }
   }
 

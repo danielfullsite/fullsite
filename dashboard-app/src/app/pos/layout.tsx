@@ -217,12 +217,20 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId }),
         })
 
-        // If API doesn't support fingerprint_id yet, look up from local cache
+        // Try API first (validates active status), fall back to local cache
         let member: StaffMember | null = null
-        try {
-          const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
-          if (fpMap[data.staffId]) member = fpMap[data.staffId]
-        } catch {}
+        if (staffRes.ok) {
+          try {
+            const staffData = await staffRes.json()
+            if (staffData.staff) member = staffData.staff
+          } catch {}
+        }
+        if (!member) {
+          try {
+            const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+            if (fpMap[data.staffId]) member = fpMap[data.staffId]
+          } catch {}
+        }
 
         if (!member) {
           setSessionError('Huella reconocida pero usuario no vinculado. Entra con PIN primero.')

@@ -29,14 +29,31 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Demasiados intentos' }, { status: 429 })
     }
 
-    const { pin, client_id, manager } = await request.json()
+    const { pin, client_id, manager, fingerprint_id } = await request.json()
+    const clientId = typeof client_id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(client_id) ? client_id : 'amalay'
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    // Fingerprint login: look up by staff ID, validate active status
+    if (fingerprint_id && typeof fingerprint_id === 'string') {
+      const fpRes = await fetch(
+        `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
+        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+      )
+      if (fpRes.ok) {
+        const rows = await fpRes.json()
+        if (Array.isArray(rows) && rows.length > 0) {
+          attemptsByIp.delete(ip)
+          return Response.json({ staff: { id: rows[0].id, name: rows[0].name, role: rows[0].role } })
+        }
+      }
+      return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
+    }
+
     if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
-    const clientId = typeof client_id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(client_id) ? client_id : 'amalay'
 
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     // manager=true: solo roles con autoridad (cancelaciones, descuentos, reabrir órdenes, cortes)
     const roleFilter = manager === true ? '&role=in.(admin,gerente)' : ''
     const res = await fetch(

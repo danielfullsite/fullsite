@@ -240,6 +240,7 @@ function startBridge() {
 
 const { spawn } = require('child_process');
 let fingerprintProcess = null;
+let fingerprintRestartCount = 0;
 
 function startFingerprintService() {
   const fpExe = 'C:\\fullsite\\fingerprint-service.exe';
@@ -276,6 +277,13 @@ function startFingerprintService() {
     fingerprintProcess.on('exit', (code) => {
       console.log('[fingerprint] Service exited with code ' + code);
       fingerprintProcess = null;
+      if (code !== 0 && fingerprintRestartCount < 5) {
+        fingerprintRestartCount++;
+        console.log('[fingerprint] Restarting... attempt ' + fingerprintRestartCount + '/5');
+        setTimeout(startFingerprintService, 3000);
+      } else if (code === 0) {
+        fingerprintRestartCount = 0;
+      }
     });
   });
   testReq.setTimeout(1000, () => testReq.destroy());

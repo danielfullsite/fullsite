@@ -440,6 +440,16 @@ export default function CortePage() {
               </div>
             )
           })()}
+          {/* Advertencia: órdenes abiertas */}
+          {stats.ordenesAbiertas > 0 && (
+            <div className="mb-6 bg-red-900/40 border border-red-500 rounded-xl px-5 py-4 flex items-start gap-3">
+              <AlertTriangle size={22} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-300 font-bold text-sm">
+                Hay {stats.ordenesAbiertas} {stats.ordenesAbiertas === 1 ? 'orden abierta' : 'órdenes abiertas'}. Cierra todas las cuentas antes de hacer el corte.
+              </p>
+            </div>
+          )}
+
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-4 py-4">
