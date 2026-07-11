@@ -320,6 +320,50 @@ if __name__ == "__main__":
             if ok:
                 print(f"OK — {row['tickets_count']} ordenes, ${row['ventas_dia']:,.2f} ventas")
 
+                # Dual-write: also write cierre to ops_daily
+                try:
+                    from ops_aggregate import aggregate_orders
+                    ops_row = {
+                        "client_id": CLIENT["id"],
+                        "fecha": fecha,
+                        "record_type": "cierre",
+                        "source_system": "fullsite",
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "data_freshness": row.get("data_freshness") or datetime.now(timezone.utc).isoformat(),
+                        "rows_aggregated": row.get("rows_aggregated", row["tickets_count"]),
+                        "ventas_dia": row["ventas_dia"],
+                        "ventas_brutas": row["ventas_brutas"],
+                        "descuentos": row["descuentos"],
+                        "devoluciones": row.get("devoluciones", 0),
+                        "efectivo": row["efectivo"],
+                        "tarjeta": row["tarjeta"],
+                        "tickets_count": row["tickets_count"],
+                        "mesas_atendidas": row["mesas_atendidas"],
+                        "personas_restaurant": row["personas_restaurant"],
+                        "ticket_promedio_restaurant": row["ticket_promedio_restaurant"],
+                        "propinas_total": row["propinas_total"],
+                        "meseros": row["meseros"],
+                        "platillos_top": row["platillos_top"],
+                        "ventas_por_grupo": row["ventas_por_grupo"],
+                        "pago_metodos": row["pago_metodos"],
+                    }
+                    # INSERT or UPDATE cierre for this date
+                    r_ops = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/ops_daily",
+                        headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                        json=ops_row, timeout=15,
+                    )
+                    if r_ops.status_code == 409 or r_ops.status_code == 400:
+                        requests.patch(
+                            f"{SUPABASE_URL}/rest/v1/ops_daily?client_id=eq.{CLIENT['id']}&fecha=eq.{fecha}&record_type=eq.cierre",
+                            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                            json={k: v for k, v in ops_row.items() if k not in ("client_id", "fecha", "record_type", "source_system")},
+                            timeout=15,
+                        )
+                    print(f"  ops_daily cierre written for {fecha}")
+                except Exception as e:
+                    print(f"  WARN: ops_daily write failed: {e}", file=sys.stderr)
+
                 # Parse meseros for summary
                 meseros = json.loads(row["meseros"])
                 top_mesero = meseros[0]["nombre"].split()[0] if meseros else "N/A"
@@ -333,7 +377,7 @@ if __name__ == "__main__":
                     f"• Propinas: *${row['propinas_total']:,.2f}*\n"
                     f"• Top mesero: *{top_mesero}*\n"
                     f"• Efectivo: ${row['efectivo']:,.2f} / Tarjeta: ${row['tarjeta']:,.2f}\n\n"
-                    f"_Datos escritos a wansoft\\_daily — agentes actualizados._"
+                    f"_Datos escritos a wansoft\\_daily + ops\\_daily._"
                 )
                 send_telegram(msg)
 
