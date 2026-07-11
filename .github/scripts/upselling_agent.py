@@ -15,6 +15,8 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get_common, log_run as _log_run_common, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -49,14 +51,9 @@ UPSELL_GROUPS = {
 
 # -- Supabase helpers --
 def sb_get(table, params):
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers=sb_headers, params=params, timeout=10,
-        )
-        return r.json() if r.ok else []
-    except:
-        return []
+    """Delegate to shared sb_get which raises on error."""
+    qs = "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params
+    return _sb_get_common(table, qs)
 
 
 # -- Data fetching --
@@ -380,11 +377,23 @@ def main():
     today_kpis = get_today_kpis()
     if not today_kpis:
         print("[upselling] No KPI data — skipping")
+        _log_run_common(
+            agent_id="upselling", status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="no KPI row in wansoft_kpis",
+            skip_reason="wansoft_kpis empty", data_status="no_data", tentacle="ops",
+        )
         return
 
     ventas = today_kpis.get("ventas_dia", 0) or 0
     if ventas == 0:
         print("[upselling] Ventas = $0 — skipping")
+        _log_run_common(
+            agent_id="upselling", status="skipped",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="ventas_dia=0",
+            skip_reason="ventas_dia=0 in wansoft_kpis", data_status="no_data", tentacle="ops",
+        )
         return
 
     # 2. Fetch historical
@@ -438,25 +447,38 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[upselling] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"{total_insights} insights")
-    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else int((time.time() - start) * 1000), "success")
-
-def log_run(status, elapsed, summary):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "upselling",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": elapsed,
-                "output_summary": summary,
-                "tentacle": "ops",
-            },
+    # Create insights for significant upselling opportunities
+    for insight in upsell_insights + bebida_insights:
+        if insight.get("diff", 0) and abs(insight.get("diff", 0)) >= 5:
+            create_insight(
+                agent_id="upselling",
+                category="sales",
+                severity="medium",
+                title=f"Oportunidad upselling: {insight.get('categoria', insight.get('tipo', ''))}",
+                summary=insight.get("msg", ""),
+                evidence={k: v for k, v in insight.items() if k != "msg"},
+                recommended_action="Indicar a meseros que ofrezcan esta categoría activamente",
+            )
+    for insight in mesero_insights:
+        create_insight(
+            agent_id="upselling",
+            category="staffing",
+            severity="info",
+            title="Mesero con bajo upselling",
+            summary=insight.get("msg", ""),
         )
-    except:
-        pass
+
+    _log_run_common(
+        agent_id="upselling",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"{total_insights} insights",
+        rows_processed=total_insights,
+        data_status="ok" if total_insights > 0 else "no_data",
+        skip_reason="0 oportunidades detectadas" if total_insights == 0 else None,
+        tentacle="ops",
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

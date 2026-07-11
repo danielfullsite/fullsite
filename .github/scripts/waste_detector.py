@@ -17,6 +17,8 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get_common, log_run as _log_run_common, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -44,14 +46,9 @@ FOOD_COST_TARGET = 0.30  # 30%
 
 # -- Supabase helpers --
 def sb_get(table, params):
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers=sb_headers, params=params, timeout=10,
-        )
-        return r.json() if r.ok else []
-    except:
-        return []
+    """Delegate to shared sb_get which raises on error."""
+    qs = "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params
+    return _sb_get_common(table, qs)
 
 
 # -- Data fetching --
@@ -489,11 +486,23 @@ def main():
 
     if not daily_data:
         print("[waste] No daily data — skipping")
+        _log_run_common(
+            agent_id="waste-detector", status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="no daily sales data",
+            skip_reason="wansoft_daily returned 0 rows for last 7 days", data_status="no_data", tentacle="ops",
+        )
         return
 
     total_ventas = sum(d.get("ventas_dia", 0) or 0 for d in daily_data)
     if total_ventas == 0:
         print("[waste] Total ventas = $0 — skipping")
+        _log_run_common(
+            agent_id="waste-detector", status="skipped",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="total ventas=0 for last 7 days",
+            skip_reason="ventas_dia=0 across all 7 daily rows", data_status="no_data", tentacle="ops",
+        )
         return
 
     # 2. Analyze
@@ -542,25 +551,37 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[waste] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"{total} insights")
-    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else int((time.time() - start) * 1000), "success")
+    # Create insights for high-priority findings
+    for insight in all_insights:
+        if insight.get("prioridad") in ("alta", "media"):
+            severity_map = {"alta": "high", "media": "medium"}
+            create_insight(
+                agent_id="waste-detector",
+                category="costs",
+                severity=severity_map.get(insight["prioridad"], "info"),
+                title=insight.get("tipo", "waste finding").replace("_", " ").title(),
+                summary=insight.get("msg", ""),
+                evidence={"tipo": insight.get("tipo"), "prioridad": insight.get("prioridad")},
+                recommended_action={
+                    "food_cost_alto": "Revisar porciones y recetas con cocina",
+                    "compras_alto": "Reducir compras o ajustar menu a ingredientes más rentables",
+                    "desperdicio": "Inventario físico vs sistema — detectar fugas",
+                    "merma": "Investigar items con mayor merma",
+                    "item_alto": "Revisar precio de venta o reducir costo del platillo",
+                }.get(insight.get("tipo"), None),
+            )
 
-def log_run(status, elapsed, summary):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "waste-detector",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": elapsed,
-                "output_summary": summary,
-                "tentacle": "ops",
-            },
-        )
-    except:
-        pass
+    _log_run_common(
+        agent_id="waste-detector",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"{total} insights",
+        rows_processed=len(daily_data),
+        data_status="ok" if total > 0 else "no_data",
+        skip_reason="0 hallazgos — posible falta de datos de compras/recetas" if total == 0 else None,
+        tentacle="ops",
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

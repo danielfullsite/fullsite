@@ -17,6 +17,8 @@ import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get_common, log_run as _log_run_common, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -45,19 +47,9 @@ CLOSE_HOUR = 22  # 10pm
 
 # -- Supabase helpers --
 def sb_get(table, params):
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers=sb_headers, params=params, timeout=10,
-        )
-        if not r.ok:
-            print(f"    [sb_get] {table} ERROR {r.status_code}: {r.text[:200]}")
-            return []
-        data = r.json()
-        return data
-    except Exception as e:
-        print(f"    [sb_get] {table} EXCEPTION: {e}")
-        return []
+    """Delegate to shared sb_get which raises on error."""
+    qs = "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params
+    return _sb_get_common(table, qs)
 
 
 # -- Data fetching --
@@ -303,13 +295,23 @@ def main():
         print(f"[table_time] Using wansoft_daily: {today_kpis.get('fecha')} ({today_kpis.get('tickets_count')} tickets)")
     elif not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
         print("[table_time] No KPI data — skipping")
-        log_run("skipped", int((time.time() - start) * 1000), "no KPI data")
+        _log_run_common(
+            agent_id="table-time", status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="no KPI data available",
+            skip_reason="wansoft_kpis and wansoft_daily both empty", data_status="no_data", tentacle="ops",
+        )
         return
 
     ventas = float(today_kpis.get("ventas_dia", 0) or 0)
     if ventas == 0:
         print("[table_time] Ventas = $0 — skipping")
-        log_run("skipped", int((time.time() - start) * 1000), "ventas=0")
+        _log_run_common(
+            agent_id="table-time", status="skipped",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="ventas_dia=0",
+            skip_reason="ventas_dia=0", data_status="no_data", tentacle="ops",
+        )
         return
 
     # 2. Try POS orders first
@@ -330,7 +332,12 @@ def main():
     if not analysis:
         print("[table_time] No analysis possible — skipping")
         elapsed = int((time.time() - start) * 1000)
-        log_run("skipped", elapsed, "no analysis possible")
+        _log_run_common(
+            agent_id="table-time", status="skipped",
+            duration_ms=elapsed,
+            output_summary="no analysis possible",
+            skip_reason="tickets_count=0 and no POS orders", data_status="no_data", tentacle="ops",
+        )
         return
 
     # 4. Build structured data and save to DB
@@ -374,25 +381,35 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[table_time] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"source={analysis['source']}")
-    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else duration if "duration" in dir() else 0, "success")
+    # Create insight if throughput is significantly below average
+    if analysis.get("source") == "wansoft_estimate":
+        tph = analysis.get("tickets_per_hour", 0)
+        hist_tph = analysis.get("hist_avg_tph", 0)
+        if hist_tph > 0 and tph > 0:
+            diff_pct = round((tph / hist_tph - 1) * 100)
+            if diff_pct < -15:
+                create_insight(
+                    agent_id="table-time",
+                    category="operations",
+                    severity="high" if diff_pct < -25 else "medium",
+                    title="Throughput de mesas bajo el promedio",
+                    summary=f"Tickets/hora: {tph} ({diff_pct:+d}% vs promedio {hist_tph}). Posible cuello de botella.",
+                    recommended_action="Revisar tiempos de cocina y cuellos de botella en servicio",
+                    evidence={"tph": tph, "hist_tph": hist_tph, "diff_pct": diff_pct,
+                              "mesas_per_hour": analysis.get("mesas_per_hour"),
+                              "est_minutes_per_mesa": analysis.get("est_minutes_per_mesa")},
+                )
 
-def log_run(status, elapsed, summary):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "table-time",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": elapsed,
-                "output_summary": summary,
-                "tentacle": "ops",
-            },
-        )
-    except:
-        pass
+    _log_run_common(
+        agent_id="table-time",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"source={analysis['source']}, {summary}",
+        rows_processed=analysis.get("today_tickets") or analysis.get("orders", 0),
+        data_status="ok",
+        tentacle="ops",
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

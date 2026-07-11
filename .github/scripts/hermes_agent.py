@@ -17,6 +17,8 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run, create_insight
 from client_config import get_client, get_tz
 try:
     from audit_log import AuditLogger
@@ -37,8 +39,8 @@ sb_write = {**sb_headers, "Content-Type": "application/json", "Prefer": "resolut
 
 
 def sb_get(table, params):
-    r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers, params=params, timeout=15)
-    return r.json() if r.ok else []
+    """Delegate to shared sb_get which raises on error."""
+    return _sb_get(table, "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params)
 
 
 def sb_upsert(table, data):
@@ -606,15 +608,28 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"\n[hermes] Done in {elapsed}ms")
 
-    # Log run
-    try:
-        requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers=sb_write,
-            json={"agent_id": "hermes", "trigger_type": TRIGGER_TYPE,
-                  "status": "success", "duration_ms": elapsed,
-                  "output_summary": summary, "tentacle": "meta"})
-    except:
-        pass
+    # Create insights for critical/high issues
+    for issue in all_issues:
+        if issue["severity"] in ("critical", "high"):
+            create_insight(
+                agent_id="hermes",
+                category="operations",
+                severity=issue["severity"],
+                title=f"[{issue['agent']}] {issue['type']}",
+                summary=issue["message"],
+                recommended_action=issue.get("fix"),
+                evidence={"agent": issue["agent"], "type": issue["type"]},
+            )
+
+    log_run(
+        agent_id="hermes",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=summary,
+        tentacle="meta",
+        rows_processed=len(all_issues),
+        data_status="ok" if all_issues else "no_data",
+    )
 
 
 if __name__ == "__main__":

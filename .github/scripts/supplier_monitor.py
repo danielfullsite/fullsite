@@ -12,6 +12,8 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get_common, log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -40,14 +42,9 @@ CONCENTRATION_THRESHOLD = 0.40  # 40%+ from one vendor = risk
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Delegate to shared sb_get which raises on error."""
+    qs = "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params
+    return _sb_get_common(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -368,22 +365,51 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[supplier] Done in {elapsed}ms — {summary}")
 
-    # 4. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "supplier-monitor",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"price_changes: {len(price_changes)}, vendors: {len(concentration)}, over_purchase: {len(consumption_alerts)}",
-                "tentacle": "ops",
-            },
+    # 4. Create insights for risky findings
+    for pc in price_changes:
+        if pc.get("pct_change", 0) > 0.10:
+            create_insight(
+                agent_id="supplier-monitor",
+                category="costs",
+                severity="high" if pc["pct_change"] > 0.20 else "medium",
+                title=f"Aumento de precio: {pc['product']}",
+                summary=f"{pc['product']} subió {pc['pct_change']*100:.0f}%: ${pc['old_price']:,.2f} → ${pc['new_price']:,.2f}",
+                recommended_action="Cotizar con otros proveedores",
+                evidence=pc,
+            )
+    for v in concentration:
+        if v.get("is_risky"):
+            create_insight(
+                agent_id="supplier-monitor",
+                category="operations",
+                severity="high",
+                title=f"Concentración de riesgo: {v['vendor']}",
+                summary=f"{v['vendor']} representa {v['pct']*100:.0f}% de compras (${v['total']:,})",
+                recommended_action="Diversificar proveedores para reducir dependencia",
+                evidence=v,
+            )
+    for ca in consumption_alerts:
+        create_insight(
+            agent_id="supplier-monitor",
+            category="costs",
+            severity="medium",
+            title=f"Sobre-compra: {ca['product']}",
+            summary=f"Comprando {ca['excess_pct']}% más de lo que se consume",
+            recommended_action="Ajustar cantidades de compra",
+            evidence=ca,
         )
-    except:
-        pass
+
+    log_run(
+        agent_id="supplier-monitor",
+        status="success" if has_data else "no_data",
+        duration_ms=elapsed,
+        output_summary=f"price_changes: {len(price_changes)}, vendors: {len(concentration)}, over_purchase: {len(consumption_alerts)}",
+        rows_processed=len(price_changes) + len(concentration) + len(consumption_alerts),
+        data_status="ok" if has_data else "no_data",
+        skip_reason="no supplier data found" if not has_data else None,
+        tentacle="ops",
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":
