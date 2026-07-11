@@ -342,7 +342,7 @@ export default function TurnoPage() {
         showToast(`Error al abrir turno: ${res.status} — ${err}`)
       }
     } catch (e) {
-      showToast(`Error de red: ${e instanceof Error ? e.message : 'sin conexion'}`)
+      showToast(`Error de red: ${e instanceof Error ? e.message : 'sin conexión'}`)
     }
   }
 

@@ -63,11 +63,11 @@ export default function LoginPage() {
         const clientId = data.user?.user_metadata?.client_id
         window.location.href = clientId === 'demo' ? '/demo/dashboard' : '/'
       } else {
-        setError('No se pudo crear la sesion.')
+        setError('No se pudo crear la sesión.')
         setLoading(false)
       }
     } catch {
-      setError('Error de conexion.')
+      setError('Error de conexión.')
       setLoading(false)
     }
   }
@@ -173,7 +173,7 @@ export default function LoginPage() {
             <p className="text-xs text-gray-400 text-center">
               <a href="/privacidad" className="hover:text-gray-500 transition-colors">Privacidad</a>
               {' · '}
-              <a href="/terminos" className="hover:text-gray-500 transition-colors">Terminos</a>
+              <a href="/terminos" className="hover:text-gray-500 transition-colors">Términos</a>
               {' · '}
               <a href="/seguridad" className="hover:text-gray-500 transition-colors">Seguridad</a>
             </p>

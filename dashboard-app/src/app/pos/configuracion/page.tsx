@@ -92,7 +92,7 @@ export default function ConfigPage() {
         </Link>
         <div className="flex items-center gap-2">
           <Settings size={24} className="text-emerald-400" />
-          <h1 className="text-xl font-bold">Configuracion</h1>
+          <h1 className="text-xl font-bold">Configuración</h1>
         </div>
         <div className="flex-1" />
         <StatusBadge ok={deviceInfo.online} label={deviceInfo.online ? 'Online' : 'Offline'} />
@@ -125,7 +125,7 @@ export default function ConfigPage() {
               <p className="text-xs text-white/40 mt-1">Asegurate de que fullsite-print-bridge.exe este corriendo en esta terminal. Doble click al .exe en C:\fullsite\</p>
             </div>
           ) : (
-            <p className="text-sm text-white/30">Verificando conexion...</p>
+            <p className="text-sm text-white/30">Verificando conexión...</p>
           )}
         </section>
 

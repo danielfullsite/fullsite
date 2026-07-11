@@ -95,7 +95,7 @@ export default function StaffShiftPanel({ onShiftChange }: StaffShiftPanelProps)
         onShiftChange?.()
       }
     } catch {
-      setPinError('Error de conexion')
+      setPinError('Error de conexión')
     }
   }
 

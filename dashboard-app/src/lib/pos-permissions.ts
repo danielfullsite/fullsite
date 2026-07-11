@@ -240,7 +240,7 @@ export const PERMISSION_LABELS: Record<keyof POSPermissions, string> = {
   abrir_dia_operaciones: 'Abrir dia de operaciones',
   administrar_cliente: 'Administrar cliente',
   borrar_platillos: 'Borrar platillos',
-  actualizar_informacion: 'Actualizacion de informacion',
+  actualizar_informacion: 'Actualización de información',
   actualizar_estatus_orden: 'Actualizar estatus de orden',
   configurar_datos_terminal: 'Configurar datos terminal',
   configurar_funciones_terminal: 'Configurar funciones de terminal',

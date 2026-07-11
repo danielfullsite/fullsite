@@ -149,7 +149,7 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <span className="font-bold">Modo Offline</span>
-              <span className="text-amber-300/70">— Operando con informacion local</span>
+              <span className="text-amber-300/70">— Operando con información local</span>
               {offlineMinutes > 0 && <span className="text-amber-400/60">({offlineMinutes} min)</span>}
             </div>
             <div className="text-xs text-amber-300/50">
@@ -247,7 +247,7 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
           </div>
 
           <p className="text-slate-500 text-xs">Sesion: {staff.name}</p>
-          <p className="text-slate-600 text-xs mt-1">Se desbloqueara automaticamente cuando el turno se abra</p>
+          <p className="text-slate-600 text-xs mt-1">Se desbloqueará automáticamente cuando el turno se abra</p>
         </div>
       </div>
     )

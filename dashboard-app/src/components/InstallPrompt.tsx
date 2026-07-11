@@ -77,7 +77,7 @@ export default function InstallPrompt() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-[var(--text-1)]">Instalar Fullsite</p>
-            <p className="text-xs text-[var(--text-3)] mt-0.5">Acceso directo desde tu pantalla. Mas rapido.</p>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">Acceso directo desde tu pantalla. Más rápido.</p>
           </div>
           <button onClick={dismiss} className="text-[var(--text-3)] hover:text-[var(--text-1)]">
             <X size={16} />

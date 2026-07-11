@@ -206,7 +206,7 @@ export default function RecepcionFacturaPage() {
         <Link href="/pos" className="p-2 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-3)]"><ArrowLeft size={16} /></Link>
         <Zap size={24} className="text-amber-400" />
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-1)]">Recepcion de Factura</h1>
+          <h1 className="text-2xl font-bold text-[var(--text-1)]">Recepción de Factura</h1>
           <p className="text-sm text-[var(--text-3)]">Arrastra el XML del proveedor — auto-compara con OC, actualiza precios y sube inventario</p>
         </div>
       </div>

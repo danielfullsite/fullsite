@@ -129,7 +129,7 @@ export default function FacturacionPage() {
         </Link>
         <div className="flex items-center gap-2">
           <FileText size={24} className="text-emerald-400" />
-          <h1 className="text-xl font-bold">Facturacion CFDI</h1>
+          <h1 className="text-xl font-bold">Facturación CFDI</h1>
         </div>
         <div className="flex-1" />
         <div className="flex bg-[var(--line)] rounded-lg p-1 gap-1">

@@ -959,7 +959,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
             <ShieldAlert size={20} className="text-red-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">{step === 'reason' ? 'Cancelar item' : 'Se preparo este articulo?'}</h3>
+            <h3 className="text-lg font-bold text-white">{step === 'reason' ? 'Cancelar item' : '¿Se preparó este artículo?'}</h3>
             <p className="text-red-400 text-sm">{itemName}</p>
           </div>
         </div>
@@ -968,7 +968,7 @@ function CancelModal({ itemName, onConfirm, onCancel }: CancelModalProps) {
           <>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de cancelacion</label>
+                <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de cancelación</label>
                 <div className="grid grid-cols-2 gap-2">
                   {CANCEL_REASONS.map(r => (
                     <button
@@ -1211,7 +1211,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
           </div>
           <div>
             <h3 className="text-lg font-bold text-white">Movimiento de caja</h3>
-            <p className="text-[var(--text-3)] text-sm">Retiro o deposito de efectivo</p>
+            <p className="text-[var(--text-3)] text-sm">Retiro o depósito de efectivo</p>
           </div>
         </div>
 
@@ -2891,8 +2891,8 @@ function POSContent() {
                 { href: '/pos/corte', icon: Receipt, label: 'Corte de caja', section: 'corte' },
                 { href: '/pos/qr', icon: QrCode, label: 'QR Mesas', section: 'qr' },
                 { href: '/pos/turno', icon: Clock, label: 'Turno', section: 'turno' },
-                { href: '/pos/facturacion', icon: Stamp, label: 'Facturacion', section: 'facturacion' },
-                { href: '/pos/recepcion-factura', icon: FileText, label: 'Recepcion XML', section: 'facturacion' },
+                { href: '/pos/facturacion', icon: Stamp, label: 'Facturación', section: 'facturacion' },
+                { href: '/pos/recepcion-factura', icon: FileText, label: 'Recepción XML', section: 'facturacion' },
                 { href: '/pos/facturas-proveedor', icon: FileText, label: 'Facturas Proveedor', section: 'facturacion' },
                 { href: '/pos/asistencia', icon: Clock, label: 'Checador', section: 'configuracion' },
                 { href: '/pos/staff-analytics', icon: Users, label: 'Rutina Meseros', section: 'configuracion' },
@@ -2900,7 +2900,7 @@ function POSContent() {
                 { href: '/pos/historial', icon: FileText, label: 'Historial', section: 'historial' },
                 { href: '/pos/staff', icon: Users, label: 'Empleados', section: 'configuracion' },
                 { href: '/pos/huella', icon: Lock, label: 'Huellas', section: 'configuracion' },
-                { href: '/pos/configuracion', icon: Settings, label: 'Configuracion', section: 'configuracion' },
+                { href: '/pos/configuracion', icon: Settings, label: 'Configuración', section: 'configuracion' },
               ].filter(item => canSee(item.section)).map(item => (
                 <Link
                   key={item.href}
@@ -4409,7 +4409,7 @@ function POSContent() {
                             const statusData = await statusRes.json()
                             if (statusData.state === 'FINISHED') {
                               clearInterval(mpPollRef.current!); mpPollRef.current = null
-                              handlePayment('Tarjeta de credito')
+                              handlePayment('Tarjeta de crédito')
                             } else if (statusData.state === 'CANCELED' || statusData.state === 'ERROR' || attempts > 60) {
                               clearInterval(mpPollRef.current!); mpPollRef.current = null
                               setSaving(false); operationLock.current = false
@@ -4420,11 +4420,11 @@ function POSContent() {
                       } else {
                         // MP failed, fall back to manual
                         setSaving(false); operationLock.current = false
-                        handlePayment('Tarjeta de credito')
+                        handlePayment('Tarjeta de crédito')
                       }
                     } catch {
                       setSaving(false); operationLock.current = false
-                      handlePayment('Tarjeta de credito')
+                      handlePayment('Tarjeta de crédito')
                     }
                   } else {
                     // Sin MP configurado — terminal bancaria standalone (Getnet):
@@ -4491,7 +4491,7 @@ function POSContent() {
                       Cancelar
                     </button>
                     <button
-                      onClick={() => { setShowCardConfirm(false); handlePayment('Tarjeta de credito') }}
+                      onClick={() => { setShowCardConfirm(false); handlePayment('Tarjeta de crédito') }}
                       disabled={saving}
                       className="flex-[2] py-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-black text-lg min-h-[56px] transition-colors"
                     >
@@ -4540,7 +4540,7 @@ function POSContent() {
                 const totalConPropina = payTotal + propina
                 const pagado = mixtoPagos.reduce((s, p) => s + p.monto, 0)
                 const restante = Math.max(0, totalConPropina - pagado)
-                const formaNames = ['Efectivo', 'Tarjeta de credito', ...paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card').map(m => m.name)]
+                const formaNames = ['Efectivo', 'Tarjeta de crédito', ...paymentMethodsDB.filter(m => m.type !== 'cash' && m.type !== 'card').map(m => m.name)]
                 const montoNum = parseFloat(mixtoMonto) || 0
                 return (
                   <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">

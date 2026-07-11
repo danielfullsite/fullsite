@@ -8,7 +8,7 @@ export default function NotFound() {
           fullsite<span className="inline-block w-3 h-3 bg-emerald-500 ml-0.5 mb-0.5 rounded-none" />
         </span>
         <h1 className="text-6xl font-bold text-[var(--text-1)] mt-8 mb-2">404</h1>
-        <p className="text-[var(--text-2)] mb-8">Esta pagina no existe o fue movida.</p>
+        <p className="text-[var(--text-2)] mb-8">Esta página no existe o fue movida.</p>
         <div className="flex gap-3 justify-center">
           <Link
             href="/"

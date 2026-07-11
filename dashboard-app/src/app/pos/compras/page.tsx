@@ -659,7 +659,7 @@ export default function ComprasPage() {
               <div className="flex items-center gap-3">
                 <PackageCheck size={24} className="text-amber-400" />
                 <div>
-                  <h3 className="text-lg font-bold text-white">Recepcion de mercancia</h3>
+                  <h3 className="text-lg font-bold text-white">Recepción de mercancía</h3>
                   <p className="text-amber-400 text-sm">{receptionPO.supplier} · OC {receptionPO.id.slice(0, 8)}</p>
                 </div>
               </div>

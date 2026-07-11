@@ -368,7 +368,7 @@ export default function StaffPage() {
         <div className="text-center">
           <Shield size={48} className="text-red-500 mx-auto mb-4" />
           <p className="text-white text-xl font-semibold mb-2">Sin permiso</p>
-          <p className="text-gray-400 mb-6">Solo admin y gerente pueden acceder a esta pagina.</p>
+          <p className="text-gray-400 mb-6">Solo admin y gerente pueden acceder a esta página.</p>
           <Link href="/pos" className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold min-h-[48px] inline-flex items-center">
             Regresar al POS
           </Link>
@@ -726,8 +726,8 @@ export default function StaffPage() {
               </h2>
               <p className="text-gray-400 text-sm">
                 {confirmToggle.active
-                  ? `¿Desactivar a ${confirmToggle.name}? Ya no podra iniciar sesion.`
-                  : `¿Reactivar a ${confirmToggle.name}? Podra iniciar sesion de nuevo.`
+                  ? `¿Desactivar a ${confirmToggle.name}? Ya no podra iniciar sesión.`
+                  : `¿Reactivar a ${confirmToggle.name}? Podra iniciar sesión de nuevo.`
                 }
               </p>
             </div>

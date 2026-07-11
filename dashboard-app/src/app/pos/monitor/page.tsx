@@ -143,7 +143,7 @@ export default function MonitorPage() {
       setError('')
     } catch (e) {
       console.error(e)
-      setError('Sin conexion — datos no actualizados')
+      setError('Sin conexión — datos no actualizados')
     }
     setLoading(false)
   }
@@ -166,7 +166,7 @@ export default function MonitorPage() {
           <Activity size={24} className="text-emerald-400" />
           <div>
             <h1 className="text-2xl font-bold text-[var(--text-1)]">Monitor</h1>
-            <p className="text-sm text-[var(--text-3)]">Ultima actualizacion: {lastRefresh || '...'} (auto cada 10s)</p>
+            <p className="text-sm text-[var(--text-3)]">Última actualización: {lastRefresh || '...'} (auto cada 10s)</p>
             {error && <p className="text-sm text-red-400">{error}</p>}
           </div>
         </div>
@@ -187,10 +187,10 @@ export default function MonitorPage() {
               {[
                 { label: 'Print Bridge', ok: data.bridge.online, detail: data.bridge.online ? `Online · ${data.bridge.stations.length} estaciones · uptime ${Math.floor(data.bridge.uptime / 60)}min` : 'No responde en 127.0.0.1:7717', icon: Server },
                 { label: 'Huella Digital', ok: data.fingerprint.online, detail: data.fingerprint.online ? 'Servicio activo' : 'No responde en /fp/health', icon: Fingerprint },
-                { label: 'Supabase', ok: data.supabase.online, detail: data.supabase.online ? 'Conectado' : 'Sin conexion a Supabase', icon: Database },
-                { label: 'Internet', ok: data.internet.online, detail: data.internet.online ? 'Conectado' : 'Sin conexion a internet', icon: Globe },
+                { label: 'Supabase', ok: data.supabase.online, detail: data.supabase.online ? 'Conectado' : 'Sin conexión a Supabase', icon: Database },
+                { label: 'Internet', ok: data.internet.online, detail: data.internet.online ? 'Conectado' : 'Sin conexión a internet', icon: Globe },
                 { label: 'Sync Queue', ok: data.sync.pending === 0, detail: data.sync.pending === 0 ? 'Sin pendientes' : `${data.sync.pending} operaciones en cola`, icon: RefreshCw },
-                { label: 'Print Queue', ok: data.prints.failed === 0 && data.prints.needsAttention.length === 0, detail: data.prints.failed > 0 ? `${data.prints.failed} fallidas` : data.prints.needsAttention.length > 0 ? `${data.prints.needsAttention.length} requieren atencion` : `${data.prints.printed} impresas hoy`, icon: Printer },
+                { label: 'Print Queue', ok: data.prints.failed === 0 && data.prints.needsAttention.length === 0, detail: data.prints.failed > 0 ? `${data.prints.failed} fallidas` : data.prints.needsAttention.length > 0 ? `${data.prints.needsAttention.length} requieren atención` : `${data.prints.printed} impresas hoy`, icon: Printer },
               ].map(h => {
                 const Icon = h.icon
                 return (
@@ -280,7 +280,7 @@ export default function MonitorPage() {
               {data.prints.pending > 0 && <p className="text-xs text-amber-400">{data.prints.pending} en cola</p>}
               {data.prints.failed > 0 && <p className="text-xs text-red-400">{data.prints.failed} fallidas</p>}
               {data.prints.bridgeUnavailable > 0 && <p className="text-xs text-amber-400">{data.prints.bridgeUnavailable} esperando bridge</p>}
-              {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atencion</p>}
+              {data.prints.needsAttention.length > 0 && <p className="text-xs text-red-400 font-bold">{data.prints.needsAttention.length} requieren atención</p>}
             </div>
             <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
