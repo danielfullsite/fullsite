@@ -123,7 +123,13 @@ try:
     if prev_results and prev_results[0].get("data"):
         prev_data = prev_results[0]["data"]
         if isinstance(prev_data, str):
-            prev_data = json.loads(prev_data)
+            try: prev_data = json.loads(prev_data)
+            except: prev_data = {}
+        if isinstance(prev_data, str):
+            try: prev_data = json.loads(prev_data)
+            except: prev_data = {}
+        if not isinstance(prev_data, dict):
+            prev_data = {}
         # Build map from previous ingredient snapshot
         for item in prev_data.get("ingredient_snapshot", []):
             prev_costs[item["id"]] = float(item.get("cost", 0))

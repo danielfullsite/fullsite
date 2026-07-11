@@ -84,7 +84,14 @@ async def run():
         if "Dashboard" not in page.url and "MyDocumentsList" not in page.url:
             print(f"[!] Login failed. URL: {page.url}")
             await browser.close()
-            return
+            try:
+                requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs", headers=sb_headers,
+                              json={"agent_id": "wansoft-browser-scraper", "trigger_type": os.environ.get("TRIGGER_TYPE", "cron"),
+                                    "status": "error", "duration_ms": int((time.time() - start) * 1000),
+                                    "output_summary": f"login_failed url={page.url}", "tentacle": "ops"})
+            except:
+                pass
+            sys.exit(1)
 
         print("[✓] Login OK\n")
 

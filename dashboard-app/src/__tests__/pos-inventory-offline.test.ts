@@ -686,7 +686,7 @@ describe('applyCombo', () => {
     const items = applyCombo(combo, prices, 'group-xyz')
 
     for (const item of items) {
-      expect((item as Record<string, unknown>)._comboGroupId).toBe('group-xyz')
+      expect((item as unknown as Record<string, unknown>)._comboGroupId).toBe('group-xyz')
     }
   })
 
@@ -696,8 +696,8 @@ describe('applyCombo', () => {
 
     const items = applyCombo(combo, prices)
 
-    const groupId = (items[0] as Record<string, unknown>)._comboGroupId
+    const groupId = (items[0] as unknown as Record<string, unknown>)._comboGroupId
     expect(groupId).toBeTruthy()
-    expect((items[1] as Record<string, unknown>)._comboGroupId).toBe(groupId)
+    expect((items[1] as unknown as Record<string, unknown>)._comboGroupId).toBe(groupId)
   })
 })

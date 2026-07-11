@@ -5,9 +5,12 @@ Not just HTTP 200 — verifies real data exists and pages work.
 Alerts on Telegram only when something is actually broken.
 Silent when everything is OK.
 """
-import os, sys, time, json, requests
+import os, sys, time, requests
 
-TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+# agent_common is in the same directory — add it to path
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import log_run, send_telegram
+
 TG_CHAT = os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
@@ -33,19 +36,35 @@ def check_health_endpoint():
     """Call /api/health and check each subsystem."""
     try:
         r = requests.get(f"{DASHBOARD_URL}/api/health", timeout=20)
+        # Treat any non-2xx as a warning, not a hard failure
+        # (health endpoint may not exist on older deploys)
+        if r.status_code == 404:
+            warnings.append("Health endpoint: 404 (not deployed yet)")
+            return
         if r.status_code >= 500:
             failures.append(f"Health endpoint: HTTP {r.status_code}")
             return
-        data = r.json()
+        if r.status_code >= 400:
+            warnings.append(f"Health endpoint: HTTP {r.status_code}")
+            return
+        try:
+            data = r.json()
+        except Exception as e:
+            failures.append(f"Health endpoint: invalid JSON — {e}")
+            return
         for check in data.get("checks", []):
-            if check["status"] != "ok":
+            if check.get("status") != "ok":
                 # data_freshness and costeo are warnings, not critical failures
-                if check["name"] in ("data_freshness", "costeo"):
-                    warnings.append(f"{check['name']}: {check['detail']}")
+                if check.get("name") in ("data_freshness", "costeo"):
+                    warnings.append(f"{check['name']}: {check.get('detail', '')}")
                 else:
-                    failures.append(f"{check['name']}: {check['detail']}")
+                    failures.append(f"{check['name']}: {check.get('detail', '')}")
             else:
-                print(f"OK: {check['name']} — {check['detail']} ({check['ms']}ms)")
+                print(f"OK: {check['name']} — {check.get('detail', '')} ({check.get('ms', '?')}ms)")
+    except requests.exceptions.Timeout:
+        failures.append("Health endpoint: timeout (>20s)")
+    except requests.exceptions.ConnectionError as e:
+        failures.append(f"Health endpoint: connection error — {e}")
     except Exception as e:
         failures.append(f"Health endpoint: {e}")
 
@@ -97,29 +116,32 @@ if failures:
     if warnings:
         msg += "\n\n⚠ Warnings:\n" + "\n".join(f"  {w}" for w in warnings)
     msg += f"\n\n{time.strftime('%H:%M MX')}"
-    requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    send_telegram(TG_CHAT, msg)
     print(f"\nALERT SENT: {len(failures)} failures")
 elif warnings:
-    # Only send warnings if they're new (avoid spamming)
     msg = "🟡 Monitor Warning\n\n"
     msg += "\n".join(f"⚠ {w}" for w in warnings)
     msg += f"\n\n{time.strftime('%H:%M MX')}"
-    requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT, "text": msg}, timeout=10)
+    send_telegram(TG_CHAT, msg)
     print(f"\nWARNING SENT: {len(warnings)}")
 else:
     print(f"\nAll OK — {duration}ms — silent success")
 
-# Log
-try:
-    requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs",
-        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
-                 "Content-Type": "application/json", "Prefer": "return=minimal"},
-        json={"agent_id": "uptime-monitor", "trigger_type": os.environ.get("TRIGGER_TYPE", "cron"),
-              "status": "error" if failures else ("warning" if warnings else "success"),
-              "duration_ms": duration,
-              "output_summary": f"{len(failures)}F {len(warnings)}W" if (failures or warnings) else "All OK",
-              "tentacle": "ops"}, timeout=10)
-except:
-    pass
+# ── Log via agent_common (truthful) ──
+error_msg = "; ".join(failures) if failures else ""
+status = "error" if failures else ("warning" if warnings else "success")
+summary = f"{len(failures)}F {len(warnings)}W" if (failures or warnings) else "All OK"
+
+log_run(
+    agent_id="uptime-monitor",
+    status=status,
+    duration_ms=duration,
+    output_summary=summary,
+    error_message=error_msg,
+    tentacle="ops",
+    data_status="error" if failures else ("partial" if warnings else "ok"),
+)
+
+# Exit non-zero on failures so GitHub Actions marks the run as failed
+if failures:
+    sys.exit(1)

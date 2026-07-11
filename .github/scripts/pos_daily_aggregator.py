@@ -316,7 +316,7 @@ if __name__ == "__main__":
         if not orders:
             print(f"Sin ordenes cerradas para {fecha}")
             duration = int((time.time() - start) * 1000)
-            log_run("success", duration, f"0 ordenes para {fecha}")
+            log_run("no_data", duration, f"0 ordenes para {fecha}")
             sys.exit(0)
 
         row = aggregate(orders, cat_map, item_cat_map)
