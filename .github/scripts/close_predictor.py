@@ -11,6 +11,9 @@ import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -53,14 +56,12 @@ HOURLY_DISTRIBUTION = {
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -277,17 +278,23 @@ def main():
     today_data = get_today_kpis()
     if not today_data:
         print("[close_predictor] No KPI data available, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("close-predictor", "no_data", elapsed, skip_reason="no KPI data for today", data_status="no_data", tentacle="reportes")
         return
 
     current_ventas = float(today_data.get("ventas_dia") or 0)
     if current_ventas <= 0:
         print("[close_predictor] Ventas = 0, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("close-predictor", "no_data", elapsed, skip_reason="ventas_dia=0", data_status="no_data", tentacle="reportes")
         return
 
     # 2. Project close
     projected = project_close(current_ventas, current_hour)
     if projected <= 0:
         print("[close_predictor] Too early to project, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("close-predictor", "skipped", elapsed, skip_reason=f"too early to project at hour {current_hour}", data_status="ok", tentacle="reportes")
         return
 
     # 3. Fetch comparison data
@@ -354,21 +361,32 @@ def main():
     print(f"[close_predictor] Done in {elapsed}ms — {summary}")
 
     # 6. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "close-predictor",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"current: ${current_ventas:,.0f}, projected: ${projected:,.0f}",
-                "tentacle": "reportes",
-            },
-        )
-    except:
-        pass
+    _log_run(
+        "close-predictor", "success", elapsed,
+        output_summary=f"current: ${current_ventas:,.0f}, projected: ${projected:,.0f}",
+        rows_processed=1,
+        data_status="ok",
+        tentacle="reportes",
+    )
+
+    # 7. Insight
+    insight_severity = "medium" if projected < avg_dow * 0.85 else "info"
+    create_insight(
+        agent_id="close-predictor",
+        category="sales",
+        severity=insight_severity,
+        title=f"Proyección cierre: ${projected:,.0f} ({pct_done:.0f}% avance)",
+        summary=summary,
+        evidence={
+            "current_ventas": current_ventas,
+            "projected": projected,
+            "avg_dow": round(avg_dow),
+            "pct_done": round(pct_done, 1),
+            "hour": current_hour,
+        },
+        recommended_action=f"Faltan ${remaining:,.0f} para cerrar en línea con el promedio." if remaining > 0 else None,
+        client_id=CLIENT["id"],
+    )
 
 
 if __name__ == "__main__":

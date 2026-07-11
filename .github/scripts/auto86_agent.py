@@ -11,6 +11,9 @@ import json
 import time
 import requests
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 
 CLIENT       = get_client()
@@ -31,9 +34,12 @@ output_sum = ""
 error_msg  = None
 
 def sb_get(table, params):
-    r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers, params=params, timeout=15)
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 def sb_post(table, data):
     r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}",
@@ -167,6 +173,22 @@ try:
             }),
         })
 
+        # 6. Create insight for 86'd items
+        create_insight(
+            agent_id="auto86",
+            category="inventory",
+            severity="critical" if len(zero_stock) >= 3 else "high",
+            title=f"86'd Alert: {len(zero_stock)} ingredientes en cero",
+            summary=f"{len(zero_stock)} ingredientes sin stock — {len(affected)} platillos afectados",
+            evidence={
+                "zero_stock_items": [c["name"] for c in zero_stock[:10]],
+                "affected_items": list(affected.keys())[:10],
+                "total_critical": len(critical),
+            },
+            recommended_action="Reabastecer urgente o desactivar platillos del menú",
+            data_freshness=today_str,
+        )
+
 except Exception as e:
     status = "error"
     error_msg = str(e)
@@ -175,16 +197,14 @@ except Exception as e:
 
 # Log to agent_runs
 duration_ms = int((time.time() - start_time) * 1000)
-try:
-    sb_post("agent_runs", {
-        "agent_id": "auto86",
-        "trigger_type": TRIGGER_TYPE,
-        "status": status,
-        "duration_ms": duration_ms,
-        "output_summary": output_sum,
-        "error_message": error_msg,
-        "tentacle": "ops",
-    })
-    print(f"[auto86] Logged. Done in {duration_ms}ms.")
-except Exception as e:
-    print(f"[auto86] WARN: log failed: {e}", file=sys.stderr)
+_log_run(
+    agent_id="auto86",
+    status=status,
+    duration_ms=duration_ms,
+    output_summary=output_sum,
+    error_message=error_msg or "",
+    tentacle="ops",
+    rows_processed=len(inventory) if "inventory" in locals() else 0,
+    data_status="error" if status == "error" else "ok",
+)
+print(f"[auto86] Logged. Done in {duration_ms}ms.")

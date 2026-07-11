@@ -12,6 +12,9 @@ import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -42,14 +45,12 @@ CATEGORY_THRESHOLD = 0.30     # 30% below normal for a category
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -321,11 +322,29 @@ def main():
     today_data = get_today_kpis()
     if not today_data:
         print("[anomaly] No KPI data available, skipping")
+        _log_run(
+            agent_id="anomaly-detector",
+            status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="No KPI data available",
+            tentacle="ops",
+            skip_reason="no_today_kpis",
+            data_status="no_data",
+        )
         return
 
     today_ventas = float(today_data.get("ventas_dia") or 0)
     if today_ventas <= 0:
         print("[anomaly] Ventas = 0, skipping")
+        _log_run(
+            agent_id="anomaly-detector",
+            status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="Ventas = $0, nothing to analyze",
+            tentacle="ops",
+            skip_reason="ventas_cero",
+            data_status="no_data",
+        )
         return
 
     # 2. Fetch same DOW historical
@@ -335,6 +354,15 @@ def main():
 
     if len(historical) < 2:
         print("[anomaly] Not enough historical data, skipping")
+        _log_run(
+            agent_id="anomaly-detector",
+            status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary=f"Only {len(historical)} historical days — need 2+",
+            tentacle="ops",
+            skip_reason="insufficient_history",
+            data_status="no_data",
+        )
         return
 
     # 3. Analyze
@@ -400,22 +428,37 @@ def main():
     else:
         print(f"[anomaly] {len(anomalies)} anomalies, priority={priority}, no Telegram")
 
-    # 8. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "anomaly-detector",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"anomalies: {len(anomalies)}, priority: {priority}, sent: {sent}",
-                "tentacle": "ops",
+    # 8. Create insights for detected anomalies
+    freshness = check_freshness([today_data], date_field="fecha")
+    for a in anomalies:
+        severity_map = {"high": "high", "medium": "medium"}
+        create_insight(
+            agent_id="anomaly-detector",
+            category="sales",
+            severity=severity_map.get(a["severity"], "medium"),
+            title=f"Anomalía detectada: {a['type']}",
+            summary=a["message"],
+            evidence={
+                "type": a["type"],
+                "today_ventas": float(today_data.get("ventas_dia") or 0),
+                "avg_ventas": round(avg_ventas),
+                "today_str": today_str,
             },
+            recommended_action="Revisar en dashboard de anomalías",
+            data_freshness=freshness["latest"],
         )
-    except:
-        pass
+
+    # 9. Log
+    _log_run(
+        agent_id="anomaly-detector",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"anomalies: {len(anomalies)}, priority: {priority}, sent: {sent}",
+        tentacle="ops",
+        input_freshness=freshness["latest"],
+        rows_processed=len(historical) + 1,
+        data_status=freshness["status"],
+    )
 
 
 if __name__ == "__main__":

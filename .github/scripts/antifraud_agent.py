@@ -12,6 +12,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -42,14 +45,12 @@ COURTESY_THRESHOLD = 500        # More than $500 in courtesies per week
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -500,6 +501,8 @@ def main():
 
     if len(data) < 3:
         print("[antifraud] Not enough data, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("antifraud-agent", "no_data", elapsed, skip_reason=f"only {len(data)} days available, need 3+", data_status="no_data", tentacle="ops")
         return
 
     # 2. Analyze
@@ -570,21 +573,38 @@ def main():
     elapsed = int((time.time() - start) * 1000)
 
     # 6. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "antifraud-agent",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"findings: {len(all_findings)}, risk: {risk_score}/100, sent: {sent}",
-                "tentacle": "ops",
-            },
-        )
-    except:
-        pass
+    _log_run(
+        "antifraud-agent", "success", elapsed,
+        output_summary=f"findings: {len(all_findings)}, risk: {risk_score}/100, sent: {sent}",
+        rows_processed=len(data),
+        data_status="ok",
+        tentacle="ops",
+    )
+
+    # 7. Insight — always emit so the inbox reflects the weekly scan
+    high_findings = [f for f in all_findings if f.get("severity") == "high"]
+    insight_severity = "high" if risk_score > 50 else "medium" if risk_score > 25 else "info"
+    create_insight(
+        agent_id="antifraud-agent",
+        category="fraud",
+        severity=insight_severity,
+        title=f"Anti-fraude: riesgo {risk_score}/100, {len(all_findings)} hallazgo(s)",
+        summary=f"Riesgo {risk_score}/100, {len(high_findings)} hallazgos de severidad alta",
+        evidence={
+            "risk_score": risk_score,
+            "total_findings": len(all_findings),
+            "high_severity": len(high_findings),
+            "finding_types": list({f["type"] for f in all_findings}),
+            "summary_stats": structured_data["summary_stats"],
+        },
+        recommended_action=(
+            "URGENTE: Revisar hallazgos de alta severidad." if high_findings
+            else "Revisar hallazgos detectados." if all_findings
+            else None
+        ),
+        client_id=CLIENT["id"],
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -36,14 +39,12 @@ sb_headers = {
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -357,6 +358,8 @@ def main():
 
     if len(sales_data) < 7:
         print("[menu_eng] Not enough data, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("menu-engineering", "no_data", elapsed, skip_reason=f"only {len(sales_data)} days available, need 7+", data_status="no_data", tentacle="reportes")
         return
 
     print("[menu_eng] Fetching food cost data...")
@@ -368,6 +371,8 @@ def main():
 
     if not categories:
         print("[menu_eng] No categories found, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("menu-engineering", "no_data", elapsed, skip_reason="ventas_por_grupo empty in all rows", data_status="no_data", tentacle="reportes")
         return
 
     classified = classify_bcg(categories, food_cost_data)
@@ -434,21 +439,35 @@ def main():
     print(f"[menu_eng] Done in {elapsed}ms — {summary}")
 
     # 5. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "menu-engineering",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"categories: {len(classified)}, estrellas: {estrellas}, perros: {perros}, recs: {len(recommendations)}",
-                "tentacle": "reportes",
-            },
-        )
-    except:
-        pass
+    _log_run(
+        "menu-engineering", "success", elapsed,
+        output_summary=f"categories: {len(classified)}, estrellas: {estrellas}, perros: {perros}, recs: {len(recommendations)}",
+        rows_processed=len(sales_data),
+        data_status="ok",
+        tentacle="reportes",
+    )
+
+    # 6. Insight
+    estrellas_list = [c for c in classified if c["quadrant"] == "Estrella"]
+    perros_list = [c for c in classified if c["quadrant"] == "Perro"]
+    rompecabezas_list = [c for c in classified if c["quadrant"] == "Rompecabezas"]
+    create_insight(
+        agent_id="menu-engineering",
+        category="sales",
+        severity="info",
+        title=f"Menú: {estrellas} estrellas, {perros} perros identificados",
+        summary=summary,
+        evidence={
+            "estrellas": [{"nombre": c["nombre"], "total_30d": c["total_30d"]} for c in estrellas_list[:5]],
+            "perros": [{"nombre": c["nombre"], "total_30d": c["total_30d"]} for c in perros_list[:5]],
+            "rompecabezas": [{"nombre": c["nombre"], "margin_pct": c["margin_pct"]} for c in rompecabezas_list[:3]],
+            "total_revenue_30d": total_rev,
+            "analysis_days": len(sales_data),
+        },
+        recommended_action=recommendations[0]["action"] if recommendations else None,
+        client_id=CLIENT["id"],
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

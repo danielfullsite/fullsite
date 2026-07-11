@@ -18,6 +18,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 try:
     from audit_log import AuditLogger
@@ -42,14 +45,12 @@ sb_headers = {
 
 # -- Supabase helpers --
 def sb_get(table, params):
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers=sb_headers, params=params, timeout=10,
-        )
-        return r.json() if r.ok else []
-    except:
-        return []
+    """Wrapper: convert dict params to query string for agent_common.sb_get (raises on error)."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # -- Data fetching --
@@ -309,6 +310,22 @@ def main():
 
     print(f"[kitchen] Starting for {CLIENT['id']} on {today_str}")
 
+    try:
+      _kitchen_main(start, now_mx, today_str)
+    except Exception as e:
+      elapsed = int((time.time() - start) * 1000)
+      print(f"[kitchen] ERROR: {e}", file=sys.stderr)
+      _log_run(
+          agent_id="kitchen-quality",
+          status="error",
+          duration_ms=elapsed,
+          error_message=str(e),
+          output_summary=f"ERROR: {e}",
+          tentacle="ops",
+          data_status="error",
+      )
+
+def _kitchen_main(start, now_mx, today_str):
     # 1. Fetch data
     recent = get_recent_daily(7)
     historical = get_historical_avg(30)
@@ -317,6 +334,15 @@ def main():
 
     if not recent and not today_kpis:
         print("[kitchen] No data — skipping")
+        _log_run(
+            agent_id="kitchen-quality",
+            status="no_data",
+            duration_ms=int((time.time() - start) * 1000),
+            output_summary="No wansoft_daily or wansoft_kpis data available",
+            tentacle="ops",
+            skip_reason="no_sales_data",
+            data_status="no_data",
+        )
         return
 
     # Use KPIs as today's data if available, prepend to recent
@@ -326,6 +352,15 @@ def main():
         ventas = today_data.get("ventas_dia", 0) or 0
         if ventas == 0:
             print("[kitchen] Ventas = $0 — skipping")
+            _log_run(
+                agent_id="kitchen-quality",
+                status="no_data",
+                duration_ms=int((time.time() - start) * 1000),
+                output_summary="Ventas = $0, nothing to analyze",
+                tentacle="ops",
+                skip_reason="ventas_cero",
+                data_status="no_data",
+            )
             return
 
     # 2. Analyze
@@ -380,25 +415,32 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[kitchen] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"{total} insights")
-    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else int((time.time() - start) * 1000), "success")
-
-def log_run(status, elapsed, summary):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "kitchen-quality",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": elapsed,
-                "output_summary": summary,
-                "tentacle": "ops",
-            },
+    # Create insights for detected kitchen issues
+    freshness = check_freshness(recent or [], date_field="fecha")
+    for insight in all_insights:
+        sev_map = {"alta": "high", "media": "medium", "baja": "info"}
+        create_insight(
+            agent_id="kitchen-quality",
+            category="operations",
+            severity=sev_map.get(insight.get("prioridad", "baja"), "info"),
+            title=f"Calidad cocina: {insight.get('tipo', 'unknown')}",
+            summary=insight.get("msg", ""),
+            evidence={"tipo": insight.get("tipo"), "today_str": today_str},
+            recommended_action="Revisar con cocina y supervisores",
+            data_freshness=freshness["latest"],
         )
-    except:
-        pass
+
+    _log_run(
+        agent_id="kitchen-quality",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"{total} insights",
+        tentacle="ops",
+        input_freshness=freshness["latest"],
+        rows_processed=len(recent) + len(historical),
+        data_status=freshness["status"],
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

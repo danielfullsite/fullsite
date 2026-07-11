@@ -12,6 +12,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -43,14 +46,12 @@ REVENUE_PER_MESERO_MAX = 6000   # Above this → understaffed
 
 # ── Supabase helpers ────────────────────────────────────────────────────────
 def sb_get(table, params):
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/{table}",
-        headers=sb_headers,
-        params=params,
-        timeout=15,
-    )
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
@@ -281,6 +282,8 @@ def main():
 
     if len(data) < 7:
         print("[staffing] Not enough data, skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("staffing-optimizer", "no_data", elapsed, skip_reason=f"only {len(data)} days available, need 7+", data_status="no_data", tentacle="ops")
         return
 
     # 2. Analyze
@@ -325,21 +328,38 @@ def main():
     print(f"[staffing] Done in {elapsed}ms — {summary}")
 
     # 5. Log
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "staffing-optimizer",
-                "trigger_type": TRIGGER_TYPE,
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"issues: {len(issues)}, mesero_patterns: {len(mesero_patterns)}",
-                "tentacle": "ops",
+    _log_run(
+        "staffing-optimizer", "success", elapsed,
+        output_summary=f"issues: {len(issues)}, mesero_patterns: {len(mesero_patterns)}",
+        rows_processed=len(data),
+        data_status="ok",
+        tentacle="ops",
+    )
+
+    # 6. Insight
+    if issues:
+        overstaffed = [i for i in issues if i["type"] == "overstaffed"]
+        understaffed = [i for i in issues if i["type"] == "understaffed"]
+        insight_severity = "medium" if len(issues) >= 3 else "info"
+        create_insight(
+            agent_id="staffing-optimizer",
+            category="staffing",
+            severity=insight_severity,
+            title=f"Staffing: {len(issues)} ajuste(s) sugerido(s) para esta semana",
+            summary=summary,
+            evidence={
+                "issues": issues,
+                "overstaffed_days": [i["day_name"] for i in overstaffed],
+                "understaffed_days": [i["day_name"] for i in understaffed],
+                "analysis_days": len(data),
             },
+            recommended_action=(
+                ("Reducir en " + ", ".join(i["day_name"] for i in overstaffed) + ". " if overstaffed else "") +
+                ("Agregar en " + ", ".join(i["day_name"] for i in understaffed) + "." if understaffed else "")
+            ) or None,
+            client_id=CLIENT["id"],
         )
-    except:
-        pass
+    if _audit: _audit.log_end(elapsed, "success")
 
 
 if __name__ == "__main__":

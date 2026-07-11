@@ -17,6 +17,7 @@ import requests
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -38,9 +39,12 @@ error_msg  = None
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 def sb_get(table, params):
-    r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers, params=params, timeout=15)
-    r.raise_for_status()
-    return r.json()
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 def sb_post(table, data):
     r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}",
@@ -244,6 +248,28 @@ try:
         }),
     })
 
+    # 7. Create insights for critical/low stock
+    if sin_stock:
+        create_insight(
+            agent_id="stock-alert",
+            category="inventory",
+            severity="critical",
+            title=f"Sin stock: {len(sin_stock)} items",
+            summary=f"{len(sin_stock)} productos sin existencias en {today_str}",
+            evidence={"sin_stock_items": sin_stock[:10], "almacenes": list(all_almacenes)},
+            recommended_action="Reabastecer o desactivar del menú de inmediato",
+        )
+    if critico:
+        create_insight(
+            agent_id="stock-alert",
+            category="inventory",
+            severity="high",
+            title=f"Stock crítico: {len(critico)} items",
+            summary=f"{len(critico)} productos por debajo de la mitad del mínimo",
+            evidence={"critico_items": critico[:10]},
+            recommended_action="Ordenar reabastecimiento urgente",
+        )
+
 except SystemExit:
     pass
 except Exception as e:
@@ -254,16 +280,14 @@ except Exception as e:
 
 # Log to agent_runs
 duration_ms = int((time.time() - start_time) * 1000)
-try:
-    sb_post("agent_runs", {
-        "agent_id": "stock-alert",
-        "trigger_type": TRIGGER_TYPE,
-        "status": status,
-        "duration_ms": duration_ms,
-        "output_summary": output_sum,
-        "error_message": error_msg,
-        "tentacle": "ops",
-    })
-    print(f"[stock-alert] Done in {duration_ms}ms. {output_sum}")
-except Exception as e:
-    print(f"[stock-alert] WARN: log failed: {e}", file=sys.stderr)
+_log_run(
+    agent_id="stock-alert",
+    status=status,
+    duration_ms=duration_ms,
+    output_summary=output_sum,
+    error_message=error_msg or "",
+    tentacle="ops",
+    rows_processed=len(inv_rows) if "inv_rows" in locals() else 0,
+    data_status="error" if status == "error" else "ok",
+)
+print(f"[stock-alert] Done in {duration_ms}ms. {output_sum}")

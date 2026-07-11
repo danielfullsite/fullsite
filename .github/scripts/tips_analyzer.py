@@ -15,6 +15,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids, is_mesero
 try:
     from audit_log import AuditLogger
@@ -39,14 +42,12 @@ sb_headers = {
 
 # -- Supabase helpers --
 def sb_get(table, params):
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{table}",
-            headers=sb_headers, params=params, timeout=10,
-        )
-        return r.json() if r.ok else []
-    except:
-        return []
+    """Wrapper: convert dict params to query string for agent_common.sb_get."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 # -- Data fetching --
@@ -377,11 +378,19 @@ def main():
 
     if not daily_data:
         print("[tips] No daily data — skipping")
+        elapsed = int((time.time() - start) * 1000)
+        _log_run("tips-analyzer", "no_data", elapsed, skip_reason="no wansoft_daily rows in last 7 days", data_status="no_data", tentacle="ops")
         return
 
     total_propinas = sum(d.get("propinas_total", 0) or 0 for d in daily_data)
     if total_propinas == 0:
         print("[tips] Total propinas = $0 — saving minimal report")
+
+    # Check if meseros JSONB is populated — recent rows often have it empty
+    days_with_meseros = sum(1 for d in daily_data if d.get("meseros") and d["meseros"] != [] and d["meseros"] != "[]")
+    meseros_data_status = "ok" if days_with_meseros > 0 else "stale_data"
+    if meseros_data_status == "stale_data":
+        print(f"[tips] WARNING: meseros JSONB empty in all {len(daily_data)} days — ranking will be based on proportional estimate only")
 
     # 2. Analyze
     mesero_ranking = analyze_mesero_tips(tips_data, daily_data)
@@ -433,25 +442,38 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[tips] Done in {elapsed}ms — {summary}")
 
-    log_run("success", elapsed, f"{len(mesero_ranking)} meseros, {len(correlations)} patterns")
-    if _audit: _audit.log_end(elapsed if "elapsed" in dir() else int((time.time() - start) * 1000), "success")
+    _log_run(
+        "tips-analyzer", "success", elapsed,
+        output_summary=f"{len(mesero_ranking)} meseros, {len(correlations)} patterns",
+        rows_processed=len(daily_data),
+        data_status=meseros_data_status,
+        skip_reason="meseros JSONB vacío — ranking estimado proporcionalmente" if meseros_data_status == "stale_data" else None,
+        tentacle="ops",
+    )
+    if _audit: _audit.log_end(elapsed, "success")
 
-def log_run(status, elapsed, summary):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "tips-analyzer",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": elapsed,
-                "output_summary": summary,
-                "tentacle": "ops",
+    # Insight
+    if mesero_ranking:
+        best = mesero_ranking[0]
+        worst = mesero_ranking[-1]
+        create_insight(
+            agent_id="tips-analyzer",
+            category="staffing",
+            severity="info",
+            title=f"Propinas: {best['nombre'].split()[0]} lidera con ${best['propina_per_ticket']}/ticket",
+            summary=summary,
+            evidence={
+                "top_mesero": best["nombre"],
+                "top_ppt": best["propina_per_ticket"],
+                "worst_mesero": worst["nombre"],
+                "worst_ppt": worst["propina_per_ticket"],
+                "gap": round(best["propina_per_ticket"] - worst["propina_per_ticket"]),
+                "total_propinas": total_propinas,
+                "meseros_data_status": meseros_data_status,
             },
+            recommended_action=f"Que {best['nombre'].split()[0]} comparta su técnica. Gap de ${round(best['propina_per_ticket'] - worst['propina_per_ticket'])}/ticket entre mejor y peor mesero." if len(mesero_ranking) >= 2 else None,
+            client_id=CLIENT["id"],
         )
-    except:
-        pass
 
 
 if __name__ == "__main__":

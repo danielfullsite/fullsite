@@ -15,10 +15,14 @@ Runs daily at 7am MX via agents-daily workflow.
 """
 
 import os
+import sys
 import json
 import time
 import requests
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(__file__))
+from agent_common import sb_get as _sb_get, log_run as _log_run, check_freshness, create_insight
 from client_config import get_client, get_tz, get_chat_ids
 from audit_log import AuditLogger
 
@@ -38,8 +42,12 @@ audit = AuditLogger("config_validator")
 
 
 def sb_get(table, params):
-    r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers, params=params, timeout=15)
-    return r.json() if r.ok else []
+    """Wrapper: convert dict params to query string for agent_common.sb_get (raises on error)."""
+    if isinstance(params, dict):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+    else:
+        qs = params
+    return _sb_get(table, qs)
 
 
 def send_telegram(msg):
@@ -200,20 +208,31 @@ def main():
     except Exception:
         pass
 
+    # Create insight if config issues found
+    if issues:
+        critical_issues = [i for i in issues if i.startswith("🔴")]
+        warning_issues = [i for i in issues if i.startswith("🟡")]
+        create_insight(
+            agent_id="config-validator",
+            category="config",
+            severity="high" if critical_issues else "medium",
+            title=f"Config issues: {len(issues)} problemas detectados",
+            summary=f"{len(critical_issues)} críticos, {len(warning_issues)} advertencias",
+            evidence={"issues": issues[:20]},
+            recommended_action="Revisar y corregir configuración del sistema",
+            data_freshness=today_str,
+        )
+
     # Log
-    try:
-        requests.post(f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "config-validator",
-                "trigger_type": os.environ.get("TRIGGER_TYPE", "cron"),
-                "status": "success",
-                "duration_ms": elapsed,
-                "output_summary": f"{len(issues)} config issues",
-                "tentacle": "ops",
-            }, timeout=10)
-    except Exception:
-        pass
+    _log_run(
+        agent_id="config-validator",
+        status="success",
+        duration_ms=elapsed,
+        output_summary=f"{len(issues)} config issues",
+        tentacle="ops",
+        rows_processed=len(issues),
+        data_status="ok",
+    )
 
     audit.log_read(["pos_menu_items", "pos_ingredients", "pos_inventory", "pos_staff", "pos_recipes", "wansoft_menu_config", "agent_runs", "clients"])
     audit.log_write(["agent_results", "agent_runs"], f"{len(issues)} issues found")
