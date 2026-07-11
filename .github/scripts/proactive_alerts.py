@@ -8,7 +8,9 @@ Runs at 2pm and 4pm MX time.
 import os, sys, json, time, requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
+sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
+from agent_common import log_run as _log_run
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("proactive_alerts")
@@ -232,4 +234,20 @@ Máximo 20 líneas. Sin markdown. Directo al punto."""
     print(f"[alerts] Sent {len(alerts)} alerts to Telegram")
 
 if __name__ == "__main__":
-    main()
+    _start = time.time()
+    try:
+        main()
+        _log_run("proactive-alerts", "success", int((time.time() - _start) * 1000),
+                 output_summary="Alerts sent", tentacle="ops", data_status="ok")
+    except Exception as e:
+        _ms = int((time.time() - _start) * 1000)
+        _err = str(e)[:500]
+        _ds = "error"
+        if "login failed" in _err.lower() or "wansoft" in _err.lower():
+            _ds = "error"
+            _err = f"Wansoft login failed: {_err}"
+        _log_run("proactive-alerts", "error", _ms,
+                 output_summary=f"ERROR: {_err[:100]}", error_message=_err,
+                 tentacle="ops", data_status=_ds)
+        print(f"[proactive-alerts] {_err}", file=sys.stderr)
+        sys.exit(1)

@@ -27,7 +27,9 @@ import time
 import requests
 from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids
+from agent_common import log_run as _log_run
 
 # -- Config --
 CLIENT = get_client()
@@ -283,24 +285,16 @@ def send_telegram(text):
 
 
 def log_run(status, duration_ms, summary, tokens=0):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "pos_daily_aggregator",
-                "client_id": CLIENT["id"],
-                "status": status,
-                "duration_ms": duration_ms,
-                "tokens_used": tokens,
-                "trigger_type": TRIGGER_TYPE,
-                "tentacle": "ops",
-                "output_summary": summary,
-            },
-            timeout=10,
-        )
-    except:
-        pass
+    _data_status = "ok" if status == "success" else ("no_data" if status == "no_data" else "error")
+    _log_run(
+        agent_id="pos-daily-aggregator",
+        status=status,
+        duration_ms=duration_ms,
+        output_summary=summary[:500] if summary else "",
+        tentacle="ops",
+        data_status=_data_status,
+        rows_processed=0,
+    )
 
 
 if __name__ == "__main__":

@@ -12,7 +12,9 @@ import time
 import requests
 from datetime import date, timedelta, datetime, timezone
 from bs4 import BeautifulSoup
+sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids, is_mesero, is_market, get_wansoft_creds
+from agent_common import log_run as _log_run
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CLIENT = get_client()
@@ -447,22 +449,18 @@ def send_telegram(msg):
 
 # ── Log to Supabase ─────────────────────────────────────────────────────────
 def log_run(status, duration_ms, summary="", error=""):
-    try:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/agent_runs",
-            headers={**sb_headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={
-                "agent_id": "intraday-sales",
-                "trigger_type": TRIGGER_TYPE,
-                "status": status,
-                "duration_ms": duration_ms,
-                "output_summary": summary[:500],
-                "error_message": error[:500] if error else None,
-                "tentacle": "reportes",
-            },
-        )
-    except Exception:
-        pass
+    _data_status = "ok" if status == "success" else "error"
+    if "login failed" in (error or "").lower():
+        _data_status = "error"
+    _log_run(
+        agent_id="intraday-sales",
+        status=status,
+        duration_ms=duration_ms,
+        output_summary=summary[:500] if summary else "",
+        error_message=error[:500] if error else "",
+        tentacle="reportes",
+        data_status=_data_status,
+    )
 
 
 # ── Main ────────────────────────────────────────────────────────────────────
