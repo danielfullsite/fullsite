@@ -51,7 +51,7 @@ def sb_get(table, params):
 def get_sales_data(days=30):
     """Fetch ventas_por_grupo from wansoft_daily for the last N days."""
     cutoff = (datetime.now(MX_TZ) - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_por_grupo",
         "fecha": f"gte.{cutoff}",
         "ventas_dia": "gt.0",

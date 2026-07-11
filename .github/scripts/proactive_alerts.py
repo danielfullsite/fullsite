@@ -7,9 +7,8 @@ Runs at 2pm and 4pm MX time.
 
 import os, sys, json, time, requests
 from datetime import date, timedelta, datetime, timezone
-from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(__file__))
-from client_config import get_client, get_tz, get_chat_ids, get_wansoft_creds
+from client_config import get_client, get_tz, get_chat_ids
 from agent_common import log_run as _log_run
 try:
     from audit_log import AuditLogger
@@ -17,8 +16,6 @@ try:
 except ImportError:
     _audit = None
 CLIENT = get_client()
-SUBSIDIARY, WANSOFT_USER, WANSOFT_PASS = get_wansoft_creds(CLIENT)
-WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
@@ -42,18 +39,6 @@ def send_telegram(text):
             requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
                           json={"chat_id": chat_id, "text": chunk}, timeout=15)
 
-def wansoft_login():
-    s = requests.Session()
-    s.get(f"{WANSOFT_URL}/")
-    r = s.post(f"{WANSOFT_URL}/", data={"UserName": WANSOFT_USER, "Password": WANSOFT_PASS}, allow_redirects=True)
-    if "Dashboard" not in r.url and "MyDocumentsList" not in r.url:
-        raise Exception("Wansoft login failed")
-    return s
-
-def parse_rows(html):
-    soup = BeautifulSoup(html, "html.parser")
-    return [[c.text.strip() for c in row.select("div")] for row in soup.select(".rowReport")]
-
 def main():
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
@@ -61,28 +46,20 @@ def main():
 
     print(f"[alerts] Checking alerts for {today_str} ({now_mx.strftime('%H:%M')} MX)...")
 
-    # 1. Get today's data from Wansoft
-    session = wansoft_login()
-
-    # Consolidated sales
-    r = session.post(f"{WANSOFT_URL}/Reports/GetConsolidatedSales",
-                     data={"subsidiaryId": SUBSIDIARY, "startDate": today_str, "endDate": today_str})
-    consolidated = r.json()
-    today_sales = float(consolidated.get("TotalSales", 0))
-
-    # Sales by user
-    users_html = session.post(f"{WANSOFT_URL}/Reports/SalesByUser",
-                              data={"subsidiaryId": SUBSIDIARY, "startDate": today_str, "endDate": today_str}).text
-    users = parse_rows(users_html)
-
-    # Sales by order type (tickets, personas)
-    ot_html = session.post(f"{WANSOFT_URL}/Reports/SalesByTypeOfOrder",
-                           data={"subsidiaryId": SUBSIDIARY, "startDate": today_str, "endDate": today_str}).text
-    ot_rows = parse_rows(ot_html)
-    # CRITICAL: cols[2]=PERSONAS, cols[3]=ORDENES (verified by audit 2026-06-06)
-    total_personas = sum(int(r[2]) for r in ot_rows if len(r) >= 6 and r[2].isdigit())
-    total_ordenes = sum(int(r[3]) for r in ot_rows if len(r) >= 6 and r[3].isdigit())
-    ticket_promedio = today_sales / total_personas if total_personas > 0 else 0
+    # 1. Get today's data from ops_daily_live
+    live_rows = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}",
+        "fecha": f"eq.{today_str}",
+        "select": "ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant",
+        "limit": "1",
+    })
+    if not live_rows or not live_rows[0].get("ventas_dia"):
+        print("[alerts] No live data for today — skipping")
+        return
+    live = live_rows[0]
+    today_sales = float(live.get("ventas_dia") or 0)
+    total_ordenes = int(live.get("tickets_count") or 0)
+    total_personas = int(live.get("personas_restaurant") or 0)
+    ticket_promedio = float(live.get("ticket_promedio_restaurant") or 0)
 
     print(f"[alerts] Today: ${today_sales:,.0f}, {total_ordenes} ordenes, {total_personas} personas, TP ${ticket_promedio:,.0f}")
 
@@ -94,7 +71,7 @@ def main():
 
     hist_data = []
     for hd in hist_dates:
-        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
             "fecha": f"eq.{hd}",
             "select": "ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant",
             "limit": "1",
@@ -188,7 +165,7 @@ Se detectaron estas anomalías HOY ({today_str}, {now_mx.strftime('%H:%M')} hrs)
 
 {alerts_text}
 
-Datos de hoy: Ventas ${today_sales:,.0f}, {total_tickets} tickets, {total_personas} personas, TP ${ticket_promedio:,.0f}
+Datos de hoy: Ventas ${today_sales:,.0f}, {total_ordenes} tickets, {total_personas} personas, TP ${ticket_promedio:,.0f}
 Promedio mismo día (4 semanas): Ventas ${avg_sales:,.0f}, {avg_tickets:.0f} tickets, TP ${avg_tp:,.0f}
 {waiter_context}
 
@@ -243,9 +220,6 @@ if __name__ == "__main__":
         _ms = int((time.time() - _start) * 1000)
         _err = str(e)[:500]
         _ds = "error"
-        if "login failed" in _err.lower() or "wansoft" in _err.lower():
-            _ds = "error"
-            _err = f"Wansoft login failed: {_err}"
         _log_run("proactive-alerts", "error", _ms,
                  output_summary=f"ERROR: {_err[:100]}", error_message=_err,
                  tentacle="ops", data_status=_ds)

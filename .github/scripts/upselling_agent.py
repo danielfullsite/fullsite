@@ -58,14 +58,19 @@ def sb_get(table, params):
 
 # -- Data fetching --
 def get_today_kpis():
-    """Fetch current day KPIs from wansoft_kpis."""
-    rows = sb_get("wansoft_kpis", {"select": "*", "limit": "1"})
+    """Fetch current day KPIs from ops_daily_live."""
+    today_str = datetime.now(MX_TZ).strftime("%Y-%m-%d")
+    rows = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}",
+        "fecha": f"eq.{today_str}",
+        "select": "*",
+        "limit": "1",
+    })
     return rows[0] if rows else None
 
 
 def get_historical_avg(days=30):
-    """Fetch last N days from wansoft_daily for historical averages."""
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    """Fetch last N days from ops_daily_history for historical averages."""
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_por_grupo,meseros,half_half_total,tickets_count,personas_restaurant",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",

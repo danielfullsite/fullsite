@@ -100,7 +100,7 @@ def get_weekly_daily(days=7):
     """Fetch sales data for the period."""
     now_mx = datetime.now(MX_TZ)
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_por_grupo,platillos_top",
         "fecha": f"gte.{start_date}",
         "ventas_dia": "gt.0",

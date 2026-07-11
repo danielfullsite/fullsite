@@ -66,18 +66,15 @@ def sb_get(table, params):
 
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis():
-    """Fetch today's data from wansoft_daily (preferred) or wansoft_kpis fallback."""
+    """Fetch today's data from ops_daily_live (handles fallback internally)."""
     now_mx = datetime.now(MX_TZ)
     today_str = now_mx.strftime("%Y-%m-%d")
-    rows = sb_get("wansoft_daily", {
+    rows = sb_get("ops_daily_live", {
+        "client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,ventas_por_grupo,meseros,platillos_top",
         "fecha": f"eq.{today_str}",
         "limit": "1",
     })
-    if rows:
-        return rows[0]
-    # Fallback to wansoft_kpis if today's daily not yet synced
-    rows = sb_get("wansoft_kpis", {"select": "*", "limit": "1"})
     return rows[0] if rows else None
 
 
@@ -88,7 +85,7 @@ def get_comparison_days(today):
 
     results = {}
     for label, fecha in [("ayer", yesterday), ("semana_pasada", last_week)]:
-        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant,tickets_count,personas_restaurant,ventas_por_grupo",
             "fecha": f"eq.{fecha}",
             "limit": "1",
@@ -104,7 +101,7 @@ def get_historical_same_dow(today, weeks=4):
     results = []
     for w in range(1, weeks + 1):
         d = today - timedelta(weeks=w)
-        rows = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+        rows = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
             "select": "fecha,ventas_dia,ticket_promedio_restaurant,ventas_por_grupo",
             "fecha": f"eq.{d.strftime('%Y-%m-%d')}",
             "limit": "1",
@@ -113,19 +110,81 @@ def get_historical_same_dow(today, weeks=4):
     return results
 
 
+# ── Snapshot curve ──────────────────────────────────────────────────────────
+def get_intraday_snapshots(business_date_str):
+    """
+    Fetch intraday snapshots from ops_daily WHERE record_type='snapshot'
+    for the given business date. Returns list of {ventas_dia, updated_at} dicts
+    ordered by updated_at asc, or [] if no snapshots exist.
+    """
+    rows = sb_get("ops_daily", {
+        "client_id": f"eq.{CLIENT['id']}",
+        "fecha": f"eq.{business_date_str}",
+        "record_type": "eq.snapshot",
+        "select": "ventas_dia,updated_at",
+        "order": "updated_at.asc",
+        "limit": "200",
+    })
+    return rows or []
+
+
+def build_snapshot_distribution(snapshots, open_hour=8, close_hour=22):
+    """
+    Build a {hour: cumulative_pct} curve from snapshot data.
+    Returns None if fewer than 2 snapshots (fall back to HOURLY_DISTRIBUTION).
+    """
+    if len(snapshots) < 2:
+        return None
+
+    # Use the last snapshot as the "current" denominator
+    max_ventas = float(snapshots[-1].get("ventas_dia") or 0)
+    if max_ventas <= 0:
+        return None
+
+    curve = {}
+    for snap in snapshots:
+        ts = snap.get("updated_at", "")
+        ventas = float(snap.get("ventas_dia") or 0)
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(MX_TZ)
+            hour = dt.hour
+        except Exception:
+            continue
+        # Store the highest cumulative pct seen for this hour
+        pct = ventas / max_ventas
+        if hour not in curve or pct > curve[hour]:
+            curve[hour] = pct
+
+    return curve if curve else None
+
+
 # ── Projection ──────────────────────────────────────────────────────────────
-def project_close(current_ventas, current_hour):
-    """Project total close based on current ventas and hourly distribution."""
+def project_close(current_ventas, current_hour, snapshot_curve=None):
+    """Project total close based on current ventas and hourly distribution.
+
+    If snapshot_curve is provided (built from ops_daily snapshots), uses actual
+    intraday ventas progression instead of the hardcoded HOURLY_DISTRIBUTION.
+    Falls back to HOURLY_DISTRIBUTION when no snapshot data is available.
+    """
     if current_hour < 8 or current_ventas <= 0:
         return 0
 
-    # Calculate what % of the day has been captured so far
+    if snapshot_curve:
+        # Use actual snapshot curve: find pct_captured at current hour
+        pct_captured = snapshot_curve.get(current_hour)
+        if pct_captured is None:
+            # Find the latest hour at or before current_hour
+            past_hours = [h for h in snapshot_curve if h <= current_hour]
+            pct_captured = snapshot_curve[max(past_hours)] if past_hours else None
+        if pct_captured and pct_captured > 0.05:
+            return round(current_ventas / pct_captured)
+        # If snapshot curve doesn't cover current hour yet, fall through to hardcoded
+
+    # Hardcoded distribution fallback
     pct_captured = sum(
         pct for hour, pct in HOURLY_DISTRIBUTION.items()
         if hour < current_hour
     )
-
-    # Add partial current hour (assume halfway through)
     current_hour_pct = HOURLY_DISTRIBUTION.get(current_hour, 0.03)
     pct_captured += current_hour_pct * 0.5
 
@@ -289,20 +348,28 @@ def main():
         _log_run("close-predictor", "no_data", elapsed, skip_reason="ventas_dia=0", data_status="no_data", tentacle="reportes")
         return
 
-    # 2. Project close
-    projected = project_close(current_ventas, current_hour)
+    # 2. Fetch intraday snapshots and build curve (if available)
+    snapshots = get_intraday_snapshots(today_str)
+    snapshot_curve = build_snapshot_distribution(snapshots) if snapshots else None
+    if snapshot_curve:
+        print(f"[close_predictor] Using snapshot curve ({len(snapshots)} snapshots)")
+    else:
+        print("[close_predictor] No snapshots — using hardcoded HOURLY_DISTRIBUTION")
+
+    # 3. Project close
+    projected = project_close(current_ventas, current_hour, snapshot_curve=snapshot_curve)
     if projected <= 0:
         print("[close_predictor] Too early to project, skipping")
         elapsed = int((time.time() - start) * 1000)
         _log_run("close-predictor", "skipped", elapsed, skip_reason=f"too early to project at hour {current_hour}", data_status="ok", tentacle="reportes")
         return
 
-    # 3. Fetch comparison data
+    # 4. Fetch comparison data
     print("[close_predictor] Fetching comparisons...")
     comparisons = get_comparison_days(now_mx)
     historical = get_historical_same_dow(now_mx, weeks=4)
 
-    # 4. Build structured data
+    # 5. Build structured data
     today_groups = today_data.get("ventas_por_grupo") or []
     boosts = []
     _cats = CLIENT.get("menu_categories") or {}
@@ -338,7 +405,7 @@ def main():
     priority = "warning" if projected < avg_dow * 0.85 else "info"
     summary = f"Proyección: ${projected:,.0f} (avance {pct_done:.0f}%)"
 
-    # 5. Save to DB
+    # 6. Save to DB
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/agent_results",
@@ -360,7 +427,7 @@ def main():
     elapsed = int((time.time() - start) * 1000)
     print(f"[close_predictor] Done in {elapsed}ms — {summary}")
 
-    # 6. Log
+    # 7. Log
     _log_run(
         "close-predictor", "success", elapsed,
         output_summary=f"current: ${current_ventas:,.0f}, projected: ${projected:,.0f}",
@@ -369,7 +436,7 @@ def main():
         tentacle="reportes",
     )
 
-    # 7. Insight
+    # 8. Insight
     insight_severity = "medium" if projected < avg_dow * 0.85 else "info"
     create_insight(
         agent_id="close-predictor",

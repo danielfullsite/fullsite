@@ -58,7 +58,7 @@ def sb_get(table, params):
 def get_last_n_days(days=28):
     """Fetch last N days of daily data."""
     cutoff = (datetime.now(MX_TZ) - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,meseros,mesas_atendidas",
         "fecha": f"gte.{cutoff}",
         "ventas_dia": "gt.0",

@@ -54,12 +54,17 @@ def sb_get(table, params):
 
 # -- Data fetching --
 def get_today_kpis():
-    rows = sb_get("wansoft_kpis", {"select": "*", "limit": "1"})
+    today_str = datetime.now(MX_TZ).strftime("%Y-%m-%d")
+    rows = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}",
+        "fecha": f"eq.{today_str}",
+        "select": "*",
+        "limit": "1",
+    })
     return rows[0] if rows else None
 
 
 def get_historical(days=30):
-    data = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    data = sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
@@ -286,14 +291,15 @@ def main():
 
     print(f"[table_time] Starting for {CLIENT['id']} on {today_str}")
 
-    # 1. Fetch today's KPIs (try kpis first, fallback to wansoft_daily)
+    # 1. Fetch today's KPIs from ops_daily_live
     today_kpis = get_today_kpis()
-    # KPIs often have tickets_count=0 — always try wansoft_daily as primary
-    daily = sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
-    if daily and int(daily[0].get("tickets_count", 0) or 0) > 0:
-        today_kpis = daily[0]
-        print(f"[table_time] Using wansoft_daily: {today_kpis.get('fecha')} ({today_kpis.get('tickets_count')} tickets)")
-    elif not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
+    # If live view returned no tickets, try latest available date from ops_daily_live
+    if not today_kpis or int(today_kpis.get("tickets_count", 0) or 0) == 0:
+        daily = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}","select": "*", "ventas_dia": "gt.0", "order": "fecha.desc", "limit": "1"})
+        if daily and int(daily[0].get("tickets_count", 0) or 0) > 0:
+            today_kpis = daily[0]
+            print(f"[table_time] Using ops_daily_live latest: {today_kpis.get('fecha')} ({today_kpis.get('tickets_count')} tickets)")
+    if not today_kpis or not (today_kpis.get("ventas_dia") or today_kpis.get("tickets_count")):
         print("[table_time] No KPI data — skipping")
         _log_run_common(
             agent_id="table-time", status="no_data",

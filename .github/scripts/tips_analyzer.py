@@ -55,7 +55,7 @@ def get_weekly_daily(days=7):
     """Fetch last 7 days from wansoft_daily."""
     now_mx = datetime.now(MX_TZ)
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,tickets_count,propinas_total,meseros,ventas_por_grupo,personas_restaurant,ticket_promedio_restaurant",
         "fecha": f"gte.{start_date}",
         "ventas_dia": "gt.0",
@@ -90,7 +90,7 @@ def get_waiter_categories(days=7):
 
 def get_historical_daily(days=30):
     """Longer history for baseline."""
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,propinas_total,ventas_dia,tickets_count",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",

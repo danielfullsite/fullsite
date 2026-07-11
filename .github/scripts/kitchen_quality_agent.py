@@ -58,7 +58,7 @@ def get_recent_daily(days=7):
     """Fetch last N days from wansoft_daily."""
     now_mx = datetime.now(MX_TZ)
     start_date = (now_mx - timedelta(days=days)).strftime("%Y-%m-%d")
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,descuentos,tickets_count,ventas_por_grupo",
         "fecha": f"gte.{start_date}",
         "ventas_dia": "gt.0",
@@ -69,7 +69,7 @@ def get_recent_daily(days=7):
 
 def get_historical_avg(days=30):
     """Fetch longer history for baseline comparison."""
-    return sb_get("wansoft_daily", {"client_slug": f"eq.{CLIENT['id']}",
+    return sb_get("ops_daily_history", {"client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,descuentos,tickets_count,ventas_dia",
         "ventas_dia": "gt.0",
         "order": "fecha.desc",
