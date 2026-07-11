@@ -98,12 +98,12 @@ export default function LoginPage() {
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Bienvenido</h2>
-          <p className="text-gray-400 text-sm mb-10">Inicia sesion para continuar</p>
+          <p className="text-gray-400 text-sm mb-10">Inicia sesión para continuar</p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1.5">
-                Correo electronico
+                Correo electrónico
               </label>
               <input
                 id="email"
@@ -119,7 +119,7 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-1.5">
-                Contrasena
+                Contraseña
               </label>
               <input
                 id="password"
@@ -150,14 +150,14 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            No tienes cuenta?{' '}
+            ¿No tienes cuenta?{' '}
             <a
               href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20crear%20una%20cuenta%20en%20Fullsite."
               target="_blank"
               rel="noopener noreferrer"
               className="text-emerald-600 font-medium hover:text-emerald-700 transition-colors"
             >
-              Contactanos
+              Contáctanos
             </a>
           </p>
 
