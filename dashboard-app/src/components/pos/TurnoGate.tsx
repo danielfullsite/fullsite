@@ -263,6 +263,17 @@ export default function TurnoGate({ staff, children }: TurnoGateProps) {
       if (!turno) return
       setClosing(true)
       setError('')
+      // Sync barrier: block close if there are pending offline writes
+      try {
+        const { getPendingQueue } = await import('@/lib/pos-offline-db')
+        const pending = await getPendingQueue()
+        const unsynced = pending.filter(p => !p.synced)
+        if (unsynced.length > 0) {
+          setError(`${unsynced.length} operaciones pendientes de sincronizar. Espera a que terminen antes de cerrar turno.`)
+          setClosing(false)
+          return
+        }
+      } catch { /* IndexedDB unavailable — proceed */ }
       const closed = await autoCloseStaleTurno(turno.id, staff.name)
       if (closed) {
         logAudit({ action: 'status_changed', actor: staff.name, mesa: 0, details: { type: 'turno_auto_closed', turno_id: turno.id } })

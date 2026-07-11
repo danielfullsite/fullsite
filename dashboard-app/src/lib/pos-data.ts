@@ -1134,6 +1134,17 @@ export async function saveOrder(order: Order): Promise<boolean> {
     updated_at: new Date().toISOString(),
   }
 
+  // Payment reconciliation: sum(pagos.monto) must equal total + propina exactly (in cents)
+  if (order.status === 'cerrada' && order.pagos && order.pagos.length > 0) {
+    const toCents = (n: number) => Math.round((n || 0) * 100)
+    const pagosSum = order.pagos.reduce((s: number, p: { monto?: number }) => s + toCents(p.monto || 0), 0)
+    const expected = toCents(order.total) + toCents(order.propina || 0)
+    if (pagosSum !== expected) {
+      console.error(`[saveOrder] Payment reconciliation failed: pagos=${pagosSum}¢ vs expected=${expected}¢ (total=${order.total} + propina=${order.propina || 0})`)
+      return false
+    }
+  }
+
   try {
     const post = (body: Record<string, unknown>) => fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
       method: 'POST',
@@ -1160,7 +1171,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
     if (typeof window !== 'undefined') {
       try {
         const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
-        await queueOperation('pos_orders', 'POST', { id: order.id, ...orderData })
+        await queueOperation('pos_orders', 'POST', { id: order.id, ...orderData }, undefined, (orderData.updated_at as string) || undefined)
         // created_at local para que el KDS offline pueda mostrar tiempos
         await cacheOrder({ id: order.id, created_at: new Date().toISOString(), ...orderData })
       } catch {

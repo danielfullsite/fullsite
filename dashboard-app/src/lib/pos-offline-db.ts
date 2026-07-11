@@ -13,6 +13,8 @@ interface SyncQueueItem {
   created_at: string
   synced: boolean
   retries: number
+  base_version?: string  // server updated_at at time of queue, for conflict detection
+  conflict?: boolean     // true if sync detected a conflict — requires manual resolution
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -128,7 +130,8 @@ export async function queueOperation(
   table: string,
   method: 'POST' | 'PATCH' | 'DELETE',
   data: Record<string, unknown>,
-  endpoint?: string
+  endpoint?: string,
+  base_version?: string
 ): Promise<string> {
   const db = await openDB()
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -141,6 +144,7 @@ export async function queueOperation(
     created_at: new Date().toISOString(),
     synced: false,
     retries: 0,
+    base_version,
   }
   const tx = db.transaction('sync_queue', 'readwrite')
   tx.objectStore('sync_queue').put(item)
@@ -235,36 +239,82 @@ export async function syncAll(): Promise<{ synced: number; failed: number }> {
         await markSynced(item.id)
         synced++
       } else if (res.status === 409) {
-        // Conflict: another terminal already modified this order.
-        // Try PATCH (merge) instead of POST (create) to apply our changes
+        // Conflict: row already exists on server.
+        // DO NOT blind PATCH — check server state first.
         if (item.method === 'POST' && item.table === 'pos_orders') {
           try {
-            const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}`, {
-              method: 'PATCH',
-              headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                Prefer: 'return=minimal',
-              },
-              body: JSON.stringify(item.data),
+            // Step 1: Read current server state
+            const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}&select=status,updated_at`, {
+              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
             })
-            if (patchRes.ok) {
-              console.warn(`[offline-sync] 409 resolved via PATCH for order ${item.data.id}`)
-              await markSynced(item.id)
-              synced++
-            } else {
-              console.error(`[offline-sync] 409 PATCH failed for order ${item.data.id}: ${patchRes.status}`)
+            const serverRows = checkRes.ok ? await checkRes.json() : []
+            const server = Array.isArray(serverRows) && serverRows.length > 0 ? serverRows[0] : null
+
+            if (!server) {
+              // Couldn't read server state — retry later
+              console.error(`[offline-sync] 409 but couldn't read server state for ${item.data.id}`)
               await incrementRetry(item.id)
               failed++
+            } else if (server.status === 'cerrada' || server.status === 'cancelada' || server.status === 'anulada') {
+              // Terminal state: order already processed by another path. Mark synced, do NOT overwrite.
+              console.warn(`[offline-sync] 409: order ${item.data.id} already ${server.status} on server — marking synced`)
+              await markSynced(item.id)
+              synced++
+            } else if (item.base_version && server.updated_at !== item.base_version) {
+              // Server was modified since we queued — CONFLICT, do not overwrite
+              console.error(`[offline-sync] CONFLICT: order ${item.data.id} modified on server (base=${item.base_version}, server=${server.updated_at})`)
+              // Mark as conflict for manual resolution
+              const db = await openDB()
+              const tx = db.transaction('sync_queue', 'readwrite')
+              const store = tx.objectStore('sync_queue')
+              const existing = await new Promise<SyncQueueItem | undefined>((resolve) => {
+                const req = store.get(item.id)
+                req.onsuccess = () => resolve(req.result)
+                req.onerror = () => resolve(undefined)
+              })
+              if (existing) {
+                existing.conflict = true
+                store.put(existing)
+              }
+              failed++
+            } else {
+              // Server version matches our base OR no base_version (legacy item) — safe to PATCH
+              // But only forward-compatible fields (never downgrade status)
+              const serverRank: Record<string, number> = { abierta: 1, enviada: 2, preparando: 3, lista: 4, entregada: 5, cerrada: 6, cancelada: 7, anulada: 7 }
+              const queuedStatus = String(item.data.status || '')
+              const queuedRank = serverRank[queuedStatus] || 0
+              const serverStatusRank = serverRank[server.status] || 0
+
+              if (queuedRank < serverStatusRank) {
+                // Queued status is lower than server — don't downgrade, just mark synced
+                console.warn(`[offline-sync] 409: skipping status downgrade ${queuedStatus} → ${server.status} for ${item.data.id}`)
+                await markSynced(item.id)
+                synced++
+              } else {
+                // Safe to apply — PATCH with full payload
+                const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}`, {
+                  method: 'PATCH',
+                  headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                  body: JSON.stringify(item.data),
+                })
+                if (patchRes.ok) {
+                  console.warn(`[offline-sync] 409 resolved via conditional PATCH for order ${item.data.id}`)
+                  await markSynced(item.id)
+                  synced++
+                } else {
+                  console.error(`[offline-sync] 409 PATCH failed for order ${item.data.id}: ${patchRes.status}`)
+                  await incrementRetry(item.id)
+                  failed++
+                }
+              }
             }
           } catch {
             await incrementRetry(item.id)
             failed++
           }
         } else {
-          // Non-order 409: log and retry (don't silently discard)
-          console.error(`[offline-sync] 409 conflict on ${item.table} — data NOT synced, will retry`)
+          // Non-order 409: log and retry
+          console.error(`[offline-sync] 409 conflict on ${item.table} — will retry`)
           await incrementRetry(item.id)
           failed++
         }
