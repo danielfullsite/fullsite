@@ -61,7 +61,7 @@ def get_today_kpis():
         "client_id": f"eq.{CLIENT['id']}",
         "fecha": f"eq.{today_str}",
         "select": "*",
-        "order": "updated_at.desc",
+        "order": "generated_at.desc",
         "limit": "1",
     })
     return rows[0] if rows else None

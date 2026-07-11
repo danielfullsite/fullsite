@@ -121,8 +121,8 @@ def get_intraday_snapshots(business_date_str):
         "client_id": f"eq.{CLIENT['id']}",
         "fecha": f"eq.{business_date_str}",
         "record_type": "eq.snapshot",
-        "select": "ventas_dia,updated_at",
-        "order": "updated_at.asc",
+        "select": "ventas_dia,bucket_start,generated_at",
+        "order": "bucket_start.asc",
         "limit": "200",
     })
     return rows or []
@@ -143,7 +143,7 @@ def build_snapshot_distribution(snapshots, open_hour=8, close_hour=22):
 
     curve = {}
     for snap in snapshots:
-        ts = snap.get("updated_at", "")
+        ts = snap.get("bucket_start") or snap.get("generated_at") or ""
         ventas = float(snap.get("ventas_dia") or 0)
         try:
             dt = datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(MX_TZ)
