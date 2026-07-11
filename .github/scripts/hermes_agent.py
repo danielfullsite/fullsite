@@ -40,7 +40,8 @@ sb_write = {**sb_headers, "Content-Type": "application/json", "Prefer": "resolut
 
 def sb_get(table, params):
     """Delegate to shared sb_get which raises on error."""
-    return _sb_get(table, "&".join(f"{k}={v}" for k, v in params.items()) if isinstance(params, dict) else params)
+    from urllib.parse import quote
+    return _sb_get(table, "&".join(f"{k}={quote(str(v), safe='.,')}" for k, v in params.items()) if isinstance(params, dict) else params)
 
 
 def sb_upsert(table, data):
