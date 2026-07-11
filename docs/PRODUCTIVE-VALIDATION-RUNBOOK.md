@@ -180,7 +180,8 @@ ORDER BY bucket_start;
 ```
 
 **PASS:** gap = 15 minutes (o NULL para el primero)
-**FAIL:** gap > 30 min → DEGRADED (snapshots missing, pipeline puede estar caído)
+**WARN:** gap > 30 min → degradación tolerable (snapshots missing, pipeline puede estar caído)
+**FAIL:** gap > 45 min → intelligence closed loop ROTO (snapshot pierde elegibilidad en ops_daily_live, agentes LIVE caen a fallback Wansoft o no_data). No es STOP-THE-LINE del POS ni motivo de rollback, pero impide declarar validado el closed loop Fullsite
 
 ### B4. generated_at fresh (pipeline freshness)
 
@@ -194,7 +195,8 @@ ORDER BY generated_at DESC LIMIT 1;
 ```
 
 **PASS:** minutes_ago < 20 (snapshot generado en los últimos 20 min)
-**FAIL:** minutes_ago > 45 → DEGRADED (pipeline stale, ops_daily_live no lo seleccionará)
+**WARN:** minutes_ago > 30 → pipeline degradado, próximo snapshot debería corregir
+**FAIL:** minutes_ago > 45 → intelligence closed loop ROTO (ops_daily_live descarta este snapshot por pipeline stale, agentes LIVE pierden datos Fullsite). Mismo criterio que B3
 
 ### B5. data_freshness refleja último evento
 
