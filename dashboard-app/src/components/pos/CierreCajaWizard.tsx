@@ -148,6 +148,17 @@ export default function CierreCajaWizard({
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
+    // Sync barrier: block cierre if there are pending offline writes
+    try {
+      const { getPendingQueue } = await import('@/lib/pos-offline-db')
+      const pending = await getPendingQueue()
+      const unsynced = pending.filter((p: { synced: boolean }) => !p.synced)
+      if (unsynced.length > 0) {
+        setPinError(`${unsynced.length} operaciones pendientes de sincronizar. Espera a que terminen.`)
+        return
+      }
+    } catch { /* IndexedDB unavailable — proceed */ }
+
     const result = await verifyManagerPinWithRole(pin)
     if (!result) {
       setPinError('PIN invalido')
