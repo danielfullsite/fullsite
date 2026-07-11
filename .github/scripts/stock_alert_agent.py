@@ -137,11 +137,8 @@ try:
             if codigo not in reorder_map:
                 reorder_map[codigo] = {"minimo": minimo, "maximo": maximo}
 
-    # 3. Check each inventory item against reorder points
-    sin_stock = []   # qty == 0
-    critico = []     # qty > 0 but < minimo/2
-    bajo_minimo = [] # qty > 0, >= minimo/2 but < minimo
-
+    # 3. Aggregate stock by product (same product across almacenes = 1 product)
+    product_agg = {}  # codigo → {producto, total_qty, almacenes, es_critico, minimo}
     for item in inventory_raw:
         codigo = (item.get("codigo") or "").strip()
         producto = (item.get("producto") or "").strip()
@@ -150,25 +147,48 @@ try:
         qty = float(item.get("inv_final_qty") or 0)
         es_critico = bool(item.get("critico"))
 
-        # Find reorder config: try (codigo, almacen) first, then just codigo
         rc = reorder_map.get((codigo, almacen_lower)) or reorder_map.get(codigo)
         minimo = rc["minimo"] if rc else 0
 
+        if codigo not in product_agg:
+            product_agg[codigo] = {
+                "producto": producto or codigo,
+                "codigo": codigo,
+                "total_qty": 0,
+                "almacenes": [],
+                "es_critico": es_critico,
+                "minimo": minimo,
+            }
+        product_agg[codigo]["total_qty"] += qty
+        if almacen:
+            product_agg[codigo]["almacenes"].append(almacen)
+        if minimo > product_agg[codigo]["minimo"]:
+            product_agg[codigo]["minimo"] = minimo
+        if es_critico:
+            product_agg[codigo]["es_critico"] = True
+
+    # 4. Check aggregated products against reorder points
+    sin_stock = []   # qty == 0
+    critico = []     # qty > 0 but < minimo/2
+    bajo_minimo = [] # qty > 0, >= minimo/2 but < minimo
+
+    for codigo, agg in product_agg.items():
+        qty = agg["total_qty"]
+        minimo = agg["minimo"]
+
         entry = {
-            "producto": producto or codigo,
-            "almacen": almacen,
-            "qty": qty,
+            "producto": agg["producto"],
+            "almacen": ", ".join(sorted(set(agg["almacenes"]))),
+            "qty": round(qty, 2),
             "minimo": minimo,
             "codigo": codigo,
         }
 
-        # Case A: Zero stock on critical items (even without reorder config)
-        if qty == 0 and es_critico:
+        if qty == 0 and agg["es_critico"]:
             sin_stock.append(entry)
             continue
 
-        # Case B: Has reorder config — check against minimo
-        if rc and minimo > 0:
+        if minimo > 0:
             if qty == 0:
                 sin_stock.append(entry)
             elif qty < minimo / 2:

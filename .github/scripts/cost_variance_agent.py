@@ -12,7 +12,9 @@ import json
 import time
 import requests
 from datetime import datetime, timezone
+sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids
+from agent_common import log_run as _log_run, create_insight
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("cost_variance_agent")
@@ -98,19 +100,25 @@ try:
 
     if suppliers_data:
         sup_raw = suppliers_data[0].get("data", "[]")
-        if isinstance(sup_raw, str):
-            try: sup_raw = json.loads(sup_raw)
-            except: sup_raw = []
-        if isinstance(sup_raw, str):
-            try: sup_raw = json.loads(sup_raw)
-            except: sup_raw = []
+        # Handle triple-encoded JSON (string → string → list/dict)
+        for _ in range(3):
+            if isinstance(sup_raw, str):
+                try: sup_raw = json.loads(sup_raw)
+                except: break
+        # Could be {"Result": [...]} or [...]
+        if isinstance(sup_raw, dict):
+            sup_raw = sup_raw.get("Result", [])
+        if not isinstance(sup_raw, list):
+            sup_raw = []
 
         # Build supplier spend map
-        for s in (sup_raw or []):
-            name = s.get("nombre") or s.get("proveedor") or ""
-            total = float(s.get("total") or s.get("monto") or 0)
+        for s in sup_raw:
+            if not isinstance(s, dict):
+                continue
+            name = s.get("SupplierName") or s.get("nombre") or s.get("proveedor") or ""
+            total = float(s.get("Amount") or s.get("total") or s.get("monto") or 0)
             if name and total > 0:
-                by_supplier[name] = total
+                by_supplier[name] = by_supplier.get(name, 0) + total
 
     # Get last week's cost snapshot from agent_results for comparison
     prev_results = sb_get("agent_results", {
@@ -245,16 +253,14 @@ except Exception as e:
     print(f"[cost-variance] {output_sum}", file=sys.stderr)
 
 duration_ms = int((time.time() - start_time) * 1000)
-try:
-    sb_post("agent_runs", {
-        "agent_id": "cost-variance",
-        "trigger_type": TRIGGER_TYPE,
-        "status": status,
-        "duration_ms": duration_ms,
-        "output_summary": output_sum,
-        "error_message": error_msg,
-        "tentacle": "ops",
-    })
-    print(f"[cost-variance] Done in {duration_ms}ms. {output_sum}")
-except Exception as e:
-    print(f"[cost-variance] WARN: log failed: {e}", file=sys.stderr)
+_log_run(
+    agent_id="cost-variance",
+    status=status,
+    duration_ms=duration_ms,
+    output_summary=output_sum,
+    error_message=error_msg or "",
+    tentacle="ops",
+    rows_processed=len(ingredients) if 'ingredients' in dir() else 0,
+    data_status="error" if status == "error" else "ok",
+)
+print(f"[cost-variance] Done in {duration_ms}ms. {output_sum}")
