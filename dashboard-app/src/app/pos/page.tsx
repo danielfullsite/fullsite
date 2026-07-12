@@ -2445,7 +2445,17 @@ function POSContent() {
       }
 
       setLoadedOrderId(orderId)
-      setLoadedUpdatedAt(new Date().toISOString())
+      // Read server's actual updated_at (trigger sets it, may differ from client time)
+      try {
+        const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at`, {
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+        })
+        if (freshRes.ok) {
+          const rows = await freshRes.json()
+          if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
+          else setLoadedUpdatedAt(new Date().toISOString())
+        } else setLoadedUpdatedAt(new Date().toISOString())
+      } catch { setLoadedUpdatedAt(new Date().toISOString()) }
       setSaving(false); operationLock.current = false
       // Cache order locally so it loads instantly when returning to this mesa
       try {
