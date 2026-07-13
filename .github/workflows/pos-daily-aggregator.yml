@@ -2,9 +2,9 @@ name: POS Daily Aggregator
 
 on:
   schedule:
-    # Avance 3pm MX = 21:00 UTC
-    - cron: '0 21 * * *'
     # Cierre 11pm MX = 05:00 UTC (+1 day)
+    # 3pm avance REMOVED: partial aggregates must not be published as record_type='cierre'.
+    # Intraday data is served by pos_intraday_snapshot (record_type='snapshot').
     - cron: '0 5 * * *'
   workflow_dispatch:
     inputs:

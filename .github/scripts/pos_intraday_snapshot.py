@@ -39,11 +39,12 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz
 from agent_common import log_run as _log_run
-from ops_aggregate import aggregate_orders
+from ops_aggregate import aggregate_orders, get_business_day_config, get_business_day_bounds
 
 CLIENT = get_client()
 CLIENT_ID = CLIENT["id"]
-MX_TZ = get_tz(CLIENT)
+MX_TZ = get_tz(CLIENT)  # kept for display/logging; business-day logic uses shared primitive
+BIZ_TZ, BIZ_BOUNDARY = get_business_day_config(CLIENT)  # fails closed if missing
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
@@ -90,10 +91,13 @@ def sb_upsert_snapshot(data):
         r.raise_for_status()
 
 
-def get_business_date(now_local):
-    """Business day: if before 5 AM, it's still yesterday's business day."""
-    if now_local.hour < 5:
-        return (now_local - timedelta(days=1)).date()
+def get_biz_date(now_local):
+    """Business day from local time, using canonical boundary from client config."""
+    boundary_today = now_local.replace(hour=BIZ_BOUNDARY.hour,
+                                       minute=BIZ_BOUNDARY.minute,
+                                       second=0, microsecond=0)
+    if now_local < boundary_today:
+        return (now_local.date() - timedelta(days=1))
     return now_local.date()
 
 
@@ -104,25 +108,18 @@ def get_bucket_start(now_local):
 
 
 def fetch_closed_orders(business_date):
-    """
-    Fetch all cerrada orders whose closed_at falls on the business day
-    in the client's timezone.
+    """Fetch all cerrada orders whose closed_at falls on the business day.
 
-    Business day window: business_date 05:00 → business_date+1 04:59:59
-    (in client timezone, converted to UTC for the query).
+    Uses canonical shared primitive for business-day bounds.
     """
-    day_start_local = datetime(business_date.year, business_date.month,
-                               business_date.day, 5, 0, 0, tzinfo=MX_TZ)
-    day_end_local = day_start_local + timedelta(hours=24)
-
-    day_start_utc = day_start_local.astimezone(timezone.utc).isoformat()
-    day_end_utc = day_end_local.astimezone(timezone.utc).isoformat()
+    _, _, utc_start, utc_end = get_business_day_bounds(
+        str(business_date), BIZ_TZ, BIZ_BOUNDARY)
 
     orders = sb_get("pos_orders", {
         "client_id": f"eq.{CLIENT_ID}",
         "status": "eq.cerrada",
-        "closed_at": f"gte.{day_start_utc}",
-        "and": f"(closed_at.lt.{day_end_utc})",
+        "closed_at": f"gte.{utc_start.isoformat()}",
+        "and": f"(closed_at.lt.{utc_end.isoformat()})",
         "order": "closed_at.asc",
         "limit": "1000",
     })
@@ -157,8 +154,8 @@ def aggregate(orders, item_cat_map):
 def main():
     start = time.time()
 
-    now_local = datetime.now(MX_TZ)
-    business_date = get_business_date(now_local)
+    now_local = datetime.now(BIZ_TZ)
+    business_date = get_biz_date(now_local)
     bucket = get_bucket_start(now_local)
 
     print(f"[intraday] {now_local.strftime('%Y-%m-%d %H:%M')} MX | "

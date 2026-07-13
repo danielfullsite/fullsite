@@ -1,0 +1,39 @@
+name: POS Intraday Snapshot
+
+# ACTIVATION STATUS: MANUAL ONLY
+# Schedule lines are commented out until controlled activation review.
+# To activate: uncomment the schedule block and commit.
+# GitHub Actions auto-enables cron on merge to default branch,
+# so schedule must NOT be present until activation is approved.
+
+on:
+  # schedule:
+  #   # AMALAY-specific: 10:00 AM - 10:45 PM America/Monterrey (UTC-6)
+  #   # For additional tenants, either:
+  #   #   A. Add tenant-specific cron lines, or
+  #   #   B. Migrate to neutral cadence (*/15 * * * *) with per-client
+  #   #      local-time eligibility check in the producer script.
+  #   - cron: '*/15 16-23 * * *'    # 10:00 AM - 5:45 PM local
+  #   - cron: '*/15 0-4 * * *'      # 6:00 PM - 10:45 PM local
+  workflow_dispatch: {}
+
+defaults:
+  run:
+    working-directory: .github/scripts
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  TRIGGER_TYPE: ${{ github.event_name }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pytz
+      - run: python pos_intraday_snapshot.py

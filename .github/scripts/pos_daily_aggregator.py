@@ -26,15 +26,16 @@ import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone, date
-from zoneinfo import ZoneInfo
 from collections import defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids
+from ops_aggregate import get_business_day_config, get_business_day_bounds
 from agent_common import log_run as _log_run
 
 # -- Config --
 CLIENT = get_client()
-MX_TZ = get_tz(CLIENT)
+MX_TZ = get_tz(CLIENT)  # kept for display/logging
+BIZ_TZ, BIZ_BOUNDARY = get_business_day_config(CLIENT)  # fails closed if missing
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -100,40 +101,29 @@ def sb_upsert_daily(fecha, data):
         return False
 
 
-def get_client_tz():
-    """Return ZoneInfo for the client's IANA timezone."""
-    tz_name = CLIENT.get("timezone", "America/Mexico_City")
-    return ZoneInfo(tz_name)
-
-
 def get_target_date():
     """Determine which date to aggregate (in client local timezone)."""
     if TARGET_DATE:
         return TARGET_DATE
-    now_local = datetime.now(get_client_tz())
+    now_local = datetime.now(BIZ_TZ)
     return now_local.strftime("%Y-%m-%d")
 
 
 def fetch_closed_orders(fecha):
     """Fetch all closed POS orders for a business day.
 
-    Business day is determined by closed_at converted to the client's
-    local timezone. Revenue attribution: [local_midnight, next_local_midnight).
+    Uses canonical shared primitive for business-day bounds.
+    Revenue attribution: [boundary, next_day_boundary) by closed_at.
     Only status='cerrada' orders count as revenue.
     """
-    client_tz = get_client_tz()
-    y, m, d = map(int, fecha.split("-"))
-    local_start = datetime(y, m, d, 0, 0, 0, tzinfo=client_tz)
-    local_end = datetime(y, m, d + 1, 0, 0, 0, tzinfo=client_tz)
-    utc_start = local_start.astimezone(timezone.utc).isoformat()
-    utc_end = local_end.astimezone(timezone.utc).isoformat()
+    _, _, utc_start, utc_end = get_business_day_bounds(fecha, BIZ_TZ, BIZ_BOUNDARY)
 
     orders = sb_get("pos_orders", {
         "select": "*",
         "client_id": f"eq.{CLIENT['id']}",
         "status": "eq.cerrada",
-        "closed_at": f"gte.{utc_start}",
-        "and": f"(closed_at.lt.{utc_end})",
+        "closed_at": f"gte.{utc_start.isoformat()}",
+        "and": f"(closed_at.lt.{utc_end.isoformat()})",
         "order": "closed_at.asc",
         "limit": "500",
     })

@@ -5,11 +5,119 @@ Used by both:
 - pos_intraday_snapshot.py (snapshots every 15 min)
 - pos_daily_aggregator.py (cierre at end of day)
 
-Single source of truth for how POS orders become operational metrics.
+Single source of truth for:
+1. Business-day attribution (which date an order belongs to)
+2. Revenue aggregation (pos_orders → ops_daily metrics)
 """
 
 import json
+from datetime import datetime, timedelta, date, time, timezone
+from zoneinfo import ZoneInfo
 from collections import defaultdict
+
+
+# ── Business-day primitives ─────────────────────────────────────────────────
+# Every producer MUST use these instead of hardcoding boundaries.
+
+def get_business_day_config(client):
+    """Read business-day config from client row. Fail closed if missing.
+
+    Args:
+        client: dict from client_config.get_client() (Supabase clients row)
+
+    Returns:
+        (tz: ZoneInfo, boundary: datetime.time)
+
+    Raises:
+        ValueError if timezone or business_day_start_local is missing/invalid.
+    """
+    tz_name = client.get("timezone")
+    if not tz_name:
+        raise ValueError(
+            f"Client '{client.get('id')}' has no timezone configured. "
+            f"Set clients.timezone to an IANA timezone (e.g. 'America/Monterrey')."
+        )
+    try:
+        tz = ZoneInfo(tz_name)
+    except (KeyError, Exception) as e:
+        raise ValueError(
+            f"Client '{client.get('id')}' has invalid timezone '{tz_name}': {e}"
+        )
+
+    boundary_raw = client.get("business_day_start_local")
+    if not boundary_raw:
+        raise ValueError(
+            f"Client '{client.get('id')}' has no business_day_start_local configured. "
+            f"Set clients.business_day_start_local (e.g. '05:00:00')."
+        )
+    # Parse TIME from string (Supabase returns "HH:MM:SS" for TIME columns)
+    if isinstance(boundary_raw, str):
+        parts = boundary_raw.split(":")
+        try:
+            boundary = time(int(parts[0]), int(parts[1]),
+                            int(parts[2]) if len(parts) > 2 else 0)
+        except (ValueError, IndexError) as e:
+            raise ValueError(
+                f"Client '{client.get('id')}' has invalid business_day_start_local "
+                f"'{boundary_raw}': {e}"
+            )
+    elif isinstance(boundary_raw, time):
+        boundary = boundary_raw
+    else:
+        raise ValueError(
+            f"Client '{client.get('id')}' business_day_start_local has unexpected "
+            f"type {type(boundary_raw)}: {boundary_raw}"
+        )
+
+    return tz, boundary
+
+
+def get_business_day_bounds(fecha_str, tz, boundary_local_time):
+    """Return [local_start, local_end, utc_start, utc_end) for a business day.
+
+    Business day runs from [fecha at boundary, next_calendar_date at boundary).
+    Each bound is constructed from its own calendar date — DST safe.
+
+    Args:
+        fecha_str: 'YYYY-MM-DD'
+        tz: ZoneInfo instance
+        boundary_local_time: datetime.time (e.g. time(5, 0))
+
+    Returns:
+        (local_start, local_end, utc_start, utc_end)
+    """
+    y, m, d = map(int, fecha_str.split("-"))
+    local_start = datetime(y, m, d, boundary_local_time.hour,
+                           boundary_local_time.minute, 0, tzinfo=tz)
+    next_d = date(y, m, d) + timedelta(days=1)
+    local_end = datetime(next_d.year, next_d.month, next_d.day,
+                         boundary_local_time.hour,
+                         boundary_local_time.minute, 0, tzinfo=tz)
+    return (local_start, local_end,
+            local_start.astimezone(timezone.utc),
+            local_end.astimezone(timezone.utc))
+
+
+def get_business_date(timestamp_utc_str, tz, boundary_local_time):
+    """Determine which business date a UTC timestamp belongs to.
+
+    Converts to local time, then: if local time < boundary → previous calendar day.
+
+    Args:
+        timestamp_utc_str: ISO format UTC timestamp
+        tz: ZoneInfo instance
+        boundary_local_time: datetime.time
+
+    Returns:
+        'YYYY-MM-DD' string
+    """
+    ts = datetime.fromisoformat(timestamp_utc_str).astimezone(tz)
+    boundary_today = ts.replace(hour=boundary_local_time.hour,
+                                minute=boundary_local_time.minute,
+                                second=0, microsecond=0)
+    if ts < boundary_today:
+        return (ts.date() - timedelta(days=1)).isoformat()
+    return ts.date().isoformat()
 
 
 def aggregate_orders(orders, item_cat_map):
