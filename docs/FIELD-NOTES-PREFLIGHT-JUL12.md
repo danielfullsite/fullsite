@@ -1,6 +1,6 @@
 # FIELD NOTES — Preflight AMALAY Jul 12, 2026
 
-> Sesion fisica domingo. Caja configurada y validada.
+> Sesion fisica domingo. 3 terminales configuradas y validadas.
 
 ---
 
@@ -31,58 +31,114 @@
 
 Bridge parsea `data.stations || data`. Soporta:
 - TCP simple: `{ type: "tcp", host, port }`
-- USB: `{ type: "usb", names: ["..."] }`
+- USB: `{ type: "usb", names: ["..."] }` (requiere impresora compartida en Windows)
 - Array (multi-target): `[ {...}, {...} ]` — envia a TODAS
 
-## printers.json efectivo Caja (PASS)
+## Terminal: CAJA (SERVER1) — PASS
 
+**printers.json:**
 ```json
 {"port":7717,"stations":{"cocina":[{"type":"tcp","host":"192.168.1.21","port":9100},{"type":"tcp","host":"192.168.1.40","port":9100}],"barra":{"type":"tcp","host":"192.168.1.30","port":9100},"caja":{"type":"usb","names":["PANADERIA"]},"tickets":{"type":"usb","names":["EC01","EC TICKET"]}},"default":"tickets"}
 ```
 
-## Cambios locales Windows hechos en Caja hoy
+**Impresoras Windows:** PANADERIA (Shared=TRUE), EC01, EC TICKET, COCINA FRIA, COCINA CALIENTE, BARRA, Canon (2), A6E
 
-| Cambio | Detalle | Persistente |
-|---|---|---|
-| start-bridge.bat eliminado | `del` del Startup folder | Si — no regresa al reiniciar |
-| PANADERIA compartida | `Set-Printer -Shared $true` | Si — config de Windows |
-| EC01/EC TICKET no compartidas | Access denied (usuario Cliente sin admin) | N/A — no se usan para caja |
-| printers.json editado | windows→usb para caja/tickets | Si — archivo en disco |
-| Fullsite POS auto-start | app.setLoginItemSettings (en main.js) | Si — registro de Windows |
+**Cambios locales:**
+- start-bridge.bat eliminado del Startup
+- PANADERIA compartida (Set-Printer -Shared $true)
+- printers.json: caja/tickets cambiados de type:windows a type:usb
+- EC01/EC TICKET no se pudieron compartir (Access denied, usuario Cliente sin admin)
 
-## Smoke test Caja — PASS
-
+**Smoke:**
 | Test | Resultado |
 |---|---|
-| Fullsite abre en kiosk | PASS |
-| Huella visible al cold start | PASS (3/3 restarts) |
+| Huella visible cold start | PASS |
 | Huella autentica | PASS |
-| Bridge health (cocina/barra/caja/tickets) | PASS |
-| Fingerprint service health | PASS (enrolled=1) |
 | Comanda cocina fria (192.168.1.21) | PASS |
 | Comanda cocina caliente (192.168.1.40) | PASS |
 | Comanda barra (192.168.1.30) | PASS |
 | Cobro efectivo | PASS |
-| Ticket caja (PANADERIA, raw USB) | PASS |
-| Conflict check (updated_at server-side) | PASS |
-| Orden persiste en DB | PASS (status=cerrada, pagos reconciliados) |
+| Ticket caja (PANADERIA USB raw) | PASS |
+| Conflict check | PASS |
 
-## Issues encontrados y resueltos
+## Terminal: ENTRADA (PDV3) — PASS
 
-| Issue | Root cause | Fix |
+**printers.json:**
+```json
+{"port":7717,"stations":{"cocina":[{"type":"tcp","host":"192.168.1.21","port":9100},{"type":"tcp","host":"192.168.1.40","port":9100}],"barra":{"type":"tcp","host":"192.168.1.30","port":9100},"caja":{"type":"usb","names":["TICKET"]},"tickets":{"type":"usb","names":["TICKET"]}},"default":"tickets"}
+```
+
+**Impresoras Windows:** TICKET (Shared=TRUE), PANADERIA, COCINA FRIA, COCINA CALIENTE, BARRA
+
+**Cambios locales:**
+- start-bridge.bat eliminado del Startup
+- printers.json editado: caja/tickets a type:usb con TICKET
+- TICKET ya estaba compartida
+
+**Smoke:**
+| Test | Resultado |
+|---|---|
+| Huella visible cold start | PASS |
+| Comanda cocina | PASS |
+| Comanda barra | PASS |
+| Ticket caja | No testeado explicitamente |
+
+## Terminal: ESCONDITE (PDV1) — PASS (comandas only)
+
+**printers.json:**
+```json
+{"port":7717,"stations":{"cocina":[{"type":"tcp","host":"192.168.1.21","port":9100},{"type":"tcp","host":"192.168.1.40","port":9100}],"barra":{"type":"tcp","host":"192.168.1.30","port":9100},"caja":{"type":"tcp","host":"192.168.1.250","port":9100},"tickets":{"type":"tcp","host":"192.168.1.250","port":9100}},"default":"tickets"}
+```
+
+**Impresoras Windows:** PANADERIA (192.168.1.250, unreachable), COCINA FRIA, COCINA CALIENTE, BARRA, Canon (2), A6E. NO tiene TICKET ni EC01.
+
+**Cambios locales:**
+- start-bridge.bat eliminado del Startup
+- printers.json creado (no existia antes)
+
+**Smoke:**
+| Test | Resultado |
+|---|---|
+| Huella visible cold start | PASS |
+| Comanda cocina fria + caliente | PASS |
+| Comanda barra | PASS |
+| Ticket caja | FAIL — 192.168.1.250 unreachable |
+
+**Ticket issue:**
+- PANADERIA en Escondite apunta a 192.168.1.250 (TCP) — host unreachable
+- No hay impresora de tickets USB local
+- Windows printer sharing a SERVER1\PANADERIA requiere credenciales no disponibles (password "1234" es incorrecta para SERVER1)
+- Escondite puede tomar ordenes y enviar comandas pero NO puede imprimir ticket de cobro
+- FIELD NOTE: resolver con acceso fisico a credenciales de red o impresora USB
+
+## Issues encontrados y resueltos hoy
+
+| Issue | Root cause | Fix | Terminal |
+|---|---|---|---|
+| PIN-only sin huella | start-bridge.bat standalone ocupaba 7717 | Eliminado del Startup | Caja, Entrada, Escondite |
+| /health port/stations/default | loadStations() retornaba wrapper | return data.stations \|\| data | Todas (rebuild exe) |
+| Cocina no imprime | Array de impresoras no soportado | Array.isArray + iterate all | Todas (rebuild exe) |
+| Ticket basura numeros | PANADERIA no compartida, PowerShell GDI fallback | Set-Printer -Shared $true | Caja |
+| type:windows no reconocido | Bridge solo soporta usb/tcp | printers.json editado a type:usb | Caja, Entrada |
+| Conflict toast al cobrar | Client time vs server trigger time | Fix c29e75e: lee server updated_at | Vercel deploy |
+| Escondite sin ticket | 192.168.1.250 unreachable, no USB local | PENDIENTE | Escondite |
+
+## Builds comparados
+
+| Feature | Build viejo (Jul 8, hardcoded) | Build nuevo (Jul 12, dynamic) |
 |---|---|---|
-| PIN-only (sin huella) | start-bridge.bat iniciaba standalone bridge en 7717, sin proxy /fp/ | Eliminado start-bridge.bat del Startup |
-| Conflict toast al cobrar | loadedUpdatedAt usaba client time vs server trigger time | Fix c29e75e: lee server updated_at post-save |
-| /health muestra port/stations/default | loadStations() retornaba wrapper completo | Fix 6e07167: return data.stations \|\| data |
-| Cocina no imprime | Array de impresoras no soportado | Fix 2932000: Array.isArray + iterate all |
-| Ticket basura en caja | PANADERIA no compartida, fallback PowerShell GDI | Set-Printer -Shared $true |
-| type: "windows" no reconocido | Bridge solo soporta "usb" y TCP | Editado printers.json: windows→usb |
+| Impresoras | Hardcoded en main.js | Dinámico via printers.json |
+| Cocina multi-target | Solo 1 IP | Array: cocina fria + caliente |
+| loadStations parser | N/A (hardcoded) | data.stations \|\| data |
+| Fingerprint crash | Muere sin restart | Auto-restart 5 intentos |
+| Offline page | No existe | offline.html con retry |
+| Auto-start Windows | No | Si (registro Windows) |
+| did-finish-load | No | Si (pos_last_boot localStorage) |
 
-## Pendiente para Entrada y Escondite
+## Pendientes para operacion
 
-- Instalar MISMO exe (SHA c6ccd31c...)
-- NO recompilar
-- Adaptar printers.json por terminal (mismos IPs pero printer names pueden variar)
-- Verificar/eliminar start-bridge.bat en Startup
-- Verificar que impresoras USB esten compartidas
-- Smoke test individual por terminal
+- [ ] Resolver ticket en Escondite (credenciales de red o impresora USB)
+- [ ] Configurar KDS en pantalla de cocina
+- [ ] Probar cold start completo (apagar/prender PC)
+- [ ] Probar ticket en Entrada (no se testeo explicitamente)
+- [ ] Registrar huellas de Eduardo y meseros
