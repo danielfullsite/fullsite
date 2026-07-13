@@ -10,6 +10,7 @@ from datetime import date, timedelta, datetime, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids
 from agent_common import log_run as _log_run
+from ops_aggregate import get_current_business_date
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("proactive_alerts")
@@ -41,7 +42,7 @@ def send_telegram(text):
 
 def main():
     now_mx = datetime.now(MX_TZ)
-    today_str = now_mx.strftime("%Y-%m-%d")
+    today_str = get_current_business_date(CLIENT)
     dow = now_mx.weekday()  # 0=Monday
 
     print(f"[alerts] Checking alerts for {today_str} ({now_mx.strftime('%H:%M')} MX)...")

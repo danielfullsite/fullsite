@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get, log_run as _log_run, create_insight
 from client_config import get_client, get_tz, get_chat_ids
+from ops_aggregate import get_current_business_date
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("close_predictor")
@@ -67,8 +68,7 @@ def sb_get(table, params):
 # ── Data fetching ───────────────────────────────────────────────────────────
 def get_today_kpis():
     """Fetch today's data from ops_daily_live (handles fallback internally)."""
-    now_mx = datetime.now(MX_TZ)
-    today_str = now_mx.strftime("%Y-%m-%d")
+    today_str = get_current_business_date(CLIENT)
     rows = sb_get("ops_daily_live", {
         "client_id": f"eq.{CLIENT['id']}",
         "select": "fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,ventas_por_grupo,meseros,platillos_top",

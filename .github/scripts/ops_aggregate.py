@@ -120,6 +120,17 @@ def get_business_date(timestamp_utc_str, tz, boundary_local_time):
     return ts.date().isoformat()
 
 
+def get_current_business_date(client):
+    """Return current business date string for this client.
+
+    Ergonomic wrapper — delegates entirely to the canonical primitive.
+    No independent attribution logic.
+    """
+    tz, boundary = get_business_day_config(client)
+    now_utc = datetime.now(timezone.utc).isoformat()
+    return get_business_date(now_utc, tz, boundary)
+
+
 def aggregate_orders(orders, item_cat_map):
     """
     Aggregate closed pos_orders into ops_daily metrics.

@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 from agent_common import sb_get as _sb_get_common, log_run as _log_run_common, create_insight
 from client_config import get_client, get_tz, get_chat_ids
+from ops_aggregate import get_current_business_date, get_business_day_config, get_business_day_bounds
 try:
     from audit_log import AuditLogger
     _audit = AuditLogger("table_time_agent")
@@ -54,7 +55,7 @@ def sb_get(table, params):
 
 # -- Data fetching --
 def get_today_kpis():
-    today_str = datetime.now(MX_TZ).strftime("%Y-%m-%d")
+    today_str = get_current_business_date(CLIENT)
     rows = sb_get("ops_daily_live", {"client_id": f"eq.{CLIENT['id']}",
         "fecha": f"eq.{today_str}",
         "select": "*",
@@ -75,10 +76,13 @@ def get_historical(days=30):
 
 
 def get_pos_orders_today(today_str):
-    """Try to fetch Fullsite POS orders if available."""
+    """Fetch Fullsite POS orders for the current business day using canonical UTC bounds."""
+    tz, boundary = get_business_day_config(CLIENT)
+    _, _, utc_start, utc_end = get_business_day_bounds(today_str, tz, boundary)
     return sb_get("pos_orders", {
         "select": "id,created_at,closed_at,mesa,total,status",
-        "created_at": f"gte.{today_str}T00:00:00",
+        "created_at": f"gte.{utc_start.isoformat()}",
+        "and": f"(created_at.lt.{utc_end.isoformat()})",
         "status": "eq.cerrada",
         "order": "created_at.asc",
         "limit": "500",
