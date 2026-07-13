@@ -3,6 +3,22 @@ const path = require('path');
 
 const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
 
+// ─── ROUTE GUARD ──────────────────────────────────────────────────────────
+// KDS must never navigate away from the cocina page.
+// Validate origin AND exact pathname — no startsWith to prevent /pos/cocina-foo.
+
+const KDS_ORIGIN = new URL(KDS_URL).origin;
+const KDS_ALLOWED_PATHNAMES = ['/pos/cocina'];
+
+function isAllowedKdsUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === KDS_ORIGIN && KDS_ALLOWED_PATHNAMES.includes(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 // ─── MAIN WINDOW ──────────────────────────────────────────────────────────
 
 let mainWindow = null;
@@ -44,6 +60,23 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // Route guard: block navigation to any URL outside the KDS allowlist
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedKdsUrl(url)) {
+      console.log(`[kds-guard] Blocked navigation to: ${url}`);
+      event.preventDefault();
+    }
+  });
+
+  // SPA guard: if client-side routing changes the path, restore KDS
+  mainWindow.webContents.on('did-navigate-in-page', (_event, url) => {
+    if (!isAllowedKdsUrl(url)) {
+      console.log(`[kds-guard] SPA navigated to ${url}, restoring KDS`);
+      mainWindow.loadURL(KDS_URL);
+    }
+  });
+
   mainWindow.webContents.on('context-menu', (e) => e.preventDefault());
 
   mainWindow.webContents.on('before-input-event', (_event, input) => {

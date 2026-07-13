@@ -32,6 +32,23 @@ interface ParsedItem {
   menuItemId?: string
 }
 
+const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
+
+/** Returns true if at least one non-cancelled item in the order matches the given station filter. */
+function orderHasItemsForStation(order: KitchenOrderFromDB, filter: 'todo' | 'panaderia' | StationName): boolean {
+  const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+  return items.some(i => {
+    if (i.cancelled) return false
+    if (i.menuItemId === '__tiempo__') return filter === 'todo'
+    const name = (i.nombre || i.name || '').toLowerCase()
+    if (filter === 'todo') return true
+    if (filter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
+    const itemStation = i.station || getStationByName(name)
+    if (filter === 'cocina' && PANADERIA_KW.some(kw => name.includes(kw))) return false
+    return itemStation === filter
+  })
+}
+
 export default function CocinaPage() {
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [mounted, setMounted] = useState(false)
@@ -50,6 +67,8 @@ export default function CocinaPage() {
   }
 
   // Station filter
+  const isKdsSurface = typeof window !== 'undefined' && (window as unknown as { fullsiteApp?: { surface?: string } }).fullsiteApp?.surface === 'kds'
+
   const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('cocina')
 
   // Cancel modal state
@@ -462,9 +481,11 @@ export default function CocinaPage() {
     <div className="h-screen flex flex-col text-white bg-[var(--surface)]">
       <header className="flex items-center justify-between px-6 py-4 bg-[var(--surface-2)] border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
+          {!isKdsSurface && (
+            <Link href="/pos" className="w-10 h-10 rounded-lg bg-[var(--line)] hover:bg-slate-600 flex items-center justify-center transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+          )}
           <div className="flex items-center gap-2">
             <ChefHat size={24} className="text-emerald-400" />
             <h1 className="text-xl font-bold">Cocina</h1>
@@ -476,15 +497,15 @@ export default function CocinaPage() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-[var(--surface)]" />
-            <span className="text-sm text-[var(--text-4)]">Nuevas ({orders.filter(o => o.status === 'enviada').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Nuevas ({orders.filter(o => o.status === 'enviada' && orderHasItemsForStation(o, stationFilter)).length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-amber-500" />
-            <span className="text-sm text-[var(--text-4)]">Preparando ({orders.filter(o => o.status === 'preparando').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Preparando ({orders.filter(o => o.status === 'preparando' && orderHasItemsForStation(o, stationFilter)).length})</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span className="text-sm text-[var(--text-4)]">Listas ({orders.filter(o => o.status === 'lista').length})</span>
+            <span className="text-sm text-[var(--text-4)]">Listas ({orders.filter(o => o.status === 'lista' && orderHasItemsForStation(o, stationFilter)).length})</span>
           </div>
         </div>
       </header>
@@ -587,8 +608,7 @@ export default function CocinaPage() {
               const elapsed = getElapsedMinutes(order.created_at)
               const isUrgent = elapsed >= alertMinutes && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              // Filter items based on station filter
-              const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
+              // Filter items based on station filter (same logic as orderHasItemsForStation)
               const activeItems = items.filter(i => {
                 if (i.cancelled) return false
                 if (i.menuItemId === '__tiempo__') return stationFilter === 'todo'
@@ -596,7 +616,6 @@ export default function CocinaPage() {
                 if (stationFilter === 'todo') return true
                 if (stationFilter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
                 const itemStation = i.station || getStationByName(name)
-                // If filtering cocina, exclude panadería items
                 if (stationFilter === 'cocina' && PANADERIA_KW.some(kw => name.includes(kw))) return false
                 return itemStation === stationFilter
               })
