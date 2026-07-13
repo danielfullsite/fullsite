@@ -76,8 +76,19 @@ function printUsb(printerName, data) {
 async function printToStation(station, data) {
   const cfg = STATIONS[station];
   if (!cfg) throw new Error(`Unknown station: ${station}`);
+  // Array of printers: send to ALL (e.g., cocina fria + cocina caliente)
+  if (Array.isArray(cfg)) {
+    const errors = [];
+    for (const printer of cfg) {
+      try {
+        if (printer.type === 'usb') { printUsb((printer.names || [printer.name])[0], data); }
+        else { await printTcp(printer.host, printer.port, data); }
+      } catch (e) { errors.push(e); }
+    }
+    if (errors.length === cfg.length) throw errors[0]; // all failed
+    return; // at least one succeeded
+  }
   if (cfg.type === 'usb') {
-    // Try each printer name until one works
     const names = cfg.names || [cfg.name];
     let lastErr;
     for (const name of names) {
