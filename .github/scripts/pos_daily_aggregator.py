@@ -26,6 +26,7 @@ import json
 import time
 import requests
 from datetime import datetime, timedelta, timezone, date
+from zoneinfo import ZoneInfo
 from collections import defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids
@@ -99,35 +100,43 @@ def sb_upsert_daily(fecha, data):
         return False
 
 
+def get_client_tz():
+    """Return ZoneInfo for the client's IANA timezone."""
+    tz_name = CLIENT.get("timezone", "America/Mexico_City")
+    return ZoneInfo(tz_name)
+
+
 def get_target_date():
-    """Determine which date to aggregate."""
+    """Determine which date to aggregate (in client local timezone)."""
     if TARGET_DATE:
         return TARGET_DATE
-    now_mx = datetime.now(MX_TZ)
-    return now_mx.strftime("%Y-%m-%d")
+    now_local = datetime.now(get_client_tz())
+    return now_local.strftime("%Y-%m-%d")
 
 
 def fetch_closed_orders(fecha):
-    """Fetch all closed POS orders for a given date."""
-    # Orders closed on this date (using closed_at, not created_at)
-    start = f"{fecha}T00:00:00"
-    end = f"{fecha}T23:59:59"
+    """Fetch all closed POS orders for a business day.
 
-    # Use PostgREST AND filter for date range
+    Business day is determined by closed_at converted to the client's
+    local timezone. Revenue attribution: [local_midnight, next_local_midnight).
+    Only status='cerrada' orders count as revenue.
+    """
+    client_tz = get_client_tz()
+    y, m, d = map(int, fecha.split("-"))
+    local_start = datetime(y, m, d, 0, 0, 0, tzinfo=client_tz)
+    local_end = datetime(y, m, d + 1, 0, 0, 0, tzinfo=client_tz)
+    utc_start = local_start.astimezone(timezone.utc).isoformat()
+    utc_end = local_end.astimezone(timezone.utc).isoformat()
+
     orders = sb_get("pos_orders", {
         "select": "*",
         "client_id": f"eq.{CLIENT['id']}",
         "status": "eq.cerrada",
-        "or": f"(closed_at.gte.{start},created_at.gte.{start})",
-        "order": "created_at.asc",
+        "closed_at": f"gte.{utc_start}",
+        "and": f"(closed_at.lt.{utc_end})",
+        "order": "closed_at.asc",
         "limit": "500",
     })
-
-    # Filter in Python to ensure correct date (PostgREST OR is loose)
-    orders = [o for o in orders if
-        (o.get("closed_at", "") or "").startswith(fecha) or
-        (o.get("created_at", "") or "").startswith(fecha)
-    ]
 
     return orders
 
