@@ -30,7 +30,7 @@ function loadStations() {
     if (fs.existsSync(PRINTERS_CONFIG_PATH)) {
       const data = JSON.parse(fs.readFileSync(PRINTERS_CONFIG_PATH, 'utf8'));
       console.log('[bridge] Loaded printers.json');
-      return data;
+      return data.stations || data;
     }
   } catch (e) {
     console.warn('[bridge] Error loading printers.json:', e.message);
