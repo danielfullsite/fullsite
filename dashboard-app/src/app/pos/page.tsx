@@ -2434,14 +2434,13 @@ function POSContent() {
           // If quantity decreased or unchanged, don't deduct (reversal is separate)
         }
       }
+      // R0 CONTAINMENT — recipe inventory deduction suspended because canonical
+      // recipe truth is not established. pos_recipes_old contains duplicate import
+      // generations that produce inflated deductions (2-4x per order). Deduction will
+      // be re-enabled via reconcile_order_inventory RPC after canonical recipe schema
+      // is migrated and validated. See docs/CUTOVER-BLOCKER-PLAN.md P0-2/R0.
       if (itemsToDeduct.length > 0) {
-        deductIngredientsForOrder(itemsToDeduct, orderId, mesero).then(result => {
-          if (result.alerts.length > 0) {
-            showToast(`${result.alerts.length} alertas de inventario`)
-          }
-        }).catch(err => {
-          console.error('[inventory] Deduction failed:', err)
-        })
+        console.log(`[inventory] R0 containment: ${itemsToDeduct.length} items would deduct — suspended pending canonical recipe truth`)
       }
 
       setLoadedOrderId(orderId)
