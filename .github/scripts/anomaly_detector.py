@@ -55,12 +55,11 @@ def sb_get(table, params):
 
 
 # ── Data fetching ───────────────────────────────────────────────────────────
-def get_today_kpis():
-    """Fetch today's data from ops_daily_live (handles fallback internally)."""
-    today_str = get_current_business_date(CLIENT)
+def get_today_kpis(business_date):
+    """Fetch KPIs for the given business date from ops_daily_live."""
     rows = sb_get("ops_daily_live", {
         "client_id": f"eq.{CLIENT['id']}",
-        "fecha": f"eq.{today_str}",
+        "fecha": f"eq.{business_date}",
         "select": "*",
         "order": "generated_at.desc",
         "limit": "1",
@@ -309,13 +308,13 @@ def main():
     start = time.time()
     if _audit: _audit.log_start()
     now_mx = datetime.now(MX_TZ)
-    today_str = now_mx.strftime("%Y-%m-%d")
+    today_str = get_current_business_date(CLIENT)  # derived ONCE for entire run
 
     print(f"[anomaly] Starting for {CLIENT['id']} on {today_str}")
 
     # 1. Fetch today's real-time data
     print("[anomaly] Fetching today's KPIs...")
-    today_data = get_today_kpis()
+    today_data = get_today_kpis(today_str)
     if not today_data:
         print("[anomaly] No KPI data available, skipping")
         _log_run(
@@ -345,7 +344,8 @@ def main():
 
     # 2. Fetch same DOW historical
     print("[anomaly] Fetching historical same DOW...")
-    historical = get_historical_same_dow(now_mx, weeks=4)
+    biz_date = datetime.strptime(today_str, "%Y-%m-%d")
+    historical = get_historical_same_dow(biz_date, weeks=4)
     print(f"[anomaly] Got {len(historical)} historical days")
 
     if len(historical) < 2:
