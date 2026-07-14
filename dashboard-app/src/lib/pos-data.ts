@@ -1254,6 +1254,7 @@ export interface KitchenOrderFromDB {
   kds_item_status: string | null // JSON string of Record<string, boolean> — separate from items to avoid race condition
   created_at: string
   notas: string | null
+  order_revision?: number
 }
 
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {

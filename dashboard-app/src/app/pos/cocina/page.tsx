@@ -215,10 +215,27 @@ export default function CocinaPage() {
       cancelledBy: manager,
     }
 
-    // 2. Update order items in Supabase
-    await updateOrderStatus(cancelTarget.orderId, order.status, {
-      items: JSON.stringify(items),
+    // 2. Update order items via revision-aware save boundary
+    // R2D1B: cocina cancel must advance order_revision to maintain reconciliation lineage
+    const saveRes = await fetch('/api/pos/save-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: cancelTarget.orderId,
+        expected_revision: order.order_revision ?? 0,
+        items,
+        status: order.status,
+      }),
     })
+    const saveResult = saveRes.ok ? await saveRes.json() : { ok: false }
+    if (saveResult.conflict) {
+      setCancelError('Orden modificada por otra terminal — recarga')
+      return
+    }
+    if (!saveResult.ok) {
+      setCancelError('Error al guardar cancelación')
+      return
+    }
 
     // 3. Re-add ingredients to inventory
     const itemName = cancelTarget.itemName.toLowerCase()
