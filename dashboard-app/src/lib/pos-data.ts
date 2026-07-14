@@ -2077,31 +2077,35 @@ export async function getMarketMovements(limit = 50): Promise<MarketMovement[]> 
   return res.json()
 }
 
-/** Entrada / merma / ajuste manual: actualiza stock y deja audit trail. */
+/** Entrada / merma / ajuste manual via constrained server-side RPC.
+ *  Conservation: no GREATEST(0,...) clamp. Negative stock visible.
+ *  Actor is REPORTED_ACTOR (browser-supplied, not server-verified). */
 export async function registerMarketMovement(
   menuItemId: string,
   type: 'entrada' | 'merma' | 'ajuste',
-  quantity: number,  // entrada: +n | merma: n (se registra -n) | ajuste: stock final deseado
+  quantity: number,
   actor: string,
   notes?: string,
 ): Promise<{ ok: boolean; newStock: number }> {
-  const rows = await getMarketStock()
-  const current = rows.find(r => r.menu_item_id === menuItemId)
-  const stock = current?.stock ?? 0
-  let newStock: number
-  let delta: number
-  if (type === 'entrada') { delta = Math.abs(quantity); newStock = stock + delta }
-  else if (type === 'merma') { delta = -Math.abs(quantity); newStock = Math.max(0, stock + delta) }
-  else { newStock = Math.max(0, quantity); delta = newStock - stock }
-
-  const ok = await upsertMarketStock(menuItemId, {
-    stock: newStock,
-    ...(type === 'entrada' ? { last_restock: new Date().toISOString() } : {}),
-  })
-  if (ok) {
-    await logMarketMovement({ menu_item_id: menuItemId, movement_type: type, quantity: delta, actor, notes })
+  try {
+    const adjustType = type === 'ajuste' ? 'ajuste_absoluto' : type
+    const res = await fetch('/api/pos/adjust-market', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        menu_item_id: menuItemId,
+        adjustment_type: adjustType,
+        quantity: Math.abs(quantity),
+        actor,
+        notes,
+      }),
+    })
+    if (!res.ok) return { ok: false, newStock: 0 }
+    const result = await res.json()
+    return { ok: result.ok ?? false, newStock: result.new_stock ?? 0 }
+  } catch {
+    return { ok: false, newStock: 0 }
   }
-  return { ok, newStock }
 }
 
 /** Descuento automático al vender items Market — via serialized authority boundary. */
