@@ -2115,14 +2115,30 @@ function POSContent() {
         after: { qty: 0, cancelled: true },
       })
     }
-    // Mark order as cancelled in database (if it was already saved)
+    // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
     if (loadedOrderId) {
-      const voidOk = await updateOrderStatus(loadedOrderId, 'cancelada', { notas: `ANULADA: ${reason} (por ${managerName})` })
-      if (!voidOk) {
+      const voidRes = await fetch('/api/pos/save-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: loadedOrderId,
+          expected_revision: orderRevision,
+          status: 'cancelada',
+          notas: `ANULADA: ${reason} (por ${managerName})`,
+        }),
+      })
+      const voidResult = voidRes.ok ? await voidRes.json() : { ok: false }
+      if (voidResult.conflict) {
+        showToast('Orden modificada por otra terminal — recarga para ver cambios')
+        setSaving(false); operationLock.current = false
+        return
+      }
+      if (!voidResult.ok) {
         showToast('Error al anular — la orden NO se anuló. Reintenta.')
         setSaving(false); operationLock.current = false
-        return // DO NOT clear UI if DB update failed
+        return
       }
+      if (voidResult.revision != null) setOrderRevision(voidResult.revision)
     }
     // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
     // recipe deductions. Reversing never-deducted stock creates phantom inflation.
