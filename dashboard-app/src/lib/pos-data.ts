@@ -640,6 +640,8 @@ export interface Order {
   notas?: string
   createdAt: Date
   closedAt?: Date
+  /** Server-authoritative monotonic order revision for optimistic concurrency */
+  orderRevision?: number
 }
 
 export interface Mesa {
@@ -1106,15 +1108,37 @@ export function generateId(): string {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export async function saveOrder(order: Order): Promise<boolean> {
+/** Result from revision-aware save */
+export interface SaveOrderResult {
+  ok: boolean
+  revision?: number
+  conflict?: boolean
+  error?: string
+  expected_revision?: number
+  current_revision?: number
+}
+
+export async function saveOrder(order: Order): Promise<SaveOrderResult> {
   // ── Turno enforcement: orders MUST have a turno_id ──
   if (!order.turnoId) {
     console.error('[saveOrder] BLOCKED: turno_id is required. No active turno.')
-    return false
+    return { ok: false, error: 'NO_TURNO' }
   }
 
-  const orderData: Record<string, unknown> = {
-    client_id: _getClientId(),
+  // Payment reconciliation: sum(pagos.monto) must equal total + propina exactly (in cents)
+  if (order.status === 'cerrada' && order.pagos && order.pagos.length > 0) {
+    const toCents = (n: number) => Math.round((n || 0) * 100)
+    const pagosSum = order.pagos.reduce((s: number, p: { monto?: number }) => s + toCents(p.monto || 0), 0)
+    const expected = toCents(order.total) + toCents(order.propina || 0)
+    if (pagosSum !== expected) {
+      console.error(`[saveOrder] Payment reconciliation failed: pagos=${pagosSum}¢ vs expected=${expected}¢`)
+      return { ok: false, error: 'PAYMENT_MISMATCH' }
+    }
+  }
+
+  const payload = {
+    order_id: order.id,
+    expected_revision: order.orderRevision ?? 0,
     mesa: order.mesa,
     customer_name: order.clienteNombre ?? null,
     mesero: order.mesero,
@@ -1129,60 +1153,52 @@ export async function saveOrder(order: Order): Promise<boolean> {
     pagos: order.pagos && order.pagos.length > 0 ? order.pagos : null,
     turno_id: order.turnoId,
     notas: order.notas ?? null,
-    items: JSON.stringify(order.items),
+    items: order.items,
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
-    updated_at: new Date().toISOString(),
-  }
-
-  // Payment reconciliation: sum(pagos.monto) must equal total + propina exactly (in cents)
-  if (order.status === 'cerrada' && order.pagos && order.pagos.length > 0) {
-    const toCents = (n: number) => Math.round((n || 0) * 100)
-    const pagosSum = order.pagos.reduce((s: number, p: { monto?: number }) => s + toCents(p.monto || 0), 0)
-    const expected = toCents(order.total) + toCents(order.propina || 0)
-    if (pagosSum !== expected) {
-      console.error(`[saveOrder] Payment reconciliation failed: pagos=${pagosSum}¢ vs expected=${expected}¢ (total=${order.total} + propina=${order.propina || 0})`)
-      return false
-    }
   }
 
   try {
-    const post = (body: Record<string, unknown>) => fetch(`${SUPABASE_URL}/rest/v1/pos_orders`, {
+    const res = await fetch('/api/pos/save-order', {
       method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     })
-    let res = await post({ id: order.id, ...orderData })
-    if (!res.ok && res.status === 400) {
-      // Columnas pagos/turno_id aún no existen en Supabase — reintenta sin ellas
-      const { pagos: _p, turno_id: _t, ...legacy } = orderData
-      res = await post({ id: order.id, ...legacy })
-    }
+
     if (!res.ok) {
-      console.warn(`[saveOrder] Failed: ${res.status} ${res.statusText}`)
+      console.warn(`[saveOrder] API error: ${res.status}`)
+      return { ok: false, error: 'API_ERROR' }
     }
-    return res.ok
+
+    const result: SaveOrderResult = await res.json()
+
+    if (result.conflict) {
+      console.warn(`[saveOrder] STALE_WRITE_REJECTED: expected rev ${result.expected_revision}, server at ${result.current_revision}`)
+    }
+
+    return result
   } catch {
-    // Offline — save to IndexedDB queue (with localStorage fallback)
+    // Offline — queue the revision-aware save for later replay
     if (typeof window !== 'undefined') {
       try {
         const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
-        await queueOperation('pos_orders', 'POST', { id: order.id, ...orderData }, undefined, (orderData.updated_at as string) || undefined)
-        // created_at local para que el KDS offline pueda mostrar tiempos
-        await cacheOrder({ id: order.id, created_at: new Date().toISOString(), ...orderData })
+        // Persist expected_revision in the queued payload so replay uses the original revision
+        await queueOperation('pos_orders', 'POST', payload, '/api/pos/save-order',
+          (order.orderRevision ?? 0).toString())
+        await cacheOrder({
+          id: order.id,
+          created_at: new Date().toISOString(),
+          client_id: _getClientId(),
+          ...payload,
+          items: JSON.stringify(order.items),
+        })
       } catch {
-        // Fallback to localStorage if IndexedDB fails
         const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-        queue.push({ table: 'pos_orders', data: { id: order.id, ...orderData }, timestamp: Date.now(), synced: false })
+        queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', timestamp: Date.now(), synced: false })
         localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
       }
       console.log('[offline] Order saved to queue — will sync when online')
     }
-    return true // Return true so the UI continues normally
+    return { ok: true, revision: order.orderRevision ?? 0 } // Optimistic for offline UX
   }
 }
 

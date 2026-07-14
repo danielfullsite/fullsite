@@ -1704,6 +1704,7 @@ function POSContent() {
   // Load active order for selected mesa
   const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null)
+  const [orderRevision, setOrderRevision] = useState<number>(0)
   useEffect(() => {
     let cancelled = false
     const loadMesaOrder = async () => {
@@ -1730,6 +1731,7 @@ function POSContent() {
             setDiscount(order.descuento || 0)
             setLoadedOrderId(order.id)
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
+            setOrderRevision(order.order_revision ?? 0)
             setOrderNotes(order.notas || '')
             // Mark loaded items as already sent + snapshot for change detection (H-7)
             if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
@@ -1753,6 +1755,7 @@ function POSContent() {
                   if (d.personas) setPersonas(d.personas)
                   setLoadedOrderId(null)
                   setLoadedUpdatedAt(null)
+                  setOrderRevision(0)
                   return // draft restored, don't reset
                 }
               }
@@ -1761,6 +1764,7 @@ function POSContent() {
             setOrderId(generateId())
             setLoadedOrderId(null)
             setLoadedUpdatedAt(null)
+            setOrderRevision(0)
             setDiscount(0)
             setOrderNotes('')
           }
@@ -2313,6 +2317,7 @@ function POSContent() {
             setOrderId(existing.id)
             setLoadedOrderId(existing.id)
             setLoadedUpdatedAt(existing.updated_at || existing.created_at || null)
+            setOrderRevision(existing.order_revision ?? 0)
             if (existing.mesero) setMesero(existing.mesero)
             if (existing.personas) setPersonas(existing.personas)
             if (existing.status === 'enviada' || existing.status === 'preparando') {
@@ -2346,14 +2351,21 @@ function POSContent() {
       turnoId: turnoId || undefined,
       notas: orderNotes || undefined,
       createdAt: new Date(),
+      orderRevision,
     }
     // SAVE FIRST — confirm persistence before printing
-    const ok = await saveOrder(order)
-    if (!ok) {
-      showToast('Error al guardar orden — NO se imprimió')
+    const saveResult = await saveOrder(order)
+    if (!saveResult.ok) {
+      if (saveResult.conflict) {
+        showToast('Orden modificada por otra terminal — recarga para ver cambios')
+      } else {
+        showToast('Error al guardar orden — NO se imprimió')
+      }
       setSaving(false); operationLock.current = false
       return
     }
+    if (saveResult.revision != null) setOrderRevision(saveResult.revision)
+    const ok = true
 
     // Only print NEW items (not already sent to kitchen)
     const newItems = activeItems.filter(i => !sentItemIds.has(i.id))
@@ -2595,8 +2607,16 @@ function POSContent() {
         : (orderNotes || undefined),
       createdAt: new Date(),
       closedAt: new Date(),
+      orderRevision: splitPayingCuenta > 0 ? 0 : orderRevision,  // Split creates new order → rev 0
     }
-    const ok = await saveOrder(order)
+    const saveResult = await saveOrder(order)
+    if (saveResult.conflict) {
+      showToast('Orden modificada por otra terminal — recarga para ver cambios')
+      setSaving(false); operationLock.current = false
+      return
+    }
+    if (saveResult.revision != null) setOrderRevision(saveResult.revision)
+    const ok = saveResult.ok
     if (ok) {
       // Open cash drawer for cash payments (incluye mixto con componente efectivo)
       if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) {
