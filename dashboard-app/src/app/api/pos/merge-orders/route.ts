@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 
 /**
- * R2D1B Phase 1 — Atomic mesa merge boundary.
+ * Atomic mesa merge + reconciliation of every affected order.
  * TEMPORARY AMALAY FIELD-CERT BOUNDARY.
  */
 const CLIENT_ID = 'amalay'
@@ -20,12 +20,14 @@ export async function POST(request: NextRequest) {
     const sbKey = process.env.SUPABASE_SERVICE_KEY
     if (!sbKey) return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' }, { status: 500 })
 
+    const headers = {
+      'apikey': sbKey, 'Authorization': `Bearer ${sbKey}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    }
+
+    // Step 1: Atomic merge
     const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_merge_orders`, {
-      method: 'POST',
-      headers: {
-        'apikey': sbKey, 'Authorization': `Bearer ${sbKey}`,
-        'Content-Type': 'application/json', 'Prefer': 'return=representation',
-      },
+      method: 'POST', headers,
       body: JSON.stringify({
         p_client_id: CLIENT_ID,
         p_target_order_id: target_order_id,
@@ -44,7 +46,33 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: false, error: 'RPC_FAILED' }, { status: 502 })
     }
 
-    return Response.json(await res.json())
+    const mergeResult = await res.json()
+    if (!mergeResult.ok) return Response.json(mergeResult)
+
+    // Step 2: Reconcile BOTH affected orders (target got items, source got cancelled)
+    const reconResults: Record<string, unknown[]> = {}
+    for (const orderId of [target_order_id, source_order_id]) {
+      try {
+        const reconRes = await fetch(`${sbUrl}/rest/v1/rpc/r1_reconcile_order`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ p_client_id: CLIENT_ID, p_order_id: orderId }),
+        })
+        if (reconRes.ok) {
+          reconResults[orderId] = await reconRes.json()
+        } else {
+          console.error(`[merge-orders] Reconciliation failed for ${orderId}`)
+          reconResults[orderId] = [{ error: 'RECONCILIATION_FAILED' }]
+        }
+      } catch (err) {
+        console.error(`[merge-orders] Reconciliation error for ${orderId}:`, err)
+        reconResults[orderId] = [{ error: 'RECONCILIATION_EXCEPTION' }]
+      }
+    }
+
+    return Response.json({
+      ...mergeResult,
+      reconciliation: reconResults,
+    })
   } catch (err) {
     console.error('[merge-orders] Error:', err)
     return Response.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 })
