@@ -2104,7 +2104,7 @@ export async function registerMarketMovement(
   return { ok, newStock }
 }
 
-/** Descuento automático al vender items Market (espejo de deductIngredientsForOrder). */
+/** Descuento automático al vender items Market — via serialized authority boundary. */
 export async function deductMarketStockForOrder(
   items: OrderItem[],
   orderId: string,
@@ -2114,7 +2114,7 @@ export async function deductMarketStockForOrder(
     const ids = [...new Set(items.map(i => i.menuItemId).filter(Boolean))]
     if (ids.length === 0) return { success: true, deductions: [], alerts: [] }
 
-    // 1. ¿Cuáles items de la orden son de stock directo (Market, cerveza, sodas, vinos, licores, bakery, ice cream)?
+    // 1. Identify direct-stock items by category
     const catFilter = DIRECT_STOCK_CATEGORIES.map(c => `category_id.eq.${c}`).join(',')
     const itemsRes = await fetch(
       `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&id=in.(${ids.join(',')})&or=(${catFilter})&select=id,name`,
@@ -2124,38 +2124,40 @@ export async function deductMarketStockForOrder(
     const marketItems: { id: string; name: string }[] = await itemsRes.json()
     if (marketItems.length === 0) return { success: true, deductions: [], alerts: [] }
     const nameById = new Map(marketItems.map(m => [m.id, m.name]))
+    const marketIdSet = new Set(marketItems.map(m => m.id))
 
-    // 2. Stock actual de esos items
-    const stockRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_market_stock?client_id=eq.${_getClientId()}&menu_item_id=in.(${marketItems.map(m => m.id).join(',')})`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    const stockRows: MarketStockRow[] = stockRes.ok ? await stockRes.json() : []
-    const stockMap = new Map(stockRows.map(r => [r.menu_item_id, { stock: r.stock, reorder_point: r.reorder_point }]))
-
-    // 3. Descontar + audit
-    const computed = computeMarketDeductions(
-      items.map(i => ({ menuItemId: i.menuItemId, cantidad: i.cantidad })),
-      new Set(marketItems.map(m => m.id)),
-      stockMap,
-    )
-    const deductions: { item: string; cantidad: number; newStock: number }[] = []
-    const alerts: string[] = []
-    for (const d of computed) {
-      const name = nameById.get(d.menu_item_id) ?? d.menu_item_id
-      await upsertMarketStock(d.menu_item_id, { stock: d.newStock })
-      await logMarketMovement({
-        menu_item_id: d.menu_item_id,
-        movement_type: 'venta',
-        quantity: -d.cantidad,
-        order_id: orderId,
-        actor,
-        notes: d.faltante > 0 ? `stock insuficiente (faltaban ${d.faltante})` : undefined,
-      })
-      deductions.push({ item: name, cantidad: d.cantidad, newStock: d.newStock })
-      if (d.alert) alerts.push(`${name}: ${d.newStock} pzas (punto de reorden)`)
+    // 2. Aggregate quantities per menu_item_id
+    const qtyByItem = new Map<string, number>()
+    for (const item of items) {
+      if (!marketIdSet.has(item.menuItemId)) continue
+      qtyByItem.set(item.menuItemId, (qtyByItem.get(item.menuItemId) || 0) + item.cantidad)
     }
-    return { success: true, deductions, alerts }
+
+    const rpcItems = Array.from(qtyByItem.entries()).map(([mid, qty]) => ({
+      menu_item_id: mid, cantidad: qty,
+    }))
+
+    // 3. Deduct via serialized authority-aware server RPC
+    const res = await fetch('/api/pos/deduct-market', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, actor, items: rpcItems }),
+    })
+
+    if (!res.ok) return { success: false, deductions: [], alerts: [] }
+    const result = await res.json()
+    if (!result.ok) {
+      console.warn('[deductMarketStockForOrder] RPC rejected:', result.error)
+      return { success: false, deductions: [], alerts: [] }
+    }
+
+    const deductions = (result.deductions || []).map((d: { menu_item_id: string; cantidad: number; new_stock: number }) => ({
+      item: nameById.get(d.menu_item_id) ?? d.menu_item_id,
+      cantidad: d.cantidad,
+      newStock: d.new_stock,
+    }))
+
+    return { success: true, deductions, alerts: [] }
   } catch (err) {
     console.warn('[deductMarketStockForOrder] Failed:', err)
     return { success: false, deductions: [], alerts: [] }
