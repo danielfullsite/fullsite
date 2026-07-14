@@ -312,21 +312,28 @@ export default function MesasPage() {
       const newIva = Number(tgtOrder.iva || 0) + Number(srcOrder.iva || 0)
       const newPersonas = (tgtOrder.personas || 0) + (srcOrder.personas || 0)
 
-      await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${tgtOrder.id}`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      // R2D1B Phase 1: Atomic cross-order merge via revision-aware server boundary
+      const mergeRes = await fetch('/api/pos/merge-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: JSON.stringify(mergedItems),
+          target_order_id: tgtOrder.id,
+          target_expected_revision: tgtOrder.order_revision ?? 0,
+          source_order_id: srcOrder.id,
+          source_expected_revision: srcOrder.order_revision ?? 0,
+          merged_items: mergedItems,
           total: newTotal, subtotal: newSubtotal, iva: newIva,
           personas: newPersonas,
           notas: `Merge: mesa ${mergeSource} → mesa ${mergeTarget}. ${tgtOrder.notas || ''}`.trim(),
         }),
       })
-      await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${srcOrder.id}`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ status: 'cancelada', notas: `Merged a mesa ${mergeTarget}` }),
-      })
+      const mergeResult = mergeRes.ok ? await mergeRes.json() : { ok: false }
+      if (mergeResult.conflict || mergeResult.error === 'STALE_WRITE_REJECTED') {
+        showToast('Orden modificada por otra terminal — recarga'); setMerging(false); return
+      }
+      if (!mergeResult.ok) {
+        showToast('Error al fusionar mesas'); setMerging(false); return
+      }
 
       logAudit({
         order_id: tgtOrder.id, action: 'status_changed', actor: 'Sistema',
