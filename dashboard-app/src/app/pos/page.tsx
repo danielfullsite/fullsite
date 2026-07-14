@@ -1083,6 +1083,50 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
   const [reason, setReason] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [biometricAvail, setBiometricAvail] = useState(false)
+  const [bioChecking, setBioChecking] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const has = Object.values(stored).some((m: unknown) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (has && window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(ok => setBiometricAvail(ok)).catch(() => {})
+      }
+    } catch {}
+  }, [])
+
+  const handleBio = async () => {
+    if (!reason.trim()) { setError('Escribe el motivo'); return }
+    setBioChecking(true)
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const managerCreds = Object.entries(stored).filter(([, m]) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (managerCreds.length === 0) { setError('No hay huellas de gerente registradas'); setBioChecking(false); return }
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge, rpId: window.location.hostname,
+          allowCredentials: managerCreds.map(([id]) => ({ id: Uint8Array.from(atob(id), c => c.charCodeAt(0)), type: 'public-key' as const })),
+          userVerification: 'required', timeout: 30000,
+        },
+      })
+      if (assertion) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+        const member = stored[credId] as { name?: string }
+        if (member?.name) onConfirm(reason, member.name)
+      }
+    } catch { setError('Huella no reconocida') }
+    setBioChecking(false)
+  }
 
   const handleConfirm = async () => {
     if (!reason.trim()) { setError('Escribe el motivo'); return }
@@ -1108,7 +1152,7 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de anulacion</label>
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">Motivo de anulación</label>
             <textarea
               value={reason}
               onChange={(e) => { setReason(e.target.value); setError('') }}
@@ -1119,16 +1163,30 @@ function VoidOrderModal({ mesa, total, onConfirm, onCancel }: VoidOrderModalProp
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
-              placeholder="****"
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
-            />
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
+              {biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={pin}
+                onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+                placeholder="****"
+                className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-red-500 min-h-[48px]"
+              />
+              {biometricAvail && (
+                <button
+                  onClick={handleBio}
+                  disabled={bioChecking}
+                  className="w-14 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white flex items-center justify-center transition-colors"
+                  title="Autorizar con huella digital"
+                >
+                  {bioChecking ? <Loader2 size={22} className="animate-spin" /> : <Lock size={22} />}
+                </button>
+              )}
+            </div>
           </div>
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
@@ -1167,15 +1225,80 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [biometricAvail, setBiometricAvail] = useState(false)
+  const [bioChecking, setBioChecking] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const has = Object.values(stored).some((m: unknown) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (has && window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(ok => setBiometricAvail(ok)).catch(() => {})
+      }
+    } catch {}
+  }, [])
+
+  const doCashSave = async (manager: string) => {
+    const num = parseFloat(amount)
+    setSaving(true)
+    try {
+      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const res = await fetch(`${sbUrl}/rest/v1/pos_cash_movements`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      onConfirm(type, num, reason.trim(), manager)
+    } catch {
+      setError('Error al guardar — intenta de nuevo')
+      setSaving(false)
+    }
+  }
+
+  const handleBio = async () => {
+    const num = parseFloat(amount)
+    if (!num || num <= 0) { setError('Ingresa un monto válido'); return }
+    if (!reason.trim()) { setError('Ingresa un motivo'); return }
+    setBioChecking(true)
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const managerCreds = Object.entries(stored).filter(([, m]) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (managerCreds.length === 0) { setError('No hay huellas de gerente registradas'); setBioChecking(false); return }
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge, rpId: window.location.hostname,
+          allowCredentials: managerCreds.map(([id]) => ({ id: Uint8Array.from(atob(id), c => c.charCodeAt(0)), type: 'public-key' as const })),
+          userVerification: 'required', timeout: 30000,
+        },
+      })
+      if (assertion) {
+        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+        const member = stored[credId] as { name?: string }
+        if (member?.name) await doCashSave(member.name)
+      }
+    } catch { setError('Huella no reconocida') }
+    setBioChecking(false)
+  }
 
   const handleConfirm = async () => {
     const num = parseFloat(amount)
-    if (!num || num <= 0) { setError('Ingresa un monto valido'); return }
+    if (!num || num <= 0) { setError('Ingresa un monto válido'); return }
     if (!reason.trim()) { setError('Ingresa un motivo'); return }
     if (!pin) { setError('Ingresa PIN de gerente'); return }
     const manager = await verifyManagerPin(pin)
-    if (!manager) { setError('PIN invalido'); return }
-    setSaving(true)
+    if (!manager) { setError('PIN inválido'); return }
+    await doCashSave(manager)
     try {
       // Save to Supabase
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -1261,18 +1384,32 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
             />
           </div>
 
-          {/* Manager PIN */}
+          {/* Manager PIN + Biometric */}
           <div>
-            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">PIN de gerente</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
-              placeholder="****"
-              className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-emerald-500 min-h-[48px]"
-            />
+            <label className="text-sm font-semibold text-[var(--text-3)] uppercase tracking-wide mb-2 block">
+              {biometricAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente'}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={pin}
+                onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError('') }}
+                placeholder="****"
+                className="flex-1 bg-[var(--line)] border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-emerald-500 min-h-[48px]"
+              />
+              {biometricAvail && (
+                <button
+                  onClick={handleBio}
+                  disabled={bioChecking || saving}
+                  className="w-14 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white flex items-center justify-center transition-colors"
+                  title="Autorizar con huella digital"
+                >
+                  {bioChecking ? <Loader2 size={22} className="animate-spin" /> : <Lock size={22} />}
+                </button>
+              )}
+            </div>
           </div>
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
