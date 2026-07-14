@@ -2067,15 +2067,14 @@ function POSContent() {
       before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
       after: { qty: 0, cancelled: !voided, voided },
     })
-    // Reverse inventory deduction for cancelled items (not voided — voided means never made)
+    // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
+    // recipe deductions. Reversing never-deducted stock creates phantom inflation.
+    // Will be re-enabled via unified R1 reconciler. See R0.5 containment.
     if (!voided && prepared) {
-      reverseIngredientDeduction(cancellingItem, orderId, managerName, reason)
-        .catch(() => { /* inventory reversal failed but cancellation proceeds */ })
+      console.log(`[inventory] R0.5 containment: reversal for ${cancellingItem.nombre} suspended — forward deduction was R0-suspended`)
     }
     if (voided) {
-      // Voided = never made, but ingredients were deducted at send-to-kitchen — reverse them
-      reverseIngredientDeduction(cancellingItem, orderId, managerName, reason)
-        .catch(() => { /* inventory reversal failed but void proceeds */ })
+      console.log(`[inventory] R0.5 containment: void reversal for ${cancellingItem.nombre} suspended — forward deduction was R0-suspended`)
       setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
     } else {
       setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
@@ -2121,12 +2120,12 @@ function POSContent() {
         return // DO NOT clear UI if DB update failed
       }
     }
-    // Reverse inventory deductions for items already sent to kitchen
-    for (const item of orderItems) {
-      if (sentItemIds.has(item.id)) {
-        reverseIngredientDeduction(item, orderId, managerName, reason)
-          .catch(() => { /* inventory reversal failed but void proceeds */ })
-      }
+    // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
+    // recipe deductions. Reversing never-deducted stock creates phantom inflation.
+    // Will be re-enabled via unified R1 reconciler. See R0.5 containment.
+    const sentCount = orderItems.filter(i => sentItemIds.has(i.id)).length
+    if (sentCount > 0) {
+      console.log(`[inventory] R0.5 containment: order void reversal for ${sentCount} items suspended — forward deduction was R0-suspended`)
     }
     setOrderItems([])
     setCancelledItems(new Set())

@@ -245,24 +245,12 @@ export default function CocinaPage() {
       }
     }
 
-    // Revert deductions (wrapped in try-catch so cancel still works if inventory fails)
-    try {
-      for (const row of recipeRows) {
-        const qty = row.quantity * (items[cancelTarget.itemIndex].cantidad || items[cancelTarget.itemIndex].quantity || 1)
-        const inv = invMap.get(row.ingredient_id)
-        if (inv) {
-          await updateInventoryStock(row.ingredient_id, inv.stock + qty)
-          await logInventoryMovement({
-            ingredient_id: row.ingredient_id,
-            movement_type: 'adjustment',
-            quantity: qty,
-            order_id: cancelTarget.orderId,
-            actor: manager,
-            notes: `Cancelacion: ${cancelTarget.itemName} — ${cancelReason}`,
-          })
-        }
-      }
-    } catch { /* inventory reversal failed but cancellation still proceeds */ }
+    // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
+    // recipe deductions. Reversing never-deducted stock creates phantom inflation.
+    // Will be re-enabled via unified R1 reconciler. See R0.5 containment.
+    if (recipeRows.length > 0) {
+      console.log(`[inventory] R0.5 containment: KDS cancel reversal for ${cancelTarget.itemName} suspended (${recipeRows.length} recipe rows) — forward deduction was R0-suspended`)
+    }
 
     // 4. Audit log
     logAudit({
