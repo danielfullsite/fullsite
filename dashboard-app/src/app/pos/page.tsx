@@ -642,6 +642,22 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
   const [reason, setReason] = useState('')
+  const [discBioAvail, setDiscBioAvail] = useState(false)
+  const [discBioChecking, setDiscBioChecking] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+      const has = Object.values(stored).some((m: unknown) => {
+        const member = m as { role?: string }
+        return member.role === 'admin' || member.role === 'gerente'
+      })
+      if (has && window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(ok => setDiscBioAvail(ok)).catch(() => {})
+      }
+    } catch {}
+  }, [])
 
   // ── 2x1 (estilo Wansoft: aplicar sobre partidas seleccionadas) ──
   const promoItems = items.filter(i => !isTiempoItem(i))
@@ -816,20 +832,66 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
           />
         )}
 
-        {/* Manager PIN required */}
+        {/* Manager PIN + Biometric */}
         {discountAmount > 0 && (
           <div className="mb-3">
-            <p className="text-xs text-[var(--text-3)] text-center mb-2">PIN de gerente para autorizar</p>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError(false) }}
-              placeholder="••••"
-              className={`w-full bg-[var(--line)] border ${pinError ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg text-center tracking-[0.3em] focus:outline-none focus:border-emerald-500 min-h-[48px]`}
-            />
-            {pinError && <p className="text-red-400 text-xs text-center mt-1">PIN incorrecto</p>}
+            <p className="text-xs text-[var(--text-3)] text-center mb-2">
+              {discBioAvail ? 'Huella digital o PIN de gerente' : 'PIN de gerente para autorizar'}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={pin}
+                onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError(false) }}
+                placeholder="••••"
+                className={`flex-1 bg-[var(--line)] border ${pinError ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg text-center tracking-[0.3em] focus:outline-none focus:border-emerald-500 min-h-[48px]`}
+              />
+              {discBioAvail && (
+                <button
+                  onClick={async () => {
+                    if (discountAmount <= 0) return
+                    setDiscBioChecking(true)
+                    try {
+                      const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+                      const managerCreds = Object.entries(stored).filter(([, m]) => {
+                        const member = m as { role?: string }
+                        return member.role === 'admin' || member.role === 'gerente'
+                      })
+                      if (managerCreds.length === 0) { setPinError(true); setDiscBioChecking(false); return }
+                      const challenge = new Uint8Array(32)
+                      crypto.getRandomValues(challenge)
+                      const assertion = await navigator.credentials.get({
+                        publicKey: {
+                          challenge, rpId: window.location.hostname,
+                          allowCredentials: managerCreds.map(([id]) => ({ id: Uint8Array.from(atob(id), c => c.charCodeAt(0)), type: 'public-key' as const })),
+                          userVerification: 'required', timeout: 30000,
+                        },
+                      })
+                      if (assertion) {
+                        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+                        const member = stored[credId] as { name?: string }
+                        if (member?.name) {
+                          onApply(discountAmount, reason || (
+                            mode === 'cortesia' ? `Cortesía ${cortesiaPersonas}p`
+                            : mode === '2x1' ? `Promo 2x1 (${promoPairs} ${promoPairs === 1 ? 'par' : 'pares'})`
+                            : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`
+                          ), member.name)
+                        }
+                      }
+                    } catch { setPinError(true) }
+                    setDiscBioChecking(false)
+                  }}
+                  disabled={discBioChecking}
+                  className="w-14 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white flex items-center justify-center transition-colors"
+                  title="Autorizar con huella digital"
+                >
+                  {discBioChecking ? <Loader2 size={22} className="animate-spin" /> : <Lock size={22} />}
+                </button>
+              )}
+            </div>
+            {pinError && <p className="text-red-400 text-xs text-center mt-1">PIN incorrecto o huella no reconocida</p>}
           </div>
         )}
 
@@ -848,7 +910,7 @@ function DiscountModal({ subtotal, personas, items, onApply, onCancel }: Discoun
                 : `Descuento ${mode === 'percent' ? value + '%' : '$' + value}`
               ), manager)
             }}
-            disabled={discountAmount <= 0 || pin.length < 4}
+            disabled={discountAmount <= 0 || (pin.length < 4 && !discBioAvail)}
             className={`flex-[2] py-3 rounded-xl ${mode === 'cortesia' ? 'bg-violet-600 hover:bg-violet-500' : mode === '2x1' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-semibold transition-colors min-h-[48px]`}
           >
             {mode === 'cortesia' ? `Cortesía -${formatMXN(discountAmount)}` : mode === '2x1' ? `2x1 -${formatMXN(discountAmount)}` : `Aplicar -${formatMXN(discountAmount)}`}
