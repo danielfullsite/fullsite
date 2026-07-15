@@ -9,6 +9,33 @@ import TurnoGate from '@/components/pos/TurnoGate'
 
 function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+/** Silent attendance: register entrada if no open session exists for this staff + turno */
+async function ensureAttendanceEntry(staffId: string, staffName: string, method: 'pin' | 'huella') {
+  try {
+    const clientId = _cid()
+    const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+    // Check for open entrada (no salida after it)
+    const res = await fetch(
+      `${SB_URL}/rest/v1/pos_attendance?client_id=eq.${clientId}&staff_id=eq.${encodeURIComponent(staffId)}&order=registered_at.desc&limit=1`,
+      { headers, cache: 'no-store' }
+    )
+    if (res.ok) {
+      const rows = await res.json()
+      // If latest event is already an entrada, session is open — do nothing
+      if (rows.length > 0 && rows[0].type === 'entrada') return
+    }
+    // No open session — register entrada silently
+    await fetch(`${SB_URL}/rest/v1/pos_attendance`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({ client_id: clientId, staff_id: staffId, staff_name: staffName, type: 'entrada', method }),
+    })
+  } catch { /* silent — attendance is non-blocking */ }
+}
+
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
@@ -248,6 +275,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         }
         await registerSession(member.id, member.name)
         startHeartbeat(member.id)
+        ensureAttendanceEntry(member.id, member.name, 'huella')
 
         setStaff(member)
         setUnlocked(true)
@@ -288,6 +316,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // Register session and start heartbeat
       await registerSession(member.id, member.name)
       startHeartbeat(member.id)
+      ensureAttendanceEntry(member.id, member.name, 'pin')
 
       setStaff(member)
       setAttempts(0)

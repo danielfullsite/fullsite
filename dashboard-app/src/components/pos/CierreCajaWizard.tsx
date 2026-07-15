@@ -245,6 +245,31 @@ export default function CierreCajaWizard({
         },
       })
 
+      // Close open attendance sessions — inferred salida, distinguishable from explicit
+      try {
+        const clientId = _cid()
+        const attRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/pos_attendance?client_id=eq.${clientId}&order=registered_at.desc`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+        )
+        if (attRes.ok) {
+          const events = await attRes.json()
+          // Find staff with open entrada (latest event is entrada)
+          const latestByStaff = new Map<string, { type: string; staff_name: string }>()
+          for (const e of events) {
+            if (!latestByStaff.has(e.staff_id)) latestByStaff.set(e.staff_id, { type: e.type, staff_name: e.staff_name })
+          }
+          const openEntries = [...latestByStaff.entries()].filter(([, v]) => v.type === 'entrada')
+          for (const [staffId, { staff_name }] of openEntries) {
+            await fetch(`${SUPABASE_URL}/rest/v1/pos_attendance`, {
+              method: 'POST',
+              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({ client_id: clientId, staff_id: staffId, staff_name, type: 'salida', method: 'inferred_cierre' }),
+            })
+          }
+        }
+      } catch { /* non-blocking */ }
+
       onComplete()
     } catch {
       setPinError('Error de conexión al guardar cierre')
