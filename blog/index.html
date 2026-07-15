@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/favicon-512.png">
+<title>Blog Fullsite — Inteligencia operativa para restaurantes</title>
+<meta name="description" content="Articulos sobre gestion de restaurantes con IA: menu engineering, deteccion de fraude, briefings automaticos y POS inteligente. Conocimiento operativo real.">
+<meta name="keywords" content="blog restaurantes, gestion restaurante, IA restaurantes, menu engineering, POS con IA, fraude restaurante, briefing restaurante">
+
+<!-- Open Graph -->
+<meta property="og:title" content="Blog Fullsite — Inteligencia operativa para restaurantes">
+<meta property="og:description" content="Articulos sobre gestion de restaurantes con IA: menu engineering, deteccion de fraude, briefings automaticos y POS inteligente.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="Fullsite">
+<meta property="og:image" content="https://fullsite.mx/img-dashboard.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<link rel="canonical" href="https://fullsite.mx/blog/">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500;1,9..144,700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* === RESET === */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+
+/* === DESIGN SYSTEM TOKENS === */
+:root{
+  --bg:#0a0a0b;
+  --bg-1:#0f0f10;
+  --bg-2:#131315;
+  --bg-3:#1a1a1d;
+  --bg-4:#222226;
+  --bg-light:#fafaf7;
+  --bg-light-1:#f3f3ee;
+  --bg-light-2:#e8e8e1;
+  --ink:#ffffff;
+  --ink-1:rgba(255,255,255,0.86);
+  --ink-2:rgba(255,255,255,0.62);
+  --ink-3:rgba(255,255,255,0.42);
+  --ink-4:rgba(255,255,255,0.16);
+  --ink-dark:#0a0a0b;
+  --ink-dark-2:rgba(10,10,11,0.62);
+  --line:rgba(255,255,255,0.06);
+  --line-2:rgba(255,255,255,0.10);
+  --line-3:rgba(255,255,255,0.18);
+  --line-light:rgba(10,10,11,0.08);
+  --line-light-2:rgba(10,10,11,0.14);
+  --accent:#00ff88;
+  --accent-2:#00d67a;
+  --accent-dim:rgba(0,255,136,0.12);
+  --accent-soft:rgba(0,255,136,0.06);
+  --accent-glow:rgba(0,255,136,0.4);
+  --coral:#ff6b4a;
+  --amber:#ffc857;
+  --violet:#8b5cf6;
+  --sans:'Geist',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --serif:'Fraunces','Times New Roman',serif;
+  --mono:'Geist Mono',ui-monospace,monospace;
+  --max:1280px;
+  --pad:32px;
+  --ease-out-quint:cubic-bezier(0.22,1,0.36,1);
+  --ease-spring:cubic-bezier(0.16,1,0.3,1);
+  --ease-soft:cubic-bezier(0.4,0,0.2,1);
+}
+
+body{
+  font-family:var(--sans);background:var(--bg);color:var(--ink-1);
+  overflow-x:hidden;font-size:17px;line-height:1.55;
+  font-feature-settings:'ss01','cv01','cv02';
+}
+a{color:inherit;text-decoration:none;}
+img{display:block;max-width:100%;}
+
+/* === NAV === */
+#nav{
+  position:fixed;top:0;left:0;right:0;z-index:90;
+  height:64px;display:flex;align-items:center;
+  padding:0 var(--pad);
+  background:rgba(10,10,11,0.72);backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
+  border-bottom:1px solid var(--line);
+}
+.nav-inner{width:100%;max-width:var(--max);margin:0 auto;display:flex;align-items:center;justify-content:space-between;}
+.nav-logo{display:flex;align-items:center;gap:0;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--ink);}
+.nav-logo .dot{width:8px;height:8px;background:var(--accent);border-radius:2px;margin-left:1px;margin-bottom:4px;box-shadow:0 0 12px var(--accent-glow);}
+.nav-links{display:flex;align-items:center;gap:6px;}
+.nav-links a{font-size:14px;font-weight:450;color:var(--ink-2);padding:6px 12px;border-radius:8px;transition:color .2s;}
+.nav-links a:hover{color:var(--ink);}
+.nav-links a.active{color:var(--accent);}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-login{font-size:14px;font-weight:450;color:var(--ink-2);transition:color .2s;}
+.nav-login:hover{color:var(--ink);}
+.nav-cta{
+  font-size:14px;font-weight:500;color:var(--ink-dark);background:var(--ink);
+  padding:8px 20px;border-radius:99px;transition:all .2s var(--ease-soft);
+}
+.nav-cta:hover{background:var(--accent);box-shadow:0 4px 20px var(--accent-glow);}
+.nav-hamburger{display:none;background:none;border:none;cursor:pointer;padding:8px;}
+.nav-hamburger span{display:block;width:20px;height:2px;background:var(--ink);margin:4px 0;transition:all .2s;}
+
+/* === SHARED === */
+.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--pad);}
+section{padding:120px 0;}
+.eyebrow{
+  font-size:12px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--ink-3);display:flex;align-items:center;gap:8px;margin-bottom:20px;
+}
+.eyebrow::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:1px;}
+h1,h2,h3{font-weight:500;letter-spacing:-0.03em;line-height:1.05;}
+h2.display{font-size:clamp(36px,5.6vw,64px);}
+h2.display em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
+
+/* scroll reveal */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease-spring),transform .7s var(--ease-spring);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.rd1{transition-delay:.08s}.rd2{transition-delay:.16s}.rd3{transition-delay:.24s}.rd4{transition-delay:.32s}.rd5{transition-delay:.4s}.rd6{transition-delay:.48s}
+
+/* === HERO === */
+.blog-hero{padding-top:140px;padding-bottom:80px;text-align:center;}
+.blog-hero h1{
+  font-size:clamp(36px,5vw,56px);font-weight:500;letter-spacing:-0.03em;
+  line-height:1.08;color:var(--ink);margin-bottom:16px;
+}
+.blog-hero h1 em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
+.blog-hero p{font-size:18px;color:var(--ink-2);max-width:560px;margin:0 auto;line-height:1.6;}
+
+/* === BLOG GRID === */
+.blog-grid-section{padding:0 0 120px;}
+.blog-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;}
+
+.blog-card{
+  background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015));
+  border:1px solid var(--line);border-radius:20px;
+  padding:32px;position:relative;overflow:hidden;
+  transition:transform .3s var(--ease-spring),border-color .3s;
+  display:flex;flex-direction:column;
+}
+.blog-card:hover{transform:translateY(-3px);border-color:var(--line-3);}
+.blog-card:hover::before{opacity:1;}
+.blog-card::before{
+  content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
+  background:var(--accent);filter:blur(4px);opacity:0;transition:opacity .3s;
+}
+
+.blog-card-tag{
+  display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-dim);
+  padding:4px 12px;border-radius:99px;margin-bottom:16px;align-self:flex-start;
+}
+
+.blog-card h2{
+  font-size:clamp(20px,2.4vw,24px);font-weight:500;letter-spacing:-0.02em;
+  color:var(--ink);margin-bottom:12px;line-height:1.2;
+}
+.blog-card p{font-size:15px;color:var(--ink-2);line-height:1.6;margin-bottom:20px;flex:1;}
+
+.blog-card-meta{
+  display:flex;align-items:center;gap:16px;
+  font-size:13px;color:var(--ink-3);padding-top:16px;
+  border-top:1px solid var(--line);
+}
+.blog-card-meta span{display:flex;align-items:center;gap:4px;}
+
+.blog-card-link{
+  font-size:14px;font-weight:600;color:var(--accent);
+  margin-top:auto;display:inline-flex;align-items:center;gap:4px;
+  transition:gap .2s;
+}
+.blog-card:hover .blog-card-link{gap:8px;}
+
+/* Featured card (first one, spans full width) */
+.blog-card.featured{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;}
+.blog-card.featured .blog-card-content{display:flex;flex-direction:column;}
+.blog-card.featured .blog-card-visual{
+  background:var(--bg-3);border-radius:16px;padding:32px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.featured-matrix{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.featured-matrix-cell{
+  background:var(--bg-2);border:1px solid var(--line);border-radius:12px;
+  padding:16px;text-align:center;
+}
+.featured-matrix-cell .label{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
+.featured-matrix-cell .value{font-size:15px;font-weight:600;color:var(--ink);}
+.featured-matrix-cell.star{border-color:rgba(0,255,136,0.2);}
+.featured-matrix-cell.star .value{color:var(--accent);}
+.featured-matrix-cell.cow .value{color:var(--amber);}
+.featured-matrix-cell.puzzle .value{color:var(--violet);}
+.featured-matrix-cell.dog .value{color:var(--coral);}
+
+/* === CTA SECTION === */
+.blog-cta{
+  text-align:center;padding:80px 0;
+  background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.blog-cta h2{
+  font-size:clamp(28px,4vw,40px);font-weight:500;letter-spacing:-0.03em;
+  color:var(--ink);margin-bottom:12px;
+}
+.blog-cta h2 em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400;}
+.blog-cta p{font-size:17px;color:var(--ink-2);margin-bottom:28px;max-width:480px;margin-left:auto;margin-right:auto;}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:14px 28px;background:var(--accent);color:var(--ink-dark);
+  font-weight:600;font-size:15px;border-radius:99px;
+  box-shadow:0 0 24px var(--accent-glow);
+  transition:all .25s var(--ease-soft);
+}
+.btn-primary:hover{background:var(--accent-2);transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-glow);}
+
+/* === FOOTER === */
+footer{padding:48px 0 24px;border-top:1px solid var(--line);}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+.footer-left{display:flex;align-items:center;gap:16px;}
+.footer-logo{display:flex;align-items:center;gap:0;font-size:14px;font-weight:700;letter-spacing:-0.02em;color:var(--ink);}
+.footer-logo .dot{width:6px;height:6px;background:var(--accent);border-radius:1px;margin-left:1px;margin-bottom:3px;}
+.footer-copy{font-size:13px;color:var(--ink-3);}
+.footer-links{display:flex;gap:24px;}
+.footer-links a{font-size:13px;color:var(--ink-3);transition:color .15s;}
+.footer-links a:hover{color:var(--ink-2);}
+
+/* === MOBILE MENU === */
+#mobile-menu{
+  position:fixed;inset:0;z-index:89;background:rgba(10,10,11,.97);backdrop-filter:blur(24px);
+  display:flex;flex-direction:column;padding:80px 24px 24px;
+  opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s;
+}
+#mobile-menu.open{opacity:1;visibility:visible;}
+.mobile-link{display:block;padding:12px 0;font-size:17px;font-weight:500;color:var(--ink);border-bottom:1px solid var(--line);}
+.mobile-cta{
+  margin-top:auto;padding:16px;text-align:center;
+  background:var(--accent);color:var(--ink-dark);font-weight:600;font-size:16px;
+  border-radius:99px;
+}
+
+/* === RESPONSIVE === */
+@media(max-width:768px){
+  :root{--pad:20px;}
+  section{padding:80px 0;}
+  .nav-links{display:none;}
+  .nav-hamburger{display:block;}
+  .blog-grid{grid-template-columns:1fr;}
+  .blog-card.featured{grid-column:span 1;grid-template-columns:1fr;}
+  .blog-card.featured .blog-card-visual{order:-1;}
+  .footer-inner{flex-direction:column;text-align:center;}
+  .footer-links{flex-wrap:wrap;justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- === NAV === -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">fullsite<span class="dot"></span></a>
+    <div class="nav-links">
+      <a href="/#bento">Producto</a>
+      <a href="/#pricing">Precios</a>
+      <a href="/demo.html">Demo</a>
+      <a href="/blog/" class="active">Blog</a>
+      <a href="/#faq">FAQ</a>
+    </div>
+    <div class="nav-right">
+      <a href="https://app.fullsite.mx/login" class="nav-login">Iniciar sesion</a>
+      <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="nav-cta">Agendar demo</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- === MOBILE MENU === -->
+<div id="mobile-menu">
+  <a href="/#bento" class="mobile-link">Producto</a>
+  <a href="/#pricing" class="mobile-link">Precios</a>
+  <a href="/demo.html" class="mobile-link">Demo</a>
+  <a href="/blog/" class="mobile-link">Blog</a>
+  <a href="/#faq" class="mobile-link">FAQ</a>
+  <a href="https://app.fullsite.mx/login" class="mobile-link">Iniciar sesion</a>
+  <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="mobile-cta">Agendar demo</a>
+</div>
+
+<!-- === HERO === -->
+<section class="blog-hero">
+  <div class="wrap">
+    <div class="eyebrow reveal" style="justify-content:center;">Blog</div>
+    <h1 class="reveal rd1">Inteligencia operativa para <em>restaurantes</em></h1>
+    <p class="reveal rd2">Guias practicas, datos reales y estrategias de IA aplicada a la operacion diaria de restaurantes en Mexico.</p>
+  </div>
+</section>
+
+<!-- === BLOG GRID === -->
+<section class="blog-grid-section">
+  <div class="wrap">
+    <div class="blog-grid">
+
+      <!-- FEATURED: Menu Engineering -->
+      <a href="/blog/que-es-menu-engineering.html" class="blog-card featured reveal">
+        <div class="blog-card-content">
+          <span class="blog-card-tag">Menu Engineering</span>
+          <h2>Que es Menu Engineering y como aumentar tu margen 12% sin subir precios</h2>
+          <p>La matriz estrellas/vacas/puzzles/perros que clasifica cada platillo por popularidad y rentabilidad. Con datos reales de un restaurante en Monterrey.</p>
+          <div class="blog-card-meta">
+            <span>26 May 2026</span>
+            <span>8 min lectura</span>
+          </div>
+        </div>
+        <div class="blog-card-visual">
+          <div class="featured-matrix">
+            <div class="featured-matrix-cell star">
+              <div class="label">Estrellas</div>
+              <div class="value">Chilaquiles</div>
+            </div>
+            <div class="featured-matrix-cell cow">
+              <div class="label">Vacas</div>
+              <div class="value">Cafe americano</div>
+            </div>
+            <div class="featured-matrix-cell puzzle">
+              <div class="label">Puzzles</div>
+              <div class="value">Bowl acai</div>
+            </div>
+            <div class="featured-matrix-cell dog">
+              <div class="label">Perros</div>
+              <div class="value">Pasta trufa</div>
+            </div>
+          </div>
+        </div>
+      </a>
+
+      <!-- Article 2: Fraude -->
+      <a href="/blog/como-detectar-fraude-restaurante.html" class="blog-card reveal rd1">
+        <span class="blog-card-tag">Anti-fraude</span>
+        <h2>Como detectar fraude en tu restaurante: la guia completa para 2026</h2>
+        <p>Cortesias falsas, cancelaciones sospechosas, descuentos no autorizados. Los patrones que cuestan entre 2% y 5% de tus ventas brutas, y como detectarlos automaticamente.</p>
+        <div class="blog-card-meta">
+          <span>26 May 2026</span>
+          <span>9 min lectura</span>
+        </div>
+      </a>
+
+      <!-- Article 3: POS con IA -->
+      <a href="/blog/pos-con-ia-vs-pos-tradicional.html" class="blog-card reveal rd2">
+        <span class="blog-card-tag">POS + IA</span>
+        <h2>POS con IA vs POS tradicional: por que tu restaurante necesita mas que un punto de venta</h2>
+        <p>La diferencia entre un sistema que registra transacciones y uno que te dice que hacer. De la gestion reactiva a la operacion proactiva con inteligencia artificial.</p>
+        <div class="blog-card-meta">
+          <span>26 May 2026</span>
+          <span>7 min lectura</span>
+        </div>
+      </a>
+
+      <!-- Article 4: Briefing diario -->
+      <a href="/blog/briefing-diario-restaurante.html" class="blog-card reveal rd3">
+        <span class="blog-card-tag">Operaciones</span>
+        <h2>El briefing diario que todo dueno de restaurante deberia recibir a las 7 AM</h2>
+        <p>Ventas, anomalias, predicciones y rendimiento del equipo. Todo en un mensaje de Telegram antes de llegar al restaurante. Asi se ve la gestion moderna.</p>
+        <div class="blog-card-meta">
+          <span>26 May 2026</span>
+          <span>6 min lectura</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- === CTA === -->
+<section class="blog-cta reveal">
+  <div class="wrap">
+    <h2>Deja de adivinar. Empieza a <em>operar con datos.</em></h2>
+    <p>Agenda una demo de 15 minutos y ve como Fullsite aplica estas estrategias automaticamente en tu restaurante.</p>
+    <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite%20(vengo%20del%20blog)" class="btn-primary">Agendar demo &rarr;</a>
+  </div>
+</section>
+
+<!-- === FOOTER === -->
+<footer>
+  <div class="wrap">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">fullsite<span class="dot"></span></span>
+        <span class="footer-copy">&copy; 2026 Fullsite &middot; Monterrey, MX</span>
+      </div>
+      <div class="footer-links">
+        <a href="/#bento">Producto</a>
+        <a href="/#pricing">Precios</a>
+        <a href="/demo.html">Demo</a>
+        <a href="/blog/">Blog</a>
+        <a href="/privacidad.html">Privacidad</a>
+        <a href="/terminos.html">Terminos</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* === SCROLL REVEAL === */
+(function(){
+  var ro = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, {threshold:0.08, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(function(el){ ro.observe(el); });
+})();
+
+/* === MOBILE MENU === */
+(function(){
+  var btn = document.getElementById('hamburger');
+  var menu = document.getElementById('mobile-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(){
+    menu.classList.toggle('open');
+  });
+  menu.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){ menu.classList.remove('open'); });
+  });
+})();
+</script>
+</body>
+</html>
