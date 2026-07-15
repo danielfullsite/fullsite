@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/favicon-512.png">
+<title>Fullsite para Restaurantes de Servicio Completo -- POS, cocina, inventario, recetas y analisis operativo</title>
+<meta name="description" content="El sistema operativo para restaurantes de servicio completo. POS, Kitchen Display System, control de recetas con deduccion automatica, inventario en tiempo real y 30+ agentes autonomos de analisis operativo.">
+<meta property="og:title" content="Fullsite para Restaurantes de Servicio Completo">
+<meta property="og:description" content="POS, cocina, inventario, recetas y analisis operativo — todo en un solo sistema. Construido para operaciones complejas con 200+ platillos.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fullsite.mx/soluciones/restaurante-servicio-completo.html">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="Fullsite">
+<meta property="og:image" content="https://fullsite.mx/img-dashboard.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fullsite para Restaurantes de Servicio Completo">
+<meta name="twitter:description" content="POS, cocina, inventario, recetas y analisis operativo — todo en un solo sistema. Construido para operaciones complejas con 200+ platillos.">
+<meta name="twitter:image" content="https://fullsite.mx/img-dashboard.png">
+<link rel="canonical" href="https://fullsite.mx/soluciones/restaurante-servicio-completo.html">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,300;1,9..144,500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+:root{
+  --bg:#0a0a0b;--bg-1:#0f0f10;--bg-2:#131315;--bg-3:#1a1a1d;
+  --bg-light:#fafaf7;--bg-light-1:#f3f3ee;
+  --ink:#ffffff;--ink-1:rgba(255,255,255,0.86);--ink-2:rgba(255,255,255,0.62);--ink-3:rgba(255,255,255,0.42);
+  --ink-dark:#0a0a0b;--ink-dark-2:rgba(10,10,11,0.62);
+  --line:rgba(255,255,255,0.06);--line-2:rgba(255,255,255,0.10);--line-3:rgba(255,255,255,0.18);
+  --accent:#00ff88;--accent-2:#00d67a;--accent-dim:rgba(0,255,136,0.12);--accent-glow:rgba(0,255,136,0.4);
+  --coral:#ff6b4a;--amber:#ffc857;--violet:#8b5cf6;
+  --sans:'Geist',-apple-system,system-ui,sans-serif;--serif:'Fraunces',serif;--mono:'Geist Mono',monospace;
+  --max:1280px;--pad:32px;--ease-spring:cubic-bezier(0.16,1,0.3,1);
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink-1);font-size:17px;line-height:1.55;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+nav.top{position:fixed;top:0;left:0;right:0;z-index:100;height:64px;display:flex;align-items:center;padding:0 var(--pad);background:rgba(10,10,11,0.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}
+.nav-wrap{max-width:var(--max);width:100%;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:700;font-size:18px;letter-spacing:-0.02em;color:var(--ink)}
+.dot{display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:2px;margin-left:2px;margin-bottom:2px;vertical-align:middle}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--ink-2);padding:8px 16px;border-radius:8px;transition:color .2s}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{font-size:14px;font-weight:600;color:var(--ink-dark);background:var(--ink);padding:8px 20px;border-radius:99px;transition:all .2s}
+.nav-cta:hover{background:var(--accent);box-shadow:0 0 24px var(--accent-glow)}
+.hero{position:relative;min-height:90vh;display:flex;align-items:center;padding:0 var(--pad);overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,255,136,0.04),transparent 70%)}
+.hero-inner{position:relative;z-index:2;max-width:var(--max);margin:0 auto;width:100%;padding-top:100px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.eyebrow-c{justify-content:center}
+h1,.display{font-weight:500;letter-spacing:-0.03em;line-height:1.05;color:var(--ink)}
+h1{font-size:clamp(40px,6vw,72px)}
+h1 em,.display em{font-family:var(--serif);font-style:italic;color:var(--accent)}
+.hero-desc{font-size:18px;color:var(--ink-2);max-width:600px;line-height:1.65;margin:24px 0 40px}
+.hero-ctas{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.hero-ctas-c{justify-content:center}
+.btn-primary{display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:var(--accent);color:var(--ink-dark);font-weight:700;font-size:15px;border-radius:99px;transition:all .2s}
+.btn-primary:hover{background:var(--accent-2);transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-glow)}
+.btn-secondary{display:inline-flex;align-items:center;padding:14px 24px;color:var(--ink-2);font-weight:500;font-size:15px;border-radius:99px;border:1px solid var(--line-3);background:rgba(255,255,255,0.02);backdrop-filter:blur(8px);transition:all .2s}
+.btn-secondary:hover{color:var(--ink);background:rgba(255,255,255,0.05)}
+.sec{padding:120px var(--pad)}
+.sec-inner{max-width:var(--max);margin:0 auto}
+.display{font-size:clamp(36px,5.6vw,64px)}
+.sec-desc{font-size:17px;color:var(--ink-2);max-width:540px;line-height:1.6;margin-top:16px;margin-bottom:48px}
+.alt{background:var(--bg-1);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:var(--bg-2);border:1px solid var(--line-2);border-radius:20px;padding:36px 32px;transition:border-color .3s,transform .3s var(--ease-spring);position:relative;overflow:hidden}
+.card:hover{border-color:rgba(0,255,136,0.2);transform:translateY(-3px)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0;transition:opacity .3s}
+.card:hover::before{opacity:1}
+.card h3{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.card p{font-size:15px;color:var(--ink-2);line-height:1.6}
+.card-icon{width:48px;height:48px;border-radius:14px;background:var(--accent-dim);border:1px solid rgba(0,255,136,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:20px}
+/* Case study */
+.case-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.case-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.case-stat{background:var(--bg-2);border:1px solid var(--line-2);border-radius:16px;padding:24px}
+.case-stat-num{font-family:var(--serif);font-size:32px;font-weight:700;color:var(--accent);line-height:1}
+.case-stat-lbl{font-size:13px;color:var(--ink-2);margin-top:6px}
+.case-text h3{font-size:clamp(24px,3vw,32px);font-weight:500;letter-spacing:-0.02em;color:var(--ink);margin-bottom:16px}
+.case-text p{font-size:15px;color:var(--ink-2);line-height:1.7;margin-bottom:12px}
+.case-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--accent);margin-top:8px;transition:gap .2s}
+.case-link:hover{gap:10px}
+/* Intelligence */
+.intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.intel-card{background:var(--bg-2);border:1px solid var(--line-2);border-radius:16px;padding:28px 24px;display:flex;gap:16px;align-items:flex-start;transition:border-color .2s}
+.intel-card:hover{border-color:rgba(0,255,136,0.2)}
+.intel-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(0,255,136,0.12);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.intel-card h4{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.intel-card p{font-size:14px;color:var(--ink-2);line-height:1.5}
+.intel-headline{background:var(--bg-2);border:1px solid var(--line-2);border-radius:16px;padding:28px 32px;margin-top:20px;text-align:center}
+.intel-headline p{font-size:15px;color:var(--ink-2);line-height:1.6}
+/* FAQ */
+.faq{max-width:700px;margin:48px auto 0}
+.faq-item{border-bottom:1px solid var(--line)}
+.faq-item summary{padding:20px 0;font-size:16px;font-weight:500;color:var(--ink);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-icon{font-size:18px;color:var(--ink-3);transition:transform .2s}
+.faq-item[open] .faq-icon{transform:rotate(45deg)}
+.faq-item p{padding:0 0 20px;font-size:15px;color:var(--ink-2);line-height:1.7}
+/* CTA */
+.cta-sec{text-align:center}
+.cta-sec .sec-inner{max-width:640px;display:flex;flex-direction:column;align-items:center}
+/* Stats row */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+.stat-box{background:var(--bg-2);border:1px solid var(--line);border-radius:20px;padding:32px;text-align:center}
+.stat-num{font-family:var(--serif);font-size:36px;font-weight:700;color:var(--accent)}
+.stat-lbl{font-size:13px;color:var(--ink-2);margin-top:4px}
+
+footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
+.footer-wrap{max-width:var(--max);margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.footer-left{display:flex;align-items:center;gap:16px}
+.footer-copy{font-size:13px;color:var(--ink-3)}
+.footer-right{display:flex;gap:24px}
+.footer-right a{font-size:13px;color:var(--ink-3);transition:color .2s}
+.footer-right a:hover{color:var(--ink-2)}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .8s var(--ease-spring),transform .8s var(--ease-spring)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.rd1{transition-delay:.1s}.rd2{transition-delay:.18s}.rd3{transition-delay:.26s}
+
+@media(max-width:900px){.grid-3,.case-grid,.intel-grid,.stat-grid{grid-template-columns:1fr}.nav-links{display:none}.case-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.footer-wrap{flex-direction:column;gap:24px;text-align:center}.footer-right{flex-wrap:wrap;justify-content:center}.hero-ctas{flex-direction:column;align-items:center}.case-stats{grid-template-columns:1fr}}
+/* WhatsApp float */
+.wa-float{position:fixed;bottom:24px;right:24px;z-index:99;width:56px;height:56px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,211,102,0.4);transition:transform .2s cubic-bezier(0.16,1,0.3,1),box-shadow .2s;}
+.wa-float:hover{transform:scale(1.08);box-shadow:0 8px 32px rgba(37,211,102,0.5);}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Es Fullsite para restaurantes con menus de 200+ platillos?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Si. Nuestro restaurante en produccion tiene 522 items activos en 43 categorias."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Fullsite maneja recetas con multiples ingredientes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Si. 178 recetas canonicas con 708 lineas de ingredientes. Cada orden descuenta automaticamente."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Funciona para restaurantes con varias estaciones de cocina?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Si. Kitchen display system con ruteo por estacion: cocina, barra, panaderia, cada impresora recibe solo lo que le corresponde."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Puedo usar mis computadoras y tablets actuales?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Si. Fullsite corre en cualquier dispositivo con navegador. Windows, Android, tablets, computadoras de escritorio."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Que pasa si se cae el internet?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Fullsite es offline-first. Cada terminal sigue tomando ordenes y enviando a cocina. Cuando regresa la conexion, todo se sincroniza automaticamente."
+      }
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+<nav class="top">
+  <div class="nav-wrap">
+    <a href="/" class="logo">fullsite<span class="dot"></span></a>
+    <div class="nav-links">
+      <a href="/#pitch">POS + IA</a>
+      <a href="/#como">Como funciona</a>
+      <a href="/precios.html">Precio</a>
+      <a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="nav-cta">Agendar demo &rarr;</a>
+    </div>
+  </div>
+</nav>
+
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow">Soluciones &middot; Servicio completo</p>
+    <h1>El sistema operativo para restaurantes de <em>servicio completo</em></h1>
+    <p class="hero-desc">POS, cocina, inventario, recetas y analisis operativo — todo en un solo sistema.</p>
+    <div class="hero-ctas">
+      <a href="/demo.html" class="btn-primary">Agenda una demo &rarr;</a>
+      <a href="/producto/" class="btn-secondary">Ver producto</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- CONSTRUIDO PARA OPERACIONES COMPLEJAS -->
+<section class="sec alt">
+  <div class="sec-inner">
+    <p class="eyebrow reveal">Capacidades</p>
+    <h2 class="display reveal">Construido para operaciones <em>complejas</em></h2>
+    <p class="sec-desc reveal">No es un POS para cafeterias adaptado a tu operacion. Es un sistema disenado desde cero para restaurantes con menus extensos, multiples estaciones y equipos grandes.</p>
+    <div class="grid-3 reveal" style="margin-top:48px">
+
+      <div class="card">
+        <div class="card-icon">&#9874;</div>
+        <h3>Control de recetas</h3>
+        <p>178 recetas canonicas con deduccion automatica de ingredientes por orden. Cada platillo descuenta exactamente los insumos de tu inventario.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">&#9635;</div>
+        <h3>Inventario en tiempo real</h3>
+        <p>Reconciliacion automatica entre lo vendido y lo consumido. Sin conteos manuales sorpresa.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">&#9783;</div>
+        <h3>Kitchen Display System</h3>
+        <p>Comandas por estacion (cocina, barra, panaderia). Cada item llega a la impresora correcta automaticamente.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">&#9889;</div>
+        <h3>Modo offline</h3>
+        <p>Si el internet falla, cada terminal sigue operando. Las ordenes se sincronizan cuando la conexion regresa.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">&#9919;</div>
+        <h3>Seguridad</h3>
+        <p>Autenticacion biometrica (huella digital) para aprobaciones de gerente. Control de acceso por rol.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">&#9000;</div>
+        <h3>Sin hardware propietario</h3>
+        <p>Corre en cualquier computadora, tablet o terminal que ya tengas. Cero inversion en equipo.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- CASO REAL: AMALAY -->
+<section class="sec">
+  <div class="sec-inner">
+    <p class="eyebrow reveal">Caso real</p>
+    <h2 class="display reveal">AMALAY — servicio completo, 40 empleados, <em>522 platillos</em></h2>
+    <div class="case-grid reveal" style="margin-top:48px">
+
+      <div class="case-text">
+        <h3>Un restaurante real, no un demo</h3>
+        <p>AMALAY Coffee & Market opera como restaurante de servicio completo en Monterrey. 40 empleados activos, 522 items en menu, 178 recetas con ingredientes detallados.</p>
+        <p>Multiples estaciones de cocina, barra y panaderia. 915 dias de datos operativos continuos.</p>
+        <p>Fullsite POS en produccion desde julio 2026.</p>
+        <a href="/caso-amalay.html" class="case-link">Ver caso completo &rarr;</a>
+      </div>
+
+      <div class="case-stats">
+        <div class="case-stat">
+          <div class="case-stat-num">522</div>
+          <div class="case-stat-lbl">Items activos en menu</div>
+        </div>
+        <div class="case-stat">
+          <div class="case-stat-num">178</div>
+          <div class="case-stat-lbl">Recetas con ingredientes</div>
+        </div>
+        <div class="case-stat">
+          <div class="case-stat-num">40</div>
+          <div class="case-stat-lbl">Empleados activos</div>
+        </div>
+        <div class="case-stat">
+          <div class="case-stat-num">915</div>
+          <div class="case-stat-lbl">Dias de datos operativos</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- INTELIGENCIA OPERATIVA -->
+<section class="sec alt">
+  <div class="sec-inner">
+    <p class="eyebrow reveal">Inteligencia operativa</p>
+    <h2 class="display reveal">30+ agentes autonomos analizan tu <em>operacion</em></h2>
+    <p class="sec-desc reveal">Analisis operativo continuo que detecta problemas antes de que se conviertan en perdidas.</p>
+
+    <div class="intel-grid reveal" style="margin-top:48px">
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9729;</div>
+        <div>
+          <h4>Clima y eventos</h4>
+          <p>Correlacion entre clima, eventos locales y patrones de venta para anticipar la demanda.</p>
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9888;</div>
+        <div>
+          <h4>Deteccion de anomalias</h4>
+          <p>Identifica metricas fuera de su patron historico: ventas atipicas, cancelaciones inusuales, caidas de ticket.</p>
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9201;</div>
+        <div>
+          <h4>Prediccion de cierre</h4>
+          <p>Proyeccion del cierre del dia a partir de las 2pm basada en datos historicos y tendencia actual.</p>
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9731;</div>
+        <div>
+          <h4>Analisis de staffing</h4>
+          <p>Sugiere horarios optimos de personal basado en patrones de demanda por dia y hora.</p>
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9760;</div>
+        <div>
+          <h4>Deteccion anti-fraude</h4>
+          <p>Patrones sospechosos en cancelaciones, descuentos y cortesias. Alertas automaticas al gerente.</p>
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <div class="intel-icon">&#9776;</div>
+        <div>
+          <h4>Menu engineering</h4>
+          <p>Clasifica platillos por popularidad y rentabilidad. Identifica estrellas, vacas y platillos a reformular.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="intel-headline reveal">
+      <p>No necesitas abrir un dashboard. Te llegan recomendaciones accionables.</p>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- FAQ -->
+<section class="sec">
+  <div class="sec-inner" style="text-align:center">
+    <p class="eyebrow eyebrow-c reveal">Preguntas frecuentes</p>
+    <h2 class="display reveal">Lo que nos preguntan los <em>operadores</em></h2>
+
+    <div class="faq reveal">
+
+      <details class="faq-item">
+        <summary>Es Fullsite para restaurantes con menus de 200+ platillos? <span class="faq-icon">+</span></summary>
+        <p>Si. Nuestro restaurante en produccion tiene 522 items activos en 43 categorias.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Fullsite maneja recetas con multiples ingredientes? <span class="faq-icon">+</span></summary>
+        <p>Si. 178 recetas canonicas con 708 lineas de ingredientes. Cada orden descuenta automaticamente.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Funciona para restaurantes con varias estaciones de cocina? <span class="faq-icon">+</span></summary>
+        <p>Si. Kitchen display system con ruteo por estacion: cocina, barra, panaderia. Cada impresora recibe solo lo que le corresponde.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Puedo usar mis computadoras y tablets actuales? <span class="faq-icon">+</span></summary>
+        <p>Si. Fullsite corre en cualquier dispositivo con navegador. Windows, Android, tablets, computadoras de escritorio.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Que pasa si se cae el internet? <span class="faq-icon">+</span></summary>
+        <p>Fullsite es offline-first. Cada terminal sigue tomando ordenes y enviando a cocina. Cuando regresa la conexion, todo se sincroniza automaticamente.</p>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- CTA -->
+<section class="sec cta-sec alt">
+  <div class="sec-inner">
+    <p class="eyebrow eyebrow-c reveal">Siguiente paso</p>
+    <h2 class="display reveal">Tu operacion merece un sistema a la altura de tu <em>cocina</em></h2>
+    <p style="color:var(--ink-2);margin:16px 0 40px;text-align:center;max-width:480px" class="reveal">Agenda una demo de 20 minutos. Te mostramos Fullsite con datos reales de un restaurante de servicio completo en Monterrey.</p>
+    <div class="hero-ctas hero-ctas-c reveal">
+      <a href="/demo.html" class="btn-primary">Agenda una demo &rarr;</a>
+      <a href="/" class="btn-secondary">Volver al inicio</a>
+    </div>
+  </div>
+</section>
+
+
+<footer>
+  <div class="footer-wrap">
+    <div class="footer-left">
+      <a href="/" class="logo" style="font-size:18px">fullsite<span class="dot" style="width:6px;height:6px;margin-bottom:2px"></span></a>
+      <span class="footer-copy">&copy; 2026 Fullsite &middot; Monterrey, MX</span>
+    </div>
+    <div class="footer-right">
+      <a href="/producto/">Producto</a>
+      <a href="/precios.html">Precios</a>
+      <a href="/demo.html">Demo</a>
+      <a href="/caso-amalay.html">Caso real</a>
+      <a href="/privacidad.html">Privacidad</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const ro = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, {threshold:.1, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+})();
+</script>
+
+<a href="https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite" class="wa-float" aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="#fff" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+</body>
+</html>
