@@ -851,6 +851,10 @@ ul { list-style: none; }
 
   /* FAQ */
   .faq-heading { font-size: 26px; }
+
+  /* Chat demo: stack vertically */
+  .chat-demo-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+  .chat-demo-grid > div:first-child { max-width: 100% !important; }
 }
 
 @media (max-width: 480px) {
@@ -1015,7 +1019,7 @@ ul { list-style: none; }
 <!-- ===== CHAT DEMO ===== -->
 <section class="section" style="background:#fff;padding:96px 24px;border-top:1px solid #eee;">
   <div class="container">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;">
+    <div class="chat-demo-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;">
       <div style="background:#ece5dd;border-radius:20px;overflow:hidden;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.08);">
         <div style="background:#075e54;padding:14px 20px;display:flex;align-items:center;gap:12px;">
           <img src="/favicon-512.png" alt="Fullsite" style="width:36px;height:36px;border-radius:50%;background:#fff;object-fit:contain;padding:4px;">
