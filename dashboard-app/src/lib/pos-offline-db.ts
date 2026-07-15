@@ -333,7 +333,25 @@ async function markConflict(
   }
 }
 
+// Module-level lock: prevents concurrent syncAll from any caller (POS page, registerAutoSync, manual button).
+// Without this, two concurrent runs can race: the second reads the queue before the first's markConflict
+// completes, causing conflicted items to be re-processed and potentially lost.
+let syncAllRunning = false
+
 export async function syncAll(): Promise<{ synced: number; failed: number }> {
+  if (syncAllRunning) {
+    console.log('[offline-sync] syncAll already running — skipping duplicate call')
+    return { synced: 0, failed: 0 }
+  }
+  syncAllRunning = true
+  try {
+    return await _syncAllInner()
+  } finally {
+    syncAllRunning = false
+  }
+}
+
+async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   const queue = await getPendingQueue()
   let synced = 0
   let failed = 0
