@@ -2601,6 +2601,9 @@ function POSContent() {
       return
     }
     if (saveResult.revision != null) setOrderRevision(saveResult.revision)
+    if (saveResult.inventory_status === 'BLOCKED') {
+      showToast('Inventario: algunos ingredientes no se pudieron descontar')
+    }
     const ok = true
 
     // Only print NEW items (not already sent to kitchen)
@@ -2853,6 +2856,9 @@ function POSContent() {
       return
     }
     if (saveResult.revision != null) setOrderRevision(saveResult.revision)
+    if (saveResult.inventory_status === 'BLOCKED') {
+      showToast('Inventario: algunos ingredientes no se pudieron descontar')
+    }
     const ok = saveResult.ok
     if (ok) {
       // Open cash drawer for cash payments (incluye mixto con componente efectivo)

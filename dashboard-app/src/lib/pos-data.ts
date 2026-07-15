@@ -1118,6 +1118,7 @@ export interface SaveOrderResult {
   current_revision?: number
   first_execution?: boolean
   idempotent_replay?: boolean
+  inventory_status?: 'COMPLETE' | 'BLOCKED' | 'PENDING' | 'SKIPPED'
 }
 
 export async function saveOrder(order: Order, saveOperationId?: string): Promise<SaveOrderResult> {
