@@ -105,6 +105,7 @@ nav.top{position:fixed;top:0;left:0;right:0;z-index:100;height:64px;display:flex
 .hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:8px}
 .hamburger span{display:block;width:20px;height:2px;background:var(--ink-2);border-radius:2px}
 @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes bounce-dot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
 .hero{position:relative;min-height:90vh;display:flex;align-items:center;padding:0 var(--pad);overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,255,136,0.04),transparent 70%)}
 .hero-inner{position:relative;z-index:2;max-width:var(--max);margin:0 auto;width:100%;padding-top:100px}
@@ -213,7 +214,7 @@ footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
 <body>
 <nav class="top">
   <div class="nav-wrap">
-    <a href="/" class="logo">fullsite<span class="dot"></span></a>
+    <a href="/" class="logo"><img src="/logo-fullsite.png" alt="fullsite" style="height:28px;"></a>
     <div class="nav-links">
       <a href="#producto">Producto</a>
       <a href="#beneficios">Beneficios</a>
@@ -473,18 +474,17 @@ footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
 </section>
 
 <!-- COMPARE BANNER -->
-<section style="background:var(--accent);padding:100px var(--pad);text-align:center;position:relative;overflow:hidden;">
-  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;"></div>
-  <div style="position:relative;z-index:2;max-width:640px;margin:0 auto;">
-    <h2 style="font-size:clamp(32px,5vw,48px);font-weight:500;letter-spacing:-0.03em;line-height:1.1;color:var(--ink-dark);margin-bottom:16px;">Comp&aacute;rate con la competencia.</h2>
-    <p style="font-size:17px;color:rgba(10,10,11,0.6);margin-bottom:40px;line-height:1.6;">Mira c&oacute;mo Fullsite se compara contra Wansoft, Soft Restaurant y Parrot. Sin letra chica.</p>
+<section style="background:#ffffff;padding:100px var(--pad);text-align:center;border-top:1px solid #e5e7eb;">
+  <div style="max-width:640px;margin:0 auto;">
+    <h2 style="font-size:clamp(32px,5vw,48px);font-weight:500;letter-spacing:-0.03em;line-height:1.1;color:#0a0a0a;margin-bottom:16px;">Comp&aacute;rate con la competencia.</h2>
+    <p style="font-size:17px;color:#6b7280;margin-bottom:40px;line-height:1.6;">Mira c&oacute;mo Fullsite se compara contra Wansoft, Soft Restaurant y Parrot. Sin letra chica.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-      <a href="/comparar/fullsite-vs-wansoft.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:var(--ink-dark);color:#fff;font-weight:700;font-size:15px;border-radius:99px;transition:all .2s;">Fullsite vs Wansoft &rarr;</a>
-      <a href="/comparar/fullsite-vs-softrestaurant.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:rgba(10,10,11,0.08);color:var(--ink-dark);font-weight:600;font-size:15px;border-radius:99px;border:1px solid rgba(10,10,11,0.15);transition:all .2s;">vs Soft Restaurant</a>
-      <a href="/comparar/fullsite-vs-parrot.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:rgba(10,10,11,0.08);color:var(--ink-dark);font-weight:600;font-size:15px;border-radius:99px;border:1px solid rgba(10,10,11,0.15);transition:all .2s;">vs Parrot</a>
+      <a href="/comparar/fullsite-vs-wansoft.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:#10b981;color:#fff;font-weight:700;font-size:15px;border-radius:99px;transition:all .2s;">Fullsite vs Wansoft &rarr;</a>
+      <a href="/comparar/fullsite-vs-softrestaurant.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;transition:all .2s;">vs Soft Restaurant</a>
+      <a href="/comparar/fullsite-vs-parrot.html" style="display:inline-flex;align-items:center;gap:6px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;transition:all .2s;">vs Parrot</a>
     </div>
     <div style="margin-top:56px;">
-      <img src="/logo-fullsite.png" alt="Fullsite" style="height:40px;margin:0 auto;filter:brightness(0);">
+      <img src="/logo-fullsite.png" alt="Fullsite" style="height:40px;margin:0 auto;">
     </div>
   </div>
 </section>
@@ -492,7 +492,7 @@ footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
 <footer>
   <div class="footer-wrap">
     <div class="footer-left">
-      <a href="/" class="logo" style="font-size:18px">fullsite<span class="dot" style="width:6px;height:6px;margin-bottom:2px"></span></a>
+      <a href="/"><img src="/logo-nav-white.png" alt="fullsite" style="height:22px;" onerror="this.onerror=null;this.parentElement.innerHTML='<span style=font-weight:700;font-size:18px;color:#fff>fullsite<span style=display:inline-block;width:6px;height:6px;background:#10b981;border-radius:2px;margin-left:2px;margin-bottom:2px;vertical-align:middle></span></span>';"></a>
       <span class="footer-copy">&copy; 2026 Fullsite &middot; Monterrey, MX</span>
     </div>
     <div class="footer-right">
@@ -521,55 +521,94 @@ footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
     });
   }
 
-  // === IQ CHAT ANIMATION ===
+  // === IQ CHAT ANIMATION (WhatsApp style) ===
   var iqData = {
-    ventas: [
-      {type:'system',text:'Analizando ventas del martes contra historial...', delay:0},
-      {type:'alert',label:'ALERTA',text:'Ventas a las 2pm: $38,400 — 19% debajo del martes promedio.', delay:1200},
-      {type:'context',text:'Clima: lluvia por la mañana. Sin eventos especiales. En 8 martes similares, las ventas no se recuperaron después de las 3pm.', delay:2400},
-      {type:'action',text:'Recomendación: considera liberar 1 mesero después de las 3pm. Ahorro estimado: ~$380 MXN.', delay:3600}
-    ],
-    inventario: [
-      {type:'system',text:'Reconciliando inventario contra ventas del día...', delay:0},
-      {type:'alert',label:'INVENTARIO',text:'Aguacate: stock actual 2.1 kg. Consumo proyectado hoy: 3.8 kg.', delay:1200},
-      {type:'context',text:'Basado en 45 órdenes de guacamole promedio los jueves. Proveedor habitual entrega mañana viernes.', delay:2400},
-      {type:'action',text:'Recomendación: contacta proveedor para entrega de emergencia hoy, o ajusta menú para reducir consumo.', delay:3600}
-    ],
-    fraude: [
-      {type:'system',text:'Analizando patrones de cancelaciones y descuentos...', delay:0},
-      {type:'alert',label:'FRAUDE',text:'Mesero "Carlos M." tiene 7 cancelaciones esta semana — 3.2x el promedio del equipo.', delay:1200},
-      {type:'context',text:'Patrón: cancelaciones concentradas entre 2-4pm en mesas de terraza. Monto total cancelado: $2,840 MXN.', delay:2400},
-      {type:'action',text:'Recomendación: revisar las cancelaciones con el supervisor del turno vespertino. Se adjunta detalle por orden.', delay:3600}
-    ]
+    ventas: {
+      question: '¿Cómo vamos hoy comparado con el martes pasado?',
+      steps: [
+        {type:'typing', delay:800},
+        {type:'bot', text:'Ventas a las 2pm: <strong>$38,400</strong> — estás <strong>19% abajo</strong> del martes promedio.', delay:2000},
+        {type:'bot', text:'Contexto: lluvia por la mañana, sin eventos especiales. En 8 martes similares, las ventas no se recuperaron después de las 3pm.', delay:3800},
+        {type:'action', text:'Recomendación: considera liberar 1 mesero después de las 3pm. Ahorro estimado: ~$380 MXN.', delay:5200}
+      ]
+    },
+    inventario: {
+      question: '¿Cómo anda el inventario de hoy?',
+      steps: [
+        {type:'typing', delay:800},
+        {type:'bot', text:'Aguacate: stock actual <strong>2.1 kg</strong>. Consumo proyectado hoy: <strong>3.8 kg</strong>.', delay:2000},
+        {type:'bot', text:'Basado en 45 órdenes de guacamole promedio los jueves. Tu proveedor habitual entrega mañana viernes.', delay:3800},
+        {type:'action', text:'Recomendación: contacta proveedor para entrega hoy, o ajusta menú para reducir consumo de aguacate.', delay:5200}
+      ]
+    },
+    fraude: {
+      question: '¿Hay algo raro en las cancelaciones de esta semana?',
+      steps: [
+        {type:'typing', delay:800},
+        {type:'bot', text:'Mesero <strong>"Carlos M."</strong> tiene 7 cancelaciones esta semana — <strong>3.2x</strong> el promedio del equipo.', delay:2000},
+        {type:'bot', text:'Patrón: cancelaciones concentradas entre 2-4pm en mesas de terraza. Monto total: $2,840 MXN.', delay:3800},
+        {type:'action', text:'Recomendación: revisa las cancelaciones con el supervisor del turno vespertino.', delay:5200}
+      ]
+    }
   };
   var iqChat = document.getElementById('iq-chat');
   var iqTabs = document.querySelectorAll('.iq-tab');
   var iqTimers = [];
+  function clearIqTimers(){ iqTimers.forEach(clearTimeout); iqTimers=[]; }
 
-  function clearIqTimers(){ iqTimers.forEach(clearTimeout); iqTimers = []; }
+  function makeMsg(html, align, bg, border, color){
+    var d = document.createElement('div');
+    d.style.cssText = 'opacity:0;transform:translateY(10px);transition:opacity 0.35s,transform 0.35s;display:flex;justify-content:'+align+';';
+    d.innerHTML = '<div style="max-width:85%;padding:12px 16px;border-radius:16px;'+
+      (align==='flex-end'?'border-bottom-right-radius:4px;':'border-bottom-left-radius:4px;')+
+      'background:'+bg+';border:1px solid '+border+';font-size:14px;color:'+color+';line-height:1.55;">'+html+'</div>';
+    return d;
+  }
+
+  function makeTyping(){
+    var d = document.createElement('div');
+    d.id = 'iq-typing';
+    d.style.cssText = 'opacity:0;transform:translateY(10px);transition:opacity 0.35s,transform 0.35s;';
+    d.innerHTML = '<div style="display:flex;align-items:center;gap:4px;padding:12px 20px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:16px;border-bottom-left-radius:4px;width:fit-content;">'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bounce-dot 1.2s infinite 0s;"></span>'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bounce-dot 1.2s infinite 0.2s;"></span>'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bounce-dot 1.2s infinite 0.4s;"></span>'
+      +'</div>';
+    return d;
+  }
 
   function renderIqChat(tab){
     clearIqTimers();
     if(!iqChat) return;
     iqChat.innerHTML = '';
-    var msgs = iqData[tab] || iqData.ventas;
-    msgs.forEach(function(m){
+    var data = iqData[tab] || iqData.ventas;
+
+    // User question bubble (right-aligned, green)
+    var q = makeMsg(data.question, 'flex-end', 'var(--accent)', 'var(--accent)', 'var(--ink-dark)');
+    iqChat.appendChild(q);
+    requestAnimationFrame(function(){ q.style.opacity='1'; q.style.transform='translateY(0)'; });
+
+    data.steps.forEach(function(s){
       var t = setTimeout(function(){
-        var div = document.createElement('div');
-        div.style.cssText = 'opacity:0;transform:translateY(12px);transition:opacity 0.4s,transform 0.4s;';
-        if(m.type === 'system'){
-          div.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse-dot 1.5s infinite;flex-shrink:0;"></div><span style="font-size:13px;color:var(--ink-3);font-family:var(--mono);">'+m.text+'</span></div>';
-        } else if(m.type === 'alert'){
-          var color = m.label==='FRAUDE'?'var(--coral)':m.label==='INVENTARIO'?'var(--amber)':'var(--accent)';
-          div.innerHTML = '<div style="background:var(--bg-3);border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;border-left:3px solid '+color+';"><span style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:'+color+';text-transform:uppercase;">'+m.label+'</span><p style="font-size:14px;color:var(--ink-1);margin-top:6px;line-height:1.5;">'+m.text+'</p></div>';
-        } else if(m.type === 'context'){
-          div.innerHTML = '<div style="padding:0 16px;"><p style="font-size:13px;color:var(--ink-3);line-height:1.55;">'+m.text+'</p></div>';
-        } else if(m.type === 'action'){
-          div.innerHTML = '<div style="background:var(--accent-dim);border:1px solid rgba(0,255,136,0.2);border-radius:12px;padding:14px 16px;"><p style="font-size:14px;color:var(--accent);line-height:1.5;font-weight:500;">'+m.text+'</p></div>';
+        // Remove typing indicator if present
+        var old = document.getElementById('iq-typing');
+        if(old) old.remove();
+
+        if(s.type === 'typing'){
+          var dots = makeTyping();
+          iqChat.appendChild(dots);
+          requestAnimationFrame(function(){ dots.style.opacity='1'; dots.style.transform='translateY(0)'; });
+        } else if(s.type === 'bot'){
+          var m = makeMsg(s.text, 'flex-start', 'var(--bg-3)', 'var(--line-2)', 'var(--ink-1)');
+          iqChat.appendChild(m);
+          requestAnimationFrame(function(){ m.style.opacity='1'; m.style.transform='translateY(0)'; });
+        } else if(s.type === 'action'){
+          var a = makeMsg(s.text, 'flex-start', 'var(--accent-dim)', 'rgba(0,255,136,0.2)', 'var(--accent)');
+          iqChat.appendChild(a);
+          requestAnimationFrame(function(){ a.style.opacity='1'; a.style.transform='translateY(0)'; });
         }
-        iqChat.appendChild(div);
-        requestAnimationFrame(function(){ div.style.opacity='1'; div.style.transform='translateY(0)'; });
-      }, m.delay);
+        iqChat.scrollTop = iqChat.scrollHeight;
+      }, s.delay);
       iqTimers.push(t);
     });
   }
@@ -582,7 +621,6 @@ footer{padding:64px var(--pad) 32px;border-top:1px solid var(--line)}
     });
   });
 
-  // Auto-start ventas tab when section is visible
   var iqSection = iqChat ? iqChat.closest('.sec') : null;
   if(iqSection){
     var iqObs = new IntersectionObserver(function(entries){
