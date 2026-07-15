@@ -1022,21 +1022,21 @@ ul { list-style: none; }
           <div><div style="font-size:15px;font-weight:600;color:#fff;">Fullsite</div><div style="font-size:11px;color:rgba(255,255,255,0.7);">online</div></div>
         </div>
         <div style="display:flex;border-bottom:1px solid rgba(0,0,0,0.08);background:#f0ebe3;">
-          <button class="iq-tab active" data-tab="ventas" style="flex:1;padding:12px;font-size:12px;font-weight:600;color:#075e54;background:none;border:none;border-bottom:2px solid #075e54;cursor:pointer;font-family:inherit;">Ventas</button>
-          <button class="iq-tab" data-tab="inventario" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Inventario</button>
-          <button class="iq-tab" data-tab="fraude" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Fraude</button>
+          <button class="iq-tab active" data-tab="ventas" style="flex:1;padding:12px;font-size:12px;font-weight:600;color:#075e54;background:none;border:none;border-bottom:2px solid #075e54;cursor:pointer;font-family:inherit;">Sales</button>
+          <button class="iq-tab" data-tab="inventario" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Inventory</button>
+          <button class="iq-tab" data-tab="fraude" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Fraud</button>
         </div>
         <div style="padding:20px 16px;min-height:320px;display:flex;flex-direction:column;gap:10px;background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ece5dd%22/><rect width=%221%22 height=%221%22 x=%2210%22 y=%2210%22 fill=%22%23d4cdc4%22 rx=%220.5%22/></svg>') repeat;" id="iq-chat"></div>
       </div>
       <div>
-        <span class="hero-eyebrow" style="color:#10b981;">Inteligencia operativa</span>
+        <span class="hero-eyebrow" style="color:#10b981;">Operational intelligence</span>
         <h2 class="feature-title">This is how alerts reach you.</h2>
-        <p class="feature-desc">Directo a tu celular por WhatsApp. Sin abrir dashboards, sin reportes complicados. Fullsite detecta lo importante y te dice qué hacer.</p>
+        <p class="feature-desc">Straight to your phone via WhatsApp. No dashboards, no complicated reports. Fullsite detects what matters and tells you what to do.</p>
         <ul class="feature-list">
-          <li>Predicción de cierre del día desde las 2pm</li>
-          <li>Alertas de inventario antes de que falte producto</li>
-          <li>Patrones sospechosos de cancelaciones y descuentos</li>
-          <li>Recomendaciones concretas con contexto y evidencia</li>
+          <li>Closing prediction from 2pm</li>
+          <li>Inventory alerts before you run out</li>
+          <li>Suspicious cancellation and discount patterns</li>
+          <li>Concrete recommendations with context and evidence</li>
         </ul>
       </div>
     </div>
@@ -1231,7 +1231,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a) {
 
 // === CHAT ANIMATION ===
 (function(){
-  var data={ventas:{q:'¿Cómo vamos hoy comparado con el martes pasado?',s:[{t:'typing',d:800},{t:'bot',m:'Ventas a las 2pm: <strong>$38,400</strong> — estás <strong>19% abajo</strong> del martes promedio.',d:2000},{t:'bot',m:'Clima: lluvia por la mañana, sin eventos. En 8 martes similares, las ventas no se recuperaron después de las 3pm.',d:3800},{t:'action',m:'Recomendación: considera liberar 1 mesero después de las 3pm. Ahorro estimado: ~$380 MXN.',d:5200}]},inventario:{q:'¿Cómo anda el inventario?',s:[{t:'typing',d:800},{t:'bot',m:'Aguacate: stock <strong>2.1 kg</strong>. Consumo proyectado hoy: <strong>3.8 kg</strong>.',d:2000},{t:'bot',m:'Basado en 45 órdenes de guacamole promedio los jueves. Proveedor entrega mañana.',d:3800},{t:'action',m:'Recomendación: contacta proveedor para entrega hoy, o ajusta menú.',d:5200}]},fraude:{q:'¿Algo raro en las cancelaciones?',s:[{t:'typing',d:800},{t:'bot',m:'Mesero <strong>"Carlos M."</strong> tiene 7 cancelaciones esta semana — <strong>3.2x</strong> el promedio.',d:2000},{t:'bot',m:'Patrón: cancelaciones entre 2-4pm en terraza. Monto: $2,840 MXN.',d:3800},{t:'action',m:'Recomendación: revisa con el supervisor del turno vespertino.',d:5200}]}};
+  var data={ventas:{q:'¿How are we doing today vs last Tuesday?',s:[{t:'typing',d:800},{t:'bot',m:'Sales at 2pm: <strong>$38,400</strong> — you're <strong>19% below</strong> the Tuesday average.',d:2000},{t:'bot',m:'Weather: rain this morning, no events. In 8 similar Tuesdays, sales didn't recover after 3pm.',d:3800},{t:'action',m:'Recommendation: consider releasing 1 server after 3pm. Estimated savings: ~$380 MXN.',d:5200}]},inventario:{q:'¿How's inventory looking?',s:[{t:'typing',d:800},{t:'bot',m:'Avocado: stock <strong>2.1 kg</strong>. Projected consumption today: <strong>3.8 kg</strong>.',d:2000},{t:'bot',m:'Based on 45 average guacamole orders on Thursdays. Supplier delivers tomorrow.',d:3800},{t:'action',m:'Recommendation: contact supplier for delivery today, or adjust menu.',d:5200}]},fraude:{q:'¿Anything odd with cancellations?',s:[{t:'typing',d:800},{t:'bot',m:'Server <strong>"Carlos M."</strong> has 7 cancellations this week — <strong>3.2x</strong> the average.',d:2000},{t:'bot',m:'Pattern: cancellations between 2-4pm on the patio. Amount: $2,840 MXN.',d:3800},{t:'action',m:'Recommendation: review with the afternoon shift supervisor.',d:5200}]}};
   var chat=document.getElementById('iq-chat'),tabs=document.querySelectorAll('.iq-tab'),timers=[];
   if(!chat) return;
   function clear(){timers.forEach(clearTimeout);timers=[];}
