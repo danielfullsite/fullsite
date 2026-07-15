@@ -96,9 +96,36 @@ export default function AsistenciaPage() {
     setChecking(false)
   }
 
-  // Register entrada or salida
+  // Register entrada or salida — with server-side sequence enforcement
   const handleRegister = async (type: 'entrada' | 'salida') => {
     if (!staff) return
+
+    // REPAIR 1: Enforce valid attendance sequence before writing.
+    // Query the most recent attendance event for this exact staff_id.
+    try {
+      const latestRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_attendance?client_id=eq.${_cid()}&staff_id=eq.${encodeURIComponent(staff.id)}&order=registered_at.desc&limit=1`,
+        { headers: SB_HEADERS },
+      )
+      if (latestRes.ok) {
+        const latestRows = await latestRes.json()
+        const latestType = latestRows.length > 0 ? latestRows[0].type : null
+
+        if (type === 'entrada' && latestType === 'entrada') {
+          setError('Ya tienes una entrada activa. Registra tu salida antes de volver a entrar.')
+          return
+        }
+        if (type === 'salida' && (latestType === 'salida' || latestType === null)) {
+          setError('No hay una entrada activa para registrar salida.')
+          return
+        }
+      }
+    } catch {
+      // Network error during validation — reject to be safe
+      setError('Error de conexión al validar asistencia')
+      return
+    }
+
     const row = {
       client_id: _cid(),
       staff_id: staff.id,
@@ -202,11 +229,24 @@ export default function AsistenciaPage() {
 
   const today = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  // Group today's records by staff
-  const todayByStaff = todayRecords.reduce<Record<string, { name: string; entrada?: string; salida?: string }>>((acc, r) => {
-    if (!acc[r.staff_id]) acc[r.staff_id] = { name: r.staff_name }
-    if (r.type === 'entrada' && !acc[r.staff_id].entrada) acc[r.staff_id].entrada = r.registered_at
-    if (r.type === 'salida' && !acc[r.staff_id].salida) acc[r.staff_id].salida = r.registered_at
+  // REPAIR 2+3: Derive attendance state per staff using staff_id (UUID), not staff_name.
+  // Detects STALE_ENTRADA (open entrada > 18 hours) for manager visibility.
+  const STALE_HOURS = 18
+  const todayByStaff = todayRecords.reduce<Record<string, { name: string; staffId: string; entrada?: string; salida?: string; status: 'ACTIVE_ON_SHIFT' | 'STALE_ENTRADA' | 'NOT_ON_SHIFT' }>>((acc, r) => {
+    if (!acc[r.staff_id]) acc[r.staff_id] = { name: r.staff_name, staffId: r.staff_id, status: 'NOT_ON_SHIFT' }
+    // Process chronologically (records are desc, but we overwrite to get latest state)
+    if (r.type === 'entrada') {
+      if (!acc[r.staff_id].entrada) acc[r.staff_id].entrada = r.registered_at
+      // Only set active if no salida recorded after this entrada
+      if (!acc[r.staff_id].salida) {
+        const hoursOpen = (Date.now() - new Date(r.registered_at).getTime()) / 3600000
+        acc[r.staff_id].status = hoursOpen >= STALE_HOURS ? 'STALE_ENTRADA' : 'ACTIVE_ON_SHIFT'
+      }
+    }
+    if (r.type === 'salida') {
+      if (!acc[r.staff_id].salida) acc[r.staff_id].salida = r.registered_at
+      acc[r.staff_id].status = 'NOT_ON_SHIFT'
+    }
     return acc
   }, {})
 
@@ -363,9 +403,9 @@ export default function AsistenciaPage() {
           ) : (
             <div className="space-y-2">
               {Object.entries(todayByStaff).map(([staffId, info]) => (
-                <div key={staffId} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/5">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <User size={18} className="text-emerald-400" />
+                <div key={staffId} className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${info.status === 'STALE_ENTRADA' ? 'bg-red-500/10 border-red-500/30' : 'bg-white/5 border-white/5'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${info.status === 'STALE_ENTRADA' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                    <User size={18} className={info.status === 'STALE_ENTRADA' ? 'text-red-400' : 'text-emerald-400'} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{info.name}</p>
@@ -377,8 +417,15 @@ export default function AsistenciaPage() {
                         {info.salida ? '↙ ' + new Date(info.salida).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
+                    {info.status === 'STALE_ENTRADA' && info.entrada && (
+                      <p className="text-red-400 text-xs mt-1">Posible salida no registrada (entrada hace {Math.round((Date.now() - new Date(info.entrada).getTime()) / 3600000)}h)</p>
+                    )}
                   </div>
-                  <div className={`w-3 h-3 rounded-full ${info.salida ? 'bg-white/20' : info.entrada ? 'bg-emerald-500 animate-pulse' : 'bg-white/10'}`} />
+                  <div className={`w-3 h-3 rounded-full ${
+                    info.status === 'STALE_ENTRADA' ? 'bg-red-500 animate-pulse' :
+                    info.status === 'ACTIVE_ON_SHIFT' ? 'bg-emerald-500 animate-pulse' :
+                    'bg-white/20'
+                  }`} />
                 </div>
               ))}
             </div>
