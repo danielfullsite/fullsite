@@ -1016,27 +1016,33 @@ ul { list-style: none; }
 </section>
 
 <!-- ===== CHAT DEMO ===== -->
-<section class="section" style="background:#0a0a1a;padding:96px 24px;">
+<section class="section" style="background:#fff;padding:96px 24px;border-top:1px solid #eee;">
   <div class="container">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;">
-      <div style="background:#111118;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;max-width:480px;">
-        <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.06);background:#0d0d12;">
-          <button class="iq-tab active" data-tab="ventas" style="flex:1;padding:14px;font-size:13px;font-weight:600;color:#10b981;background:none;border:none;border-bottom:2px solid #10b981;cursor:pointer;font-family:inherit;">Ventas</button>
-          <button class="iq-tab" data-tab="inventario" style="flex:1;padding:14px;font-size:13px;font-weight:500;color:#666;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Inventario</button>
-          <button class="iq-tab" data-tab="fraude" style="flex:1;padding:14px;font-size:13px;font-weight:500;color:#666;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Fraude</button>
+      <div style="background:#ece5dd;border-radius:20px;overflow:hidden;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.08);">
+        <div style="background:#075e54;padding:14px 20px;display:flex;align-items:center;gap:12px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-6" stroke="white" stroke-width="2" fill="none"/></svg>
+          </div>
+          <div><div style="font-size:15px;font-weight:600;color:#fff;">Fullsite</div><div style="font-size:11px;color:rgba(255,255,255,0.7);">en línea</div></div>
         </div>
-        <div style="padding:24px;min-height:340px;display:flex;flex-direction:column;gap:14px;" id="iq-chat"></div>
+        <div style="display:flex;border-bottom:1px solid rgba(0,0,0,0.08);background:#f0ebe3;">
+          <button class="iq-tab active" data-tab="ventas" style="flex:1;padding:12px;font-size:12px;font-weight:600;color:#075e54;background:none;border:none;border-bottom:2px solid #075e54;cursor:pointer;font-family:inherit;">Ventas</button>
+          <button class="iq-tab" data-tab="inventario" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Inventario</button>
+          <button class="iq-tab" data-tab="fraude" style="flex:1;padding:12px;font-size:12px;font-weight:500;color:#999;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;">Fraude</button>
+        </div>
+        <div style="padding:20px 16px;min-height:320px;display:flex;flex-direction:column;gap:10px;background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect width=%2240%22 height=%2240%22 fill=%22%23ece5dd%22/><rect width=%221%22 height=%221%22 x=%2210%22 y=%2210%22 fill=%22%23d4cdc4%22 rx=%220.5%22/></svg>') repeat;" id="iq-chat"></div>
       </div>
       <div>
-        <div style="font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#10b981;margin-bottom:16px;">Inteligencia operativa</div>
-        <h2 style="font-size:clamp(28px,3.5vw,40px);font-weight:600;color:#fff;letter-spacing:-0.5px;margin-bottom:16px;line-height:1.15;">Tu operación te habla. Fullsite traduce.</h2>
-        <p style="font-size:16px;color:rgba(255,255,255,0.5);line-height:1.7;margin-bottom:32px;">Ventas, inventario y patrones de comportamiento se analizan continuamente. Cuando algo requiere tu atención, te llega una recomendación concreta.</p>
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div style="display:flex;align-items:center;gap:14px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,0.1);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#10b981;">1</div><span style="font-size:15px;color:rgba(255,255,255,0.7);">Detecta algo fuera de lo normal.</span></div>
-          <div style="display:flex;align-items:center;gap:14px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,0.1);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#10b981;">2</div><span style="font-size:15px;color:rgba(255,255,255,0.7);">Te explica qué está pasando y por qué.</span></div>
-          <div style="display:flex;align-items:center;gap:14px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,0.1);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#10b981;">3</div><span style="font-size:15px;color:rgba(255,255,255,0.7);">Te recomienda una acción concreta.</span></div>
-          <div style="display:flex;align-items:center;gap:14px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,0.1);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:#10b981;">4</div><span style="font-size:15px;color:rgba(255,255,255,0.7);">Tú decides. Fullsite mide el resultado.</span></div>
-        </div>
+        <span class="hero-eyebrow" style="color:#10b981;">Inteligencia operativa</span>
+        <h2 class="feature-title">Así te llegan las alertas.</h2>
+        <p class="feature-desc">Directo a tu celular por WhatsApp. Sin abrir dashboards, sin reportes complicados. Fullsite detecta lo importante y te dice qué hacer.</p>
+        <ul class="feature-list">
+          <li>Predicción de cierre del día desde las 2pm</li>
+          <li>Alertas de inventario antes de que falte producto</li>
+          <li>Patrones sospechosos de cancelaciones y descuentos</li>
+          <li>Recomendaciones concretas con contexto y evidencia</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -1107,35 +1113,21 @@ ul { list-style: none; }
   </div>
 </section>
 
-<!-- ===== ASK AI BANNER ===== -->
-<section style="background:#ffffff;padding:80px 24px;text-align:center;border-top:1px solid #eee;">
-  <div style="max-width:640px;margin:0 auto;">
-    <h2 style="font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-0.03em;line-height:1.1;color:#0a0a0a;margin-bottom:16px;">Pregúntale a la IA.</h2>
-    <p style="font-size:16px;color:#6b7280;margin-bottom:40px;line-height:1.6;">Pídele a ChatGPT que compare Fullsite contra tu sistema actual.</p>
-    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:center;">
-      <a href="https://chatgpt.com/?prompt=Tengo%20un%20restaurante%20en%20M%C3%A9xico%20y%20estoy%20evaluando%20cambiar%20de%20POS.%20Compara%20Fullsite%20(fullsite.mx)%20contra%20los%20principales%20POS%20del%20mercado%20mexicano.%20Quiero%20saber%20qu%C3%A9%20ofrece%20cada%20uno%20en%20POS%2C%20inventario%20con%20recetas%2C%20inteligencia%20operativa%2C%20soporte%20y%20precio.%20Dame%20tu%20recomendaci%C3%B3n%20honesta." target="_blank" style="display:inline-flex;align-items:center;gap:10px;padding:16px 32px;background:#0a0a0a;color:#fff;font-weight:700;font-size:16px;border-radius:99px;transition:all .2s;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M22.28 12.17c.47-1.42.18-2.98-.76-4.1a4.14 4.14 0 0 0-3.83-1.68A4.16 4.16 0 0 0 14.56 4a4.14 4.14 0 0 0-3.95 2.88 4.14 4.14 0 0 0-2.76 2A4.16 4.16 0 0 0 8.37 13a4.14 4.14 0 0 0 .76 4.1 4.14 4.14 0 0 0 3.83 1.68A4.16 4.16 0 0 0 16.1 20.4a4.14 4.14 0 0 0 3.95-2.88 4.14 4.14 0 0 0 2.76-2 4.16 4.16 0 0 0-.53-3.35Z" stroke="white" stroke-width="1.5"/></svg>
-        Comparar en ChatGPT
-      </a>
-    </div>
-  </div>
-</section>
-
 <!-- ===== ASK AI ===== -->
 <section style="background:#fff;padding:80px 24px;text-align:center;border-top:1px solid #eee;">
   <div style="max-width:640px;margin:0 auto;">
     <h2 style="font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-0.03em;line-height:1.1;color:#0a0a0a;margin-bottom:16px;">Pregúntale a la IA.</h2>
     <p style="font-size:16px;color:#6b7280;margin-bottom:40px;line-height:1.6;">Pídele a cualquier IA que compare Fullsite contra tu sistema actual.</p>
     <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;align-items:center;">
-      <a href="https://chatgpt.com/?prompt=Tengo%20un%20restaurante%20en%20M%C3%A9xico%20y%20estoy%20evaluando%20cambiar%20de%20POS.%20Compara%20Fullsite%20(fullsite.mx)%20contra%20los%20principales%20POS%20del%20mercado%20mexicano.%20Quiero%20saber%20qu%C3%A9%20ofrece%20cada%20uno%20en%20POS%2C%20inventario%20con%20recetas%2C%20inteligencia%20operativa%2C%20soporte%20y%20precio.%20Dame%20tu%20recomendaci%C3%B3n%20honesta." target="_blank" style="display:inline-flex;align-items:center;gap:10px;padding:14px 28px;background:#0a0a0a;color:#fff;font-weight:700;font-size:15px;border-radius:99px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M22.28 12.17c.47-1.42.18-2.98-.76-4.1a4.14 4.14 0 0 0-3.83-1.68A4.16 4.16 0 0 0 14.56 4a4.14 4.14 0 0 0-3.95 2.88 4.14 4.14 0 0 0-2.76 2A4.16 4.16 0 0 0 8.37 13a4.14 4.14 0 0 0 .76 4.1 4.14 4.14 0 0 0 3.83 1.68A4.16 4.16 0 0 0 16.1 20.4a4.14 4.14 0 0 0 3.95-2.88 4.14 4.14 0 0 0 2.76-2 4.16 4.16 0 0 0-.53-3.35Z" stroke="white" stroke-width="1.5"/></svg>
+      <a href="https://chatgpt.com/?prompt=Visita%20fullsite.mx%20y%20compara%20Fullsite%20contra%20Wansoft%2C%20Soft%20Restaurant%20y%20Parrot%20para%20un%20restaurante%20de%20servicio%20completo%20en%20M%C3%A9xico%20con%20500%2B%20platillos%2C%20recetas%20complejas%20y%2040%20empleados.%20Evalua%20POS%2C%20inventario%20con%20recetas%2C%20inteligencia%20operativa%2C%20modo%20offline%20y%20facilidad%20de%20uso.%20Dame%20tu%20recomendaci%C3%B3n." target="_blank" style="display:inline-flex;align-items:center;gap:10px;padding:14px 28px;background:#0a0a0a;color:#fff;font-weight:700;font-size:15px;border-radius:99px;">
+        <svg width="20" height="20" viewBox="0 0 320 320" fill="white"><path d="M297.06 130.97c7.26-21.79 4.76-45.66-6.85-65.48-17.46-30.4-52.56-46.04-86.84-38.68C186.96 7.04 163.91-4.42 140.42 1.68c-35.67 9.23-59.39 43.16-56.72 79.94C55.7 87.52 30.66 108.42 23.12 137.12c-11.44 43.6 14.3 88.04 57.42 99.3-7.26 21.79-4.76 45.66 6.85 65.48 17.46 30.4 52.56 46.04 86.84 38.68 16.41 19.77 39.46 31.23 63 25.13 35.66-9.23 59.38-43.16 56.71-79.94 28-5.9 53.04-26.8 60.58-55.5 11.44-43.6-14.29-88.04-57.42-99.3zM149.82 285.48c-22.68 5.86-46.64-3.38-59.36-22.06l1.12-.65 49.34-28.48c2.52-1.46 4.08-4.15 4.06-7.07v-69.48l20.86 12.04c.22.12.38.34.42.6v57.56c-.06 24.98-14.88 47.56-37.44 57.54zm-80.52-52.78c-11.34-19.6-13.44-43.32-5.76-64.52l1.12.68 49.34 28.48c2.52 1.44 5.62 1.44 8.14 0l60.26-34.8v24.08c.02.26-.08.5-.28.66l-49.9 28.8c-21.64 12.5-49.36 10.08-62.92-11.38zm-10.48-131.8c11.34-19.58 30.8-32.98 52.86-36.68v58.56c-.02 2.92 1.54 5.62 4.06 7.08l60.26 34.78-20.86 12.04c-.2.14-.46.16-.68.04l-49.9-28.82C82.92 135.4 65.2 107.72 58.82 100.9zm138.28 32.18L136.84 98.3l20.86-12.04c.2-.14.46-.16.68-.04l49.9 28.82c21.68 12.52 34.6 37.14 30.04 63.14-5.74 16.06-17.78 28.96-32.94 36.36V155c.02-2.92-1.52-5.62-4.04-7.08l-.24-.14v.3zm20.76-25.94-1.12-.68-49.34-28.48c-2.52-1.44-5.62-1.44-8.14 0l-60.26 34.8V88.7c-.02-.26.08-.5.28-.66l49.9-28.78c21.68-12.52 49.36-10.08 65.12 7.84 9.76 16.8 13.64 36.62 3.56 55.04zM132.14 174.9l-20.88-12.04c-.22-.12-.38-.34-.42-.6V104.7c.06-25.04 20.58-47.58 45.54-50.64 16.12-1.98 32.22 4.76 42.86 17.04l-1.12.65-49.34 28.48c-2.52 1.46-4.08 4.15-4.06 7.07l-.58 67.6zm11.34-24.42L168 136l24.52 14.48v28.48L168 193.44l-24.52-14.48v-28.48z"/></svg>
         ChatGPT
       </a>
-      <a href="https://www.perplexity.ai/search?q=Compara+Fullsite+fullsite.mx+contra+los+principales+POS+para+restaurantes+en+Mexico" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;">
+      <a href="https://www.perplexity.ai/search?q=Compara+Fullsite+(fullsite.mx)+contra+Wansoft+Soft+Restaurant+y+Parrot+para+un+restaurante+de+servicio+completo+en+Mexico+con+500+platillos+y+recetas+complejas.+Evalua+POS+inventario+inteligencia+operativa+modo+offline+y+precio.+Cual+recomiendas" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;">
         <img src="/logo-perplexity.png" alt="Perplexity" style="height:20px;width:20px;object-fit:contain;">
         Perplexity
       </a>
-      <a href="https://gemini.google.com/app?q=Compara%20Fullsite%20(fullsite.mx)%20contra%20los%20principales%20POS%20para%20restaurantes%20en%20Mexico" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;">
+      <a href="https://gemini.google.com/app?q=Visita%20fullsite.mx%20y%20compara%20Fullsite%20contra%20Wansoft%2C%20Soft%20Restaurant%20y%20Parrot%20para%20un%20restaurante%20de%20servicio%20completo%20en%20M%C3%A9xico%20con%20500%2B%20platillos%20y%20recetas%20complejas.%20Evalua%20POS%2C%20inventario%20con%20recetas%2C%20inteligencia%20operativa%2C%20modo%20offline.%20Dame%20tu%20recomendaci%C3%B3n." target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#f3f4f6;color:#0a0a0a;font-weight:600;font-size:15px;border-radius:99px;">
         <img src="/logo-gemini.png" alt="Gemini" style="height:20px;width:20px;object-fit:contain;">
         Gemini
       </a>
@@ -1215,9 +1207,9 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   var chat=document.getElementById('iq-chat'),tabs=document.querySelectorAll('.iq-tab'),timers=[];
   if(!chat) return;
   function clear(){timers.forEach(clearTimeout);timers=[];}
-  function bubble(html,align,bg,border,color){var d=document.createElement('div');d.style.cssText='opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s;display:flex;justify-content:'+align+';';d.innerHTML='<div style="max-width:85%;padding:12px 16px;border-radius:16px;'+(align==='flex-end'?'border-bottom-right-radius:4px;':'border-bottom-left-radius:4px;')+'background:'+bg+';border:1px solid '+border+';font-size:14px;color:'+color+';line-height:1.55;">'+html+'</div>';return d;}
-  function render(tab){clear();chat.innerHTML='';var d=data[tab]||data.ventas;var q=bubble(d.q,'flex-end','#10b981','#10b981','#fff');chat.appendChild(q);requestAnimationFrame(function(){q.style.opacity='1';q.style.transform='translateY(0)';});d.s.forEach(function(s){var tm=setTimeout(function(){var old=document.getElementById('iq-typing');if(old)old.remove();if(s.t==='typing'){var dots=document.createElement('div');dots.id='iq-typing';dots.style.cssText='opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s;';dots.innerHTML='<div style="display:flex;gap:4px;padding:12px 20px;background:#1a1a22;border:1px solid rgba(255,255,255,0.06);border-radius:16px;border-bottom-left-radius:4px;width:fit-content;"><span class="td"></span><span class="td" style="animation-delay:.2s"></span><span class="td" style="animation-delay:.4s"></span></div>';chat.appendChild(dots);requestAnimationFrame(function(){dots.style.opacity='1';dots.style.transform='translateY(0)';});}else if(s.t==='bot'){var m=bubble(s.m,'flex-start','#1a1a22','rgba(255,255,255,0.06)','rgba(255,255,255,0.85)');chat.appendChild(m);requestAnimationFrame(function(){m.style.opacity='1';m.style.transform='translateY(0)';});}else if(s.t==='action'){var a=bubble(s.m,'flex-start','rgba(16,185,129,0.1)','rgba(16,185,129,0.2)','#10b981');chat.appendChild(a);requestAnimationFrame(function(){a.style.opacity='1';a.style.transform='translateY(0)';});}chat.scrollTop=chat.scrollHeight;},s.d);timers.push(tm);});}
-  tabs.forEach(function(tab){tab.addEventListener('click',function(){tabs.forEach(function(t){t.style.color='#666';t.style.fontWeight='500';t.style.borderBottom='2px solid transparent';});this.style.color='#10b981';this.style.fontWeight='600';this.style.borderBottom='2px solid #10b981';render(this.dataset.tab);});});
+  function bubble(html,align,bg,color){var d=document.createElement('div');d.style.cssText='opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s;display:flex;justify-content:'+align+';';d.innerHTML='<div style="max-width:85%;padding:10px 14px;border-radius:12px;'+(align==='flex-end'?'border-bottom-right-radius:2px;':'border-bottom-left-radius:2px;')+'background:'+bg+';font-size:13px;color:'+color+';line-height:1.5;box-shadow:0 1px 1px rgba(0,0,0,0.06);">'+html+'</div>';return d;}
+  function render(tab){clear();chat.innerHTML='';var d=data[tab]||data.ventas;var q=bubble(d.q,'flex-end','#dcf8c6','#111');chat.appendChild(q);requestAnimationFrame(function(){q.style.opacity='1';q.style.transform='translateY(0)';});d.s.forEach(function(s){var tm=setTimeout(function(){var old=document.getElementById('iq-typing');if(old)old.remove();if(s.t==='typing'){var dots=document.createElement('div');dots.id='iq-typing';dots.style.cssText='opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s;';dots.innerHTML='<div style="display:flex;gap:4px;padding:10px 18px;background:#fff;border-radius:12px;border-bottom-left-radius:2px;width:fit-content;box-shadow:0 1px 1px rgba(0,0,0,0.06);"><span class="td"></span><span class="td" style="animation-delay:.2s"></span><span class="td" style="animation-delay:.4s"></span></div>';chat.appendChild(dots);requestAnimationFrame(function(){dots.style.opacity='1';dots.style.transform='translateY(0)';});}else if(s.t==='bot'){var m=bubble(s.m,'flex-start','#fff','#333');chat.appendChild(m);requestAnimationFrame(function(){m.style.opacity='1';m.style.transform='translateY(0)';});}else if(s.t==='action'){var a=bubble(s.m,'flex-start','#e8f5e9','#1b5e20');chat.appendChild(a);requestAnimationFrame(function(){a.style.opacity='1';a.style.transform='translateY(0)';});}chat.scrollTop=chat.scrollHeight;},s.d);timers.push(tm);});}
+  tabs.forEach(function(tab){tab.addEventListener('click',function(){tabs.forEach(function(t){t.style.color='#999';t.style.fontWeight='500';t.style.borderBottom='2px solid transparent';});this.style.color='#075e54';this.style.fontWeight='600';this.style.borderBottom='2px solid #075e54';render(this.dataset.tab);});});
   var sec=chat.closest('section');if(sec){var io=new IntersectionObserver(function(e){if(e[0].isIntersecting){render('ventas');io.disconnect();}},{threshold:.3});io.observe(sec);}
 })();
 </script>
