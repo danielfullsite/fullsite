@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 /**
  * Atomic mesa merge + reconciliation of every affected order.
- * TEMPORARY AMALAY FIELD-CERT BOUNDARY.
  */
-const CLIENT_ID = 'amalay'
 
 export async function POST(request: NextRequest) {
   try {
+    const clientId = getClientId(request)
     const body = await request.json()
     const { target_order_id, target_expected_revision, source_order_id, source_expected_revision,
             merged_items, total, subtotal, iva, personas, notas } = body
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const res = await fetch(`${sbUrl}/rest/v1/rpc/r1_merge_orders`, {
       method: 'POST', headers,
       body: JSON.stringify({
-        p_client_id: CLIENT_ID,
+        p_client_id: clientId,
         p_target_order_id: target_order_id,
         p_target_expected_revision: target_expected_revision ?? 0,
         p_source_order_id: source_order_id,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       try {
         const reconRes = await fetch(`${sbUrl}/rest/v1/rpc/r1_reconcile_order`, {
           method: 'POST', headers,
-          body: JSON.stringify({ p_client_id: CLIENT_ID, p_order_id: orderId }),
+          body: JSON.stringify({ p_client_id: clientId, p_order_id: orderId }),
         })
         if (reconRes.ok) {
           reconResults[orderId] = await reconRes.json()

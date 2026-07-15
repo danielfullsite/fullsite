@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/format'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const CLIENT_ID = 'amalay'
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 type DatePreset = 'hoy' | 'semana' | 'mes' | 'custom'
 
@@ -104,10 +104,10 @@ export default function ControlEfectivoPage() {
     try {
       const [mvs, ords] = await Promise.all([
         supaFetch<CashMovement[]>(
-          `pos_cash_movements?client_id=eq.${CLIENT_ID}&created_at=gte.${from}&created_at=lte.${to}&order=created_at.asc&limit=500`
+          `pos_cash_movements?client_id=eq.${_cid()}&created_at=gte.${from}&created_at=lte.${to}&order=created_at.asc&limit=500`
         ),
         supaFetch<PosOrder[]>(
-          `pos_orders?client_id=eq.${CLIENT_ID}&created_at=gte.${from}&created_at=lte.${to}&status=eq.pagada&order=created_at.asc&limit=1000`
+          `pos_orders?client_id=eq.${_cid()}&created_at=gte.${from}&created_at=lte.${to}&status=eq.pagada&order=created_at.asc&limit=1000`
         ),
       ])
       setMovements(mvs)
@@ -215,7 +215,7 @@ export default function ControlEfectivoPage() {
           Prefer: 'return=minimal',
         },
         body: JSON.stringify({
-          client_id: CLIENT_ID,
+          client_id: _cid(),
           type: 'deposito_bancario',
           amount: parseFloat(depositAmount),
           reason: `${depositBank} — Ref: ${depositRef}`,

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -391,7 +392,7 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
     let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
     try {
       const staffRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?client_id=eq.amalay&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(getClientId(request))}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
         { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
       )
       if (staffRes.ok) {

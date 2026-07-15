@@ -39,4 +39,4 @@
 | "24/7 monitoring" | INFERENCIA | Agents run on scheduled cadence (1-6x/day), not continuously | CORRECTED to "autonomos" | Was across site |
 | "Restaurantes se cambian a Fullsite" | HIPOTESIS | Only one restaurant (AMALAY, founder's) | REMOVED | Was in comparar |
 | **UNRESOLVED** | | | | |
-| Canonical pricing ($1,999 or $4,999) | UNRESOLVED | Two conflicting prices across surfaces. PENDING DANIEL. | DO NOT PUBLISH | precios.html vs deck |
+| Canonical pricing $1,999/mes | HECHO | Daniel confirmed 2026-07-15. $1,999/mes por sucursal, $0 instalacion | YES | precios.html, all surfaces |

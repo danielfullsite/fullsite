@@ -69,7 +69,7 @@ export default function VaultPage() {
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
 
   // Form state
-  const [form, setForm] = useState({ client_id: 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
+  const [form, setForm] = useState({ client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
 
   // Auth handled by /internal layout
 
@@ -100,7 +100,7 @@ export default function VaultPage() {
         notes: form.notes || null,
       }),
     })
-    setForm({ client_id: 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
+    setForm({ client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
     setShowAdd(false)
     fetchCredentials()
   }

@@ -114,7 +114,7 @@ export default function OrdenCompraPage() {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
-          client_id: 'amalay',
+          client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay',
           fecha: today,
           status: 'borrador',
           items: JSON.stringify(items),

@@ -1,12 +1,9 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
  * + exactly-once save operation idempotency.
- *
- * TEMPORARY AMALAY FIELD-CERT BOUNDARY.
- * client_id is server-fixed to 'amalay'. Browser cannot choose arbitrary tenant.
- * P0 TENANT ISOLATION ARCHITECTURE remains open.
  *
  * Transaction semantics:
  * - Order save and reconciliation are SEPARATE operations
@@ -20,8 +17,6 @@ import { NextRequest } from 'next/server'
  * - Inventory status is derived dynamically from current lineage, never frozen
  * - Legacy requests without save_operation_id bypass idempotency (OCC-protected only)
  */
-
-const CLIENT_ID = 'amalay'
 
 interface SaveResult {
   ok: boolean
@@ -38,6 +33,7 @@ interface SaveResult {
 
 export async function POST(request: NextRequest) {
   try {
+    const clientId = getClientId(request)
     const body = await request.json()
 
     const { order_id, expected_revision } = body
@@ -66,7 +62,7 @@ export async function POST(request: NextRequest) {
     const rpcName = hasOperationId ? 'r1_save_order_idempotent' : 'r1_save_order'
 
     const rpcParams: Record<string, unknown> = {
-      p_client_id: CLIENT_ID,
+      p_client_id: clientId,
       p_order_id: order_id,
       p_expected_revision: expected_revision,
       p_mesa: body.mesa ?? null,
@@ -123,7 +119,7 @@ export async function POST(request: NextRequest) {
       // Check current inventory lineage for catch-up determination
       try {
         const lineageRes = await fetch(
-          `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${CLIENT_ID}&select=last_inventory_processed_revision`,
+          `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision`,
           { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
         )
         if (lineageRes.ok) {
@@ -150,7 +146,7 @@ export async function POST(request: NextRequest) {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            p_client_id: CLIENT_ID,
+            p_client_id: clientId,
             p_order_id: order_id,
           }),
         })
@@ -186,7 +182,7 @@ export async function POST(request: NextRequest) {
       // Derive inventory status from current lineage (no reconciliation call)
       try {
         const statusRes = await fetch(
-          `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${CLIENT_ID}&select=last_inventory_processed_revision,last_inventory_complete_revision`,
+          `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision,last_inventory_complete_revision`,
           { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
         )
         if (statusRes.ok) {

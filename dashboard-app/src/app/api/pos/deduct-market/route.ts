@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 /**
  * Phase 3 — Legacy direct-stock sale deduction via serialized authority boundary.
- * TEMPORARY AMALAY FIELD-CERT BOUNDARY.
  */
-const CLIENT_ID = 'amalay'
 
 export async function POST(request: NextRequest) {
   try {
+    const clientId = getClientId(request)
     const body = await request.json()
     const { order_id, actor, items } = body
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json', 'Prefer': 'return=representation',
       },
       body: JSON.stringify({
-        p_client_id: CLIENT_ID,
+        p_client_id: clientId,
         p_order_id: order_id,
         p_actor: actor || 'pos',
         p_items: items,

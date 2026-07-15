@@ -28,3 +28,14 @@ export async function requireAuth(request: NextRequest): Promise<Response | null
   }
   return null
 }
+
+const CLIENT_ID_RE = /^[a-z0-9_-]{1,40}$/i
+
+/** Extract and validate client_id from request header, query param, or body. Falls back to 'amalay'. */
+export function getClientId(request: NextRequest): string {
+  const fromHeader = request.headers.get('x-client-id')
+  if (fromHeader && CLIENT_ID_RE.test(fromHeader)) return fromHeader
+  const fromParam = request.nextUrl.searchParams.get('client_id')
+  if (fromParam && CLIENT_ID_RE.test(fromParam)) return fromParam
+  return 'amalay'
+}

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 // Lista de empleados para asignaciones (repartidores estilo Wansoft: se eligen
 // de la lista general de empleados, no hay rol "repartidor").
@@ -6,8 +7,7 @@ import { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const clientIdRaw = request.nextUrl.searchParams.get('client_id') || 'amalay'
-    const clientId = /^[a-z0-9_-]{1,40}$/i.test(clientIdRaw) ? clientIdRaw : 'amalay'
+    const clientId = getClientId(request)
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

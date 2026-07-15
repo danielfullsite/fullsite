@@ -2,6 +2,9 @@
 // Cross-references wansoft_daily ventas_por_grupo with pos_recipes ingredientes
 // and compares against current stock in pos_inventory_products
 
+import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
+
 export const dynamic = 'force-dynamic'
 
 interface VentasPorGrupo { nombre: string; total: number }
@@ -13,7 +16,7 @@ interface InventoryProduct {
 }
 interface DailyRow { fecha: string; ventas_por_grupo: VentasPorGrupo[] | null }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,7 +32,7 @@ export async function GET() {
       fetch(`${sbUrl}/rest/v1/wansoft_daily?fecha=gte.${since}&select=fecha,ventas_por_grupo&order=fecha.asc`, opts),
       fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,ingredientes,category`, opts),
       fetch(`${sbUrl}/rest/v1/pos_inventory_products?active=eq.true&select=name,unit,cost_per_unit,stock,reorder_point,category`, opts),
-      fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.amalay&select=name,price,category_id`, opts),
+      fetch(`${sbUrl}/rest/v1/pos_menu_items?client_id=eq.${encodeURIComponent(getClientId(request))}&select=name,price,category_id`, opts),
     ])
 
     const daily: DailyRow[] = dailyRes.ok ? await dailyRes.json() : []

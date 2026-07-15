@@ -576,6 +576,29 @@ Para cada competidor: quiénes son, por qué ganan, por qué pierden, nuestro me
 | **Clip/Square** | $0/mes, terminal bonita | No es POS real | "Clip cobra. Fullsite opera" | Cuando crecen de café a restaurante |
 | **No hacer nada** | $0, cero riesgo | Pierde sin saber, no escala | "¿Cuánto pierdes por no saber?" | Evento de shock, hijo entra |
 
+### Intel competitivo — LinkedIn Insights (julio 2026) HECHO
+
+| Métrica | Wansoft | Parrot | Fullsite |
+|---------|---------|--------|----------|
+| Empleados | 104 | 63 | 1 |
+| Tendencia 6m | +2% | **-7%** | Construyendo |
+| Tendencia 1y | +8% | **-5%** | — |
+| Tendencia 2y | +22% | +2% | — |
+| Tenure mediana | 3.2 años | 2.9 años | — |
+| **Top función** | Sales 28% + BD 23% = **51% ventas** | Engineering 16%, Sales 14% | Engineering 100% |
+| IT / Engineering | 14% (~15 personas) | 29% (~18 personas) | 1 founder + IA |
+| Nómina estimada/mes | ~$3M+ MXN | ~$2M+ MXN | $0 |
+
+**Implicaciones estratégicas:**
+
+1. **Wansoft es empresa de ventas, no de tech.** 51% de su equipo vende. Solo 15 ingenieros mantienen un sistema de 2007. No van a innovar — van a defender base instalada con contratos y relaciones.
+
+2. **Parrot está encogiendo.** -7% en 6 meses, -5% en 1 año. Gente se va (tenure 2.9 años). Sus clientes que necesitan servicio completo van a buscar alternativas. Oportunidad directa para Fullsite vía Susy (ex-Parrot).
+
+3. **Wansoft necesita ~$3M/mes de nómina.** Por eso cobra $130K+ de instalación y $1,500/mes. Fullsite con COGS de ~$285/restaurante puede cobrar $1,999/mes con 86% de margen porque no tiene 104 sueldos que pagar.
+
+4. **El headcount de ventas de Wansoft (53 personas) es una amenaza y una oportunidad.** Amenaza: tienen 53 vendedores tocando puertas. Oportunidad: si reclutamos a los mejores (como Eduardo), ya conocen a los 200+ clientes.
+
 ---
 
 ## Sección 7: Un día en la vida — ICP-01

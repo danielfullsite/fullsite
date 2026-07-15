@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server'
+import { getClientId } from '@/lib/api-auth'
 
 /**
  * Phase 4 — Manual market stock adjustment via constrained server boundary.
  * Independent of sale_authority (manual adjustments always allowed).
- * TEMPORARY AMALAY FIELD-CERT BOUNDARY.
  */
-const CLIENT_ID = 'amalay'
 
 export async function POST(request: NextRequest) {
   try {
+    const clientId = getClientId(request)
     const body = await request.json()
     const { menu_item_id, adjustment_type, quantity, actor, notes } = body
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json', 'Prefer': 'return=representation',
       },
       body: JSON.stringify({
-        p_client_id: CLIENT_ID,
+        p_client_id: clientId,
         p_menu_item_id: menu_item_id,
         p_adjustment_type: adjustment_type,
         p_quantity: quantity,

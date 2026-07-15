@@ -3,7 +3,7 @@
 // Cada venta cerrada genera un asiento: Debe (Caja/Banco) / Haber (Ingreso + IVA).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
+import { requireAuth, getClientId } from '@/lib/api-auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from') || new Date().toISOString().slice(0, 8) + '01'
   const to = searchParams.get('to') || new Date().toISOString().slice(0, 10)
-  const clientId = searchParams.get('client_id') || 'amalay'
+  const clientId = getClientId(request)
 
   try {
     const res = await fetch(

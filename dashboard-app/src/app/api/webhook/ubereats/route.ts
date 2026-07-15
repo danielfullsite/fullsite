@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const clientId = 'amalay'
+    // TODO: derive client_id from store_id mapping when multi-tenant
+    const clientId = process.env.UBER_CLIENT_ID_MAPPING ? 'amalay' : 'amalay'
 
     // Handle different event types
     if (eventType === 'orders.notification' || eventType === 'orders.created') {
