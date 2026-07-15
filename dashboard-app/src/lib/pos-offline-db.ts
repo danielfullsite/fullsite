@@ -249,13 +249,18 @@ function resolveTransport(item: SyncQueueItem): ReplayTransport {
 // ─── APP_API Replay ────────────────────────────────────────────────────────
 // Replays through application API routes (e.g. /api/pos/save-order).
 // Uses the current page origin as the base URL.
-// Returns: { ok, classified error class, detail }
-async function replayViaAppApi(item: SyncQueueItem): Promise<{
+// Returns typed result including committed revision for active state propagation.
+interface AppApiReplayResult {
   ok: boolean
+  committedRevision?: number  // revision from successful save or idempotent replay
+  orderId?: string            // order identity for event routing
+  idempotentReplay?: boolean  // true if server recognized this as a replay of already-committed operation
   errorClass?: SyncErrorClass
   detail?: string
-  serverRevision?: number
-}> {
+  serverRevision?: number     // server revision at conflict time (for STALE_WRITE)
+}
+
+async function replayViaAppApi(item: SyncQueueItem): Promise<AppApiReplayResult> {
   const apiPath = item.endpoint!
   // In browser: use window.location.origin. In SSR/worker: fall back to relative URL.
   const base = typeof window !== 'undefined' ? window.location.origin : ''
@@ -268,30 +273,41 @@ async function replayViaAppApi(item: SyncQueueItem): Promise<{
   })
 
   if (!res.ok) {
-    // 5xx = transient, 4xx = depends on body
     if (res.status >= 500) {
       return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
     }
-    // 400/422 = malformed payload, terminal
     if (res.status === 400 || res.status === 422) {
       const errText = await res.text().catch(() => '')
       return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: `HTTP ${res.status}: ${errText}` }
     }
-    // Other client errors
     return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
   }
 
   // Parse structured response body from /api/pos/save-order
   const body = await res.json().catch(() => ({ ok: false }))
+  const dataPayload = item.data as Record<string, unknown>
 
   if (body.ok) {
-    // ORDER_SAVED — inventory_status may be COMPLETE/BLOCKED/PENDING/SKIPPED
-    return { ok: true }
+    return {
+      ok: true,
+      committedRevision: typeof body.revision === 'number' ? body.revision : undefined,
+      orderId: typeof dataPayload.order_id === 'string' ? dataPayload.order_id : undefined,
+      idempotentReplay: body.idempotent_replay === true,
+    }
   }
 
   // Save rejected — classify from body
   if (body.conflict === true) {
-    // STALE_WRITE_REJECTED — revision mismatch
+    // Check if this is an idempotent replay of a REJECTED operation
+    // (the original operation was itself rejected — not a new conflict)
+    if (body.idempotent_replay === true) {
+      return {
+        ok: false,
+        errorClass: 'STALE_WRITE_CONFLICT',
+        detail: `IDEMPOTENT_REPLAY_OF_REJECTED: original expected rev ${body.expected_revision}, was at ${body.current_revision}`,
+        serverRevision: body.current_revision,
+      }
+    }
     return {
       ok: false,
       errorClass: 'STALE_WRITE_CONFLICT',
@@ -304,7 +320,10 @@ async function replayViaAppApi(item: SyncQueueItem): Promise<{
     return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: 'ORDER_NOT_FOUND' }
   }
 
-  // Unknown rejection — treat as terminal to avoid infinite retry
+  if (body.error === 'PAYLOAD_IDENTITY_CORRUPTION') {
+    return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: 'PAYLOAD_IDENTITY_CORRUPTION' }
+  }
+
   return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: body.error || 'UNKNOWN_REJECTION' }
 }
 
@@ -373,6 +392,16 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         if (result.ok) {
           await markSynced(item.id)
           synced++
+          // R2D: Emit order sync event so active POS page can advance revision state
+          if (typeof window !== 'undefined' && result.committedRevision != null && result.orderId) {
+            window.dispatchEvent(new CustomEvent('pos-order-synced', {
+              detail: {
+                orderId: result.orderId,
+                revision: result.committedRevision,
+                idempotentReplay: result.idempotentReplay || false,
+              }
+            }))
+          }
         } else if (result.errorClass === 'STALE_WRITE_CONFLICT') {
           // TERMINAL — preserve payload, mark conflict, NO retry, NO overwrite, NO direct PATCH
           console.error(`[offline-sync] ${result.detail}`)

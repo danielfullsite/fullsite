@@ -1116,9 +1116,11 @@ export interface SaveOrderResult {
   error?: string
   expected_revision?: number
   current_revision?: number
+  first_execution?: boolean
+  idempotent_replay?: boolean
 }
 
-export async function saveOrder(order: Order): Promise<SaveOrderResult> {
+export async function saveOrder(order: Order, saveOperationId?: string): Promise<SaveOrderResult> {
   // ── Turno enforcement: orders MUST have a turno_id ──
   if (!order.turnoId) {
     console.error('[saveOrder] BLOCKED: turno_id is required. No active turno.')
@@ -1136,7 +1138,7 @@ export async function saveOrder(order: Order): Promise<SaveOrderResult> {
     }
   }
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     order_id: order.id,
     expected_revision: order.orderRevision ?? 0,
     mesa: order.mesa,
@@ -1155,6 +1157,11 @@ export async function saveOrder(order: Order): Promise<SaveOrderResult> {
     notas: order.notas ?? null,
     items: order.items,
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
+  }
+  // R2D: save_operation_id for exactly-once idempotency.
+  // Generated ONCE per logical save action. Same ID survives catch → queue → replay.
+  if (saveOperationId) {
+    payload.save_operation_id = saveOperationId
   }
 
   try {

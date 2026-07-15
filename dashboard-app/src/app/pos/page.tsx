@@ -2030,6 +2030,24 @@ function POSContent() {
     }
   }, [orderItems, mesa, orderId, mesero, personas])
 
+  // R2D: Listen for successful offline replay → advance active order revision
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.orderId === orderId && typeof detail?.revision === 'number' && detail.revision > orderRevision) {
+        setOrderRevision(detail.revision)
+        // Refresh server updated_at to prevent false checkOrderConflict
+        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${detail.orderId}&select=updated_at`, {
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+        }).then(r => r.json()).then(rows => {
+          if (Array.isArray(rows) && rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
+        }).catch(() => {})
+      }
+    }
+    window.addEventListener('pos-order-synced', handler)
+    return () => window.removeEventListener('pos-order-synced', handler)
+  }, [orderId, orderRevision])
+
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
@@ -2316,12 +2334,14 @@ function POSContent() {
     }
     // Mark order as cancelled via revision-aware boundary (reconciliation-relevant status)
     if (loadedOrderId) {
+      const voidOpId = genOpId()
       const voidRes = await fetch('/api/pos/save-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: loadedOrderId,
           expected_revision: orderRevision,
+          save_operation_id: voidOpId,
           status: 'cancelada',
           notas: `ANULADA: ${reason} (por ${managerName})`,
         }),
@@ -2569,7 +2589,8 @@ function POSContent() {
       orderRevision,
     }
     // SAVE FIRST — confirm persistence before printing
-    const saveResult = await saveOrder(order)
+    // R2D: opId generated ONCE per logical save action, survives catch → queue → replay
+    const saveResult = await saveOrder(order, opId)
     if (!saveResult.ok) {
       if (saveResult.conflict) {
         showToast('Orden modificada por otra terminal — recarga para ver cambios')
@@ -2824,7 +2845,8 @@ function POSContent() {
       closedAt: new Date(),
       orderRevision: splitPayingCuenta > 0 ? 0 : orderRevision,  // Split creates new order → rev 0
     }
-    const saveResult = await saveOrder(order)
+    // R2D: opId generated ONCE per logical payment action
+    const saveResult = await saveOrder(order, opId)
     if (saveResult.conflict) {
       showToast('Orden modificada por otra terminal — recarga para ver cambios')
       setSaving(false); operationLock.current = false

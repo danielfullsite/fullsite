@@ -217,12 +217,15 @@ export default function CocinaPage() {
 
     // 2. Update order items via revision-aware save boundary
     // R2D1B: cocina cancel must advance order_revision to maintain reconciliation lineage
+    // R2D: save_operation_id for exactly-once idempotency
+    const cocinaOpId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const saveRes = await fetch('/api/pos/save-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         order_id: cancelTarget.orderId,
         expected_revision: order.order_revision ?? 0,
+        save_operation_id: cocinaOpId,
         items,
         status: order.status,
       }),
