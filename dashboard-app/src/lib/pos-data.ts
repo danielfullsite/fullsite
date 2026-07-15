@@ -1182,8 +1182,9 @@ export async function saveOrder(order: Order): Promise<SaveOrderResult> {
       try {
         const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
         // Persist expected_revision in the queued payload so replay uses the original revision
+        // Transport: APP_API — must pass through certified revision-aware writer boundary
         await queueOperation('pos_orders', 'POST', payload, '/api/pos/save-order',
-          (order.orderRevision ?? 0).toString())
+          (order.orderRevision ?? 0).toString(), 'APP_API')
         await cacheOrder({
           id: order.id,
           created_at: new Date().toISOString(),
@@ -1193,7 +1194,7 @@ export async function saveOrder(order: Order): Promise<SaveOrderResult> {
         })
       } catch {
         const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-        queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', timestamp: Date.now(), synced: false })
+        queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
         localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
       }
       console.log('[offline] Order saved to queue — will sync when online')

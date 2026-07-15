@@ -4,17 +4,36 @@
 const DB_NAME = 'fullsite_pos'
 const DB_VERSION = 1
 
+// ─── Replay Transport Classes ───────────────────────────────────────────────
+// APP_API: replay through application API routes (Next.js /api/pos/*)
+//   - revision-aware, passes through r1_save_order + r1_reconcile_order
+//   - REQUIRED for all reconciliation-relevant order state mutations
+// SUPABASE_REST: replay directly to Supabase PostgREST
+//   - for non-reconciliation-relevant data (audit logs, market stock, inventory movements)
+//   - MUST NOT be used for reconciliation-relevant pos_orders mutations
+type ReplayTransport = 'APP_API' | 'SUPABASE_REST'
+
+// ─── Error Classification ───────────────────────────────────────────────────
+// TRANSIENT_RETRYABLE: network failure, 5xx, fetch error — will retry
+// STALE_WRITE_CONFLICT: revision mismatch — TERMINAL, no auto-retry, no overwrite
+// TERMINAL_NON_RETRYABLE: malformed payload, validation rejection — cannot succeed unchanged
+type SyncErrorClass = 'TRANSIENT_RETRYABLE' | 'STALE_WRITE_CONFLICT' | 'TERMINAL_NON_RETRYABLE'
+
 interface SyncQueueItem {
   id: string
   table: string
   method: 'POST' | 'PATCH' | 'DELETE'
   data: Record<string, unknown>
   endpoint?: string
+  transport?: ReplayTransport    // explicit routing — APP_API or SUPABASE_REST
   created_at: string
   synced: boolean
   retries: number
-  base_version?: string  // server updated_at at time of queue, for conflict detection
-  conflict?: boolean     // true if sync detected a conflict — requires manual resolution
+  base_version?: string          // server updated_at at time of queue, for conflict detection
+  conflict?: boolean             // true if sync detected a conflict — requires manual resolution
+  error_class?: SyncErrorClass   // classified error state
+  error_detail?: string          // human-readable error detail for operator recovery
+  server_revision?: number       // server revision at time of conflict (evidence)
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -131,7 +150,8 @@ export async function queueOperation(
   method: 'POST' | 'PATCH' | 'DELETE',
   data: Record<string, unknown>,
   endpoint?: string,
-  base_version?: string
+  base_version?: string,
+  transport?: ReplayTransport
 ): Promise<string> {
   const db = await openDB()
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -141,6 +161,7 @@ export async function queueOperation(
     method,
     data,
     endpoint,
+    transport,
     created_at: new Date().toISOString(),
     synced: false,
     retries: 0,
@@ -212,117 +233,174 @@ export async function clearSyncedItems(): Promise<void> {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// ─── Transport Resolution ──────────────────────────────────────────────────
+// Determines replay transport for a queue item.
+// Priority: explicit transport field > endpoint prefix detection > default SUPABASE_REST
+// Endpoint prefix detection is unambiguous: only /api/ paths are APP_API routes.
+// Legacy persisted items (no transport field) with endpoint=/api/pos/save-order
+// are correctly routed via prefix detection — no IndexedDB migration required.
+function resolveTransport(item: SyncQueueItem): ReplayTransport {
+  if (item.transport) return item.transport
+  // Legacy compatibility: detect APP_API from endpoint prefix
+  if (item.endpoint?.startsWith('/api/')) return 'APP_API'
+  return 'SUPABASE_REST'
+}
+
+// ─── APP_API Replay ────────────────────────────────────────────────────────
+// Replays through application API routes (e.g. /api/pos/save-order).
+// Uses the current page origin as the base URL.
+// Returns: { ok, classified error class, detail }
+async function replayViaAppApi(item: SyncQueueItem): Promise<{
+  ok: boolean
+  errorClass?: SyncErrorClass
+  detail?: string
+  serverRevision?: number
+}> {
+  const apiPath = item.endpoint!
+  // In browser: use window.location.origin. In SSR/worker: fall back to relative URL.
+  const base = typeof window !== 'undefined' ? window.location.origin : ''
+  const url = `${base}${apiPath}`
+
+  const res = await fetch(url, {
+    method: item.method,
+    headers: { 'Content-Type': 'application/json' },
+    body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
+  })
+
+  if (!res.ok) {
+    // 5xx = transient, 4xx = depends on body
+    if (res.status >= 500) {
+      return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
+    }
+    // 400/422 = malformed payload, terminal
+    if (res.status === 400 || res.status === 422) {
+      const errText = await res.text().catch(() => '')
+      return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: `HTTP ${res.status}: ${errText}` }
+    }
+    // Other client errors
+    return { ok: false, errorClass: 'TRANSIENT_RETRYABLE', detail: `HTTP ${res.status}` }
+  }
+
+  // Parse structured response body from /api/pos/save-order
+  const body = await res.json().catch(() => ({ ok: false }))
+
+  if (body.ok) {
+    // ORDER_SAVED — inventory_status may be COMPLETE/BLOCKED/PENDING/SKIPPED
+    return { ok: true }
+  }
+
+  // Save rejected — classify from body
+  if (body.conflict === true) {
+    // STALE_WRITE_REJECTED — revision mismatch
+    return {
+      ok: false,
+      errorClass: 'STALE_WRITE_CONFLICT',
+      detail: `STALE_WRITE_REJECTED: expected rev ${body.expected_revision}, server at ${body.current_revision}`,
+      serverRevision: body.current_revision,
+    }
+  }
+
+  if (body.error === 'ORDER_NOT_FOUND') {
+    return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: 'ORDER_NOT_FOUND' }
+  }
+
+  // Unknown rejection — treat as terminal to avoid infinite retry
+  return { ok: false, errorClass: 'TERMINAL_NON_RETRYABLE', detail: body.error || 'UNKNOWN_REJECTION' }
+}
+
+// ─── Conflict State Writer ─────────────────────────────────────────────────
+// Marks a queue item with classified error state. Payload is PRESERVED for operator recovery.
+async function markConflict(
+  itemId: string,
+  errorClass: SyncErrorClass,
+  detail: string,
+  serverRevision?: number
+): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('sync_queue', 'readwrite')
+  const store = tx.objectStore('sync_queue')
+  const existing = await new Promise<SyncQueueItem | undefined>((resolve) => {
+    const req = store.get(itemId)
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => resolve(undefined)
+  })
+  if (existing) {
+    existing.conflict = true
+    existing.error_class = errorClass
+    existing.error_detail = detail
+    if (serverRevision != null) existing.server_revision = serverRevision
+    store.put(existing)
+  }
+}
+
 export async function syncAll(): Promise<{ synced: number; failed: number }> {
   const queue = await getPendingQueue()
   let synced = 0
   let failed = 0
 
   for (const item of queue) {
-    if (item.retries >= 5) continue // skip items that failed too many times
+    // Skip items in terminal error state — they require operator intervention
+    if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
+      continue
+    }
+    if (item.retries >= 5) continue
 
-    const url = item.endpoint
-      ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
-      : `${SUPABASE_URL}/rest/v1/${item.table}`
+    const transport = resolveTransport(item)
 
     try {
-      const res = await fetch(url, {
-        method: item.method,
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
-      })
-      if (res.ok) {
-        await markSynced(item.id)
-        synced++
-      } else if (res.status === 409) {
-        // Conflict: row already exists on server.
-        // DO NOT blind PATCH — check server state first.
-        if (item.method === 'POST' && item.table === 'pos_orders') {
-          try {
-            // Step 1: Read current server state
-            const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}&select=status,updated_at`, {
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-            })
-            const serverRows = checkRes.ok ? await checkRes.json() : []
-            const server = Array.isArray(serverRows) && serverRows.length > 0 ? serverRows[0] : null
+      if (transport === 'APP_API') {
+        // ── APP_API replay: through certified application boundary ──
+        const result = await replayViaAppApi(item)
 
-            if (!server) {
-              // Couldn't read server state — retry later
-              console.error(`[offline-sync] 409 but couldn't read server state for ${item.data.id}`)
-              await incrementRetry(item.id)
-              failed++
-            } else if (server.status === 'cerrada' || server.status === 'cancelada' || server.status === 'anulada') {
-              // Terminal state: order already processed by another path. Mark synced, do NOT overwrite.
-              console.warn(`[offline-sync] 409: order ${item.data.id} already ${server.status} on server — marking synced`)
-              await markSynced(item.id)
-              synced++
-            } else if (item.base_version && server.updated_at !== item.base_version) {
-              // Server was modified since we queued — CONFLICT, do not overwrite
-              console.error(`[offline-sync] CONFLICT: order ${item.data.id} modified on server (base=${item.base_version}, server=${server.updated_at})`)
-              // Mark as conflict for manual resolution
-              const db = await openDB()
-              const tx = db.transaction('sync_queue', 'readwrite')
-              const store = tx.objectStore('sync_queue')
-              const existing = await new Promise<SyncQueueItem | undefined>((resolve) => {
-                const req = store.get(item.id)
-                req.onsuccess = () => resolve(req.result)
-                req.onerror = () => resolve(undefined)
-              })
-              if (existing) {
-                existing.conflict = true
-                store.put(existing)
-              }
-              failed++
-            } else {
-              // Server version matches our base OR no base_version (legacy item) — safe to PATCH
-              // But only forward-compatible fields (never downgrade status)
-              const serverRank: Record<string, number> = { abierta: 1, enviada: 2, preparando: 3, lista: 4, entregada: 5, cerrada: 6, cancelada: 7, anulada: 7 }
-              const queuedStatus = String(item.data.status || '')
-              const queuedRank = serverRank[queuedStatus] || 0
-              const serverStatusRank = serverRank[server.status] || 0
-
-              if (queuedRank < serverStatusRank) {
-                // Queued status is lower than server — don't downgrade, just mark synced
-                console.warn(`[offline-sync] 409: skipping status downgrade ${queuedStatus} → ${server.status} for ${item.data.id}`)
-                await markSynced(item.id)
-                synced++
-              } else {
-                // Safe to apply — PATCH with full payload
-                const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${item.data.id}`, {
-                  method: 'PATCH',
-                  headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-                  body: JSON.stringify(item.data),
-                })
-                if (patchRes.ok) {
-                  console.warn(`[offline-sync] 409 resolved via conditional PATCH for order ${item.data.id}`)
-                  await markSynced(item.id)
-                  synced++
-                } else {
-                  console.error(`[offline-sync] 409 PATCH failed for order ${item.data.id}: ${patchRes.status}`)
-                  await incrementRetry(item.id)
-                  failed++
-                }
-              }
-            }
-          } catch {
-            await incrementRetry(item.id)
-            failed++
-          }
+        if (result.ok) {
+          await markSynced(item.id)
+          synced++
+        } else if (result.errorClass === 'STALE_WRITE_CONFLICT') {
+          // TERMINAL — preserve payload, mark conflict, NO retry, NO overwrite, NO direct PATCH
+          console.error(`[offline-sync] ${result.detail}`)
+          await markConflict(item.id, 'STALE_WRITE_CONFLICT', result.detail!, result.serverRevision)
+          failed++
+        } else if (result.errorClass === 'TERMINAL_NON_RETRYABLE') {
+          console.error(`[offline-sync] TERMINAL: ${result.detail}`)
+          await markConflict(item.id, 'TERMINAL_NON_RETRYABLE', result.detail!)
+          failed++
         } else {
-          // Non-order 409: log and retry
-          console.error(`[offline-sync] 409 conflict on ${item.table} — will retry`)
+          // TRANSIENT_RETRYABLE
+          console.warn(`[offline-sync] Transient failure for ${item.endpoint}: ${result.detail}`)
           await incrementRetry(item.id)
           failed++
         }
       } else {
-        await incrementRetry(item.id)
-        failed++
+        // ── SUPABASE_REST replay: direct PostgREST for non-reconciliation data ──
+        const url = item.endpoint
+          ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
+          : `${SUPABASE_URL}/rest/v1/${item.table}`
+
+        const res = await fetch(url, {
+          method: item.method,
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
+        })
+        if (res.ok) {
+          await markSynced(item.id)
+          synced++
+        } else if (res.status === 409) {
+          // For non-reconciliation-relevant 409, mark as synced (data already exists)
+          console.warn(`[offline-sync] 409 on ${item.table} — already exists, marking synced`)
+          await markSynced(item.id)
+          synced++
+        } else {
+          await incrementRetry(item.id)
+          failed++
+        }
       }
     } catch {
+      // Network error — transient retryable
       await incrementRetry(item.id)
       failed++
     }

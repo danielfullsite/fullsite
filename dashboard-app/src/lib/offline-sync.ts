@@ -8,6 +8,8 @@ interface QueuedOrder {
   id: string
   table: string // 'pos_orders'
   data: Record<string, unknown>
+  endpoint?: string
+  transport?: 'APP_API' | 'SUPABASE_REST'
   timestamp: number
   synced: boolean
 }
@@ -50,22 +52,55 @@ export async function syncQueue(): Promise<{ synced: number; failed: number }> {
   let failed = 0
 
   for (const item of pending) {
+    // Determine transport: explicit field > endpoint prefix > default SUPABASE_REST
+    const isAppApi = item.transport === 'APP_API' || item.endpoint?.startsWith('/api/')
+
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${item.table}`, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify(item.data),
-      })
-      if (res.ok) {
-        item.synced = true
-        synced++
+      if (isAppApi && item.endpoint) {
+        // APP_API: replay through certified application boundary
+        const base = typeof window !== 'undefined' ? window.location.origin : ''
+        const res = await fetch(`${base}${item.endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item.data),
+        })
+        if (res.ok) {
+          const body = await res.json().catch(() => ({ ok: false }))
+          if (body.ok) {
+            item.synced = true
+            synced++
+          } else if (body.conflict) {
+            // STALE_WRITE_CONFLICT — terminal, do not retry
+            console.error(`[offline-sync-ls] STALE_WRITE: ${item.id}, expected ${body.expected_revision}, server ${body.current_revision}`)
+            item.synced = true // remove from retry loop — conflict is terminal
+            failed++
+          } else {
+            failed++
+          }
+        } else {
+          failed++
+        }
       } else {
-        failed++
+        // SUPABASE_REST: direct PostgREST for non-reconciliation data
+        const url = item.endpoint
+          ? `${SUPABASE_URL}/rest/v1/${item.endpoint}`
+          : `${SUPABASE_URL}/rest/v1/${item.table}`
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(item.data),
+        })
+        if (res.ok) {
+          item.synced = true
+          synced++
+        } else {
+          failed++
+        }
       }
     } catch {
       failed++
