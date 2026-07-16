@@ -707,7 +707,54 @@ export default function MesasPage() {
           </button>
           {(staffRole === 'admin' || staffRole === 'gerente') && (
             <button
-              onClick={() => {
+              onClick={async () => {
+                // Try fingerprint first if available
+                let authenticated = false
+                let actorName = ''
+                try {
+                  const stored = JSON.parse(localStorage.getItem('pos_biometric_credentials') || '{}')
+                  const managerCreds = Object.entries(stored).filter(([, m]) => {
+                    const member = m as { role?: string }
+                    return member.role === 'admin' || member.role === 'gerente'
+                  })
+                  if (managerCreds.length > 0 && window.PublicKeyCredential) {
+                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+                    if (available) {
+                      const challenge = new Uint8Array(32)
+                      crypto.getRandomValues(challenge)
+                      const assertion = await navigator.credentials.get({
+                        publicKey: {
+                          challenge,
+                          rpId: window.location.hostname,
+                          allowCredentials: managerCreds.map(([id]) => ({
+                            id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
+                            type: 'public-key' as const,
+                          })),
+                          userVerification: 'required',
+                          timeout: 15000,
+                        },
+                      })
+                      if (assertion) {
+                        const credId = btoa(String.fromCharCode(...new Uint8Array((assertion as PublicKeyCredential).rawId)))
+                        const member = stored[credId] as { name?: string }
+                        if (member?.name) { authenticated = true; actorName = member.name }
+                      }
+                    }
+                  }
+                } catch { /* fingerprint failed or cancelled — fall through to PIN */ }
+
+                if (authenticated) {
+                  logAudit({ action: 'cerrar_app', actor: actorName, mesa: 0, details: { method: 'huella' } })
+                  if ((window as any).fullsiteApp?.quit) {
+                    ;(window as any).fullsiteApp.quit()
+                  } else {
+                    try { document.exitFullscreen?.() } catch {}
+                    window.location.href = 'about:blank'
+                  }
+                  return
+                }
+
+                // Fallback to PIN
                 setPinInput('')
                 setPinPrompt({
                   title: 'PIN de gerente para cerrar la app:',
@@ -715,7 +762,7 @@ export default function MesasPage() {
                     const managerName = await verifyManagerPin(pin)
                     if (!managerName) { alert('PIN incorrecto'); return }
                     setPinPrompt(null)
-                    logAudit({ action: 'cerrar_app', actor: managerName, mesa: 0, details: {} })
+                    logAudit({ action: 'cerrar_app', actor: managerName, mesa: 0, details: { method: 'pin' } })
                     if ((window as any).fullsiteApp?.quit) {
                       ;(window as any).fullsiteApp.quit()
                     } else {

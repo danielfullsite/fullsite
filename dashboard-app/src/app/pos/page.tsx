@@ -1921,6 +1921,7 @@ function POSContent() {
         if (cancelled) return // mesa changed while fetching
         if (res.ok) {
           const rows = await res.json()
+          if (cancelled) return // mesa changed during JSON parse
           if (rows.length > 0) {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
@@ -2501,15 +2502,15 @@ function POSContent() {
 
   const handleSendToKitchen = async () => {
     if (activeItems.length === 0 || operationLock.current) return
-    if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
     operationLock.current = true
     setSaving(true)
     const opId = genOpId()
     try {
 
+    if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
+
     // Multi-user conflict check
     if (await checkOrderConflict('kitchen')) {
-      setSaving(false); operationLock.current = false
       return
     }
 
@@ -2765,7 +2766,6 @@ function POSContent() {
 
     // Concurrency check: prevent double payment or payment on modified order
     if (await checkOrderConflict('payment')) {
-      setSaving(false); operationLock.current = false
       return
     }
 
