@@ -1940,7 +1940,16 @@ function POSContent() {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
             const loadedItems2 = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
-            setOrderItems(loadedItems2)
+            // Merge: keep any local unsent items that aren't in the DB yet
+            setOrderItems(prev => {
+              const dbIds = new Set(loadedItems2.map((i: OrderItem) => i.id))
+              const localUnsent = prev.filter((i: OrderItem) => !dbIds.has(i.id) && !sentItemIds.has(i.id))
+              if (localUnsent.length > 0) {
+                // User has new items not yet saved — keep them
+                return [...loadedItems2, ...localUnsent]
+              }
+              return loadedItems2
+            })
             setOrderId(order.id)
             setMesero(order.mesero || meserosList[0] || MESEROS[0])
             setPersonas(order.personas || 2)
