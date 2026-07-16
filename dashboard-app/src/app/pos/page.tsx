@@ -1976,6 +1976,8 @@ function POSContent() {
       } catch { /* */ }
       if (!cancelled) setLoadingMesa(false)
     }
+    // Safety: ensure loadingMesa is always cleared after 3 seconds max
+    const safetyTimer = setTimeout(() => setLoadingMesa(false), 3000)
     // Reset state immediately
     setCancelledItems(new Set())
     setVoidedItems(new Set())
@@ -2005,7 +2007,7 @@ function POSContent() {
     } catch {}
     // DB is truth — will overwrite cache preview if different
     loadMesaOrder()
-    return () => { cancelled = true }
+    return () => { cancelled = true; clearTimeout(safetyTimer) }
   }, [mesa, clienteNombre])
 
   // Order-level notes
