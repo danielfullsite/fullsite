@@ -30,8 +30,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
   const isPosRoute = pathname.startsWith('/pos')
+  const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra')
   const isDemoRoute = pathname.startsWith('/demo')
-  const isPublicPage = publicPages.includes(pathname) || isPosRoute || isDemoRoute
+  const isPublicPage = publicPages.includes(pathname) || isPosRoute || isKdsRoute || isDemoRoute
 
   // Demo user: always redirect to /demo/* world
   const isDemoUser = user?.user_metadata?.client_id === 'demo'
