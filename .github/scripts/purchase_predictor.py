@@ -31,7 +31,7 @@ CLIENT       = get_client()
 MX_TZ        = get_tz(CLIENT)
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS  = get_chat_ids(CLIENT, "daily_briefing")
 # Fallback: use TELEGRAM_CHAT_ID_DANIEL if no chat IDs configured
 if not TG_CHAT_IDS:

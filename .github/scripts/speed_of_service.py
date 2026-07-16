@@ -26,7 +26,7 @@ BIZ_TZ, BIZ_BOUNDARY = get_business_day_config(CLIENT)
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: agent key (SELECT + INSERT agent_runs/results)
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS = get_chat_ids(CLIENT, "intraday")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 

@@ -21,7 +21,7 @@ WANSOFT_URL = "https://www.wansoft.net/Wansoft.Web"
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS = [os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")]
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 MX_TZ = get_tz(CLIENT)

@@ -13,7 +13,7 @@ CLIENT       = get_client()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
-TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS  = get_chat_ids(CLIENT, "reservas_pendientes")
 TRIGGER_TYPE = os.environ.get("TRIGGER_TYPE", "cron")
 

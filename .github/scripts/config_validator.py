@@ -31,7 +31,7 @@ MX_TZ = get_tz(CLIENT)
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 # Least privilege: use agent key (SELECT + INSERT agent_runs/results) instead of service_role
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS = get_chat_ids(CLIENT, "daily_briefing")
 
 sb_headers = {

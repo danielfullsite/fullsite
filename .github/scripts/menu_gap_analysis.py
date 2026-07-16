@@ -29,7 +29,7 @@ sb_headers = {
     "Authorization": f"Bearer {SUPABASE_KEY}",
 }
 
-TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID_DANIEL", "")
 
 

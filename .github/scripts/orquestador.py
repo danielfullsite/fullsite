@@ -8,7 +8,7 @@ y dispara el workflow del tentáculo correcto.
 import os, sys, json, requests
 
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
-TG_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_ID   = os.environ.get("INPUT_CHAT_ID") or os.environ["TELEGRAM_CHAT_ID_DANIEL"]
 GH_TOKEN     = os.environ["GH_TOKEN"]
 GH_REPO      = os.environ["GH_REPO"]

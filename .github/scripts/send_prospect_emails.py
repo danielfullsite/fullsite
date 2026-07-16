@@ -23,7 +23,7 @@ RATE_LIMIT          = 2  # max emails per second
 
 RESEND_ENDPOINT     = "https://api.resend.com/emails"
 FROM_EMAIL          = "Daniel Ramonfaur <daniel@fullsite.mx>"
-WHATSAPP_LINK       = "https://wa.me/528112741000?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite"
+WHATSAPP_LINK       = "https://wa.me/528115324371?text=Hola%20Daniel%2C%20me%20interesa%20Fullsite"
 DEMO_LINK           = "https://app.fullsite.mx/demo-live"
 
 sb_headers = {}
@@ -37,25 +37,9 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 # ── Hardcoded prospects (fallback if no CSV) ────────────────────────────────
 DEFAULT_PROSPECTS = [
-    {"name": "Equipo GIM", "restaurant": "Grupo GIM", "email": "info@grupogim.com.mx"},
-    {"name": "Equipo Estancia", "restaurant": "Grupo Estancia", "email": "atencion.clientes@grupoestancia.com"},
-    {"name": "Equipo Hunan", "restaurant": "Grupo Hunan", "email": "contacto@grupohunan.com"},
-    {"name": "Equipo Pangea", "restaurant": "Grupo Pangea", "email": "pangea@grupopangea.com"},
-    {"name": "Equipo Sonora Grill", "restaurant": "Sonora Grill Group", "email": "contacto@sggroup.com.mx"},
-    {"name": "Equipo Costeño", "restaurant": "Grupo Costeño (Mochomos)", "email": "contacto@grupocosteno.com"},
-    {"name": "Equipo Toks", "restaurant": "Grupo Restaurantero Gigante (Toks)", "email": "contacto@grg.mx"},
-    {"name": "Equipo Punta del Cielo", "restaurant": "Café Punta del Cielo", "email": "pedidos@puntadelcielo.com.mx"},
-    {"name": "Equipo Carolo", "restaurant": "Grupo Carolo", "email": "contacto@grupocarolo.com.mx"},
-    {"name": "Equipo Anderson's", "restaurant": "Grupo Anderson's", "email": "contacto@grupoandersons.com"},
-    {"name": "Equipo Origo", "restaurant": "Grupo Origo", "email": "contacto@grupoorigo.mx"},
-    {"name": "Equipo Sanborns", "restaurant": "Grupo Sanborns", "email": "inversionistas@gcarso.com.mx"},
-    {"name": "Equipo Café de Tacuba", "restaurant": "Café de Tacuba", "email": "reservaciones@cafedetacuba.mx"},
-    {"name": "Equipo Azul", "restaurant": "Azul Restaurantes", "email": "contacto@azul.rest"},
-    {"name": "Equipo Alme", "restaurant": "Grupo Alme", "email": "contacto@grupoalme.mx"},
-    {"name": "Equipo BWW", "restaurant": "Buffalo Wild Wings México", "email": "contacto@buffalowildwings.com.mx"},
-    {"name": "Equipo BHW", "restaurant": "Buffalo's Hot Wings Monterrey", "email": "contacto@buffaloshotwings.com"},
-    {"name": "Equipo GRG", "restaurant": "Grupo Restaurantero Gigante", "email": "contacto@gruporestauranterogigante.com.mx"},
-    {"name": "Equipo Lalo", "restaurant": "Lalo Café CDMX", "email": "hola@eat-lalo.com"},
+    {"name": "Equipo Monopoly", "restaurant": "Monopoly Steakhouse", "email": "hola@monopolysteakhouse.com"},
+    {"name": "Equipo UNO", "restaurant": "UNO by Real Madrid", "email": "informacion@unobyrealmadrid.com"},
+    {"name": "Equipo Kalma", "restaurant": "Kalma Kava", "email": "kalma.atencion@gmail.com"},
 ]
 
 
@@ -84,7 +68,7 @@ def build_email_html(name: str, restaurant: str) -> str:
     <span style="color:#ffffff;">full</span><span style="color:#10b981;">site</span>
   </h1>
   <p style="margin:8px 0 0;color:#94a3b8;font-size:13px;letter-spacing:1px;text-transform:uppercase;">
-    POS + 30 Agentes de IA
+    POS + IA desde el dia uno
   </p>
 </td>
 </tr>
@@ -94,17 +78,19 @@ def build_email_html(name: str, restaurant: str) -> str:
 <td style="background-color:#ffffff;padding:40px;">
 
   <p style="margin:0 0 20px;font-size:16px;color:#1e293b;line-height:1.6;">
-    {first_name}, que tal &mdash;
+    {first_name}, felicidades por la apertura de <strong>{restaurant}</strong> &mdash;
   </p>
 
   <p style="margin:0 0 24px;font-size:16px;color:#475569;line-height:1.6;">
-    Soy Daniel Ramonfaur, 3ra generacion restaurantera y fundador de <strong>Fullsite</strong>.
-    Creci en restaurantes y construi lo que siempre nos hizo falta: un sistema con <strong>30 agentes de IA</strong>
-    que analizan tu operacion 24/7 y te dicen exactamente que hacer para vender mas.
+    Soy Daniel Ramonfaur, 3ra generacion restaurantera en Monterrey y fundador de <strong>Fullsite</strong>.
+    Vi que acaban de abrir y quise escribirles porque los primeros meses son clave:
+    es cuando mas necesitas <strong>datos en tiempo real</strong> para tomar decisiones rapidas.
   </p>
 
   <p style="margin:0 0 24px;font-size:16px;color:#475569;line-height:1.6;">
-    Creo que le puede servir mucho a <strong>{restaurant}</strong>. Te cuento lo mas relevante:
+    Fullsite es un punto de venta con <strong>30 agentes de IA</strong> integrados que desde el dia uno te dicen
+    que esta funcionando y que no. Sin instalaciones complicadas &mdash; solo abres el navegador en tu computadora
+    y listo.
   </p>
 
   <!-- Feature list -->
@@ -112,8 +98,17 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;margin-bottom:8px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
+          <strong style="color:#059669;">Listo en minutos, no en semanas</strong> &mdash;
+          No necesitas instalar nada. Corre en el navegador, usa tu misma red e impresora. Hoy lo configuras, hoy empiezas a vender.
+        </p>
+      </td>
+    </tr>
+    <tr><td style="height:8px;"></td></tr>
+    <tr>
+      <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
+        <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
           <strong style="color:#059669;">Preguntale a tu restaurante</strong> &mdash;
-          &ldquo;Como vamos hoy?&rdquo; y en 2 segundos te responde con voz: ventas, meseros, ticket promedio. Ningun POS tiene esto.
+          &ldquo;Como vamos hoy?&rdquo; y en 2 segundos te responde: ventas, ticket promedio, que platillo se esta vendiendo mas. Con voz.
         </p>
       </td>
     </tr>
@@ -121,8 +116,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Anti-fraude automatico</strong> &mdash;
-          detecta cancelaciones sospechosas, descuentos fuera de patron, y meseros con devoluciones anormales. Te alerta antes de que sea problema.
+          <strong style="color:#059669;">Costeo real desde el dia uno</strong> &mdash;
+          Sube tus recetas y el sistema te dice el food cost real por platillo. Si un proveedor sube precio, te alerta.
         </p>
       </td>
     </tr>
@@ -130,8 +125,8 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Food cost + alertas de costos</strong> &mdash;
-          si un insumo sube de precio, te avisa. Costeo real por platillo con factor de merma incluido.
+          <strong style="color:#059669;">Control total sin estar presente</strong> &mdash;
+          Briefing diario a las 7am en tu celular. Alertas de anti-fraude, prediccion de cierre, y coaching para tu equipo. Todo automatico.
         </p>
       </td>
     </tr>
@@ -139,34 +134,25 @@ def build_email_html(name: str, restaurant: str) -> str:
     <tr>
       <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
         <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">Prediccion de cierre + coaching</strong> &mdash;
-          a las 2pm te dice cuanto vas a facturar y que hacer para llegar a la meta. Briefing diario 7am por Telegram.
-        </p>
-      </td>
-    </tr>
-    <tr><td style="height:8px;"></td></tr>
-    <tr>
-      <td style="padding:12px 16px;background-color:#f0fdf4;border-left:3px solid #10b981;border-radius:6px;">
-        <p style="margin:0;font-size:14px;color:#1e293b;line-height:1.5;">
-          <strong style="color:#059669;">POS completo + inteligencia</strong> &mdash;
-          punto de venta con comandero, KDS, inventario, facturacion CFDI, y 30 agentes de IA integrados. Todo en uno.
+          <strong style="color:#059669;">Todo incluido</strong> &mdash;
+          POS, comandero, pantalla de cocina (KDS), inventario, facturacion CFDI, y 30 agentes de IA. Sin modulos extra ni costos ocultos.
         </p>
       </td>
     </tr>
   </table>
 
-  <!-- ROI callout -->
+  <!-- Social proof -->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
     <tr>
       <td style="background-color:#0f172a;padding:20px 24px;border-radius:8px;text-align:center;">
         <p style="margin:0 0 4px;font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">
-          Caso real
+          Ya operando en Monterrey
         </p>
         <p style="margin:0;font-size:22px;font-weight:700;color:#10b981;">
-          881 dias de datos reales analizados
+          +880 dias de datos reales analizados
         </p>
         <p style="margin:6px 0 0;font-size:14px;color:#cbd5e1;">
-          30 agentes IA &middot; anti-fraude &middot; food cost &middot; predicciones &middot; $0 costo de IA
+          Hecho por restauranteros, para restauranteros
         </p>
       </td>
     </tr>
@@ -178,7 +164,7 @@ def build_email_html(name: str, restaurant: str) -> str:
       <td style="padding:10px;text-align:center;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
         <p style="margin:0;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Desde</p>
         <p style="margin:4px 0;font-size:28px;font-weight:800;color:#1e293b;">$4,999/mes</p>
-        <p style="margin:0;font-size:13px;color:#64748b;">POS completo + 30 agentes IA + soporte especializado</p>
+        <p style="margin:0;font-size:13px;color:#64748b;">POS completo + 30 agentes IA + soporte dedicado</p>
       </td>
     </tr>
   </table>
@@ -213,7 +199,7 @@ def build_email_html(name: str, restaurant: str) -> str:
     Daniel Ramonfaur &middot; Fundador de Fullsite
   </p>
   <p style="margin:0;font-size:12px;color:#64748b;">
-    Monterrey, MX &middot; +52 811 274 1000 &middot; daniel@fullsite.mx
+    Monterrey, MX &middot; +52 811 532 4371 &middot; daniel@fullsite.mx
   </p>
 </td>
 </tr>
@@ -228,7 +214,7 @@ def build_email_html(name: str, restaurant: str) -> str:
 
 
 def build_subject(restaurant: str) -> str:
-    return f"El POS con 30 agentes de IA para {restaurant}"
+    return f"{restaurant} + IA desde el dia uno"
 
 
 # ── Load prospects ──────────────────────────────────────────────────────────

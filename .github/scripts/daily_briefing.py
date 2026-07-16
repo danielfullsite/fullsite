@@ -22,7 +22,7 @@ CLIENT           = get_client()
 SUPABASE_URL     = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY     = os.environ["SUPABASE_SERVICE_KEY"]
 GROQ_API_KEY     = os.environ["GROQ_API_KEY"]
-TG_TOKEN         = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_TOKEN         = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT_IDS      = get_chat_ids(CLIENT, "daily_briefing")
 TRIGGER_TYPE     = os.environ.get("TRIGGER_TYPE", "cron")
 
@@ -72,16 +72,22 @@ def sb_post(table, data):
     r.raise_for_status()
 
 def send_telegram(text):
-    """Send message to all recipients; splits at 4096 chars if needed."""
+    """Send message to all recipients; skips if no token."""
+    if not TG_TOKEN:
+        print("[briefing] No Telegram token — skipping send, results saved to agent_runs")
+        return
     chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
     for chat_id in TG_CHAT_IDS:
         for chunk in chunks:
-            r = requests.post(
-                f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": chunk},
-                timeout=15,
-            )
-            r.raise_for_status()
+            try:
+                r = requests.post(
+                    f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": chunk},
+                    timeout=15,
+                )
+                r.raise_for_status()
+            except Exception as e:
+                print(f"[briefing] Telegram send failed: {e} — continuing")
 
 DAY_NAMES = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
 
