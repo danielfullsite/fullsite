@@ -2007,6 +2007,7 @@ function POSContent() {
           if (c.personas) setPersonas(c.personas)
           if (c.discount != null) setDiscount(c.discount)
           if (c.notas) setOrderNotes(c.notas)
+          if (c.revision != null) setOrderRevision(c.revision)
           setLoadedOrderId(c.id || null)
           setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
           const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
@@ -2755,7 +2756,7 @@ function POSContent() {
       setSaving(false); operationLock.current = false
       // Cache order locally so it loads instantly when returning to this mesa
       try {
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, ts: Date.now() }))
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
       // Mode-dependent behavior after sending to kitchen:
