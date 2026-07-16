@@ -1950,7 +1950,7 @@ function POSContent() {
             setOrderRevision(order.order_revision ?? 0)
             setOrderNotes(order.notas || '')
             // Update cache with DB truth so next entry is instant AND correct
-            try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: order.id, items: loadedItems2, mesero: order.mesero, personas: order.personas, discount: order.descuento || 0, notas: order.notas || '', revision: order.order_revision ?? 0, ts: Date.now() })) } catch {}
+            try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: order.id, items: loadedItems2, mesero: order.mesero, personas: order.personas, discount: order.descuento || 0, notas: order.notas || '', revision: order.order_revision ?? 0, updatedAt: order.updated_at || order.created_at, ts: Date.now() })) } catch {}
             // Mark loaded items as already sent + snapshot for change detection (H-7)
             if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
               setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
@@ -2010,6 +2010,7 @@ function POSContent() {
           if (c.discount != null) setDiscount(c.discount)
           if (c.notas) setOrderNotes(c.notas)
           if (c.revision != null) setOrderRevision(c.revision)
+          if (c.updatedAt) setLoadedUpdatedAt(c.updatedAt)
           setLoadedOrderId(c.id || null)
           setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
           const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
@@ -2758,7 +2759,7 @@ function POSContent() {
       setSaving(false); operationLock.current = false
       // Cache order locally so it loads instantly when returning to this mesa
       try {
-        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, ts: Date.now() }))
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
       // Mode-dependent behavior after sending to kitchen:
