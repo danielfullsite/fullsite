@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isOfflineBuild, pathname, router])
 
-  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live']
+  const publicPages = ['/login', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
   const isPosRoute = pathname.startsWith('/pos')
   const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra')
   const isDemoRoute = pathname.startsWith('/demo')
