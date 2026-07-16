@@ -1,14 +1,14 @@
 const { app, BrowserWindow, globalShortcut } = require('electron');
 const path = require('path');
 
-const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
+const KDS_URL = 'https://app.fullsite.mx/cocina';
 
 // ─── ROUTE GUARD ──────────────────────────────────────────────────────────
 // KDS must never navigate away from the cocina page.
 // Validate origin AND exact pathname — no startsWith to prevent /pos/cocina-foo.
 
 const KDS_ORIGIN = new URL(KDS_URL).origin;
-const KDS_ALLOWED_PATHNAMES = ['/pos/cocina'];
+const KDS_ALLOWED_PATHNAMES = ['/cocina'];
 
 function isAllowedKdsUrl(url) {
   try {
