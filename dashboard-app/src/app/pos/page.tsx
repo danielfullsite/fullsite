@@ -1949,6 +1949,8 @@ function POSContent() {
             setLoadedUpdatedAt(order.updated_at || order.created_at || null)
             setOrderRevision(order.order_revision ?? 0)
             setOrderNotes(order.notas || '')
+            // Update cache with DB truth so next entry is instant AND correct
+            try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: order.id, items: loadedItems2, mesero: order.mesero, personas: order.personas, discount: order.descuento || 0, notas: order.notas || '', revision: order.order_revision ?? 0, ts: Date.now() })) } catch {}
             // Mark loaded items as already sent + snapshot for change detection (H-7)
             if (order.status === 'enviada' || order.status === 'preparando' || order.status === 'lista') {
               setSentItemIds(new Set(loadedItems2.map((i: OrderItem) => i.id)))
