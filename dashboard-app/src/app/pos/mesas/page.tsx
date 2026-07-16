@@ -131,7 +131,18 @@ interface ActiveOrder {
 
 export default function MesasPage() {
   const router = useRouter()
-  const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([])
+  const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>(() => {
+    // Pre-populate from localStorage cache for instant render
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = localStorage.getItem('pos_mesas_orders')
+      if (cached) {
+        const c = JSON.parse(cached)
+        if (c.ts && Date.now() - c.ts < 30000 && c.orders) return c.orders
+      }
+    } catch {}
+    return []
+  })
   const [reservas, setReservas] = useState<Reserva[]>([])
   const [loading, setLoading] = useState(true)
   const [soloMisMesas, setSoloMisMesas] = useState(false)
@@ -192,7 +203,9 @@ export default function MesasPage() {
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
       ])
-      setActiveOrders(ordersRes.ok ? await ordersRes.json() : [])
+      const orders = ordersRes.ok ? await ordersRes.json() : []
+      setActiveOrders(orders)
+      try { localStorage.setItem('pos_mesas_orders', JSON.stringify({ orders, ts: Date.now() })) } catch {}
       setReservas(resRes.ok ? await resRes.json() : [])
     } catch { /* */ }
     setLoading(false)
@@ -201,7 +214,19 @@ export default function MesasPage() {
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
+    // Refresh immediately when page becomes visible (returning from order)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData() }
+    document.addEventListener('visibilitychange', onVisible)
+    // Also refresh on popstate (back navigation from order page)
+    const onFocus = () => fetchData()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('pageshow', onFocus)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('pageshow', onFocus)
+    }
   }, [fetchData])
 
   // Cuentas por nombre (sin mesa, estilo Wansoft "#SR RAUL")
