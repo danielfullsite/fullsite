@@ -1942,7 +1942,9 @@ function POSContent() {
               setSentItemSnapshots(snaps)
             }
           } else {
-            // No existing order — check for unsaved draft
+            // DB says no open order for this mesa — clear stale cache
+            try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
+            // Check for unsaved draft
             try {
               const draft = localStorage.getItem(`pos_draft_${mesa}`)
               if (draft) {
