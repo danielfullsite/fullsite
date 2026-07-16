@@ -2565,10 +2565,8 @@ function POSContent() {
 
     if (!turnoId) { showToast('No hay turno activo. Un encargado debe abrir turno.'); return }
 
-    // Multi-user conflict check
-    if (await checkOrderConflict('kitchen')) {
-      return
-    }
+    // Server-side revision check handles conflicts for kitchen sends.
+    // Client-side conflict check removed: caused false positives from stale updatedAt.
 
     // Phantom order prevention: if this is a NEW order (not loaded from DB),
     // re-check Supabase to see if another terminal already created one for this mesa
