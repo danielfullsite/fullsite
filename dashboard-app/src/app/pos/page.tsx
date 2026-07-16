@@ -1507,7 +1507,21 @@ function POSContent() {
   const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categorySearch, setCategorySearch] = useState('')
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([])
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(() => {
+    // Pre-populate from cache to prevent blank flash on mount
+    if (typeof window === 'undefined') return []
+    try {
+      const m = Number(new URLSearchParams(window.location.search).get('mesa'))
+      if (m > 0) {
+        const cached = localStorage.getItem(`pos_order_${m}`)
+        if (cached) {
+          const c = JSON.parse(cached)
+          if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) return c.items
+        }
+      }
+    } catch {}
+    return []
+  })
   const [mesa, setMesa] = useState<number>(initialMesa)
 
   // Sync mesa state when searchParams change (client-side navigation from mesas/plano)
@@ -2004,7 +2018,20 @@ function POSContent() {
   const [voidedItems, setVoidedItems] = useState<Set<string>>(new Set())
 
   // Order ID for audit trail (generated once per order)
-  const [orderId, setOrderId] = useState(() => generateId())
+  const [orderId, setOrderId] = useState(() => {
+    if (typeof window === 'undefined') return generateId()
+    try {
+      const m = Number(new URLSearchParams(window.location.search).get('mesa'))
+      if (m > 0) {
+        const cached = localStorage.getItem(`pos_order_${m}`)
+        if (cached) {
+          const c = JSON.parse(cached)
+          if (c.ts && Date.now() - c.ts < 300000 && c.id) return c.id
+        }
+      }
+    } catch {}
+    return generateId()
+  })
 
   // Auto-save draft items to localStorage on every change (prevents loss on refresh)
   useEffect(() => {
