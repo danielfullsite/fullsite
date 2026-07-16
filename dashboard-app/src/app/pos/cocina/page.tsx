@@ -44,7 +44,11 @@ function orderHasItemsForStation(order: KitchenOrderFromDB, filter: 'todo' | 'pa
     if (filter === 'todo') return true
     if (filter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
     const itemStation = i.station || getStationByName(name)
-    if (filter === 'cocina' && PANADERIA_KW.some(kw => name.includes(kw))) return false
+    if (filter === 'cocina') {
+      // Cocina includes panadería but excludes barra and market/caja
+      const itemStation = i.station || getStationByName(name)
+      return itemStation === 'cocina' || PANADERIA_KW.some(kw => name.includes(kw))
+    }
     return itemStation === filter
   })
 }
@@ -69,7 +73,7 @@ export default function CocinaPage() {
   // Station filter
   const isKdsSurface = typeof window !== 'undefined' && (window as unknown as { fullsiteApp?: { surface?: string } }).fullsiteApp?.surface === 'kds'
 
-  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('todo')
+  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('cocina')
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -621,7 +625,9 @@ export default function CocinaPage() {
                 if (stationFilter === 'todo') return true
                 if (stationFilter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
                 const itemStation = i.station || getStationByName(name)
-                if (stationFilter === 'cocina' && PANADERIA_KW.some(kw => name.includes(kw))) return false
+                if (stationFilter === 'cocina') {
+                  return itemStation === 'cocina' || PANADERIA_KW.some(kw => name.includes(kw))
+                }
                 return itemStation === stationFilter
               })
 
@@ -651,6 +657,7 @@ export default function CocinaPage() {
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${config.badge} ${config.badgeText}`}>
                           {config.label}
                         </span>
+                        {order.order_number != null && <span className="text-xs font-mono text-[var(--text-3)]">#{order.order_number}</span>}
                       </div>
                       <p className="text-[var(--text-3)] text-sm">{order.mesero}</p>
                     </div>
@@ -676,11 +683,11 @@ export default function CocinaPage() {
                           status === 'preparando' ? 'bg-amber-900/30 border border-amber-500/30' : 'hover:bg-white/5'
                         }`}
                       >
-                        <span className={`font-bold text-lg min-w-[32px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <span className={`font-bold text-xl min-w-[36px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {`${item.cantidad || item.quantity || 1}x`}
                         </span>
                         <div className="flex-1">
-                          <p className={`text-lg font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
+                          <p className={`text-xl font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
                             {item.nombre || item.name}
                           </p>
                           {item.modificadores && item.modificadores.length > 0 && (
