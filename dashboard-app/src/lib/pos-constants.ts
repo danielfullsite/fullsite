@@ -117,6 +117,7 @@ const CATEGORY_NAME_TO_STATION: Array<{ keywords: string[]; station: StationName
   { keywords: ['bakery', 'panadería', 'panaderia'], station: 'cocina' },
   { keywords: ['croissant'], station: 'cocina' },
   { keywords: ['toast', 'bagel'], station: 'cocina' },
+  { keywords: ['concha', 'brownie', 'galleta', 'cookie', 'muffin', 'scone', 'pan de', 'crunchy'], station: 'cocina' },
   { keywords: ['market', 'healthy snack', 'vitamina', 'suplemento', 'regalo', 'detalle', 'marca propia'], station: 'caja' },
   { keywords: ['dessert', 'postre'], station: 'caja' },
   { keywords: ['vino'], station: 'barra' },
@@ -163,12 +164,11 @@ export const STATION_LABELS: Record<StationName, string> = {
 
 // Keywords for caja/market items (used when we only have the item name, no category)
 const CAJA_KEYWORDS = [
-  'toast', 'bagel', 'concha', 'bakery', 'crunchy', 'galleta', 'brownie',
-  'cheesecake', 'carrot cake', 'tiramisu', 'tiramisú', 'pastel de choc',
+  // Market/retail only — NOT panadería (panadería goes to cocina)
   'cafe grano', 'cafe molido', 'vaso cafe refill', 'semilla', 'dulce',
-  'croissant', 'muffin', 'scone', 'pan de', 'amalay -', 'ramekin',
+  'amalay -', 'ramekin',
   'taza de ceramica', 'termo', 'vela', 'gift card', 'tarjeta de regalo',
-  'ice cream', 'helado', 'nieve', 'dessert',
+  'ice cream', 'helado', 'nieve',
 ]
 
 /**
