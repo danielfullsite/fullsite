@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
+import { getDeepTable } from '@/lib/data'
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -25,21 +26,14 @@ type SortDir = 'asc' | 'desc'
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
 async function fetchAgentRuns(): Promise<AgentRun[]> {
-  const url = `${SUPABASE_URL}/rest/v1/agent_runs?select=agent_id,status,created_at,duration_ms,tentacle,tokens_used&order=created_at.desc&limit=200`
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
-    cache: 'no-store',
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return Array.isArray(data) ? data : []
+  try {
+    const rows = await getDeepTable('agent_runs', 200)
+    const data = (rows as unknown as AgentRun[])
+    return data.sort((a, b) => b.created_at.localeCompare(a.created_at))
+  } catch {
+    return []
+  }
 }
 
 function timeSince(ts: string): string {

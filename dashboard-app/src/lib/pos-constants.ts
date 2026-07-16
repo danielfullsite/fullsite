@@ -16,7 +16,7 @@ export const POLL_INTERVAL_KDS = 1500     // 1.5 seconds — near-instant for co
 
 // Beverage keywords — used by both Cocina (to exclude) and Barra (to include)
 export const BEBIDA_KEYWORDS = [
-  'cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai',
+  'cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'espresso', 'mocca', 'matcha', 'chai',
   'smoothie', 'frappe', 'jugo', 'limonada', 'fresco',
   'soda', 'coca', 'agua', 'te ', 'té ', 'tisana',
   'mimosa', 'chamoyada', 'cerveza', 'vino',
@@ -171,6 +171,7 @@ const CAJA_KEYWORDS = [
   'amalay -', 'ramekin',
   'taza de ceramica', 'termo', 'vela', 'gift card', 'tarjeta de regalo',
   'ice cream', 'helado', 'nieve',
+  'chips', 'snack',
 ]
 
 /**

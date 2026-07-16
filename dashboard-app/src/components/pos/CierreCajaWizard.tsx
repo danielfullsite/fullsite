@@ -67,6 +67,7 @@ export default function CierreCajaWizard({
   const [notas, setNotas] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [systemData, setSystemData] = useState({
     efectivo: 0,
     tarjeta: 0,
@@ -133,6 +134,7 @@ export default function CierreCajaWizard({
           } catch { /* */ }
 
           setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas, depositos, retiros })
+          setDataLoaded(true)
         }
       } catch { /* */ }
       setLoading(false)
@@ -145,6 +147,10 @@ export default function CierreCajaWizard({
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
+    if (!dataLoaded) {
+      setPinError('No se pudieron cargar los datos del turno')
+      return
+    }
     // Sync barrier: block cierre if there are pending offline writes
     try {
       const { getPendingQueue } = await import('@/lib/pos-offline-db')

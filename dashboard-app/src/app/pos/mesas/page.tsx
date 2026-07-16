@@ -718,7 +718,16 @@ export default function MesasPage() {
             <UserPlus size={14} /> Cuenta
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
+              try {
+                const { getPendingQueue } = await import('@/lib/pos-offline-db')
+                const pending = await getPendingQueue()
+                const unsynced = pending.filter((p: { synced: boolean }) => !p.synced)
+                if (unsynced.length > 0) {
+                  alert(`${unsynced.length} operaciones pendientes de sincronizar`)
+                  return
+                }
+              } catch { /* IndexedDB unavailable — proceed */ }
               try {
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
