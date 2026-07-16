@@ -2103,7 +2103,7 @@ function POSContent() {
           const rows = await res.json()
           const count = rows.length
           if (count > readyOrders && readyOrders > 0) {
-            // Play notification sound
+            // Play notification sound — reuse single AudioContext
             try {
               const ctx = new AudioContext()
               const osc = ctx.createOscillator()
@@ -2118,6 +2118,7 @@ function POSContent() {
                 o2.frequency.value = 659; o2.type = 'sine'; g2.gain.value = 0.2
                 o2.start(); g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
                 o2.stop(ctx.currentTime + 0.3)
+                setTimeout(() => ctx.close().catch(() => {}), 500)
               }, 150)
             } catch { /* */ }
           }
@@ -2136,9 +2137,11 @@ function POSContent() {
   const operationLock = useRef(false)
   const genOpId = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500)
   }
 
   useEffect(() => {
