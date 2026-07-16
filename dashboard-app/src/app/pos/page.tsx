@@ -2574,7 +2574,7 @@ function POSContent() {
               }
               setSentItemSnapshots(snaps)
             }
-            showToast(`Mesa ${mesa} ya tiene una orden abierta. Cargando...`)
+            // Silently load existing order — no toast needed
             setSaving(false); operationLock.current = false
             return
           }
