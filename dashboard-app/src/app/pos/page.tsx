@@ -2629,7 +2629,16 @@ function POSContent() {
     const saveResult = await saveOrder(order, opId)
     if (!saveResult.ok) {
       if (saveResult.conflict) {
-        showToast('Orden modificada por otra terminal — recarga para ver cambios')
+        // Auto-refresh revision and retry silently
+        if (saveResult.current_revision != null) {
+          setOrderRevision(saveResult.current_revision)
+          showToast('Reintentando...')
+          setSaving(false); operationLock.current = false
+          // Re-trigger send with updated revision after brief delay
+          setTimeout(() => { const btn = document.querySelector('[data-action="send-kitchen"]') as HTMLElement; if (btn) btn.click() }, 500)
+          return
+        }
+        showToast('Orden modificada — intenta enviar de nuevo')
       } else if (saveResult.error === 'OFFLINE_QUEUED') {
         showToast('Sin conexión — orden guardada localmente, se enviará al reconectar')
       } else {
