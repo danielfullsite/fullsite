@@ -2,10 +2,22 @@
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    console.warn('[SW] Service workers not supported')
     return null
   }
 
+  // Unregister any existing service worker — SW caching causes stale code issues
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    for (const reg of registrations) {
+      await reg.unregister()
+    }
+    if (registrations.length > 0) console.log('[SW] Unregistered', registrations.length, 'service workers')
+  } catch {}
+
+  return null
+
+  // Registration disabled — SW caching causes stale POS code
+  /* eslint-disable no-unreachable */
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
