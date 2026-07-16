@@ -2633,16 +2633,21 @@ function POSContent() {
     const saveResult = await saveOrder(order, opId)
     if (!saveResult.ok) {
       if (saveResult.conflict) {
-        // Auto-refresh revision and retry silently
+        // Update revision to server's current and let user retry
         if (saveResult.current_revision != null) {
           setOrderRevision(saveResult.current_revision)
-          showToast('Reintentando...')
-          setSaving(false); operationLock.current = false
-          // Re-trigger send with updated revision after brief delay
-          setTimeout(() => { const btn = document.querySelector('[data-action="send-kitchen"]') as HTMLElement; if (btn) btn.click() }, 500)
-          return
+          // Also refresh loadedUpdatedAt to prevent false conflict on next try
+          try {
+            const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at`, {
+              headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+            })
+            if (freshRes.ok) {
+              const rows = await freshRes.json()
+              if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
+            }
+          } catch {}
         }
-        showToast('Orden modificada — intenta enviar de nuevo')
+        showToast('Toca Enviar de nuevo')
       } else if (saveResult.error === 'OFFLINE_QUEUED') {
         showToast('Sin conexión — orden guardada localmente, se enviará al reconectar')
       } else {
