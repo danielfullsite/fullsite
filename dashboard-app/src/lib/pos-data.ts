@@ -1263,6 +1263,7 @@ export interface KitchenOrderFromDB {
   created_at: string
   notas: string | null
   order_revision?: number
+  order_number?: number
 }
 
 export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
