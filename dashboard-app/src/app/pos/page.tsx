@@ -1904,8 +1904,10 @@ function POSContent() {
   const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null)
   const [orderRevision, setOrderRevision] = useState<number>(0)
+  const [loadingMesa, setLoadingMesa] = useState(false)
   useEffect(() => {
     let cancelled = false
+    setLoadingMesa(true)
     const loadMesaOrder = async () => {
       try {
         // Cuenta por nombre: busca por customer_name; mesa: busca por número
@@ -1971,35 +1973,14 @@ function POSContent() {
           }
         }
       } catch { /* */ }
+      if (!cancelled) setLoadingMesa(false)
     }
-    // Load cached order instantly, then refresh from Supabase
+    // Reset state immediately
     setCancelledItems(new Set())
     setVoidedItems(new Set())
     setSentItemIds(new Set())
     setSentItemSnapshots({})
-    try {
-      const cached = localStorage.getItem(`pos_order_${mesa}`)
-      if (cached) {
-        const c = JSON.parse(cached)
-        // Only use cache if less than 5 min old
-        if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) {
-          setOrderItems(c.items)
-          setOrderId(c.id)
-          if (c.mesero) setMesero(c.mesero)
-          if (c.personas) setPersonas(c.personas)
-          if (c.discount) setDiscount(c.discount)
-          if (c.notas) setOrderNotes(c.notas)
-          setLoadedOrderId(c.id)
-          setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
-          const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
-          for (const item of c.items) {
-            snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
-          }
-          setSentItemSnapshots(snaps)
-        }
-      }
-    } catch {}
-    // Load fresh from Supabase immediately
+    // Load from Supabase — no stale cache, DB is truth
     loadMesaOrder()
     return () => { cancelled = true }
   }, [mesa, clienteNombre])
@@ -3635,7 +3616,7 @@ function POSContent() {
             </button>
             <button
               onClick={handleSendToKitchen}
-              disabled={activeItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving || loadingMesa}
               className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               {saving ? <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
@@ -3643,7 +3624,7 @@ function POSContent() {
             </button>
             <button
               onClick={handlePreTicket}
-              disabled={activeItems.length === 0 || saving}
+              disabled={activeItems.length === 0 || saving || loadingMesa}
               className="flex-[0.6] flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 active:scale-[0.97] disabled:bg-[var(--line)] disabled:text-[var(--text-2)] text-white font-bold py-2.5 rounded-xl text-base transition-all min-h-[52px]"
             >
               <Receipt size={16} />
