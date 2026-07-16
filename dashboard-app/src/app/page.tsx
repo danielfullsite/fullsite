@@ -82,14 +82,14 @@ const WIDGET_DEFS = [
   { id: 'kpis', label: 'KPIs principales', defaultOn: true },
   { id: 'prediction', label: 'Predicción de cierre', defaultOn: true },
   { id: 'extra_kpis', label: 'Propinas / Descuentos / Brutas', defaultOn: true },
-  { id: 'agent_status', label: 'Status de agentes', defaultOn: true },
+  { id: 'agent_status', label: 'Status de agentes', defaultOn: false },
   { id: 'week_comparison', label: 'vs Semana pasada', defaultOn: true },
   { id: 'revenue_chart', label: 'Gráfica de ventas (30d)', defaultOn: true },
   { id: 'top_meseros', label: 'Top meseros', defaultOn: true },
-  { id: 'categories', label: 'Distribución por categoría', defaultOn: true },
-  { id: 'hora_pico', label: 'Hora pico y tendencia', defaultOn: true },
+  { id: 'categories', label: 'Distribución por categoría', defaultOn: false },
+  { id: 'hora_pico', label: 'Mejor día y eficiencia', defaultOn: true },
   { id: 'payment_methods', label: 'Métodos de pago', defaultOn: false },
-  { id: 'quick_actions', label: 'Acciones rápidas', defaultOn: true },
+  { id: 'quick_actions', label: 'Acciones rápidas', defaultOn: false },
 ] as const
 
 type WidgetId = typeof WIDGET_DEFS[number]['id']

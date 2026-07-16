@@ -189,7 +189,7 @@ export default function ReportesPage() {
             className="px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-700 hover:bg-blue-100 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Download size={16} />
-            Generar PDF
+            Imprimir
           </button>
           <button
             onClick={exportExcel}
@@ -197,7 +197,7 @@ export default function ReportesPage() {
             className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 hover:bg-emerald-500/15 disabled:bg-[var(--surface-2)] disabled:border-[var(--line)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <Download size={16} />
-            Generar Excel
+            Exportar CSV
           </button>
         </div>
       </div>
