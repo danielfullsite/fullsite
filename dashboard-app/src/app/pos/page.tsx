@@ -1978,34 +1978,11 @@ function POSContent() {
     }
     // Safety: ensure loadingMesa is always cleared after 3 seconds max
     const safetyTimer = setTimeout(() => setLoadingMesa(false), 3000)
-    // Reset state immediately
+    // Don't reset order items — keep showing current state until DB responds
+    // Only reset tracking state
     setCancelledItems(new Set())
     setVoidedItems(new Set())
-    setSentItemIds(new Set())
-    setSentItemSnapshots({})
-    // Show cached order instantly while DB loads (prevents blank flash)
-    try {
-      const cached = localStorage.getItem(`pos_order_${mesa}`)
-      if (cached) {
-        const c = JSON.parse(cached)
-        if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) {
-          setOrderItems(c.items)
-          setOrderId(c.id)
-          if (c.mesero) setMesero(c.mesero)
-          if (c.personas) setPersonas(c.personas)
-          if (c.discount) setDiscount(c.discount)
-          if (c.notas) setOrderNotes(c.notas)
-          setLoadedOrderId(c.id)
-          setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
-          const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
-          for (const item of c.items) {
-            snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
-          }
-          setSentItemSnapshots(snaps)
-        }
-      }
-    } catch {}
-    // DB is truth — will overwrite cache preview if different
+    // DB is the only truth — load from server
     loadMesaOrder()
     return () => { cancelled = true; clearTimeout(safetyTimer) }
   }, [mesa, clienteNombre])
