@@ -45,9 +45,11 @@ function orderHasItemsForStation(order: KitchenOrderFromDB, filter: 'todo' | 'pa
     if (filter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
     const itemStation = i.station || getStationByName(name)
     if (filter === 'cocina') {
-      // Cocina includes panadería but excludes barra and market/caja
+      // Cocina = everything EXCEPT beverages and market
+      if (isBebida(name)) return false
       const itemStation = i.station || getStationByName(name)
-      return itemStation === 'cocina' || PANADERIA_KW.some(kw => name.includes(kw))
+      if (itemStation === 'barra' || itemStation === 'caja') return false
+      return true
     }
     return itemStation === filter
   })
@@ -624,10 +626,13 @@ export default function CocinaPage() {
                 const name = (i.nombre || i.name || '').toLowerCase()
                 if (stationFilter === 'todo') return true
                 if (stationFilter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
-                const itemStation = i.station || getStationByName(name)
                 if (stationFilter === 'cocina') {
-                  return itemStation === 'cocina' || PANADERIA_KW.some(kw => name.includes(kw))
+                  if (isBebida(name)) return false
+                  const itemStation = i.station || getStationByName(name)
+                  if (itemStation === 'barra' || itemStation === 'caja') return false
+                  return true
                 }
+                const itemStation = i.station || getStationByName(name)
                 return itemStation === stationFilter
               })
 
