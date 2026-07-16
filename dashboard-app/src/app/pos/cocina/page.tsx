@@ -69,7 +69,7 @@ export default function CocinaPage() {
   // Station filter
   const isKdsSurface = typeof window !== 'undefined' && (window as unknown as { fullsiteApp?: { surface?: string } }).fullsiteApp?.surface === 'kds'
 
-  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('cocina')
+  const [stationFilter, setStationFilter] = useState<'todo' | 'panaderia' | StationName>('todo')
 
   // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemIndex: number; itemName: string; mesa: number; mesero: string } | null>(null)
@@ -525,13 +525,10 @@ export default function CocinaPage() {
         </div>
       )}
 
-      {/* Station filter tabs */}
-      <div className="flex items-center gap-1 px-6 py-2 bg-[var(--surface-2)]/80 border-b border-slate-700/50 flex-shrink-0">
+      {/* Station filter — hidden, always show all */}
+      <div className="hidden">
         {([
-          { key: 'cocina', label: 'Cocina', color: 'bg-amber-500 text-black' },
-          { key: 'panaderia', label: 'Panadería', color: 'bg-orange-400 text-black' },
-          { key: 'barra', label: 'Barra', color: 'bg-purple-500 text-white' },
-          { key: 'caja', label: 'Market', color: 'bg-cyan-500 text-black' },
+          { key: 'todo', label: 'Todo', color: 'bg-amber-500 text-black' },
         ] as const).map(tab => (
           <button
             key={tab.key}

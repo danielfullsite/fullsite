@@ -2357,6 +2357,18 @@ function POSContent() {
     } else {
       showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
     }
+    // Immediately save to DB so KDS reflects cancellation
+    if (loadedOrderId) {
+      const updatedItems = orderItems.map(i => {
+        if (i.id === cancellingItem.id) return { ...i, cancelled: true }
+        return i
+      })
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
+        method: 'PATCH',
+        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ items: JSON.stringify(updatedItems), updated_at: new Date().toISOString() }),
+      }).catch(() => {})
+    }
   }, [cancellingItem, orderId, mesero, mesa])
 
   // Void entire order
