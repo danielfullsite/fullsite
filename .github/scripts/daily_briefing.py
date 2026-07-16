@@ -217,9 +217,11 @@ if wansoft:
     descuentos = wansoft.get("descuentos") or 0
 
     # Top meseros
-    meseros_raw = wansoft.get("meseros", [])
+    meseros_raw = wansoft.get("meseros") or []
     if isinstance(meseros_raw, str):
         meseros_raw = json.loads(meseros_raw)
+    if not meseros_raw:
+        meseros_raw = []
     top_meseros = sorted(meseros_raw, key=lambda m: m.get("total", 0), reverse=True)[:5]
     meseros_lines = "\n".join(f"  {m.get('nombre','?')}: ${m.get('total',0):,.0f}" for m in top_meseros)
 
