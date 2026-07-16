@@ -1184,13 +1184,12 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     }
 
     return result
-  } catch {
+  } catch (err) {
     // Offline — queue the revision-aware save for later replay
+    console.warn('[saveOrder] Network error — queuing offline:', err)
     if (typeof window !== 'undefined') {
       try {
         const { queueOperation, cacheOrder } = await import('@/lib/pos-offline-db')
-        // Persist expected_revision in the queued payload so replay uses the original revision
-        // Transport: APP_API — must pass through certified revision-aware writer boundary
         await queueOperation('pos_orders', 'POST', payload, '/api/pos/save-order',
           (order.orderRevision ?? 0).toString(), 'APP_API')
         await cacheOrder({
@@ -1207,7 +1206,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
       }
       console.log('[offline] Order saved to queue — will sync when online')
     }
-    return { ok: true, revision: order.orderRevision ?? 0 } // Optimistic for offline UX
+    return { ok: false, error: 'OFFLINE_QUEUED' }
   }
 }
 

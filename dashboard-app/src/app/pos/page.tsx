@@ -2581,6 +2581,8 @@ function POSContent() {
     if (!saveResult.ok) {
       if (saveResult.conflict) {
         showToast('Orden modificada por otra terminal — recarga para ver cambios')
+      } else if (saveResult.error === 'OFFLINE_QUEUED') {
+        showToast('Sin conexión — orden guardada localmente, se enviará al reconectar')
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }
