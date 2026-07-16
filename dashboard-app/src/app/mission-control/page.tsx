@@ -62,7 +62,6 @@ export default function MissionControlPage() {
   const [runs, setRuns] = useState<AgentRun[]>([])
   const [results, setResults] = useState<AgentResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [tick, setTick] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +80,7 @@ export default function MissionControlPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    const i = setInterval(() => { setTick(t => t + 1); load() }, 30000)
+    const i = setInterval(() => { load() }, 30000)
     return () => clearInterval(i)
   }, [load])
 

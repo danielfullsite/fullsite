@@ -2199,6 +2199,7 @@ function POSContent() {
   const operationLock = useRef(false)
   const genOpId = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
+  const lastReprintRef = useRef<number>(0)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = (msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
@@ -3586,6 +3587,9 @@ function POSContent() {
               </button>
               <button
                 onClick={() => {
+                  const now = Date.now()
+                  if (now - lastReprintRef.current < 3000) return
+                  lastReprintRef.current = now
                   const reprintOrder: Order = {
                     id: orderId, items: activeItems, mesa: Number(mesa) || 0, mesero,
                     subtotal: Number(subtotal), descuento: Number(discount), iva: Number(iva), total: Number(total), propina: 0,

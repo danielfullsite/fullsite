@@ -85,7 +85,7 @@ export default function CierreCajaWizard({
   useEffect(() => {
     async function fetchShiftData() {
       try {
-        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&created_at=gte.${encodeURIComponent(turnoOpenedAt)}`
+        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&turno_id=eq.${turnoId}`
         const res = await fetch(queryUrl,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
         )
@@ -140,7 +140,7 @@ export default function CierreCajaWizard({
       setLoading(false)
     }
     fetchShiftData()
-  }, [turnoOpenedAt])
+  }, [turnoId])
 
   const totalContado = Number(cashInput) || 0
   const efectivoEsperado = fondoInicial + systemData.efectivo + systemData.depositos - systemData.retiros

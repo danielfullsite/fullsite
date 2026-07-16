@@ -29,8 +29,7 @@ export default function IngresosPage() {
         d = await getDashboardFromPosOrders(30)
       }
       setData(d)
-      setLoading(false)
-    })
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   // efectivo/tarjeta in wansoft_daily are PERCENTAGES, not MXN

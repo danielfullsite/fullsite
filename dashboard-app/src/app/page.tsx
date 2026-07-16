@@ -1017,10 +1017,10 @@ export default function DashboardPage() {
               <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
                 <Clock size={14} className="text-amber-400" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--text-1)]">Hora pico</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-1)]">Mejor día de la semana</h3>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[var(--text-1)]">
+              <span className="text-3xl font-bold text-[var(--text-1)] capitalize">
                 {(() => {
                   const peak = recentData.slice(-7).reduce((best, d) => {
                     const m = d.meseros as unknown as Array<{ nombre: string; total: number }>
@@ -1030,7 +1030,7 @@ export default function DashboardPage() {
                   return peak.fecha ? new Date(peak.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long' }) : '-'
                 })()}
               </span>
-              <span className="text-sm text-[var(--text-3)]">mejor día (7d)</span>
+              <span className="text-sm text-[var(--text-3)]">últimos 7 días</span>
             </div>
             <div className="mt-3 flex items-center gap-4 text-sm">
               <div>

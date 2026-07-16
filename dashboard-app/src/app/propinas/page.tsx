@@ -34,8 +34,7 @@ export default function PropinasPage() {
       } else if (tips && Array.isArray(tips.data) && tips.data.length > 0) {
         setRealTips(tips.data as typeof realTips)
       }
-      setLoading(false)
-    })
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const totalPropinas = useMemo(() => data.reduce((s, d) => s + (d.propinas_total || 0), 0), [data])

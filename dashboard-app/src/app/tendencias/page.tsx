@@ -841,18 +841,6 @@ export default function TendenciasPage() {
         </div>
       )}
 
-      {/* Horas pico — requires POS hourly data (not available from Wansoft) */}
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
-        <h3 className="text-sm font-semibold text-[var(--text-1)] mb-1">Ventas por hora</h3>
-        <p className="text-xs text-[var(--text-3)] mb-5">Promedio de ventas por franja horaria</p>
-        <div className="h-[120px] flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-sm text-[var(--text-3)]">Datos por hora no disponibles</p>
-            <p className="text-xs text-[var(--text-4)] mt-1">Se activara automaticamente con ordenes del POS Fullsite</p>
-          </div>
-        </div>
-      </div>
-
       {/* Mismo día semana a semana — viernes vs viernes */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] shadow-sm p-6 hover:shadow-md transition-shadow mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

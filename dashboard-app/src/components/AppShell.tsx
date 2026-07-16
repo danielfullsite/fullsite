@@ -14,11 +14,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const [showContent, setShowContent] = useState(false)
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowContent(true), 2000)
-    return () => clearTimeout(timer)
-  }, [])
-
   // Build offline empaquetado (terminales POS): arrancar directo en /pos.
   // El gate de PIN del POS funciona sin internet; el login de Supabase no.
   const isOfflineBuild = process.env.NEXT_PUBLIC_CAPACITOR_OFFLINE === '1'
@@ -84,12 +79,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="grid lg:grid-cols-[240px_1fr] min-h-screen bg-[var(--bg)] overflow-x-hidden">
-      <div className="hidden lg:block">
-        <Sidebar />
-      </div>
-      <div className="lg:hidden">
-        <Sidebar />
-      </div>
+      <Sidebar />
       <main className="min-h-screen overflow-x-hidden overflow-y-auto lg:pt-0 relative min-w-0" style={{ paddingTop: 'max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))' }}>
         {/* Notification bell — top right */}
         <div className="absolute right-4 lg:right-8 z-30 hidden lg:block" style={{ top: '1.25rem' }}>

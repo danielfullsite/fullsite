@@ -26,7 +26,6 @@ export function canAccessPage(role: DashboardRole, path: string): boolean {
 // ni app_metadata.role. La fuente de verdad es la BD.
 export const ROLE_MAP: Record<string, DashboardRole> = {
   'ramonfaur.daniel@gmail.com': 'dueño',
-  'monica@fullsite.mx': 'dueño',
   'demo@fullsite.mx': 'dueño',
 }
 
