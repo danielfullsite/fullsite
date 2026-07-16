@@ -79,14 +79,8 @@ def get_pos_orders_today(today_str):
     """Fetch Fullsite POS orders for the current business day using canonical UTC bounds."""
     tz, boundary = get_business_day_config(CLIENT)
     _, _, utc_start, utc_end = get_business_day_bounds(today_str, tz, boundary)
-    return sb_get("pos_orders", {
-        "select": "id,created_at,closed_at,mesa,total,status",
-        "created_at": f"gte.{utc_start.isoformat()}",
-        "and": f"(created_at.lt.{utc_end.isoformat()})",
-        "status": "eq.cerrada",
-        "order": "created_at.asc",
-        "limit": "500",
-    })
+    qs = f"select=id,created_at,closed_at,mesa,total,status&created_at=gte.{utc_start.isoformat()}&created_at=lt.{utc_end.isoformat()}&status=eq.cerrada&order=created_at.asc&limit=500"
+    return sb_get("pos_orders", qs)
 
 
 # -- Analysis --

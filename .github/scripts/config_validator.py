@@ -91,15 +91,15 @@ def main():
     # 2. Check ingredients at zero stock
     print("\n[2] Checking inventory stock levels...")
     try:
-        ingredients = sb_get("pos_ingredients", {
+        ingredients = sb_get("pos_inventory", {
             "client_id": f"eq.{CLIENT['id']}",
-            "select": "name,stock,unit,min_stock",
+            "select": "ingredient_name,stock,ingredient_unit,reorder_point",
             "stock": "lte.0",
             "limit": "50",
         })
         zero_stock = [i for i in ingredients if (i.get("stock") or 0) <= 0]
         if zero_stock:
-            names = ", ".join(i.get("name", "?")[:20] for i in zero_stock[:5])
+            names = ", ".join(i.get("ingredient_name", "?")[:20] for i in zero_stock[:5])
             issues.append(f"🟡 {len(zero_stock)} ingredientes en stock 0: {names}{'...' if len(zero_stock) > 5 else ''}")
             print(f"  Zero stock: {len(zero_stock)}")
         else:
@@ -110,13 +110,13 @@ def main():
     # 3. Check ingredients below minimum
     print("\n[3] Checking ingredients below minimum...")
     try:
-        low_stock = sb_get("pos_ingredients", {
+        low_stock = sb_get("pos_inventory", {
             "client_id": f"eq.{CLIENT['id']}",
-            "select": "name,stock,min_stock",
+            "select": "ingredient_name,stock,reorder_point",
             "limit": "200",
         })
         below_min = [i for i in low_stock
-                     if (i.get("min_stock") or 0) > 0 and (i.get("stock") or 0) < (i.get("min_stock") or 0)]
+                     if (i.get("reorder_point") or 0) > 0 and (i.get("stock") or 0) < (i.get("reorder_point") or 0)]
         if below_min:
             issues.append(f"🟡 {len(below_min)} ingredientes bajo mínimo")
             print(f"  Below minimum: {len(below_min)}")
