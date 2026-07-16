@@ -60,8 +60,7 @@ export default function CierreCajaWizard({
   onComplete,
 }: CierreCajaWizardProps) {
   const [step, setStep] = useState(1)
-  const [billetes, setBilletes] = useState<Record<number, number>>({})
-  const [monedas, setMonedas] = useState<Record<number, number>>({})
+  const [cashInput, setCashInput] = useState('')
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState('')
   const [managerName, setManagerName] = useState('')
@@ -141,9 +140,7 @@ export default function CierreCajaWizard({
     fetchShiftData()
   }, [turnoOpenedAt])
 
-  const totalBilletes = Object.entries(billetes).reduce((sum, [denom, qty]) => sum + (Number(denom) * qty), 0)
-  const totalMonedas = Object.entries(monedas).reduce((sum, [denom, qty]) => sum + (Number(denom) * qty), 0)
-  const totalContado = totalBilletes + totalMonedas
+  const totalContado = Number(cashInput) || 0
   const efectivoEsperado = fondoInicial + systemData.efectivo + systemData.depositos - systemData.retiros
   const diferencia = totalContado - efectivoEsperado
 
@@ -180,8 +177,8 @@ export default function CierreCajaWizard({
       turno_id: turnoId,
       fecha: new Date().toISOString().split('T')[0],
       fondo_inicial: fondoInicial,
-      billetes: JSON.stringify(billetes),
-      monedas: JSON.stringify(monedas),
+      billetes: JSON.stringify({}),
+      monedas: JSON.stringify({}),
       total_contado: totalContado,
       efectivo_sistema: efectivoEsperado,
       tarjeta_sistema: systemData.tarjeta,
@@ -343,7 +340,7 @@ export default function CierreCajaWizard({
             <DollarSign size={24} className="text-emerald-400" />
             <div>
               <h2 className="text-lg font-bold text-[var(--text-1)]">Cierre de Caja</h2>
-              <p className="text-xs text-[var(--text-3)]">Paso {step} de 4</p>
+              <p className="text-xs text-[var(--text-3)]">Paso {step} de 2</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--line)]">
@@ -355,78 +352,36 @@ export default function CierreCajaWizard({
         <div className="h-1 bg-[var(--line)]">
           <div
             className="h-1 bg-emerald-500 transition-all duration-300"
-            style={{ width: `${(step / 4) * 100}%` }}
+            style={{ width: `${(step / 2) * 100}%` }}
           />
         </div>
 
         <div className="p-5">
-          {/* Step 1: Count bills */}
+          {/* Step 1: How much cash? */}
           {step === 1 && (
             <div>
-              <h3 className="font-bold text-[var(--text-1)] mb-4">Contar billetes</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {BILLETES.map(({ value, label }) => (
-                  <div key={value} className="flex items-center gap-2 bg-[var(--line)] rounded-xl px-4 py-3">
-                    <span className="text-sm font-medium text-[var(--text-2)] w-16">{label}</span>
-                    <span className="text-[var(--text-3)]">×</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      value={billetes[value] || ''}
-                      onChange={(e) => setBilletes(prev => ({ ...prev, [value]: Number(e.target.value) || 0 }))}
-                      placeholder="0"
-                      className="flex-1 bg-transparent text-center text-lg font-bold text-[var(--text-1)] focus:outline-none w-16"
-                    />
-                    {(billetes[value] || 0) > 0 && (
-                      <span className="text-xs text-emerald-400 font-medium">
-                        {formatMXN(value * (billetes[value] || 0))}
-                      </span>
-                    )}
-                  </div>
-                ))}
+              <h3 className="font-bold text-[var(--text-1)] mb-2">¿Cuánto efectivo hay en caja?</h3>
+              <p className="text-sm text-[var(--text-3)] mb-6">Cuenta todo el efectivo (billetes + monedas) y escribe el total.</p>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-[var(--text-3)]">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  autoFocus
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-[var(--line)] border border-[var(--line)] rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-center text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
+                />
               </div>
-              <div className="mt-4 text-right">
-                <span className="text-sm text-[var(--text-3)]">Subtotal billetes: </span>
-                <span className="text-lg font-bold text-[var(--text-1)]">{formatMXN(totalBilletes)}</span>
+              <div className="mt-4 text-center text-sm text-[var(--text-3)]">
+                Efectivo esperado por el sistema: <span className="text-emerald-400 font-bold">{formatMXN(efectivoEsperado)}</span>
               </div>
             </div>
           )}
 
-          {/* Step 2: Count coins */}
+          {/* Step 2: Review + Approve (combined old steps 3+4) */}
           {step === 2 && (
-            <div>
-              <h3 className="font-bold text-[var(--text-1)] mb-4">Contar monedas</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {MONEDAS.map(({ value, label }) => (
-                  <div key={value} className="flex items-center gap-2 bg-[var(--line)] rounded-xl px-4 py-3">
-                    <span className="text-sm font-medium text-[var(--text-2)] w-16">{label}</span>
-                    <span className="text-[var(--text-3)]">×</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      value={monedas[value] || ''}
-                      onChange={(e) => setMonedas(prev => ({ ...prev, [value]: Number(e.target.value) || 0 }))}
-                      placeholder="0"
-                      className="flex-1 bg-transparent text-center text-lg font-bold text-[var(--text-1)] focus:outline-none w-16"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 text-right">
-                <span className="text-sm text-[var(--text-3)]">Subtotal monedas: </span>
-                <span className="text-lg font-bold text-[var(--text-1)]">{formatMXN(totalMonedas)}</span>
-              </div>
-              <div className="mt-2 text-right">
-                <span className="text-sm text-[var(--text-3)]">Total contado: </span>
-                <span className="text-xl font-bold text-emerald-400">{formatMXN(totalContado)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: System summary & discrepancy */}
-          {step === 3 && (
             <div>
               <h3 className="font-bold text-[var(--text-1)] mb-2">Resumen del sistema</h3>
 
@@ -524,43 +479,18 @@ export default function CierreCajaWizard({
             </div>
           )}
 
-          {/* Step 4: Approve & sign */}
-          {step === 4 && (
-            <div>
-              <h3 className="font-bold text-[var(--text-1)] mb-4">Aprobar y firmar</h3>
-
-              <div className="bg-[var(--line)] rounded-xl p-4 mb-6">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-[var(--text-3)]">Total contado</span>
-                    <p className="font-bold text-lg text-[var(--text-1)]">{formatMXN(totalContado)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-3)]">Diferencia</span>
-                    <p className={`font-bold text-lg ${diferencia >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {diferencia >= 0 ? '+' : ''}{formatMXN(diferencia)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-3)]">Total ventas</span>
-                    <p className="font-bold text-lg text-emerald-400">{formatMXN(systemData.totalVentas)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-3)]">Tickets</span>
-                    <p className="font-bold text-lg text-[var(--text-1)]">{systemData.ticketsCount}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="text-sm text-[var(--text-3)] block mb-2">PIN de gerente para aprobar</label>
+          {/* Approve section (part of step 2) */}
+          {step === 2 && (
+            <>
+              <div className="mt-6 mb-4">
+                <label className="text-sm text-[var(--text-3)] block mb-2">Huella o PIN de gerente para aprobar</label>
                 <input
                   type="password"
                   inputMode="numeric"
-                  maxLength={4}
+                  maxLength={8}
                   value={pin}
-                  onChange={(e) => { setPin(e.target.value); setPinError('') }}
-                  placeholder="••••"
+                  onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setPinError('') }}
+                  placeholder="PIN"
                   className="w-full bg-[var(--line)] border border-[var(--line)] rounded-lg px-4 py-3 text-center text-2xl tracking-[0.5em] text-[var(--text-1)] focus:outline-none focus:border-emerald-500"
                 />
                 {pinError && <p className="text-red-400 text-sm mt-1">{pinError}</p>}
@@ -569,8 +499,7 @@ export default function CierreCajaWizard({
               <div className="flex gap-3">
                 <button
                   onClick={handlePrint}
-                  disabled={!pin || pin.length < 4}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--line)] transition-colors disabled:opacity-30"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--line)] transition-colors"
                 >
                   <Printer size={18} />
                   Imprimir
@@ -587,12 +516,12 @@ export default function CierreCajaWizard({
                   )}
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 
         {/* Footer navigation */}
-        {step < 4 && (
+        {step < 2 && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--line)]">
             <button
               onClick={() => setStep(s => s - 1)}

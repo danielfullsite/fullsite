@@ -46,8 +46,30 @@ interface StaffMember {
   role: string
 }
 
+// KDS/display paths that don't require login — no keyboard on these terminals
+const KDS_PATHS = ['/pos/cocina', '/pos/barra', '/pos/panaderia', '/pos/kds']
+
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const router = useRouter()
+
+  // KDS screens bypass auth entirely — no PIN, no turno gate
+  const isKDS = typeof window !== 'undefined' && KDS_PATHS.some(p => window.location.pathname.startsWith(p))
+  if (isKDS) {
+    return (
+      <div className="pos-kiosk" style={{
+        background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
+        colorScheme:'dark',
+        // @ts-expect-error CSS custom properties
+        '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+        '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
+        '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
+        '--text-4':'rgba(255,255,255,0.25)',
+      }}>
+        {children}
+      </div>
+    )
+  }
+
   const [unlocked, setUnlocked] = useState(false)
   const [staff, setStaff] = useState<StaffMember | null>(null)
   const [pin, setPin] = useState('')
