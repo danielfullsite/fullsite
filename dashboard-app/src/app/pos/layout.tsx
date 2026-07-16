@@ -533,17 +533,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           <p className="text-slate-400 text-sm mt-2">
             {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}
           </p>
-          {typeof window !== 'undefined' && (window as unknown as { fullsiteApp?: { quit: () => void } }).fullsiteApp && (
-            <button
-              onClick={() => {
-                const fApp = (window as unknown as { fullsiteApp?: { quit: () => void } }).fullsiteApp
-                if (fApp?.quit) fApp.quit()
-              }}
-              className="mt-4 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-            >
-              Salir de la aplicacion
-            </button>
-          )}
+          <button
+            onClick={() => {
+              const fApp = (window as unknown as { fullsiteApp?: { quit: () => void } }).fullsiteApp
+              if (fApp?.quit) { fApp.quit(); return }
+              try { document.exitFullscreen?.() } catch {}
+              window.close()
+              window.location.href = 'about:blank'
+            }}
+            className="mt-4 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            Salir de la aplicacion
+          </button>
         </div>
 
         {/* Biometric login button */}
