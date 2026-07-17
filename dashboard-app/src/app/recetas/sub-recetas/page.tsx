@@ -73,6 +73,14 @@ export default function SubRecetasPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Edit header
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editYield, setEditYield] = useState('')
+  const [editUnit, setEditUnit] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   // Add ingredient form
   const [addingIngredient, setAddingIngredient] = useState(false)
   const [addIngId, setAddIngId] = useState('')
@@ -181,7 +189,44 @@ export default function SubRecetasPage() {
     loadDetail(selectedId)
   }
 
-  // ─── Delete (soft) sub-recipe ──────────────────────────────────────
+  // ─── Edit sub-recipe header ──────────────────────────────────────
+  const startEditing = () => {
+    if (!detail) return
+    setEditName(detail.name)
+    setEditYield(String(detail.yield_quantity))
+    setEditUnit(detail.yield_unit)
+    setEditNotes(detail.notes || '')
+    setEditing(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedId) return
+    setError('')
+    if (!editName.trim()) { setError('Nombre obligatorio'); return }
+    if (Number(editYield) <= 0) { setError('Rendimiento debe ser mayor a 0'); return }
+    setSaving(true)
+    const res = await fetch(`/api/sub-recipes/${selectedId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-client-id': _cid() },
+      body: JSON.stringify({
+        name: editName.trim(),
+        yield_quantity: Number(editYield),
+        yield_unit: editUnit.toUpperCase(),
+        notes: editNotes || null,
+      }),
+    })
+    if (res.ok) {
+      setEditing(false)
+      loadDetail(selectedId)
+      loadList()
+    } else {
+      const err = await res.json().catch(() => ({ message: 'Error' }))
+      setError(err.message || 'Error al guardar')
+    }
+    setSaving(false)
+  }
+
+  // ─── Delete (soft) sub-recipe with confirmation ────────────────────
   const handleDelete = async () => {
     if (!selectedId) return
     const res = await fetch(`/api/sub-recipes/${selectedId}`, {
@@ -191,10 +236,12 @@ export default function SubRecetasPage() {
     if (res.ok) {
       setSelectedId(null)
       setDetail(null)
+      setConfirmDelete(false)
       loadList()
     } else {
       const err = await res.json().catch(() => ({ message: 'Error' }))
       setError(err.message || 'No se puede eliminar')
+      setConfirmDelete(false)
     }
   }
 
@@ -301,30 +348,80 @@ export default function SubRecetasPage() {
             <div className="space-y-4">
               {/* Header */}
               <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-bold text-[var(--text-1)]">{detail.name}</h2>
-                  <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10">
-                    Desactivar
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-1)]">{detail.yield_quantity} {detail.yield_unit}</p>
-                    <p className="text-[10px] text-[var(--text-4)] uppercase">Rendimiento</p>
+                {editing ? (
+                  <div className="space-y-3">
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-lg font-bold text-[var(--text-1)] focus:outline-none focus:border-emerald-500/50" />
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] text-[var(--text-4)] uppercase block mb-1">Rendimiento</label>
+                        <input type="number" step="0.1" min="0.01" value={editYield} onChange={e => setEditYield(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-sm text-[var(--text-1)]" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-[var(--text-4)] uppercase block mb-1">Unidad</label>
+                        <select value={editUnit} onChange={e => setEditUnit(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-sm text-[var(--text-2)]">
+                          <option value="KG">KG</option><option value="LT">LT</option><option value="PZ">PZ</option>
+                          <option value="ML">ML</option><option value="GR">GR</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-[var(--text-4)] uppercase block mb-1">Notas</label>
+                        <input type="text" value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Opcional"
+                          className="w-full px-2 py-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-sm text-[var(--text-1)]" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs text-[var(--text-3)] hover:bg-[var(--surface-2)] rounded-lg">Cancelar</button>
+                      <button onClick={handleSaveEdit} disabled={saving} className="px-3 py-1.5 text-xs bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40">
+                        {saving ? 'Guardando...' : 'Guardar'}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-emerald-400">{cost ? formatCost(cost.total_cost) : '--'}</p>
-                    <p className="text-[10px] text-[var(--text-4)] uppercase">Costo total</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--text-1)]">
-                      {cost && detail.yield_quantity > 0 ? formatCost(cost.total_cost / detail.yield_quantity) : '--'}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-4)] uppercase">Costo / {detail.yield_unit}</p>
-                  </div>
-                </div>
-                {detail.notes && (
-                  <p className="text-xs text-[var(--text-3)] mt-3 italic">{detail.notes}</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-lg font-bold text-[var(--text-1)] cursor-pointer hover:text-emerald-400" onClick={startEditing} title="Clic para editar">
+                        {detail.name}
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <button onClick={startEditing} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] px-2 py-1 rounded hover:bg-[var(--surface-2)]">
+                          Editar
+                        </button>
+                        {confirmDelete ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-red-400">Confirmar?</span>
+                            <button onClick={handleDelete} className="text-[10px] text-red-400 font-bold px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20">Sí</button>
+                            <button onClick={() => setConfirmDelete(false)} className="text-[10px] text-[var(--text-3)] px-1.5 py-0.5 rounded hover:bg-[var(--surface-2)]">No</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmDelete(true)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10">
+                            Desactivar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-[var(--text-1)]">{detail.yield_quantity} {detail.yield_unit}</p>
+                        <p className="text-[10px] text-[var(--text-4)] uppercase">Rendimiento</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-emerald-400">{cost ? formatCost(cost.total_cost) : '--'}</p>
+                        <p className="text-[10px] text-[var(--text-4)] uppercase">Costo total</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-[var(--text-1)]">
+                          {cost && detail.yield_quantity > 0 ? formatCost(cost.total_cost / detail.yield_quantity) : '--'}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-4)] uppercase">Costo / {detail.yield_unit}</p>
+                      </div>
+                    </div>
+                    {detail.notes && (
+                      <p className="text-xs text-[var(--text-3)] mt-3 italic">{detail.notes}</p>
+                    )}
+                  </>
                 )}
               </div>
 
