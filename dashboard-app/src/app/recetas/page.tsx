@@ -134,9 +134,14 @@ export default function RecetasPage() {
           <h2 className="text-xl font-bold tracking-tight text-[var(--text-1)]">Recetas</h2>
           <p className="text-sm text-[var(--text-3)]">{grouped.length} recetas · {ingredients.length} ingredientes</p>
         </div>
-        <button onClick={fetchData} className="w-10 h-10 rounded-lg border border-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-3)]">
-          <RefreshCw size={14} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/recetas/sub-recetas" className="text-xs text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/10 font-medium">
+            Sub-recetas
+          </Link>
+          <button onClick={fetchData} className="w-10 h-10 rounded-lg border border-[var(--line)] hover:bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-3)]">
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3 mb-4">
