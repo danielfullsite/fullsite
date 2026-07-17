@@ -32,12 +32,20 @@ import {
   Ban,
   FileText,
   Bike,
+  ScanBarcode,
   ArrowDownUp,
   RotateCcw,
+  Undo2,
+  FlaskConical,
+  Factory,
+  Layers,
+  ArrowLeftRight,
   Activity,
   Coins,
+  Wallet,
   Map,
   Calculator,
+  Mic,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -47,12 +55,11 @@ import ThemeToggle from '@/components/ThemeToggle'
 
 const navSections = [
   {
-    label: 'Resumen',
+    label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/ventas', label: 'Ventas', icon: DollarSign },
-      { href: '/cortes', label: 'Cortes de Caja', icon: ClipboardList },
-      { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
+      { href: '/cortes', label: 'Cortes', icon: ClipboardList },
     ],
   },
   {
@@ -60,50 +67,75 @@ const navSections = [
     items: [
       { href: '/meseros', label: 'Meseros', icon: Users },
       { href: '/platillos', label: 'Platillos', icon: UtensilsCrossed },
+      { href: '/tendencias', label: 'Tendencias', icon: TrendingUp },
       { href: '/propinas', label: 'Propinas', icon: HandCoins },
-      { href: '/cancelaciones', label: 'Descuentos', icon: Ban },
-      { href: '/delivery', label: 'Delivery', icon: Bike },
-      { href: '/reportes', label: 'Exportar', icon: FileBarChart },
     ],
   },
   {
     label: 'Finanzas',
     items: [
       { href: '/ingresos', label: 'Ingresos', icon: Banknote },
+      { href: '/costos', label: 'Costos', icon: DollarSign },
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
-      { href: '/gastos', label: 'Gastos', icon: DollarSign },
-      { href: '/caja', label: 'Caja', icon: Banknote },
-      { href: '/control-efectivo', label: 'Control de Efectivo', icon: Coins },
       { href: '/nomina', label: 'Nómina', icon: UserCheck },
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
       { href: '/notas-credito', label: 'Notas de Crédito', icon: FileText },
-      { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
+      { href: '/facturas', label: 'Facturas Proveedores', icon: FileText },
       { href: '/reporte-fiscal', label: 'Reporte Fiscal', icon: FileSpreadsheet },
-      { href: '/contabilidad', label: 'Contabilidad', icon: Calculator },
+      { href: '/conciliacion', label: 'Conciliación', icon: FileSpreadsheet },
+      { href: '/egresos', label: 'Egresos', icon: Wallet },
+      { href: '/control-efectivo', label: 'Control de Efectivo', icon: Coins },
+      { href: '/contabilidad', label: 'Contabilidad CONTPAQi', icon: Calculator },
     ],
   },
   {
-    label: 'Operacion',
+    label: 'Operaciones',
     items: [
-      { href: '/food-cost', label: 'Food Cost', icon: PieChart },
-      { href: '/costos', label: 'Ingredientes', icon: DollarSign },
-      { href: '/recetas', label: 'Recetas', icon: UtensilsCrossed },
-      { href: '/proveedores', label: 'Proveedores', icon: Truck },
-      { href: '/compras', label: 'Compras', icon: ShoppingCart },
-    ],
-  },
-  {
-    label: 'Inventario',
-    items: [
-      { href: '/inventario-real', label: 'Stock', icon: Package },
-      { href: '/inventario-real/entradas', label: 'Entradas', icon: Package },
-      { href: '/inventario-real/merma', label: 'Merma', icon: RotateCcw },
-      { href: '/inventario-real/toma-fisica', label: 'Toma Física', icon: ClipboardList },
-      { href: '/inventario-real/movimientos', label: 'Movimientos', icon: Activity },
-      { href: '/inventario-real/reorden', label: 'Punto Reorden', icon: ArrowDownUp },
-      { href: '/inventario-real/orden-compra', label: 'Orden Compra', icon: ShoppingCart },
+      { href: '/inventario-real', label: 'Inventario', icon: Package },
       { href: '/cierre-inventario', label: 'Cierre Inventario', icon: ClipboardList },
+      { href: '/caja', label: 'Caja', icon: Banknote },
+      { href: '/cancelaciones', label: 'Cancelaciones', icon: Ban },
+      { href: '/delivery', label: 'Delivery', icon: Bike },
       { href: '/auto86', label: 'Auto-86', icon: ShieldOff },
+      { href: '/food-cost', label: 'Food Cost', icon: PieChart },
+      { href: '/compras', label: 'Compras', icon: ShoppingCart },
+      { href: '/proveedores', label: 'Proveedores', icon: Truck },
+      { href: '/reportes', label: 'Reportes', icon: FileBarChart },
+    ],
+  },
+  {
+    label: 'Inv. Entradas',
+    items: [
+      { href: '/inventario-real/entradas', label: 'Entradas', icon: Package },
+      { href: '/inventario-real/entradas-factura', label: 'Con Factura', icon: FileText },
+      { href: '/inventario-real/devoluciones', label: 'Devoluciones', icon: Undo2 },
+      { href: '/inventario-real/barcode', label: 'Código Barras', icon: ScanBarcode },
+    ],
+  },
+  {
+    label: 'Inv. Control',
+    items: [
+      { href: '/inventario-real/reorden', label: 'Punto Reorden', icon: ArrowDownUp },
+      { href: '/inventario-real/conversiones', label: 'Conversiones', icon: ArrowLeftRight },
+      { href: '/inventario-real/presentaciones', label: 'Presentaciones', icon: Layers },
+      { href: '/inventario-real/subproductos', label: 'Subproductos', icon: FlaskConical },
+    ],
+  },
+  {
+    label: 'Inv. Auditoría',
+    items: [
+      { href: '/inventario-real/toma-fisica', label: 'Toma Física', icon: ClipboardList },
+      { href: '/inventario-real/merma', label: 'Merma', icon: RotateCcw },
+      { href: '/inventario-real/movimientos', label: 'Movimientos', icon: Activity },
+      { href: '/inventario-real/costos', label: 'Costos Inv.', icon: Coins },
+    ],
+  },
+  {
+    label: 'Inv. Compras',
+    items: [
+      { href: '/inventario-real/orden-compra', label: 'Orden Compra', icon: ShoppingCart },
+      { href: '/inventario-real/produccion', label: 'Producción', icon: Factory },
+      { href: '/inventario-real/transferencias', label: 'Transferencias', icon: Truck },
     ],
   },
   {
@@ -114,7 +146,7 @@ const navSections = [
     ],
   },
   {
-    label: 'Admin POS',
+    label: 'POS Restaurante',
     items: [
       { href: '/admin/menu', label: 'Platillos', icon: UtensilsCrossed },
       { href: '/admin/grupos', label: 'Grupos', icon: Package },
@@ -125,12 +157,13 @@ const navSections = [
     ],
   },
   {
-    label: 'Asistente',
+    label: 'Herramientas',
     items: [
-      { href: '/chat', label: 'Preguntame', icon: MessageCircle },
-      { href: '/coach', label: 'Coach', icon: Sparkles },
+      { href: '/crm', label: 'CRM', icon: Users },
       { href: '/mission-control', label: 'Agentes IA', icon: Bot },
-      { href: '/crm', label: 'Clientes', icon: Users },
+      { href: '/coach', label: 'Coach', icon: Sparkles },
+      { href: '/chat', label: 'Chat IA', icon: MessageCircle },
+      { href: '/voice', label: 'Voice Agent', icon: Mic },
     ],
   },
 ]
