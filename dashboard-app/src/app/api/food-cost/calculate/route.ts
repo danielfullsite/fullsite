@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const data = await loadCostEngineData(clientId)
+  const data = await loadCostEngineData(clientId, itemId || undefined)
 
   if (subRecipeId) {
     if (!data.subRecipes.has(subRecipeId)) {

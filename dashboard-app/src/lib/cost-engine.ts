@@ -91,22 +91,32 @@ export interface CostEngineData {
 const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-async function sbFetch(table: string, query: string): Promise<unknown[]> {
+async function sbFetch(table: string, query: string, maxRows: number = 1000): Promise<unknown[]> {
   const res = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      Range: `0-${maxRows - 1}`,
+    },
     cache: 'no-store',
   })
   if (!res.ok) return []
   return res.json()
 }
 
-export async function loadCostEngineData(clientId: string): Promise<CostEngineData> {
+export async function loadCostEngineData(clientId: string, itemId?: string): Promise<CostEngineData> {
+  // Ingredients and conversions are small enough to load fully.
+  // Recipes can be large (4000+), so filter by item_id when available.
+  const recipeFilter = itemId
+    ? `client_id=eq.${clientId}&menu_item_id=eq.${encodeURIComponent(itemId)}&select=id,menu_item_id,menu_item_name,ingredient_id,ingredient_type,quantity,unit`
+    : `client_id=eq.${clientId}&select=id,menu_item_id,menu_item_name,ingredient_id,ingredient_type,quantity,unit`
+
   const [rawIngredients, rawSubRecipes, rawSRI, rawRecipes, rawConversions] = await Promise.all([
-    sbFetch('pos_ingredients', `client_id=eq.${clientId}&active=eq.true&select=id,name,unit,cost_per_unit,yield_factor&limit=10000`),
-    sbFetch('pos_sub_recipes', `client_id=eq.${clientId}&active=eq.true&select=id,name,yield_quantity,yield_unit&limit=5000`),
-    sbFetch('pos_sub_recipe_ingredients', `select=id,sub_recipe_id,ingredient_id,ingredient_type,quantity,unit&limit=50000`),
-    sbFetch('pos_recipes_old', `client_id=eq.${clientId}&select=id,menu_item_id,menu_item_name,ingredient_id,ingredient_type,quantity,unit&limit=50000`),
-    sbFetch('pos_unit_conversions', `client_id=eq.${clientId}&select=from_unit,to_unit,factor&limit=1000`),
+    sbFetch('pos_ingredients', `client_id=eq.${clientId}&active=eq.true&select=id,name,unit,cost_per_unit,yield_factor`),
+    sbFetch('pos_sub_recipes', `client_id=eq.${clientId}&active=eq.true&select=id,name,yield_quantity,yield_unit`),
+    sbFetch('pos_sub_recipe_ingredients', `select=id,sub_recipe_id,ingredient_id,ingredient_type,quantity,unit`),
+    sbFetch('pos_recipes_old', recipeFilter),
+    sbFetch('pos_unit_conversions', `client_id=eq.${clientId}&select=from_unit,to_unit,factor`),
   ])
 
   const ingredients = new Map<string, Ingredient>()
