@@ -58,10 +58,23 @@ function timeAgo(ts: string): string {
   return `${Math.floor(hrs / 24)}d`
 }
 
+interface AgentRunFull extends AgentRun {
+  error_message?: string
+  tokens_in?: number
+  tokens_out?: number
+}
+
+interface AgentResultFull extends AgentResult {
+  data?: unknown
+  client_id?: string
+  updated_at?: string
+}
+
 export default function MissionControlPage() {
-  const [runs, setRuns] = useState<AgentRun[]>([])
-  const [results, setResults] = useState<AgentResult[]>([])
+  const [runs, setRuns] = useState<AgentRunFull[]>([])
+  const [results, setResults] = useState<AgentResultFull[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -93,7 +106,7 @@ export default function MissionControlPage() {
   }
 
   // Latest result per agent
-  const latestResults = new Map<string, AgentResult>()
+  const latestResults = new Map<string, AgentResultFull>()
   for (const r of results) {
     if (!latestResults.has(r.agent_id)) latestResults.set(r.agent_id, r)
   }
@@ -180,10 +193,10 @@ export default function MissionControlPage() {
                   const isRecent = run && (Date.now() - new Date(run.created_at).getTime()) < 3600000
 
                   return (
-                    <div key={id} className={`bg-[var(--surface)] rounded-lg border p-3 transition-all ${
+                    <div key={id} onClick={() => setSelectedAgent(id)} className={`bg-[var(--surface)] rounded-lg border p-3 transition-all cursor-pointer hover:shadow-md ${
                       isError ? 'border-red-500/30 bg-red-500/5' :
                       isRecent ? 'border-emerald-500/20' : 'border-[var(--line)]'
-                    }`}>
+                    } ${selectedAgent === id ? 'ring-2 ring-emerald-500/50' : ''}`}>
                       <div className="flex items-center gap-2 mb-1.5">
                         <Icon size={14} className={meta?.color || 'text-[var(--text-3)]'} />
                         <span className="text-xs font-bold text-[var(--text-1)] truncate">{meta?.name || id}</span>
@@ -211,42 +224,162 @@ export default function MissionControlPage() {
           ))}
         </div>
 
-        {/* Live feed */}
+        {/* Right panel: agent detail or live feed */}
         <div>
-          <h3 className="text-xs font-bold text-[var(--text-3)] uppercase tracking-wider mb-2">Feed en vivo</h3>
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden">
-            <div className="divide-y divide-[var(--line-soft)] max-h-[600px] overflow-y-auto">
-              {recentFeed.map((run, i) => {
-                const meta = AGENT_META[run.agent_id]
-                const Icon = meta?.icon || Bot
-                return (
-                  <div key={`${run.agent_id}-${run.created_at}-${i}`} className="px-3 py-2.5 flex items-start gap-2.5">
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      run.status === 'error' ? 'bg-red-500/10' : 'bg-emerald-500/10'
-                    }`}>
-                      {run.status === 'error' ? (
-                        <AlertTriangle size={12} className="text-red-400" />
-                      ) : (
-                        <Icon size={12} className={meta?.color || 'text-emerald-400'} />
+          {selectedAgent ? (() => {
+            const meta = AGENT_META[selectedAgent]
+            const Icon = meta?.icon || Bot
+            const agentRuns = runs.filter(r => r.agent_id === selectedAgent).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            const latestRun = agentRuns[0]
+            const result = latestResults.get(selectedAgent)
+            const resultData = result?.data
+            const successCount = agentRuns.filter(r => r.status === 'success').length
+            const errorCount = agentRuns.filter(r => r.status === 'error').length
+
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-[var(--text-1)] flex items-center gap-2">
+                    <Icon size={16} className={meta?.color || 'text-[var(--text-3)]'} />
+                    {meta?.name || selectedAgent}
+                  </h3>
+                  <button onClick={() => setSelectedAgent(null)} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] px-2 py-1 rounded hover:bg-[var(--surface-2)]">
+                    Cerrar
+                  </button>
+                </div>
+
+                {/* Agent summary */}
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] p-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-[var(--text-1)]">{agentRuns.length}</p>
+                      <p className="text-[10px] text-[var(--text-4)] uppercase">Runs</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-emerald-400">{successCount}</p>
+                      <p className="text-[10px] text-[var(--text-4)] uppercase">OK</p>
+                    </div>
+                    <div>
+                      <p className={`text-lg font-bold ${errorCount > 0 ? 'text-red-400' : 'text-[var(--text-1)]'}`}>{errorCount}</p>
+                      <p className="text-[10px] text-[var(--text-4)] uppercase">Errores</p>
+                    </div>
+                  </div>
+
+                  {latestRun && (
+                    <div className="border-t border-[var(--line-soft)] pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-[var(--text-3)]">Ultimo run</span>
+                        <span className="text-xs text-[var(--text-2)]">{new Date(latestRun.created_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-[var(--text-3)]">Status</span>
+                        <span className={`text-xs font-bold ${latestRun.status === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{latestRun.status === 'success' ? 'OK' : 'Error'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-[var(--text-3)]">Duracion</span>
+                        <span className="text-xs text-[var(--text-2)]">{latestRun.duration_ms ? `${(latestRun.duration_ms / 1000).toFixed(1)}s` : '--'}</span>
+                      </div>
+                      {latestRun.trigger_type && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-[var(--text-3)]">Trigger</span>
+                          <span className="text-xs text-[var(--text-2)]">{latestRun.trigger_type}</span>
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-[var(--text-1)]">{meta?.name || run.agent_id}</span>
-                        <span className="text-[10px] text-[var(--text-4)]">{timeAgo(run.created_at)}</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--text-3)] truncate">
-                        {run.output_summary || (run.status === 'error' ? 'Error en ejecución' : 'Completado')}
-                      </p>
+                  )}
+
+                  {/* Output summary */}
+                  {latestRun?.output_summary && (
+                    <div className="border-t border-[var(--line-soft)] pt-3">
+                      <p className="text-xs font-bold text-[var(--text-2)] mb-1">Resultado</p>
+                      <p className="text-xs text-[var(--text-2)] whitespace-pre-wrap">{latestRun.output_summary}</p>
                     </div>
-                    {run.duration_ms && (
-                      <span className="text-[10px] text-[var(--text-4)] flex-shrink-0">{(run.duration_ms / 1000).toFixed(1)}s</span>
-                    )}
+                  )}
+
+                  {/* Error message */}
+                  {latestRun?.error_message && (
+                    <div className="border-t border-[var(--line-soft)] pt-3">
+                      <p className="text-xs font-bold text-red-400 mb-1">Error</p>
+                      <p className="text-xs text-red-300 whitespace-pre-wrap">{latestRun.error_message}</p>
+                    </div>
+                  )}
+
+                  {/* Agent result data */}
+                  {result && (
+                    <div className="border-t border-[var(--line-soft)] pt-3">
+                      <p className="text-xs font-bold text-[var(--text-2)] mb-1">Analisis ({result.fecha})</p>
+                      {result.summary && <p className="text-xs text-[var(--text-2)] mb-2">{result.summary}</p>}
+                      {resultData != null && (
+                        <div className="bg-[var(--bg)] rounded-lg p-2 max-h-[200px] overflow-y-auto">
+                          <pre className="text-[10px] text-[var(--text-3)] whitespace-pre-wrap">{typeof resultData === 'string' ? resultData : JSON.stringify(resultData, null, 2)}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Run history */}
+                <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden">
+                  <div className="px-3 py-2 border-b border-[var(--line-soft)]">
+                    <p className="text-xs font-bold text-[var(--text-2)]">Historial de ejecuciones</p>
                   </div>
-                )
-              })}
-            </div>
-          </div>
+                  <div className="divide-y divide-[var(--line-soft)] max-h-[300px] overflow-y-auto">
+                    {agentRuns.slice(0, 20).map((run, i) => (
+                      <div key={`${run.created_at}-${i}`} className="px-3 py-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${run.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                          <span className="text-[11px] text-[var(--text-2)]">
+                            {new Date(run.created_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {run.output_summary && <span className="text-[10px] text-[var(--text-3)] truncate max-w-[150px]">{run.output_summary}</span>}
+                          <span className="text-[10px] text-[var(--text-4)]">{run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : ''}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })() : (
+            <>
+              <h3 className="text-xs font-bold text-[var(--text-3)] uppercase tracking-wider mb-2">Feed en vivo</h3>
+              <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden">
+                <div className="divide-y divide-[var(--line-soft)] max-h-[600px] overflow-y-auto">
+                  {recentFeed.map((run, i) => {
+                    const meta = AGENT_META[run.agent_id]
+                    const Icon = meta?.icon || Bot
+                    return (
+                      <div key={`${run.agent_id}-${run.created_at}-${i}`} className="px-3 py-2.5 flex items-start gap-2.5">
+                        <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          run.status === 'error' ? 'bg-red-500/10' : 'bg-emerald-500/10'
+                        }`}>
+                          {run.status === 'error' ? (
+                            <AlertTriangle size={12} className="text-red-400" />
+                          ) : (
+                            <Icon size={12} className={meta?.color || 'text-emerald-400'} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-[var(--text-1)]">{meta?.name || run.agent_id}</span>
+                            <span className="text-[10px] text-[var(--text-4)]">{timeAgo(run.created_at)}</span>
+                          </div>
+                          <p className="text-[11px] text-[var(--text-3)] truncate">
+                            {run.output_summary || (run.status === 'error' ? 'Error en ejecución' : 'Completado')}
+                          </p>
+                        </div>
+                        {run.duration_ms && (
+                          <span className="text-[10px] text-[var(--text-4)] flex-shrink-0">{(run.duration_ms / 1000).toFixed(1)}s</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

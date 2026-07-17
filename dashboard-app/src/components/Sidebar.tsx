@@ -21,6 +21,7 @@ import {
   Monitor,
   Settings,
   PieChart,
+  Bot,
   Stamp,
   ShieldOff,
   Bike,
@@ -88,6 +89,7 @@ const navSections = [
     label: 'Asistente',
     items: [
       { href: '/chat', label: 'Preguntame', icon: MessageCircle },
+      { href: '/mission-control', label: 'Agentes IA', icon: Bot },
       { href: '/crm', label: 'Clientes', icon: Users },
     ],
   },
