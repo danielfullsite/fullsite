@@ -102,11 +102,11 @@ async function sbFetch(table: string, query: string): Promise<unknown[]> {
 
 export async function loadCostEngineData(clientId: string): Promise<CostEngineData> {
   const [rawIngredients, rawSubRecipes, rawSRI, rawRecipes, rawConversions] = await Promise.all([
-    sbFetch('pos_ingredients', `client_id=eq.${clientId}&active=eq.true&select=id,name,unit,cost_per_unit,yield_factor`),
-    sbFetch('pos_sub_recipes', `client_id=eq.${clientId}&active=eq.true&select=id,name,yield_quantity,yield_unit`),
-    sbFetch('pos_sub_recipe_ingredients', `select=id,sub_recipe_id,ingredient_id,ingredient_type,quantity,unit`),
-    sbFetch('pos_recipes_old', `client_id=eq.${clientId}&select=id,menu_item_id,menu_item_name,ingredient_id,ingredient_type,quantity,unit`),
-    sbFetch('pos_unit_conversions', `client_id=eq.${clientId}&select=from_unit,to_unit,factor`),
+    sbFetch('pos_ingredients', `client_id=eq.${clientId}&active=eq.true&select=id,name,unit,cost_per_unit,yield_factor&limit=10000`),
+    sbFetch('pos_sub_recipes', `client_id=eq.${clientId}&active=eq.true&select=id,name,yield_quantity,yield_unit&limit=5000`),
+    sbFetch('pos_sub_recipe_ingredients', `select=id,sub_recipe_id,ingredient_id,ingredient_type,quantity,unit&limit=50000`),
+    sbFetch('pos_recipes_old', `client_id=eq.${clientId}&select=id,menu_item_id,menu_item_name,ingredient_id,ingredient_type,quantity,unit&limit=50000`),
+    sbFetch('pos_unit_conversions', `client_id=eq.${clientId}&select=from_unit,to_unit,factor&limit=1000`),
   ])
 
   const ingredients = new Map<string, Ingredient>()
