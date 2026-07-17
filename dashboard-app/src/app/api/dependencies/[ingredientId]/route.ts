@@ -57,11 +57,11 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
   }
   const ingredientName = String(ingRows[0].name)
 
-  // 2. Preload all sub-recipe data for this client (small tables)
-  const [allSRI, allSubRecipes, allRecipeLines] = await Promise.all([
+  // 2. Preload sub-recipe data for this client (small tables)
+  // Recipe lines loaded AFTER we know which IDs to search for (avoids 1000-row limit)
+  const [allSRI, allSubRecipes] = await Promise.all([
     sbGet('pos_sub_recipe_ingredients', `select=sub_recipe_id,ingredient_id,ingredient_type`),
     sbGet('pos_sub_recipes', `client_id=eq.${clientId}&select=id,name`),
-    sbGet('pos_recipes_old', `client_id=eq.${clientId}&select=menu_item_id,menu_item_name,ingredient_id,ingredient_type`),
   ])
 
   // Build lookup maps
@@ -117,7 +117,20 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
     }
   }
 
-  // 4. Find all dishes that use this ingredient (directly or via sub-recipes)
+  // 4. Load recipe lines that reference this ingredient OR any affected sub-recipe
+  // This avoids the Supabase 1000-row limit by filtering to only relevant IDs
+  const searchIds = [ingredientId, ...Array.from(visited)] // ingredient + all affected sub-recipes
+  const allRecipeLines: Record<string, unknown>[] = []
+  // Supabase `in` filter: batch in groups to avoid URL length issues
+  for (let i = 0; i < searchIds.length; i += 50) {
+    const batch = searchIds.slice(i, i + 50)
+    const inFilter = `(${batch.map(id => `"${id}"`).join(',')})`
+    const rows = await sbGet('pos_recipes_old',
+      `client_id=eq.${clientId}&ingredient_id=in.${inFilter}&select=menu_item_id,menu_item_name,ingredient_id,ingredient_type`)
+    allRecipeLines.push(...rows)
+  }
+
+  // 5. Find all dishes that use this ingredient (directly or via sub-recipes)
   const dishMap = new Map<string, DishDep>()
 
   for (const line of allRecipeLines) {
