@@ -386,12 +386,15 @@ COMMIT;
 
 ---
 
-## 6. SQL de rollback (reversible)
+## 6. SQL de rollback (parcialmente reversible)
+
+**Excepción honesta:** El UPDATE de `yield_factor` NULL→1 NO se revierte. Los NULLs originales se pierden porque no se preservan en ningún lado. Esto es aceptable: NULL en yield_factor era un dato faltante (no un dato significativo). El código existente ya hacía `Number(yield_factor) || 1` como fallback, así que el comportamiento efectivo no cambia.
 
 ```sql
 -- =============================================================================
 -- ROLLBACK: Revertir migración sub-recetas + rendimiento
 -- Ejecutar SOLO si la migración causa problemas
+-- NOTA: yield_factor NULL→1 NO se revierte (ver documentación arriba)
 -- =============================================================================
 
 BEGIN;
@@ -404,7 +407,8 @@ DROP TABLE IF EXISTS pos_sub_recipe_ingredients CASCADE;
 DROP TABLE IF EXISTS pos_sub_recipes CASCADE;
 
 -- Revertir columnas nuevas de pos_ingredients
--- (NO revertir yield_factor ya que existía antes de la migración)
+-- (NO revertir yield_factor — existía antes de la migración)
+-- (NO revertir NULL→1 — NULLs eran datos faltantes, no significativos)
 ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS product_type;
 ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS department;
 ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS is_critical;
@@ -412,9 +416,8 @@ ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS sale_price;
 ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS sat_product_key;
 ALTER TABLE pos_ingredients DROP COLUMN IF EXISTS sat_unit_key;
 
--- Revertir constraint de yield_factor
-ALTER TABLE pos_ingredients DROP CONSTRAINT IF EXISTS chk_yield_factor_range;
--- NO revertir el DEFAULT ni el UPDATE de NULLs — son mejoras sin riesgo
+-- Revertir constraint de yield_factor (mantener DEFAULT 1 — es mejora sin riesgo)
+ALTER TABLE pos_ingredients DROP CONSTRAINT IF EXISTS chk_yield_factor_positive;
 
 -- Revertir columna nueva de pos_recipes_old
 ALTER TABLE pos_recipes_old DROP COLUMN IF EXISTS ingredient_type;
@@ -604,3 +607,15 @@ Esta migración SOLO crea la base de datos. Los siguientes archivos se modificar
 - `dashboard-app/src/app/api/pos/save-order/route.ts` — deducción expandida
 
 **Ninguno de estos cambios sucede en el Paso 1.** Este paso solo crea la base segura.
+
+---
+
+## 11. Pendientes registrados para Paso 2 (sin resolver todavía)
+
+1. **Filtro explícito por client_id en todas las APIs y CTE** — cada query en las nuevas APIs debe incluir `WHERE client_id = $client_id`. El recursive CTE de dependencias debe filtrar por client_id en cada nivel para impedir referencias cruzadas entre tenants.
+
+2. **Validación server-side de referencias polimórficas** — cuando `ingredient_type = 'sub_recipe'`, la API debe verificar que `ingredient_id` realmente existe en `pos_sub_recipes` (y con el mismo `client_id`). Cuando `ingredient_type = 'ingredient'`, verificar que existe en `pos_ingredients`. No depender de FK física.
+
+3. **Protección de concurrencia para anti-ciclos** — el recursive CTE de detección de ciclos debe ejecutarse dentro de una transacción con `pg_advisory_xact_lock` sobre el client_id (hash). Esto previene que dos escrituras concurrentes creen un ciclo que ninguna detectó individualmente.
+
+4. **Auditoría de referencias huérfanas** — crear un job periódico (o query bajo demanda) que detecte: (a) `pos_sub_recipe_ingredients` con `ingredient_id` que no existe en su tabla correspondiente, (b) `pos_recipes_old` con `ingredient_type = 'sub_recipe'` y `ingredient_id` que no existe en `pos_sub_recipes`.
