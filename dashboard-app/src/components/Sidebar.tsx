@@ -72,6 +72,7 @@ const navSections = [
       { href: '/ingresos', label: 'Ingresos', icon: Banknote },
       { href: '/estado-resultados', label: 'Estado de Resultados', icon: FileSpreadsheet },
       { href: '/gastos', label: 'Gastos', icon: DollarSign },
+      { href: '/caja', label: 'Caja', icon: Banknote },
       { href: '/control-efectivo', label: 'Control de Efectivo', icon: Coins },
       { href: '/nomina', label: 'Nómina', icon: UserCheck },
       { href: '/pos/facturacion', label: 'Facturación CFDI', icon: Stamp },
@@ -127,6 +128,7 @@ const navSections = [
     label: 'Asistente',
     items: [
       { href: '/chat', label: 'Preguntame', icon: MessageCircle },
+      { href: '/coach', label: 'Coach', icon: Sparkles },
       { href: '/mission-control', label: 'Agentes IA', icon: Bot },
       { href: '/crm', label: 'Clientes', icon: Users },
     ],

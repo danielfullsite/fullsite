@@ -14,21 +14,32 @@ export default function CajaPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getRecentDays(30).then(d => { setData(d); setLoading(false) })
+    getRecentDays(30).then(d => { setData(d) }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
-  const totalEfectivo = data.reduce((s, d) => s + (d.efectivo || 0), 0)
-  const totalTarjeta = data.reduce((s, d) => s + (d.tarjeta || 0), 0)
+  // efectivo/tarjeta in wansoft_daily can be percentages (<100) or MXN amounts
+  const totalEfectivo = data.reduce((s, d) => {
+    const val = d.efectivo || 0
+    return s + (val < 100 ? (val / 100) * (d.ventas_dia || 0) : val)
+  }, 0)
+  const totalTarjeta = data.reduce((s, d) => {
+    const val = d.tarjeta || 0
+    return s + (val < 100 ? (val / 100) * (d.ventas_dia || 0) : val)
+  }, 0)
   const totalVentas = data.reduce((s, d) => s + (d.ventas_dia || 0), 0)
   const totalOtros = Math.max(0, totalVentas - totalEfectivo - totalTarjeta)
   const pctEfectivo = totalVentas > 0 ? (totalEfectivo / totalVentas * 100) : 0
   const pctTarjeta = totalVentas > 0 ? (totalTarjeta / totalVentas * 100) : 0
 
-  const chartData = data.map(d => ({
-    fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
-    efectivo: d.efectivo || 0,
-    tarjeta: d.tarjeta || 0,
-  }))
+  const chartData = data.map(d => {
+    const ef = d.efectivo || 0
+    const ta = d.tarjeta || 0
+    return {
+      fecha: new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }),
+      efectivo: Math.round(ef < 100 ? (ef / 100) * (d.ventas_dia || 0) : ef),
+      tarjeta: Math.round(ta < 100 ? (ta / 100) * (d.ventas_dia || 0) : ta),
+    }
+  })
 
   return (
     <>
