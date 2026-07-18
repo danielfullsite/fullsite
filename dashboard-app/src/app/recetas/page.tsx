@@ -26,20 +26,22 @@ export default function RecetasPage() {
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [newIngId, setNewIngId] = useState('')
   const [newIngQty, setNewIngQty] = useState('')
+  const [newIngUnit, setNewIngUnit] = useState('KG')
   const [newIngType, setNewIngType] = useState<'ingredient' | 'sub_recipe'>('ingredient')
+  const [newIngSearch, setNewIngSearch] = useState('')
   const [newRecipeName, setNewRecipeName] = useState('')
   const [showNewRecipe, setShowNewRecipe] = useState(false)
   const [saving, setSaving] = useState(false)
   const [subRecipes, setSubRecipes] = useState<{ id: string; name: string; yield_quantity: number; yield_unit: string }[]>([])
 
-  async function addIngredientToRecipe(menuItemId: string, menuItemName: string, ingredientId: string, quantity: number, ingredientType: string) {
+  async function addIngredientToRecipe(menuItemId: string, menuItemName: string, ingredientId: string, quantity: number, ingredientType: string, unit: string) {
     setSaving(true)
     await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old`, {
       method: 'POST', headers: { ...hdrs(), Prefer: 'return=minimal' },
-      body: JSON.stringify({ client_id: _cid(), menu_item_id: menuItemId, menu_item_name: menuItemName, ingredient_id: ingredientId, ingredient_type: ingredientType, quantity, unit: 'kg' }),
+      body: JSON.stringify({ client_id: _cid(), menu_item_id: menuItemId, menu_item_name: menuItemName, ingredient_id: ingredientId, ingredient_type: ingredientType, quantity, unit: unit.toLowerCase() }),
     })
     setSaving(false)
-    setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngType('ingredient')
+    setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngUnit('KG'); setNewIngType('ingredient'); setNewIngSearch('')
     fetchData()
   }
 
@@ -273,41 +275,53 @@ export default function RecetasPage() {
                             </tr>
                             {addingTo === recipe.menu_item_id ? (
                               <tr>
-                                <td className="px-4 py-2" colSpan={3}>
-                                  <div className="flex gap-2">
-                                    <select value={newIngType} onChange={e => { setNewIngType(e.target.value as 'ingredient' | 'sub_recipe'); setNewIngId('') }}
-                                      className="bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-xs text-[var(--text-2)]">
-                                      <option value="ingredient">Materia prima</option>
-                                      <option value="sub_recipe">Sub-receta</option>
-                                    </select>
-                                    <select value={newIngId} onChange={e => setNewIngId(e.target.value)}
-                                      className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)]">
-                                      <option value="">Seleccionar...</option>
-                                      {newIngType === 'ingredient'
-                                        ? ingredients.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
-                                            <option key={i.id} value={i.id}>{i.name}</option>
+                                <td className="px-4 py-2" colSpan={6}>
+                                  <div className="space-y-2">
+                                    <div className="flex gap-2 items-center">
+                                      <select value={newIngType} onChange={e => { setNewIngType(e.target.value as 'ingredient' | 'sub_recipe'); setNewIngId(''); setNewIngSearch('') }}
+                                        className="bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-xs text-[var(--text-2)]">
+                                        <option value="ingredient">Materia prima</option>
+                                        <option value="sub_recipe">Sub-receta</option>
+                                      </select>
+                                      <input type="text" placeholder="Buscar ingrediente..." value={newIngSearch} onChange={e => setNewIngSearch(e.target.value)}
+                                        className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)] placeholder-[var(--text-4)]" autoFocus />
+                                      <input type="number" step="0.001" min="0" placeholder="Cantidad" value={newIngQty} onChange={e => setNewIngQty(e.target.value)}
+                                        className="w-20 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)] text-right" />
+                                      <select value={newIngUnit} onChange={e => setNewIngUnit(e.target.value)}
+                                        className="w-16 bg-[var(--surface-2)] border border-[var(--line)] rounded px-1 py-1.5 text-xs text-[var(--text-2)]">
+                                        <option value="KG">KG</option><option value="GR">GR</option><option value="LT">LT</option>
+                                        <option value="ML">ML</option><option value="PZ">PZ</option><option value="OZ">OZ</option>
+                                      </select>
+                                      <button onClick={() => { if (newIngId && newIngQty) addIngredientToRecipe(recipe.menu_item_id, recipe.menu_item_name, newIngId, parseFloat(newIngQty), newIngType, newIngUnit) }}
+                                        disabled={!newIngId || !newIngQty || saving}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded text-xs text-[var(--text-1)] font-medium">
+                                        <Save size={12} className="inline mr-1" />Guardar
+                                      </button>
+                                      <button onClick={() => { setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngUnit('KG'); setNewIngType('ingredient'); setNewIngSearch('') }}
+                                        className="px-2 py-1.5 rounded text-xs text-[var(--text-3)] hover:bg-[var(--surface-2)]">
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                    {newIngSearch.length >= 2 && (
+                                      <div className="max-h-40 overflow-y-auto bg-[var(--surface-2)] border border-[var(--line)] rounded text-sm">
+                                        {(() => {
+                                          const q = newIngSearch.toLowerCase()
+                                          const items = newIngType === 'ingredient'
+                                            ? ingredients.filter(i => i.name.toLowerCase().includes(q)).slice(0, 20).map(i => ({ id: i.id, label: i.name, detail: i.unit }))
+                                            : subRecipes.filter(s => s.name.toLowerCase().includes(q)).slice(0, 20).map(s => ({ id: s.id, label: s.name, detail: `${s.yield_quantity} ${s.yield_unit}` }))
+                                          if (items.length === 0) return <div className="px-3 py-2 text-[var(--text-4)]">Sin resultados</div>
+                                          return items.map(item => (
+                                            <button key={item.id} onClick={() => { setNewIngId(item.id); setNewIngSearch(item.label); if (newIngType === 'ingredient') { const ing = ingredients.find(i => i.id === item.id); if (ing) setNewIngUnit(ing.unit.toUpperCase()) } }}
+                                              className={`w-full text-left px-3 py-1.5 hover:bg-emerald-500/10 flex justify-between ${newIngId === item.id ? 'bg-emerald-500/10 text-emerald-400' : 'text-[var(--text-1)]'}`}>
+                                              <span className="truncate">{item.label}</span>
+                                              <span className="text-[10px] text-[var(--text-4)] ml-2 flex-shrink-0">{item.detail}</span>
+                                            </button>
                                           ))
-                                        : subRecipes.sort((a, b) => a.name.localeCompare(b.name)).map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} ({s.yield_quantity} {s.yield_unit})</option>
-                                          ))
-                                      }
-                                    </select>
-                                    <input type="number" step="0.01" placeholder="Cant" value={newIngQty} onChange={e => setNewIngQty(e.target.value)}
-                                      className="w-20 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)] text-right" />
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
-                                <td className="px-4 py-2 text-right" colSpan={2}>
-                                  <button onClick={() => { if (newIngId && newIngQty) addIngredientToRecipe(recipe.menu_item_id, recipe.menu_item_name, newIngId, parseFloat(newIngQty), newIngType) }}
-                                    disabled={!newIngId || !newIngQty || saving}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded text-xs text-[var(--text-1)] font-medium mr-2">
-                                    <Save size={12} className="inline mr-1" />Guardar
-                                  </button>
-                                  <button onClick={() => { setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngType('ingredient') }}
-                                    className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-2)] rounded text-xs text-[var(--text-1)]">
-                                    Cancelar
-                                  </button>
-                                </td>
-                                <td></td>
                               </tr>
                             ) : (
                               <tr>
