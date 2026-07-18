@@ -1587,12 +1587,24 @@ export async function getIngredients(): Promise<Ingredient[]> {
 // ─── Recipes CRUD ───────────────────────────────────────────────────────────
 
 export async function getRecipes(): Promise<RecipeRow[]> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&order=menu_item_name.asc&limit=5000`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-  )
-  if (!res.ok) return []
-  return res.json()
+  // Supabase has a 1000-row default limit. Use Range header to get all rows.
+  // pos_recipes_old has 4000+ rows for AMALAY.
+  const all: RecipeRow[] = []
+  let offset = 0
+  const pageSize = 1000
+  while (true) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_recipes_old?client_id=eq.${_getClientId()}&order=menu_item_name.asc&select=*`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${offset}-${offset + pageSize - 1}` }, cache: 'no-store' }
+    )
+    if (!res.ok) break
+    const rows = await res.json()
+    if (!Array.isArray(rows) || rows.length === 0) break
+    all.push(...rows)
+    if (rows.length < pageSize) break
+    offset += pageSize
+  }
+  return all
 }
 
 export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]> {
