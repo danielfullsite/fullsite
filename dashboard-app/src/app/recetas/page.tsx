@@ -26,18 +26,20 @@ export default function RecetasPage() {
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [newIngId, setNewIngId] = useState('')
   const [newIngQty, setNewIngQty] = useState('')
+  const [newIngType, setNewIngType] = useState<'ingredient' | 'sub_recipe'>('ingredient')
   const [newRecipeName, setNewRecipeName] = useState('')
   const [showNewRecipe, setShowNewRecipe] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [subRecipes, setSubRecipes] = useState<{ id: string; name: string; yield_quantity: number; yield_unit: string }[]>([])
 
-  async function addIngredientToRecipe(menuItemId: string, menuItemName: string, ingredientId: string, quantity: number) {
+  async function addIngredientToRecipe(menuItemId: string, menuItemName: string, ingredientId: string, quantity: number, ingredientType: string) {
     setSaving(true)
     await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old`, {
       method: 'POST', headers: { ...hdrs(), Prefer: 'return=minimal' },
-      body: JSON.stringify({ client_id: _cid(), menu_item_id: menuItemId, menu_item_name: menuItemName, ingredient_id: ingredientId, quantity, unit: 'kg' }),
+      body: JSON.stringify({ client_id: _cid(), menu_item_id: menuItemId, menu_item_name: menuItemName, ingredient_id: ingredientId, ingredient_type: ingredientType, quantity, unit: 'kg' }),
     })
     setSaving(false)
-    setAddingTo(null); setNewIngId(''); setNewIngQty('')
+    setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngType('ingredient')
     fetchData()
   }
 
@@ -74,12 +76,19 @@ export default function RecetasPage() {
     const [r, i] = await Promise.all([getRecipes(), getIngredients()])
     setRecipes(r)
     setIngredients(i)
+    // Load sub-recipes for the dropdown
+    try {
+      const srRes = await fetch(`/api/sub-recipes`, { headers: { 'x-client-id': _cid() } })
+      if (srRes.ok) setSubRecipes(await srRes.json())
+    } catch { /* */ }
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
 
   const ingMap = useMemo(() => new Map(ingredients.map(i => [i.id, i])), [ingredients])
+
+  const subMap = useMemo(() => new Map(subRecipes.map(s => [s.id, s])), [subRecipes])
 
   const grouped: GroupedRecipe[] = useMemo(() => {
     const map = new Map<string, GroupedRecipe>()
@@ -93,18 +102,24 @@ export default function RecetasPage() {
         })
       }
       const group = map.get(row.menu_item_id)!
+      const isSubRecipe = (row as { ingredient_type?: string }).ingredient_type === 'sub_recipe'
       const ing = ingMap.get(row.ingredient_id)
-      const cost = (ing?.cost_per_unit ?? 0) * row.quantity
+      const sub = subMap.get(row.ingredient_id)
+      const name = isSubRecipe && sub ? sub.name : (ing?.name ?? row.ingredient_id)
+      const unit = isSubRecipe && sub ? sub.yield_unit : (ing?.unit ?? row.unit ?? '')
+      const costPerUnit = ing?.cost_per_unit ?? 0
+      const yieldFactor = (ing as Ingredient & { yield_factor?: number })?.yield_factor ?? 1
+      const cost = isSubRecipe ? 0 : (costPerUnit / (yieldFactor || 1)) * row.quantity // sub-recipe costs need API call
       group.ingredients.push({
         ...row,
-        ingredient_name: ing?.name ?? row.ingredient_id,
-        ingredient_unit: ing?.unit ?? row.unit ?? '',
+        ingredient_name: isSubRecipe ? `${name} (sub-receta)` : name,
+        ingredient_unit: unit,
         cost,
       })
       group.total_cost += cost
     }
     return Array.from(map.values()).sort((a, b) => a.menu_item_name.localeCompare(b.menu_item_name))
-  }, [recipes, ingMap])
+  }, [recipes, ingMap, subMap])
 
   const filtered = grouped.filter(g =>
     g.menu_item_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -258,26 +273,36 @@ export default function RecetasPage() {
                             </tr>
                             {addingTo === recipe.menu_item_id ? (
                               <tr>
-                                <td className="px-4 py-2" colSpan={2}>
-                                  <select value={newIngId} onChange={e => setNewIngId(e.target.value)}
-                                    className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)]">
-                                    <option value="">Seleccionar ingrediente...</option>
-                                    {ingredients.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
-                                      <option key={i.id} value={i.id}>{i.name}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-4 py-2">
-                                  <input type="number" step="0.01" placeholder="Cant" value={newIngQty} onChange={e => setNewIngQty(e.target.value)}
-                                    className="w-20 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)] text-right" />
+                                <td className="px-4 py-2" colSpan={3}>
+                                  <div className="flex gap-2">
+                                    <select value={newIngType} onChange={e => { setNewIngType(e.target.value as 'ingredient' | 'sub_recipe'); setNewIngId('') }}
+                                      className="bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-xs text-[var(--text-2)]">
+                                      <option value="ingredient">Materia prima</option>
+                                      <option value="sub_recipe">Sub-receta</option>
+                                    </select>
+                                    <select value={newIngId} onChange={e => setNewIngId(e.target.value)}
+                                      className="flex-1 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)]">
+                                      <option value="">Seleccionar...</option>
+                                      {newIngType === 'ingredient'
+                                        ? ingredients.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
+                                            <option key={i.id} value={i.id}>{i.name}</option>
+                                          ))
+                                        : subRecipes.sort((a, b) => a.name.localeCompare(b.name)).map(s => (
+                                            <option key={s.id} value={s.id}>{s.name} ({s.yield_quantity} {s.yield_unit})</option>
+                                          ))
+                                      }
+                                    </select>
+                                    <input type="number" step="0.01" placeholder="Cant" value={newIngQty} onChange={e => setNewIngQty(e.target.value)}
+                                      className="w-20 bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1.5 text-sm text-[var(--text-1)] text-right" />
+                                  </div>
                                 </td>
                                 <td className="px-4 py-2 text-right" colSpan={2}>
-                                  <button onClick={() => { if (newIngId && newIngQty) addIngredientToRecipe(recipe.menu_item_id, recipe.menu_item_name, newIngId, parseFloat(newIngQty)) }}
+                                  <button onClick={() => { if (newIngId && newIngQty) addIngredientToRecipe(recipe.menu_item_id, recipe.menu_item_name, newIngId, parseFloat(newIngQty), newIngType) }}
                                     disabled={!newIngId || !newIngQty || saving}
                                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded text-xs text-[var(--text-1)] font-medium mr-2">
                                     <Save size={12} className="inline mr-1" />Guardar
                                   </button>
-                                  <button onClick={() => { setAddingTo(null); setNewIngId(''); setNewIngQty('') }}
+                                  <button onClick={() => { setAddingTo(null); setNewIngId(''); setNewIngQty(''); setNewIngType('ingredient') }}
                                     className="px-3 py-1.5 bg-[var(--surface-2)] hover:bg-[var(--surface-2)] rounded text-xs text-[var(--text-1)]">
                                     Cancelar
                                   </button>

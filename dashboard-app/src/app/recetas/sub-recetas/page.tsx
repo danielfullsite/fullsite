@@ -189,6 +189,43 @@ export default function SubRecetasPage() {
     loadDetail(selectedId)
   }
 
+  // ─── Duplicate sub-recipe ────────────────────────────────────────
+  const handleDuplicate = async () => {
+    if (!selectedId || !detail) return
+    setError('')
+    setSaving(true)
+    // 1. Create copy with new name
+    const newName = `${detail.name} (copia)`
+    const res = await fetch('/api/sub-recipes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-client-id': _cid() },
+      body: JSON.stringify({ name: newName, yield_quantity: detail.yield_quantity, yield_unit: detail.yield_unit, notes: detail.notes }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Error' }))
+      setError(err.message || 'Error al duplicar')
+      setSaving(false)
+      return
+    }
+    const created = await res.json()
+    // 2. Copy all ingredients
+    for (const ing of detail.ingredients) {
+      await fetch(`/api/sub-recipes/${created.id}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-id': _cid() },
+        body: JSON.stringify({
+          ingredient_id: ing.ingredient_id,
+          ingredient_type: ing.ingredient_type,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        }),
+      })
+    }
+    setSaving(false)
+    await loadList()
+    setSelectedId(created.id)
+  }
+
   // ─── Edit sub-recipe header ──────────────────────────────────────
   const startEditing = () => {
     if (!detail) return
@@ -388,6 +425,9 @@ export default function SubRecetasPage() {
                       <div className="flex items-center gap-2">
                         <button onClick={startEditing} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] px-2 py-1 rounded hover:bg-[var(--surface-2)]">
                           Editar
+                        </button>
+                        <button onClick={handleDuplicate} disabled={saving} className="text-xs text-[var(--text-3)] hover:text-[var(--text-1)] px-2 py-1 rounded hover:bg-[var(--surface-2)] disabled:opacity-40">
+                          Duplicar
                         </button>
                         {confirmDelete ? (
                           <div className="flex items-center gap-1">
