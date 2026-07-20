@@ -313,8 +313,9 @@ export default function EntradasFacturaPage() {
     const clientId = getActiveClientSlug()
     const fecha = cfdi.fecha.slice(0, 10) || todayStr()
     const timestamp = nowKey()
-    const uuidShort = (cfdi.uuid || 'noid').slice(0, 12)
-    const idempotencyKey = makeIdempotencyKey('invoice_entry', 'dashboard', timestamp, uuidShort)
+    // For invoices, idempotency is by UUID — same invoice can never be imported twice
+    const cfdiUuid = (cfdi.uuid || 'noid').replace(/[^a-zA-Z0-9-]/g, '')
+    const idempotencyKey = `cfdi_${cfdiUuid}`
 
     const mapped = mappings.filter(m => m.matchedProduct)
 
