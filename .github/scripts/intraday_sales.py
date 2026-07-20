@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(__file__))
 from client_config import get_client, get_tz, get_chat_ids, is_mesero, is_market, get_wansoft_creds
 from agent_common import log_run as _log_run
+from wansoft_auth import get_session as _get_wansoft_session, WansoftAuthExpired
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CLIENT = get_client()
@@ -73,7 +74,20 @@ def sb_get(table, params):
 
 # ── Wansoft API ─────────────────────────────────────────────────────────────
 def wansoft_session():
-    """Login to Wansoft and return authenticated session."""
+    """Get authenticated Wansoft session via cookie relay.
+
+    Uses stored cookies from Supabase (set via wansoft_auth.py store).
+    Falls back to legacy login if cookie relay is not configured.
+    """
+    try:
+        return _get_wansoft_session(CLIENT["id"])
+    except WansoftAuthExpired:
+        print("[intraday] Cookie relay expired/missing, trying legacy login...")
+    except Exception as e:
+        print(f"[intraday] Cookie relay error: {e}, trying legacy login...")
+
+    # Legacy fallback — will fail if Turnstile is active, but keeps
+    # the script runnable in environments without cookie relay.
     s = requests.Session()
     s.get(f"{WANSOFT_URL}/")
     resp = s.post(f"{WANSOFT_URL}/", data={
