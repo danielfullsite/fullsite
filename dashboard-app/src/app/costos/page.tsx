@@ -34,6 +34,7 @@ export default function CostosPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [costChanges, setCostChanges] = useState<CostChange[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function CostosPage() {
         }
       } catch (e) {
         console.error('[costos] Error loading:', e)
+        setError('No se pudieron cargar los ingredientes. Intenta recargar la pagina.')
       }
       setLoading(false)
     }
@@ -69,7 +71,7 @@ export default function CostosPage() {
 
   // KPIs
   const totalIngredients = ingredients.length
-  const avgCost = totalIngredients > 0 ? ingredients.reduce((s, i) => s + Number(i.cost_per_unit), 0) / totalIngredients : 0
+  const withCost = ingredients.filter(i => Number(i.cost_per_unit) > 0).length
   const highCost = ingredients.filter(i => Number(i.cost_per_unit) > 500)
   const withYield = ingredients.filter(i => Number(i.yield_factor) > 0 && Number(i.yield_factor) < 1)
   const increases = costChanges.filter(c => c.pct > 0)
@@ -113,9 +115,9 @@ export default function CostosPage() {
               accentClass="kpi-accent-blue"
             />
             <KPICard
-              label="Costo promedio"
-              value={formatCurrency(avgCost)}
-              subtitle="Por unidad"
+              label="Con costo"
+              value={`${withCost}/${totalIngredients}`}
+              subtitle="Ingredientes con precio"
               icon={DollarSign}
               accentClass="kpi-accent-green"
             />

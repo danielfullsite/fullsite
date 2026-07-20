@@ -299,7 +299,7 @@ export default function FoodCostPage() {
             const matchedCount = cocina.filter(i => i.matched).length
             const mktCount = costItems.filter(i => i.market).length
             const modCount = costItems.filter(i => i.modifier).length
-            setSource(`wansoft_recipes · ${cocina.length} recetas cocina · ${matchedCount} con precio · ${mktCount} Market excluidas · ${modCount} modificadores`)
+            setSource(`${cocina.length} recetas · ${matchedCount} con precio · ${mktCount} Market excluidas · ${modCount} modificadores`)
             setLoading(false)
             return
           }
@@ -532,7 +532,7 @@ export default function FoodCostPage() {
               {error || (items.length === 0 ? 'Sin datos de food cost' : 'Sin resultados')}
             </p>
             <p className="text-xs text-[var(--text-3)]">
-              {items.length === 0 ? 'Verifica la conexion a wansoft_recipes.' : 'Intenta con otro termino de busqueda.'}
+              {items.length === 0 ? 'No se pudieron cargar las recetas. Intenta recargar la pagina.' : 'Intenta con otro termino de busqueda.'}
             </p>
           </div>
         ) : (

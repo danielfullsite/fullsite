@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/format'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 interface Supplier {
   id: string
@@ -27,7 +28,7 @@ export default function ProveedoresPage() {
     async function load() {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_suppliers?client_id=eq.amalay&select=id,name,rfc,phone,email,giro,clave_wansoft,payment_terms&order=name.asc&limit=500`,
+          `${SUPABASE_URL}/rest/v1/pos_suppliers?client_id=eq.${_cid()}&select=id,name,rfc,phone,email,giro,clave_wansoft,payment_terms&order=name.asc&limit=500`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (res.ok) {

@@ -90,7 +90,7 @@ export default function ChatPage() {
         {
           role: 'assistant',
           content:
-            'Lo siento, hubo un error al procesar tu mensaje. Verifica que las claves API est\u00E9n configuradas en .env.local.',
+            'Lo siento, hubo un error al procesar tu mensaje. Intenta de nuevo en unos segundos.',
           timestamp: new Date(),
         },
       ])

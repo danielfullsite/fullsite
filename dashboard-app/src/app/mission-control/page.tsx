@@ -140,7 +140,7 @@ export default function MissionControlPage() {
           <h2 className="text-xl font-bold text-[var(--text-1)] flex items-center gap-2">
             <Bot size={20} className="text-emerald-500" /> Mission Control
           </h2>
-          <p className="text-sm text-[var(--text-3)]">Agentic OS — 30 agentes en tiempo real</p>
+          <p className="text-sm text-[var(--text-3)]">Agentic OS — {Object.keys(AGENT_META).length} agentes en tiempo real</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
