@@ -883,7 +883,7 @@ Rutas disponibles:
 - Propinas → [Ver propinas →](/propinas)
 - Food cost/margen/recetas → [Ver food cost →](/food-cost)
 - Recetas/ingredientes → [Ver recetas →](/recetas)
-- Inventario/stock → [Ver inventario →](/inventario-real)
+- Inventario/stock → [Ver inventario →](/inventario)
 - Toma física de inventario → [Toma física →](/inventario-real/toma-fisica)
 - Puntos de reorden → [Reorden →](/inventario-real/reorden)
 - Entradas de inventario → [Entradas →](/inventario-real/entradas)
