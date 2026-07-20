@@ -2,16 +2,26 @@
  * Inventory Operations — Single transactional module
  *
  * ALL stock changes MUST go through recordMovement().
- * Direct writes to pos_inventory are forbidden outside this module.
+ * Direct writes to pos_inventory or pos_ingredients.cost_per_unit
+ * are forbidden outside this module.
  *
  * Flow:
- *   1. Idempotency check (has this exact movement been recorded?)
- *   2. INSERT into pos_inventory_movements (immutable ledger)
- *   3. PATCH pos_inventory.stock (materialized state)
- *   4. Optionally INSERT into wansoft_data (historical blob)
+ *   1. Validate inputs (no negative qty on entries, no negative costs)
+ *   2. Idempotency check (has this exact movement been recorded?)
+ *   3. Load current stock + cost for all affected ingredients
+ *   4. Detect anomalies (negative stock = halt)
+ *   5. Calculate new stock and (for entries) new weighted average cost
+ *   6. INSERT into pos_inventory_movements (immutable ledger) with full audit trail
+ *   7. PATCH pos_inventory.stock + pos_ingredients.cost_per_unit (materialized state)
  *
- * If step 3 fails, step 2 still exists as a record. The stock can always
+ * If step 7 fails, step 6 still exists as a record. The stock can always
  * be reconciled from the ledger: SUM(quantity) GROUP BY ingredient_id.
+ *
+ * Cost Policy: Weighted Average Cost (Costo Promedio Ponderado)
+ *   - stock > 0: new_cost = (stock * cost + qty * purchase_cost) / (stock + qty)
+ *   - stock = 0: new_cost = purchase_cost
+ *   - purchase_cost = 0: cost unchanged (entry without price)
+ *   - stock < 0 (legacy anomaly): movement halted, requires manual fix
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -35,11 +45,13 @@ export type MovementType =
   | 'transfer_out'   // Transferencia entre almacenes (salida)
   | 'transfer_in'    // Transferencia entre almacenes (entrada)
   | 'return'         // Devolución a proveedor
+  | 'reversal'       // Reversa de un movimiento anterior
 
 export interface MovementLine {
-  ingredient_id: string   // FK to pos_ingredients.id
-  quantity: number        // positive = stock goes UP, negative = stock goes DOWN
-  notes?: string          // per-line notes (e.g., motivo de merma)
+  ingredient_id: string       // FK to pos_ingredients.id
+  quantity: number            // positive = stock goes UP, negative = stock goes DOWN
+  unit_cost?: number          // purchase unit cost (for entries). Omit for waste/deduction.
+  notes?: string              // per-line notes (e.g., motivo de merma, supplier info)
 }
 
 export interface MovementRequest {
@@ -55,28 +67,44 @@ export interface MovementResult {
   success: boolean
   movements_created: number
   stock_updates: number
+  cost_updates: number
   errors: string[]
-  was_duplicate: boolean           // true if idempotency_key already existed
+  was_duplicate: boolean
+  details: {
+    ingredient_id: string
+    stock_before: number
+    stock_after: number
+    cost_before: number
+    cost_after: number
+  }[]
 }
+
+// ── Internals ─────────────────────────────────────────────────────────
+
+interface InventoryRow {
+  id: number
+  ingredient_id: string
+  stock: number
+}
+
+interface IngredientRow {
+  id: string
+  cost_per_unit: number
+}
+
+const ENTRY_TYPES: MovementType[] = ['entry', 'invoice_entry', 'restock', 'transfer_in']
 
 // ── Core function ─────────────────────────────────────────────────────
 
-/**
- * Record one or more inventory movements atomically.
- *
- * This is the ONLY function that should modify pos_inventory.stock.
- * All dashboard and POS pages must call this instead of writing directly.
- *
- * Idempotency: if the same idempotency_key has been used before,
- * returns success with was_duplicate=true and does nothing.
- */
 export async function recordMovement(req: MovementRequest): Promise<MovementResult> {
   const result: MovementResult = {
     success: false,
     movements_created: 0,
     stock_updates: 0,
+    cost_updates: 0,
     errors: [],
     was_duplicate: false,
+    details: [],
   }
 
   // ── 0. Validate ──────────────────────────────────────────────────
@@ -86,6 +114,8 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     return result
   }
 
+  const isEntry = ENTRY_TYPES.includes(req.movement_type)
+
   for (const line of req.lines) {
     if (!line.ingredient_id) {
       result.errors.push('Missing ingredient_id in movement line')
@@ -93,6 +123,16 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     }
     if (line.quantity === 0) {
       result.errors.push(`Zero quantity for ${line.ingredient_id}`)
+      return result
+    }
+    // Entries must have positive quantity
+    if (isEntry && line.quantity < 0) {
+      result.errors.push(`Negative quantity on entry for ${line.ingredient_id}. Use 'return' or 'waste' for outflows.`)
+      return result
+    }
+    // No negative costs ever
+    if (line.unit_cost !== undefined && line.unit_cost < 0) {
+      result.errors.push(`Negative unit_cost for ${line.ingredient_id}`)
       return result
     }
   }
@@ -112,12 +152,13 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     }
   }
 
-  // ── 2. Load current stock for all affected ingredients ──────────
+  // ── 2. Load current stock + cost for all affected ingredients ───
 
   const ingredientIds = [...new Set(req.lines.map(l => l.ingredient_id))]
-  const stockMap = new Map<string, { id: number; stock: number }>()
+  const stockMap = new Map<string, InventoryRow>()
+  const costMap = new Map<string, number>()
 
-  // Batch load in chunks of 50 to stay within URL limits
+  // Load pos_inventory (stock)
   for (let i = 0; i < ingredientIds.length; i += 50) {
     const chunk = ingredientIds.slice(i, i + 50)
     const filter = `ingredient_id=in.(${chunk.join(',')})`
@@ -126,9 +167,27 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
       { headers: headers() }
     )
     if (res.ok) {
-      const rows: { id: number; ingredient_id: string; stock: number }[] = await res.json()
+      const rows: InventoryRow[] = await res.json()
       for (const row of rows) {
-        stockMap.set(row.ingredient_id, { id: row.id, stock: Number(row.stock) || 0 })
+        stockMap.set(row.ingredient_id, { ...row, stock: Number(row.stock) || 0 })
+      }
+    }
+  }
+
+  // Load pos_ingredients (cost) — only needed for entries with cost
+  if (isEntry) {
+    for (let i = 0; i < ingredientIds.length; i += 50) {
+      const chunk = ingredientIds.slice(i, i + 50)
+      const filter = `id=in.(${chunk.join(',')})`
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${req.client_id}&${filter}&select=id,cost_per_unit`,
+        { headers: headers() }
+      )
+      if (res.ok) {
+        const rows: IngredientRow[] = await res.json()
+        for (const row of rows) {
+          costMap.set(row.id, Number(row.cost_per_unit) || 0)
+        }
       }
     }
   }
@@ -140,17 +199,89 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     return result
   }
 
-  // ── 3. INSERT movements (ledger) ────────────────────────────────
+  // ── 3. Detect anomalies ─────────────────────────────────────────
 
-  const movementRows = req.lines.map(line => ({
+  for (const line of req.lines) {
+    const current = stockMap.get(line.ingredient_id)!
+    if (current.stock < 0) {
+      result.errors.push(
+        `ANOMALY: ${line.ingredient_id} has negative stock (${current.stock}). ` +
+        `Fix via manual adjustment before recording new movements.`
+      )
+      return result
+    }
+  }
+
+  // ── 4. Calculate new stock and cost per line ────────────────────
+
+  interface ComputedLine {
+    ingredient_id: string
+    quantity: number
+    stock_before: number
+    stock_after: number
+    cost_before: number
+    cost_after: number
+    unit_cost: number
+    notes: string
+  }
+
+  const computed: ComputedLine[] = []
+
+  for (const line of req.lines) {
+    const current = stockMap.get(line.ingredient_id)!
+    const stockBefore = current.stock
+    const costBefore = costMap.get(line.ingredient_id) ?? 0
+    const purchaseCost = line.unit_cost ?? 0
+
+    let stockAfter: number
+    let costAfter = costBefore
+
+    if (isEntry) {
+      // Entries: stock goes up
+      stockAfter = stockBefore + line.quantity
+
+      // Weighted average cost calculation
+      if (purchaseCost > 0) {
+        if (stockBefore <= 0) {
+          // Rule 2: stock=0, adopt new cost
+          costAfter = purchaseCost
+        } else {
+          // Rule 1: weighted average
+          costAfter = (stockBefore * costBefore + line.quantity * purchaseCost) / stockAfter
+        }
+      }
+      // Rule 3: purchaseCost=0, cost unchanged (costAfter = costBefore)
+    } else {
+      // Waste, deduction, return, etc.: stock goes down (quantity is negative)
+      stockAfter = Math.max(0, stockBefore + line.quantity)
+    }
+
+    computed.push({
+      ingredient_id: line.ingredient_id,
+      quantity: line.quantity,
+      stock_before: stockBefore,
+      stock_after: stockAfter,
+      cost_before: costBefore,
+      cost_after: costAfter,
+      unit_cost: purchaseCost,
+      notes: line.notes || '',
+    })
+  }
+
+  // ── 5. INSERT movements (ledger) with full audit trail ──────────
+
+  const movementRows = computed.map(c => ({
     client_id: req.client_id,
-    ingredient_id: line.ingredient_id,
+    ingredient_id: c.ingredient_id,
     movement_type: req.movement_type,
-    quantity: line.quantity,
+    quantity: c.quantity,
     actor: req.actor,
-    notes: line.notes
-      ? `${line.notes} [key:${req.idempotency_key}]`
-      : `[key:${req.idempotency_key}]`,
+    notes: [
+      c.notes,
+      `stock:${c.stock_before}→${c.stock_after}`,
+      c.unit_cost > 0 ? `cost:${c.cost_before}→${c.cost_after}@${c.unit_cost}` : null,
+      `[key:${req.idempotency_key}]`,
+    ].filter(Boolean).join(' '),
   }))
 
   const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
@@ -165,28 +296,54 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     return result
   }
 
-  result.movements_created = req.lines.length
+  result.movements_created = computed.length
 
-  // ── 4. PATCH stock for each ingredient ──────────────────────────
+  // ── 6. PATCH stock + cost ───────────────────────────────────────
 
-  for (const line of req.lines) {
-    const current = stockMap.get(line.ingredient_id)!
-    const newStock = Math.max(0, current.stock + line.quantity)
+  for (const c of computed) {
+    const current = stockMap.get(c.ingredient_id)!
 
+    // Update stock
     const patchRes = await fetch(
       `${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${current.id}&client_id=eq.${req.client_id}`,
       {
         method: 'PATCH',
         headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify({ stock: newStock, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ stock: c.stock_after, updated_at: new Date().toISOString() }),
       }
     )
 
     if (patchRes.ok) {
       result.stock_updates++
     } else {
-      result.errors.push(`Stock update failed for ${line.ingredient_id}: ${patchRes.status}`)
+      result.errors.push(`Stock update failed for ${c.ingredient_id}: ${patchRes.status}`)
     }
+
+    // Update cost (only if it changed)
+    if (isEntry && c.cost_after !== c.cost_before && c.unit_cost > 0) {
+      const costRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${c.ingredient_id}&client_id=eq.${req.client_id}`,
+        {
+          method: 'PATCH',
+          headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify({ cost_per_unit: c.cost_after }),
+        }
+      )
+
+      if (costRes.ok) {
+        result.cost_updates++
+      } else {
+        result.errors.push(`Cost update failed for ${c.ingredient_id}: ${costRes.status}`)
+      }
+    }
+
+    result.details.push({
+      ingredient_id: c.ingredient_id,
+      stock_before: c.stock_before,
+      stock_after: c.stock_after,
+      cost_before: c.cost_before,
+      cost_after: c.cost_after,
+    })
   }
 
   result.success = result.movements_created > 0
@@ -202,8 +359,8 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
 export function makeIdempotencyKey(
   type: MovementType,
   actor: string,
-  timestamp: string,    // ISO string, typically to the minute
-  extra?: string,       // warehouse, supplier, etc.
+  timestamp: string,
+  extra?: string,
 ): string {
   const parts = [type, actor, timestamp]
   if (extra) parts.push(extra)
@@ -212,7 +369,6 @@ export function makeIdempotencyKey(
 
 /**
  * Load pos_ingredients catalog for the dashboard inventory pages.
- * Returns the canonical product list that all pages should use.
  */
 export async function loadIngredientsCatalog(clientId: string): Promise<{
   id: string
@@ -232,7 +388,6 @@ export async function loadIngredientsCatalog(clientId: string): Promise<{
 
 /**
  * Load current stock levels joined with ingredient info.
- * This is the read-side companion to recordMovement().
  */
 export async function loadInventoryWithStock(clientId: string): Promise<{
   ingredient_id: string
@@ -243,8 +398,6 @@ export async function loadInventoryWithStock(clientId: string): Promise<{
   stock: number
   reorder_point: number
 }[]> {
-  // Load both tables and join client-side (PostgREST doesn't support
-  // cross-table joins without a foreign key relationship defined in DB)
   const [ingredientsRes, inventoryRes] = await Promise.all([
     fetch(
       `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${clientId}&active=eq.true&order=name.asc&limit=2000&select=id,name,unit,cost_per_unit,category`,

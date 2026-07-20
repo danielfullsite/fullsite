@@ -2,53 +2,51 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Trash2, Search, Save, PackageCheck, Loader2 } from 'lucide-react'
-import { getWansoftDataLatest } from '@/lib/data'
 import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
-import { sbPost } from '@/lib/supabase-helpers'
+import { sbPost, sbGet } from '@/lib/supabase-helpers'
+import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import type { MovementResult } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
 
 interface Supplier {
-  clave: string
-  nombre: string
-  rfc: string
-  giro: string
+  id: string
+  name: string
+  rfc: string | null
+  phone: string | null
+  giro: string | null
 }
 
-interface ProductOption {
-  Text: string
-  Value: string
+interface InventoryProduct {
+  ingredient_id: string
+  name: string
+  unit: string
+  cost_per_unit: number
+  stock: number
+  category: string | null
 }
 
 interface LineItem {
   id: string
-  code: string
+  ingredient_id: string
   name: string
-  productValue: string
+  unit: string
+  current_cost: number
+  current_stock: number
   quantity: number
   unitCost: number
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function deepParse(raw: unknown): unknown {
-  let parsed = raw
-  for (let i = 0; i < 5; i++) {
-    if (typeof parsed !== 'string') break
-    try { parsed = JSON.parse(parsed) } catch { break }
-  }
-  return parsed
-}
-
 function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
 function todayStr() {
-  const d = new Date()
-  return d.toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10)
 }
 
 function nowKey() {
@@ -62,7 +60,7 @@ function nowKey() {
 export default function EntradasPage() {
   // Data sources
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [products, setProducts] = useState<ProductOption[]>([])
+  const [products, setProducts] = useState<InventoryProduct[]>([])
   const [loading, setLoading] = useState(true)
 
   // Form state
@@ -75,45 +73,38 @@ export default function EntradasPage() {
   const [items, setItems] = useState<LineItem[]>([])
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
-  const [saveResult, setSaveResult] = useState<'ok' | 'error' | null>(null)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error' | 'duplicate'; text: string } | null>(null)
 
   const supplierRef = useRef<HTMLDivElement>(null)
   const productRef = useRef<HTMLDivElement>(null)
 
-  // ── Load catalogs ───────────────────────────────────────────────
+  // ── Load catalogs from canonical sources ─────────────────────────
 
   useEffect(() => {
     async function load() {
       try {
-        const [suppResult, prodResult] = await Promise.all([
-          getWansoftDataLatest('proveedores_catalog'),
-          getWansoftDataLatest('products_catalog'),
+        const clientId = getActiveClientSlug()
+
+        const [invData, suppData] = await Promise.all([
+          loadInventoryWithStock(clientId),
+          sbGet<Supplier[]>('pos_suppliers', clientId, {
+            select: 'id,name,rfc,phone,giro',
+            order: 'name.asc',
+            limit: '500',
+          }),
         ])
 
-        if (suppResult?.data) {
-          const parsed = deepParse(suppResult.data)
-          const arr = Array.isArray(parsed) ? parsed : []
-          setSuppliers(arr.map((s: any) => ({
-            clave: s.clave || '',
-            nombre: s.nombre || '',
-            rfc: s.rfc || '',
-            giro: s.giro || '',
-          })))
-        }
+        setProducts(invData.map(r => ({
+          ingredient_id: r.ingredient_id,
+          name: r.name,
+          unit: r.unit,
+          cost_per_unit: r.cost_per_unit,
+          stock: r.stock,
+          category: r.category,
+        })))
 
-        if (prodResult?.data) {
-          const parsed = deepParse(prodResult.data)
-          // Could be { products: [...] } or directly an array
-          let arr: ProductOption[] = []
-          if (Array.isArray(parsed)) {
-            arr = parsed
-          } else if (parsed && typeof parsed === 'object' && 'products' in (parsed as any)) {
-            arr = (parsed as any).products || []
-          }
-          setProducts(arr.map((p: any) => ({
-            Text: p.Text || p.text || '',
-            Value: p.Value || p.value || '',
-          })))
+        if (Array.isArray(suppData)) {
+          setSuppliers(suppData)
         }
       } catch (err) {
         console.error('[Entradas] Error loading catalogs:', err)
@@ -144,38 +135,39 @@ export default function EntradasPage() {
   const filteredSuppliers = suppliers.filter(s => {
     const q = supplierSearch.toLowerCase()
     if (!q) return true
-    return s.nombre.toLowerCase().includes(q) || s.clave.toLowerCase().includes(q) || s.rfc.toLowerCase().includes(q)
+    return (s.name || '').toLowerCase().includes(q) ||
+           (s.rfc || '').toLowerCase().includes(q) ||
+           (s.giro || '').toLowerCase().includes(q)
   }).slice(0, 50)
 
-  const addedValues = new Set(items.map(i => i.productValue))
+  const addedIds = new Set(items.map(i => i.ingredient_id))
   const filteredProducts = products.filter(p => {
-    if (addedValues.has(p.Value)) return false
+    if (addedIds.has(p.ingredient_id)) return false
     const q = productSearch.toLowerCase()
     if (!q) return true
-    return p.Text.toLowerCase().includes(q)
+    return p.name.toLowerCase().includes(q) ||
+           p.ingredient_id.toLowerCase().includes(q) ||
+           (p.category || '').toLowerCase().includes(q)
   }).slice(0, 50)
 
   // ── Actions ─────────────────────────────────────────────────────
 
   const selectSupplier = useCallback((s: Supplier) => {
     setSelectedSupplier(s)
-    setSupplierSearch(s.nombre)
+    setSupplierSearch(s.name)
     setSupplierDropdownOpen(false)
   }, [])
 
-  const addProduct = useCallback((p: ProductOption) => {
-    // Extract code from Text like "ACEITE VEGETAL (ABA001)"
-    const match = p.Text.match(/\(([^)]+)\)/)
-    const code = match ? match[1] : ''
-    const name = p.Text.replace(/\s*\([^)]+\)\s*$/, '').trim()
-
+  const addProduct = useCallback((p: InventoryProduct) => {
     setItems(prev => [...prev, {
       id: uid(),
-      code,
-      name,
-      productValue: p.Value,
+      ingredient_id: p.ingredient_id,
+      name: p.name,
+      unit: p.unit,
+      current_cost: p.cost_per_unit,
+      current_stock: p.stock,
       quantity: 1,
-      unitCost: 0,
+      unitCost: p.cost_per_unit, // pre-fill with current cost
     }])
     setProductSearch('')
     setProductDropdownOpen(false)
@@ -196,49 +188,101 @@ export default function EntradasPage() {
   const handleSave = async () => {
     if (!selectedSupplier || items.length === 0) return
     setSaving(true)
-    setSaveResult(null)
+    setSaveMessage(null)
 
-    const payload = {
-      supplier: {
-        clave: selectedSupplier.clave,
-        nombre: selectedSupplier.nombre,
-        rfc: selectedSupplier.rfc,
-      },
-      fecha,
-      items: items.map(i => ({
-        code: i.code,
-        name: i.name,
-        productValue: i.productValue,
-        quantity: i.quantity,
-        unitCost: i.unitCost,
-        total: i.quantity * i.unitCost,
-      })),
-      grandTotal,
-      notes,
-      createdAt: new Date().toISOString(),
-    }
+    const clientId = getActiveClientSlug()
+    const timestamp = nowKey()
+    const supplierKey = selectedSupplier.id.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20)
+    const idempotencyKey = makeIdempotencyKey('entry', 'dashboard', timestamp, supplierKey)
 
     try {
-      const clientId = getActiveClientSlug()
-      const ok = await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_entry_${nowKey()}`,
+      // ── 1. Record movements (updates pos_inventory + cost + ledger) ──
+      const movResult: MovementResult = await recordMovement({
+        client_id: clientId,
+        movement_type: 'entry',
+        actor: 'dashboard',
+        idempotency_key: idempotencyKey,
+        metadata: {
+          supplier_id: selectedSupplier.id,
+          supplier_name: selectedSupplier.name,
+          supplier_rfc: selectedSupplier.rfc,
+          fecha,
+        },
+        lines: items.map(i => ({
+          ingredient_id: i.ingredient_id,
+          quantity: Math.abs(i.quantity),   // entries are always positive
+          unit_cost: i.unitCost,
+          notes: `Proveedor: ${selectedSupplier!.name}${notes ? ' | ' + notes : ''}`,
+        })),
+      })
+
+      if (movResult.was_duplicate) {
+        setSaveMessage({ type: 'duplicate', text: 'Esta entrada ya fue registrada anteriormente.' })
+        setItems([])
+        setSaving(false)
+        return
+      }
+
+      if (!movResult.success) {
+        setSaveMessage({ type: 'error', text: `Error: ${movResult.errors.join(', ')}` })
+        setSaving(false)
+        return
+      }
+
+      // ── 2. Save historical blob (wansoft_data, for traceability) ──
+      const payload = {
+        supplier: {
+          id: selectedSupplier.id,
+          name: selectedSupplier.name,
+          rfc: selectedSupplier.rfc,
+        },
+        fecha,
+        items: items.map((i, idx) => ({
+          ingredient_id: i.ingredient_id,
+          name: i.name,
+          unit: i.unit,
+          quantity: i.quantity,
+          unitCost: i.unitCost,
+          total: i.quantity * i.unitCost,
+          cost_before: i.current_cost,
+          cost_after: movResult.details[idx]?.cost_after ?? i.current_cost,
+          stock_before: i.current_stock,
+          stock_after: movResult.details[idx]?.stock_after ?? i.current_stock + i.quantity,
+        })),
+        grandTotal,
+        notes,
+        idempotency_key: idempotencyKey,
+        movements_created: movResult.movements_created,
+        stock_updates: movResult.stock_updates,
+        cost_updates: movResult.cost_updates,
+        created_at: new Date().toISOString(),
+      }
+
+      await sbPost('wansoft_data', clientId, {
+        data_key: `inventory_entry_${timestamp}`,
         fecha,
         data: payload,
       })
-      setSaveResult(ok ? 'ok' : 'error')
-      if (ok) {
-        // Reset form
-        setItems([])
-        setNotes('')
-        setSelectedSupplier(null)
-        setSupplierSearch('')
-        setFecha(todayStr())
-      }
+
+      const costNote = movResult.cost_updates > 0
+        ? ` ${movResult.cost_updates} costos actualizados.`
+        : ''
+
+      setSaveMessage({
+        type: 'success',
+        text: `Entrada registrada: ${items.length} productos por ${formatCurrency(grandTotal)}. Stock actualizado.${costNote}`,
+      })
+
+      // Reset form
+      setItems([])
+      setNotes('')
+      setSelectedSupplier(null)
+      setSupplierSearch('')
+      setFecha(todayStr())
     } catch {
-      setSaveResult('error')
-    } finally {
-      setSaving(false)
+      setSaveMessage({ type: 'error', text: 'Error de red. Verifica tu conexion.' })
     }
+    setSaving(false)
   }
 
   // ── Render ──────────────────────────────────────────────────────
@@ -256,7 +300,7 @@ export default function EntradasPage() {
     <div className="space-y-6 pb-24">
       <PageHeader
         title="Entrada de Mercancia"
-        subtitle="Registro de productos recibidos"
+        subtitle={`${products.length} productos disponibles · ${suppliers.length} proveedores`}
         eyebrow="Inventario"
       />
 
@@ -275,12 +319,12 @@ export default function EntradasPage() {
               onChange={e => {
                 setSupplierSearch(e.target.value)
                 setSupplierDropdownOpen(true)
-                if (selectedSupplier && e.target.value !== selectedSupplier.nombre) {
+                if (selectedSupplier && e.target.value !== selectedSupplier.name) {
                   setSelectedSupplier(null)
                 }
               }}
               onFocus={() => setSupplierDropdownOpen(true)}
-              placeholder="Buscar proveedor por nombre, clave o RFC..."
+              placeholder="Buscar proveedor por nombre, RFC o giro..."
               className="w-full h-12 pl-10 pr-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text-1)] text-sm placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             />
           </div>
@@ -288,13 +332,13 @@ export default function EntradasPage() {
             <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xl">
               {filteredSuppliers.map(s => (
                 <button
-                  key={s.clave}
+                  key={s.id}
                   onClick={() => selectSupplier(s)}
                   className="w-full text-left px-4 py-3 hover:bg-[var(--border)] transition-colors border-b border-[var(--border)] last:border-b-0"
                 >
-                  <div className="text-sm font-medium text-[var(--text-1)]">{s.nombre}</div>
+                  <div className="text-sm font-medium text-[var(--text-1)]">{s.name}</div>
                   <div className="text-xs text-[var(--text-3)] mt-0.5">
-                    {s.clave} {s.rfc ? `| ${s.rfc}` : ''} {s.giro ? `| ${s.giro}` : ''}
+                    {s.rfc || ''} {s.giro ? `| ${s.giro}` : ''} {s.phone ? `| ${s.phone}` : ''}
                   </div>
                 </button>
               ))}
@@ -331,7 +375,7 @@ export default function EntradasPage() {
               setProductDropdownOpen(true)
             }}
             onFocus={() => setProductDropdownOpen(true)}
-            placeholder="Buscar producto por nombre o codigo..."
+            placeholder="Buscar producto por nombre, codigo o categoria..."
             className="w-full h-12 pl-10 pr-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text-1)] text-sm placeholder:text-[var(--text-3)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
           />
         </div>
@@ -339,12 +383,17 @@ export default function EntradasPage() {
           <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xl">
             {filteredProducts.map(p => (
               <button
-                key={p.Value}
+                key={p.ingredient_id}
                 onClick={() => addProduct(p)}
                 className="w-full text-left px-4 py-3 hover:bg-[var(--border)] transition-colors border-b border-[var(--border)] last:border-b-0 flex items-center gap-3"
               >
                 <Plus size={16} className="text-blue-400 shrink-0" />
-                <span className="text-sm text-[var(--text-1)]">{p.Text}</span>
+                <div className="min-w-0">
+                  <div className="text-sm text-[var(--text-1)] truncate">{p.name}</div>
+                  <div className="text-xs text-[var(--text-3)] mt-0.5">
+                    {p.category || 'Sin categoría'} | Stock: {p.stock.toFixed(1)} {p.unit} | Costo: {formatCurrency(p.cost_per_unit)}/{p.unit}
+                  </div>
+                </div>
               </button>
             ))}
           </div>
@@ -360,9 +409,9 @@ export default function EntradasPage() {
       {items.length > 0 && (
         <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           {/* Desktop table header */}
-          <div className="hidden md:grid grid-cols-[100px_1fr_120px_160px_140px_48px] gap-2 px-4 py-2.5 bg-[var(--surface)] border-b border-[var(--border)] text-xs font-semibold text-[var(--text-3)] uppercase tracking-wider">
-            <div>Codigo</div>
+          <div className="hidden md:grid grid-cols-[1fr_80px_120px_160px_140px_48px] gap-2 px-4 py-2.5 bg-[var(--surface)] border-b border-[var(--border)] text-xs font-semibold text-[var(--text-3)] uppercase tracking-wider">
             <div>Producto</div>
+            <div>Unidad</div>
             <div className="text-right">Cantidad</div>
             <div className="text-right">Costo Unitario</div>
             <div className="text-right">Total</div>
@@ -374,16 +423,21 @@ export default function EntradasPage() {
             return (
               <div key={item.id}>
                 {/* Desktop row */}
-                <div className="hidden md:grid grid-cols-[100px_1fr_120px_160px_140px_48px] gap-2 items-center px-4 py-3 border-b border-[var(--border)] last:border-b-0 bg-[var(--surface)]">
-                  <div className="text-xs font-mono text-[var(--text-3)]">{item.code}</div>
-                  <div className="text-sm text-[var(--text-1)] truncate">{item.name}</div>
+                <div className="hidden md:grid grid-cols-[1fr_80px_120px_160px_140px_48px] gap-2 items-center px-4 py-3 border-b border-[var(--border)] last:border-b-0 bg-[var(--surface)]">
+                  <div className="min-w-0">
+                    <div className="text-sm text-[var(--text-1)] truncate">{item.name}</div>
+                    <div className="text-xs text-[var(--text-3)]">
+                      Stock: {item.current_stock.toFixed(1)} | Costo actual: {formatCurrency(item.current_cost)}
+                    </div>
+                  </div>
+                  <div className="text-xs text-[var(--text-2)]">{item.unit}</div>
                   <input
                     type="number"
-                    min={0}
+                    min={0.01}
                     step="0.01"
                     value={item.quantity || ''}
                     onChange={e => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                    className="h-10 w-full text-right px-3 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="h-10 w-full text-right px-3 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-3)] text-sm">$</span>
@@ -393,7 +447,7 @@ export default function EntradasPage() {
                       step="0.01"
                       value={item.unitCost || ''}
                       onChange={e => updateItem(item.id, 'unitCost', parseFloat(e.target.value) || 0)}
-                      className="h-10 w-full text-right px-3 pl-7 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      className="h-10 w-full text-right px-3 pl-7 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <div className="text-sm font-medium text-[var(--text-1)] text-right tabular-nums">
@@ -412,7 +466,7 @@ export default function EntradasPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="text-sm font-medium text-[var(--text-1)]">{item.name}</div>
-                      <div className="text-xs font-mono text-[var(--text-3)] mt-0.5">{item.code}</div>
+                      <div className="text-xs text-[var(--text-3)] mt-0.5">{item.unit} | Stock: {item.current_stock.toFixed(1)}</div>
                     </div>
                     <button
                       onClick={() => removeItem(item.id)}
@@ -426,7 +480,7 @@ export default function EntradasPage() {
                       <label className="block text-[10px] text-[var(--text-3)] mb-1">Cantidad</label>
                       <input
                         type="number"
-                        min={0}
+                        min={0.01}
                         step="0.01"
                         value={item.quantity || ''}
                         onChange={e => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
@@ -492,30 +546,39 @@ export default function EntradasPage() {
         />
       </div>
 
-      {/* ── Save Button ────────────────────────────────────────── */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleSave}
-          disabled={saving || !selectedSupplier || items.length === 0}
-          className="h-12 px-8 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm flex items-center gap-2 transition-colors"
-        >
-          {saving ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <Save size={18} />
-          )}
-          {saving ? 'Guardando...' : 'Guardar Entrada'}
-        </button>
+      {/* ── Save message ──────────────────────────────────────── */}
+      {saveMessage && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${
+          saveMessage.type === 'success'
+            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+            : saveMessage.type === 'duplicate'
+            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+            : 'bg-red-500/15 text-red-400 border border-red-500/30'
+        }`}>
+          {saveMessage.text}
+        </div>
+      )}
 
-        {saveResult === 'ok' && (
-          <span className="text-sm text-emerald-400 font-medium">
-            Entrada registrada correctamente
-          </span>
-        )}
-        {saveResult === 'error' && (
-          <span className="text-sm text-red-400 font-medium">
-            Error al guardar. Intenta de nuevo.
-          </span>
+      {/* ── Save Button ────────────────────────────────────────── */}
+      <div className="sticky bottom-4 z-10">
+        {(items.length > 0 || saving) && (
+          <div className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 shadow-lg">
+            <span className="text-sm text-[var(--text-2)]">
+              {items.length} {items.length === 1 ? 'producto' : 'productos'} — {formatCurrency(grandTotal)}
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={saving || !selectedSupplier || items.length === 0}
+              className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm flex items-center gap-2 transition-colors"
+            >
+              {saving ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Save size={18} />
+              )}
+              {saving ? 'Guardando...' : 'Guardar Entrada'}
+            </button>
+          </div>
         )}
       </div>
     </div>
