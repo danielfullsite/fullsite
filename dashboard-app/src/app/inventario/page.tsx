@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Package, AlertTriangle, TrendingDown, Search, ArrowUpDown, Filter } from 'lucide-react'
-import { sbApi } from '@/lib/supabase-api'
 import { formatCurrency } from '@/lib/format'
+import { loadInventoryWithStock } from '@/lib/inventory'
+import { getActiveClientSlug } from '@/lib/data'
 
 interface InventoryItem {
   producto: string
@@ -30,23 +31,21 @@ export default function InventarioPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Read from pos_inventory_products (769 products with real stock)
-        const data = await sbApi('pos_inventory_products?active=eq.true&order=name.asc&select=name,unit,cost_per_unit,stock,reorder_point,category,updated_at')
-        if (Array.isArray(data) && data.length > 0) {
-          const items: InventoryItem[] = data.map((row: { name: string; unit: string; cost_per_unit: number; stock: number; reorder_point: number; category: string; updated_at: string }) => ({
+        const clientId = getActiveClientSlug()
+        const data = await loadInventoryWithStock(clientId)
+        if (data.length > 0) {
+          const items: InventoryItem[] = data.map(row => ({
             producto: row.name,
-            existencia: row.stock ?? 0,
+            existencia: row.stock,
             unidad: row.unit || '',
-            costo_unitario: row.cost_per_unit ?? 0,
-            costo_total: (row.stock ?? 0) * (row.cost_per_unit ?? 0),
+            costo_unitario: row.cost_per_unit,
+            costo_total: row.stock * row.cost_per_unit,
             category: row.category || 'SIN CATEGORIA',
-            reorder_point: row.reorder_point ?? 0,
-            below_reorder: row.reorder_point > 0 && (row.stock ?? 0) <= row.reorder_point,
+            reorder_point: row.reorder_point,
+            below_reorder: row.reorder_point > 0 && row.stock <= row.reorder_point,
           }))
           setInventory(items)
-          // Use the most recent updated_at as the date
-          const latest = data.reduce((max: string, r: { updated_at: string }) => r.updated_at > max ? r.updated_at : max, data[0].updated_at)
-          setFecha(latest ? new Date(latest).toLocaleDateString('es-MX') : '')
+          setFecha(new Date().toLocaleDateString('es-MX'))
         }
       } catch (err) {
         console.error('Error loading inventory:', err)
@@ -127,7 +126,7 @@ export default function InventarioPage() {
           <div className="p-8 text-center">
             <Package size={24} className="mx-auto mb-3 text-[var(--text-3)]" />
             <p className="text-sm font-bold text-[var(--text-1)] mb-1">{inventory.length === 0 ? 'Sin datos de inventario' : 'Sin resultados'}</p>
-            <p className="text-xs text-[var(--text-3)]">{inventory.length === 0 ? 'Verifica la tabla pos_inventory_products.' : 'Intenta con otro termino de busqueda.'}</p>
+            <p className="text-xs text-[var(--text-3)]">{inventory.length === 0 ? 'No se encontraron ingredientes con inventario.' : 'Intenta con otro termino de busqueda.'}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
