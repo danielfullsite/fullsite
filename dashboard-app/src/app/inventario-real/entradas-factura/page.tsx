@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Upload, FileText, CheckCircle, AlertTriangle, Search, Save, Loader2, Link2, PackageCheck, Trash2, ArrowRight, X } from 'lucide-react'
-import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
-import { sbPost } from '@/lib/supabase-helpers'
+import { sbPost, sbGet } from '@/lib/supabase-helpers'
+import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import type { MovementResult } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -21,15 +23,19 @@ interface CFDIData {
 }
 
 interface Supplier {
-  clave: string
-  nombre: string
-  rfc: string
-  giro: string
+  id: string
+  name: string
+  rfc: string | null
+  giro: string | null
 }
 
-interface ProductOption {
-  Text: string
-  Value: string
+interface InventoryProduct {
+  ingredient_id: string
+  name: string
+  unit: string
+  cost_per_unit: number
+  stock: number
+  category: string | null
 }
 
 interface ConceptoMapping {
@@ -38,7 +44,7 @@ interface ConceptoMapping {
   cantidad: number
   unitario: number
   importe: number
-  matchedProduct: ProductOption | null
+  matchedProduct: InventoryProduct | null
   adjustedQuantity: number
   adjustedCost: number
 }
@@ -132,9 +138,9 @@ function parseCFDI(xml: string): CFDIData | null {
 // ── Component ───────────────────────────────────────────────────────
 
 export default function EntradasFacturaPage() {
-  // Catalogs
+  // Catalogs (canonical sources)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [products, setProducts] = useState<ProductOption[]>([])
+  const [products, setProducts] = useState<InventoryProduct[]>([])
   const [loading, setLoading] = useState(true)
 
   // CFDI
@@ -155,39 +161,33 @@ export default function EntradasFacturaPage() {
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<'ok' | 'error' | null>(null)
 
-  // ── Load catalogs ─────────────────────────────────────────────────
+  // ── Load catalogs from canonical sources ───────────────────────────
 
   useEffect(() => {
     async function load() {
       try {
-        const [suppResult, prodResult] = await Promise.all([
-          getWansoftDataLatest('proveedores_catalog'),
-          getWansoftDataLatest('products_catalog'),
+        const clientId = getActiveClientSlug()
+
+        const [invData, suppData] = await Promise.all([
+          loadInventoryWithStock(clientId),
+          sbGet<Supplier[]>('pos_suppliers', clientId, {
+            select: 'id,name,rfc,giro',
+            order: 'name.asc',
+            limit: '500',
+          }),
         ])
 
-        if (suppResult?.data) {
-          const parsed = deepParse(suppResult.data)
-          const arr = Array.isArray(parsed) ? parsed : []
-          setSuppliers(arr.map((s: any) => ({
-            clave: s.clave || '',
-            nombre: s.nombre || '',
-            rfc: s.rfc || '',
-            giro: s.giro || '',
-          })))
-        }
+        setProducts(invData.map(r => ({
+          ingredient_id: r.ingredient_id,
+          name: r.name,
+          unit: r.unit,
+          cost_per_unit: r.cost_per_unit,
+          stock: r.stock,
+          category: r.category,
+        })))
 
-        if (prodResult?.data) {
-          const parsed = deepParse(prodResult.data)
-          let arr: ProductOption[] = []
-          if (Array.isArray(parsed)) {
-            arr = parsed
-          } else if (parsed && typeof parsed === 'object' && 'products' in (parsed as any)) {
-            arr = (parsed as any).products || []
-          }
-          setProducts(arr.map((p: any) => ({
-            Text: p.Text || p.text || '',
-            Value: p.Value || p.value || '',
-          })))
+        if (Array.isArray(suppData)) {
+          setSuppliers(suppData)
         }
       } catch (err) {
         console.error('[EntradasFactura] Error loading catalogs:', err)
@@ -238,13 +238,11 @@ export default function EntradasFacturaPage() {
 
       // Auto-map conceptos to products using fuzzy matching
       const newMappings: ConceptoMapping[] = parsed.conceptos.map(c => {
-        // Find best fuzzy match
-        let bestMatch: ProductOption | null = null
+        let bestMatch: InventoryProduct | null = null
         let bestScore = 0
 
         for (const p of products) {
-          const productName = p.Text.replace(/\s*\([^)]+\)\s*$/, '').trim()
-          const score = fuzzyScore(c.descripcion, productName)
+          const score = fuzzyScore(c.descripcion, p.name)
           if (score > bestScore && score >= 0.3) {
             bestScore = score
             bestMatch = p
@@ -277,7 +275,7 @@ export default function EntradasFacturaPage() {
 
   // ── Mapping actions ───────────────────────────────────────────────
 
-  const setMappingProduct = useCallback((mappingId: string, product: ProductOption | null) => {
+  const setMappingProduct = useCallback((mappingId: string, product: InventoryProduct | null) => {
     setMappings(prev => prev.map(m => m.id === mappingId ? { ...m, matchedProduct: product } : m))
     setSearchingId(null)
     setProductSearch('')
@@ -292,10 +290,14 @@ export default function EntradasFacturaPage() {
   }, [])
 
   // Filtered products for inline search
+  const alreadyMapped = new Set(mappings.filter(m => m.matchedProduct).map(m => m.matchedProduct!.ingredient_id))
   const filteredProducts = products.filter(p => {
+    if (alreadyMapped.has(p.ingredient_id)) return false
     const q = productSearch.toLowerCase()
     if (!q) return true
-    return p.Text.toLowerCase().includes(q)
+    return p.name.toLowerCase().includes(q) ||
+           p.ingredient_id.toLowerCase().includes(q) ||
+           (p.category || '').toLowerCase().includes(q)
   }).slice(0, 30)
 
   const mappedCount = mappings.filter(m => m.matchedProduct).length
@@ -308,62 +310,105 @@ export default function EntradasFacturaPage() {
     setSaving(true)
     setSaveResult(null)
 
+    const clientId = getActiveClientSlug()
     const fecha = cfdi.fecha.slice(0, 10) || todayStr()
+    const timestamp = nowKey()
+    const uuidShort = (cfdi.uuid || 'noid').slice(0, 12)
+    const idempotencyKey = makeIdempotencyKey('invoice_entry', 'dashboard', timestamp, uuidShort)
 
-    const payload = {
-      invoice: {
-        uuid: cfdi.uuid,
-        emisor: cfdi.emisor,
-        receptor: cfdi.receptor,
-        fecha: cfdi.fecha,
-        subtotal: cfdi.subtotal,
-        iva: cfdi.iva,
-        total: cfdi.total,
-      },
-      supplier: matchedSupplier ? {
-        clave: matchedSupplier.clave,
-        nombre: matchedSupplier.nombre,
-        rfc: matchedSupplier.rfc,
-      } : {
-        clave: '',
-        nombre: cfdi.emisor.nombre,
-        rfc: cfdi.emisor.rfc,
-      },
-      items: mappings
-        .filter(m => m.matchedProduct)
-        .map(m => {
-          const codeMatch = m.matchedProduct!.Text.match(/\(([^)]+)\)/)
-          const code = codeMatch ? codeMatch[1] : ''
-          const name = m.matchedProduct!.Text.replace(/\s*\([^)]+\)\s*$/, '').trim()
-          return {
-            invoiceDescripcion: m.descripcion,
-            code,
-            name,
-            productValue: m.matchedProduct!.Value,
-            quantity: m.adjustedQuantity,
-            unitCost: m.adjustedCost,
-            total: m.adjustedQuantity * m.adjustedCost,
-            originalQuantity: m.cantidad,
-            originalUnitario: m.unitario,
-          }
-        }),
-      grandTotal,
-      createdAt: new Date().toISOString(),
-    }
+    const mapped = mappings.filter(m => m.matchedProduct)
 
     try {
-      const clientId = getActiveClientSlug()
-      const ok = await sbPost('wansoft_data', clientId, {
-        data_key: `invoice_entry_${nowKey()}`,
-        fecha,
-        data: payload,
+      // ── 1. Record movements (updates pos_inventory + cost + ledger) ──
+      const movResult: MovementResult = await recordMovement({
+        client_id: clientId,
+        movement_type: 'invoice_entry',
+        actor: 'dashboard',
+        idempotency_key: idempotencyKey,
+        metadata: {
+          cfdi_uuid: cfdi.uuid,
+          emisor_rfc: cfdi.emisor.rfc,
+          emisor_nombre: cfdi.emisor.nombre,
+          supplier_id: matchedSupplier?.id,
+          cfdi_total: cfdi.total,
+          fecha,
+        },
+        lines: mapped.map(m => ({
+          ingredient_id: m.matchedProduct!.ingredient_id,
+          quantity: Math.abs(m.adjustedQuantity),
+          unit_cost: m.adjustedCost,
+          notes: `CFDI:${uuidShort} ${cfdi.emisor.nombre}`,
+        })),
       })
-      setSaveResult(ok ? 'ok' : 'error')
-      if (ok) {
+
+      if (movResult.was_duplicate) {
+        setSaveResult('ok')
         setCfdi(null)
         setMappings([])
         setMatchedSupplier(null)
+        setSaving(false)
+        return
       }
+
+      if (!movResult.success) {
+        setSaveResult('error')
+        setSaving(false)
+        return
+      }
+
+      // ── 2. Save historical blob (wansoft_data) ──
+      const payload = {
+        invoice: {
+          uuid: cfdi.uuid,
+          emisor: cfdi.emisor,
+          receptor: cfdi.receptor,
+          fecha: cfdi.fecha,
+          subtotal: cfdi.subtotal,
+          iva: cfdi.iva,
+          total: cfdi.total,
+        },
+        supplier: matchedSupplier ? {
+          id: matchedSupplier.id,
+          name: matchedSupplier.name,
+          rfc: matchedSupplier.rfc,
+        } : {
+          id: '',
+          name: cfdi.emisor.nombre,
+          rfc: cfdi.emisor.rfc,
+        },
+        items: mapped.map((m, idx) => ({
+          invoiceDescripcion: m.descripcion,
+          ingredient_id: m.matchedProduct!.ingredient_id,
+          name: m.matchedProduct!.name,
+          unit: m.matchedProduct!.unit,
+          quantity: m.adjustedQuantity,
+          unitCost: m.adjustedCost,
+          total: m.adjustedQuantity * m.adjustedCost,
+          originalQuantity: m.cantidad,
+          originalUnitario: m.unitario,
+          stock_before: movResult.details[idx]?.stock_before,
+          stock_after: movResult.details[idx]?.stock_after,
+          cost_before: movResult.details[idx]?.cost_before,
+          cost_after: movResult.details[idx]?.cost_after,
+        })),
+        grandTotal,
+        idempotency_key: idempotencyKey,
+        movements_created: movResult.movements_created,
+        stock_updates: movResult.stock_updates,
+        cost_updates: movResult.cost_updates,
+        created_at: new Date().toISOString(),
+      }
+
+      await sbPost('wansoft_data', clientId, {
+        data_key: `invoice_entry_${timestamp}`,
+        fecha,
+        data: payload,
+      })
+
+      setSaveResult('ok')
+      setCfdi(null)
+      setMappings([])
+      setMatchedSupplier(null)
     } catch {
       setSaveResult('error')
     } finally {
@@ -487,7 +532,7 @@ export default function EntradasFacturaPage() {
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                   <CheckCircle size={16} className="text-emerald-400 shrink-0" />
                   <span className="text-xs text-emerald-400 font-medium">
-                    Proveedor vinculado: {matchedSupplier.nombre} ({matchedSupplier.clave})
+                    Proveedor vinculado: {matchedSupplier.name} ({matchedSupplier.rfc})
                   </span>
                 </div>
               ) : (
@@ -541,7 +586,7 @@ export default function EntradasFacturaPage() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <ArrowRight size={14} className="text-emerald-400 shrink-0" />
-                            <p className="text-sm text-emerald-400 font-medium truncate">{m.matchedProduct.Text}</p>
+                            <p className="text-sm text-emerald-400 font-medium truncate">{m.matchedProduct.name} ({m.matchedProduct.unit})</p>
                             <button
                               onClick={() => removeMappingProduct(m.id)}
                               className="h-6 w-6 flex items-center justify-center rounded hover:bg-red-500/10 text-[var(--text-3)] hover:text-red-400 transition-colors shrink-0"
@@ -606,11 +651,12 @@ export default function EntradasFacturaPage() {
                             <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xl">
                               {filteredProducts.map(p => (
                                 <button
-                                  key={p.Value}
+                                  key={p.ingredient_id}
                                   onClick={() => setMappingProduct(m.id, p)}
-                                  className="w-full text-left px-3 py-2 hover:bg-[var(--border)] transition-colors border-b border-[var(--border)] last:border-b-0 text-xs text-[var(--text-1)]"
+                                  className="w-full text-left px-3 py-2 hover:bg-[var(--border)] transition-colors border-b border-[var(--border)] last:border-b-0"
                                 >
-                                  {p.Text}
+                                  <div className="text-xs text-[var(--text-1)]">{p.name}</div>
+                                  <div className="text-[10px] text-[var(--text-3)]">{p.category || ''} | {p.unit} | Stock: {p.stock.toFixed(1)}</div>
                                 </button>
                               ))}
                             </div>
@@ -653,7 +699,7 @@ export default function EntradasFacturaPage() {
 
             {saveResult === 'ok' && (
               <span className="text-sm text-emerald-400 font-medium">
-                Entrada con factura registrada correctamente
+                Entrada con factura registrada. Stock y costos actualizados.
               </span>
             )}
             {saveResult === 'error' && (
