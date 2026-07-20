@@ -2,30 +2,32 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Search, Save, Trash2, Plus, AlertTriangle, Loader2, PackageX, ChevronDown, Clock, TrendingDown, DollarSign, BarChart3 } from 'lucide-react'
-import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
 import { sbPost } from '@/lib/supabase-helpers'
+import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import type { MovementResult } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
 
 interface InventoryItem {
-  almacen: string
-  codigo: string
-  producto: string
-  departamento: string
-  critico: boolean
-  inv_final_qty: number
-  inv_final_val: number
-  costo_promedio: number
+  ingredient_id: string   // pos_ingredients.id — canonical identifier
+  codigo: string          // same as ingredient_id for display
+  producto: string        // pos_ingredients.name
+  departamento: string    // pos_ingredients.category
+  unit: string            // pos_ingredients.unit
+  stock: number           // pos_inventory.stock (current)
+  costo_promedio: number  // pos_ingredients.cost_per_unit
 }
 
 interface WasteLineItem {
   id: string
+  ingredient_id: string   // pos_ingredients.id — for recordMovement()
   codigo: string
   producto: string
-  almacen: string
+  unit: string
   cantidad: number
   motivo: string
   notas: string
@@ -121,22 +123,18 @@ export default function MermaPage() {
       try {
         const clientId = getActiveClientSlug()
 
-        // Load inventory
-        const invResult = await getWansoftDataLatest('inventory_parsed')
-        if (invResult?.data) {
-          const raw = Array.isArray(invResult.data) ? invResult.data : (invResult.data as any)?.items || []
-          setInventoryItems(raw.map((r: any) => ({
-            almacen: r.almacen || '',
-            codigo: r.codigo || '',
-            producto: r.producto || '',
-            departamento: r.departamento || '',
-            critico: Boolean(r.critico),
-            inv_final_qty: Number(r.inv_final_qty) || 0,
-            inv_final_val: Number(r.inv_final_val) || 0,
-            costo_promedio: Number(r.costo_promedio) || 0,
-          })))
-          setInventoryFecha(invResult.fecha)
-        }
+        // Load inventory from canonical source (pos_ingredients + pos_inventory)
+        const invRows = await loadInventoryWithStock(clientId)
+        setInventoryItems(invRows.map(r => ({
+          ingredient_id: r.ingredient_id,
+          codigo: r.ingredient_id,
+          producto: r.name,
+          departamento: r.category || 'Sin categoría',
+          unit: r.unit,
+          stock: r.stock,
+          costo_promedio: r.cost_per_unit,
+        })))
+        setInventoryFecha(new Date().toISOString().split('T')[0])
 
         // Load waste history (last 60 entries with data_key starting with inventory_waste_)
         const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -225,11 +223,10 @@ export default function MermaPage() {
 
   // ── Filtered products for selected warehouse ──────────────────
 
-  const addedCodes = new Set(items.map(i => `${i.almacen}::${i.codigo}`))
+  const addedIds = new Set(items.map(i => i.ingredient_id))
 
   const filteredProducts = useMemo(() => {
-    let list = inventoryItems.filter(i => matchWarehouse(i.almacen, activeWarehouse))
-    list = list.filter(i => !addedCodes.has(`${i.almacen}::${i.codigo}`))
+    let list = inventoryItems.filter(i => !addedIds.has(i.ingredient_id))
     if (search.length >= 2) {
       const q = search.toLowerCase()
       list = list.filter(i =>
@@ -239,16 +236,17 @@ export default function MermaPage() {
       )
     }
     return list.sort((a, b) => a.producto.localeCompare(b.producto, 'es')).slice(0, 50)
-  }, [inventoryItems, activeWarehouse, search, addedCodes])
+  }, [inventoryItems, search, addedIds])
 
   // ── Actions ────────────────────────────────────────────────────
 
   const addProduct = useCallback((item: InventoryItem) => {
     setItems(prev => [...prev, {
       id: uid(),
+      ingredient_id: item.ingredient_id,
       codigo: item.codigo,
       producto: item.producto,
-      almacen: item.almacen,
+      unit: item.unit,
       cantidad: 1,
       motivo: MOTIVOS[0],
       notas: '',
@@ -283,42 +281,76 @@ export default function MermaPage() {
     setSaving(true)
     setSaveMessage(null)
 
-    const payload = {
-      warehouse: activeWarehouse,
-      warehouse_label: WAREHOUSES.find(w => w.key === activeWarehouse)?.label,
-      items: items.map(i => ({
-        codigo: i.codigo,
-        producto: i.producto,
-        almacen: i.almacen,
-        cantidad: i.cantidad,
-        motivo: i.motivo,
-        notas: i.notas,
-        costo_unitario: i.costo_unitario,
-        costo_total: i.costo_total,
-      })),
-      total: grandTotal,
-      created_at: new Date().toISOString(),
-    }
+    const clientId = getActiveClientSlug()
+    const timestamp = nowKey()
+    const idempotencyKey = makeIdempotencyKey('waste', 'dashboard', timestamp, activeWarehouse)
 
     try {
-      const clientId = getActiveClientSlug()
-      const ok = await sbPost('wansoft_data', clientId, {
-        data_key: `inventory_waste_${nowKey()}`,
+      // ── 1. Record movements (updates pos_inventory + ledger) ──
+      const movResult: MovementResult = await recordMovement({
+        client_id: clientId,
+        movement_type: 'waste',
+        actor: 'dashboard',
+        idempotency_key: idempotencyKey,
+        metadata: { warehouse: activeWarehouse },
+        lines: items.map(i => ({
+          ingredient_id: i.ingredient_id,
+          quantity: -Math.abs(i.cantidad),  // waste = negative
+          notes: `${i.motivo}${i.notas ? ': ' + i.notas : ''}`,
+        })),
+      })
+
+      if (movResult.was_duplicate) {
+        setSaveMessage({ type: 'success', text: 'Esta merma ya fue registrada anteriormente.' })
+        setItems([])
+        setSaving(false)
+        return
+      }
+
+      if (!movResult.success) {
+        setSaveMessage({ type: 'error', text: `Error: ${movResult.errors.join(', ')}` })
+        setSaving(false)
+        return
+      }
+
+      // ── 2. Save historical blob (wansoft_data, for traceability) ──
+      const payload = {
+        warehouse: activeWarehouse,
+        warehouse_label: WAREHOUSES.find(w => w.key === activeWarehouse)?.label,
+        items: items.map(i => ({
+          ingredient_id: i.ingredient_id,
+          codigo: i.codigo,
+          producto: i.producto,
+          unit: i.unit,
+          cantidad: i.cantidad,
+          motivo: i.motivo,
+          notas: i.notas,
+          costo_unitario: i.costo_unitario,
+          costo_total: i.costo_total,
+        })),
+        total: grandTotal,
+        idempotency_key: idempotencyKey,
+        movements_created: movResult.movements_created,
+        stock_updates: movResult.stock_updates,
+        created_at: new Date().toISOString(),
+      }
+
+      await sbPost('wansoft_data', clientId, {
+        data_key: `inventory_waste_${timestamp}`,
         fecha: todayISO(),
         data: payload,
       })
-      if (ok) {
-        setSaveMessage({ type: 'success', text: `Merma registrada: ${items.length} productos por ${formatCurrency(grandTotal)}` })
-        // Add to local history
-        setWasteHistory(prev => [{
-          data_key: `inventory_waste_${nowKey()}`,
-          fecha: todayISO(),
-          data: payload,
-        }, ...prev])
-        setItems([])
-      } else {
-        setSaveMessage({ type: 'error', text: 'Error al guardar. Intenta de nuevo.' })
-      }
+
+      setSaveMessage({
+        type: 'success',
+        text: `Merma registrada: ${items.length} productos por ${formatCurrency(grandTotal)}. Stock actualizado.`,
+      })
+      setWasteHistory(prev => [{
+        data_key: `inventory_waste_${timestamp}`,
+        fecha: todayISO(),
+        data: payload,
+      }, ...prev])
+      setItems([])
     } catch {
       setSaveMessage({ type: 'error', text: 'Error de red. Verifica tu conexion.' })
     }
@@ -424,7 +456,7 @@ export default function MermaPage() {
           <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xl">
             {filteredProducts.map(p => (
               <button
-                key={`${p.almacen}::${p.codigo}`}
+                key={p.ingredient_id}
                 onClick={() => addProduct(p)}
                 className="w-full text-left px-4 py-3 hover:bg-[var(--border)] transition-colors border-b border-[var(--border)] last:border-b-0 flex items-center gap-3"
               >
@@ -432,7 +464,7 @@ export default function MermaPage() {
                 <div className="min-w-0">
                   <div className="text-sm text-[var(--text-1)] truncate">{p.producto}</div>
                   <div className="text-xs text-[var(--text-3)] mt-0.5">
-                    {p.codigo} | {p.departamento} | Stock: {p.inv_final_qty.toFixed(1)} | {formatCurrency(p.costo_promedio)}/u
+                    {p.departamento} | Stock: {formatNumber(p.stock)} {p.unit} | {formatCurrency(p.costo_promedio)}/{p.unit}
                   </div>
                 </div>
               </button>
@@ -441,7 +473,7 @@ export default function MermaPage() {
         )}
         {dropdownOpen && search.length >= 2 && filteredProducts.length === 0 && (
           <div className="absolute z-50 mt-1 w-full rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-xl px-4 py-3">
-            <span className="text-sm text-[var(--text-3)]">Sin resultados en {WAREHOUSES.find(w => w.key === activeWarehouse)?.label}</span>
+            <span className="text-sm text-[var(--text-3)]">Sin resultados</span>
           </div>
         )}
       </div>
