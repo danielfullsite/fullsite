@@ -33,6 +33,7 @@ export default function RecetasPage() {
   const [showNewRecipe, setShowNewRecipe] = useState(false)
   const [saving, setSaving] = useState(false)
   const [subRecipes, setSubRecipes] = useState<{ id: string; name: string; yield_quantity: number; yield_unit: string }[]>([])
+  const [subCosts, setSubCosts] = useState<Map<string, number>>(new Map()) // sub_recipe_id → cost per yield unit
 
   async function addIngredientToRecipe(menuItemId: string, menuItemName: string, ingredientId: string, quantity: number, ingredientType: string, unit: string) {
     setSaving(true)
@@ -78,10 +79,29 @@ export default function RecetasPage() {
     const [r, i] = await Promise.all([getRecipes(), getIngredients()])
     setRecipes(r)
     setIngredients(i)
-    // Load sub-recipes for the dropdown
+    // Load sub-recipes for the dropdown + their costs
     try {
       const srRes = await fetch(`/api/sub-recipes`, { headers: { 'x-client-id': _cid() } })
-      if (srRes.ok) setSubRecipes(await srRes.json())
+      if (srRes.ok) {
+        const srs = await srRes.json()
+        setSubRecipes(srs)
+        // Load costs in parallel for all sub-recipes used in recipes
+        const costMap = new Map<string, number>()
+        const usedSubIds = new Set(r.filter((row: RecipeRow) => (row as RecipeRow & { ingredient_type?: string }).ingredient_type === 'sub_recipe').map((row: RecipeRow) => row.ingredient_id))
+        await Promise.all(Array.from(usedSubIds).map(async (subId: string) => {
+          try {
+            const costRes = await fetch(`/api/food-cost/calculate?sub_recipe_id=${subId}`, { headers: { 'x-client-id': _cid() } })
+            if (costRes.ok) {
+              const data = await costRes.json()
+              const sr = srs.find((s: { id: string }) => s.id === subId)
+              if (sr && sr.yield_quantity > 0) {
+                costMap.set(subId, data.total_cost / sr.yield_quantity)
+              }
+            }
+          } catch { /* */ }
+        }))
+        setSubCosts(costMap)
+      }
     } catch { /* */ }
     setLoading(false)
   }
@@ -111,7 +131,9 @@ export default function RecetasPage() {
       const unit = isSubRecipe && sub ? sub.yield_unit : (ing?.unit ?? row.unit ?? '')
       const costPerUnit = ing?.cost_per_unit ?? 0
       const yieldFactor = (ing as Ingredient & { yield_factor?: number })?.yield_factor ?? 1
-      const cost = isSubRecipe ? 0 : (costPerUnit / (yieldFactor || 1)) * row.quantity // sub-recipe costs need API call
+      const cost = isSubRecipe
+        ? (subCosts.get(row.ingredient_id) ?? 0) * row.quantity
+        : (costPerUnit / (yieldFactor || 1)) * row.quantity
       group.ingredients.push({
         ...row,
         ingredient_name: isSubRecipe ? `${name} (sub-receta)` : name,
@@ -121,7 +143,7 @@ export default function RecetasPage() {
       group.total_cost += cost
     }
     return Array.from(map.values()).sort((a, b) => a.menu_item_name.localeCompare(b.menu_item_name))
-  }, [recipes, ingMap, subMap])
+  }, [recipes, ingMap, subMap, subCosts])
 
   const filtered = grouped.filter(g =>
     g.menu_item_name.toLowerCase().includes(searchTerm.toLowerCase())
