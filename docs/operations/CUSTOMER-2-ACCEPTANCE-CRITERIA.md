@@ -1,8 +1,9 @@
 # Customer #2 Acceptance Criteria
 
 **Fecha:** 2026-07-21
-**Objetivo:** Definición objetiva de cuándo Fullsite está listo para instalar en un restaurante nuevo.
+**Objetivo:** Definición objetiva de cuándo Fullsite está listo para instalar en un restaurante nuevo dentro del perfil operativo certificado.
 **Regla:** Todos los criterios P0 deben ser PASS antes de ofrecer instalación.
+**Tenant de certificación:** `fullsite_certification` — permanente. Se limpia transacciones entre pruebas pero se conserva configuración.
 
 ---
 
@@ -39,6 +40,7 @@
 | C-3 | Número de mesas configurable sin código | Cambiar `mesas` en `clients` row, verificar que POS muestra la cantidad correcta | POS muestra N mesas, no 16 ni 33 | ☐ |
 | C-4 | Logo del restaurante aparece (o placeholder neutral, no AMALAY) | Subir logo a `logo_url` en `clients` o verificar que sin logo no muestra AMALAY | POS login sin logo de otro restaurante | ☐ |
 | C-5 | AI chat/coach se identifica como el restaurante nuevo | Enviar mensaje al chat, verificar que responde con el nombre correcto | Respuesta menciona nombre del restaurante, no AMALAY | ☐ |
+| C-6 | Station routing configurable por cliente — items van a la estación correcta | Crear categorías con nombres diferentes a AMALAY (ej: "Parrilla" en vez de "Coffee"). Enviar orden. Verificar que la comanda llega a la impresora correcta según config del cliente, no según keywords hardcodeados de AMALAY. | Comanda de categoría custom imprime en la estación asignada | ☐ |
 
 ### FASE 3: DATOS MÍNIMOS
 
@@ -58,7 +60,7 @@
 | H-2 | Bridge de impresión responde en localhost:7717 | Verificar `/health` del bridge | `{"status":"ok"}` | ☐ |
 | H-3 | Impresora de cocina recibe comanda | Enviar orden a cocina desde POS | Comanda impresa legible | ☐ |
 | H-4 | Impresora de caja imprime ticket | Cobrar una orden | Ticket impreso con QR de factura | ☐ |
-| H-5 | Offline: POS no crashea si pierde internet | Desconectar WiFi, intentar operación | Mensaje de offline, no crash | ☐ |
+| H-5 | Offline: POS mantiene operación básica sin internet | Desconectar WiFi durante una orden abierta. Verificar: (1) orden se guarda en cola offline, (2) indicador "Sin conexión" visible, (3) no crash ni pérdida de datos, (4) al reconectar se sincroniza automáticamente | Screenshot de indicador offline + orden sincronizada post-reconexión | ☐ |
 
 ### FASE 5: OPERACIÓN
 
@@ -97,8 +99,10 @@
 | D-4, D-5 | Dev (ya implementado) | 0 (verificar) | Ninguna |
 | P-1 a P-5 | Operativo + Dev | 0 (verificar) | D-1, D-2, H-1 |
 | A-1 a A-4 | Dev (ya validado) | 0 (verificar) | O-1 |
+| C-6 | Dev (station routing configurable) | 2 horas | D-1 |
+| F-1 a F-9 | Dev + QA | 2 horas (verificar) | P-1 a P-5 |
 
-**Total P0: ~5 horas de desarrollo + 2 horas de verificación**
+**Total P0: ~7 horas de desarrollo + 4 horas de verificación**
 
 ### P1 — Importantes (resolver en semana 1)
 
@@ -117,7 +121,6 @@
 | Criterio | Esfuerzo |
 |---|---|
 | O-4 (errores visibles en wizard) | 1 hora |
-| Station routing configurable | 2 horas |
 | Modifier groups import | 2 horas |
 | Agent workflows por cliente | 1 hora |
 | Health check multi-tenant | 30 min |
@@ -159,7 +162,8 @@ VERIFICACIÓN OPERATIVA (en terminal o browser, 1 hora):
   □ Abrir dashboard → verificar datos del día
 
 CLEANUP:
-  □ Eliminar datos del cliente ficticio
+  □ Limpiar transacciones del tenant fullsite_certification
+  □ Conservar configuración del tenant (no eliminar)
   □ Verificar que AMALAY no fue afectado
 ```
 
@@ -173,9 +177,46 @@ CLEANUP:
 
 ---
 
+## Escenarios de Fallo (P0)
+
+Cada escenario debe probarse durante la certificación. El sistema debe manejar cada uno sin crash, data leak ni corrupción.
+
+| ID | Escenario | Comportamiento esperado | Status |
+|---|---|---|---|
+| F-1 | Impresora de cocina apagada/desconectada | Orden se guarda. Error de impresión visible. Reintento disponible. No bloquea la operación. | ☐ |
+| F-2 | Onboarding parcial (wizard abandonado a mitad) | No quedan datos huérfanos. El cliente no aparece como activo. Se puede reintentar. | ☐ |
+| F-3 | CSV de menú con formato inválido (columnas faltantes, encoding roto) | Error visible con mensaje claro. No se importan datos parciales. | ☐ |
+| F-4 | PIN duplicado entre dos staff del mismo restaurante | Error visible al crear. No se guarda el duplicado. | ☐ |
+| F-5 | Email duplicado en onboarding (ya existe en Supabase Auth) | Error claro. No se crea un segundo usuario. Flujo no crashea. | ☐ |
+| F-6 | Reintento de pago (doble click en "Cobrar") | Solo se procesa un cobro. Idempotencia por operation lock. | ☐ |
+| F-7 | Diferencia de caja en cierre de turno | Diferencia se registra. Cierre se completa con la diferencia documentada. No se bloquea. | ☐ |
+| F-8 | Orden enviada a cocina pero internet se cae antes de confirmar | Orden queda en cola offline. Se sincroniza al reconectar. No se pierde. | ☐ |
+| F-9 | Station routing con categoría desconocida | Item se rutea a estación default (cocina). Warning en logs, no error visible. | ☐ |
+
+---
+
+## Metadata de Evidencia
+
+Cada criterio marcado como PASS debe incluir:
+
+```
+Criterio: [ID]
+Fecha: YYYY-MM-DD HH:MM
+Commit: [hash]
+Ambiente: producción | staging | local
+Ejecutor: [nombre]
+Client ID: [fullsite_certification | otro]
+IDs relevantes: [order_id, turno_id, etc.]
+Evidencia: [screenshot path | log entry | query result]
+Notas: [observaciones]
+```
+
+---
+
 ## Notas
 
 - Este documento se actualiza cada vez que se cierra un gap.
-- Cada criterio marcado como ☐ se convierte en ☑ con fecha y evidencia.
+- Cada criterio marcado como ☐ se convierte en ☑ con la metadata de evidencia.
 - La prueba de aceptación se corre ANTES de cada instalación nueva.
 - Si un criterio previamente PASS regresa a FAIL, se congela la instalación.
+- El tenant `fullsite_certification` es permanente. Se limpian órdenes y turnos entre pruebas, se conserva configuración (staff, menú, métodos de pago).
