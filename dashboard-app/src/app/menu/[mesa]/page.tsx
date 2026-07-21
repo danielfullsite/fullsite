@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { MENU_CATEGORIES, getMenuCategoriesFromDB, formatMXN, type MenuCategory, type MenuItem } from '@/lib/pos-data'
 import { ShoppingCart, Plus, Minus, Send, ChevronLeft, X, MessageSquare } from 'lucide-react'
+import { getActiveClientSlug } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -75,7 +76,7 @@ export default function MenuPage({ params }: { params: Promise<{ mesa: string }>
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
-        client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay', mesa: mesaNum, mesero: `QR: ${nombre || 'Cliente'}`, personas: 1,
+        client_id: getActiveClientSlug(), mesa: mesaNum, mesero: `QR: ${nombre || 'Cliente'}`, personas: 1,
         status: 'enviada', subtotal: totalPrice, iva, total: totalPrice + iva, descuento: 0,
         items: JSON.stringify(items),
       }),

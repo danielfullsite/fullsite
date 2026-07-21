@@ -264,6 +264,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 
 // Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
 import { _categoryNameCache } from '@/lib/pos-constants'
+import { getActiveClientSlug } from '@/lib/data'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
@@ -300,12 +301,9 @@ const _SUPABASE_URL = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_S
 const _SUPABASE_KEY = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' : ''
 const _SB_HEADERS = { apikey: _SUPABASE_KEY, Authorization: `Bearer ${_SUPABASE_KEY}` }
 
-/** Get current client ID from localStorage (set by AuthContext on login). Falls back to 'amalay'. */
+/** Get current client ID — delegates to canonical getActiveClientSlug(). */
 function _getClientId(): string {
-  if (typeof window === 'undefined') return 'amalay'
-  try {
-    return localStorage.getItem('fullsite_client_id') || 'amalay'
-  } catch { return 'amalay' }
+  return getActiveClientSlug()
 }
 
 /** Public accessor for pages that query Supabase directly (e.g. corte). */

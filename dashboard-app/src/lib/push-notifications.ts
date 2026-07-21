@@ -1,4 +1,5 @@
 // Push Notification utilities
+import { getActiveClientSlug } from '@/lib/data'
 // VAPID key pair should be generated and stored in env vars:
 //   NEXT_PUBLIC_VAPID_PUBLIC_KEY — for client subscription
 //   VAPID_PRIVATE_KEY — for server-side push sending
@@ -85,7 +86,7 @@ async function saveSubscription(subscription: PushSubscription): Promise<void> {
     body: JSON.stringify({
       endpoint: subscription.endpoint,
       keys: JSON.stringify(subscription.toJSON().keys),
-      client_id: typeof window !== 'undefined' ? (localStorage.getItem('fullsite_client_id') || 'amalay') : 'amalay',
+      client_id: getActiveClientSlug(),
       created_at: new Date().toISOString(),
     }),
   })

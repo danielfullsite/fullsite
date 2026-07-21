@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { User, Sparkles, ArrowUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
+import { getActiveClientSlug } from '@/lib/data'
 
 const suggestionCards = [
   {
@@ -73,7 +74,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: text,
           history: messages.slice(-8),
-          client_id: clientId || 'amalay',
+          client_id: clientId || getActiveClientSlug(),
         }),
       })
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, ArrowLeft, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
+import { getActiveClientSlug } from '@/lib/data'
 
 const quickQuestions = [
   '¿Cómo van las ventas hoy?',
@@ -218,7 +219,7 @@ export default function ChatWidget() {
         body: JSON.stringify({
           message: text,
           history: messages.slice(-6),
-          client_id: clientId || 'amalay',
+          client_id: clientId || getActiveClientSlug(),
         }),
       })
 

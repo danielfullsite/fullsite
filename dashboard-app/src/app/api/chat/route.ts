@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const fetches: Promise<unknown>[] = [
       // 0: Daily data (always)
-      fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(client_id || 'amalay')}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&client_slug=eq.${encodeURIComponent(client_id || '')}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []),
       // 1: Waiter categories (conditional)
       wantsMeseros ? fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=7`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 2: Food cost (conditional)
@@ -136,13 +136,13 @@ export async function POST(request: NextRequest) {
       // 3: Reservaciones (conditional)
       wantsReservas ? fetch(`${sbUrl}/rest/v1/amalay_reservaciones?select=nombre,fecha,espacio,horario_inicio,guests,paquete,total,status,codigo_reserva&order=fecha.asc&fecha=gte.${new Date().toISOString().split('T')[0]}&limit=20`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 4: POS orders (conditional)
-      wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(client_id || 'amalay')}&select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsOrders ? fetch(`${sbUrl}/rest/v1/pos_orders?client_id=eq.${encodeURIComponent(client_id || '')}&select=status,total,mesa,mesero,metodo_pago,created_at&order=created_at.desc&limit=50`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 5: Recipes + insumos (conditional — for food cost, receta, ingrediente questions)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_recipes?select=nombre,precio_venta,costo_total,pct_costo,ingredientes&order=nombre.asc&limit=120`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 6: Insumos (conditional)
       wantsFoodCost ? fetch(`${sbUrl}/rest/v1/pos_insumos?select=nombre,categoria,proveedor,um,precio_limpio,merma_pct&order=nombre.asc&limit=500`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
       // 7: Market stock (conditional)
-      wantsMarket ? fetch(`${sbUrl}/rest/v1/pos_market_stock?select=menu_item_id,stock,reorder_point&client_id=eq.${encodeURIComponent(client_id || 'amalay')}&order=stock.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
+      wantsMarket ? fetch(`${sbUrl}/rest/v1/pos_market_stock?select=menu_item_id,stock,reorder_point&client_id=eq.${encodeURIComponent(client_id || '')}&order=stock.asc&limit=100`, { headers: sbHeaders, cache: 'no-store' }).then(r => r.ok ? r.json() : []).catch(() => []) : Promise.resolve([]),
     ]
 
     const [recentDays, waiterRowsRaw, fcRowsRaw, reservasRaw, ordersRaw, recipesRaw, insumosRaw, marketStockRaw] = await Promise.all(fetches) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]]
@@ -544,7 +544,7 @@ export async function POST(request: NextRequest) {
       try {
         const pfStart = dateFilter?.start || todayStr.slice(0, 8) + '01'
         const pfEnd = dateFilter?.end || todayStr
-        const pfRes = await fetch(`${sbUrl}/rest/v1/wansoft_data?client_id=eq.${encodeURIComponent(client_id || 'amalay')}&data_key=eq.platillos_full&fecha=gte.${pfStart}&fecha=lte.${pfEnd}&select=fecha,data&order=fecha.asc&limit=92`, { headers: sbHeaders, cache: 'no-store' })
+        const pfRes = await fetch(`${sbUrl}/rest/v1/wansoft_data?client_id=eq.${encodeURIComponent(client_id || '')}&data_key=eq.platillos_full&fecha=gte.${pfStart}&fecha=lte.${pfEnd}&select=fecha,data&order=fecha.asc&limit=92`, { headers: sbHeaders, cache: 'no-store' })
         const pfRows = pfRes.ok ? await pfRes.json() as Array<{ fecha: string; data: unknown }> : []
         if (pfRows.length > 0) {
           // Tokens de búsqueda: palabras del mensaje (4+ letras) que no son stopwords
@@ -758,7 +758,7 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
     let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
     try {
       const staffRes = await fetch(
-        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(client_id || 'amalay')}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
+        `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(client_id || '')}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,
         { headers: sbHeaders, cache: 'no-store' }
       )
       if (staffRes.ok) {
@@ -1043,7 +1043,7 @@ ${dailyContext}`
       method: 'POST',
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
-        client_id: client_id || 'amalay',
+        client_id: client_id || '',
         user_id: userId || null,
         user_message: message.slice(0, 2000),
         ai_response: finalText.slice(0, 5000),

@@ -45,10 +45,7 @@ function hdrs() {
   return { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
 }
 
-function clientId(): string {
-  if (typeof window !== 'undefined') return localStorage.getItem('fullsite_client_id') || 'amalay'
-  return 'amalay'
-}
+import { getActiveClientSlug as clientId } from '@/lib/data'
 
 function parseDate(dateStr: string): Date {
   if (dateStr.includes('/')) {

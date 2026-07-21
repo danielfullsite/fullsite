@@ -43,7 +43,7 @@ const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // ═════════════════════════════════════════════════════════════════════
 export default function PublicSurveyPage() {
   const params = useParams()
-  const clientId = (params?.id as string) || 'amalay'
+  const clientId = (params?.id as string) || ''
 
   const [config, setConfig] = useState<SurveyConfig | null>(null)
   const [answers, setAnswers] = useState<Record<string, number | string | boolean>>({})

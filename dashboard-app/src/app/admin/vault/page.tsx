@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Shield, Plus, Eye, EyeOff, Copy, Trash2, Search, Lock, Key, Wifi, CreditCard, Store, Globe, Bot, Server, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { getActiveClientSlug } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -69,7 +70,7 @@ export default function VaultPage() {
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
 
   // Form state
-  const [form, setForm] = useState({ client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
+  const [form, setForm] = useState({ client_id: getActiveClientSlug(), category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
 
   // Only dueño/admin can access
   if (role !== 'dueño') {
@@ -111,7 +112,7 @@ export default function VaultPage() {
         notes: form.notes || null,
       }),
     })
-    setForm({ client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay', category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
+    setForm({ client_id: getActiveClientSlug(), category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
     setShowAdd(false)
     fetchCredentials()
   }

@@ -202,7 +202,7 @@ export default function CierreInventarioPage() {
     setSaving(true)
     setSaveMsg('')
     const payload = {
-      client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay',
+      client_id: getActiveClientSlug(),
       snapshot_date: new Date().toISOString().slice(0, 10),
       total_value: totalValue,
       total_items: totalActive,

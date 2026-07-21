@@ -5,6 +5,7 @@ import { Search, Plus, Trash2, Check, ArrowLeft, Send, Download } from 'lucide-r
 import { getIngredients, getInventory } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
+import { getActiveClientSlug } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -114,7 +115,7 @@ export default function OrdenCompraPage() {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
-          client_id: (typeof window !== 'undefined' && localStorage.getItem('fullsite_client_id')) || 'amalay',
+          client_id: getActiveClientSlug(),
           fecha: today,
           status: 'borrador',
           items: JSON.stringify(items),

@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
     const order = orders[0]
     const verifiedTotal = Number(order.total) || 0
-    const clientId = order.client_id || 'amalay'
+    const clientId = order.client_id || ''
 
     // 2. Check no duplicate invoice for this order
     const dupRes = await fetch(

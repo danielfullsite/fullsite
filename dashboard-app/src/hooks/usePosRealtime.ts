@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient, RealtimeChannel } from '@supabase/supabase-js'
+import { getActiveClientSlug } from '@/lib/data'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,7 +39,7 @@ export function usePosRealtime(): RealtimeState {
   const subscribe = useCallback((callbacks: RealtimeCallbacks) => {
     callbacksRef.current = callbacks
 
-    const clientId = typeof window !== 'undefined' ? (localStorage.getItem('fullsite_client_id') || 'amalay') : 'amalay'
+    const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : getActiveClientSlug()
 
     // Orders channel
     const channel = supabase

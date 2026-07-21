@@ -28,9 +28,7 @@ export function getTerminalId(): string {
   return id
 }
 
-function getClientId(): string {
-  try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' }
-}
+import { getActiveClientSlug as getClientId } from '@/lib/data'
 
 /**
  * Check if a staff member has an active session on a DIFFERENT terminal.

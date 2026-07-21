@@ -2,6 +2,7 @@
 // Loaded once per session from Supabase `clients` table via fetchClientConfig()
 
 import { fetchClientConfig } from './client-config'
+import { getActiveClientSlug } from '@/lib/data'
 
 export interface PosClientConfig {
   name: string         // "AMALAY"
@@ -20,7 +21,7 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
   if (_posConfig) return _posConfig
 
   const clientId = typeof window !== 'undefined'
-    ? (localStorage.getItem('fullsite_client_id') || 'amalay')
+    ? getActiveClientSlug()
     : 'amalay'
 
   const config = await fetchClientConfig(clientId)
