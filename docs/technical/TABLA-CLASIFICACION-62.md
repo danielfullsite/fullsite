@@ -128,19 +128,34 @@ Solo necesarias para clientes que vienen de Wansoft. Cliente #2 sin Wansoft no l
 |---|---|---|
 | **Generar migration** | 22 Core + 4 Infra + 5 CRM = 31 | Base reproducible para cliente #2 |
 | **Generar migration con flag Wansoft** | 14 Pipeline | Solo instalar si cliente viene de Wansoft |
-| **Eliminar** | 6 Legacy + 8 Experimental + 3 Temporal = 17 | Base limpia, sin dead weight |
-| **Revisar** | content, pos_mutation_authority, tasks = 3 | Decidir antes de generar |
-| **Total** | 62 → 31 migrations + 14 opcionales + 17 eliminar | |
+| **Eliminar** | 6 Legacy + 8 Experimental + 3 Temporal + 2 Revisados = 19 | Base limpia, sin dead weight |
+| **Mantener temporal** | pos_mutation_authority = 1 | Necesaria por SQL functions R1, eliminar cuando se deprecen |
+| **Total** | 62 → 31 migrations + 14 opcionales + 1 temporal + 19 eliminar | |
 
 ---
 
-## Notas Adicionales
+## Revisión Completada (3 tablas pendientes → resueltas)
 
-### `content` (258 filas, 33 refs en src/)
-Altamente referenciada. Probablemente es el CMS para el sitio web o blog de Fullsite. Necesita revisión para determinar si es core o legacy.
+### `content` → **ELIMINAR**
+- 258 filas, todas de abril 2026 (3 meses sin actividad)
+- Contenido: posts de Instagram generados por IA, todos en `status=draft`
+- Los "33 refs en src/" eran falsos positivos (la palabra "content" en `msg.content`, `Content-Type`, etc.)
+- **0 queries reales** al tabla Supabase en todo el código
+- Prototipo de CMS social media abandonado
 
-### `pos_mutation_authority` (0 refs visibles)
-Parte del sistema R1 de idempotencia. Puede ser referenciada solo vía SQL functions (no visible en grep de código JS/TS). Revisar antes de eliminar.
+### `pos_mutation_authority` → **MANTENER TEMPORALMENTE**
+- 1 fila: `{client_id: 'amalay', sale_authority: 'r1'}`
+- **2 funciones SQL** la referencian: `r1_reconcile_order`, `r1_legacy_sale_deduction`
+- Estas funciones controlan el path de deducción de inventario en runtime
+- Eliminarla rompe el POS (SELECT a tabla inexistente en cada orden)
+- No afecta cliente #2 (las funciones R1 son específicas de transición Wansoft)
+- Se elimina cuando se deprecen las funciones R1
+
+### `tasks` → **ELIMINAR**
+- 505 filas, todas de abril 2026, 503/505 en `status=pending`
+- Tareas de marketing generadas por IA, nunca ejecutadas
+- 0 referencias en código TypeScript o Python
+- Mismo patrón que `content`: prototipo abandonado
 
 ### `tasks` (505 filas, 0 refs)
 Internal task tracking. Si nadie la lee en código, probablemente es legacy de un sistema de tareas anterior. Revisar si las filas son históricas o activas.
