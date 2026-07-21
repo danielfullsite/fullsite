@@ -1,29 +1,30 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Search, Save, CheckCircle, AlertTriangle, Package, ClipboardList, ChevronDown } from 'lucide-react'
-import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { Search, Save, CheckCircle, AlertTriangle, Package } from 'lucide-react'
+import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
+import { sbPost } from '@/lib/supabase-helpers'
+import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
+import type { MovementResult } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
 
 interface InventoryItem {
-  almacen: string
-  codigo: string
-  producto: string
-  departamento: string
-  critico: boolean
-  inv_final_qty: number
-  inv_final_val: number
-  costo_promedio: number
+  ingredient_id: string
+  name: string
+  unit: string
+  category: string | null
+  stock: number
+  cost_per_unit: number
 }
 
 interface CountEntry {
-  codigo: string
-  almacen: string
-  producto: string
-  departamento: string
+  ingredient_id: string
+  name: string
+  unit: string
+  category: string | null
   stock_sistema: number
   conteo_real: number | null
   diferencia: number | null
@@ -33,27 +34,22 @@ interface CountEntry {
 
 // ── Constants ───────────────────────────────────────────────────────
 
-const WAREHOUSES = [
-  { key: 'cocina', label: 'Cocina' },
-  { key: 'barra', label: 'Barra' },
-  { key: 'panaderia', label: 'Panaderia' },
-  { key: 'market', label: 'Market' },
-  { key: 'venta_terceros', label: 'Venta Terceros' },
+const COUNT_REASONS = [
+  'Cierre mensual',
+  'Auditoría',
+  'Conteo parcial',
+  'Verificación de discrepancia',
+  'Otro',
 ]
 
-function matchWarehouse(almacen: string, tab: string): boolean {
-  const normalized = almacen.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  if (tab === 'cocina') return normalized.includes('cocina')
-  if (tab === 'barra') return normalized.includes('barra')
-  if (tab === 'panaderia') return normalized.includes('panaderia') || normalized.includes('panadería')
-  if (tab === 'market') return normalized.includes('market')
-  if (tab === 'venta_terceros') return normalized.includes('venta') && normalized.includes('tercero')
-  return false
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0]
 }
 
-function todayISO(): string {
+function nowKey(): string {
   const d = new Date()
-  return d.toISOString().split('T')[0]
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`
 }
 
 // ── Component ───────────────────────────────────────────────────────
@@ -61,33 +57,29 @@ function todayISO(): string {
 export default function TomaFisicaPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [fecha, setFecha] = useState('')
-  const [activeWarehouse, setActiveWarehouse] = useState('cocina')
   const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [countReason, setCountReason] = useState(COUNT_REASONS[0])
   const [counts, setCounts] = useState<Record<string, number | null>>({})
   const [saving, setSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error' | 'duplicate'; text: string } | null>(null)
 
-  // Load inventory data
+  // ── Load inventory from canonical source ──────────────────────────
+
   useEffect(() => {
     async function load() {
       try {
-        const result = await getWansoftDataLatest('inventory_parsed')
-        if (result?.data) {
-          const raw = Array.isArray(result.data) ? result.data : (result.data as any)?.items || []
-          setItems(raw.map((r: any) => ({
-            almacen: r.almacen || '',
-            codigo: r.codigo || '',
-            producto: r.producto || '',
-            departamento: r.departamento || '',
-            critico: Boolean(r.critico),
-            inv_final_qty: Number(r.inv_final_qty) || 0,
-            inv_final_val: Number(r.inv_final_val) || 0,
-            costo_promedio: Number(r.costo_promedio) || 0,
-          })))
-          setFecha(result.fecha)
-        }
+        const clientId = getActiveClientSlug()
+        const data = await loadInventoryWithStock(clientId)
+        setItems(data.map(r => ({
+          ingredient_id: r.ingredient_id,
+          name: r.name,
+          unit: r.unit,
+          category: r.category,
+          stock: r.stock,
+          cost_per_unit: r.cost_per_unit,
+        })))
       } catch (e) {
         console.error('[toma-fisica] Error loading:', e)
       }
@@ -96,45 +88,56 @@ export default function TomaFisicaPage() {
     load()
   }, [])
 
-  // Filter items for the selected warehouse
-  const warehouseItems = useMemo(() => {
-    let list = items.filter(i => matchWarehouse(i.almacen, activeWarehouse))
+  // ── Categories ────────────────────────────────────────────────────
+
+  const categories = useMemo(() => {
+    return [...new Set(items.map(i => i.category || 'SIN CATEGORIA'))].sort()
+  }, [items])
+
+  // ── Filter items ──────────────────────────────────────────────────
+
+  const filteredItems = useMemo(() => {
+    let list = items
     if (!showAll) {
-      list = list.filter(i => i.inv_final_qty > 0)
+      list = list.filter(i => i.stock > 0)
+    }
+    if (categoryFilter) {
+      list = list.filter(i => (i.category || 'SIN CATEGORIA') === categoryFilter)
     }
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(i =>
-        i.producto.toLowerCase().includes(q) ||
-        i.codigo.toLowerCase().includes(q) ||
-        i.departamento.toLowerCase().includes(q)
+        i.name.toLowerCase().includes(q) ||
+        i.ingredient_id.toLowerCase().includes(q) ||
+        (i.category || '').toLowerCase().includes(q)
       )
     }
-    return list.sort((a, b) => a.producto.localeCompare(b.producto, 'es'))
-  }, [items, activeWarehouse, showAll, search])
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [items, showAll, categoryFilter, search])
 
-  // Build count entries with difference calculations
+  // ── Build count entries with difference calculations ──────────────
+
   const countEntries: CountEntry[] = useMemo(() => {
-    return warehouseItems.map(item => {
-      const key = `${item.almacen}::${item.codigo}`
-      const conteo = counts[key] ?? null
-      const diferencia = conteo !== null ? conteo - item.inv_final_qty : null
-      const valorDif = diferencia !== null ? diferencia * item.costo_promedio : null
+    return filteredItems.map(item => {
+      const conteo = counts[item.ingredient_id] ?? null
+      const diferencia = conteo !== null ? conteo - item.stock : null
+      const valorDif = diferencia !== null ? diferencia * item.cost_per_unit : null
       return {
-        codigo: item.codigo,
-        almacen: item.almacen,
-        producto: item.producto,
-        departamento: item.departamento,
-        stock_sistema: item.inv_final_qty,
+        ingredient_id: item.ingredient_id,
+        name: item.name,
+        unit: item.unit,
+        category: item.category,
+        stock_sistema: item.stock,
         conteo_real: conteo,
         diferencia,
         valor_diferencia: valorDif,
-        costo_promedio: item.costo_promedio,
+        costo_promedio: item.cost_per_unit,
       }
     })
-  }, [warehouseItems, counts])
+  }, [filteredItems, counts])
 
-  // Summary stats
+  // ── Summary stats ─────────────────────────────────────────────────
+
   const summary = useMemo(() => {
     const total = countEntries.length
     const counted = countEntries.filter(e => e.conteo_real !== null).length
@@ -144,91 +147,117 @@ export default function TomaFisicaPage() {
     return { total, counted, pending, totalDiffValue, discrepancies }
   }, [countEntries])
 
-  // Handle count input
-  const handleCount = useCallback((almacen: string, codigo: string, value: string) => {
-    const key = `${almacen}::${codigo}`
+  // ── Handle count input ────────────────────────────────────────────
+
+  const handleCount = useCallback((ingredientId: string, value: string) => {
     if (value === '' || value === '-') {
       setCounts(prev => {
         const next = { ...prev }
-        delete next[key]
+        delete next[ingredientId]
         return next
       })
     } else {
       const num = parseFloat(value)
       if (!isNaN(num)) {
-        setCounts(prev => ({ ...prev, [key]: num }))
+        setCounts(prev => ({ ...prev, [ingredientId]: num }))
       }
     }
   }, [])
 
-  // Save to Supabase
+  // ── Save ──────────────────────────────────────────────────────────
+
   const handleSave = async () => {
     if (summary.counted === 0) return
-
     setSaving(true)
     setSaveMessage(null)
 
-    const countData = countEntries
-      .filter(e => e.conteo_real !== null)
-      .map(e => ({
-        codigo: e.codigo,
-        almacen: e.almacen,
-        producto: e.producto,
-        departamento: e.departamento,
-        stock_sistema: e.stock_sistema,
-        conteo_real: e.conteo_real,
-        diferencia: e.diferencia,
-        valor_diferencia: e.valor_diferencia,
-        costo_promedio: e.costo_promedio,
-      }))
+    const clientId = getActiveClientSlug()
+    const timestamp = nowKey()
+    const idempotencyKey = makeIdempotencyKey('adjustment', 'dashboard', timestamp, 'toma_fisica')
 
-    const payload = {
-      client_id: getActiveClientSlug(),
-      data_key: `physical_count_${todayISO()}`,
-      fecha: todayISO(),
-      data: {
-        warehouse: activeWarehouse,
-        warehouse_label: WAREHOUSES.find(w => w.key === activeWarehouse)?.label,
-        counted_at: new Date().toISOString(),
-        sistema_fecha: fecha,
-        total_items: summary.total,
-        items_counted: summary.counted,
-        total_diff_value: summary.totalDiffValue,
-        items: countData,
-      },
-    }
+    // Only items that were counted AND have a difference
+    const adjustments = countEntries
+      .filter(e => e.conteo_real !== null && e.diferencia !== null && e.diferencia !== 0)
 
     try {
-      const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (adjustments.length > 0) {
+        // ── 1. Record adjustment movements ──────────────────────
+        const movResult: MovementResult = await recordMovement({
+          client_id: clientId,
+          movement_type: 'adjustment',
+          actor: 'dashboard',
+          idempotency_key: idempotencyKey,
+          metadata: {
+            reason: countReason,
+            total_counted: summary.counted,
+            total_discrepancies: adjustments.length,
+          },
+          lines: adjustments.map(e => ({
+            ingredient_id: e.ingredient_id,
+            quantity: e.diferencia!,  // positive = found more, negative = found less
+            notes: `Toma física: sistema=${e.stock_sistema} conteo=${e.conteo_real} dif=${e.diferencia} motivo=${countReason}`,
+          })),
+        })
 
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/wansoft_data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_KEY!,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Prefer': 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify(payload),
+        if (movResult.was_duplicate) {
+          setSaveMessage({ type: 'duplicate', text: 'Este conteo ya fue registrado anteriormente.' })
+          setCounts({})
+          setSaving(false)
+          return
+        }
+
+        if (!movResult.success) {
+          setSaveMessage({ type: 'error', text: `Error: ${movResult.errors.join(', ')}` })
+          setSaving(false)
+          return
+        }
+      }
+
+      // ── 2. Save historical blob (all counted items, including 0 diff) ──
+      const allCounted = countEntries.filter(e => e.conteo_real !== null)
+      const payload = {
+        reason: countReason,
+        counted_at: new Date().toISOString(),
+        total_items: summary.total,
+        items_counted: summary.counted,
+        discrepancies: adjustments.length,
+        total_diff_value: summary.totalDiffValue,
+        items: allCounted.map(e => ({
+          ingredient_id: e.ingredient_id,
+          name: e.name,
+          unit: e.unit,
+          stock_sistema: e.stock_sistema,
+          conteo_real: e.conteo_real,
+          diferencia: e.diferencia,
+          valor_diferencia: e.valor_diferencia,
+          costo_promedio: e.costo_promedio,
+        })),
+        idempotency_key: idempotencyKey,
+      }
+
+      await sbPost('wansoft_data', clientId, {
+        data_key: `physical_count_${timestamp}`,
+        fecha: todayISO(),
+        data: payload,
       })
 
-      if (res.ok) {
-        setSaveMessage({ type: 'success', text: `Conteo guardado: ${summary.counted} productos en ${WAREHOUSES.find(w => w.key === activeWarehouse)?.label}` })
-      } else {
-        const errText = await res.text().catch(() => '')
-        console.error('[toma-fisica] Save error:', res.status, errText)
-        setSaveMessage({ type: 'error', text: `Error al guardar (${res.status}). Intenta de nuevo.` })
-      }
-    } catch (err) {
-      console.error('[toma-fisica] Save error:', err)
+      const adjMsg = adjustments.length > 0
+        ? ` ${adjustments.length} ajustes aplicados al stock.`
+        : ' Sin discrepancias.'
+
+      setSaveMessage({
+        type: 'success',
+        text: `Conteo guardado: ${summary.counted} productos.${adjMsg}`,
+      })
+      setCounts({})
+    } catch {
       setSaveMessage({ type: 'error', text: 'Error de red. Verifica tu conexion.' })
     }
-
     setSaving(false)
   }
 
-  // Difference color
+  // ── Difference colors ─────────────────────────────────────────────
+
   function diffColor(diff: number | null): string {
     if (diff === null) return ''
     if (diff === 0) return 'text-emerald-400'
@@ -243,7 +272,7 @@ export default function TomaFisicaPage() {
     return 'bg-amber-500/8'
   }
 
-  // ── Render ──────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -257,7 +286,7 @@ export default function TomaFisicaPage() {
     <div className="space-y-6">
       <PageHeader
         title="Toma Fisica de Inventario"
-        subtitle={`Conteo real vs sistema${fecha ? ` — datos al ${fecha}` : ''}`}
+        subtitle={`Conteo real vs sistema — ${items.length} productos`}
         action={
           <button
             onClick={handleSave}
@@ -279,6 +308,8 @@ export default function TomaFisicaPage() {
         <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${
           saveMessage.type === 'success'
             ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+            : saveMessage.type === 'duplicate'
+            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
             : 'bg-red-500/15 text-red-400 border border-red-500/30'
         }`}>
           {saveMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
@@ -319,57 +350,61 @@ export default function TomaFisicaPage() {
         </div>
       </div>
 
-      {/* Warehouse selector + controls */}
+      {/* Controls: reason + search + filter */}
       <div className="flex flex-col gap-3">
-        {/* Warehouse tabs - large touch targets */}
-        <div className="flex gap-2 flex-wrap">
-          {WAREHOUSES.map(wh => (
-            <button
-              key={wh.key}
-              onClick={() => {
-                setActiveWarehouse(wh.key)
-                setSearch('')
-              }}
-              className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeWarehouse === wh.key
-                  ? 'bg-blue-500/20 text-blue-400 border-2 border-blue-500/40'
-                  : 'text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] border-2 border-transparent'
-              }`}
-            >
-              {wh.label}
-            </button>
-          ))}
+        {/* Reason selector */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-[var(--text-3)] shrink-0">Motivo del conteo:</label>
+          <select
+            value={countReason}
+            onChange={e => setCountReason(e.target.value)}
+            className="px-3 py-2 rounded-lg text-sm bg-[var(--surface)] border border-[var(--accent-line)] text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          >
+            {COUNT_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
         </div>
 
-        {/* Search + toggle */}
+        {/* Search + category filter + toggle */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
             <input
               type="text"
-              placeholder="Buscar producto, codigo o departamento..."
+              placeholder="Buscar producto, codigo o categoria..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-11 pr-4 py-3 rounded-xl text-sm bg-[var(--surface)] border border-[var(--accent-line)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer select-none px-1">
-            <input
-              type="checkbox"
-              checked={showAll}
-              onChange={e => setShowAll(e.target.checked)}
-              className="w-5 h-5 rounded border-[var(--accent-line)] bg-[var(--surface)] text-blue-500 focus:ring-blue-500/50 accent-blue-500"
-            />
-            <span className="text-sm text-[var(--text-2)]">Mostrar items sin stock</span>
-          </label>
+          <div className="flex items-center gap-3">
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="px-3 py-2.5 rounded-lg text-xs bg-[var(--surface)] border border-[var(--accent-line)] text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <option value="">Todas las categorias</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none px-1">
+              <input
+                type="checkbox"
+                checked={showAll}
+                onChange={e => setShowAll(e.target.checked)}
+                className="w-5 h-5 rounded border-[var(--accent-line)] bg-[var(--surface)] text-blue-500 focus:ring-blue-500/50 accent-blue-500"
+              />
+              <span className="text-sm text-[var(--text-2)]">Con stock 0</span>
+            </label>
+          </div>
         </div>
       </div>
 
       {/* Results count */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--text-3)]">
-          {formatNumber(warehouseItems.length)} productos en {WAREHOUSES.find(w => w.key === activeWarehouse)?.label}
+          {formatNumber(filteredItems.length)} productos
+          {categoryFilter ? ` en ${categoryFilter}` : ''}
           {search ? ` (filtro: "${search}")` : ''}
         </p>
         {summary.discrepancies > 0 && (
@@ -384,27 +419,13 @@ export default function TomaFisicaPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--accent-line)]">
-              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap">
-                Codigo
-              </th>
-              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap">
-                Producto
-              </th>
-              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap hidden sm:table-cell">
-                Depto
-              </th>
-              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap">
-                Stock Sistema
-              </th>
-              <th className="px-3 py-3 text-center text-[10px] uppercase tracking-wider font-semibold text-blue-400 whitespace-nowrap">
-                Conteo Real
-              </th>
-              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap">
-                Diferencia
-              </th>
-              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] whitespace-nowrap hidden md:table-cell">
-                Valor Dif.
-              </th>
+              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Producto</th>
+              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] hidden sm:table-cell">Categoria</th>
+              <th className="px-3 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Unidad</th>
+              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Stock Sistema</th>
+              <th className="px-3 py-3 text-center text-[10px] uppercase tracking-wider font-semibold text-blue-400">Conteo Real</th>
+              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)]">Diferencia</th>
+              <th className="px-3 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[var(--text-3)] hidden md:table-cell">Valor Dif.</th>
             </tr>
           </thead>
           <tbody>
@@ -412,36 +433,25 @@ export default function TomaFisicaPage() {
               <tr>
                 <td colSpan={7} className="px-4 py-16 text-center text-[var(--text-4)] text-sm">
                   <Package size={32} className="mx-auto mb-3 opacity-40" />
-                  No se encontraron productos para este almacen
+                  No se encontraron productos
                 </td>
               </tr>
             ) : (
-              countEntries.map((entry, idx) => (
+              countEntries.map((entry) => (
                 <tr
-                  key={`${entry.almacen}::${entry.codigo}::${idx}`}
+                  key={entry.ingredient_id}
                   className={`border-b border-[var(--accent-line)]/50 transition-colors ${diffBg(entry.diferencia)} hover:bg-[var(--surface-2)]`}
                 >
-                  {/* Codigo */}
-                  <td className="px-3 py-3 font-mono text-xs text-[var(--text-3)] whitespace-nowrap">
-                    {entry.codigo}
-                  </td>
-
-                  {/* Producto */}
                   <td className="px-3 py-3 font-medium text-[var(--text-1)] max-w-[240px]">
-                    <span className="block truncate">{entry.producto}</span>
+                    <span className="block truncate">{entry.name}</span>
                   </td>
-
-                  {/* Departamento */}
                   <td className="px-3 py-3 text-[var(--text-3)] text-xs whitespace-nowrap hidden sm:table-cell">
-                    {entry.departamento}
+                    {entry.category || 'Sin categoría'}
                   </td>
-
-                  {/* Stock Sistema */}
+                  <td className="px-3 py-3 text-[var(--text-3)] text-xs">{entry.unit}</td>
                   <td className="px-3 py-3 text-right font-mono text-sm tabular-nums text-[var(--text-2)]">
                     {entry.stock_sistema.toFixed(2)}
                   </td>
-
-                  {/* Conteo Real - large touch-friendly input */}
                   <td className="px-2 py-2 text-center">
                     <input
                       type="number"
@@ -449,29 +459,19 @@ export default function TomaFisicaPage() {
                       step="any"
                       placeholder="--"
                       value={entry.conteo_real !== null ? entry.conteo_real : ''}
-                      onChange={e => handleCount(entry.almacen, entry.codigo, e.target.value)}
+                      onChange={e => handleCount(entry.ingredient_id, e.target.value)}
                       className="w-24 sm:w-28 px-3 py-3 rounded-lg text-center text-base font-semibold tabular-nums bg-[var(--surface)] border-2 border-[var(--accent-line)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </td>
-
-                  {/* Diferencia */}
                   <td className={`px-3 py-3 text-right font-mono text-sm font-semibold tabular-nums ${diffColor(entry.diferencia)}`}>
                     {entry.diferencia !== null ? (
-                      <>
-                        {entry.diferencia > 0 ? '+' : ''}{entry.diferencia.toFixed(2)}
-                      </>
+                      <>{entry.diferencia > 0 ? '+' : ''}{entry.diferencia.toFixed(2)}</>
                     ) : (
                       <span className="text-[var(--text-4)]">--</span>
                     )}
                   </td>
-
-                  {/* Valor diferencia */}
                   <td className={`px-3 py-3 text-right font-mono text-xs tabular-nums hidden md:table-cell ${diffColor(entry.valor_diferencia)}`}>
-                    {entry.valor_diferencia !== null ? (
-                      formatCurrency(entry.valor_diferencia)
-                    ) : (
-                      <span className="text-[var(--text-4)]">--</span>
-                    )}
+                    {entry.valor_diferencia !== null ? formatCurrency(entry.valor_diferencia) : <span className="text-[var(--text-4)]">--</span>}
                   </td>
                 </tr>
               ))
@@ -480,11 +480,11 @@ export default function TomaFisicaPage() {
             {/* Totals row */}
             {countEntries.length > 0 && summary.counted > 0 && (
               <tr className="border-t-2 border-[var(--accent-line)] bg-[var(--surface-2)]">
-                <td className="px-3 py-3" />
                 <td className="px-3 py-3 font-bold text-[var(--text-1)] text-xs uppercase tracking-wider">
                   Total ({formatNumber(summary.counted)} contados)
                 </td>
                 <td className="px-3 py-3 hidden sm:table-cell" />
+                <td className="px-3 py-3" />
                 <td className="px-3 py-3 text-right font-mono text-sm font-bold tabular-nums text-[var(--text-1)]">
                   {countEntries.filter(e => e.conteo_real !== null).reduce((s, e) => s + e.stock_sistema, 0).toFixed(2)}
                 </td>
@@ -503,11 +503,11 @@ export default function TomaFisicaPage() {
         </table>
       </div>
 
-      {/* Bottom save bar - sticky on mobile */}
+      {/* Bottom save bar */}
       {summary.counted > 0 && (
         <div className="sticky bottom-4 flex items-center justify-between gap-4 px-5 py-4 rounded-xl border border-[var(--accent-line)] shadow-2xl" style={{ background: 'var(--bento-card)' }}>
           <div className="text-sm text-[var(--text-2)]">
-            <span className="font-semibold text-[var(--text-1)]">{summary.counted}</span> de {summary.total} productos contados
+            <span className="font-semibold text-[var(--text-1)]">{summary.counted}</span> de {summary.total} contados
             {summary.discrepancies > 0 && (
               <span className="ml-3 text-amber-400 font-medium">
                 {summary.discrepancies} discrepancia{summary.discrepancies !== 1 ? 's' : ''}

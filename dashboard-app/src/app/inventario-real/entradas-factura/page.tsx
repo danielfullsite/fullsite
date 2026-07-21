@@ -338,7 +338,7 @@ export default function EntradasFacturaPage() {
           ingredient_id: m.matchedProduct!.ingredient_id,
           quantity: Math.abs(m.adjustedQuantity),
           unit_cost: m.adjustedCost,
-          notes: `CFDI:${uuidShort} ${cfdi.emisor.nombre}`,
+          notes: `CFDI:${cfdiUuid.slice(0, 12)} ${cfdi.emisor.nombre}`,
         })),
       })
 
