@@ -1,0 +1,3831 @@
+{
+  "PECHUGA DE POLLO": {
+    "cost": 12.04,
+    "unit": "Kilogramo",
+    "product_id": 1431696,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HUEVO BLANCO": {
+    "cost": 26.792,
+    "unit": "Kilogramo",
+    "product_id": 1431805,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FLOR COMESTIBLE": {
+    "cost": 5,
+    "unit": "Pieza",
+    "product_id": 1431747,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COL MORADA": {
+    "cost": 0.9,
+    "unit": "Kilogramo",
+    "product_id": 1431742,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TOMATE CHERRY": {
+    "cost": 7.2,
+    "unit": "Kilogramo",
+    "product_id": 1431778,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TOMATE GUAJE": {
+    "cost": 3.3,
+    "unit": "Kilogramo",
+    "product_id": 1431779,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB LECHUGAS MIXTAS": {
+    "cost": 21.2058,
+    "unit": "Kilogramo",
+    "product_id": 1431938,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ACEITE OLIVA": {
+    "cost": 2.3,
+    "unit": "Kilogramo",
+    "product_id": 1431528,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ARUGULA": {
+    "cost": 4.375,
+    "unit": "Kilogramo",
+    "product_id": 1431729,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB VINAGRETA DE CHAMPAÑA": {
+    "cost": 126.54,
+    "unit": "Litro",
+    "product_id": 1431959,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUACATE": {
+    "cost": 30,
+    "unit": "Kilogramo",
+    "product_id": 1431726,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO GOUDA": {
+    "cost": 11.6,
+    "unit": "Kilogramo",
+    "product_id": 1431718,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PECHUGA DE PAVO": {
+    "cost": 42.601656,
+    "unit": "Kilogramo",
+    "product_id": 1431712,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB ADERESO CLASSIC RUBENS": {
+    "cost": 12.08,
+    "unit": "Kilogramo",
+    "product_id": 1431919,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN PARA PANINI (BRIOCHE)": {
+    "cost": 4,
+    "unit": "Pieza",
+    "product_id": 1431917,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BASE PARA SOPA DE CEBOLLA": {
+    "cost": 28.35,
+    "unit": "Kilogramo",
+    "product_id": 1431926,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROMERO": {
+    "cost": 4,
+    "unit": "Gramo",
+    "product_id": 1431775,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO PARMESANO": {
+    "cost": 4.9,
+    "unit": "Kilogramo",
+    "product_id": 1431705,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO SUIZO": {
+    "cost": 21.92,
+    "unit": "Kilogramo",
+    "product_id": 1431722,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEREJIL LISO": {
+    "cost": 4,
+    "unit": "Kilogramo",
+    "product_id": 1431770,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN BAGUETE (400G)": {
+    "cost": 10.24,
+    "unit": "PZA",
+    "product_id": 1431912,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROCCIUTO": {
+    "cost": 59.5,
+    "unit": "Kilogramo",
+    "product_id": 1431698,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PESTO ALBAHACA": {
+    "cost": 6.9156,
+    "unit": "Kilogramo",
+    "product_id": 1431942,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TOMATES DESHIDRATADOS": {
+    "cost": 12.221828,
+    "unit": "Kilogramo",
+    "product_id": 1431637,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANTEQUILLA SIN SAL": {
+    "cost": 6.4,
+    "unit": "Kilogramo",
+    "product_id": 1902468,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB TOMATO BASIL SOUP": {
+    "cost": 6.3245,
+    "unit": "Kilogramo",
+    "product_id": 1431957,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO FETFA": {
+    "cost": 5.6,
+    "unit": "Kilogramo",
+    "product_id": 1431717,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CALABACITA": {
+    "cost": 5.25,
+    "unit": "Kilogramo",
+    "product_id": 1431733,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CEBOLLA MORADA": {
+    "cost": 1.14,
+    "unit": "Kilogramo",
+    "product_id": 1431736,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB VINAGRETA DE LA CASA": {
+    "cost": 7.44,
+    "unit": "Kilogramo",
+    "product_id": 1431960,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB HUMMUS DE BETABEL": {
+    "cost": 8.475,
+    "unit": "Kilogramo",
+    "product_id": 1431935,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NARANJA": {
+    "cost": 0.7,
+    "unit": "Gramo",
+    "product_id": 1431767,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SAL DE MESA": {
+    "cost": 0.18,
+    "unit": "Gramo",
+    "product_id": 1431626,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MEZCAL - 400 CONEJOS": {
+    "cost": 0,
+    "unit": "Litro",
+    "product_id": 1431816,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COCO RALLADO": {
+    "cost": 1.35,
+    "unit": "Kilogramo",
+    "product_id": 1431799,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BLUEBERRYS": {
+    "cost": 17.142855,
+    "unit": "Kilogramo",
+    "product_id": 1431731,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANGO ATAULFO": {
+    "cost": 3.75,
+    "unit": "Kilogramo",
+    "product_id": 1431761,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BASE PARA ACAI": {
+    "cost": 26.75,
+    "unit": "Kilogramo",
+    "product_id": 1431924,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB GRANOLA DE LA CASA": {
+    "cost": 2.595,
+    "unit": "Kilogramo",
+    "product_id": 1431932,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CREMA DE ALMENDRA": {
+    "cost": 3.313725,
+    "unit": "Kilogramo",
+    "product_id": 1431567,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FRESAS FRESCAS": {
+    "cost": 154.185,
+    "unit": "Litro",
+    "product_id": 1431749,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MENTA": {
+    "cost": 2,
+    "unit": "Gramo",
+    "product_id": 1431763,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PLATANO": {
+    "cost": 6.65,
+    "unit": "Kilogramo",
+    "product_id": 1431772,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FRAMBUESA": {
+    "cost": 7.42857,
+    "unit": "Kilogramo",
+    "product_id": 1431748,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BASE PARA ACAI LOVE": {
+    "cost": 37.25,
+    "unit": "Kilogramo",
+    "product_id": 1431925,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CAFE EN GRANO": {
+    "cost": 19.8,
+    "unit": "Gramo",
+    "product_id": 1431544,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NIEVE VAINILLA DE PAPANTLA GRANEL": {
+    "cost": 65,
+    "unit": "Gramo",
+    "product_id": 1432157,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB GALLETA AMALAY A GRANEL": {
+    "cost": 1.4,
+    "unit": "Pieza",
+    "product_id": 1481723,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CREMA DE PISTACHE": {
+    "cost": 6.8522,
+    "unit": "Gramo",
+    "product_id": 1982525,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PISTACHE SIN CASCARA": {
+    "cost": 0.7004,
+    "unit": "Gramo",
+    "product_id": 1912420,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUA PERSONALIZADA AMALAY 500ML": {
+    "cost": 7.5,
+    "unit": "Pieza",
+    "product_id": 1431648,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUA MINERAL 355 ml": {
+    "cost": 11.8712,
+    "unit": "Pieza",
+    "product_id": 1431646,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUA DE PIEDRA NATURAL": {
+    "cost": 13.91,
+    "unit": "Pieza",
+    "product_id": 1431645,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA JAMAICA": {
+    "cost": 3.6168,
+    "unit": "Mililitro",
+    "product_id": 1431686,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GUAYABA": {
+    "cost": 3.6,
+    "unit": "Gramo",
+    "product_id": 1431752,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MIEL DE AGAVE": {
+    "cost": 110,
+    "unit": "Litro",
+    "product_id": 1431606,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUA MINERAL": {
+    "cost": 5.860132,
+    "unit": "Mililitro",
+    "product_id": 1431647,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AGUA TONICA": {
+    "cost": 14.08064,
+    "unit": "Botella",
+    "product_id": 1532513,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CAFE EN GRANO BOLSA 500G": {
+    "cost": 340,
+    "unit": "Pieza",
+    "product_id": 1870315,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CAFE MOLIDO BOLSA 300G": {
+    "cost": 110,
+    "unit": "Pieza",
+    "product_id": 1722346,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CAFE MOLIDO BOLSA 500G": {
+    "cost": 340,
+    "unit": "Pieza",
+    "product_id": 1432047,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CHOCOLATE VARIEDAD, BARRA 80G": {
+    "cost": 185,
+    "unit": "Pieza",
+    "product_id": 2861383,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, JICAMA FUEGO 170": {
+    "cost": 90,
+    "unit": "Pieza",
+    "product_id": 2805571,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS , JICAMA FUEGO 50 G": {
+    "cost": 36,
+    "unit": "Pieza",
+    "product_id": 2805587,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, JICAMA NATURAL 170 G": {
+    "cost": 90,
+    "unit": "Pieza",
+    "product_id": 2805569,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, JICAMA NATURAL 50 G": {
+    "cost": 36,
+    "unit": "Pieza",
+    "product_id": 2805588,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, PEPINO FUEGO 170 G": {
+    "cost": 90,
+    "unit": "Pieza",
+    "product_id": 2805585,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, PEPINO FUEGO 50 G": {
+    "cost": 36,
+    "unit": "Pieza",
+    "product_id": 2805589,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, PEPINO NATURAL 170 G": {
+    "cost": 90,
+    "unit": "Pieza",
+    "product_id": 2805568,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - CRUNCHY CHIPS, PEPINO NATURAL 50 G": {
+    "cost": 36,
+    "unit": "Pieza",
+    "product_id": 2805586,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - GALLETAS BOTE CHICO 20 PZ": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1431993,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - GALLETAS BOTE DE 420G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1431994,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - GALLETAS BOTE MEDIANO 180G": {
+    "cost": 55,
+    "unit": "Pieza",
+    "product_id": 1431995,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - GALLETAS PQ DE 3 PZS": {
+    "cost": 5.23,
+    "unit": "Pieza",
+    "product_id": 1431996,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - GIFT CARD": {
+    "cost": 5,
+    "unit": "Pieza",
+    "product_id": 1833041,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - HAND & BODY LOTION 500ML": {
+    "cost": 100,
+    "unit": "Pieza",
+    "product_id": 1680893,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - HAND WASH 500 ml": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1680890,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUBAMALAY - HEALTHY CRUNCH MIX 300G": {
+    "cost": 121.54,
+    "unit": "Pieza",
+    "product_id": 2265737,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUBAMALAY - HEALTHY CRUNCH MIX 60G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2265390,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - LIBRETA C/ PLUMA PZ": {
+    "cost": 70.689,
+    "unit": "Pieza",
+    "product_id": 2680304,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ALMENDRA ENCHILADA A GRANEL": {
+    "cost": 1.7755,
+    "unit": "Kilogramo",
+    "product_id": 1482654,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ALMENDRA ENTERA ENCHILADA A GRANEL": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1868160,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPITA DE CALABAZA ENCHILADA A GRANEL": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1868156,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPITA DE GIRASOL ENCHILADA A GRANEL": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1868158,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ARANDANO DESHIDRATADO ENCHILADO A GRANEL": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1868162,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CACAHUATE NATURAL ENCHILADO A GRANEL": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1868165,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BOLSA EMPAQUE PRODUCTO MARKET GRANDE": {
+    "cost": 0.1275,
+    "unit": "Pieza",
+    "product_id": 1481618,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ETIQUETA EMPAQUE GRANDE": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1481617,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - MIX SALUD OMEGA 3, 100G": {
+    "cost": 31.02,
+    "unit": "Pieza",
+    "product_id": 1432006,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - RAMEKIN CORAZON PZ": {
+    "cost": 43.1,
+    "unit": "Pieza",
+    "product_id": 2228524,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TAZA CERAMICA VERDE": {
+    "cost": 240,
+    "unit": "Pieza",
+    "product_id": 1870291,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - TE JENGIBRE LIMON PZ - 100G": {
+    "cost": 100.99,
+    "unit": "Pieza",
+    "product_id": 2748079,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - TE MORA DE LA SELVA PZ - 220G": {
+    "cost": 220.63,
+    "unit": "Pieza",
+    "product_id": 2748078,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - TE PETALO MIO PZ - 100G": {
+    "cost": 196.79,
+    "unit": "Pieza",
+    "product_id": 2748076,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - TE PONCHE GUAYABA PZ - 150G": {
+    "cost": 139.9,
+    "unit": "Pieza",
+    "product_id": 2748077,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TERMO GRANDE 1.2 ML": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432192,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TOTEBAG": {
+    "cost": 1000,
+    "unit": "Pieza",
+    "product_id": 2265748,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - VASO PARA CAFE REFILL": {
+    "cost": 30,
+    "unit": "Pieza",
+    "product_id": 1431965,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - VELITA DECORACION PZ": {
+    "cost": 50,
+    "unit": "Pieza",
+    "product_id": 2680305,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ARANDANOS": {
+    "cost": 3.625,
+    "unit": "Kilogramo",
+    "product_id": 1431790,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUEZ GARAMPIÑADA": {
+    "cost": 10.8,
+    "unit": "Kilogramo",
+    "product_id": 1431810,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UVA ROJA": {
+    "cost": 3.04,
+    "unit": "Kilogramo",
+    "product_id": 1431782,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO CABRA": {
+    "cost": 13,
+    "unit": "Kilogramo",
+    "product_id": 1431715,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB NUEZ CARAMELIZADA": {
+    "cost": 4.6818,
+    "unit": "Kilogramo",
+    "product_id": 1828861,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ALCAPARRAS": {
+    "cost": 5.46,
+    "unit": "Kilogramo",
+    "product_id": 1431532,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB ADEREZO VERDE DE LA CASA": {
+    "cost": 10.4,
+    "unit": "Kilogramo",
+    "product_id": 1431920,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ENELDO": {
+    "cost": 8,
+    "unit": "Kilogramo",
+    "product_id": 1431744,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SALMON AHUMADO": {
+    "cost": 66,
+    "unit": "Kilogramo",
+    "product_id": 1431699,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIMON AMARILLO": {
+    "cost": 1.9,
+    "unit": "Gramo",
+    "product_id": 1431759,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TAZA CERAMICA IMPRESA BLANCA": {
+    "cost": 100.89,
+    "unit": "Pieza",
+    "product_id": 1481603,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TAZA TERMICA": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432191,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CACAHUATE CHIPOTLE 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341289,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CACAHUATE HABANERO 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341286,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CACAHUATE LIMON 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341290,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CACAHUATE ORIG SAL DEL HIM 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341291,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CHARRIS CHIPOTLE 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341283,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CHARRIS HABANERO 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341284,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CHARRIS LIM Y SAL DEL HIM 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341285,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - CHARRIS ORIG SAL DEL HIM 142G": {
+    "cost": 48,
+    "unit": "Pieza",
+    "product_id": 2341288,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - PAPAS DESH CHIPOTLE 100G": {
+    "cost": 54,
+    "unit": "Pieza",
+    "product_id": 2341281,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - PAPAS DESH JALAPEÑO Y SAL DEL HIM 100G": {
+    "cost": 54,
+    "unit": "Pieza",
+    "product_id": 2341287,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMARANTH - PAPAS DESH LIM Y SAL DE MAR 100G": {
+    "cost": 54,
+    "unit": "Pieza",
+    "product_id": 2341282,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CAFE DESCAFEINADO": {
+    "cost": 6.8,
+    "unit": "Gramo",
+    "product_id": 1431545,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - OBLEAS DIF SABORES PAQ 58G": {
+    "cost": 28.35,
+    "unit": "Pieza",
+    "product_id": 2495134,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMSTEL ULTRA": {
+    "cost": 13.5057,
+    "unit": "Pieza",
+    "product_id": 1431650,
+    "department_id": 0,
+    "performance": 0
+  },
+  "APEROL": {
+    "cost": 16.894215,
+    "unit": "Mililitro",
+    "product_id": 1431817,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO ESPUMOSO CINZANO PRO SPRITZ": {
+    "cost": 11.54748,
+    "unit": "Mililitro",
+    "product_id": 1431833,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANZANA GOLDEN": {
+    "cost": 7,
+    "unit": "Kilogramo",
+    "product_id": 1431762,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB COMPOTA DE MANZANA": {
+    "cost": 7.5105,
+    "unit": "Kilogramo",
+    "product_id": 2528946,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AZUCAR GLASS": {
+    "cost": 0.255,
+    "unit": "Kilogramo",
+    "product_id": 1431538,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MEZCLA DE FRENCH TOAST": {
+    "cost": 11.925,
+    "unit": "Kilogramo",
+    "product_id": 1699101,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB TARTA DE MANZANA": {
+    "cost": 16.51,
+    "unit": "Pieza",
+    "product_id": 1431918,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CULIS DE FRUTOS ROJOS": {
+    "cost": 2.739,
+    "unit": "Kilogramo",
+    "product_id": 1431929,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HIERBABUENA": {
+    "cost": 2,
+    "unit": "Kilogramo",
+    "product_id": 1431783,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AJONJOLI NEGRO": {
+    "cost": 1.25,
+    "unit": "Kilogramo",
+    "product_id": 1431787,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AJONJOLI BLANCO": {
+    "cost": 1.2,
+    "unit": "Kilogramo",
+    "product_id": 1431786,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA DE LA CASA": {
+    "cost": 1.55,
+    "unit": "Kilogramo",
+    "product_id": 1431946,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PIMIENTA NEGRA MOLIDA": {
+    "cost": 0.19,
+    "unit": "Kilogramo",
+    "product_id": 1431813,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RON BACARDI BLANCO": {
+    "cost": 11.610144,
+    "unit": "Litro",
+    "product_id": 1431827,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BAILEYS CREMA IRLANDESA": {
+    "cost": 15,
+    "unit": "Litro",
+    "product_id": 1432209,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BAITZ - ALMOND CLUSTER 75 GR": {
+    "cost": 75.38,
+    "unit": "Pieza",
+    "product_id": 1432035,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BAITZ - CHOCO DATES 135G": {
+    "cost": 121.95,
+    "unit": "Pieza",
+    "product_id": 1631971,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BAITZ - DARK OAT CLUSTER 75 G": {
+    "cost": 75.38,
+    "unit": "Pieza",
+    "product_id": 1432036,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BAITZ - PECAN CLUSTERS 75G": {
+    "cost": 75.38,
+    "unit": "Pieza",
+    "product_id": 1631965,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BARRA CACAO BLUE 30 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1431986,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO CHIHUAHUA": {
+    "cost": 11.12,
+    "unit": "Kilogramo",
+    "product_id": 1431701,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ESPINACA BABY": {
+    "cost": 12.8888,
+    "unit": "Kilogramo",
+    "product_id": 1431745,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHAMPIÑONES": {
+    "cost": 4.4,
+    "unit": "Kilogramo",
+    "product_id": 1431738,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB  HOLANDESA": {
+    "cost": 17.112,
+    "unit": "Kilogramo",
+    "product_id": 1431947,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BINNY BRUN BARRA CHOCOLATE 72% CACAO": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432189,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BINNY BRUN BARRA KETOCHOC CHOCOLATE 22 GR": {
+    "cost": 28.5,
+    "unit": "Pieza",
+    "product_id": 1432188,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BINNY BRUN SUPERCHOC BOLSA 186 GR": {
+    "cost": 260.42,
+    "unit": "Pieza",
+    "product_id": 1432190,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BIRDMAN - CREATINE ELECTROLITS GOLDEN PEACH, LATA 300G": {
+    "cost": 288.793103,
+    "unit": "Pieza",
+    "product_id": 2793665,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BIRDMAN - CREATINE ELECTROLITS LEMON TWIST, LATA 300G": {
+    "cost": 288.793103,
+    "unit": "Pieza",
+    "product_id": 2793667,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BIRDMAN FITMINGO PROTEIN MOKA 510G": {
+    "cost": 450,
+    "unit": "Pieza",
+    "product_id": 1993162,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BISKETO": {
+    "cost": 35,
+    "unit": "Pieza",
+    "product_id": 1431898,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BISKET TRADICIONAL": {
+    "cost": 9.69,
+    "unit": "PZA",
+    "product_id": 1431897,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CHEESE CAKE NEW YORK (REB)": {
+    "cost": 25,
+    "unit": "Pieza",
+    "product_id": 1431903,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MUFFIN DE BLUE BERRYS": {
+    "cost": 26.35,
+    "unit": "Pieza",
+    "product_id": 1431909,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BOTE CILINDRO GALLETAS CHICO": {
+    "cost": 29.9,
+    "unit": "Pieza",
+    "product_id": 1568608,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ETIQUETA BOTE CHICO GALLETAS": {
+    "cost": 4.2,
+    "unit": "Pieza",
+    "product_id": 1568609,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - PINOT NOIR ARROGANT FROG": {
+    "cost": 478.66,
+    "unit": "Botella",
+    "product_id": 1456393,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - BLANCO MADERO 2V": {
+    "cost": 431,
+    "unit": "Botella",
+    "product_id": 1431819,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - TINTO MADERO 3V": {
+    "cost": 435.3375,
+    "unit": "Mililitro",
+    "product_id": 1431835,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - CHIVITE ROSADO": {
+    "cost": 0,
+    "unit": "Mililitro",
+    "product_id": 1431834,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - FLOR DE ABA ROBLE": {
+    "cost": 231.885,
+    "unit": "Mililitro",
+    "product_id": 1601694,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - LAUS ROSADO": {
+    "cost": 242.25,
+    "unit": "Mililitro",
+    "product_id": 1601695,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO -LAUS MERLOT-SYRAH": {
+    "cost": 156.8925,
+    "unit": "Mililitro",
+    "product_id": 1456391,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO TINTO - LUCIA & JAIME MURIA VERDEJO": {
+    "cost": 231.315,
+    "unit": "Mililitro",
+    "product_id": 1601696,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO - ROSADO MADERO V": {
+    "cost": 294.18,
+    "unit": "Mililitro",
+    "product_id": 1431828,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BREAKFAST PROTEIN KIND BOX": {
+    "cost": 100,
+    "unit": "Pieza",
+    "product_id": 1509597,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN BRIOCHE (1.050KG)": {
+    "cost": 12.25,
+    "unit": "Pieza",
+    "product_id": 1431914,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BRIOCHE 750G": {
+    "cost": 37.25,
+    "unit": "Pieza",
+    "product_id": 2620866,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BRULE - GALLETA GLUTEN FREE CHOCOLATE": {
+    "cost": 50,
+    "unit": "Pieza",
+    "product_id": 2651518,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BRULE - BROWNIE BRITTLE": {
+    "cost": 70,
+    "unit": "Pieza",
+    "product_id": 2617495,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - GALLETA SIN GLUTEN": {
+    "cost": 20,
+    "unit": "Pieza",
+    "product_id": 2270807,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CREATINA BIRDMAN MONOHIDRATADA": {
+    "cost": 26.4264,
+    "unit": "Kilogramo",
+    "product_id": 1999678,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA BIRDMAN FITMINGO VAINILLA": {
+    "cost": 27.9498,
+    "unit": "Kilogramo",
+    "product_id": 1999677,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PESTO DE ALBAHACAR": {
+    "cost": 3.098397,
+    "unit": "Kilogramo",
+    "product_id": 1431619,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN CAMPESINO (MASA MADRE)": {
+    "cost": 16,
+    "unit": "Pieza",
+    "product_id": 1431916,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BRIOCHE 500G (CAMPESINO)": {
+    "cost": 2.8075,
+    "unit": "Pieza",
+    "product_id": 2226793,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAN DE BARRA SIN GLUTEN (PAN GABRIEL)": {
+    "cost": 32.6,
+    "unit": "Pieza",
+    "product_id": 1431615,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CEBOLLA ENCURTIDA": {
+    "cost": 1.2159,
+    "unit": "Kilogramo",
+    "product_id": 2160553,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RIB EYE": {
+    "cost": 67,
+    "unit": "Kilogramo",
+    "product_id": 2160595,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SALMON FRESCO": {
+    "cost": 52.5,
+    "unit": "Kilogramo",
+    "product_id": 1431700,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CALM - MAGNESIUM CITRATE 453G POLVO (DIF SABORES)": {
+    "cost": 304.31,
+    "unit": "Pieza",
+    "product_id": 2580609,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CALM MAGNESIUM SUPLEMENT ORIGINAL UNFLAVORED 4OZ": {
+    "cost": 0,
+    "unit": "PZA",
+    "product_id": 1518395,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NAT VIT - CALM MAGNESIUM SUPLEMENT ORANGE 453 GR": {
+    "cost": 314.58,
+    "unit": "Pieza",
+    "product_id": 1432065,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CALM SLEEP MIX 6 OZ (170G)": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1610329,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LICOR 43": {
+    "cost": 21.9828,
+    "unit": "Mililitro",
+    "product_id": 1431825,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CARROT CAKE REBANADA": {
+    "cost": 38.52,
+    "unit": "Pieza",
+    "product_id": 1879772,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GALLETA SUSALIA": {
+    "cost": 9.4749984,
+    "unit": "Kilogramo",
+    "product_id": 1431578,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPINO": {
+    "cost": 12.6,
+    "unit": "Kilogramo",
+    "product_id": 1431769,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CILANTRO": {
+    "cost": 0.7,
+    "unit": "Kilogramo",
+    "product_id": 1431741,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIMON VERDE": {
+    "cost": 5.25,
+    "unit": "Kilogramo",
+    "product_id": 1431760,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SALSA DE SOYA": {
+    "cost": 6.969944,
+    "unit": "Litro",
+    "product_id": 1431629,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ATUN FRESCO": {
+    "cost": 25.2,
+    "unit": "Kilogramo",
+    "product_id": 1836822,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHAI BASE EN POLVO": {
+    "cost": 20.75919,
+    "unit": "Gramo",
+    "product_id": 1431672,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHAI MASALA": {
+    "cost": 19,
+    "unit": "Kilogramo",
+    "product_id": 1431671,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA MANGO SIN AZUCAR": {
+    "cost": 13.7222,
+    "unit": "Kilogramo",
+    "product_id": 1431687,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SALSA ROJAMAICA LT": {
+    "cost": 54.833333333333336,
+    "unit": "Kilogramo",
+    "product_id": 1431631,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHIPS DE ROJAMAICA": {
+    "cost": 24.6312,
+    "unit": "Gramo",
+    "product_id": 1431552,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA DE FRUTOS ROJOS": {
+    "cost": 15.9504,
+    "unit": "Mililitro",
+    "product_id": 1431685,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA MARACUYA SIN AZUCAR": {
+    "cost": 33.72212,
+    "unit": "Kilogramo",
+    "product_id": 1431688,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JUGO DE LIMON BOTE": {
+    "cost": 3.0114,
+    "unit": "Mililitro",
+    "product_id": 1431665,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA TAMARINDO": {
+    "cost": 6.5058,
+    "unit": "Mililitro",
+    "product_id": 1431690,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PIÑA": {
+    "cost": 3.15,
+    "unit": "Gramo",
+    "product_id": 1431771,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHICHARRON DE LA RAMOS": {
+    "cost": 13.6715,
+    "unit": "Kilogramo",
+    "product_id": 1640043,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB FRIJOLES COCIDOS REFRITOS": {
+    "cost": 3.2279,
+    "unit": "Kilogramo",
+    "product_id": 1431930,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO PANELA": {
+    "cost": 10.64,
+    "unit": "Kilogramo",
+    "product_id": 1431711,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CREMA ACIDA": {
+    "cost": 6.3,
+    "unit": "Kilogramo",
+    "product_id": 1431702,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TOTOPO DE MAIZ": {
+    "cost": 8.1,
+    "unit": "Kilogramo",
+    "product_id": 1431639,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TOTOPO DE NOPAL": {
+    "cost": 9.143,
+    "unit": "Kilogramo",
+    "product_id": 1431638,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CHOCOLATIN": {
+    "cost": 31,
+    "unit": "Pieza",
+    "product_id": 1431904,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CINNAMMON ROLL BUTTER GLASS PZ": {
+    "cost": 15.17,
+    "unit": "Pieza",
+    "product_id": 1882354,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MEZCLA PANCAKES": {
+    "cost": 24.6,
+    "unit": "Kilogramo",
+    "product_id": 1431941,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MIEL DE MAPLE ORGANICA": {
+    "cost": 13.7802,
+    "unit": "Kilogramo",
+    "product_id": 1431607,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB JARABE NATURAL": {
+    "cost": 3.6,
+    "unit": "Mililitro",
+    "product_id": 1431589,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINO TINTO FINCA LAS MORAS (BATEO)": {
+    "cost": 7.7586,
+    "unit": "Mililitro",
+    "product_id": 1435615,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COCA COLA DESCAFEINADA 235 ML": {
+    "cost": 14.51,
+    "unit": "Pieza",
+    "product_id": 1446910,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COCA COLA LIGHT 355ML": {
+    "cost": 17.528,
+    "unit": "Pieza",
+    "product_id": 1431663,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COCA COLA REGULAR 355ML": {
+    "cost": 17.52875,
+    "unit": "Pieza",
+    "product_id": 1431661,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COCA COLA SIN AZUCAR 355ML": {
+    "cost": 17.528,
+    "unit": "Pieza",
+    "product_id": 1431662,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COLD BREW  DARK": {
+    "cost": 18.75,
+    "unit": "Mililitro",
+    "product_id": 1431566,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ACEITE VEGETAL": {
+    "cost": 0.7788,
+    "unit": "Litro",
+    "product_id": 1431526,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO CHEDDAR": {
+    "cost": 10.14,
+    "unit": "Kilogramo",
+    "product_id": 1431716,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CEBOLLIN": {
+    "cost": 1.05,
+    "unit": "Kilogramo",
+    "product_id": 1431737,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALMON CURADO": {
+    "cost": 56.7879,
+    "unit": "Kilogramo",
+    "product_id": 1994526,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CONCHAS DE MANTEQUILLA": {
+    "cost": 6.7,
+    "unit": "Pieza",
+    "product_id": 1431905,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CROISSANT C/ALMENDRA": {
+    "cost": 38.21,
+    "unit": "Pieza",
+    "product_id": 1946504,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CROISSANT NATURAL": {
+    "cost": 8,
+    "unit": "Pieza",
+    "product_id": 1431906,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CROISSANT DE NUTELLA PZ": {
+    "cost": 18.22,
+    "unit": "Pieza",
+    "product_id": 2805510,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA BECHAMEL": {
+    "cost": 57.63,
+    "unit": "Litro",
+    "product_id": 1699105,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JAMON DE PIERNA": {
+    "cost": 135.44,
+    "unit": "Kilogramo",
+    "product_id": 1647973,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB BROWNIE EVENTOS": {
+    "cost": 2.7,
+    "unit": "Pieza",
+    "product_id": 1431900,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUEZ GRANILLO": {
+    "cost": 4.4,
+    "unit": "Kilogramo",
+    "product_id": 1431611,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ZARZAMORA": {
+    "cost": 12,
+    "unit": "Kilogramo",
+    "product_id": 1431776,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EL DURAZNERO - DURAZNO/CHILE 250G": {
+    "cost": 155,
+    "unit": "Pieza",
+    "product_id": 2255666,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EL DURAZNERO - FRESA/CHILE 250G": {
+    "cost": 155,
+    "unit": "Pieza",
+    "product_id": 2255668,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EL DURAZNERO - MANGO/CHILE 250G": {
+    "cost": 155,
+    "unit": "Pieza",
+    "product_id": 2255667,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EL DURAZNERO - ROLLITOSCHILE 250G": {
+    "cost": 155,
+    "unit": "Pieza",
+    "product_id": 2255669,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CEBOLLA BCA": {
+    "cost": 0.75,
+    "unit": "Kilogramo",
+    "product_id": 1431734,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHILE JALAPEÑO": {
+    "cost": 1.05,
+    "unit": "Kilogramo",
+    "product_id": 1431739,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHORIZO DE CERDO": {
+    "cost": 11.76,
+    "unit": "Kilogramo",
+    "product_id": 1431692,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EMERGEN-C": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432071,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EMERGEN C- KIDS CRYSTALS SPARKLY STRAWBERRY 56G": {
+    "cost": 280,
+    "unit": "Pieza",
+    "product_id": 1509594,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA VERDE PARA CHILAQUILES": {
+    "cost": 6.948,
+    "unit": "Kilogramo",
+    "product_id": 1431953,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TORTILLA DE MAIZ": {
+    "cost": 3.6,
+    "unit": "Kilogramo",
+    "product_id": 1431641,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB POLLO COCIDO": {
+    "cost": 19.6,
+    "unit": "Kilogramo",
+    "product_id": 1434504,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CEBOLLA CAMBRAY": {
+    "cost": 0.08,
+    "unit": "Kilogramo",
+    "product_id": 1431735,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MOSTAZA DIJON": {
+    "cost": 1.486274,
+    "unit": "Kilogramo",
+    "product_id": 1431609,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MAYONESA NATURAL": {
+    "cost": 3.4876,
+    "unit": "Kilogramo",
+    "product_id": 1431604,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAPA DE GALEANA": {
+    "cost": 8,
+    "unit": "Kilogramo",
+    "product_id": 1431768,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EXCEED - PASTA DENTAL S/FLOUR 108 G": {
+    "cost": 80,
+    "unit": "Pieza",
+    "product_id": 2478093,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EXCEED - PASTA DENTAL 93.5g": {
+    "cost": 50,
+    "unit": "Pieza",
+    "product_id": 1640623,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS NATURAL KG": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1431564,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CARNE SECA": {
+    "cost": 21,
+    "unit": "Kilogramo",
+    "product_id": 1431547,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LOMO CANADIENSE": {
+    "cost": 17.52,
+    "unit": "Kilogramo",
+    "product_id": 1431695,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUTELLA": {
+    "cost": 10.1785,
+    "unit": "Kilogramo",
+    "product_id": 1431612,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO PANELA WALLANDER": {
+    "cost": 60,
+    "unit": "Kilogramo",
+    "product_id": 1431723,
+    "department_id": 0,
+    "performance": 0
+  },
+  "YOGURTH GRIEGO LIGHT": {
+    "cost": 23.332,
+    "unit": "Kilogramo",
+    "product_id": 1431725,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FLOR DE JAMAICA ENCHILADA POUCH": {
+    "cost": 26.6,
+    "unit": "Pieza",
+    "product_id": 2223279,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FORCE FACTOR - AMAZING ASHWA + SFOODS, 60 PZ": {
+    "cost": 258.62,
+    "unit": "Pieza",
+    "product_id": 1509592,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FORCE FACTOR - COLLAGEN BOOSTING SUPERFOODS 60 CAP": {
+    "cost": 300,
+    "unit": "Pieza",
+    "product_id": 1509571,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FORCE FACTOR - MODERN MUSHROOMS 60 PZ": {
+    "cost": 300,
+    "unit": "Pieza",
+    "product_id": 1509591,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FORCE FACTOR - MODERN MUSHROOMS 90 CAP": {
+    "cost": 380,
+    "unit": "Pieza",
+    "product_id": 1665639,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FORCE FACTOR - MODERN MUSHROOMS LIONS MANE 30 PZ": {
+    "cost": 300,
+    "unit": "Pieza",
+    "product_id": 1665640,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE KIWI DA VINCI": {
+    "cost": 274.6,
+    "unit": "Litro",
+    "product_id": 1431573,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PULPA DE FRESA": {
+    "cost": 6.48,
+    "unit": "Mililitro",
+    "product_id": 1431684,
+    "department_id": 0,
+    "performance": 0
+  },
+  "DURAZNOS EN ALMIBAR": {
+    "cost": 3.58183,
+    "unit": "Kilogramo",
+    "product_id": 1431568,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AIYA  TE VERDE MATCHA POLVO": {
+    "cost": 31.3524,
+    "unit": "Gramo",
+    "product_id": 1431670,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BASE BIG TRAIN DRAGON FLY TARO": {
+    "cost": 36.2136,
+    "unit": "Gramo",
+    "product_id": 1484242,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MONK FRUIT": {
+    "cost": 0.795,
+    "unit": "Kilogramo",
+    "product_id": 1431608,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO MANCHEGO": {
+    "cost": 7.98,
+    "unit": "Kilogramo",
+    "product_id": 1431719,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JALAPEÑOS EN ESCABECHE": {
+    "cost": 0.8751,
+    "unit": "Kilogramo",
+    "product_id": 1431550,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAN INTEGRAL": {
+    "cost": 7.419352,
+    "unit": "Kilogramo",
+    "product_id": 1431614,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO CREMA": {
+    "cost": 8.073,
+    "unit": "Kilogramo",
+    "product_id": 1431720,
+    "department_id": 0,
+    "performance": 0
+  },
+  "DOMO PARA SANDWICH": {
+    "cost": 1,
+    "unit": "Pieza",
+    "product_id": 1441797,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MELON CHINO": {
+    "cost": 1.4,
+    "unit": "Kilogramo",
+    "product_id": 1635451,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAPAYA": {
+    "cost": 1.52,
+    "unit": "Kilogramo",
+    "product_id": 2470065,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA MORAS DE LA SELVA": {
+    "cost": 9.72,
+    "unit": "Gramo",
+    "product_id": 1431678,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB GALLETAS CHOCO CHIPS": {
+    "cost": 6.56,
+    "unit": "Pieza",
+    "product_id": 1431907,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GARDEN OF LIFE - PROB WOM 40 BILL, 30 CAP": {
+    "cost": 567,
+    "unit": "Pieza",
+    "product_id": 1509606,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GARDEN OF LIFE - PROB WOM 50 BILL 30 CAP": {
+    "cost": 523.27,
+    "unit": "Pieza",
+    "product_id": 1432026,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAPITA GALEANA COCIDA": {
+    "cost": 2.32,
+    "unit": "Kilogramo",
+    "product_id": 1438041,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CEBOLLA CARAMELIZADA": {
+    "cost": 1.8506,
+    "unit": "Kilogramo",
+    "product_id": 1438005,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB GUISO GARDEN OMELLET": {
+    "cost": 17.4,
+    "unit": "Kilogramo",
+    "product_id": 1431933,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GINEBRA BEEFEATER": {
+    "cost": 20.75445,
+    "unit": "Mililitro",
+    "product_id": 1431824,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PALILLO PARA BROCHETAS": {
+    "cost": 1.25,
+    "unit": "Paquete",
+    "product_id": 1438219,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AMALAY - GRANOLA 250G": {
+    "cost": 45.88,
+    "unit": "Pieza",
+    "product_id": 2671168,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPITA VERDE": {
+    "cost": 3.75,
+    "unit": "Kilogramo",
+    "product_id": 1431812,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EJOTE": {
+    "cost": 1.95,
+    "unit": "Kilogramo",
+    "product_id": 1431743,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUINOA BLANCA": {
+    "cost": 3.3,
+    "unit": "Kilogramo",
+    "product_id": 1431814,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB VINAGRETA DE ALBAHACA": {
+    "cost": 7.276,
+    "unit": "Kilogramo",
+    "product_id": 1431958,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPITA DE GIRASOL": {
+    "cost": 3.8,
+    "unit": "Kilogramo",
+    "product_id": 1481615,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GUAYABATE - GUAYABA ENCHILADA 100G": {
+    "cost": 71.98,
+    "unit": "Pieza",
+    "product_id": 2461472,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GUAYABATE - TABLETAS GUAYABATE 100G": {
+    "cost": 71.98,
+    "unit": "Pieza",
+    "product_id": 2461475,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GUAYABATE - TEJOCOTE ENCHILADO 100G": {
+    "cost": 71.98,
+    "unit": "Pieza",
+    "product_id": 2461474,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - PEPTIDOS DE COLAGENO, BOLSA 250G": {
+    "cost": 578.04,
+    "unit": "Pieza",
+    "product_id": 1432119,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - HIGH PERFORMANCE CACAO 578G": {
+    "cost": 464.63,
+    "unit": "Pieza",
+    "product_id": 1432118,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - HIGH PERFORMANCE VAINILLA 578G": {
+    "cost": 501.75,
+    "unit": "Pieza",
+    "product_id": 1996132,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - CREATINA MONOHIDRATADA  300G": {
+    "cost": 403.23,
+    "unit": "Pieza",
+    "product_id": 2022660,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - CACAO LATA 488G": {
+    "cost": 404.09,
+    "unit": "Pieza",
+    "product_id": 1432117,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS CACAO KG": {
+    "cost": 24.8415,
+    "unit": "Kilogramo",
+    "product_id": 1431559,
+    "department_id": 0,
+    "performance": 0
+  },
+  "COLAGENO HIDROLIZADO HABITS KG": {
+    "cost": 0,
+    "unit": "Kilogramo",
+    "product_id": 1431561,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS MACA-CACAO KG": {
+    "cost": 26.2347,
+    "unit": "Kilogramo",
+    "product_id": 1431562,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - MACA-CACAO 488G": {
+    "cost": 454.2566,
+    "unit": "Pieza",
+    "product_id": 1432120,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS MATCHA-VAINILLA KG": {
+    "cost": 12.7257,
+    "unit": "Kilogramo",
+    "product_id": 1431563,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - MATCHA-VAINILLA 488G": {
+    "cost": 464.25,
+    "unit": "Pieza",
+    "product_id": 1432121,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - NATURAL 488G": {
+    "cost": 426.75,
+    "unit": "Pieza",
+    "product_id": 1432122,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HABITS - VAINILLA LATA 488G": {
+    "cost": 424.19,
+    "unit": "Pieza",
+    "product_id": 1432123,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS VAINILLA KG": {
+    "cost": 26.0775,
+    "unit": "Kilogramo",
+    "product_id": 1431565,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HEALTY CRUNCH - CHIPS PEPINO LIMON Y SAL 200GR": {
+    "cost": 102,
+    "unit": "Pieza",
+    "product_id": 1432132,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HEALTY CRUNCH - CHIPS PEPINO SALSA 200GR": {
+    "cost": 102,
+    "unit": "Pieza",
+    "product_id": 1432134,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HEINEKEN": {
+    "cost": 19.7556,
+    "unit": "Pieza",
+    "product_id": 1431664,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CANELA EN POLVO": {
+    "cost": 0.65,
+    "unit": "Kilogramo",
+    "product_id": 1431546,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AVENA ORGANICA": {
+    "cost": 29.1665,
+    "unit": "Kilogramo",
+    "product_id": 1431536,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE DE ALMENDRA SIN AZUCAR": {
+    "cost": 18.039,
+    "unit": "Litro",
+    "product_id": 1431593,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHOCOLATE EN POLVO": {
+    "cost": 7.2,
+    "unit": "Gramo",
+    "product_id": 1431555,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SALSA DE CHOCOLATE": {
+    "cost": 15.8412,
+    "unit": "Mililitro",
+    "product_id": 1431628,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HU - NUT BUTTER FILLE D 60G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2455864,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB HUMMUS DE CHIPOTLE": {
+    "cost": 8.479,
+    "unit": "Kilogramo",
+    "product_id": 1431936,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB HUMMUS NATURAL": {
+    "cost": 7.04,
+    "unit": "Kilogramo",
+    "product_id": 1431937,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ZANAHORIA": {
+    "cost": 2,
+    "unit": "Kilogramo",
+    "product_id": 1431784,
+    "department_id": 0,
+    "performance": 0
+  },
+  "BROCOLI": {
+    "cost": 1.8,
+    "unit": "Kilogramo",
+    "product_id": 1431732,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARRA INFUSORA PZ": {
+    "cost": 80,
+    "unit": "Pieza",
+    "product_id": 2703827,
+    "department_id": 0,
+    "performance": 0
+  },
+  "WHISKY - JOHNNIE WALKER ETIQUETA NEGRA": {
+    "cost": 200,
+    "unit": "Kilogramo",
+    "product_id": 2214706,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO ALERT 1LT": {
+    "cost": 40.955,
+    "unit": "Litro",
+    "product_id": 1431651,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO BE INMUNE 1 LT": {
+    "cost": 40.955,
+    "unit": "Litro",
+    "product_id": 1431652,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JUGO DE NARANJA NATURAL BOTE": {
+    "cost": 14.265335235378032,
+    "unit": "Mililitro",
+    "product_id": 1431666,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JUGO DE TORONJA GALON": {
+    "cost": 3.559376552015639,
+    "unit": "Mililitro",
+    "product_id": 1623671,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TORONJA": {
+    "cost": 0.76,
+    "unit": "Gramo",
+    "product_id": 1431781,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO DR D TOX 1 LT": {
+    "cost": 40.955,
+    "unit": "Litro",
+    "product_id": 1431654,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO GREEN ALCHEMIST 1 LT": {
+    "cost": 40.955,
+    "unit": "Litro",
+    "product_id": 1431655,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO U GLOW 1 LT": {
+    "cost": 40.955,
+    "unit": "Litro",
+    "product_id": 1431656,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JUGO VERDE DE LA CASA": {
+    "cost": 82.32,
+    "unit": "Mililitro",
+    "product_id": 1883286,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE DESLACTOSADA": {
+    "cost": 11.37486,
+    "unit": "Litro",
+    "product_id": 1431596,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KIND BREAKFAST PROTEIN BAR 50G": {
+    "cost": 20,
+    "unit": "Pieza",
+    "product_id": 1509600,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NIBS DE CACAO": {
+    "cost": 19.2,
+    "unit": "Gramo",
+    "product_id": 1431610,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KOMBUCHA JAMAICA SALVAJE  377 ML": {
+    "cost": 43.25,
+    "unit": "Pieza",
+    "product_id": 1447920,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KOMBUCHA MANZANA-JENGIBRE 377 ML": {
+    "cost": 43.25,
+    "unit": "Pieza",
+    "product_id": 1447922,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KOMBUCHA MORA FEROZ 377 ML.": {
+    "cost": 41,
+    "unit": "Pieza",
+    "product_id": 1610386,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KOMBUCHA ORIGINAL 377 ML.": {
+    "cost": 43.25,
+    "unit": "Pieza",
+    "product_id": 1610387,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KOMBUCHA SANDIA FRESA 377 ML.": {
+    "cost": 23.75,
+    "unit": "Pieza",
+    "product_id": 1610389,
+    "department_id": 0,
+    "performance": 0
+  },
+  "KAMBUCHA VERDE MISTICO 377 ML": {
+    "cost": 30.75,
+    "unit": "Pieza",
+    "product_id": 1447949,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA CASA DEL JUGO  - COCO DESHIDRATADO ORGANICO 150G": {
+    "cost": 21,
+    "unit": "Pieza",
+    "product_id": 2703826,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - DORADITAS  KETO/ALMENDRAS 120 GR": {
+    "cost": 73,
+    "unit": "Pieza",
+    "product_id": 1432136,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - DORADITAS  VEGANA /PLATANO 130 GR": {
+    "cost": 20.062,
+    "unit": "Pieza",
+    "product_id": 2677201,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - DORADITAS DE AVENA/STEVIA 130 GR": {
+    "cost": 42,
+    "unit": "Pieza",
+    "product_id": 1432137,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - DORADITAS DE CHOCOLATE /AVENA 130 GR": {
+    "cost": 50,
+    "unit": "Pieza",
+    "product_id": 1432138,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - GORDITAS DE AVENA /STEVIA 270 GR": {
+    "cost": 42,
+    "unit": "Pieza",
+    "product_id": 1432141,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LA NONA - GORDITAS DE CHOCOLATE/AVENA 270 GR": {
+    "cost": 50,
+    "unit": "Pieza",
+    "product_id": 1432142,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE DE AVENA": {
+    "cost": 18.039,
+    "unit": "Litro",
+    "product_id": 1431594,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE DE COCO": {
+    "cost": 18.039,
+    "unit": "Litro",
+    "product_id": 1431595,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE DESLACTOSADA LIGHT": {
+    "cost": 11.37486,
+    "unit": "Litro",
+    "product_id": 1431597,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LECHE ENTERA": {
+    "cost": 11.37486,
+    "unit": "Litro",
+    "product_id": 1431598,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - COMO HACER QUE TE PASEN COSAS BUENAS": {
+    "cost": 200,
+    "unit": "Pieza",
+    "product_id": 2279585,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - KIDNESS": {
+    "cost": 250,
+    "unit": "Pieza",
+    "product_id": 1432001,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - THE WAR FOR KIDNESS": {
+    "cost": 400,
+    "unit": "Pieza",
+    "product_id": 1431998,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - LAS COSAS QUE NO NOS DIJERON": {
+    "cost": 200,
+    "unit": "Pieza",
+    "product_id": 2279584,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - RECUPERA TU MENTE": {
+    "cost": 200,
+    "unit": "Pieza",
+    "product_id": 2279583,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - THE HIDDEN POWER": {
+    "cost": 400,
+    "unit": "Pieza",
+    "product_id": 1431999,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LIBRO - HUMAN KIND": {
+    "cost": 400,
+    "unit": "Pieza",
+    "product_id": 1432002,
+    "department_id": 0,
+    "performance": 0
+  },
+  "LMNT - ELECTROLYTE (DIF SABORES), PZA.": {
+    "cost": 814.65,
+    "unit": "Pieza",
+    "product_id": 1509533,
+    "department_id": 0,
+    "performance": 0
+  },
+  "M BITES - BARRA PZ DIF SABORES, 25G": {
+    "cost": 17,
+    "unit": "Pieza",
+    "product_id": 2549274,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TORTILLA DE HARINA": {
+    "cost": 3,
+    "unit": "Kilogramo",
+    "product_id": 1431640,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - ACEITE BRONCEADOR CACAO TANING 100 ML": {
+    "cost": 381.46,
+    "unit": "Pieza",
+    "product_id": 2271224,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - ACEITE BRONCEADOR CARROT DROPS 100 ML": {
+    "cost": 381.46,
+    "unit": "Pieza",
+    "product_id": 2271225,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - ACEITE BRONCEADOR SUN DROPS 100 ML": {
+    "cost": 381.46,
+    "unit": "Pieza",
+    "product_id": 2470258,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - ACEITE BRONCEADOR WATERMELON DROPS 100 ML": {
+    "cost": 381.46,
+    "unit": "Pieza",
+    "product_id": 2271226,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - COCONUT SELF TANNING FOAM 200 ML": {
+    "cost": 516.59,
+    "unit": "Pieza",
+    "product_id": 2473098,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - GUANTE DE APLICACION PZ": {
+    "cost": 129.31,
+    "unit": "Pieza",
+    "product_id": 2470255,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MALI - TONE DARK SPRAY 200 ML": {
+    "cost": 516.59,
+    "unit": "Pieza",
+    "product_id": 2470254,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANDOLIN - KOMBUCHA VARIOS SABORES 475ML": {
+    "cost": 58,
+    "unit": "Pieza",
+    "product_id": 2270806,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANGLO - MANGO ENCHILADO DE 120 GR": {
+    "cost": 59,
+    "unit": "Pieza",
+    "product_id": 1432158,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MANGLO - MANGO ENCHILADO DE 300 GR": {
+    "cost": 150,
+    "unit": "Pieza",
+    "product_id": 1432159,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TEQUILA CUERVO TRADICIONAL": {
+    "cost": 15.7113,
+    "unit": "Mililitro",
+    "product_id": 1431829,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CONTROY": {
+    "cost": 6.0777,
+    "unit": "Mililitro",
+    "product_id": 1431820,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE ROSE MONIN": {
+    "cost": 11.39715,
+    "unit": "Litro",
+    "product_id": 1928686,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VODKA SMIRNOFF": {
+    "cost": 8.9226,
+    "unit": "Mililitro",
+    "product_id": 1431836,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MATCHA CEREMONIAL": {
+    "cost": 32,
+    "unit": "Kilogramo",
+    "product_id": 1719757,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TE MATE MANGO": {
+    "cost": 40,
+    "unit": "Gramo",
+    "product_id": 1431681,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TE VERDE SABOR MENTA": {
+    "cost": 4.42,
+    "unit": "Gramo",
+    "product_id": 1431674,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MEZCAL - VERDE MOMENTO AMARAS": {
+    "cost": 25.3446,
+    "unit": "Litro",
+    "product_id": 1432212,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MIEL DE ABEJA": {
+    "cost": 8.211,
+    "unit": "Kilogramo",
+    "product_id": 1431605,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MIEL INFINITA - FRASCO GOURMET 600G": {
+    "cost": 120,
+    "unit": "Pieza",
+    "product_id": 2265761,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MIEL INFINITA - PANAL DE ABEJA 250G": {
+    "cost": 80,
+    "unit": "Pieza",
+    "product_id": 2265762,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE BLUE CURACAO MONIN": {
+    "cost": 3.18105,
+    "unit": "Mililitro",
+    "product_id": 1484217,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CONCENTRADO LYCHEE": {
+    "cost": 2.605263,
+    "unit": "Mililitro",
+    "product_id": 1484205,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO RICOTTA": {
+    "cost": 2.4555,
+    "unit": "Kilogramo",
+    "product_id": 1431721,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ACEITUNA VERDE S/HUESO": {
+    "cost": 4.01421,
+    "unit": "Kilogramo",
+    "product_id": 1431529,
+    "department_id": 0,
+    "performance": 0
+  },
+  "HIGO": {
+    "cost": 10.45,
+    "unit": "Kilogramo",
+    "product_id": 1431753,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VINAGRE BLANCO": {
+    "cost": 1.87525,
+    "unit": "Litro",
+    "product_id": 1431643,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN BRIOCHE P/BENEDICT (50G)": {
+    "cost": 2.4,
+    "unit": "Pieza",
+    "product_id": 1431913,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA ROJA PARA CHILAQUILES": {
+    "cost": 4.715,
+    "unit": "Kilogramo",
+    "product_id": 1431951,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TEQUILA MTRO. TEQ DOBEL DIAMANTE": {
+    "cost": 0,
+    "unit": "Litro",
+    "product_id": 1431821,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TEQUILA MTRO. TEQ REPOSADO": {
+    "cost": 60,
+    "unit": "Litro",
+    "product_id": 2214704,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MINI MUFFIN BLUEBERRYS": {
+    "cost": 15.13,
+    "unit": "Pieza",
+    "product_id": 2271176,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MUFFIN DE ZANAHORIA": {
+    "cost": 7.49,
+    "unit": "Pieza",
+    "product_id": 2271178,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MUFFIN VEGANO": {
+    "cost": 19.46,
+    "unit": "Pieza",
+    "product_id": 2271174,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NAT VIT - CALM GUMMIES MAGNESIUM RASPBERRY 60PZ": {
+    "cost": 314.58,
+    "unit": "Pieza",
+    "product_id": 1432066,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NATROL - MELATONINE FAST DISSOLVE 150 TAB": {
+    "cost": 426.72,
+    "unit": "Pieza",
+    "product_id": 2580608,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NATURAL VITALITY - CALM GUMMIES 240 GUM": {
+    "cost": 431.04,
+    "unit": "Pieza",
+    "product_id": 2478092,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NATURAL VITALITY - SLEEP FRASCO 60 CAPSULAS": {
+    "cost": 258.62,
+    "unit": "Pieza",
+    "product_id": 2289658,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NATURE MADE - MEGNESIUM GLICINATED 200 MG": {
+    "cost": 523.27,
+    "unit": "Pieza",
+    "product_id": 2580606,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NIEVE DE  PAY DE LIMON GRANEL": {
+    "cost": 22.23,
+    "unit": "Kilogramo",
+    "product_id": 1432147,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NIEVE  FRUTOS ROJOS CUBETA 4 LT": {
+    "cost": 19.435,
+    "unit": "Kilogramo",
+    "product_id": 1432143,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUBITS - TAMARINDO SIN AZUCAR PZ 30 G": {
+    "cost": 140,
+    "unit": "Pieza",
+    "product_id": 1781249,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUGO BARRA CHOCOLATE PRETZEL": {
+    "cost": 21.55,
+    "unit": "Pieza",
+    "product_id": 1743136,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUTRICION AVANZADA - JAMAICA FIT 60 ML": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432044,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUTRICION AVANZADA - MORA FIT 60 ML": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432045,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUTRICION AVANZADA-CHERRY EPIC 60 ML": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432039,
+    "department_id": 0,
+    "performance": 0
+  },
+  "NUUN - SPORT HYDRATATION (DIF SAB), 10 TAB": {
+    "cost": 252,
+    "unit": "Pieza",
+    "product_id": 1441800,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OKKO - RICE CAKES CACAO 33g": {
+    "cost": 12.9,
+    "unit": "Pieza",
+    "product_id": 1781259,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OKKO - RICE CAKE HONEY 40G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2000993,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OKKO - RICE CAKE QUINOA 140G": {
+    "cost": 28.9,
+    "unit": "Pieza",
+    "product_id": 1781261,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OKKO RICE CAKE BROWN 140G": {
+    "cost": 28.9,
+    "unit": "Pieza",
+    "product_id": 1999970,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY  - GLOWING SKIN, PLUMP BERRY, 50 GUM": {
+    "cost": 260,
+    "unit": "Pieza",
+    "product_id": 1509595,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY - KIDS IMMUNITY CHERRY BERRY 50 GUM": {
+    "cost": 233.18,
+    "unit": "Pieza",
+    "product_id": 1441897,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY - KIDS SLEEP RAZZZBERRY 50 GUM": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1518853,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY SLEEP EXTRA STRENGTH 50 GUMMIES.": {
+    "cost": 312.48,
+    "unit": "Pieza",
+    "product_id": 1441886,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY - SLEEP EXTRA STRENGTH 70 GUMMIES": {
+    "cost": 312.48,
+    "unit": "Pieza",
+    "product_id": 1610324,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY - UNDENIABLE BEAUTY, 60 GUM": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432086,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY-WOMENS MULTI BLISSFUL BERRY 90PZ": {
+    "cost": 348,
+    "unit": "Pieza",
+    "product_id": 1432087,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY KIDS SLEEP RASPBERRY 60 GUMMIES": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1518855,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY SLEEP CYCLE 50 GUMMIES (DIF SABORES)": {
+    "cost": 155.17,
+    "unit": "Pieza",
+    "product_id": 1870385,
+    "department_id": 0,
+    "performance": 0
+  },
+  "OLLY - WOMENS MULTI +OMEGA 3, 60 CAP": {
+    "cost": 361.62,
+    "unit": "Pieza",
+    "product_id": 1432089,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB OREJAS DE DANES": {
+    "cost": 3.56,
+    "unit": "Pieza",
+    "product_id": 2107330,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PANQUE DE LIMON": {
+    "cost": 40.55,
+    "unit": "Pieza",
+    "product_id": 2337738,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PANQUE DE NUEZ": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2337737,
+    "department_id": 0,
+    "performance": 0
+  },
+  "QUESO PARMESANO EN POLVO": {
+    "cost": 2.45,
+    "unit": "Kilogramo",
+    "product_id": 1699099,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA BOLOGNESA": {
+    "cost": 13.175,
+    "unit": "Kilogramo",
+    "product_id": 1699103,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PASTA PENNE": {
+    "cost": 4.7,
+    "unit": "Kilogramo",
+    "product_id": 1699097,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA MAMAROSA": {
+    "cost": 30.4725,
+    "unit": "Kilogramo",
+    "product_id": 1699102,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PASTEL CUMPLEAÑOS CHOCOLATE": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1883412,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAY DE NUEZ": {
+    "cost": 21.65,
+    "unit": "Pieza",
+    "product_id": 2317917,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CHEESECAKE VASCO Y QUESO DE OVEJA": {
+    "cost": 321,
+    "unit": "Pieza",
+    "product_id": 2037404,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEDIALYTE - ELECTROLYTE DRINK ZERO SUGAR 8PZ 27.2G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432070,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEDIALYTE - VARIETY PACK 8PZ 68G": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1928738,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JUGO DE ARANDANO": {
+    "cost": 1.4685,
+    "unit": "Mililitro",
+    "product_id": 1431591,
+    "department_id": 0,
+    "performance": 0
+  },
+  "FRUTA DEL DRAGON": {
+    "cost": 4.35,
+    "unit": "Kilogramo",
+    "product_id": 1431750,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ALMENDRA EN LAJA": {
+    "cost": 1.00831,
+    "unit": "Kilogramo",
+    "product_id": 1431788,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CREMA PARA BATIR": {
+    "cost": 10.418478,
+    "unit": "Kilogramo",
+    "product_id": 1431704,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MASA DE PIZZA": {
+    "cost": 6,
+    "unit": "Pieza",
+    "product_id": 1431908,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ALBAHACA REGULAR": {
+    "cost": 11.985,
+    "unit": "Kilogramo",
+    "product_id": 1431727,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA PARA PIZZA": {
+    "cost": 65,
+    "unit": "Litro",
+    "product_id": 1431950,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MOZARELA FRESCO": {
+    "cost": 51.699817,
+    "unit": "Kilogramo",
+    "product_id": 1431710,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPERONI": {
+    "cost": 7.98,
+    "unit": "Kilogramo",
+    "product_id": 1431697,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MOZARELA RALLADO": {
+    "cost": 187.2246,
+    "unit": "Litro",
+    "product_id": 1836846,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PLANTA CHICA": {
+    "cost": 45,
+    "unit": "Pieza",
+    "product_id": 2703130,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PLANTA GRANDE": {
+    "cost": 45,
+    "unit": "Pieza",
+    "product_id": 2703128,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JICAMA": {
+    "cost": 6,
+    "unit": "Kilogramo",
+    "product_id": 1431754,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA PONCHE DE GUAYABA": {
+    "cost": 8.82,
+    "unit": "Gramo",
+    "product_id": 1431679,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PROTEINA HABITS CACAO HIGH PERFORMANCE KG": {
+    "cost": 26.0424,
+    "unit": "Kilogramo",
+    "product_id": 1431560,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAICES DEL HUERTO - GOLDEN MANE MIX 250G": {
+    "cost": 220.5,
+    "unit": "Pieza",
+    "product_id": 2703824,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAICES DEL HUERTO - REISHI CACAO MIX 250G": {
+    "cost": 220.5,
+    "unit": "Pieza",
+    "product_id": 2703825,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAICES DEL HUERTO - TE MATCHA MIX 125G": {
+    "cost": 227.5,
+    "unit": "Pieza",
+    "product_id": 2703823,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAMO DE FLORES": {
+    "cost": 240.827586,
+    "unit": "Pieza",
+    "product_id": 2793664,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAW REV - BARRA CHOCOLATE CARAMELO SAE 46 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432090,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAW REV - BARRA DOUBLE CHOCOLATE BROWNIE 46g": {
+    "cost": 40.05,
+    "unit": "Pieza",
+    "product_id": 1579110,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RAW REV - PEANUT BUTTER CHOCOLATE & SEA SALT 46 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2000188,
+    "department_id": 0,
+    "performance": 0
+  },
+  "REFRESCO GINGER PARASOL": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1431667,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RENEW - JABON CORPORAL 355 ML": {
+    "cost": 94.82,
+    "unit": "Pieza",
+    "product_id": 1432028,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RENEW - LOCION HIDRATANTE 237 ML": {
+    "cost": 144,
+    "unit": "Pieza",
+    "product_id": 1432031,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RENEW - TRATAMIENTO PIEL LAVANDA  207ML": {
+    "cost": 144,
+    "unit": "Pieza",
+    "product_id": 1432029,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PEPINILLOS REBANADOS": {
+    "cost": 1.53109,
+    "unit": "Kilogramo",
+    "product_id": 1431618,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB ADEREZO CHIPOTLE PEPINILLO": {
+    "cost": 9.1392,
+    "unit": "Kilogramo",
+    "product_id": 2160554,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAPA CORTE FRANCES": {
+    "cost": 5.80992,
+    "unit": "Kilogramo",
+    "product_id": 2160585,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PAN DE PAPA": {
+    "cost": 9.5,
+    "unit": "Pieza",
+    "product_id": 2568444,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB CARNE PARA SMASH BURGER": {
+    "cost": 27.4,
+    "unit": "Kilogramo",
+    "product_id": 2160552,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROJAMAICA - CHIPS DE ROJAMAICA  40 GR": {
+    "cost": 47,
+    "unit": "Pieza",
+    "product_id": 1432176,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROJAMAICA - DIP DE ROJAMAICA 320 GR": {
+    "cost": 70,
+    "unit": "Pieza",
+    "product_id": 1432177,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROJAMAICA - FLOR DE JAMAICA ENCHILADA BOLSA 50G": {
+    "cost": 26.6,
+    "unit": "Pieza",
+    "product_id": 2279582,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROJAMAICA - SALSA ROJAMAICA  250 GR": {
+    "cost": 63.84,
+    "unit": "Pieza",
+    "product_id": 1432178,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ROJAMAICA - SALSA ROJAMAICA 520 GR": {
+    "cost": 84,
+    "unit": "Pieza",
+    "product_id": 1432179,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RX BAR - BLUEBERRY 52 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 2000195,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RX BAR - CHOCOLATE RASPBERRY 52 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432091,
+    "department_id": 0,
+    "performance": 0
+  },
+  "RX BAR - CHOCOLATE SEA SALT 52 GR": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1432092,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB PAN BAGEL": {
+    "cost": 4.46,
+    "unit": "Pieza",
+    "product_id": 1994527,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI - CHURRITOS AMARANTO CHIPOTLE DE 300 GR": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1432055,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI - CHURRITOS AMARANTO FUEGO DE 300 GR": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1432056,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI - CHURRITOS AMARANTO MIX CRUNCH 300 GR": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1432058,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI - CHURRITOS AMARANTO NOPAL DE 300 GR": {
+    "cost": 70,
+    "unit": "Pieza",
+    "product_id": 1432059,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI - CHURRITOS AMARANTO SAL Y LIMON DE 300 GR": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1432060,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI -CHURRITOS AMARANTO CHILE LIMON  DE 300 GR": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1432054,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SANUTRI CHURRITOS AMARANTO HABANERO DE 300 G": {
+    "cost": 77,
+    "unit": "Pieza",
+    "product_id": 1640069,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SERVICIO DE TE": {
+    "cost": 0,
+    "unit": "PZA",
+    "product_id": 1836489,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE ALMENDRAS MONIN": {
+    "cost": 5.877,
+    "unit": "Mililitro",
+    "product_id": 1431572,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE  AVELLANAS MONIN": {
+    "cost": 7.836,
+    "unit": "Mililitro",
+    "product_id": 1431574,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE DE CARAMELO": {
+    "cost": 8.3979,
+    "unit": "Mililitro",
+    "product_id": 1431575,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE VAINILLA": {
+    "cost": 8.3979,
+    "unit": "Mililitro",
+    "product_id": 1431570,
+    "department_id": 0,
+    "performance": 0
+  },
+  "JARABE VAINILLA SUGAR FREE": {
+    "cost": 8.79,
+    "unit": "Litro",
+    "product_id": 1858726,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA ADOBADA 170 GR": {
+    "cost": 95,
+    "unit": "Pieza",
+    "product_id": 1432183,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA ADOBADA 50 GR": {
+    "cost": 35,
+    "unit": "Pieza",
+    "product_id": 2014638,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA HABANERO  170 GR": {
+    "cost": 95,
+    "unit": "Pieza",
+    "product_id": 2001049,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA LIMON 170 GR": {
+    "cost": 95,
+    "unit": "Pieza",
+    "product_id": 1432184,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA LIMON 50 GR": {
+    "cost": 35,
+    "unit": "Pieza",
+    "product_id": 2014640,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA NATURAL 170 GR": {
+    "cost": 95,
+    "unit": "Pieza",
+    "product_id": 1432185,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA NATURAL 50 GR": {
+    "cost": 35,
+    "unit": "Pieza",
+    "product_id": 2014641,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA TORITO 170 GR": {
+    "cost": 95,
+    "unit": "Pieza",
+    "product_id": 1432186,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SMARTY CHIPS JICAMA TORITO 50 GR": {
+    "cost": 35,
+    "unit": "Pieza",
+    "product_id": 2014639,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ACEITE DE COCO": {
+    "cost": 1.667609,
+    "unit": "Gramo",
+    "product_id": 1431527,
+    "department_id": 0,
+    "performance": 0
+  },
+  "GREEN PEACH - MACA EN POLVO 100 GR": {
+    "cost": 9,
+    "unit": "Pieza",
+    "product_id": 1432108,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ESPIRULINA VERDE": {
+    "cost": 1.25,
+    "unit": "Gramo",
+    "product_id": 1431802,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHOCOCHIPS": {
+    "cost": 11.6667,
+    "unit": "Kilogramo",
+    "product_id": 1431554,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AJO EN POLVO": {
+    "cost": 0.285,
+    "unit": "Kilogramo",
+    "product_id": 1431531,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SPRITE": {
+    "cost": 16.7745,
+    "unit": "Pieza",
+    "product_id": 1431668,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB AGUACATE PARA AVOTOAST": {
+    "cost": 5.94,
+    "unit": "Kilogramo",
+    "product_id": 1431921,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MUFFIN SALUDABLE": {
+    "cost": 47.39,
+    "unit": "Pieza",
+    "product_id": 1431911,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CHIA": {
+    "cost": 1.2,
+    "unit": "Gramo",
+    "product_id": 1431793,
+    "department_id": 0,
+    "performance": 0
+  },
+  "CURCUMA": {
+    "cost": 5.225,
+    "unit": "Gramo",
+    "product_id": 1431801,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB SALSA TATEMADA": {
+    "cost": 0.72,
+    "unit": "Kilogramo",
+    "product_id": 2160598,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TARJETA P/ REGALO PZ": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1878532,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TE DE MANZANILLA SOBRE": {
+    "cost": 1.02,
+    "unit": "Pieza",
+    "product_id": 1431680,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TE PETALO MIO": {
+    "cost": 19,
+    "unit": "Gramo",
+    "product_id": 1431682,
+    "department_id": 0,
+    "performance": 0
+  },
+  "TERMO CHICO P/CAFE": {
+    "cost": 220,
+    "unit": "Pieza",
+    "product_id": 1751101,
+    "department_id": 0,
+    "performance": 0
+  },
+  "AMALAY - TERMO VIDRIO PZ 1.25L": {
+    "cost": 0,
+    "unit": "Pieza",
+    "product_id": 1878533,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA BORA BORA": {
+    "cost": 10.98,
+    "unit": "Gramo",
+    "product_id": 1431675,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA DATIL CITUS": {
+    "cost": 10,
+    "unit": "Gramo",
+    "product_id": 1853989,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA FRESA Y KIWI": {
+    "cost": 10,
+    "unit": "Gramo",
+    "product_id": 1431677,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA HONEY BEE": {
+    "cost": 12.28,
+    "unit": "Gramo",
+    "product_id": 1853990,
+    "department_id": 0,
+    "performance": 0
+  },
+  "EUROTE - TISANA JENGIBRE LIMON": {
+    "cost": 9.42,
+    "unit": "Gramo",
+    "product_id": 1853987,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ULTIMA - 6 ESSENCIAL ELECTROLYTES 90 PORCIONES": {
+    "cost": 625.86,
+    "unit": "Pieza",
+    "product_id": 2580607,
+    "department_id": 0,
+    "performance": 0
+  },
+  "ULTIMA REPLENISHER, ELECTROLITOS CAJA 8 STICKS.": {
+    "cost": 153.44,
+    "unit": "Pieza",
+    "product_id": 2289657,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO ALERT 473 ML": {
+    "cost": 44.31,
+    "unit": "Pieza",
+    "product_id": 1431966,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO BE INMUNE 473 ML": {
+    "cost": 44.04,
+    "unit": "Pieza",
+    "product_id": 1431967,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO DR DETOX 473 ML": {
+    "cost": 44.04,
+    "unit": "Pieza",
+    "product_id": 1431973,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO GREEN ALCHEMIST 473 ML": {
+    "cost": 44.04,
+    "unit": "Pieza",
+    "product_id": 1431974,
+    "department_id": 0,
+    "performance": 0
+  },
+  "UNICORP - JUGO U GLOW 473 ML": {
+    "cost": 44.04,
+    "unit": "Pieza",
+    "product_id": 1431975,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VAMARA - CIRUELA ENCHILADA 250 GR": {
+    "cost": 149.31,
+    "unit": "Pieza",
+    "product_id": 1432013,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VAMARA - DATIL ENCHILADO 220 GR": {
+    "cost": 138.89,
+    "unit": "Pieza",
+    "product_id": 1432014,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VAMARA - MIX ENCHILAD 220 GR": {
+    "cost": 149.31,
+    "unit": "Pieza",
+    "product_id": 1432015,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VAMARA -MANZANA ENCHILADA,180 G": {
+    "cost": 138.89,
+    "unit": "Pieza",
+    "product_id": 1977713,
+    "department_id": 0,
+    "performance": 0
+  },
+  "SUB MEZCLA GREEN WAFFLE": {
+    "cost": 28.98,
+    "unit": "Kilogramo",
+    "product_id": 1431940,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MORRON VERDE": {
+    "cost": 3.8,
+    "unit": "Kilogramo",
+    "product_id": 1431766,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MORRON ROJO": {
+    "cost": 4,
+    "unit": "Kilogramo",
+    "product_id": 1431765,
+    "department_id": 0,
+    "performance": 0
+  },
+  "MORRON AMARILLO": {
+    "cost": 4.25,
+    "unit": "Kilogramo",
+    "product_id": 1431764,
+    "department_id": 0,
+    "performance": 0
+  },
+  "PORTOBELLO": {
+    "cost": 9,
+    "unit": "Kilogramo",
+    "product_id": 1431774,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VELVET DAMASCO 275 ML": {
+    "cost": 22.875,
+    "unit": "PZA",
+    "product_id": 1456400,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VELVET GUANABANA 275 ML": {
+    "cost": 25.32,
+    "unit": "Pieza",
+    "product_id": 1431659,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VELVET LYCHEE 275 ML": {
+    "cost": 25.32,
+    "unit": "Pieza",
+    "product_id": 1431660,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VELVET MARACUYA 275 ML": {
+    "cost": 25.32,
+    "unit": "Pieza",
+    "product_id": 1431657,
+    "department_id": 0,
+    "performance": 0
+  },
+  "VITAL PROTEINS-COLLAGEN PEPTIDE 567 GR": {
+    "cost": 0,
+    "unit": "Bolsa",
+    "product_id": 1928695,
+    "department_id": 0,
+    "performance": 0
+  },
+  "XX LAGGER": {
+    "cost": 18.103,
+    "unit": "Pieza",
+    "product_id": 1431669,
+    "department_id": 0,
+    "performance": 0
+  },
+  "YOGI - ICHINACEA INMUNE SUPORT 16PZ (BED)": {
+    "cost": 73.27,
+    "unit": "Pieza",
+    "product_id": 1432016,
+    "department_id": 0,
+    "performance": 0
+  },
+  "YOGURTH DE COCO": {
+    "cost": 5.25,
+    "unit": "Kilogramo",
+    "product_id": 1431724,
+    "department_id": 0,
+    "performance": 0
+  },
+  "YOOJU - BARRA 35G (DIF SABORES)": {
+    "cost": 135,
+    "unit": "Pieza",
+    "product_id": 1509484,
+    "department_id": 0,
+    "performance": 0
+  }
+}
