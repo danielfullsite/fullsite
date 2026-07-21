@@ -1,0 +1,16 @@
+[
+  {"id": "1001", "name": "aceite de oliva", "unit": "kg", "cost_per_unit": 123.15, "category": "abarrote"},
+  {"id": "1002", "name": "ACEITE OLIVA", "unit": "KG", "cost_per_unit": 118, "category": "ABARRROTE"},
+  {"id": "pechuga_de_pollo", "name": "pechuga de pollo", "unit": "kilo", "cost_per_unit": 113, "category": "proteina"},
+  {"id": "3023", "name": "PECHUGA DE POLLO", "unit": "KG", "cost_per_unit": 120, "category": "PROTEINA"},
+  {"id": "sub_salsa_roja", "name": "SUB SALSA ROJA PARA CHILAQUILES", "unit": "KG", "cost_per_unit": 0, "category": "subreceta"},
+  {"id": "flor_comestible", "name": "flor comestible", "unit": "pza.", "cost_per_unit": 5, "category": null},
+  {"id": "3042", "name": "FLOR COMESTIBLE", "unit": "PZ", "cost_per_unit": 5, "category": null},
+  {"id": "agua_purificada", "name": "AGUA PURIFICADA", "unit": "KG", "cost_per_unit": 0, "category": null},
+  {"id": "bad_cost", "name": "TEST NEGATIVE", "unit": "kg", "cost_per_unit": -50, "category": "PROTEINA"},
+  {"id": "no_unit", "name": "TEST NO UNIT", "unit": "", "cost_per_unit": 10, "category": "abarrote"},
+  {"id": "typo_unit", "name": "TEST TYPO UNIT", "unit": "k", "cost_per_unit": 10, "category": "abarrote"},
+  {"id": "unknown_cat", "name": "TEST UNKNOWN CAT", "unit": "kg", "cost_per_unit": 10, "category": "PASTAS"},
+  {"id": "subamalay_mix", "name": "SUBAMALAY - HEALTHY CRUNCH MIX 60G", "unit": "PZ", "cost_per_unit": 30, "category": "market"},
+  {"id": "empty_name", "name": "", "unit": "kg", "cost_per_unit": 10, "category": "abarrote"}
+]

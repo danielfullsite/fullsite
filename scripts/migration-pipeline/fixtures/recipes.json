@@ -1,0 +1,10 @@
+[
+  {"menu_item_name": "CHILAQUILES", "ingredient_id": "sub_salsa_roja", "quantity": 0.15, "unit": "kg"},
+  {"menu_item_name": "CHILAQUILES", "ingredient_id": "pechuga_de_pollo", "quantity": 0.08, "unit": "kg"},
+  {"menu_item_name": "CHILAQUILES", "ingredient_id": "flor_comestible", "quantity": 1, "unit": "pz"},
+  {"menu_item_name": "CHILAQUILES", "ingredient_id": "orphan_ingredient", "quantity": 0.5, "unit": "kg"},
+  {"menu_item_name": "AVOCADO TOAST", "ingredient_id": "1001", "quantity": 0.02, "unit": "kg"},
+  {"menu_item_name": "AVOCADO TOAST", "ingredient_id": "", "quantity": 1, "unit": "pz"},
+  {"menu_item_name": "", "ingredient_id": "pechuga_de_pollo", "quantity": 0.1, "unit": "kg"},
+  {"menu_item_name": "EMPTY QTY", "ingredient_id": "pechuga_de_pollo", "quantity": 0, "unit": "kg"}
+]
