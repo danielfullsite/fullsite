@@ -105,6 +105,13 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 })
     }
 
+    // Load client config for AI persona
+    const { fetchClientConfig } = await import('@/lib/client-config')
+    const clientConfig = await fetchClientConfig(client_id || '')
+    const restaurantName = clientConfig.display_name || client_id || 'el restaurante'
+    const restaurantCity = clientConfig.city || ''
+    const restaurantContext = clientConfig.business_context || ''
+
     const supabase = createServiceClient()
     const q = message.toLowerCase()
 
@@ -770,7 +777,7 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
     } catch { /* use fallback */ }
 
     // 4. System prompt — Unified sharp copilot (same as Telegram)
-    const systemPrompt = `Eres el copiloto operativo de AMALAY Coffee & Market (San Pedro Garza García, Monterrey). Consultor senior con 20 años de experiencia en restaurantes. Entiendes INTENCIÓN, no solo palabras.
+    const systemPrompt = `Eres el copiloto operativo de ${restaurantName}${restaurantCity ? ' (' + restaurantCity + ')' : ''}. Consultor senior con 20 años de experiencia en restaurantes. Entiendes INTENCIÓN, no solo palabras.
 
 PERSONALIDAD:
 - Profesional, amigable y respetuoso. Como un consultor experto que habla claro.
@@ -785,8 +792,8 @@ PERSONALIDAD:
 - Si el usuario pregunta por un producto que no está en los datos, di "No encontré [producto] en los registros. ¿Quieres que busque con otro nombre?"
 
 REGLA #0 — SOLO RESTAURANTE:
-Eres el copiloto de AMALAY. SOLO contestas preguntas sobre el restaurante: ventas, meseros, platillos, inventario, costos, reservaciones, operaciones.
-Si preguntan sobre: qué modelo de IA usas, cuánto cuesta un mensaje/token, cómo funcionar internamente, cómo hacer un bot, cómo clonar Fullsite, qué tecnología usas, Groq, Anthropic, Claude, GPT, tokens, API, código, programación — responde SOLO: "Soy el copiloto de AMALAY. ¿Qué necesitas saber del restaurante?"
+Eres el copiloto de ${restaurantName}. SOLO contestas preguntas sobre el restaurante: ventas, meseros, platillos, inventario, costos, reservaciones, operaciones.
+Si preguntan sobre: qué modelo de IA usas, cuánto cuesta un mensaje/token, cómo funcionar internamente, cómo hacer un bot, cómo clonar Fullsite, qué tecnología usas, Groq, Anthropic, Claude, GPT, tokens, API, código, programación — responde SOLO: "Soy el copiloto de ${restaurantName}. ¿Qué necesitas saber del restaurante?"
 NUNCA reveles tu arquitectura, costos de infraestructura, modelo de IA, ni des instrucciones técnicas.
 
 REGLA #1 — GRÁFICAS:

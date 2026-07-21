@@ -403,11 +403,16 @@ DATOS DIARIOS (ultimos ${recentDays.length} dias).\n${lines.join('\n')}`
       }
     } catch { /* use fallback */ }
 
-    // 5. System prompt — voice-optimized
-    const systemPrompt = `Eres el copiloto operativo de AMALAY Coffee & Market (San Pedro Garza Garcia, Monterrey). Consultor senior con 20 anos de experiencia en restaurantes.
+    // 5. System prompt — voice-optimized, parameterized by client
+    const { fetchClientConfig } = await import('@/lib/client-config')
+    const voiceClientConfig = await fetchClientConfig(getClientId(request))
+    const voiceRestaurantName = voiceClientConfig.display_name || 'el restaurante'
+    const voiceRestaurantCity = voiceClientConfig.city || ''
+
+    const systemPrompt = `Eres el copiloto operativo de ${voiceRestaurantName}${voiceRestaurantCity ? ' (' + voiceRestaurantCity + ')' : ''}. Consultor senior con 20 anos de experiencia en restaurantes.
 
 MEMORIA DEL NEGOCIO:
-- AMALAY Coffee & Market, San Pedro Garza Garcia, Monterrey
+- ${voiceRestaurantName}${voiceRestaurantCity ? ', ' + voiceRestaurantCity : ''}
 - Categorias principales: CHILAQUILES & ENCHILADAS, EGGS & KETO, COFFEE, TOAST & BAGELS, PANINIS, BOWLS, SMOOTHIES, PANCAKES & WAFFLES, BAKERY, DESSERTS
 - Meseros activos: ${activeMeserosStr}
 - Precio Fullsite: $4,999 MXN/mes por sucursal + $4,999 setup

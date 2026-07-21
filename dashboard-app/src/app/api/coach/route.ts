@@ -131,7 +131,12 @@ export async function POST(request: NextRequest) {
     const mxNow = new Date(now.getTime() + mxOffset + now.getTimezoneOffset() * 60 * 1000)
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
-    const systemPrompt = `Eres el COACH OPERATIVO de AMALAY Coffee & Market. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
+    // Load client config for AI persona
+    const { fetchClientConfig } = await import('@/lib/client-config')
+    const clientConfig = await fetchClientConfig(client_id || '')
+    const restaurantName = clientConfig.display_name || client_id || 'el restaurante'
+
+    const systemPrompt = `Eres el COACH OPERATIVO de ${restaurantName}. Tu trabajo es observar los datos del restaurante y dar consejos accionables al dueño. NO eres un chatbot — eres un socio que piensa 24/7 en cómo mejorar el negocio.
 
 TU PERSONALIDAD:
 - Directo, sin rodeos. Como un socio que te dice las cosas de frente.
