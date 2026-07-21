@@ -79,7 +79,7 @@ export function printTicketCSS(order: Order) {
 
   <div class="center" style="margin-top:8px">
     <div style="font-size:9px;font-weight:bold;margin-bottom:4px">FACTURA ELECTRÓNICA</div>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://app.fullsite.mx/factura?order=${order.id.slice(0, 8)}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`)}" style="width:100px;height:100px" />
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://app.fullsite.mx/factura?order=${order.id}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`)}" style="width:100px;height:100px" />
     <div style="font-size:8px;color:#666;margin-top:2px">Escanea para solicitar tu factura</div>
   </div>
 
@@ -498,7 +498,7 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   cmds.push(LF)
 
   // QR Code for CFDI self-service invoice
-  const facturaURL = `https://app.fullsite.mx/factura?order=${order.id.slice(0, 8)}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`
+  const facturaURL = `https://app.fullsite.mx/factura?order=${order.id}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`
   cmds.push(...textToBytes('FACTURA ELECTRONICA\n'))
   // ESC/POS QR Code: GS ( k — store + print QR
   const qrData = new TextEncoder().encode(facturaURL)

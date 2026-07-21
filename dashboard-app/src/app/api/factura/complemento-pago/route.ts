@@ -1,10 +1,14 @@
 // POST /api/factura/complemento-pago — Timbra complemento de pago (CFDI tipo P)
 // Para facturas emitidas como PPD (pago diferido/parcialidades)
 
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { stampPaymentComplement, type PaymentComplementRequest } from '@/lib/facturama'
+import { requireAuth } from '@/lib/api-auth'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authErr = await requireAuth(request)
+  if (authErr) return authErr
+
   try {
     const body = await request.json() as PaymentComplementRequest
 

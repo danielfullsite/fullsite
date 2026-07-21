@@ -3,8 +3,13 @@
 // en el servidor; el cliente solo recibe el archivo.
 
 import { fetchCfdiFile } from '@/lib/facturama'
+import { requireAuth } from '@/lib/api-auth'
+import { NextRequest } from 'next/server'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const authErr = await requireAuth(req)
+  if (authErr) return authErr
+
   const url = new URL(req.url)
   const fid = url.searchParams.get('fid') || ''
   const tipo = url.searchParams.get('tipo') === 'xml' ? 'xml' : 'pdf'

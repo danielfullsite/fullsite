@@ -3,6 +3,8 @@
 // y manda el PDF/XML por email al cliente (best-effort).
 
 import { stampCfdi, emailCfdi, isFacturamaConfigured, type CfdiRequestRow } from '@/lib/facturama'
+import { requireAuth } from '@/lib/api-auth'
+import { NextRequest } from 'next/server'
 
 function sbHeaders() {
   const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -22,7 +24,10 @@ async function patchRequest(id: string, patch: Record<string, unknown>) {
   })
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const authErr = await requireAuth(req)
+  if (authErr) return authErr
+
   try {
     if (!isFacturamaConfigured()) {
       return Response.json(
