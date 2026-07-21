@@ -313,15 +313,18 @@ export function getClientId(): string {
 
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
+    const clientId = _getClientId()
+    if (!clientId) return [] // No client configured — show empty state
+
     const [catRes, itemsRes] = await Promise.all([
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${_getClientId()}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
-      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
     ])
-    if (!catRes.ok || !itemsRes.ok) return MENU_CATEGORIES
+    if (!catRes.ok || !itemsRes.ok) return [] // DB error — show empty, not another client's menu
 
     const cats = await catRes.json()
     const items = await itemsRes.json()
-    if (!cats.length || !items.length) return MENU_CATEGORIES
+    if (!cats.length || !items.length) return [] // No menu imported yet — show empty state
 
     const itemsByCat = new Map<string, MenuItem[]>()
     for (const item of items) {
@@ -337,7 +340,7 @@ export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
       items: itemsByCat.get(cat.id) || [],
     }))
   } catch {
-    return MENU_CATEGORIES
+    return [] // Network error — show empty, not another client's menu
   }
 }
 
@@ -1023,20 +1026,8 @@ export const MENU_CATEGORIES: MenuCategory[] = [
 
 // MESEROS — fetched dynamically from pos_staff table
 // Fallback used only when DB is unreachable (offline mode)
-const MESEROS_FALLBACK = [
-  'Omar Aguilera',
-  'Hector Enrique Rodriguez Lopez',
-  'Brayan Berlanga Solis',
-  'Daniela Edith Rico Segura',
-  'Julio Cesar Hernández Hernández',
-  'Oscar Rios Alvarado',
-  'Mauricio Rodriguez Rodriguez',
-  'Alexis Alejandro Ocampo Vera',
-  'Aldo Ruiz Ramirez',
-  'Mariana Carolina Salas Alva',
-  'Mario García Ramírez',
-  'MESERO EVENTO',
-]
+// Empty fallback — staff comes from DB. No hardcoded names from any client.
+const MESEROS_FALLBACK: string[] = []
 
 // Dynamic meseros — populated by fetchMeseros(), falls back to hardcoded if offline
 export let MESEROS: string[] = [...MESEROS_FALLBACK]
@@ -1072,16 +1063,11 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
 // Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),
 // barra (10-12), toldo (50-55), privado (60-63)
 const DEFAULT_MESA_NUMBERS = [
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-  20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
-  50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
 ]
-// Capacidades segun las sillas dibujadas en el plano fisico
-const MESA_CAPACITY: Record<number, number> = {
-  30: 8,                // redonda grande terraza (8 sillas)
-  40: 6, 41: 6, 42: 6,  // rectangulares grandes terraza (6 sillas)
-  // resto: 4 sillas
-}
+// Generic default: 20 tables, capacity 4 each.
+// Per-client mesa config should come from DB (pos_config or client_locations).
+const MESA_CAPACITY: Record<number, number> = {}
 export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
   number: n,
   capacity: MESA_CAPACITY[n] ?? 4,

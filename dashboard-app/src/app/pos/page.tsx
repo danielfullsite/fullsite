@@ -4,10 +4,10 @@ import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
-  MENU_CATEGORIES,
   MESEROS,
   fetchMeseros,
   verifyManagerPin,
+  type MenuCategory,
   RECIPE_ALIASES,
   formatMXN,
   generateId,
@@ -1504,7 +1504,7 @@ function POSContent() {
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
 
-  const [menuCategories, setMenuCategories] = useState(MENU_CATEGORIES)
+  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categorySearch, setCategorySearch] = useState('')
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => {
@@ -3876,6 +3876,15 @@ function POSContent() {
                       <span>Combos</span>
                       <span className="text-[10px] font-normal opacity-70">{allCombos.length}</span>
                     </button>
+                  )}
+                  {menuCategories.length === 0 && (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                      <Package size={48} className="text-[var(--text-3)] mb-4 opacity-40" />
+                      <p className="text-lg font-semibold text-[var(--text-1)] mb-2">Sin menú configurado</p>
+                      <p className="text-sm text-[var(--text-3)] max-w-md">
+                        Importa el menú desde Administración → Carga Masiva o contacta a soporte para configurar tu restaurante.
+                      </p>
+                    </div>
                   )}
                   {menuCategories.filter(cat => cat.items.some(i => i.price > 0))
                     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
