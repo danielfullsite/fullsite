@@ -360,7 +360,23 @@ function createWindow() {
     if (input.control && input.key.toLowerCase() === 'w') _event.preventDefault();
   });
 
-  mainWindow.on('close', (e) => { if (!allowClose) e.preventDefault(); });
+  mainWindow.on('close', (e) => {
+    if (!allowClose) {
+      e.preventDefault();
+      // Let the web app handle close via IPC (Salir button, Ctrl+Shift+Q)
+      // But also allow taskbar "Close window" to work
+      const { dialog } = require('electron');
+      dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['Cancelar', 'Cerrar Fullsite'],
+        defaultId: 0,
+        title: 'Cerrar Fullsite POS',
+        message: '¿Cerrar la aplicación?',
+      }).then(({ response }) => {
+        if (response === 1) { allowClose = true; app.quit(); }
+      });
+    }
+  });
   try { globalShortcut.register('CommandOrControl+Shift+Q', () => { allowClose = true; app.quit(); }); } catch {}
   mainWindow.on('closed', () => { mainWindow = null; });
 }

@@ -148,6 +148,18 @@ para ser la plataforma lider (largo plazo). Nunca sacrificar
 el largo plazo por una feature tactica. Nunca sacrificar el
 primer cliente por una vision demasiado lejana.
 
+## 16. No convertimos incertidumbre en desarrollo
+
+Primero medimos. Luego decidimos.
+
+Si algo falla, entendemos por que antes de escribir codigo.
+El diagnostico es obligatorio. El desarrollo es opcional.
+
+Muchos problemas se resuelven con configuracion, con capacitacion,
+o con un cambio de proceso. Muy pocos requieren codigo nuevo.
+
+Convertir incertidumbre en codigo es la forma mas cara de equivocarse.
+
 ## 15. No copiamos. Aprendemos y superamos.
 
 Wansoft opero restaurantes 20 anos. Respetamos eso. Estudiamos
@@ -157,6 +169,20 @@ de impresion, y sus decisiones de diseno.
 Pero no copiamos su arquitectura, su UX, ni sus limitaciones.
 Adoptamos los principios operativos que funcionan. Mejoramos lo
 que podemos hacer mejor. Y no replicamos su deuda tecnica.
+
+## 17. El conocimiento no vive en chats. Vive en documentos canonicos.
+
+Cada aprendizaje operativo importante termina en un documento canonico.
+Cada decision importante se registra en DECISIONS.md.
+Cada cambio arquitectonico tiene contexto documentado.
+Cada incidente deja una mejora permanente en POSTMORTEMS/.
+
+Si alguien pregunta "por que hicimos esto" dentro de seis meses, la
+respuesta no depende de la memoria de Daniel. Existe un documento
+que lo explica.
+
+El conocimiento no documentado es conocimiento perdido. Ningun aprendizaje
+existe oficialmente hasta que queda en el lugar correcto.
 
 ---
 
