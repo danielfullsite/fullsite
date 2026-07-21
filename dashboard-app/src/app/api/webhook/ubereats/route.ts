@@ -82,8 +82,14 @@ export async function POST(request: NextRequest) {
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    // TODO: derive client_id from store_id mapping when multi-tenant
-    const clientId = process.env.UBER_CLIENT_ID_MAPPING ? 'amalay' : 'amalay'
+    // Derive client_id from store_id mapping or env default
+    // For multi-tenant: UBER_STORE_CLIENT_MAP='{"store123":"client_a","store456":"client_b"}'
+    const storeId = body.meta?.resource?.store?.store_id || body.store_id || ''
+    let clientId = process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || ''
+    try {
+      const storeMap = JSON.parse(process.env.UBER_STORE_CLIENT_MAP || '{}')
+      if (storeMap[storeId]) clientId = storeMap[storeId]
+    } catch { /* invalid JSON, use default */ }
 
     // Handle different event types
     if (eventType === 'orders.notification' || eventType === 'orders.created') {

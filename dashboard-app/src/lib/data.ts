@@ -28,14 +28,31 @@ async function getAuthToken(): Promise<string> {
   }
 }
 
-/** Get the current client slug from AuthContext (stored in localStorage after login). Falls back to 'amalay' for backward compat. */
+/**
+ * SINGLE SOURCE OF TRUTH for client_id resolution (client-side).
+ *
+ * Resolution order:
+ *   1. localStorage 'fullsite_client_id' (set by AuthContext on login)
+ *   2. Environment default (NEXT_PUBLIC_DEFAULT_CLIENT_ID)
+ *   3. Empty string '' (fails DB queries safely — returns 0 rows)
+ *
+ * For a new Fullsite installation with no default client:
+ *   - Set NEXT_PUBLIC_DEFAULT_CLIENT_ID='' in .env
+ *   - All unauthenticated pages return empty data
+ *   - AuthContext sets localStorage on login → all subsequent queries work
+ *
+ * For AMALAY (current single-tenant):
+ *   - NEXT_PUBLIC_DEFAULT_CLIENT_ID='amalay' in .env
+ *   - Backward compatible
+ */
 export function getActiveClientSlug(): string {
-  if (typeof window === 'undefined') return 'amalay'
-  try {
-    const stored = localStorage.getItem('fullsite_client_id')
-    if (stored) return stored
-  } catch { /* SSR or private browsing */ }
-  return 'amalay'
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('fullsite_client_id')
+      if (stored) return stored
+    } catch { /* private browsing */ }
+  }
+  return process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || ''
 }
 
 /**

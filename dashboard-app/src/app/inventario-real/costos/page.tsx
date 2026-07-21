@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { DollarSign, TrendingUp, TrendingDown, ArrowDownUp, Warehouse, Package, BarChart3 } from 'lucide-react'
 import { formatCurrency, formatNumber } from '@/lib/format'
+import { getActiveClientSlug } from '@/lib/data'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
 
@@ -72,7 +73,7 @@ export default function CostosInventarioPage() {
         const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
         const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.amalay&data_key=eq.inventory_parsed&order=fecha.desc&limit=5&select=fecha,data`,
+          `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${getActiveClientSlug()}&data_key=eq.inventory_parsed&order=fecha.desc&limit=5&select=fecha,data`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         if (!res.ok) throw new Error(`HTTP ${res.status}`)

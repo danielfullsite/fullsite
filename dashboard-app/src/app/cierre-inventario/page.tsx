@@ -6,6 +6,8 @@ import { formatCurrency, formatNumber } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
 
+import { getActiveClientSlug } from '@/lib/data'
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
@@ -81,9 +83,9 @@ export default function CierreInventarioPage() {
   useEffect(() => {
     async function load() {
       const [ingredients, inventory, snaps] = await Promise.all([
-        sbFetch<Ingredient[]>('pos_ingredients?client_id=eq.amalay&active=eq.true&select=id,name,unit,cost_per_unit,category'),
-        sbFetch<InventoryRow[]>('pos_inventory?client_id=eq.amalay&select=ingredient_id,stock,reorder_point'),
-        sbFetch<Snapshot[]>('pos_inventory_snapshots?client_id=eq.amalay&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20'),
+        sbFetch<Ingredient[]>('pos_ingredients?client_id=eq.${getActiveClientSlug()}&active=eq.true&select=id,name,unit,cost_per_unit,category'),
+        sbFetch<InventoryRow[]>('pos_inventory?client_id=eq.${getActiveClientSlug()}&select=ingredient_id,stock,reorder_point'),
+        sbFetch<Snapshot[]>('pos_inventory_snapshots?client_id=eq.${getActiveClientSlug()}&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20'),
       ])
 
       if (ingredients && inventory) {
@@ -230,7 +232,7 @@ export default function CierreInventarioPage() {
       if (res.ok) {
         setSaveMsg('Cierre guardado correctamente')
         // Refresh snapshots
-        const snaps = await sbFetch<Snapshot[]>('pos_inventory_snapshots?client_id=eq.amalay&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20')
+        const snaps = await sbFetch<Snapshot[]>('pos_inventory_snapshots?client_id=eq.${getActiveClientSlug()}&select=id,snapshot_date,total_value,total_items,items_zero&order=snapshot_date.desc&limit=20')
         if (snaps) setSnapshots(snaps)
       } else {
         setSaveMsg(`Error al guardar (${res.status})`)
