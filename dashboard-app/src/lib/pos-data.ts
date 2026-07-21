@@ -1817,6 +1817,9 @@ export async function deductIngredientsForOrder(
       const inv = invMap.get(row.ingredient_id)
       if (!inv) continue
 
+      // Skip sub-recipes — they don't carry physical stock
+      if (row.ingredient_id.startsWith('sub_') || inv.ingredient_category === 'subreceta' || inv.ingredient_category === 'SUBRECETA') continue
+
       const actualDeduction = Math.min(deductAmount, inv.stock) // never deduct more than available
       const newStock = Math.max(0, inv.stock - deductAmount)
 

@@ -46,6 +46,7 @@ export type MovementType =
   | 'transfer_in'    // Transferencia entre almacenes (entrada)
   | 'return'         // Devolución a proveedor
   | 'reversal'       // Reversa de un movimiento anterior
+  | 'underflow_prevented'  // Alert: stock would have gone negative
 
 export interface MovementLine {
   ingredient_id: string       // FK to pos_ingredients.id
@@ -90,6 +91,7 @@ interface InventoryRow {
 interface IngredientRow {
   id: string
   cost_per_unit: number
+  product_type?: string
 }
 
 const ENTRY_TYPES: MovementType[] = ['entry', 'invoice_entry', 'restock', 'transfer_in']
@@ -174,20 +176,20 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     }
   }
 
-  // Load pos_ingredients (cost) — only needed for entries with cost
-  if (isEntry) {
-    for (let i = 0; i < ingredientIds.length; i += 50) {
-      const chunk = ingredientIds.slice(i, i + 50)
-      const filter = `id=in.(${chunk.join(',')})`
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${req.client_id}&${filter}&select=id,cost_per_unit`,
-        { headers: headers() }
-      )
-      if (res.ok) {
-        const rows: IngredientRow[] = await res.json()
-        for (const row of rows) {
-          costMap.set(row.id, Number(row.cost_per_unit) || 0)
-        }
+  // Load pos_ingredients (cost + product_type)
+  const productTypeMap = new Map<string, string>()
+  for (let i = 0; i < ingredientIds.length; i += 50) {
+    const chunk = ingredientIds.slice(i, i + 50)
+    const filter = `id=in.(${chunk.join(',')})`
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_ingredients?client_id=eq.${req.client_id}&${filter}&select=id,cost_per_unit,product_type`,
+      { headers: headers() }
+    )
+    if (res.ok) {
+      const rows: IngredientRow[] = await res.json()
+      for (const row of rows) {
+        costMap.set(row.id, Number(row.cost_per_unit) || 0)
+        if (row.product_type) productTypeMap.set(row.id, row.product_type)
       }
     }
   }
@@ -203,6 +205,21 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
 
   for (const line of req.lines) {
     const current = stockMap.get(line.ingredient_id)!
+
+    // Block deductions on sub-recipes (canonical product_type check + prefix fallback)
+    if (req.movement_type === 'deduction') {
+      const ptype = productTypeMap.get(line.ingredient_id)
+      const isSubRecipe = ptype === 'subreceta' || ptype === 'sub_recipe' ||
+                          line.ingredient_id.startsWith('sub_')
+      if (isSubRecipe) {
+        result.errors.push(
+          `BLOCKED: ${line.ingredient_id} is a sub-recipe (product_type=${ptype || 'sub_ prefix'}). ` +
+          `Sub-recipes do not carry physical stock.`
+        )
+        return result
+      }
+    }
+
     if (current.stock < 0) {
       result.errors.push(
         `ANOMALY: ${line.ingredient_id} has negative stock (${current.stock}). ` +
@@ -226,6 +243,7 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
   }
 
   const computed: ComputedLine[] = []
+  const underflows: { ingredient_id: string; stock_before: number; attempted: number; would_be: number; floored_to: number }[] = []
 
   for (const line of req.lines) {
     const current = stockMap.get(line.ingredient_id)!
@@ -253,7 +271,19 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
       // Rule 3: purchaseCost=0, cost unchanged (costAfter = costBefore)
     } else {
       // Waste, deduction, return, etc.: stock goes down (quantity is negative)
-      stockAfter = Math.max(0, stockBefore + line.quantity)
+      const rawAfter = stockBefore + line.quantity
+      stockAfter = Math.max(0, rawAfter)
+
+      // UNDERFLOW_PREVENTED: log when floor to 0 was applied
+      if (rawAfter < 0) {
+        underflows.push({
+          ingredient_id: line.ingredient_id,
+          stock_before: stockBefore,
+          attempted: line.quantity,
+          would_be: rawAfter,
+          floored_to: 0,
+        })
+      }
     }
 
     computed.push({
@@ -297,6 +327,27 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
   }
 
   result.movements_created = computed.length
+
+  // ── 5b. INSERT underflow alerts if any ──────────────────────────
+
+  if (underflows.length > 0) {
+    const alertRows = underflows.map(u => ({
+      client_id: req.client_id,
+      ingredient_id: u.ingredient_id,
+      movement_type: 'underflow_prevented',
+      quantity: 0,
+      actor: 'system',
+      notes: `UNDERFLOW_PREVENTED: ${req.movement_type} would set stock to ${u.would_be.toFixed(4)} ` +
+             `(before=${u.stock_before} qty=${u.attempted}). Floored to 0. ` +
+             `Original key: ${req.idempotency_key}`,
+    }))
+
+    await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(alertRows),
+    })
+  }
 
   // ── 6. PATCH stock + cost ───────────────────────────────────────
 
