@@ -1,0 +1,5494 @@
+{
+  "constraints": [
+    {
+      "table_name": "agent_audit_log",
+      "constraint_name": "agent_audit_log_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_insights",
+      "constraint_name": "agent_insights_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_insights",
+      "constraint_name": "agent_insights_agent_id_client_id_title_created_at_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_insights",
+      "constraint_name": "agent_insights_agent_id_client_id_title_created_at_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "agent_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_insights",
+      "constraint_name": "agent_insights_agent_id_client_id_title_created_at_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "created_at",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_insights",
+      "constraint_name": "agent_insights_agent_id_client_id_title_created_at_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "title",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_messages",
+      "constraint_name": "agent_messages_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_results",
+      "constraint_name": "agent_results_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_results",
+      "constraint_name": "agent_results_client_id_agent_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_results",
+      "constraint_name": "agent_results_client_id_agent_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "agent_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_results",
+      "constraint_name": "agent_results_client_id_agent_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "agent_runs",
+      "constraint_name": "agent_runs_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "amalay_reservaciones",
+      "constraint_name": "amalay_reservaciones_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "amalay_reservaciones",
+      "constraint_name": "amalay_reservaciones_codigo_reserva_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "codigo_reserva",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "calendar_sync_log",
+      "constraint_name": "calendar_sync_log_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "chat_logs",
+      "constraint_name": "chat_logs_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "client_locations",
+      "constraint_name": "client_locations_client_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "clients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "client_locations",
+      "constraint_name": "client_locations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "client_users",
+      "constraint_name": "client_users_client_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "clients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "client_users",
+      "constraint_name": "client_users_user_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "user_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "client_users",
+      "constraint_name": "client_users_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "clients",
+      "constraint_name": "clients_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "content",
+      "constraint_name": "content_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "credentials_vault",
+      "constraint_name": "credentials_vault_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "delivery_orders",
+      "constraint_name": "delivery_orders_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "delivery_orders",
+      "constraint_name": "delivery_orders_platform_platform_order_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "platform_order_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "delivery_orders",
+      "constraint_name": "delivery_orders_platform_platform_order_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "platform",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "delivery_platform_payments",
+      "constraint_name": "delivery_platform_payments_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "events",
+      "constraint_name": "events_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "sequence",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "events",
+      "constraint_name": "events_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "memories",
+      "constraint_name": "memories_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "ops_daily",
+      "constraint_name": "ops_daily_client_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "clients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "ops_daily",
+      "constraint_name": "ops_daily_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "parity_reports",
+      "constraint_name": "parity_reports_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_attendance",
+      "constraint_name": "pos_attendance_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_audit_log",
+      "constraint_name": "pos_audit_log_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_billing_clients",
+      "constraint_name": "pos_billing_clients_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_billing_clients",
+      "constraint_name": "pos_billing_clients_rfc_client_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "rfc",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_billing_clients",
+      "constraint_name": "pos_billing_clients_rfc_client_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_bridge_logs",
+      "constraint_name": "pos_bridge_logs_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_cash_movements",
+      "constraint_name": "pos_cash_movements_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_category_modifiers",
+      "constraint_name": "pos_category_modifiers_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_category_modifiers",
+      "constraint_name": "pos_category_modifiers_client_id_category_id_modifier_group_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "category_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_category_modifiers",
+      "constraint_name": "pos_category_modifiers_client_id_category_id_modifier_group_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "modifier_group_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_category_modifiers",
+      "constraint_name": "pos_category_modifiers_client_id_category_id_modifier_group_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_cfdi_requests",
+      "constraint_name": "pos_cfdi_requests_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_cierres",
+      "constraint_name": "pos_cierres_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_clients",
+      "constraint_name": "pos_clients_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_combos",
+      "constraint_name": "pos_combos_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_customer_notes",
+      "constraint_name": "pos_customer_notes_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_customer_visits",
+      "constraint_name": "pos_customer_visits_customer_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "customer_id",
+      "ref_table": "pos_customers",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_customer_visits",
+      "constraint_name": "pos_customer_visits_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_customers",
+      "constraint_name": "pos_customers_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_customers",
+      "constraint_name": "pos_customers_client_id_phone_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_customers",
+      "constraint_name": "pos_customers_client_id_phone_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "phone",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_delivery_zones",
+      "constraint_name": "pos_delivery_zones_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_facturas",
+      "constraint_name": "pos_facturas_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_fingerprint_templates",
+      "constraint_name": "pos_fingerprint_templates_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_gastos",
+      "constraint_name": "pos_gastos_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_gift_cards",
+      "constraint_name": "pos_gift_cards_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredient_presentations",
+      "constraint_name": "pos_ingredient_presentations_presentation_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "presentation_id",
+      "ref_table": "pos_presentations",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_ingredient_presentations",
+      "constraint_name": "pos_ingredient_presentations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredient_presentations",
+      "constraint_name": "uq_ip_client_ingredient_pres",
+      "constraint_type": "UNIQUE",
+      "column_name": "presentation_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredient_presentations",
+      "constraint_name": "uq_ip_client_ingredient_pres",
+      "constraint_type": "UNIQUE",
+      "column_name": "ingredient_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredient_presentations",
+      "constraint_name": "uq_ip_client_ingredient_pres",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredients",
+      "constraint_name": "pos_ingredients_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredients",
+      "constraint_name": "uq_ingredients_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_ingredients",
+      "constraint_name": "uq_ingredients_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_insumos",
+      "constraint_name": "pos_insumos_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory",
+      "constraint_name": "pos_inventory_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory",
+      "constraint_name": "pos_inventory_client_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory",
+      "constraint_name": "pos_inventory_client_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "ingredient_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory_alerts",
+      "constraint_name": "pos_inventory_alerts_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory_movements",
+      "constraint_name": "pos_inventory_movements_reconciliation_result_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "reconciliation_result_id",
+      "ref_table": "pos_reconciliation_results",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_inventory_movements",
+      "constraint_name": "pos_inventory_movements_product_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "product_id",
+      "ref_table": "pos_inventory_products",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_inventory_movements",
+      "constraint_name": "pos_inventory_movements_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory_products",
+      "constraint_name": "pos_inventory_products_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory_products",
+      "constraint_name": "pos_inventory_products_client_id_name_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "name",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_inventory_products",
+      "constraint_name": "pos_inventory_products_client_id_name_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_inventory_policy",
+      "constraint_name": "pos_item_inventory_policy_client_id_menu_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_modifier_groups",
+      "constraint_name": "pos_item_modifier_groups_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_modifier_groups",
+      "constraint_name": "pos_item_modifier_groups_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "group_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_item_modifier_groups",
+      "constraint_name": "pos_item_modifier_groups_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_movements",
+      "constraint_name": "pos_market_movements_reconciliation_result_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "reconciliation_result_id",
+      "ref_table": "pos_reconciliation_results",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_market_movements",
+      "constraint_name": "pos_market_movements_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "pos_market_stock_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "uq_market_stock_client_item_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "uq_market_stock_client_item_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "pos_market_stock_client_id_menu_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "pos_market_stock_client_id_menu_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_market_stock",
+      "constraint_name": "uq_market_stock_client_item_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_menu_categories",
+      "constraint_name": "pos_menu_categories_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_menu_items",
+      "constraint_name": "pos_menu_items_category_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "category_id",
+      "ref_table": "pos_menu_categories",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_menu_items",
+      "constraint_name": "pos_menu_items_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_menu_items",
+      "constraint_name": "uq_menu_items_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_menu_items",
+      "constraint_name": "uq_menu_items_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_modifier_groups",
+      "constraint_name": "pos_modifier_groups_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_modifiers",
+      "constraint_name": "pos_modifiers_group_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "group_id",
+      "ref_table": "pos_modifier_groups",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_modifiers",
+      "constraint_name": "pos_modifiers_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_mutation_authority",
+      "constraint_name": "pos_mutation_authority_client_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "clients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_mutation_authority",
+      "constraint_name": "pos_mutation_authority_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_orders",
+      "constraint_name": "pos_orders_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_payment_methods",
+      "constraint_name": "pos_payment_methods_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_presentations",
+      "constraint_name": "pos_presentations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_presentations",
+      "constraint_name": "uq_pres_client_code",
+      "constraint_type": "UNIQUE",
+      "column_name": "code",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_presentations",
+      "constraint_name": "uq_pres_client_code",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_price_types",
+      "constraint_name": "pos_price_types_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_print_jobs",
+      "constraint_name": "pos_print_jobs_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_promos",
+      "constraint_name": "pos_promos_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_promotions",
+      "constraint_name": "pos_promotions_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_purchase_order_items",
+      "constraint_name": "pos_purchase_order_items_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_purchase_orders",
+      "constraint_name": "pos_purchase_orders_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_details",
+      "constraint_name": "pos_recipe_details_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey1",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_inventory",
+      "ref_column": "ingredient_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "ingredient_id",
+      "ref_table": "pos_ingredients",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "ingredient_id",
+      "ref_table": "pos_ingredients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_ingredients",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_ingredients",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey1",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "ingredient_id",
+      "ref_table": "pos_inventory",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey1",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "ingredient_id",
+      "ref_table": "pos_inventory",
+      "ref_column": "ingredient_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_recipe_version_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "recipe_version_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_ingredient_id_fkey1",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_inventory",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_recipe_version_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_recipe_version_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_client_id_recipe_version_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "recipe_version_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_recipe_version_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "recipe_version_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_lines",
+      "constraint_name": "pos_recipe_lines_recipe_version_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "ingredient_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_menu_items",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_version_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "version",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "uq_recipe_versions_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_version_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_version_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "pos_recipe_versions_client_id_menu_item_id_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipe_versions",
+      "constraint_name": "uq_recipe_versions_client_id",
+      "constraint_type": "UNIQUE",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipes",
+      "constraint_name": "pos_recipes_pkey1",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipes_old",
+      "constraint_name": "pos_recipes_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipes_old",
+      "constraint_name": "pos_recipes_client_id_menu_item_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "ingredient_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipes_old",
+      "constraint_name": "pos_recipes_client_id_menu_item_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "menu_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_recipes_old",
+      "constraint_name": "pos_recipes_client_id_menu_item_id_ingredient_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_recipe_version_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_market_stock_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_market_stock",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_recipe_version_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "pinned_recipe_version_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "menu_item_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "client_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "client_id",
+      "ref_table": "pos_recipe_versions",
+      "ref_column": "menu_item_id"
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_order_id_order_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "order_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_order_id_order_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "order_item_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_reconciliation_results",
+      "constraint_name": "pos_reconciliation_results_client_id_order_id_order_item_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_retail_groups",
+      "constraint_name": "pos_retail_groups_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_retail_items",
+      "constraint_name": "pos_retail_items_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_retail_promotions",
+      "constraint_name": "pos_retail_promotions_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_save_operations",
+      "constraint_name": "pos_save_operations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_save_operations",
+      "constraint_name": "pos_save_operations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "save_operation_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_save_operations",
+      "constraint_name": "pos_save_operations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "order_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_schedules",
+      "constraint_name": "pos_schedules_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_sizes",
+      "constraint_name": "pos_sizes_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_staff",
+      "constraint_name": "pos_staff_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_staff",
+      "constraint_name": "unique_pin_per_client",
+      "constraint_type": "UNIQUE",
+      "column_name": "pin",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_staff",
+      "constraint_name": "unique_pin_per_client",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_staff_audit",
+      "constraint_name": "pos_staff_audit_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_staff_shifts",
+      "constraint_name": "pos_staff_shifts_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_sub_recipe_ingredients",
+      "constraint_name": "pos_sub_recipe_ingredients_sub_recipe_id_fkey",
+      "constraint_type": "FOREIGN KEY",
+      "column_name": "sub_recipe_id",
+      "ref_table": "pos_sub_recipes",
+      "ref_column": "id"
+    },
+    {
+      "table_name": "pos_sub_recipe_ingredients",
+      "constraint_name": "pos_sub_recipe_ingredients_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_sub_recipes",
+      "constraint_name": "pos_sub_recipes_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_sub_recipes",
+      "constraint_name": "uq_sub_recipes_client_name",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_sub_recipes",
+      "constraint_name": "uq_sub_recipes_client_name",
+      "constraint_type": "UNIQUE",
+      "column_name": "name",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_suppliers",
+      "constraint_name": "pos_suppliers_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_suppliers",
+      "constraint_name": "pos_suppliers_client_name_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_suppliers",
+      "constraint_name": "pos_suppliers_client_name_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "name",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_survey",
+      "constraint_name": "pos_survey_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_turnos",
+      "constraint_name": "pos_turnos_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_unit_conversions",
+      "constraint_name": "pos_unit_conversions_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_unit_conversions",
+      "constraint_name": "uq_uc_client_units",
+      "constraint_type": "UNIQUE",
+      "column_name": "from_unit",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_unit_conversions",
+      "constraint_name": "uq_uc_client_units",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "pos_unit_conversions",
+      "constraint_name": "uq_uc_client_units",
+      "constraint_type": "UNIQUE",
+      "column_name": "to_unit",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "prospects",
+      "constraint_name": "prospects_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "push_subscriptions",
+      "constraint_name": "push_subscriptions_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "push_subscriptions",
+      "constraint_name": "push_subscriptions_endpoint_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "endpoint",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "r1_observation_baseline",
+      "constraint_name": "r1_observation_baseline_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "r1_observation_final",
+      "constraint_name": "r1_observation_final_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "r1_observation_log",
+      "constraint_name": "r1_observation_log_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "reservaciones",
+      "constraint_name": "reservaciones_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "reviews",
+      "constraint_name": "reviews_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "reviews",
+      "constraint_name": "reviews_review_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "review_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "tasks",
+      "constraint_name": "tasks_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_catalog",
+      "constraint_name": "wansoft_catalog_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_catalog",
+      "constraint_name": "wansoft_catalog_path_explorer_version_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "path",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_catalog",
+      "constraint_name": "wansoft_catalog_path_explorer_version_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "explorer_version",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_daily",
+      "constraint_name": "wansoft_daily_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_daily",
+      "constraint_name": "wansoft_daily_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_slug",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_daily",
+      "constraint_name": "wansoft_daily_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "report_type",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_daily",
+      "constraint_name": "wansoft_daily_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_data",
+      "constraint_name": "wansoft_data_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_data",
+      "constraint_name": "wansoft_data_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_data",
+      "constraint_name": "wansoft_data_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "data_key",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_food_cost",
+      "constraint_name": "wansoft_food_cost_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_food_cost",
+      "constraint_name": "wansoft_food_cost_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_food_cost",
+      "constraint_name": "wansoft_food_cost_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_hourly",
+      "constraint_name": "wansoft_hourly_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_hourly",
+      "constraint_name": "wansoft_hourly_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_inventory",
+      "constraint_name": "wansoft_inventory_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_inventory",
+      "constraint_name": "wansoft_inventory_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_inventory",
+      "constraint_name": "wansoft_inventory_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_kpis",
+      "constraint_name": "wansoft_kpis_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_labor",
+      "constraint_name": "wansoft_labor_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_labor",
+      "constraint_name": "wansoft_labor_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_labor",
+      "constraint_name": "wansoft_labor_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_menu_config",
+      "constraint_name": "wansoft_menu_config_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_menu_config",
+      "constraint_name": "wansoft_menu_config_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_persons_hourly",
+      "constraint_name": "wansoft_persons_hourly_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_persons_hourly",
+      "constraint_name": "wansoft_persons_hourly_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_persons_hourly",
+      "constraint_name": "wansoft_persons_hourly_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_pnl",
+      "constraint_name": "wansoft_pnl_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_pnl",
+      "constraint_name": "wansoft_pnl_client_id_periodo_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_pnl",
+      "constraint_name": "wansoft_pnl_client_id_periodo_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "periodo",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_recipes",
+      "constraint_name": "wansoft_recipes_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_recipes",
+      "constraint_name": "wansoft_recipes_client_id_saucer_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "saucer_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_recipes",
+      "constraint_name": "wansoft_recipes_client_id_saucer_id_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_shrinkage",
+      "constraint_name": "wansoft_shrinkage_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_shrinkage",
+      "constraint_name": "wansoft_shrinkage_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_shrinkage",
+      "constraint_name": "wansoft_shrinkage_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_suppliers",
+      "constraint_name": "wansoft_suppliers_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_suppliers",
+      "constraint_name": "wansoft_suppliers_client_id_fecha_periodo_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_suppliers",
+      "constraint_name": "wansoft_suppliers_client_id_fecha_periodo_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_suppliers",
+      "constraint_name": "wansoft_suppliers_client_id_fecha_periodo_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "periodo",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_tips",
+      "constraint_name": "wansoft_tips_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_tips",
+      "constraint_name": "wansoft_tips_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_tips",
+      "constraint_name": "wansoft_tips_client_id_fecha_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "client_id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "wansoft_waiter_categories",
+      "constraint_name": "wansoft_waiter_categories_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "fecha",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "whatsapp_conversations",
+      "constraint_name": "whatsapp_conversations_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "whatsapp_messages_log",
+      "constraint_name": "whatsapp_messages_log_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "whatsapp_whitelist",
+      "constraint_name": "whatsapp_whitelist_pkey",
+      "constraint_type": "PRIMARY KEY",
+      "column_name": "id",
+      "ref_table": null,
+      "ref_column": null
+    },
+    {
+      "table_name": "whatsapp_whitelist",
+      "constraint_name": "whatsapp_whitelist_phone_number_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "phone_number",
+      "ref_table": null,
+      "ref_column": null
+    }
+  ],
+  "indexes": [
+    {
+      "tablename": "agent_audit_log",
+      "indexname": "agent_audit_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX agent_audit_log_pkey ON public.agent_audit_log USING btree (id)"
+    },
+    {
+      "tablename": "agent_audit_log",
+      "indexname": "idx_audit_agent_ts",
+      "indexdef": "CREATE INDEX idx_audit_agent_ts ON public.agent_audit_log USING btree (agent_name, ts DESC)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "agent_insights_agent_id_client_id_title_created_at_key",
+      "indexdef": "CREATE UNIQUE INDEX agent_insights_agent_id_client_id_title_created_at_key ON public.agent_insights USING btree (agent_id, client_id, title, created_at)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "agent_insights_pkey",
+      "indexdef": "CREATE UNIQUE INDEX agent_insights_pkey ON public.agent_insights USING btree (id)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "idx_insights_client",
+      "indexdef": "CREATE INDEX idx_insights_client ON public.agent_insights USING btree (client_id)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "idx_insights_created",
+      "indexdef": "CREATE INDEX idx_insights_created ON public.agent_insights USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "idx_insights_severity",
+      "indexdef": "CREATE INDEX idx_insights_severity ON public.agent_insights USING btree (severity)"
+    },
+    {
+      "tablename": "agent_insights",
+      "indexname": "idx_insights_status",
+      "indexdef": "CREATE INDEX idx_insights_status ON public.agent_insights USING btree (status)"
+    },
+    {
+      "tablename": "agent_messages",
+      "indexname": "agent_messages_pkey",
+      "indexdef": "CREATE UNIQUE INDEX agent_messages_pkey ON public.agent_messages USING btree (id)"
+    },
+    {
+      "tablename": "agent_messages",
+      "indexname": "idx_agent_messages_unread",
+      "indexdef": "CREATE INDEX idx_agent_messages_unread ON public.agent_messages USING btree (to_agent, created_at DESC) WHERE (read = false)"
+    },
+    {
+      "tablename": "agent_results",
+      "indexname": "agent_results_client_id_agent_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX agent_results_client_id_agent_id_fecha_key ON public.agent_results USING btree (client_id, agent_id, fecha)"
+    },
+    {
+      "tablename": "agent_results",
+      "indexname": "agent_results_pkey",
+      "indexdef": "CREATE UNIQUE INDEX agent_results_pkey ON public.agent_results USING btree (id)"
+    },
+    {
+      "tablename": "agent_results",
+      "indexname": "idx_agent_results_agent",
+      "indexdef": "CREATE INDEX idx_agent_results_agent ON public.agent_results USING btree (client_id, agent_id, fecha DESC)"
+    },
+    {
+      "tablename": "agent_runs",
+      "indexname": "agent_runs_pkey",
+      "indexdef": "CREATE UNIQUE INDEX agent_runs_pkey ON public.agent_runs USING btree (id)"
+    },
+    {
+      "tablename": "agent_runs",
+      "indexname": "idx_agent_runs_agent_created",
+      "indexdef": "CREATE INDEX idx_agent_runs_agent_created ON public.agent_runs USING btree (agent_id, created_at DESC)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "amalay_reservaciones_codigo_reserva_key",
+      "indexdef": "CREATE UNIQUE INDEX amalay_reservaciones_codigo_reserva_key ON public.amalay_reservaciones USING btree (codigo_reserva)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "amalay_reservaciones_pkey",
+      "indexdef": "CREATE UNIQUE INDEX amalay_reservaciones_pkey ON public.amalay_reservaciones USING btree (id)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "idx_res_espacio",
+      "indexdef": "CREATE INDEX idx_res_espacio ON public.amalay_reservaciones USING btree (espacio)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "idx_res_fecha",
+      "indexdef": "CREATE INDEX idx_res_fecha ON public.amalay_reservaciones USING btree (fecha)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "idx_res_status",
+      "indexdef": "CREATE INDEX idx_res_status ON public.amalay_reservaciones USING btree (status)"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "indexname": "no_double_booking",
+      "indexdef": "CREATE UNIQUE INDEX no_double_booking ON public.amalay_reservaciones USING btree (fecha, espacio, horario_inicio) WHERE (status = ANY (ARRAY['pending'::text, 'confirmed'::text]))"
+    },
+    {
+      "tablename": "calendar_sync_log",
+      "indexname": "calendar_sync_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX calendar_sync_log_pkey ON public.calendar_sync_log USING btree (id)"
+    },
+    {
+      "tablename": "calendar_sync_log",
+      "indexname": "idx_sync_log_codigo",
+      "indexdef": "CREATE INDEX idx_sync_log_codigo ON public.calendar_sync_log USING btree (matched_codigo)"
+    },
+    {
+      "tablename": "calendar_sync_log",
+      "indexname": "idx_sync_log_created",
+      "indexdef": "CREATE INDEX idx_sync_log_created ON public.calendar_sync_log USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "chat_logs",
+      "indexname": "chat_logs_pkey",
+      "indexdef": "CREATE UNIQUE INDEX chat_logs_pkey ON public.chat_logs USING btree (id)"
+    },
+    {
+      "tablename": "chat_logs",
+      "indexname": "idx_chat_logs_client",
+      "indexdef": "CREATE INDEX idx_chat_logs_client ON public.chat_logs USING btree (client_id, created_at DESC)"
+    },
+    {
+      "tablename": "chat_logs",
+      "indexname": "idx_chat_logs_error",
+      "indexdef": "CREATE INDEX idx_chat_logs_error ON public.chat_logs USING btree (had_error) WHERE (had_error = true)"
+    },
+    {
+      "tablename": "client_locations",
+      "indexname": "client_locations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX client_locations_pkey ON public.client_locations USING btree (id)"
+    },
+    {
+      "tablename": "client_users",
+      "indexname": "client_users_pkey",
+      "indexdef": "CREATE UNIQUE INDEX client_users_pkey ON public.client_users USING btree (id)"
+    },
+    {
+      "tablename": "clients",
+      "indexname": "clients_pkey",
+      "indexdef": "CREATE UNIQUE INDEX clients_pkey ON public.clients USING btree (id)"
+    },
+    {
+      "tablename": "content",
+      "indexname": "content_pkey",
+      "indexdef": "CREATE UNIQUE INDEX content_pkey ON public.content USING btree (id)"
+    },
+    {
+      "tablename": "credentials_vault",
+      "indexname": "credentials_vault_pkey",
+      "indexdef": "CREATE UNIQUE INDEX credentials_vault_pkey ON public.credentials_vault USING btree (id)"
+    },
+    {
+      "tablename": "credentials_vault",
+      "indexname": "idx_vault_client",
+      "indexdef": "CREATE INDEX idx_vault_client ON public.credentials_vault USING btree (client_id, category)"
+    },
+    {
+      "tablename": "delivery_orders",
+      "indexname": "delivery_orders_pkey",
+      "indexdef": "CREATE UNIQUE INDEX delivery_orders_pkey ON public.delivery_orders USING btree (id)"
+    },
+    {
+      "tablename": "delivery_orders",
+      "indexname": "delivery_orders_platform_platform_order_id_key",
+      "indexdef": "CREATE UNIQUE INDEX delivery_orders_platform_platform_order_id_key ON public.delivery_orders USING btree (platform, platform_order_id)"
+    },
+    {
+      "tablename": "delivery_orders",
+      "indexname": "idx_delivery_orders_platform",
+      "indexdef": "CREATE INDEX idx_delivery_orders_platform ON public.delivery_orders USING btree (platform, platform_order_id)"
+    },
+    {
+      "tablename": "delivery_orders",
+      "indexname": "idx_delivery_orders_status",
+      "indexdef": "CREATE INDEX idx_delivery_orders_status ON public.delivery_orders USING btree (client_id, status, created_at DESC)"
+    },
+    {
+      "tablename": "delivery_platform_payments",
+      "indexname": "delivery_platform_payments_pkey",
+      "indexdef": "CREATE UNIQUE INDEX delivery_platform_payments_pkey ON public.delivery_platform_payments USING btree (id)"
+    },
+    {
+      "tablename": "events",
+      "indexname": "events_id_key",
+      "indexdef": "CREATE UNIQUE INDEX events_id_key ON public.events USING btree (id)"
+    },
+    {
+      "tablename": "events",
+      "indexname": "events_pkey",
+      "indexdef": "CREATE UNIQUE INDEX events_pkey ON public.events USING btree (sequence)"
+    },
+    {
+      "tablename": "memories",
+      "indexname": "idx_memories_agent",
+      "indexdef": "CREATE INDEX idx_memories_agent ON public.memories USING btree (agent_id)"
+    },
+    {
+      "tablename": "memories",
+      "indexname": "idx_memories_client",
+      "indexdef": "CREATE INDEX idx_memories_client ON public.memories USING btree (client)"
+    },
+    {
+      "tablename": "memories",
+      "indexname": "idx_memories_salience",
+      "indexdef": "CREATE INDEX idx_memories_salience ON public.memories USING btree (salience DESC)"
+    },
+    {
+      "tablename": "memories",
+      "indexname": "memories_pkey",
+      "indexdef": "CREATE UNIQUE INDEX memories_pkey ON public.memories USING btree (id)"
+    },
+    {
+      "tablename": "ops_daily",
+      "indexname": "idx_ops_daily_fecha",
+      "indexdef": "CREATE INDEX idx_ops_daily_fecha ON public.ops_daily USING btree (client_id, fecha DESC)"
+    },
+    {
+      "tablename": "ops_daily",
+      "indexname": "idx_ops_daily_latest",
+      "indexdef": "CREATE INDEX idx_ops_daily_latest ON public.ops_daily USING btree (client_id, fecha DESC, record_type)"
+    },
+    {
+      "tablename": "ops_daily",
+      "indexname": "ops_daily_pkey",
+      "indexdef": "CREATE UNIQUE INDEX ops_daily_pkey ON public.ops_daily USING btree (id)"
+    },
+    {
+      "tablename": "ops_daily",
+      "indexname": "uq_ops_daily_close",
+      "indexdef": "CREATE UNIQUE INDEX uq_ops_daily_close ON public.ops_daily USING btree (client_id, fecha, record_type) WHERE (record_type = ANY (ARRAY['cierre'::text, 'cierre_wansoft'::text]))"
+    },
+    {
+      "tablename": "ops_daily",
+      "indexname": "uq_ops_daily_snapshot",
+      "indexdef": "CREATE UNIQUE INDEX uq_ops_daily_snapshot ON public.ops_daily USING btree (client_id, fecha, bucket_start) WHERE (record_type = 'snapshot'::text)"
+    },
+    {
+      "tablename": "parity_reports",
+      "indexname": "idx_parity_reports_day",
+      "indexdef": "CREATE INDEX idx_parity_reports_day ON public.parity_reports USING btree (day DESC)"
+    },
+    {
+      "tablename": "parity_reports",
+      "indexname": "parity_reports_pkey",
+      "indexdef": "CREATE UNIQUE INDEX parity_reports_pkey ON public.parity_reports USING btree (id)"
+    },
+    {
+      "tablename": "pos_attendance",
+      "indexname": "idx_attendance_staff",
+      "indexdef": "CREATE INDEX idx_attendance_staff ON public.pos_attendance USING btree (client_id, staff_id, registered_at DESC)"
+    },
+    {
+      "tablename": "pos_attendance",
+      "indexname": "pos_attendance_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_attendance_pkey ON public.pos_attendance USING btree (id)"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "indexname": "idx_audit_action",
+      "indexdef": "CREATE INDEX idx_audit_action ON public.pos_audit_log USING btree (action)"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "indexname": "idx_audit_created",
+      "indexdef": "CREATE INDEX idx_audit_created ON public.pos_audit_log USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "indexname": "idx_audit_order",
+      "indexdef": "CREATE INDEX idx_audit_order ON public.pos_audit_log USING btree (order_id)"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "indexname": "pos_audit_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_audit_log_pkey ON public.pos_audit_log USING btree (id)"
+    },
+    {
+      "tablename": "pos_billing_clients",
+      "indexname": "pos_billing_clients_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_billing_clients_pkey ON public.pos_billing_clients USING btree (id)"
+    },
+    {
+      "tablename": "pos_billing_clients",
+      "indexname": "pos_billing_clients_rfc_client_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_billing_clients_rfc_client_id_key ON public.pos_billing_clients USING btree (rfc, client_id)"
+    },
+    {
+      "tablename": "pos_bridge_logs",
+      "indexname": "idx_bridge_logs_client_time",
+      "indexdef": "CREATE INDEX idx_bridge_logs_client_time ON public.pos_bridge_logs USING btree (client_id, logged_at DESC)"
+    },
+    {
+      "tablename": "pos_bridge_logs",
+      "indexname": "pos_bridge_logs_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_bridge_logs_pkey ON public.pos_bridge_logs USING btree (id)"
+    },
+    {
+      "tablename": "pos_cash_movements",
+      "indexname": "pos_cash_movements_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_cash_movements_pkey ON public.pos_cash_movements USING btree (id)"
+    },
+    {
+      "tablename": "pos_category_modifiers",
+      "indexname": "pos_category_modifiers_client_id_category_id_modifier_group_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_category_modifiers_client_id_category_id_modifier_group_key ON public.pos_category_modifiers USING btree (client_id, category_id, modifier_group_id)"
+    },
+    {
+      "tablename": "pos_category_modifiers",
+      "indexname": "pos_category_modifiers_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_category_modifiers_pkey ON public.pos_category_modifiers USING btree (id)"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "indexname": "idx_cfdi_created",
+      "indexdef": "CREATE INDEX idx_cfdi_created ON public.pos_cfdi_requests USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "indexname": "idx_cfdi_rfc",
+      "indexdef": "CREATE INDEX idx_cfdi_rfc ON public.pos_cfdi_requests USING btree (rfc)"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "indexname": "idx_cfdi_status",
+      "indexdef": "CREATE INDEX idx_cfdi_status ON public.pos_cfdi_requests USING btree (status)"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "indexname": "pos_cfdi_requests_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_cfdi_requests_pkey ON public.pos_cfdi_requests USING btree (id)"
+    },
+    {
+      "tablename": "pos_cierres",
+      "indexname": "idx_cierres_fecha",
+      "indexdef": "CREATE INDEX idx_cierres_fecha ON public.pos_cierres USING btree (fecha DESC)"
+    },
+    {
+      "tablename": "pos_cierres",
+      "indexname": "idx_cierres_turno",
+      "indexdef": "CREATE INDEX idx_cierres_turno ON public.pos_cierres USING btree (turno_id)"
+    },
+    {
+      "tablename": "pos_cierres",
+      "indexname": "pos_cierres_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_cierres_pkey ON public.pos_cierres USING btree (id)"
+    },
+    {
+      "tablename": "pos_cierres",
+      "indexname": "uq_cierres_turno_id",
+      "indexdef": "CREATE UNIQUE INDEX uq_cierres_turno_id ON public.pos_cierres USING btree (turno_id) WHERE (turno_id IS NOT NULL)"
+    },
+    {
+      "tablename": "pos_clients",
+      "indexname": "idx_pos_clients_email",
+      "indexdef": "CREATE INDEX idx_pos_clients_email ON public.pos_clients USING btree (client_id, email)"
+    },
+    {
+      "tablename": "pos_clients",
+      "indexname": "idx_pos_clients_phone",
+      "indexdef": "CREATE INDEX idx_pos_clients_phone ON public.pos_clients USING btree (client_id, telefono)"
+    },
+    {
+      "tablename": "pos_clients",
+      "indexname": "pos_clients_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_clients_pkey ON public.pos_clients USING btree (id)"
+    },
+    {
+      "tablename": "pos_combos",
+      "indexname": "pos_combos_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_combos_pkey ON public.pos_combos USING btree (id)"
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "indexname": "idx_notes_mesa",
+      "indexdef": "CREATE INDEX idx_notes_mesa ON public.pos_customer_notes USING btree (mesa, client_id)"
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "indexname": "pos_customer_notes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_customer_notes_pkey ON public.pos_customer_notes USING btree (id)"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "indexname": "idx_pos_customer_visits_client",
+      "indexdef": "CREATE INDEX idx_pos_customer_visits_client ON public.pos_customer_visits USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "indexname": "idx_pos_customer_visits_customer",
+      "indexdef": "CREATE INDEX idx_pos_customer_visits_customer ON public.pos_customer_visits USING btree (customer_id)"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "indexname": "idx_pos_customer_visits_date",
+      "indexdef": "CREATE INDEX idx_pos_customer_visits_date ON public.pos_customer_visits USING btree (visited_at DESC)"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "indexname": "pos_customer_visits_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_customer_visits_pkey ON public.pos_customer_visits USING btree (id)"
+    },
+    {
+      "tablename": "pos_customers",
+      "indexname": "idx_pos_customers_client_id",
+      "indexdef": "CREATE INDEX idx_pos_customers_client_id ON public.pos_customers USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_customers",
+      "indexname": "idx_pos_customers_last_visit",
+      "indexdef": "CREATE INDEX idx_pos_customers_last_visit ON public.pos_customers USING btree (client_id, last_visit DESC)"
+    },
+    {
+      "tablename": "pos_customers",
+      "indexname": "idx_pos_customers_phone",
+      "indexdef": "CREATE INDEX idx_pos_customers_phone ON public.pos_customers USING btree (client_id, phone)"
+    },
+    {
+      "tablename": "pos_customers",
+      "indexname": "pos_customers_client_id_phone_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_customers_client_id_phone_key ON public.pos_customers USING btree (client_id, phone)"
+    },
+    {
+      "tablename": "pos_customers",
+      "indexname": "pos_customers_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_customers_pkey ON public.pos_customers USING btree (id)"
+    },
+    {
+      "tablename": "pos_delivery_zones",
+      "indexname": "pos_delivery_zones_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_delivery_zones_pkey ON public.pos_delivery_zones USING btree (id)"
+    },
+    {
+      "tablename": "pos_facturas",
+      "indexname": "pos_facturas_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_facturas_pkey ON public.pos_facturas USING btree (id)"
+    },
+    {
+      "tablename": "pos_fingerprint_templates",
+      "indexname": "pos_fingerprint_templates_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_fingerprint_templates_pkey ON public.pos_fingerprint_templates USING btree (id)"
+    },
+    {
+      "tablename": "pos_gastos",
+      "indexname": "pos_gastos_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_gastos_pkey ON public.pos_gastos USING btree (id)"
+    },
+    {
+      "tablename": "pos_gift_cards",
+      "indexname": "pos_gift_cards_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_gift_cards_pkey ON public.pos_gift_cards USING btree (id)"
+    },
+    {
+      "tablename": "pos_ingredient_presentations",
+      "indexname": "idx_ip_ingredient",
+      "indexdef": "CREATE INDEX idx_ip_ingredient ON public.pos_ingredient_presentations USING btree (ingredient_id)"
+    },
+    {
+      "tablename": "pos_ingredient_presentations",
+      "indexname": "pos_ingredient_presentations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_ingredient_presentations_pkey ON public.pos_ingredient_presentations USING btree (id)"
+    },
+    {
+      "tablename": "pos_ingredient_presentations",
+      "indexname": "uq_ip_client_ingredient_pres",
+      "indexdef": "CREATE UNIQUE INDEX uq_ip_client_ingredient_pres ON public.pos_ingredient_presentations USING btree (client_id, ingredient_id, presentation_id)"
+    },
+    {
+      "tablename": "pos_ingredients",
+      "indexname": "pos_ingredients_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_ingredients_pkey ON public.pos_ingredients USING btree (id)"
+    },
+    {
+      "tablename": "pos_ingredients",
+      "indexname": "uq_ingredients_client_id",
+      "indexdef": "CREATE UNIQUE INDEX uq_ingredients_client_id ON public.pos_ingredients USING btree (client_id, id)"
+    },
+    {
+      "tablename": "pos_insumos",
+      "indexname": "pos_insumos_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_insumos_pkey ON public.pos_insumos USING btree (id)"
+    },
+    {
+      "tablename": "pos_inventory",
+      "indexname": "pos_inventory_client_id_ingredient_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_client_id_ingredient_id_key ON public.pos_inventory USING btree (client_id, ingredient_id)"
+    },
+    {
+      "tablename": "pos_inventory",
+      "indexname": "pos_inventory_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_pkey ON public.pos_inventory USING btree (id)"
+    },
+    {
+      "tablename": "pos_inventory_alerts",
+      "indexname": "pos_inventory_alerts_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_alerts_pkey ON public.pos_inventory_alerts USING btree (id)"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "indexname": "idx_inv_mov_created",
+      "indexdef": "CREATE INDEX idx_inv_mov_created ON public.pos_inventory_movements USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "indexname": "idx_inv_mov_product",
+      "indexdef": "CREATE INDEX idx_inv_mov_product ON public.pos_inventory_movements USING btree (product_id)"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "indexname": "idx_inv_mov_reconciliation",
+      "indexdef": "CREATE INDEX idx_inv_mov_reconciliation ON public.pos_inventory_movements USING btree (reconciliation_result_id) WHERE (reconciliation_result_id IS NOT NULL)"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "indexname": "idx_inv_mov_type",
+      "indexdef": "CREATE INDEX idx_inv_mov_type ON public.pos_inventory_movements USING btree (movement_type)"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "indexname": "pos_inventory_movements_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_movements_pkey ON public.pos_inventory_movements USING btree (id)"
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "indexname": "idx_inv_products_client",
+      "indexdef": "CREATE INDEX idx_inv_products_client ON public.pos_inventory_products USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "indexname": "idx_inv_products_name",
+      "indexdef": "CREATE INDEX idx_inv_products_name ON public.pos_inventory_products USING btree (name)"
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "indexname": "pos_inventory_products_client_id_name_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_products_client_id_name_key ON public.pos_inventory_products USING btree (client_id, name)"
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "indexname": "pos_inventory_products_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_inventory_products_pkey ON public.pos_inventory_products USING btree (id)"
+    },
+    {
+      "tablename": "pos_item_inventory_policy",
+      "indexname": "pos_item_inventory_policy_client_id_menu_item_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_item_inventory_policy_client_id_menu_item_id_key ON public.pos_item_inventory_policy USING btree (client_id, menu_item_id)"
+    },
+    {
+      "tablename": "pos_item_inventory_policy",
+      "indexname": "pos_item_inventory_policy_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_item_inventory_policy_pkey ON public.pos_item_inventory_policy USING btree (id)"
+    },
+    {
+      "tablename": "pos_item_modifier_groups",
+      "indexname": "pos_item_modifier_groups_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_item_modifier_groups_pkey ON public.pos_item_modifier_groups USING btree (client_id, item_id, group_id)"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "indexname": "idx_market_mov_created",
+      "indexdef": "CREATE INDEX idx_market_mov_created ON public.pos_market_movements USING btree (created_at DESC)"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "indexname": "idx_market_mov_item",
+      "indexdef": "CREATE INDEX idx_market_mov_item ON public.pos_market_movements USING btree (menu_item_id)"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "indexname": "idx_mkt_mov_reconciliation",
+      "indexdef": "CREATE INDEX idx_mkt_mov_reconciliation ON public.pos_market_movements USING btree (reconciliation_result_id) WHERE (reconciliation_result_id IS NOT NULL)"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "indexname": "pos_market_movements_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_market_movements_pkey ON public.pos_market_movements USING btree (id)"
+    },
+    {
+      "tablename": "pos_market_stock",
+      "indexname": "idx_market_stock_item",
+      "indexdef": "CREATE INDEX idx_market_stock_item ON public.pos_market_stock USING btree (menu_item_id)"
+    },
+    {
+      "tablename": "pos_market_stock",
+      "indexname": "pos_market_stock_client_id_menu_item_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_market_stock_client_id_menu_item_id_key ON public.pos_market_stock USING btree (client_id, menu_item_id)"
+    },
+    {
+      "tablename": "pos_market_stock",
+      "indexname": "pos_market_stock_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_market_stock_pkey ON public.pos_market_stock USING btree (id)"
+    },
+    {
+      "tablename": "pos_market_stock",
+      "indexname": "uq_market_stock_client_item_id",
+      "indexdef": "CREATE UNIQUE INDEX uq_market_stock_client_item_id ON public.pos_market_stock USING btree (client_id, menu_item_id, id)"
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "indexname": "idx_menu_cat_client",
+      "indexdef": "CREATE INDEX idx_menu_cat_client ON public.pos_menu_categories USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "indexname": "pos_menu_categories_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_menu_categories_pkey ON public.pos_menu_categories USING btree (id)"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "indexname": "idx_menu_items_cat",
+      "indexdef": "CREATE INDEX idx_menu_items_cat ON public.pos_menu_items USING btree (category_id)"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "indexname": "idx_menu_items_client",
+      "indexdef": "CREATE INDEX idx_menu_items_client ON public.pos_menu_items USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "indexname": "pos_menu_items_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_menu_items_pkey ON public.pos_menu_items USING btree (id)"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "indexname": "uq_menu_items_client_id",
+      "indexdef": "CREATE UNIQUE INDEX uq_menu_items_client_id ON public.pos_menu_items USING btree (client_id, id)"
+    },
+    {
+      "tablename": "pos_modifier_groups",
+      "indexname": "pos_modifier_groups_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_modifier_groups_pkey ON public.pos_modifier_groups USING btree (id)"
+    },
+    {
+      "tablename": "pos_modifiers",
+      "indexname": "idx_modifiers_group",
+      "indexdef": "CREATE INDEX idx_modifiers_group ON public.pos_modifiers USING btree (group_id)"
+    },
+    {
+      "tablename": "pos_modifiers",
+      "indexname": "pos_modifiers_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_modifiers_pkey ON public.pos_modifiers USING btree (id)"
+    },
+    {
+      "tablename": "pos_mutation_authority",
+      "indexname": "pos_mutation_authority_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_mutation_authority_pkey ON public.pos_mutation_authority USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_orders",
+      "indexname": "idx_pos_orders_mesa",
+      "indexdef": "CREATE INDEX idx_pos_orders_mesa ON public.pos_orders USING btree (mesa, status)"
+    },
+    {
+      "tablename": "pos_orders",
+      "indexname": "idx_pos_orders_status",
+      "indexdef": "CREATE INDEX idx_pos_orders_status ON public.pos_orders USING btree (client_id, status, created_at DESC)"
+    },
+    {
+      "tablename": "pos_orders",
+      "indexname": "pos_orders_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_orders_pkey ON public.pos_orders USING btree (id)"
+    },
+    {
+      "tablename": "pos_payment_methods",
+      "indexname": "pos_payment_methods_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_payment_methods_pkey ON public.pos_payment_methods USING btree (id)"
+    },
+    {
+      "tablename": "pos_presentations",
+      "indexname": "pos_presentations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_presentations_pkey ON public.pos_presentations USING btree (id)"
+    },
+    {
+      "tablename": "pos_presentations",
+      "indexname": "uq_pres_client_code",
+      "indexdef": "CREATE UNIQUE INDEX uq_pres_client_code ON public.pos_presentations USING btree (client_id, code)"
+    },
+    {
+      "tablename": "pos_price_types",
+      "indexname": "pos_price_types_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_price_types_pkey ON public.pos_price_types USING btree (id)"
+    },
+    {
+      "tablename": "pos_print_jobs",
+      "indexname": "idx_print_jobs_status",
+      "indexdef": "CREATE INDEX idx_print_jobs_status ON public.pos_print_jobs USING btree (client_id, status)"
+    },
+    {
+      "tablename": "pos_print_jobs",
+      "indexname": "pos_print_jobs_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_print_jobs_pkey ON public.pos_print_jobs USING btree (id)"
+    },
+    {
+      "tablename": "pos_promos",
+      "indexname": "pos_promos_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_promos_pkey ON public.pos_promos USING btree (id)"
+    },
+    {
+      "tablename": "pos_promotions",
+      "indexname": "pos_promotions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_promotions_pkey ON public.pos_promotions USING btree (id)"
+    },
+    {
+      "tablename": "pos_purchase_order_items",
+      "indexname": "pos_purchase_order_items_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_purchase_order_items_pkey ON public.pos_purchase_order_items USING btree (id)"
+    },
+    {
+      "tablename": "pos_purchase_orders",
+      "indexname": "pos_purchase_orders_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_purchase_orders_pkey ON public.pos_purchase_orders USING btree (id)"
+    },
+    {
+      "tablename": "pos_recipe_details",
+      "indexname": "pos_recipe_details_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_details_pkey ON public.pos_recipe_details USING btree (id)"
+    },
+    {
+      "tablename": "pos_recipe_lines",
+      "indexname": "pos_recipe_lines_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_lines_pkey ON public.pos_recipe_lines USING btree (id)"
+    },
+    {
+      "tablename": "pos_recipe_lines",
+      "indexname": "pos_recipe_lines_recipe_version_id_ingredient_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_lines_recipe_version_id_ingredient_id_key ON public.pos_recipe_lines USING btree (recipe_version_id, ingredient_id)"
+    },
+    {
+      "tablename": "pos_recipe_versions",
+      "indexname": "pos_recipe_versions_client_id_menu_item_id_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_versions_client_id_menu_item_id_id_key ON public.pos_recipe_versions USING btree (client_id, menu_item_id, id)"
+    },
+    {
+      "tablename": "pos_recipe_versions",
+      "indexname": "pos_recipe_versions_client_id_menu_item_id_version_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_versions_client_id_menu_item_id_version_key ON public.pos_recipe_versions USING btree (client_id, menu_item_id, version)"
+    },
+    {
+      "tablename": "pos_recipe_versions",
+      "indexname": "pos_recipe_versions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipe_versions_pkey ON public.pos_recipe_versions USING btree (id)"
+    },
+    {
+      "tablename": "pos_recipe_versions",
+      "indexname": "uq_recipe_active",
+      "indexdef": "CREATE UNIQUE INDEX uq_recipe_active ON public.pos_recipe_versions USING btree (client_id, menu_item_id) WHERE (active = true)"
+    },
+    {
+      "tablename": "pos_recipe_versions",
+      "indexname": "uq_recipe_versions_client_id",
+      "indexdef": "CREATE UNIQUE INDEX uq_recipe_versions_client_id ON public.pos_recipe_versions USING btree (client_id, id)"
+    },
+    {
+      "tablename": "pos_recipes",
+      "indexname": "pos_recipes_pkey1",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipes_pkey1 ON public.pos_recipes USING btree (id)"
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "indexname": "pos_recipes_client_id_menu_item_id_ingredient_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipes_client_id_menu_item_id_ingredient_id_key ON public.pos_recipes_old USING btree (client_id, menu_item_id, ingredient_id)"
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "indexname": "pos_recipes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_recipes_pkey ON public.pos_recipes_old USING btree (id)"
+    },
+    {
+      "tablename": "pos_reconciliation_results",
+      "indexname": "idx_recon_results_order",
+      "indexdef": "CREATE INDEX idx_recon_results_order ON public.pos_reconciliation_results USING btree (client_id, order_id)"
+    },
+    {
+      "tablename": "pos_reconciliation_results",
+      "indexname": "pos_reconciliation_results_client_id_order_id_order_item_id_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_reconciliation_results_client_id_order_id_order_item_id_key ON public.pos_reconciliation_results USING btree (client_id, order_id, order_item_id)"
+    },
+    {
+      "tablename": "pos_reconciliation_results",
+      "indexname": "pos_reconciliation_results_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_reconciliation_results_pkey ON public.pos_reconciliation_results USING btree (id)"
+    },
+    {
+      "tablename": "pos_retail_groups",
+      "indexname": "pos_retail_groups_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_retail_groups_pkey ON public.pos_retail_groups USING btree (id)"
+    },
+    {
+      "tablename": "pos_retail_items",
+      "indexname": "pos_retail_items_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_retail_items_pkey ON public.pos_retail_items USING btree (id)"
+    },
+    {
+      "tablename": "pos_retail_promotions",
+      "indexname": "pos_retail_promotions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_retail_promotions_pkey ON public.pos_retail_promotions USING btree (id)"
+    },
+    {
+      "tablename": "pos_save_operations",
+      "indexname": "pos_save_operations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_save_operations_pkey ON public.pos_save_operations USING btree (client_id, order_id, save_operation_id)"
+    },
+    {
+      "tablename": "pos_schedules",
+      "indexname": "pos_schedules_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_schedules_pkey ON public.pos_schedules USING btree (id)"
+    },
+    {
+      "tablename": "pos_sizes",
+      "indexname": "pos_sizes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_sizes_pkey ON public.pos_sizes USING btree (id)"
+    },
+    {
+      "tablename": "pos_staff",
+      "indexname": "pos_staff_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_staff_pkey ON public.pos_staff USING btree (id)"
+    },
+    {
+      "tablename": "pos_staff",
+      "indexname": "unique_pin_per_client",
+      "indexdef": "CREATE UNIQUE INDEX unique_pin_per_client ON public.pos_staff USING btree (pin, client_id)"
+    },
+    {
+      "tablename": "pos_staff_audit",
+      "indexname": "pos_staff_audit_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_staff_audit_pkey ON public.pos_staff_audit USING btree (id)"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "indexname": "idx_shifts_client",
+      "indexdef": "CREATE INDEX idx_shifts_client ON public.pos_staff_shifts USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "indexname": "idx_shifts_date",
+      "indexdef": "CREATE INDEX idx_shifts_date ON public.pos_staff_shifts USING btree (clock_in DESC)"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "indexname": "idx_shifts_staff",
+      "indexdef": "CREATE INDEX idx_shifts_staff ON public.pos_staff_shifts USING btree (staff_id, clock_in DESC)"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "indexname": "pos_staff_shifts_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_staff_shifts_pkey ON public.pos_staff_shifts USING btree (id)"
+    },
+    {
+      "tablename": "pos_sub_recipe_ingredients",
+      "indexname": "idx_sri_ingredient",
+      "indexdef": "CREATE INDEX idx_sri_ingredient ON public.pos_sub_recipe_ingredients USING btree (ingredient_id)"
+    },
+    {
+      "tablename": "pos_sub_recipe_ingredients",
+      "indexname": "idx_sri_sub_recipe",
+      "indexdef": "CREATE INDEX idx_sri_sub_recipe ON public.pos_sub_recipe_ingredients USING btree (sub_recipe_id)"
+    },
+    {
+      "tablename": "pos_sub_recipe_ingredients",
+      "indexname": "pos_sub_recipe_ingredients_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_sub_recipe_ingredients_pkey ON public.pos_sub_recipe_ingredients USING btree (id)"
+    },
+    {
+      "tablename": "pos_sub_recipes",
+      "indexname": "idx_sub_recipes_client",
+      "indexdef": "CREATE INDEX idx_sub_recipes_client ON public.pos_sub_recipes USING btree (client_id)"
+    },
+    {
+      "tablename": "pos_sub_recipes",
+      "indexname": "pos_sub_recipes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_sub_recipes_pkey ON public.pos_sub_recipes USING btree (id)"
+    },
+    {
+      "tablename": "pos_sub_recipes",
+      "indexname": "uq_sub_recipes_client_name",
+      "indexdef": "CREATE UNIQUE INDEX uq_sub_recipes_client_name ON public.pos_sub_recipes USING btree (client_id, name)"
+    },
+    {
+      "tablename": "pos_suppliers",
+      "indexname": "pos_suppliers_client_name_key",
+      "indexdef": "CREATE UNIQUE INDEX pos_suppliers_client_name_key ON public.pos_suppliers USING btree (client_id, name)"
+    },
+    {
+      "tablename": "pos_suppliers",
+      "indexname": "pos_suppliers_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_suppliers_pkey ON public.pos_suppliers USING btree (id)"
+    },
+    {
+      "tablename": "pos_survey",
+      "indexname": "pos_survey_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_survey_pkey ON public.pos_survey USING btree (id)"
+    },
+    {
+      "tablename": "pos_turnos",
+      "indexname": "pos_turnos_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_turnos_pkey ON public.pos_turnos USING btree (id)"
+    },
+    {
+      "tablename": "pos_unit_conversions",
+      "indexname": "pos_unit_conversions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX pos_unit_conversions_pkey ON public.pos_unit_conversions USING btree (id)"
+    },
+    {
+      "tablename": "pos_unit_conversions",
+      "indexname": "uq_uc_client_units",
+      "indexdef": "CREATE UNIQUE INDEX uq_uc_client_units ON public.pos_unit_conversions USING btree (client_id, from_unit, to_unit)"
+    },
+    {
+      "tablename": "prospects",
+      "indexname": "prospects_pkey",
+      "indexdef": "CREATE UNIQUE INDEX prospects_pkey ON public.prospects USING btree (id)"
+    },
+    {
+      "tablename": "push_subscriptions",
+      "indexname": "idx_push_client",
+      "indexdef": "CREATE INDEX idx_push_client ON public.push_subscriptions USING btree (client_id)"
+    },
+    {
+      "tablename": "push_subscriptions",
+      "indexname": "push_subscriptions_endpoint_key",
+      "indexdef": "CREATE UNIQUE INDEX push_subscriptions_endpoint_key ON public.push_subscriptions USING btree (endpoint)"
+    },
+    {
+      "tablename": "push_subscriptions",
+      "indexname": "push_subscriptions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX push_subscriptions_pkey ON public.push_subscriptions USING btree (id)"
+    },
+    {
+      "tablename": "r1_observation_baseline",
+      "indexname": "r1_observation_baseline_pkey",
+      "indexdef": "CREATE UNIQUE INDEX r1_observation_baseline_pkey ON public.r1_observation_baseline USING btree (id)"
+    },
+    {
+      "tablename": "r1_observation_final",
+      "indexname": "r1_observation_final_pkey",
+      "indexdef": "CREATE UNIQUE INDEX r1_observation_final_pkey ON public.r1_observation_final USING btree (id)"
+    },
+    {
+      "tablename": "r1_observation_log",
+      "indexname": "r1_observation_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX r1_observation_log_pkey ON public.r1_observation_log USING btree (id)"
+    },
+    {
+      "tablename": "reservaciones",
+      "indexname": "reservaciones_pkey",
+      "indexdef": "CREATE UNIQUE INDEX reservaciones_pkey ON public.reservaciones USING btree (id)"
+    },
+    {
+      "tablename": "reviews",
+      "indexname": "reviews_date_idx",
+      "indexdef": "CREATE INDEX reviews_date_idx ON public.reviews USING btree (date DESC NULLS LAST)"
+    },
+    {
+      "tablename": "reviews",
+      "indexname": "reviews_pkey",
+      "indexdef": "CREATE UNIQUE INDEX reviews_pkey ON public.reviews USING btree (id)"
+    },
+    {
+      "tablename": "reviews",
+      "indexname": "reviews_rating_idx",
+      "indexdef": "CREATE INDEX reviews_rating_idx ON public.reviews USING btree (rating)"
+    },
+    {
+      "tablename": "reviews",
+      "indexname": "reviews_review_id_key",
+      "indexdef": "CREATE UNIQUE INDEX reviews_review_id_key ON public.reviews USING btree (review_id)"
+    },
+    {
+      "tablename": "reviews",
+      "indexname": "reviews_status_idx",
+      "indexdef": "CREATE INDEX reviews_status_idx ON public.reviews USING btree (status)"
+    },
+    {
+      "tablename": "tasks",
+      "indexname": "tasks_pkey",
+      "indexdef": "CREATE UNIQUE INDEX tasks_pkey ON public.tasks USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_catalog",
+      "indexname": "wansoft_catalog_path_explorer_version_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_catalog_path_explorer_version_key ON public.wansoft_catalog USING btree (path, explorer_version)"
+    },
+    {
+      "tablename": "wansoft_catalog",
+      "indexname": "wansoft_catalog_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_catalog_pkey ON public.wansoft_catalog USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_daily",
+      "indexname": "idx_wansoft_daily_client_fecha",
+      "indexdef": "CREATE INDEX idx_wansoft_daily_client_fecha ON public.wansoft_daily USING btree (client_slug, fecha DESC)"
+    },
+    {
+      "tablename": "wansoft_daily",
+      "indexname": "idx_wansoft_daily_fecha",
+      "indexdef": "CREATE UNIQUE INDEX idx_wansoft_daily_fecha ON public.wansoft_daily USING btree (fecha) WHERE (ventas_dia > (0)::numeric)"
+    },
+    {
+      "tablename": "wansoft_daily",
+      "indexname": "wansoft_daily_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_daily_fecha_key ON public.wansoft_daily USING btree (fecha)"
+    },
+    {
+      "tablename": "wansoft_daily",
+      "indexname": "wansoft_daily_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_daily_pkey ON public.wansoft_daily USING btree (client_slug, fecha, report_type)"
+    },
+    {
+      "tablename": "wansoft_data",
+      "indexname": "idx_wansoft_data_key",
+      "indexdef": "CREATE INDEX idx_wansoft_data_key ON public.wansoft_data USING btree (client_id, data_key, fecha DESC)"
+    },
+    {
+      "tablename": "wansoft_data",
+      "indexname": "wansoft_data_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_data_pkey ON public.wansoft_data USING btree (client_id, fecha, data_key)"
+    },
+    {
+      "tablename": "wansoft_food_cost",
+      "indexname": "wansoft_food_cost_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_food_cost_client_id_fecha_key ON public.wansoft_food_cost USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_food_cost",
+      "indexname": "wansoft_food_cost_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_food_cost_pkey ON public.wansoft_food_cost USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_hourly",
+      "indexname": "wansoft_hourly_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_hourly_pkey ON public.wansoft_hourly USING btree (fecha, client_id)"
+    },
+    {
+      "tablename": "wansoft_inventory",
+      "indexname": "wansoft_inventory_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_inventory_client_id_fecha_key ON public.wansoft_inventory USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_inventory",
+      "indexname": "wansoft_inventory_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_inventory_pkey ON public.wansoft_inventory USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_kpis",
+      "indexname": "wansoft_kpis_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_kpis_pkey ON public.wansoft_kpis USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_labor",
+      "indexname": "wansoft_labor_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_labor_client_id_fecha_key ON public.wansoft_labor USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_labor",
+      "indexname": "wansoft_labor_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_labor_pkey ON public.wansoft_labor USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_menu_config",
+      "indexname": "wansoft_menu_config_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_menu_config_pkey ON public.wansoft_menu_config USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_persons_hourly",
+      "indexname": "wansoft_persons_hourly_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_persons_hourly_client_id_fecha_key ON public.wansoft_persons_hourly USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_persons_hourly",
+      "indexname": "wansoft_persons_hourly_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_persons_hourly_pkey ON public.wansoft_persons_hourly USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_pnl",
+      "indexname": "wansoft_pnl_client_id_periodo_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_pnl_client_id_periodo_key ON public.wansoft_pnl USING btree (client_id, periodo)"
+    },
+    {
+      "tablename": "wansoft_pnl",
+      "indexname": "wansoft_pnl_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_pnl_pkey ON public.wansoft_pnl USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_recipes",
+      "indexname": "wansoft_recipes_client_id_saucer_id_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_recipes_client_id_saucer_id_key ON public.wansoft_recipes USING btree (client_id, saucer_id)"
+    },
+    {
+      "tablename": "wansoft_recipes",
+      "indexname": "wansoft_recipes_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_recipes_pkey ON public.wansoft_recipes USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_shrinkage",
+      "indexname": "wansoft_shrinkage_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_shrinkage_client_id_fecha_key ON public.wansoft_shrinkage USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_shrinkage",
+      "indexname": "wansoft_shrinkage_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_shrinkage_pkey ON public.wansoft_shrinkage USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_suppliers",
+      "indexname": "wansoft_suppliers_client_id_fecha_periodo_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_suppliers_client_id_fecha_periodo_key ON public.wansoft_suppliers USING btree (client_id, fecha, periodo)"
+    },
+    {
+      "tablename": "wansoft_suppliers",
+      "indexname": "wansoft_suppliers_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_suppliers_pkey ON public.wansoft_suppliers USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_tips",
+      "indexname": "wansoft_tips_client_id_fecha_key",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_tips_client_id_fecha_key ON public.wansoft_tips USING btree (client_id, fecha)"
+    },
+    {
+      "tablename": "wansoft_tips",
+      "indexname": "wansoft_tips_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_tips_pkey ON public.wansoft_tips USING btree (id)"
+    },
+    {
+      "tablename": "wansoft_waiter_categories",
+      "indexname": "wansoft_waiter_categories_pkey",
+      "indexdef": "CREATE UNIQUE INDEX wansoft_waiter_categories_pkey ON public.wansoft_waiter_categories USING btree (fecha)"
+    },
+    {
+      "tablename": "whatsapp_conversations",
+      "indexname": "idx_whatsapp_conv_phone_date",
+      "indexdef": "CREATE INDEX idx_whatsapp_conv_phone_date ON public.whatsapp_conversations USING btree (phone_number, created_at DESC)"
+    },
+    {
+      "tablename": "whatsapp_conversations",
+      "indexname": "whatsapp_conversations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX whatsapp_conversations_pkey ON public.whatsapp_conversations USING btree (id)"
+    },
+    {
+      "tablename": "whatsapp_messages_log",
+      "indexname": "idx_whatsapp_msg_phone_date",
+      "indexdef": "CREATE INDEX idx_whatsapp_msg_phone_date ON public.whatsapp_messages_log USING btree (phone_number, created_at DESC)"
+    },
+    {
+      "tablename": "whatsapp_messages_log",
+      "indexname": "whatsapp_messages_log_pkey",
+      "indexdef": "CREATE UNIQUE INDEX whatsapp_messages_log_pkey ON public.whatsapp_messages_log USING btree (id)"
+    },
+    {
+      "tablename": "whatsapp_whitelist",
+      "indexname": "whatsapp_whitelist_phone_number_key",
+      "indexdef": "CREATE UNIQUE INDEX whatsapp_whitelist_phone_number_key ON public.whatsapp_whitelist USING btree (phone_number)"
+    },
+    {
+      "tablename": "whatsapp_whitelist",
+      "indexname": "whatsapp_whitelist_pkey",
+      "indexdef": "CREATE UNIQUE INDEX whatsapp_whitelist_pkey ON public.whatsapp_whitelist USING btree (id)"
+    }
+  ],
+  "policies": [
+    {
+      "tablename": "agent_insights",
+      "policyname": "anon_read_insights",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "agent_insights",
+      "policyname": "anon_update_insights",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "agent_insights",
+      "policyname": "service_insert_insights",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "agent_results",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "agent_runs",
+      "policyname": "anon_read_agent_runs",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "agent_runs",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "policyname": "anon puede insertar",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "amalay_reservaciones",
+      "policyname": "anon puede leer activas",
+      "cmd": "SELECT",
+      "qual": "(status <> 'cancelled'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "client_locations",
+      "policyname": "Authenticated read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "client_users",
+      "policyname": "Users can read own client_users",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "clients",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "clients",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "content",
+      "policyname": "anon_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "delivery_orders",
+      "policyname": "anon insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "delivery_orders",
+      "policyname": "anon update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "delivery_orders",
+      "policyname": "delivery_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "delivery_platform_payments",
+      "policyname": "service_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "events",
+      "policyname": "events_insert_authenticated",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "events",
+      "policyname": "events_select_authenticated",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_daily",
+      "policyname": "service_all_ops_daily",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "parity_reports",
+      "policyname": "parity_select_authenticated",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_attendance",
+      "policyname": "anon_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_attendance",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_attendance",
+      "policyname": "auth_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "anon_insert_audit",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "anon_read_audit",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "audit_insert_only",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "audit_no_delete",
+      "cmd": "DELETE",
+      "qual": "false",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "audit_no_update",
+      "cmd": "UPDATE",
+      "qual": "false",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "audit_select_all",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "auth_all_audit",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_audit_log",
+      "policyname": "service_all_audit",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_billing_clients",
+      "policyname": "anon_read_billing_clients",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_bridge_logs",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cash_movements",
+      "policyname": "anon_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cash_movements",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_cash_movements",
+      "policyname": "auth_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_category_modifiers",
+      "policyname": "anon read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_category_modifiers",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_category_modifiers",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "policyname": "anon_insert_cfdi_requests",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "policyname": "anon_select_cfdi_requests",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_cfdi_requests",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cierres",
+      "policyname": "anon_read_cierres",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_cierres",
+      "policyname": "anon_write_cierres",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cierres",
+      "policyname": "auth_all_cierres",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_cierres",
+      "policyname": "service_all_cierres",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_clients",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_combos",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_combos",
+      "policyname": "auth_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "policyname": "anon_read_notes",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "policyname": "anon_write_notes",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "policyname": "auth_all_notes",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customer_notes",
+      "policyname": "service_all_notes",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "policyname": "pos_customer_visits_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customer_visits",
+      "policyname": "pos_customer_visits_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_customers",
+      "policyname": "pos_customers_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_customers",
+      "policyname": "pos_customers_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_customers",
+      "policyname": "pos_customers_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_facturas",
+      "policyname": "fact_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_facturas",
+      "policyname": "fact_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_facturas",
+      "policyname": "fact_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_fingerprint_templates",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_gastos",
+      "policyname": "anon_all_gastos",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_gastos",
+      "policyname": "auth_all_gastos",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_ingredient_presentations",
+      "policyname": "rls_ip_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_ingredient_presentations",
+      "policyname": "rls_ip_service",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_ingredients",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_ingredients",
+      "policyname": "anon_select_ingredients",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_ingredients",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_ingredients",
+      "policyname": "ing_update_anon",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_insumos",
+      "policyname": "Allow read pos_insumos",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_inventory",
+      "policyname": "inv_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory",
+      "policyname": "inv_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_inventory",
+      "policyname": "inv_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory_alerts",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "policyname": "anon_insert_inv_movements",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "policyname": "anon_read_inv_movements",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "policyname": "auth_insert_inv_movements",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory_movements",
+      "policyname": "auth_read_inv_movements",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "policyname": "anon_insert_inv_products",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "policyname": "anon_read_inv_products",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_inventory_products",
+      "policyname": "anon_update_inv_products",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_item_modifier_groups",
+      "policyname": "anon read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_item_modifier_groups",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "policyname": "anon_insert_market_mov",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_market_movements",
+      "policyname": "anon_read_market_mov",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_market_stock",
+      "policyname": "anon_insert_market_stock",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_market_stock",
+      "policyname": "anon_read_market_stock",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_market_stock",
+      "policyname": "anon_update_market_stock",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "policyname": "anon_read_menu_categories",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "policyname": "anon_update_menu_categories",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "policyname": "anon_write_menu_categories",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_categories",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "policyname": "anon_read_menu_items",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_items",
+      "policyname": "anon_update_menu_items",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_items",
+      "policyname": "anon_write_menu_items",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_menu_items",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_menu_items",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_modifier_groups",
+      "policyname": "anon read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_modifier_groups",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_modifier_groups",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_modifiers",
+      "policyname": "anon read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_modifiers",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_modifiers",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_orders",
+      "policyname": "anon_insert_orders",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_orders",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_orders",
+      "policyname": "anon_update_orders",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_orders",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_payment_methods",
+      "policyname": "anon_read_payment_methods",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_payment_methods",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_payment_methods",
+      "policyname": "authenticated_write",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_presentations",
+      "policyname": "rls_pres_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_presentations",
+      "policyname": "rls_pres_service",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_print_jobs",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_print_jobs",
+      "policyname": "auth_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_promos",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_promotions",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_promotions",
+      "policyname": "auth_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_purchase_order_items",
+      "policyname": "poi_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_purchase_order_items",
+      "policyname": "poi_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_purchase_order_items",
+      "policyname": "poi_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_purchase_orders",
+      "policyname": "po_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_purchase_orders",
+      "policyname": "po_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_purchase_orders",
+      "policyname": "po_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_recipe_details",
+      "policyname": "rd_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_recipes",
+      "policyname": "Allow read pos_recipes_new",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "policyname": "Allow read pos_recipes",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "policyname": "anon_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "policyname": "anon_select_recipes",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_recipes_old",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff",
+      "policyname": "anon_read_staff",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_staff",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff_audit",
+      "policyname": "anon_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "policyname": "anon_read_shifts",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "policyname": "anon_update_shifts",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "policyname": "anon_write_shifts",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "policyname": "auth_all_shifts",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_staff_shifts",
+      "policyname": "service_all_shifts",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_sub_recipe_ingredients",
+      "policyname": "rls_sri_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_sub_recipe_ingredients",
+      "policyname": "rls_sri_service",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_sub_recipes",
+      "policyname": "rls_sub_recipes_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_sub_recipes",
+      "policyname": "rls_sub_recipes_service",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "Allow insert pos_suppliers",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "Allow read pos_suppliers",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "Allow update pos_suppliers",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "anon_insert_suppliers",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "anon_read_suppliers",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_suppliers",
+      "policyname": "anon_update_suppliers",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "anon_all_turnos",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "anon_insert_turnos",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "anon_read_turnos",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "anon_update_turnos",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "auth_all_turnos",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_turnos",
+      "policyname": "service_all_turnos",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "pos_unit_conversions",
+      "policyname": "rls_uc_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "pos_unit_conversions",
+      "policyname": "rls_uc_service",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "push_subscriptions",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "reservaciones",
+      "policyname": "reservaciones_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "reservaciones",
+      "policyname": "reservaciones_update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "reservaciones",
+      "policyname": "reservaciones_write",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "reviews",
+      "policyname": "anon_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "reviews",
+      "policyname": "anon_update_draft",
+      "cmd": "UPDATE",
+      "qual": "(status = ANY (ARRAY['pending'::text, 'draft'::text]))",
+      "with_check": "(status = ANY (ARRAY['pending'::text, 'draft'::text]))"
+    },
+    {
+      "tablename": "tasks",
+      "policyname": "anon_select",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_catalog",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_daily",
+      "policyname": "authenticated_read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_daily",
+      "policyname": "public_read_wansoft_daily",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_data",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_data",
+      "policyname": "anon_survey_insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(data_key ~~ 'survey%'::text)"
+    },
+    {
+      "tablename": "wansoft_data",
+      "policyname": "anon_survey_select",
+      "cmd": "SELECT",
+      "qual": "(data_key ~~ 'survey%'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_food_cost",
+      "policyname": "Allow read wansoft_food_cost",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_hourly",
+      "policyname": "Allow delete",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_hourly",
+      "policyname": "Allow insert",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "wansoft_hourly",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_hourly",
+      "policyname": "Allow update",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_inventory",
+      "policyname": "Allow read wansoft_inventory",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_kpis",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_kpis",
+      "policyname": "public_read_wansoft_kpis",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_labor",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_menu_config",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_persons_hourly",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_pnl",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_recipes",
+      "policyname": "Allow read wansoft_recipes",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_shrinkage",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_suppliers",
+      "policyname": "Allow read",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_tips",
+      "policyname": "Allow delete tips",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_tips",
+      "policyname": "Allow insert tips",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "wansoft_tips",
+      "policyname": "Allow read wansoft_tips",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_tips",
+      "policyname": "Allow update tips",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "wansoft_waiter_categories",
+      "policyname": "authenticated_all",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    }
+  ],
+  "rlsStatus": [
+    {
+      "relname": "agent_audit_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "agent_insights",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "agent_messages",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "agent_results",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "agent_runs",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "amalay_reservaciones",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "calendar_sync_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "chat_logs",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "client_locations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "client_users",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "clients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "content",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "credentials_vault",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "delivery_orders",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "delivery_platform_payments",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "events",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "memories",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "ops_daily",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "parity_reports",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_attendance",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_audit_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_billing_clients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_bridge_logs",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_cash_movements",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_category_modifiers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_cfdi_requests",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_cierres",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_clients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_combos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_customer_notes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_customer_visits",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_customers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_delivery_zones",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_facturas",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_fingerprint_templates",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_gastos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_gift_cards",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_ingredient_presentations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_ingredients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_insumos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_inventory",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_inventory_alerts",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_inventory_movements",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_inventory_products",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_item_inventory_policy",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "pos_item_modifier_groups",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_market_movements",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_market_stock",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_menu_categories",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_menu_items",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_modifier_groups",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_modifiers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_mutation_authority",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "pos_orders",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_payment_methods",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_presentations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_price_types",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_print_jobs",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_promos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_promotions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_purchase_order_items",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_purchase_orders",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_recipe_details",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_recipe_lines",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "pos_recipe_versions",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "pos_recipes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_recipes_old",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_reconciliation_results",
+      "relrowsecurity": false
+    },
+    {
+      "relname": "pos_retail_groups",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_retail_items",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_retail_promotions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_save_operations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_schedules",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_sizes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_staff",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_staff_audit",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_staff_shifts",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_sub_recipe_ingredients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_sub_recipes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_suppliers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_survey",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_turnos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pos_unit_conversions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "prospects",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "push_subscriptions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "r1_observation_baseline",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "r1_observation_final",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "r1_observation_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "reservaciones",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "reviews",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "tasks",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_catalog",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_daily",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_data",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_food_cost",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_hourly",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_inventory",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_kpis",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_labor",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_menu_config",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_persons_hourly",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_pnl",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_recipes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_shrinkage",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_suppliers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_tips",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "wansoft_waiter_categories",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "whatsapp_conversations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "whatsapp_messages_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "whatsapp_whitelist",
+      "relrowsecurity": true
+    }
+  ],
+  "functions": [
+    {
+      "routine_name": "activate_recipe_version",
+      "routine_type": "FUNCTION",
+      "data_type": "void"
+    },
+    {
+      "routine_name": "cancel_stale_pending_reservations",
+      "routine_type": "FUNCTION",
+      "data_type": "void"
+    },
+    {
+      "routine_name": "convert_recipe_to_stock",
+      "routine_type": "FUNCTION",
+      "data_type": "numeric"
+    },
+    {
+      "routine_name": "dblink",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_build_sql_delete",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_build_sql_insert",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_build_sql_update",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_cancel_query",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_close",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_close",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_close",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_close",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_connect",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_connect",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_current_query",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_disconnect",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_disconnect",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_error_message",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_exec",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_exec",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_exec",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_exec",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_fdw_validator",
+      "routine_type": "FUNCTION",
+      "data_type": "void"
+    },
+    {
+      "routine_name": "dblink_fetch",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_fetch",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_fetch",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_fetch",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_get_connections",
+      "routine_type": "FUNCTION",
+      "data_type": "ARRAY"
+    },
+    {
+      "routine_name": "dblink_get_notify",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_get_notify",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_get_pkey",
+      "routine_type": "FUNCTION",
+      "data_type": "USER-DEFINED"
+    },
+    {
+      "routine_name": "dblink_get_result",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_get_result",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "dblink_is_busy",
+      "routine_type": "FUNCTION",
+      "data_type": "integer"
+    },
+    {
+      "routine_name": "dblink_open",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_open",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_open",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_open",
+      "routine_type": "FUNCTION",
+      "data_type": "text"
+    },
+    {
+      "routine_name": "dblink_send_query",
+      "routine_type": "FUNCTION",
+      "data_type": "integer"
+    },
+    {
+      "routine_name": "gen_codigo_reserva",
+      "routine_type": "FUNCTION",
+      "data_type": "trigger"
+    },
+    {
+      "routine_name": "r1_adjust_market_stock",
+      "routine_type": "FUNCTION",
+      "data_type": "jsonb"
+    },
+    {
+      "routine_name": "r1_legacy_sale_deduction",
+      "routine_type": "FUNCTION",
+      "data_type": "jsonb"
+    },
+    {
+      "routine_name": "r1_merge_orders",
+      "routine_type": "FUNCTION",
+      "data_type": "jsonb"
+    },
+    {
+      "routine_name": "r1_observation_sample",
+      "routine_type": "FUNCTION",
+      "data_type": "void"
+    },
+    {
+      "routine_name": "r1_reconcile_item",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "r1_reconcile_order",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "r1_save_order",
+      "routine_type": "FUNCTION",
+      "data_type": "jsonb"
+    },
+    {
+      "routine_name": "r1_save_order_idempotent",
+      "routine_type": "FUNCTION",
+      "data_type": "jsonb"
+    },
+    {
+      "routine_name": "reconcile_order_inventory",
+      "routine_type": "FUNCTION",
+      "data_type": "record"
+    },
+    {
+      "routine_name": "reject_mutation",
+      "routine_type": "FUNCTION",
+      "data_type": "trigger"
+    },
+    {
+      "routine_name": "set_pos_order_number",
+      "routine_type": "FUNCTION",
+      "data_type": "trigger"
+    },
+    {
+      "routine_name": "set_updated_at",
+      "routine_type": "FUNCTION",
+      "data_type": "trigger"
+    }
+  ],
+  "triggers": [
+    {
+      "trigger_name": "set_codigo_reserva",
+      "event_manipulation": "INSERT",
+      "event_object_table": "amalay_reservaciones",
+      "action_statement": "EXECUTE FUNCTION gen_codigo_reserva()"
+    },
+    {
+      "trigger_name": "trg_reservaciones_updated_at",
+      "event_manipulation": "UPDATE",
+      "event_object_table": "amalay_reservaciones",
+      "action_statement": "EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "trigger_name": "events_immutable",
+      "event_manipulation": "DELETE",
+      "event_object_table": "events",
+      "action_statement": "EXECUTE FUNCTION reject_mutation()"
+    },
+    {
+      "trigger_name": "events_immutable",
+      "event_manipulation": "UPDATE",
+      "event_object_table": "events",
+      "action_statement": "EXECUTE FUNCTION reject_mutation()"
+    },
+    {
+      "trigger_name": "trg_pos_order_number",
+      "event_manipulation": "INSERT",
+      "event_object_table": "pos_orders",
+      "action_statement": "EXECUTE FUNCTION set_pos_order_number()"
+    },
+    {
+      "trigger_name": "trg_pos_orders_updated_at",
+      "event_manipulation": "UPDATE",
+      "event_object_table": "pos_orders",
+      "action_statement": "EXECUTE FUNCTION set_updated_at()"
+    },
+    {
+      "trigger_name": "reviews_set_updated_at",
+      "event_manipulation": "UPDATE",
+      "event_object_table": "reviews",
+      "action_statement": "EXECUTE FUNCTION set_updated_at()"
+    }
+  ],
+  "views": [
+    {
+      "table_name": "ops_daily_history",
+      "view_definition": " SELECT DISTINCT ON (client_id, fecha) id,\n    client_id,\n    fecha,\n    record_type,\n    bucket_start,\n    ventas_dia,\n    ventas_brutas,\n    descuentos,\n    devoluciones,\n    efectivo,\n    tarjeta,\n    tickets_count,\n    mesas_atendidas,\n    personas_restaurant,\n    ticket_promedio_restaurant,\n    propinas_total,\n    meseros,\n    platillos_top,\n    ventas_por_grupo,\n    pago_metodos,\n    source_system,\n    generated_at,\n    data_freshness,\n    rows_aggregated\n   FROM ops_daily\n  WHERE (record_type = ANY (ARRAY['cierre'::text, 'cierre_wansoft'::text]))\n  ORDER BY client_id, fecha,\n        CASE record_type\n            WHEN 'cierre'::text THEN 1\n            WHEN 'cierre_wansoft'::text THEN 2\n            ELSE NULL::integer\n        END;"
+    },
+    {
+      "table_name": "ops_daily_live",
+      "view_definition": " SELECT DISTINCT ON (client_id, fecha) id,\n    client_id,\n    fecha,\n    record_type,\n    bucket_start,\n    ventas_dia,\n    ventas_brutas,\n    descuentos,\n    devoluciones,\n    efectivo,\n    tarjeta,\n    tickets_count,\n    mesas_atendidas,\n    personas_restaurant,\n    ticket_promedio_restaurant,\n    propinas_total,\n    meseros,\n    platillos_top,\n    ventas_por_grupo,\n    pago_metodos,\n    source_system,\n    generated_at,\n    data_freshness,\n    rows_aggregated,\n    pipeline_fresh\n   FROM ( SELECT ops_daily.id,\n            ops_daily.client_id,\n            ops_daily.fecha,\n            ops_daily.record_type,\n            ops_daily.bucket_start,\n            ops_daily.ventas_dia,\n            ops_daily.ventas_brutas,\n            ops_daily.descuentos,\n            ops_daily.devoluciones,\n            ops_daily.efectivo,\n            ops_daily.tarjeta,\n            ops_daily.tickets_count,\n            ops_daily.mesas_atendidas,\n            ops_daily.personas_restaurant,\n            ops_daily.ticket_promedio_restaurant,\n            ops_daily.propinas_total,\n            ops_daily.meseros,\n            ops_daily.platillos_top,\n            ops_daily.ventas_por_grupo,\n            ops_daily.pago_metodos,\n            ops_daily.source_system,\n            ops_daily.generated_at,\n            ops_daily.data_freshness,\n            ops_daily.rows_aggregated,\n            true AS pipeline_fresh\n           FROM ops_daily\n          WHERE (ops_daily.record_type = ANY (ARRAY['cierre'::text, 'cierre_wansoft'::text]))\n        UNION ALL\n         SELECT ops_daily.id,\n            ops_daily.client_id,\n            ops_daily.fecha,\n            ops_daily.record_type,\n            ops_daily.bucket_start,\n            ops_daily.ventas_dia,\n            ops_daily.ventas_brutas,\n            ops_daily.descuentos,\n            ops_daily.devoluciones,\n            ops_daily.efectivo,\n            ops_daily.tarjeta,\n            ops_daily.tickets_count,\n            ops_daily.mesas_atendidas,\n            ops_daily.personas_restaurant,\n            ops_daily.ticket_promedio_restaurant,\n            ops_daily.propinas_total,\n            ops_daily.meseros,\n            ops_daily.platillos_top,\n            ops_daily.ventas_por_grupo,\n            ops_daily.pago_metodos,\n            ops_daily.source_system,\n            ops_daily.generated_at,\n            ops_daily.data_freshness,\n            ops_daily.rows_aggregated,\n            (ops_daily.generated_at > (now() - '00:45:00'::interval)) AS pipeline_fresh\n           FROM ops_daily\n          WHERE (ops_daily.record_type = 'snapshot'::text)) sub\n  WHERE (pipeline_fresh = true)\n  ORDER BY client_id, fecha,\n        CASE\n            WHEN (record_type = 'cierre'::text) THEN 1\n            WHEN ((record_type = 'snapshot'::text) AND pipeline_fresh) THEN 2\n            WHEN (record_type = 'cierre_wansoft'::text) THEN 3\n            ELSE NULL::integer\n        END, generated_at DESC NULLS LAST;"
+    },
+    {
+      "table_name": "pos_recipes_canonical",
+      "view_definition": " SELECT v.client_id,\n    v.menu_item_id,\n    m.name AS menu_item_name,\n    l.ingredient_id,\n    l.quantity,\n    inv.stock_unit,\n    l.recipe_unit\n   FROM (((pos_recipe_versions v\n     JOIN pos_recipe_lines l ON (((l.recipe_version_id = v.id) AND (l.client_id = v.client_id))))\n     JOIN pos_menu_items m ON (((m.id = v.menu_item_id) AND (m.client_id = v.client_id))))\n     JOIN pos_inventory inv ON (((inv.client_id = v.client_id) AND (inv.ingredient_id = l.ingredient_id))))\n  WHERE (v.active = true);"
+    },
+    {
+      "table_name": "reservaciones_activas",
+      "view_definition": " SELECT id,\n    fecha,\n    espacio,\n    horario_inicio,\n    horario_fin,\n    status\n   FROM amalay_reservaciones\n  WHERE (status <> 'cancelled'::text);"
+    },
+    {
+      "table_name": "reservaciones_hoy",
+      "view_definition": " SELECT nombre,\n    espacio,\n    horario_inicio,\n    horario_fin,\n    guests,\n    paquete,\n    total,\n    status\n   FROM amalay_reservaciones\n  WHERE ((fecha = CURRENT_DATE) AND (status <> 'cancelled'::text))\n  ORDER BY horario_inicio;"
+    },
+    {
+      "table_name": "reviews_pending",
+      "view_definition": " SELECT id,\n    review_id,\n    author,\n    rating,\n    text,\n    date,\n    status,\n    draft_response,\n    published_response,\n    location_id,\n    created_at,\n    updated_at\n   FROM reviews\n  WHERE (status = ANY (ARRAY['pending'::text, 'draft'::text]))\n  ORDER BY date DESC NULLS LAST;"
+    }
+  ],
+  "extensions": [
+    {
+      "extname": "dblink",
+      "extversion": "1.2"
+    },
+    {
+      "extname": "pg_cron",
+      "extversion": "1.6.4"
+    },
+    {
+      "extname": "pg_stat_statements",
+      "extversion": "1.11"
+    },
+    {
+      "extname": "pgcrypto",
+      "extversion": "1.3"
+    },
+    {
+      "extname": "plpgsql",
+      "extversion": "1.0"
+    },
+    {
+      "extname": "supabase_vault",
+      "extversion": "0.3.1"
+    },
+    {
+      "extname": "uuid-ossp",
+      "extversion": "1.1"
+    }
+  ]
+}
