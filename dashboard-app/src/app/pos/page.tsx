@@ -2338,14 +2338,16 @@ function POSContent() {
       before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
       after: { qty: 0, cancelled: !voided, voided },
     })
-    // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
-    // recipe deductions. Reversing never-deducted stock creates phantom inflation.
-    // Will be re-enabled via unified R1 reconciler. See R0.5 containment.
+    // R0.5 RESOLVED: Forward deduction is now active, so reversal is safe.
+    // Only reverse if item was prepared (sent to kitchen = stock was deducted).
+    // Voided items that were never sent don't need reversal.
     if (!voided && prepared) {
-      console.log(`[inventory] R0.5 containment: reversal for ${cancellingItem.nombre} suspended — forward deduction was R0-suspended`)
+      reverseIngredientDeduction(cancellingItem, loadedOrderId || '', managerName, reason)
+        .catch(err => console.error('[inventory] Reversal error (non-blocking):', err))
     }
     if (voided) {
-      console.log(`[inventory] R0.5 containment: void reversal for ${cancellingItem.nombre} suspended — forward deduction was R0-suspended`)
+      // Void of prepared item = merma (stock doesn't come back, it was wasted)
+      // Void of unprepared item = no deduction happened, no reversal needed
       setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
     } else {
       setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
@@ -2421,12 +2423,14 @@ function POSContent() {
       }
       if (voidResult.revision != null) setOrderRevision(voidResult.revision)
     }
-    // R0.5 CONTAINMENT — recipe reversal suspended because R0 suspends forward
-    // recipe deductions. Reversing never-deducted stock creates phantom inflation.
-    // Will be re-enabled via unified R1 reconciler. See R0.5 containment.
-    const sentCount = orderItems.filter(i => sentItemIds.has(i.id)).length
-    if (sentCount > 0) {
-      console.log(`[inventory] R0.5 containment: order void reversal for ${sentCount} items suspended — forward deduction was R0-suspended`)
+    // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
+    // Void = entire order cancelled before payment, stock should come back.
+    const sentItems = orderItems.filter(i => sentItemIds.has(i.id) && !cancelledItems.has(i.id) && !voidedItems.has(i.id))
+    if (sentItems.length > 0) {
+      for (const item of sentItems) {
+        reverseIngredientDeduction(item, loadedOrderId || '', managerName, reason)
+          .catch(err => console.error('[inventory] Order void reversal error (non-blocking):', err))
+      }
     }
     setOrderItems([])
     setCancelledItems(new Set())
@@ -2760,13 +2764,22 @@ function POSContent() {
           // If quantity decreased or unchanged, don't deduct (reversal is separate)
         }
       }
-      // R0 CONTAINMENT — recipe inventory deduction suspended because canonical
-      // recipe truth is not established. pos_recipes_old contains duplicate import
-      // generations that produce inflated deductions (2-4x per order). Deduction will
-      // be re-enabled via reconcile_order_inventory RPC after canonical recipe schema
-      // is migrated and validated. See docs/CUTOVER-BLOCKER-PLAN.md P0-2/R0.
+      // R0 RESOLVED (2026-07-20): Root cause was sub-recipes classified as
+      // ingredient_type='ingredient' causing physical stock deduction. Fixed by:
+      // 1. 436 recipe rows reclassified to ingredient_type='sub_recipe'
+      // 2. 92 pos_ingredients reclassified to product_type='subproducto'
+      // 3. deductIngredientsForOrder() skips sub_ ingredients
+      // 4. recordMovement() blocks deductions on subproducto product_type
+      // See docs/postmortem/R0-INVENTORY-DEDUCTION.md
       if (itemsToDeduct.length > 0) {
-        console.log(`[inventory] R0 containment: ${itemsToDeduct.length} items would deduct — suspended pending canonical recipe truth`)
+        deductIngredientsForOrder(itemsToDeduct, orderId, mesero || 'POS')
+          .then(result => {
+            if (result.alerts.length > 0) {
+              console.warn('[inventory] Deduction alerts:', result.alerts)
+            }
+            console.log(`[inventory] Deducted ${result.deductions.length} ingredients for ${itemsToDeduct.length} items`)
+          })
+          .catch(err => console.error('[inventory] Deduction error (non-blocking):', err))
       }
 
       setLoadedOrderId(orderId)
