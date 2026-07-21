@@ -9,13 +9,11 @@ import {
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function _cid() {
-  try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' }
-}
 
 function fmtMXDate(): string {
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))

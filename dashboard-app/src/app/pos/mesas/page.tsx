@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
 import { MESAS_CONFIG, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 // ─── Plano arquitectónico AMALAY ─────────────────────────────────────────────
 // Réplica del "PLANO DE MESAS DE RESTAURANTE" físico (foto 2026-06-10).

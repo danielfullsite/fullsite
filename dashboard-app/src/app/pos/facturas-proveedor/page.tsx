@@ -5,6 +5,7 @@ import { FileText, Upload, Check, ArrowLeft, AlertTriangle, DollarSign } from 'l
 import { getIngredients } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -30,7 +31,6 @@ interface Ingredient {
 
 const VARIANCE_THRESHOLD = 10 // Alert if price varies >10%
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 export default function FacturasProveedorPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])

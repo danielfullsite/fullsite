@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Upload, FileText, CheckCircle, AlertTriangle, XCircle, Package, ArrowRight, Zap } from 'lucide-react'
 import { parseCfdiXml, matchConceptToIngredient, type CfdiParsed, type CfdiConcept } from '@/lib/cfdi-xml-parser'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
 interface Ingredient { id: string; name: string; unit: string; cost_per_unit?: number }

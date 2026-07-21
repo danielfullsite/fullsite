@@ -6,8 +6,8 @@ import { registerServiceWorker, requestNotificationPermission } from '@/lib/serv
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
 import TurnoGate from '@/components/pos/TurnoGate'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

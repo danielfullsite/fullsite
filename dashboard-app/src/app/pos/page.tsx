@@ -126,6 +126,7 @@ import {
   type MPDevice,
 } from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
@@ -136,7 +137,6 @@ const SmartCashCalculator = dynamic(() => import('@/components/pos/SmartCashCalc
 const CustomerMemory = dynamic(() => import('@/components/pos/CustomerMemory'), { ssr: false })
 const KitchenTimer = dynamic(() => import('@/components/pos/KitchenTimer'), { ssr: false })
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 export default function POSPage() {
   return (

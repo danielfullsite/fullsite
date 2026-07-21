@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { User, AlertTriangle, Heart, Clock, Star } from 'lucide-react'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 interface CustomerNote {
   id: string

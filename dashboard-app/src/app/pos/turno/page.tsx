@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Printer, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { formatMXN, logAudit } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -12,7 +13,6 @@ const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 interface Turno {
   id: string

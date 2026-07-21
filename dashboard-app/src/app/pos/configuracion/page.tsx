@@ -6,12 +6,12 @@ import {
   ArrowLeft, Printer, Users, Tag, Wifi, WifiOff, Settings, Shield,
   RefreshCw, CheckCircle, XCircle, AlertCircle, Monitor, Smartphone,
 } from 'lucide-react'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const SB = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 interface PrinterStatus {
   station: string

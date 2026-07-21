@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Sparkles, TrendingUp, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,6 @@ function getTimeBasedSuggestions(): CopilotSuggestion[] {
   return suggestions
 }
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 // ── Component ────────────────────────────────────────────────────────────
 

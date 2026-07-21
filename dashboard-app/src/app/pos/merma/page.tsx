@@ -5,11 +5,11 @@ import { Trash2, Search, Plus, Check, ArrowLeft } from 'lucide-react'
 import { getIngredients, logAudit } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 const MOTIVOS = [
   'Caducado',

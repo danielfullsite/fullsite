@@ -17,18 +17,11 @@ import {
   Users,
   AlertTriangle,
 } from 'lucide-react'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function _cid(): string {
-  try {
-    return localStorage.getItem('fullsite_client_id') || 'amalay'
-  } catch {
-    return 'amalay'
-  }
-}
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

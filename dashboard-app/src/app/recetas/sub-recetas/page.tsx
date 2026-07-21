@@ -7,8 +7,8 @@ import {
   Package, AlertTriangle, DollarSign, ArrowLeft, X, Check,
 } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
-function _cid() { try { return localStorage.getItem('fullsite_client_id') || 'amalay' } catch { return 'amalay' } }
 
 interface SubRecipe {
   id: string
