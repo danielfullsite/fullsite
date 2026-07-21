@@ -1549,7 +1549,7 @@ function POSContent() {
         }
       } catch { /* */ }
     }
-    return MESEROS[0]
+    return MESEROS[0] || ''
   })
   // Dynamic meseros list from pos_staff (replaces hardcoded MESEROS for dropdown)
   const [meserosList, setMeserosList] = useState<string[]>(MESEROS)
@@ -3330,7 +3330,7 @@ function POSContent() {
                   max={999}
                   className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-white font-bold text-base mx-1 py-0.5 focus:border-emerald-500 focus:outline-none"
                 />
-                <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {mesero.split(' ')[0]}</span>
+                <span className="text-[var(--text-3)] font-normal text-xs">{personas}p · {(mesero || '').split(' ')[0] || 'Sin mesero'}</span>
               </h2>
               <span className="text-emerald-400 font-bold text-lg">{formatMXN(total)}</span>
             </div>
