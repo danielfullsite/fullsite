@@ -207,7 +207,7 @@ export default function CRMPage() {
   const importFromReservations = async () => {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/amalay_reservaciones?select=nombre,telefono,fecha,total&order=fecha.desc&limit=500`,
+        `${SUPABASE_URL}/rest/v1/reservaciones?client_id=eq.${clientId()}&select=nombre,telefono,fecha,total&order=fecha.desc&limit=500`,
         { headers: hdrs() }
       )
       if (!res.ok) return

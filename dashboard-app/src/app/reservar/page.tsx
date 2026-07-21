@@ -164,6 +164,7 @@ export default function ReservarPage() {
       const codigo = 'AMA-' + String(Math.floor(Math.random() * 9000) + 1000)
 
       const body = {
+        client_id: process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || '',
         codigo_reserva: codigo,
         nombre: form.nombre,
         teléfono: form.teléfono,
@@ -180,7 +181,7 @@ export default function ReservarPage() {
         status: 'pending',
       }
 
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/amalay_reservaciones`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/reservaciones`, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON,
