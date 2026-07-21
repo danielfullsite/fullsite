@@ -182,7 +182,7 @@ export default function Sidebar() {
   const { user, role, clientConfig, locations, locationId, setLocationId, signOut } = useAuth()
 
   // Collapsible sections — auto-expand section containing current page
-  const activeSection = navSections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href))))
+  const activeSection = navSections.findIndex(s => s.items.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/'))))
   const [expandedSections, setExpandedSections] = useState<Set<number>>(() => new Set(activeSection >= 0 ? [activeSection, 0] : [0]))
   const toggleSection = (idx: number) => setExpandedSections(prev => {
     const next = new Set(prev)
@@ -218,7 +218,7 @@ export default function Sidebar() {
           )
           if (visibleItems.length === 0) return null
           const isExpanded = expandedSections.has(sectionIdx)
-          const hasActive = visibleItems.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href)))
+          const hasActive = visibleItems.some(i => pathname === i.href || (i.href !== '/' && pathname.startsWith(i.href + '/')))
           return (
           <div key={section.label}>
             <button
@@ -238,7 +238,7 @@ export default function Sidebar() {
               {visibleItems.map((item) => {
                 const isActive =
                   pathname === item.href ||
-                  (item.href !== '/' && pathname.startsWith(item.href))
+                  (item.href !== '/' && pathname.startsWith(item.href + '/'))
                 const Icon = item.icon
                 return (
                   <Link
