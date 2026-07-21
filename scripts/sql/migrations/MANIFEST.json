@@ -1,0 +1,91 @@
+{
+  "generated": "2026-07-21",
+  "source": "production schema export via Supabase Management API",
+  "migrations": [
+    {
+      "file": "001_core_schema.sql",
+      "tables": 29,
+      "tableList": [
+        "clients",
+        "client_users",
+        "client_locations",
+        "prospects",
+        "pos_staff",
+        "pos_staff_audit",
+        "pos_attendance",
+        "pos_fingerprint_templates",
+        "pos_turnos",
+        "pos_cash_movements",
+        "agent_runs",
+        "agent_results",
+        "pos_item_modifier_groups",
+        "pos_inventory_alerts",
+        "pos_recipes",
+        "pos_insumos",
+        "pos_cfdi_requests",
+        "pos_gastos",
+        "credentials_vault",
+        "ops_daily",
+        "events",
+        "chat_logs",
+        "push_subscriptions",
+        "delivery_orders",
+        "reviews",
+        "memories",
+        "whatsapp_conversations",
+        "whatsapp_messages_log",
+        "whatsapp_whitelist"
+      ],
+      "group": "Core + Infrastructure + CRM",
+      "required": true,
+      "dependencies": "None (first migration)",
+      "manualReview": [
+        "RLS policies not included (need body extraction)",
+        "Functions not included (15 custom functions)",
+        "Triggers not included (7 triggers)",
+        "CHECK constraints may need manual verification",
+        "Some UNIQUE constraints use non-standard syntax"
+      ]
+    },
+    {
+      "file": "002_wansoft_pipeline.sql",
+      "tables": 16,
+      "tableList": [
+        "calendar_sync_log",
+        "delivery_platform_payments",
+        "wansoft_catalog",
+        "wansoft_daily",
+        "wansoft_food_cost",
+        "wansoft_hourly",
+        "wansoft_inventory",
+        "wansoft_kpis",
+        "wansoft_labor",
+        "wansoft_persons_hourly",
+        "wansoft_pnl",
+        "wansoft_recipes",
+        "wansoft_shrinkage",
+        "wansoft_suppliers",
+        "wansoft_tips",
+        "wansoft_waiter_categories"
+      ],
+      "group": "Wansoft Pipeline (optional)",
+      "required": false,
+      "dependencies": "001_core_schema.sql (clients table)",
+      "manualReview": [
+        "client_slug vs client_id inconsistency in wansoft_daily",
+        "Some tables use composite PK not captured in auto-generation"
+      ]
+    }
+  ],
+  "notIncluded": {
+    "rlsPolicies": 194,
+    "functions": 15,
+    "triggers": 7,
+    "views": 6,
+    "reason": "Bodies not available from information_schema. Need pg_get_functiondef() extraction."
+  },
+  "tablesAlreadyWithMigration": 52,
+  "tablesNewlyGenerated": 45,
+  "tablesToEliminate": 19,
+  "tablesToKeepTemporarily": 1
+}
