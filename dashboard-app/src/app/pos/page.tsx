@@ -1360,30 +1360,9 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
     if (!pin) { setError('Ingresa PIN de gerente'); return }
     const manager = await verifyManagerPin(pin)
     if (!manager) { setError('PIN inválido'); return }
+    // H-1 FIX: doCashSave already POSTs to pos_cash_movements.
+    // Previously there was a duplicate POST here causing double-write.
     await doCashSave(manager)
-    try {
-      // Save to Supabase
-      const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const res = await fetch(`${sbUrl}/rest/v1/pos_cash_movements`, {
-        method: 'POST',
-        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          client_id: _cid(),
-          turno_id: turnoId,
-          type,
-          amount: num,
-          reason: reason.trim(),
-          actor,
-          approved_by: manager,
-        }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      onConfirm(type, num, reason.trim(), manager)
-    } catch {
-      setError('Error al guardar — intenta de nuevo')
-      setSaving(false)
-    }
   }
 
   return (
@@ -2346,12 +2325,15 @@ function POSContent() {
         .catch(err => console.error('[inventory] Reversal error (non-blocking):', err))
     }
     if (voided) {
-      // Void of prepared item = merma (stock doesn't come back, it was wasted)
-      // Void of unprepared item = no deduction happened, no reversal needed
       setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
     } else {
       setCancelledItems(prev => new Set(prev).add(cancellingItem.id))
     }
+    // H-4 FIX: persist cancelled flag ON the item in orderItems state
+    // so draft auto-save (pos_draft_${mesa}) includes it, and mesa switch preserves it
+    setOrderItems(prev => prev.map(i =>
+      i.id === cancellingItem.id ? { ...i, cancelled: true } : i
+    ))
     setCancellingItem(null)
     if (voided) {
       showToast(`${cancellingItem.nombre} ANULADO — aprobado por ${managerName}`)
@@ -2360,19 +2342,20 @@ function POSContent() {
     } else {
       showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
     }
-    // Immediately save to DB so KDS reflects cancellation
-    if (loadedOrderId) {
+    // Save to DB so KDS reflects cancellation
+    const effectiveOrderId = loadedOrderId || orderId
+    if (effectiveOrderId) {
       const updatedItems = orderItems.map(i => {
         if (i.id === cancellingItem.id) return { ...i, cancelled: true }
         return i
       })
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${effectiveOrderId}`, {
         method: 'PATCH',
         headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ items: JSON.stringify(updatedItems), updated_at: new Date().toISOString() }),
-      }).catch(() => {})
+      }).catch(err => console.error('[cancel] DB save failed:', err))
     }
-  }, [cancellingItem, orderId, mesero, mesa])
+  }, [cancellingItem, orderId, mesero, mesa, orderItems, loadedOrderId])
 
   // Void entire order
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
@@ -3447,9 +3430,9 @@ function POSContent() {
                         {isCancelled && !isVoided && (
                           <p className="text-red-500 text-[10px] font-semibold">CANCELADO</p>
                         )}
-                        {item.modificadores.length > 0 && (
+                        {(item.modificadores || []).length > 0 && (
                           <p className="text-[var(--text-3)] text-[11px] truncate">
-                            {item.modificadores.join(' · ')}
+                            {(item.modificadores || []).join(' · ')}
                           </p>
                         )}
                         {item.notas && (
