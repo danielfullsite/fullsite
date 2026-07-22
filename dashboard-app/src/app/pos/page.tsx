@@ -3377,6 +3377,7 @@ function POSContent() {
                             {seatItems.map(item => {
                   const isCancelled = cancelledItems.has(item.id)
                   const isVoided = voidedItems.has(item.id)
+                  const isSent = sentItemIds.has(item.id)
                   return (
                     <div
                       key={item.id}
@@ -3394,17 +3395,17 @@ function POSContent() {
                       <div className="flex items-center gap-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1) }}
-                          disabled={isCancelled || isVoided}
+                          disabled={isCancelled || isVoided || isSent}
                           className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
                           <Minus size={18} />
                         </button>
-                        <span className="w-7 text-center font-bold text-lg">
+                        <span className={`w-7 text-center font-bold text-lg ${isSent ? 'text-[var(--text-3)]' : ''}`}>
                           {item.cantidad}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1) }}
-                          disabled={isCancelled || isVoided}
+                          disabled={isCancelled || isVoided || isSent}
                           className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-[var(--text-1)]"
                         >
                           <Plus size={18} />
@@ -3437,13 +3438,15 @@ function POSContent() {
                         )}
                       </div>
 
-                      {/* Silla badge (tap para ciclar 1..personas) */}
+                      {/* Silla badge (tap para ciclar 1..personas) — locked if sent */}
                       {!isCancelled && !isVoided && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); cycleSilla(item.id) }}
-                          className="flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-sm font-bold flex items-center justify-center transition-colors hover:bg-sky-500/30"
-                          title="Silla — toca para cambiar"
+                          onClick={(e) => { e.stopPropagation(); if (!isSent) cycleSilla(item.id) }}
+                          disabled={isSent}
+                          className={`flex-shrink-0 min-w-[44px] h-11 px-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors ${isSent ? 'bg-slate-500/10 border border-slate-500/20 text-slate-500 cursor-not-allowed' : 'bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/30'}`}
+                          title={isSent ? 'Enviado — no se puede cambiar silla' : 'Silla — toca para cambiar'}
                         >
+                          {isSent && <Lock size={12} className="mr-1" />}
                           S{item.silla || 1}
                         </button>
                       )}
@@ -3455,13 +3458,15 @@ function POSContent() {
 
                       {!isCancelled && !isVoided && (
                         <>
-                          {/* Edit */}
+                          {/* Edit — disabled if sent to kitchen (Eduardo Jul 21) */}
+                          {!isSent && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEditOrderItem(item) }}
                             className="w-11 h-11 rounded-lg bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--line)] text-[var(--text-3)] flex items-center justify-center transition-colors"
                           >
                             <Pencil size={18} />
                           </button>
+                          )}
 
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           {can('cancelar_ordenes') && (
