@@ -1063,11 +1063,16 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
 // Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),
 // barra (10-12), toldo (50-55), privado (60-63)
 const DEFAULT_MESA_NUMBERS = [
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+  20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
+  50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
 ]
-// Generic default: 20 tables, capacity 4 each.
-// Per-client mesa config should come from DB (pos_config or client_locations).
-const MESA_CAPACITY: Record<number, number> = {}
+// Capacidades segun las sillas dibujadas en el plano fisico
+const MESA_CAPACITY: Record<number, number> = {
+  30: 8,                // redonda grande terraza (8 sillas)
+  40: 6, 41: 6, 42: 6,  // rectangulares grandes terraza (6 sillas)
+  // resto: 4 sillas
+}
 export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
   number: n,
   capacity: MESA_CAPACITY[n] ?? 4,
