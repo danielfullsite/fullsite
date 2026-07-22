@@ -128,6 +128,7 @@ import {
 } from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { usePOSLock } from './pos-lock-context'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
@@ -1480,6 +1481,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
 function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { lock } = usePOSLock()
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
@@ -2834,15 +2836,10 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // Eduardo Jul 21: ALL roles return to lock screen after send.
-      // Prevents next mesero from operating on wrong session.
-      if (navigator.onLine) {
-        sessionStorage.removeItem('pos_staff')
-        sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { router.push('/pos') }, 1200)
-      } else {
-        showToast('Offline — orden guardada localmente')
-      }
+      // All roles return to lock screen after a confirmed save.
+      // lock() sets unlocked=false in layout state — no navigation hack needed.
+      // Offline-queued orders return early above; reaching here means server confirmed.
+      setTimeout(() => lock(), 1200)
     } finally {
       operationLock.current = false
       setSaving(false)

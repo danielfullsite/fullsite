@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { POSLockContext } from './pos-lock-context'
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/service-worker'
 import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
@@ -215,6 +216,18 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }, [unlocked, resetIdleTimer])
 
   const isLocked = lockedUntil > Date.now()
+
+  // Exposed to page.tsx via context — called after a successful kitchen send
+  const lockPOS = useCallback(() => {
+    setUnlocked(false)
+    setStaff(null)
+    setPin('')
+    sessionStorage.removeItem('pos_staff')
+    sessionStorage.removeItem('pos_last_activity')
+    router.push('/pos')
+  }, [router])
+  const lockContextValue = useMemo(() => ({ lock: lockPOS }), [lockPOS])
+
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
 
@@ -504,20 +517,22 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <div className="pos-kiosk" style={{
-      background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
-      colorScheme:'dark',
-      // Force all CSS variables to dark values for POS
-      // @ts-expect-error CSS custom properties
-      '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
-      '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
-      '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
-      '--text-4':'rgba(255,255,255,0.25)',
-    }}>
-      <TurnoGate staff={staff!}>
-        {children}
-      </TurnoGate>
-    </div>
+    <POSLockContext.Provider value={lockContextValue}>
+      <div className="pos-kiosk" style={{
+        background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
+        colorScheme:'dark',
+        // Force all CSS variables to dark values for POS
+        // @ts-expect-error CSS custom properties
+        '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+        '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
+        '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
+        '--text-4':'rgba(255,255,255,0.25)',
+      }}>
+        <TurnoGate staff={staff!}>
+          {children}
+        </TurnoGate>
+      </div>
+    </POSLockContext.Provider>
   )
 
   const remainingAttempts = MAX_ATTEMPTS - attempts
