@@ -106,6 +106,18 @@ export async function POST(request: NextRequest) {
       return Response.json(saveResult satisfies SaveResult)
     }
 
+    // Eduardo Jul 21 (Batch 5): persist comanda_batches alongside the order
+    // Written as separate PATCH to avoid modifying the RPC function
+    if (body.comanda_batches) {
+      try {
+        await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ comanda_batches: body.comanda_batches }),
+        })
+      } catch { /* non-blocking — KDS will fall back to single card */ }
+    }
+
     // ── Step 2: Reconciliation ──
     // FIRST_EXECUTION: always invoke reconciliation
     // IDEMPOTENT_REPLAY: invoke only if inventory not yet processed for committed revision

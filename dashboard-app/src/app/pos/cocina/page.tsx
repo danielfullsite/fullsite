@@ -30,6 +30,8 @@ interface ParsedItem {
   cancelledBy?: string
   station?: 'cocina' | 'barra' | 'caja'
   menuItemId?: string
+  comanda_batch_id?: string
+  comanda_batch_seq?: number
 }
 
 const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
@@ -485,9 +487,45 @@ export default function CocinaPage() {
 
   const totalPendingItems = Object.values(areaCounts).reduce((a, b) => a + b, 0)
 
-  // FIFO: oldest orders first (Eduardo feedback Jul 21 — priority by time of entry)
-  const sortedOrders = [...orders].sort((a, b) => {
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  // Eduardo Jul 21 (Batch 5): expand orders into per-batch cards
+  // Each send creates a batch. KDS renders separate cards per batch.
+  interface KDSCard {
+    order: typeof orders[0]
+    batchId: string | null       // null = legacy order without batches
+    batchSeq: number
+    batchCreatedAt: string       // for FIFO sorting
+    batchStatus: string          // 'enviada' | 'preparando' | 'lista'
+  }
+
+  const allCards: KDSCard[] = []
+  for (const order of orders) {
+    const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+    const batches: Record<string, { status: string; created_at: string; seq: number }> = typeof order.comanda_batches === 'string'
+      ? JSON.parse(order.comanda_batches || '{}')
+      : (order.comanda_batches || {})
+    const batchIds = new Set(items.map(i => i.comanda_batch_id).filter(Boolean))
+
+    if (batchIds.size <= 1) {
+      // Single batch or legacy order — render as 1 card (backward compatible)
+      allCards.push({ order, batchId: null, batchSeq: 0, batchCreatedAt: order.created_at, batchStatus: order.status })
+    } else {
+      // Multiple batches — render N cards
+      for (const bid of batchIds) {
+        if (!bid) continue
+        allCards.push({
+          order,
+          batchId: bid,
+          batchSeq: batches[bid]?.seq ?? 0,
+          batchCreatedAt: batches[bid]?.created_at ?? order.created_at,
+          batchStatus: batches[bid]?.status ?? order.status,
+        })
+      }
+    }
+  }
+
+  // FIFO: oldest cards first (Eduardo feedback Jul 21 — priority by time of entry)
+  const sortedCards = allCards.sort((a, b) => {
+    return new Date(a.batchCreatedAt).getTime() - new Date(b.batchCreatedAt).getTime()
   })
 
   if (!mounted) return null
@@ -605,7 +643,7 @@ export default function CocinaPage() {
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : sortedOrders.length === 0 ? (
+        ) : sortedCards.length === 0 ? (
           <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <div className="text-center">
               <ChefHat size={48} className="mx-auto mb-3 opacity-50" />
@@ -615,13 +653,18 @@ export default function CocinaPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedOrders.map(order => {
-              const config = statusConfig[order.status] || statusConfig.enviada
-              const elapsed = getElapsedMinutes(order.created_at)
-              const isUrgent = elapsed >= alertMinutes && order.status !== 'lista'
+            {sortedCards.map(card => {
+              const order = card.order
+              const cardStatus = card.batchStatus || order.status
+              const config = statusConfig[cardStatus] || statusConfig.enviada
+              const elapsed = getElapsedMinutes(card.batchCreatedAt)
+              const isUrgent = elapsed >= alertMinutes && cardStatus !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              // Filter items by station — strict: each station only sees its own items
-              const activeItems = items.filter(i => {
+              // Filter items by batch (if multi-batch) AND by station
+              const batchItems = card.batchId
+                ? items.filter(i => i.comanda_batch_id === card.batchId)
+                : items
+              const activeItems = batchItems.filter(i => {
                 if (i.cancelled) return false
                 if (i.menuItemId === '__tiempo__') return stationFilter === 'todo'
                 if (stationFilter === 'todo') return true
@@ -630,7 +673,7 @@ export default function CocinaPage() {
                 return resolveItemStation(i) === stationFilter
               })
 
-              // Skip orders with no items matching the filter
+              // Skip cards with no items matching the filter
               if (activeItems.length === 0) return null
 
               // Filter out items marked as "listo" by the chef
@@ -648,11 +691,12 @@ export default function CocinaPage() {
               const entryTime = new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
               return (
-                <div key={order.id} className={`rounded-2xl border-2 p-4 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
+                <div key={card.batchId ? `${order.id}-${card.batchId}` : order.id} className={`rounded-2xl border-2 p-4 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-4xl font-black">{order.mesa}</span>
+                        {card.batchSeq > 0 && <span className="text-xs font-bold text-amber-400 ml-1">({card.batchSeq + 1}a)</span>}
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${config.badge} ${config.badgeText}`}>
                           {config.label}
                         </span>

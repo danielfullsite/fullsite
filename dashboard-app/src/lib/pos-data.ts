@@ -175,6 +175,9 @@ export interface OrderItem {
   station?: 'cocina' | 'barra' | 'caja'  // estación de ruteo, fijada al agregar (por categoría)
   courseId?: number         // 1=Tiempo 1, 2=Tiempo 2, etc. Assigned when tiempo separator is added
   courseStatus?: 'pending' | 'fired' | 'preparing' | 'ready' | 'served'
+  comanda_batch_id?: string   // UUID of the send batch (Eduardo Jul 21: separate KDS cards per send)
+  comanda_batch_seq?: number  // Sequential: 0 = first send, 1 = second send, etc.
+  cancelled?: boolean         // H-4 fix: persisted cancellation flag
 }
 
 // Keep legacy alias for any other pages that import the old shape
@@ -643,6 +646,8 @@ export interface Order {
   closedAt?: Date
   /** Server-authoritative monotonic order revision for optimistic concurrency */
   orderRevision?: number
+  /** Per-batch status tracking for KDS (Eduardo Jul 21: separate comanda cards per send) */
+  comandaBatches?: Record<string, { status: string; created_at: string; seq: number }>
 }
 
 export interface Mesa {
@@ -1147,6 +1152,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
     notas: order.notas ?? null,
     items: order.items,
     closed_at: order.closedAt ? order.closedAt.toISOString() : null,
+    comanda_batches: order.comandaBatches ?? null,
   }
   // R2D: save_operation_id for exactly-once idempotency.
   // Generated ONCE per logical save action. Same ID survives catch → queue → replay.
@@ -1242,6 +1248,12 @@ export async function updateOrderStatus(
   }
 }
 
+export interface ComandaBatch {
+  status: string      // 'enviada' | 'preparando' | 'lista'
+  created_at: string  // ISO timestamp of when this batch was sent
+  seq: number         // 0 = first send, 1 = second, etc.
+}
+
 export interface KitchenOrderFromDB {
   id: string
   mesa: number
@@ -1249,6 +1261,7 @@ export interface KitchenOrderFromDB {
   status: string
   items: string // JSON string of OrderItem[]
   kds_item_status: string | null // JSON string of Record<string, boolean> — separate from items to avoid race condition
+  comanda_batches: string | null // JSON string of Record<string, ComandaBatch> — per-batch status
   created_at: string
   notas: string | null
   order_revision?: number

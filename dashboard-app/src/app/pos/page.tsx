@@ -2618,6 +2618,28 @@ function POSContent() {
       } catch { /* network error — proceed with creation */ }
     }
 
+    // Eduardo Jul 21 (Batch 5): stamp comanda_batch_id on new items
+    // Each send action creates a new batch. Items keep their batch forever.
+    const batchId = generateId()
+    const existingBatchIds = new Set(activeItems.map(i => i.comanda_batch_id).filter(Boolean))
+    const batchSeq = existingBatchIds.size // 0 for first send, 1+ for subsequent
+    const now = new Date()
+    const itemsWithBatch = activeItems.map(item => {
+      if (item.comanda_batch_id) return item // already stamped from previous send
+      return { ...item, comanda_batch_id: batchId, comanda_batch_seq: batchSeq }
+    })
+    // Build comanda_batches metadata (KDS reads this for per-card status)
+    const prevBatches: Record<string, { status: string; created_at: string; seq: number }> = {}
+    for (const item of activeItems) {
+      if (item.comanda_batch_id && !prevBatches[item.comanda_batch_id]) {
+        prevBatches[item.comanda_batch_id] = { status: 'preparando', created_at: now.toISOString(), seq: item.comanda_batch_seq ?? 0 }
+      }
+    }
+    const comandaBatches = {
+      ...prevBatches,
+      [batchId]: { status: 'enviada', created_at: now.toISOString(), seq: batchSeq },
+    }
+
     const order: Order = {
       id: orderId,
       mesa,
@@ -2625,15 +2647,16 @@ function POSContent() {
       mesero,
       personas,
       status: 'enviada',
-      items: activeItems,
+      items: itemsWithBatch,
       subtotal,
       iva,
       total,
       descuento: discount,
       turnoId: turnoId || undefined,
       notas: orderNotes || undefined,
-      createdAt: new Date(),
+      createdAt: now,
       orderRevision,
+      comandaBatches,
     }
     // SAVE FIRST — confirm persistence before printing
     // R2D: opId generated ONCE per logical save action, survives catch → queue → replay
