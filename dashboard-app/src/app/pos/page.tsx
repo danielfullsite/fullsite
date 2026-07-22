@@ -1896,6 +1896,7 @@ function POSContent() {
 
   // Load active order for selected mesa
   const [loadedOrderId, setLoadedOrderId] = useState<string | null>(null)
+  const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null)
   const [orderRevision, setOrderRevision] = useState<number>(0)
   const [loadingMesa, setLoadingMesa] = useState(false)
@@ -2739,6 +2740,7 @@ function POSContent() {
       createdAt: now,
       orderRevision,
       comandaBatches,
+      orderNumber: orderNumber ?? undefined,
     }
     // SAVE FIRST — confirm persistence before printing
     // R2D: opId generated ONCE per logical save action, survives catch → queue → replay
@@ -2839,15 +2841,16 @@ function POSContent() {
       // Deduction now happens in handlePayment after successful save
 
       setLoadedOrderId(orderId)
-      // Read server's actual updated_at (trigger sets it, may differ from client time)
+      // Read server's actual updated_at + order_number (triggers set these)
       try {
-        const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at`, {
+        const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at,order_number`, {
           headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
         })
         if (freshRes.ok) {
           const rows = await freshRes.json()
           if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
           else setLoadedUpdatedAt(new Date().toISOString())
+          if (rows[0]?.order_number) setOrderNumber(rows[0].order_number)
         } else setLoadedUpdatedAt(new Date().toISOString())
       } catch { setLoadedUpdatedAt(new Date().toISOString()) }
       setSaving(false); operationLock.current = false
@@ -2986,6 +2989,7 @@ function POSContent() {
       createdAt: new Date(),
       closedAt: new Date(),
       orderRevision: splitPayingCuenta > 0 ? 0 : orderRevision,  // Split creates new order → rev 0
+      orderNumber: orderNumber ?? undefined,
     }
     // R2D: opId generated ONCE per logical payment action
     const saveResult = await saveOrder(order, opId)

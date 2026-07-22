@@ -56,7 +56,7 @@ export function printTicketCSS(order: Order) {
     <span>${dateStr}</span>
     <span>${timeStr}</span>
   </div>
-  <div style="font-size:9px;color:#888">Orden: ${order.id.slice(0, 8)}</div>
+  <div style="font-size:9px;color:#888">Orden: ${order.orderNumber ? `#${order.orderNumber}` : order.id.slice(0, 8)}</div>
   <div class="line"></div>
 
   <table>${itemRows}</table>
@@ -445,7 +445,7 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
 
   cmds.push(...textToBytes(`Mesa: ${order.mesa}  ${order.mesero}\n`))
   cmds.push(...textToBytes(`${dateStr}  ${timeStr}\n`))
-  cmds.push(...textToBytes(`Orden: ${order.id.slice(0, 8)}\n`))
+  cmds.push(...textToBytes(`Orden: ${order.orderNumber ? `#${order.orderNumber}` : order.id.slice(0, 8)}\n`))
   cmds.push(...textToBytes(dashedLine(cols)))
 
   // Items

@@ -12,6 +12,9 @@ export interface PosClientConfig {
   rfc: string          // "AFO200806JI0"
   ivaRate: number      // 0 (AMALAY: precios incluyen IVA)
   receiptFooter: string // "Gracias por tu visita!"
+  logoUrl: string      // URL to logo image for tickets
+  socialMedia: string  // "@amalay.mx" or similar
+  razonSocial: string  // Legal name for fiscal purposes
 }
 
 let _posConfig: PosClientConfig | null = null
@@ -34,6 +37,9 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
     rfc: config.rfc || '',
     ivaRate: config.iva_rate,
     receiptFooter: config.receipt_footer || 'Gracias por tu visita!',
+    logoUrl: config.logo_url || '',
+    socialMedia: config.social_media || '',
+    razonSocial: config.razon_social || '',
   }
 
   return _posConfig
@@ -49,6 +55,9 @@ export function getPosConfigSync(): PosClientConfig {
     rfc: '',
     ivaRate: 0,
     receiptFooter: 'Gracias por tu visita!',
+    logoUrl: '',
+    socialMedia: '',
+    razonSocial: '',
   }
 }
 

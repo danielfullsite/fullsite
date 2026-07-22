@@ -648,6 +648,8 @@ export interface Order {
   orderRevision?: number
   /** Per-batch status tracking for KDS (Eduardo Jul 21: separate comanda cards per send) */
   comandaBatches?: Record<string, { status: string; created_at: string; seq: number }>
+  /** Sequential order number (auto-assigned by DB trigger, per client_id) */
+  orderNumber?: number
 }
 
 export interface Mesa {

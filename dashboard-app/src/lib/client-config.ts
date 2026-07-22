@@ -50,6 +50,8 @@ export interface ClientConfig {
   phone?: string
   rfc?: string
   receipt_footer?: string
+  social_media?: string
+  razon_social?: string
 }
 
 // Default features for new clients
@@ -110,6 +112,8 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
           phone: row.phone,
           rfc: row.rfc,
           receipt_footer: row.receipt_footer,
+          social_media: row.social_media,
+          razon_social: row.razon_social,
         }
         _cache[clientId] = config
         _cacheTime = Date.now()
