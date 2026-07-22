@@ -428,7 +428,7 @@ export default function CocinaPage() {
     lista: { bg: 'bg-emerald-950/40', border: 'border-emerald-500/40', badge: 'bg-emerald-500', badgeText: 'text-black', label: 'LISTA', nextLabel: 'Entregada' },
   }
 
-  // Batch counter: count pending items by name
+  // Batch counter: count pending items by name — filtered by current station
   const batchCounts = (() => {
     const counts: Record<string, { total: number; listo: number }> = {}
     const pendingOrders = orders.filter(o => o.status === 'enviada' || o.status === 'preparando')
@@ -436,6 +436,14 @@ export default function CocinaPage() {
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
       items.forEach((item, idx) => {
         if (item.cancelled) return
+        if (item.menuItemId === '__tiempo__') return
+        // Only count items that belong to the current station filter
+        const itemStation = resolveItemStation(item)
+        if (stationFilter !== 'todo' && stationFilter !== 'panaderia' && itemStation !== stationFilter) return
+        if (stationFilter === 'panaderia') {
+          const name = (item.nombre || item.name || '').toLowerCase()
+          if (!PANADERIA_KW.some(kw => name.includes(kw))) return
+        }
         const name = item.nombre || item.name || '?'
         const qty = item.cantidad || item.quantity || 1
         if (!counts[name]) counts[name] = { total: 0, listo: 0 }
