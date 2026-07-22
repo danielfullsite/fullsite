@@ -2783,20 +2783,15 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // Mode-dependent behavior after sending to kitchen:
-      // Comandero (mesero): clear session, return to mesas
-      // Caja (cajero/gerente/admin): stay on order to charge
-      if (staffRole === 'mesero' || staffRole === 'capitan') {
-        // Modo Comandero: regresa a mesas para tomar siguiente orden
-        if (navigator.onLine) {
-          sessionStorage.removeItem('pos_staff')
-          sessionStorage.removeItem('pos_last_activity')
-          setTimeout(() => { router.push('/pos/mesas') }, 1200)
-        } else {
-          showToast('Offline — orden guardada localmente')
-        }
+      // Eduardo Jul 21: ALL roles return to lock screen after send.
+      // Prevents next mesero from operating on wrong session.
+      if (navigator.onLine) {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        setTimeout(() => { router.push('/pos') }, 1200)
+      } else {
+        showToast('Offline — orden guardada localmente')
       }
-      // Modo Caja (cajero/gerente/admin): se queda en la orden para cobrar
     } finally {
       operationLock.current = false
       setSaving(false)

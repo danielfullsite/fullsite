@@ -478,9 +478,9 @@ export default function CocinaPage() {
 
   const totalPendingItems = Object.values(areaCounts).reduce((a, b) => a + b, 0)
 
+  // FIFO: oldest orders first (Eduardo feedback Jul 21)
   const sortedOrders = [...orders].sort((a, b) => {
-    const priority: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
-    return (priority[a.status] || 3) - (priority[b.status] || 3)
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   })
 
   if (!mounted) return null

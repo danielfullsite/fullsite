@@ -147,7 +147,7 @@ export default function MesasPage() {
   const [loading, setLoading] = useState(true)
   const [soloMisMesas, setSoloMisMesas] = useState(false)
   const [currentMesero, setCurrentMesero] = useState<string>('')
-  const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('planograma')
+  const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
   const [staffName, setStaffName] = useState<string>('')
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
