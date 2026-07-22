@@ -589,29 +589,7 @@ export default function CocinaPage() {
         ))}
       </div>
 
-      {/* Batch counter — how many of each dish are pending */}
-      {Object.keys(batchCounts).length > 0 && (
-        <div className="flex items-center gap-3 px-6 py-2 bg-[var(--surface-2)]/60 border-b border-slate-700/50 flex-shrink-0 overflow-x-auto">
-          {Object.entries(batchCounts)
-            .filter(([, v]) => v.total - v.listo > 0)
-            .sort((a, b) => (b[1].total - b[1].listo) - (a[1].total - a[1].listo))
-            .slice(0, 15)
-            .map(([name, { total, listo }]) => (
-            <div key={name} className="flex items-center gap-1.5 bg-[var(--line)]/40 rounded-lg px-2.5 py-1 whitespace-nowrap">
-              <span className="text-white text-xs font-bold">{name.length > 18 ? name.slice(0, 18) + '…' : name}</span>
-              <span className={`text-xs font-bold ${listo > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {listo}/{total}
-              </span>
-            </div>
-          ))}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="ml-auto text-xs text-[var(--text-3)] hover:text-white px-2 py-1 rounded-lg hover:bg-[var(--line)]"
-          >
-            ⚙ Settings
-          </button>
-        </div>
-      )}
+      {/* Removed horizontal batch counter — moved to left sidebar below */}
 
       {/* Settings modal */}
       {showSettings && (
@@ -647,12 +625,34 @@ export default function CocinaPage() {
           <div className="flex items-center justify-center h-full text-[var(--text-2)]">
             <div className="text-center">
               <ChefHat size={48} className="mx-auto mb-3 opacity-50" />
-              <p className="text-xl">No hay órdenes pendientes</p>
+              <p className="text-xl">No hay ordenes pendientes</p>
               <p className="text-sm mt-1">Se actualiza cada 2 segundos</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="flex gap-3 h-full">
+            {/* Left sidebar: platillos pendientes sorted by demand (Eduardo Jul 21) */}
+            {Object.keys(batchCounts).length > 0 && (
+              <div className="w-44 flex-shrink-0 overflow-y-auto space-y-1.5 pr-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-wider">Pendientes</span>
+                  <button onClick={() => setShowSettings(true)} className="text-[10px] text-[var(--text-4)] hover:text-white">⚙</button>
+                </div>
+                {Object.entries(batchCounts)
+                  .filter(([, v]) => v.total - v.listo > 0)
+                  .sort((a, b) => (b[1].total - b[1].listo) - (a[1].total - a[1].listo))
+                  .map(([name, { total, listo }]) => (
+                  <div key={name} className="flex items-center justify-between bg-[var(--line)]/30 rounded-lg px-2 py-1.5">
+                    <span className="text-white text-[11px] font-medium leading-tight truncate flex-1 mr-1">{name}</span>
+                    <span className={`text-[11px] font-bold flex-shrink-0 ${listo > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {listo}/{total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Main grid: comanda cards */}
+            <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
             {sortedCards.map(card => {
               const order = card.order
               const cardStatus = card.batchStatus || order.status
@@ -691,29 +691,29 @@ export default function CocinaPage() {
               const entryTime = new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
               return (
-                <div key={card.batchId ? `${order.id}-${card.batchId}` : order.id} className={`rounded-2xl border-2 p-4 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
-                  <div className="flex items-start justify-between mb-3">
+                <div key={card.batchId ? `${order.id}-${card.batchId}` : order.id} className={`rounded-2xl border-2 p-3 flex flex-col ${isOverAlert ? 'bg-red-950/60 border-red-500/60' : `${config.bg} ${config.border}`}`}>
+                  <div className="flex items-start justify-between mb-2">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-4xl font-black">{order.mesa}</span>
-                        {card.batchSeq > 0 && <span className="text-xs font-bold text-amber-400 ml-1">({card.batchSeq + 1}a)</span>}
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${config.badge} ${config.badgeText}`}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-3xl font-black">{order.mesa}</span>
+                        {card.batchSeq > 0 && <span className="text-[10px] font-bold text-amber-400">({card.batchSeq + 1}a)</span>}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${config.badge} ${config.badgeText}`}>
                           {config.label}
                         </span>
-                        {order.order_number != null && <span className="text-xs font-mono text-[var(--text-3)]">#{order.order_number}</span>}
+                        {order.order_number != null && <span className="text-[10px] font-mono text-[var(--text-3)]">#{order.order_number}</span>}
                       </div>
-                      <p className="text-[var(--text-3)] text-sm">{order.mesero}</p>
+                      <p className="text-[var(--text-3)] text-xs">{order.mesero}</p>
                     </div>
                     <div className="text-right">
                       <div className={`flex items-center gap-1 ${isOverAlert ? 'text-red-400 animate-pulse' : elapsed >= alertMinutes * 0.7 ? 'text-amber-400' : 'text-[var(--text-3)]'}`}>
-                        {isOverAlert ? <Flame size={18} /> : <Clock size={16} />}
-                        <span className="text-lg font-mono font-bold">{elapsed}m</span>
+                        {isOverAlert ? <Flame size={16} /> : <Clock size={14} />}
+                        <span className="text-base font-mono font-bold">{elapsed}m</span>
                       </div>
-                      <p className="text-[var(--text-4)] text-xs font-mono">{entryTime}</p>
+                      <p className="text-[var(--text-4)] text-[10px] font-mono">{entryTime}</p>
                     </div>
                   </div>
 
-                  <div className="flex-1 space-y-2.5 mb-3">
+                  <div className="flex-1 space-y-2 mb-2">
                     {visibleItems.map((item, i) => {
                       const globalIdx = items.indexOf(item)
                       const key = `${order.id}-${globalIdx}`
@@ -722,26 +722,26 @@ export default function CocinaPage() {
                       <div
                         key={i}
                         onClick={() => { if (!item.cancelled) handleItemClick(order.id, globalIdx, item.nombre || item.name || '') }}
-                        className={`flex items-start gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${
+                        className={`flex items-start gap-2 cursor-pointer rounded-lg px-2 py-1 transition-colors ${
                           status === 'preparando' ? 'bg-amber-900/30 border border-amber-500/30' : 'hover:bg-white/5'
                         }`}
                       >
-                        <span className={`font-bold text-xl min-w-[36px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <span className={`font-bold text-lg min-w-[32px] ${status === 'preparando' ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {`${item.cantidad || item.quantity || 1}x`}
                         </span>
                         <div className="flex-1">
-                          <p className={`text-xl font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
+                          <p className={`text-lg font-bold leading-tight ${status === 'preparando' ? 'text-amber-200' : 'text-white'}`}>
                             {item.nombre || item.name}
                           </p>
                           {item.modificadores && item.modificadores.length > 0 && (
                             <div className="mt-1">
                               {(typeof item.modificadores === 'string' ? (item.modificadores as string).split(/\s*·\s*/) : (item.modificadores as string[])).map((mod: string, mi: number) => (
-                                <div key={mi} className="text-amber-300 text-sm leading-snug font-medium">▸ {mod}</div>
+                                <div key={mi} className="text-amber-300 text-xs leading-snug font-medium">▸ {mod}</div>
                               ))}
                             </div>
                           )}
                           {item.notas && (
-                            <p className="text-sky-400 text-sm italic mt-0.5">{item.notas}</p>
+                            <p className="text-sky-400 text-xs italic mt-0.5">{item.notas}</p>
                           )}
                           {status === 'preparando' && (
                             <p className="text-amber-400 text-xs mt-1 font-semibold">⏳ Preparando — toca para marcar listo</p>
@@ -768,6 +768,7 @@ export default function CocinaPage() {
                 </div>
               )
             })}
+          </div>
           </div>
         )}
       </div>
