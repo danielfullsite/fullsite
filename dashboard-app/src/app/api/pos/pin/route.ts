@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Demasiados intentos' }, { status: 429 })
     }
 
-    const { pin, client_id, manager, fingerprint_id } = await request.json()
+    const { pin, client_id, manager, fingerprint_id, min_role } = await request.json()
     const clientId = typeof client_id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(client_id) ? client_id : 'amalay'
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -54,8 +54,19 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
 
-    // manager=true: solo roles con autoridad (cancelaciones, descuentos, reabrir órdenes, cortes)
-    const roleFilter = manager === true ? '&role=in.(admin,gerente)' : ''
+    // Role hierarchy: mesero < cajero < capitan < gerente < admin
+    // min_role param: only accept PINs from staff at or above this role level
+    // manager=true is legacy shorthand for min_role='gerente'
+    const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
+    const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
+    let roleFilter = ''
+    if (effectiveMinRole && ROLE_HIERARCHY[effectiveMinRole]) {
+      const minLevel = ROLE_HIERARCHY[effectiveMinRole]
+      const allowedRoles = Object.entries(ROLE_HIERARCHY)
+        .filter(([, level]) => level >= minLevel)
+        .map(([role]) => role)
+      roleFilter = `&role=in.(${allowedRoles.join(',')})`
+    }
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }

@@ -1510,6 +1510,49 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   return null
 }
 
+/**
+ * Verify PIN with minimum role level (Eduardo Jul 21 — permission hierarchy).
+ * Role hierarchy: mesero < cajero < capitan < gerente < admin
+ *
+ * Usage:
+ *   verifyPinWithMinRole(pin, 'capitan')  → accepts capitan, gerente, admin
+ *   verifyPinWithMinRole(pin, 'gerente')  → accepts gerente, admin
+ *   verifyPinWithMinRole(pin, 'admin')    → accepts admin only
+ */
+export async function verifyPinWithMinRole(pin: string, minRole: string): Promise<{ name: string; role: string } | null> {
+  if (!pin) return null
+  try {
+    const { apiUrl } = await import('./api-base')
+    const res = await fetch(apiUrl('/api/pos/pin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, client_id: _getClientId(), min_role: minRole }),
+    })
+    if (res.ok) {
+      const { staff } = await res.json()
+      if (staff?.name) {
+        const role = staff.role || minRole
+        try {
+          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+          cached[_pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
+          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
+        } catch { /* ignore */ }
+        return { name: staff.name, role }
+      }
+      return null
+    }
+    if (res.status === 401 || res.status === 400) return null
+  } catch { /* offline → fallback */ }
+  try {
+    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+    const entry = cached[_pinCacheKey(pin)]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) {
+      return { name: entry.name, role: entry.role || minRole }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
 // ─── INVENTORY & RECIPES ────────────────────────────────────────────────────
 
 export interface Ingredient {
