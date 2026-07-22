@@ -34,23 +34,24 @@ interface ParsedItem {
 
 const PANADERIA_KW = ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy', 'muffin', 'scone']
 
+/** Resolve the station for an item — stored station field takes priority, keyword fallback */
+function resolveItemStation(i: ParsedItem): StationName {
+  if (i.station) return i.station
+  const name = (i.nombre || i.name || '').toLowerCase()
+  return getStationByName(name)
+}
+
 /** Returns true if at least one non-cancelled item in the order matches the given station filter. */
 function orderHasItemsForStation(order: KitchenOrderFromDB, filter: 'todo' | 'panaderia' | StationName): boolean {
   const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
   return items.some(i => {
     if (i.cancelled) return false
     if (i.menuItemId === '__tiempo__') return filter === 'todo'
-    const name = (i.nombre || i.name || '').toLowerCase()
     if (filter === 'todo') return true
+    const name = (i.nombre || i.name || '').toLowerCase()
     if (filter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
-    const itemStation = i.station || getStationByName(name)
-    if (filter === 'cocina') {
-      // Cocina = everything EXCEPT beverages and market
-      if (isBebida(name)) return false
-      const itemStation = i.station || getStationByName(name)
-      if (itemStation === 'barra' || itemStation === 'caja') return false
-      return true
-    }
+    const itemStation = resolveItemStation(i)
+    // Eduardo Jul 21: strict filtering — each station only sees its own items
     return itemStation === filter
   })
 }
@@ -619,21 +620,14 @@ export default function CocinaPage() {
               const elapsed = getElapsedMinutes(order.created_at)
               const isUrgent = elapsed >= alertMinutes && order.status !== 'lista'
               const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-              // Filter items based on station filter (same logic as orderHasItemsForStation)
+              // Filter items by station — strict: each station only sees its own items
               const activeItems = items.filter(i => {
                 if (i.cancelled) return false
                 if (i.menuItemId === '__tiempo__') return stationFilter === 'todo'
-                const name = (i.nombre || i.name || '').toLowerCase()
                 if (stationFilter === 'todo') return true
+                const name = (i.nombre || i.name || '').toLowerCase()
                 if (stationFilter === 'panaderia') return PANADERIA_KW.some(kw => name.includes(kw))
-                if (stationFilter === 'cocina') {
-                  if (isBebida(name)) return false
-                  const itemStation = i.station || getStationByName(name)
-                  if (itemStation === 'barra' || itemStation === 'caja') return false
-                  return true
-                }
-                const itemStation = i.station || getStationByName(name)
-                return itemStation === stationFilter
+                return resolveItemStation(i) === stationFilter
               })
 
               // Skip orders with no items matching the filter
