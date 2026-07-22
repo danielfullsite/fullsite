@@ -7,6 +7,7 @@ import {
   MESEROS,
   fetchMeseros,
   verifyManagerPin,
+  verifyPinWithMinRole,
   type MenuCategory,
   RECIPE_ALIASES,
   formatMXN,
@@ -2020,6 +2021,9 @@ function POSContent() {
   // Cancel modal state
   const [cancellingItem, setCancellingItem] = useState<OrderItem | null>(null)
 
+  // Transfer platillo modal state (Eduardo Jul 21 — Batch 8)
+  const [transferringItem, setTransferringItem] = useState<OrderItem | null>(null)
+
   // Void order modal state
   const [showVoidOrder, setShowVoidOrder] = useState(false)
   // Cash movement modal state (retiros / depositos)
@@ -2358,6 +2362,84 @@ function POSContent() {
   }, [cancellingItem, orderId, mesero, mesa, orderItems, loadedOrderId])
 
   // Void entire order
+  // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
+  const handleTransferItem = useCallback(async (pin: string, targetMesa: number) => {
+    if (!transferringItem || !loadedOrderId) return
+    // Verify supervisor PIN (capitan+)
+    const auth = await verifyPinWithMinRole(pin, 'capitan')
+    if (!auth) { showToast('PIN no autorizado — se requiere supervisor'); return }
+
+    const itemName = transferringItem.nombre
+    const itemId = transferringItem.id
+
+    // Remove item from current order
+    setOrderItems(prev => prev.filter(i => i.id !== itemId))
+    setCancelledItems(prev => { const next = new Set(prev); next.delete(itemId); return next })
+
+    // Find or create target order on target mesa
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
+
+    try {
+      // Check for open order on target mesa
+      const findRes = await fetch(
+        `${sbUrl}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${targetMesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
+        { headers, cache: 'no-store' }
+      )
+      const targetOrders = findRes.ok ? await findRes.json() : []
+
+      if (targetOrders.length > 0) {
+        // Append item to existing target order
+        const target = targetOrders[0]
+        const targetItems = typeof target.items === 'string' ? JSON.parse(target.items) : (target.items || [])
+        targetItems.push({ ...transferringItem, id: generateId() }) // new id to avoid collision
+        await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${target.id}`, {
+          method: 'PATCH',
+          headers: { ...headers, Prefer: 'return=minimal' },
+          body: JSON.stringify({ items: JSON.stringify(targetItems), updated_at: new Date().toISOString() }),
+        })
+      } else {
+        // Create new order on target mesa with the transferred item
+        await fetch(`${sbUrl}/rest/v1/pos_orders`, {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            client_id: _cid(),
+            mesa: targetMesa,
+            mesero,
+            personas: 1,
+            status: 'enviada',
+            items: JSON.stringify([{ ...transferringItem, id: generateId() }]),
+            updated_at: new Date().toISOString(),
+          }),
+        })
+      }
+
+      // Update current order in DB (remove the transferred item)
+      const updatedItems = orderItems.filter(i => i.id !== itemId)
+      await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ items: JSON.stringify(updatedItems), updated_at: new Date().toISOString() }),
+      })
+
+      logAudit({
+        order_id: loadedOrderId, action: 'item_transferred', actor: mesero, mesa,
+        details: { item: itemName, from_mesa: mesa, to_mesa: targetMesa, approved_by: auth.name, approved_role: auth.role },
+      })
+
+      showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
+    } catch (err) {
+      console.error('[transfer] Error:', err)
+      showToast('Error al transferir platillo')
+      // Re-add item if transfer failed
+      setOrderItems(prev => [...prev, transferringItem])
+    }
+
+    setTransferringItem(null)
+  }, [transferringItem, loadedOrderId, orderItems, mesero, mesa])
+
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
     if (saving) return
     setSaving(true)
@@ -3475,6 +3557,17 @@ function POSContent() {
                           </button>
                           )}
 
+                          {/* Transfer platillo (Eduardo Jul 21 — requires supervisor PIN) */}
+                          {isSent && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTransferringItem(item) }}
+                            className="w-11 h-11 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 flex items-center justify-center transition-colors"
+                            title="Transferir platillo a otra mesa (requiere supervisor)"
+                          >
+                            <ArrowRightLeft size={16} />
+                          </button>
+                          )}
+
                           {/* Cancel (NOT delete — requires reason + manager PIN) */}
                           {can('cancelar_ordenes') && (
                           <button
@@ -4058,6 +4151,55 @@ function POSContent() {
           onConfirm={handleCancelItem}
           onCancel={() => setCancellingItem(null)}
         />
+      )}
+
+      {/* Transfer Platillo Modal (Eduardo Jul 21 — Batch 8) */}
+      {transferringItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-center mb-1">Transferir platillo</h3>
+            <p className="text-[var(--text-3)] text-sm text-center mb-4">{transferringItem.cantidad}x {transferringItem.nombre}</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-[var(--text-3)] mb-1 block">Mesa destino</label>
+                <input
+                  type="number"
+                  id="transfer-mesa-input"
+                  placeholder="# mesa"
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-1)] text-center text-lg"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-3)] mb-1 block">PIN supervisor</label>
+                <input
+                  type="password"
+                  id="transfer-pin-input"
+                  placeholder="PIN"
+                  maxLength={8}
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text-1)] text-center text-lg tracking-widest"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setTransferringItem(null)}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--line)] text-[var(--text-2)] font-medium transition-colors"
+              >Cancelar</button>
+              <button
+                onClick={() => {
+                  const mesaInput = (document.getElementById('transfer-mesa-input') as HTMLInputElement)?.value
+                  const pinInput = (document.getElementById('transfer-pin-input') as HTMLInputElement)?.value
+                  const targetMesa = parseInt(mesaInput || '', 10)
+                  if (isNaN(targetMesa) || targetMesa <= 0) { showToast('Ingresa un numero de mesa valido'); return }
+                  if (!pinInput) { showToast('Ingresa PIN de supervisor'); return }
+                  handleTransferItem(pinInput, targetMesa)
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold transition-colors"
+              >Transferir</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Void Order Modal (blindaje) */}
