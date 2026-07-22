@@ -2364,6 +2364,7 @@ function POSContent() {
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
+  // Uses server-side OCC API to prevent race conditions and data loss
   const handleTransferItem = useCallback(async (pin: string, targetMesa: number) => {
     if (!transferringItem || !loadedOrderId) return
     // Verify supervisor PIN (capitan+)
@@ -2372,74 +2373,48 @@ function POSContent() {
 
     const itemName = transferringItem.nombre
     const itemId = transferringItem.id
-
-    // Remove item from current order
-    setOrderItems(prev => prev.filter(i => i.id !== itemId))
-    setCancelledItems(prev => { const next = new Set(prev); next.delete(itemId); return next })
-
-    // Find or create target order on target mesa
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' }
+    const opId = generateId() // idempotency key
 
     try {
-      // Check for open order on target mesa
-      const findRes = await fetch(
-        `${sbUrl}/rest/v1/pos_orders?client_id=eq.${_cid()}&mesa=eq.${targetMesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1`,
-        { headers, cache: 'no-store' }
-      )
-      const targetOrders = findRes.ok ? await findRes.json() : []
+      const res = await fetch('/api/pos/transfer-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: _cid(),
+          source_order_id: loadedOrderId,
+          item_id: itemId,
+          target_mesa: targetMesa,
+          source_mesa: mesa,
+          mesero,
+          approved_by: auth.name,
+          approved_role: auth.role,
+          operation_id: opId,
+        }),
+      })
+      const result = await res.json()
 
-      if (targetOrders.length > 0) {
-        // Append item to existing target order
-        const target = targetOrders[0]
-        const targetItems = typeof target.items === 'string' ? JSON.parse(target.items) : (target.items || [])
-        targetItems.push({ ...transferringItem, id: generateId() }) // new id to avoid collision
-        await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${target.id}`, {
-          method: 'PATCH',
-          headers: { ...headers, Prefer: 'return=minimal' },
-          body: JSON.stringify({ items: JSON.stringify(targetItems), updated_at: new Date().toISOString() }),
-        })
+      if (result.ok) {
+        // Success: remove item from local state
+        setOrderItems(prev => prev.filter(i => i.id !== itemId))
+        setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
+        showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
+      } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
+        showToast(result.message || 'Conflicto — recarga y reintenta')
+        // Reload order from DB to get fresh state
+        // The mesa load effect will handle this on next render
+      } else if (result.error === 'ITEM_NOT_IN_SOURCE') {
+        showToast(result.message || 'El item ya fue movido por otra terminal')
+        setOrderItems(prev => prev.filter(i => i.id !== itemId))
       } else {
-        // Create new order on target mesa with the transferred item
-        await fetch(`${sbUrl}/rest/v1/pos_orders`, {
-          method: 'POST',
-          headers: { ...headers, Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            client_id: _cid(),
-            mesa: targetMesa,
-            mesero,
-            personas: 1,
-            status: 'enviada',
-            items: JSON.stringify([{ ...transferringItem, id: generateId() }]),
-            updated_at: new Date().toISOString(),
-          }),
-        })
+        showToast(`Error: ${result.error || 'desconocido'}`)
       }
-
-      // Update current order in DB (remove the transferred item)
-      const updatedItems = orderItems.filter(i => i.id !== itemId)
-      await fetch(`${sbUrl}/rest/v1/pos_orders?id=eq.${loadedOrderId}`, {
-        method: 'PATCH',
-        headers: { ...headers, Prefer: 'return=minimal' },
-        body: JSON.stringify({ items: JSON.stringify(updatedItems), updated_at: new Date().toISOString() }),
-      })
-
-      logAudit({
-        order_id: loadedOrderId, action: 'item_transferred', actor: mesero, mesa,
-        details: { item: itemName, from_mesa: mesa, to_mesa: targetMesa, approved_by: auth.name, approved_role: auth.role },
-      })
-
-      showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
     } catch (err) {
-      console.error('[transfer] Error:', err)
-      showToast('Error al transferir platillo')
-      // Re-add item if transfer failed
-      setOrderItems(prev => [...prev, transferringItem])
+      console.error('[transfer] Network error:', err)
+      showToast('Error de red al transferir — intenta de nuevo')
     }
 
     setTransferringItem(null)
-  }, [transferringItem, loadedOrderId, orderItems, mesero, mesa])
+  }, [transferringItem, loadedOrderId, mesero, mesa])
 
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
     if (saving) return
