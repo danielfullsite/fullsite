@@ -2730,40 +2730,8 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Auto-deduct ingredients from inventory — IDEMPOTENT (Principle #12)
-      // Only deduct NEW items + quantity DELTAS of already-sent items
-      const itemsToDeduct: typeof activeItems = []
-      for (const item of activeItems) {
-        if (!sentItemIds.has(item.id)) {
-          // New item: deduct full quantity
-          itemsToDeduct.push(item)
-        } else {
-          // Already sent: check if quantity increased (deduct only the delta)
-          const snapshot = sentItemSnapshots[item.id]
-          if (snapshot && item.cantidad > snapshot.cantidad) {
-            const delta = item.cantidad - snapshot.cantidad
-            itemsToDeduct.push({ ...item, cantidad: delta, subtotal: (item.precio + item.precioExtra) * delta })
-          }
-          // If quantity decreased or unchanged, don't deduct (reversal is separate)
-        }
-      }
-      // R0 RESOLVED (2026-07-20): Root cause was sub-recipes classified as
-      // ingredient_type='ingredient' causing physical stock deduction. Fixed by:
-      // 1. 436 recipe rows reclassified to ingredient_type='sub_recipe'
-      // 2. 92 pos_ingredients reclassified to product_type='subproducto'
-      // 3. deductIngredientsForOrder() skips sub_ ingredients
-      // 4. recordMovement() blocks deductions on subproducto product_type
-      // See docs/postmortem/R0-INVENTORY-DEDUCTION.md
-      if (itemsToDeduct.length > 0) {
-        deductIngredientsForOrder(itemsToDeduct, orderId, mesero || 'POS')
-          .then(result => {
-            if (result.alerts.length > 0) {
-              console.warn('[inventory] Deduction alerts:', result.alerts)
-            }
-            console.log(`[inventory] Deducted ${result.deductions.length} ingredients for ${itemsToDeduct.length} items`)
-          })
-          .catch(err => console.error('[inventory] Deduction error (non-blocking):', err))
-      }
+      // Eduardo Jul 21: inventory deduction moved to payment time (Batch 3)
+      // Deduction now happens in handlePayment after successful save
 
       setLoadedOrderId(orderId)
       // Read server's actual updated_at (trigger sets it, may differ from client time)
@@ -2951,6 +2919,22 @@ function POSContent() {
         if (mkt.alerts.length > 0) {
           showToast(`Stock Market bajo: ${mkt.alerts[0]}${mkt.alerts.length > 1 ? ` (+${mkt.alerts.length - 1})` : ''}`)
         }
+      }
+
+      // Eduardo Jul 21: deduct ingredients at PAYMENT, not at kitchen send.
+      // Simpler: deduct full quantity of paying items once. No delta tracking needed.
+      // Split: only deduct items being paid in this cuenta (payingItems).
+      // Split parejo: all cuentas share same items → only cuenta 1 deducts.
+      const shouldDeductIngredients = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
+      if (shouldDeductIngredients && payingItems.length > 0) {
+        deductIngredientsForOrder(payingItems, payId, mesero || 'POS')
+          .then(result => {
+            if (result.alerts.length > 0) {
+              console.warn('[inventory] Deduction alerts:', result.alerts)
+            }
+            console.log(`[inventory] Deducted ${result.deductions.length} ingredients for ${payingItems.length} items at payment`)
+          })
+          .catch(err => console.error('[inventory] Deduction error (non-blocking):', err))
       }
 
       // Shadow mode (Fullsite OS): pago capturado, fire-and-forget
