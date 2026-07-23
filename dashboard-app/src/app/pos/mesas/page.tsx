@@ -382,6 +382,7 @@ export default function MesasPage() {
   const [pinInput, setPinInput] = useState('')
 
   const handleMesaClick = (mesaNum: number) => {
+    console.log('[mesa-debug] handleMesaClick received:', mesaNum)
     if (mergeMode) {
       if (!mergeSource) setMergeSource(mesaNum)
       else if (mesaNum !== mergeSource) setMergeTarget(mesaNum)
@@ -389,8 +390,10 @@ export default function MesasPage() {
     }
     // Cajero can only open occupied tables (to charge), not empty ones
     if (staffRole === 'cajero' && !ordersByMesa.has(mesaNum)) {
+      console.log('[mesa-debug] cajero blocked: mesa not occupied', mesaNum)
       return // silently ignore — cajero can't open new restaurant tables
     }
+    console.log('[mesa-debug] router.push:', `/pos?mesa=${mesaNum}`)
     router.push(`/pos?mesa=${mesaNum}`)
   }
 

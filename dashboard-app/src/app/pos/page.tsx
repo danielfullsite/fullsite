@@ -128,7 +128,6 @@ import {
 } from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { usePOSLock } from './pos-lock-context'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
@@ -1481,10 +1480,10 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
 function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { lock } = usePOSLock()
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
+  console.log('[mesa-debug] POS render: searchParams.mesa=', searchParams.get('mesa'), 'initialMesa=', initialMesa, 'URL=', typeof window !== 'undefined' ? window.location.search : 'SSR')
 
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
@@ -1504,12 +1503,17 @@ function POSContent() {
     } catch {}
     return []
   })
-  const [mesa, setMesa] = useState<number>(initialMesa)
+  const [mesa, setMesa] = useState<number>(() => {
+    console.log('[mesa-debug] useState(mesa) init: initialMesa=', initialMesa)
+    return initialMesa
+  })
 
   // Sync mesa state when searchParams change (client-side navigation from mesas/plano)
   const urlMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 0)
   useEffect(() => {
+    console.log('[mesa-debug] urlMesa effect fired: urlMesa=', urlMesa, 'current mesa=', mesa)
     if (urlMesa > 0 && urlMesa !== mesa) {
+      console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', urlMesa, '(reason: URL sync)')
       setMesa(urlMesa)
     }
   }, [urlMesa])
@@ -1904,6 +1908,7 @@ function POSContent() {
   const [loadingMesa, setLoadingMesa] = useState(false)
   useEffect(() => {
     let cancelled = false
+    console.log('[mesa-debug] order load effect triggered: mesa=', mesa, 'clienteNombre=', clienteNombre || '(none)')
     setLoadingMesa(true)
     const loadMesaOrder = async () => {
       try {
@@ -1918,6 +1923,7 @@ function POSContent() {
         if (cancelled) return // mesa changed while fetching
         if (res.ok) {
           const rows = await res.json()
+          console.log('[mesa-debug] order load result: mesa=', mesa, 'rows=', rows.length, rows.length > 0 ? `order.mesa=${rows[0].mesa} order.id=${rows[0].id}` : '(no order)')
           if (cancelled) return // mesa changed during JSON parse
           if (rows.length > 0) {
             const order = rows[0]
@@ -2400,7 +2406,7 @@ function POSContent() {
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
         setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
         showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
-      } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT' || result.error === 'TARGET_OCC_CONFLICT' || result.error === 'TARGET_CREATE_FAILED') {
+      } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
         showToast(result.message || 'Conflicto — recarga y reintenta')
         // Reload order from DB to get fresh state
         // The mesa load effect will handle this on next render
@@ -2616,11 +2622,11 @@ function POSContent() {
         }
       }
     } catch {
-      // Network error during conflict check — block payment (safe side), allow kitchen send
-      if (context === 'payment') {
-        showToast('No se pudo verificar el estado de la orden. Reintenta.')
-        return true
-      }
+      // Network error during conflict check — proceed offline.
+      // saveOrder already protects against double payment via expected_revision (OCC)
+      // and save_operation_id (idempotency). If two terminals pay the same order offline,
+      // the second sync will return STALE_WRITE_CONFLICT and be flagged for operator review.
+      return false
     }
     return false
   }
@@ -2836,10 +2842,15 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // All roles return to lock screen after a confirmed save.
-      // lock() sets unlocked=false in layout state — no navigation hack needed.
-      // Offline-queued orders return early above; reaching here means server confirmed.
-      setTimeout(() => lock(), 1200)
+      // Eduardo Jul 21: ALL roles return to lock screen after send.
+      // Prevents next mesero from operating on wrong session.
+      if (navigator.onLine) {
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        setTimeout(() => { router.push('/pos') }, 1200)
+      } else {
+        showToast('Offline — orden guardada localmente')
+      }
     } finally {
       operationLock.current = false
       setSaving(false)
@@ -3008,7 +3019,7 @@ function POSContent() {
       // Split parejo: all cuentas share same items → only cuenta 1 deducts.
       const shouldDeductIngredients = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
       if (shouldDeductIngredients && payingItems.length > 0) {
-        deductIngredientsForOrder(payingItems, orderId, mesero || 'POS')
+        deductIngredientsForOrder(payingItems, payId, mesero || 'POS')
           .then(result => {
             if (result.alerts.length > 0) {
               console.warn('[inventory] Deduction alerts:', result.alerts)
@@ -3219,13 +3230,16 @@ function POSContent() {
               type="number"
               disabled={!!clienteNombre}
               value={mesa}
+              onWheel={e => e.currentTarget.blur()}
               onChange={(e) => {
                 const newMesa = Number(e.target.value) || 1
                 if (orderItems.length > 0 && newMesa !== mesa) {
                   logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
                   showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
                 }
+                console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', newMesa, '(reason: spinner header)')
                 setMesa(newMesa)
+                router.replace(`/pos?mesa=${newMesa}`)
               }}
               min={1} max={999}
               className="w-14 bg-transparent text-white text-base font-bold text-center border-none outline-none"
@@ -3368,7 +3382,8 @@ function POSContent() {
                 <input
                   type="number"
                   value={mesa}
-                  onChange={e => setMesa(Number(e.target.value) || 1)}
+                  onWheel={e => e.currentTarget.blur()}
+                  onChange={e => { const v = Number(e.target.value) || 1; console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', v, '(reason: spinner compact)'); setMesa(v); router.replace(`/pos?mesa=${v}`) }}
                   min={1}
                   max={999}
                   className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-white font-bold text-base mx-1 py-0.5 focus:border-emerald-500 focus:outline-none"
@@ -3690,12 +3705,14 @@ function POSContent() {
                       const newMesa = parseInt(input, 10)
                       if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
                       const oldMesa = mesa
+                      console.log('[mesa-debug] setMesa: prev=', oldMesa, '→ next=', newMesa, '(reason: transfer)')
                       setMesa(newMesa)
                       // Persist to Supabase — keep current status (or 'enviada' if unknown)
                       if (orderId && loadedOrderId) {
                         await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
                       } else {
                         // New unsaved order — block transfer, must send to kitchen first
+                        console.log('[mesa-debug] setMesa: prev=', newMesa, '→ next=', oldMesa, '(reason: transfer revert no order)')
                         setMesa(Number(oldMesa))
                         showToast('Envia la orden a cocina antes de transferir mesa')
                         setPinPrompt(null)

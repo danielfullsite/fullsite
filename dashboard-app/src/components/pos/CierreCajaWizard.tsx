@@ -155,7 +155,13 @@ export default function CierreCajaWizard({
     try {
       const { getPendingQueue } = await import('@/lib/pos-offline-db')
       const pending = await getPendingQueue()
-      const unsynced = pending.filter((p: { synced: boolean }) => !p.synced)
+      // Only block on retryable items — terminal errors (STALE_WRITE_CONFLICT,
+      // TERMINAL_NON_RETRYABLE) will never auto-resolve and must not gate cierre.
+      const unsynced = pending.filter((p: { synced: boolean; error_class?: string }) =>
+        !p.synced &&
+        p.error_class !== 'STALE_WRITE_CONFLICT' &&
+        p.error_class !== 'TERMINAL_NON_RETRYABLE'
+      )
       if (unsynced.length > 0) {
         setPinError(`${unsynced.length} operaciones pendientes de sincronizar. Espera a que terminen.`)
         return

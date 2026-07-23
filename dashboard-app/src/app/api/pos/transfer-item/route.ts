@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: Read source order with version ──
     const sourceRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${client_id}&select=id,items,updated_at,mesa,order_revision,turno_id`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${client_id}&select=id,items,updated_at,mesa,order_revision`,
       { headers, cache: 'no-store' }
     )
     if (!sourceRes.ok) return Response.json({ ok: false, error: 'SOURCE_READ_FAILED' }, { status: 502 })
@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
     const source = sourceRows[0]
     const sourceItems = typeof source.items === 'string' ? JSON.parse(source.items) : (source.items || [])
     const sourceUpdatedAt = source.updated_at
-    const sourceTurnoId: string | null = source.turno_id ?? null
 
     // Verify item exists in source
     const itemIndex = sourceItems.findIndex((i: { id: string }) => i.id === item_id)
@@ -69,16 +68,6 @@ export async function POST(request: NextRequest) {
     const hasTarget = Array.isArray(targetRows) && targetRows.length > 0
     const target = hasTarget ? targetRows[0] : null
     const targetUpdatedAt = target?.updated_at
-
-    // ── Step 2.5: Guard — CREATE path requires turno_id from source ──
-    // Check before any mutations so no rollback is needed on failure.
-    if (!hasTarget && !sourceTurnoId) {
-      return Response.json({
-        ok: false,
-        error: 'SOURCE_MISSING_TURNO',
-        message: 'La orden origen no tiene turno asignado. No se puede crear la orden destino.'
-      }, { status: 422 })
-    }
 
     // ── Step 3: Build new items arrays ──
     const newSourceItems = sourceItems.filter((_: unknown, i: number) => i !== itemIndex)
@@ -116,9 +105,6 @@ export async function POST(request: NextRequest) {
 
     // ── Step 5: PATCH target (add item) or POST new order ──
     let targetSuccess = false
-    let targetFailCode = 'TARGET_OCC_CONFLICT'
-    let targetFailMessage = 'La orden destino fue modificada por otra terminal. El item no se movió. Reintenta.'
-
     if (target) {
       const targetPatchRes = await fetch(
         `${sbUrl}/rest/v1/pos_orders?id=eq.${target.id}&updated_at=eq.${encodeURIComponent(targetUpdatedAt)}`,
@@ -135,9 +121,8 @@ export async function POST(request: NextRequest) {
         const targetPatchRows = await targetPatchRes.json()
         targetSuccess = Array.isArray(targetPatchRows) && targetPatchRows.length > 0
       }
-      // targetFailCode already set to TARGET_OCC_CONFLICT
     } else {
-      // Create new order on target mesa using turno_id from the validated source order
+      // Create new order on target mesa
       const createRes = await fetch(`${sbUrl}/rest/v1/pos_orders`, {
         method: 'POST',
         headers: { ...headers, Prefer: 'return=minimal' },
@@ -148,39 +133,28 @@ export async function POST(request: NextRequest) {
           personas: 1,
           status: 'enviada',
           items: JSON.stringify([transferItem]),
-          turno_id: sourceTurnoId,
           updated_at: new Date().toISOString(),
         }),
       })
       targetSuccess = createRes.ok
-      if (!targetSuccess) {
-        targetFailCode = 'TARGET_CREATE_FAILED'
-        targetFailMessage = 'No se pudo crear la orden destino. Verifica que el turno esté activo y reintenta.'
-      }
     }
 
     if (!targetSuccess) {
       // ── Rollback source: re-add the item ──
-      const rollbackRes = await fetch(
+      await fetch(
         `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}`,
         {
           method: 'PATCH',
           headers: { ...headers, Prefer: 'return=minimal' },
           body: JSON.stringify({
-            items: JSON.stringify(sourceItems),
+            items: JSON.stringify(sourceItems), // restore original items
             updated_at: new Date().toISOString()
           }),
         }
       )
-      if (!rollbackRes.ok) {
-        return Response.json({
-          ok: false,
-          error: 'SOURCE_ROLLBACK_FAILED',
-          message: 'Error crítico: el item fue removido de la orden origen pero no pudo restaurarse. Contacta soporte inmediatamente.'
-        }, { status: 500 })
-      }
       return Response.json({
-        ok: false, error: targetFailCode, message: targetFailMessage
+        ok: false, error: 'TARGET_CONFLICT',
+        message: 'La orden destino fue modificada. El item no se movio. Reintenta.'
       }, { status: 409 })
     }
 
