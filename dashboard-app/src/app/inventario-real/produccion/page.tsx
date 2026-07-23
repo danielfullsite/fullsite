@@ -555,11 +555,15 @@ export default function ProduccionPage() {
                       >
                         <div>
                           <span className="text-[var(--text-1)] font-medium">{p.nombre}</span>
-                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-md ${
-                            p.tipo === 'receta' ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'
-                          }`}>
-                            {p.tipo === 'receta' ? 'Con receta' : 'Subproducto'}
-                          </span>
+                          {p.receta.length > 0 ? (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400">
+                              Receta · {p.receta.length} ing.
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400">
+                              Sin receta · Solo aumenta inventario
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-[var(--text-3)]">{formatCurrency(p.costo_unitario)}/u</span>
                       </button>
@@ -567,8 +571,13 @@ export default function ProduccionPage() {
                   </div>
                 )}
 
+                {!selectedProduct && !formSearch && filteredProducts.length === 0 && (
+                  <p className="text-xs text-[var(--text-3)] mt-2 text-center py-4">
+                    No hay productos disponibles para producción. Verifica que existan recetas de producción o productos configurados para producir internamente.
+                  </p>
+                )}
                 {!selectedProduct && formSearch && filteredProducts.length === 0 && (
-                  <p className="text-xs text-[var(--text-3)] mt-1">Sin resultados. Verifica que el producto tenga receta en pos_recipes.</p>
+                  <p className="text-xs text-[var(--text-3)] mt-1">No se encontraron productos o subproductos.</p>
                 )}
               </div>
 
@@ -795,10 +804,16 @@ export default function ProduccionPage() {
       {lines.length === 0 && logs.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-12 text-center">
           <Factory size={48} className="mx-auto mb-4 text-[var(--text-3)] opacity-50" />
-          <p className="text-[var(--text-2)] font-medium text-lg mb-2">Sin ordenes de produccion</p>
-          <p className="text-[var(--text-3)] text-sm mb-6 max-w-md mx-auto">
-            Crea ordenes de produccion para items hechos internamente: pan, salsas, masas, preparaciones. El sistema calcula ingredientes necesarios y los deduce del inventario.
+          <p className="text-[var(--text-2)] font-medium text-lg mb-2">Produccion interna</p>
+          <p className="text-[var(--text-3)] text-sm mb-2 max-w-md mx-auto">
+            Registra las preparaciones elaboradas en tu negocio. Al producir, Fullsite:
           </p>
+          <ul className="text-[var(--text-3)] text-sm mb-6 max-w-xs mx-auto text-left space-y-1">
+            <li>· Calcula los ingredientes necesarios</li>
+            <li>· Descuenta las materias primas del inventario</li>
+            <li>· Incrementa el stock del producto terminado en el almacen seleccionado</li>
+            <li>· Registra el costo de produccion automaticamente</li>
+          </ul>
           <button
             onClick={() => setShowForm(true)}
             className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/15 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 active:scale-95 transition-all min-h-[48px] mx-auto"
