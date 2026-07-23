@@ -401,14 +401,15 @@ export default function OrdenCompraPage() {
   // ── Filtered add-modal products ───────────────────────────────────
 
   const addModalProducts = useMemo(() => {
-    if (!addSearch || addSearch.length < 2) return []
+    const sorted = [...inventory].sort((a, b) => a.producto.localeCompare(b.producto))
+    if (!addSearch) return sorted.slice(0, 30)
     const q = addSearch.toLowerCase()
-    return inventory
+    return sorted
       .filter(i =>
         i.producto.toLowerCase().includes(q) ||
         i.codigo.toLowerCase().includes(q)
       )
-      .slice(0, 20)
+      .slice(0, 30)
   }, [inventory, addSearch])
 
   // ── Render ────────────────────────────────────────────────────────
@@ -507,27 +508,45 @@ export default function OrdenCompraPage() {
       {/* Empty state */}
       {orderLines.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-12 text-center">
-          <ShoppingCart size={48} className="mx-auto mb-4 text-[var(--text-3)] opacity-50" />
-          <p className="text-[var(--text-2)] font-medium text-lg mb-2">Sin productos en la orden</p>
-          <p className="text-[var(--text-3)] text-sm mb-6 max-w-md mx-auto">
-            Usa &quot;Auto-generar&quot; para crear ordenes de compra automaticamente basadas en productos bajo minimo, o agrega productos manualmente.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={autoGenerate}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-500/15 text-purple-400 font-semibold text-sm hover:bg-purple-500/25 active:scale-95 transition-all min-h-[48px]"
-            >
-              <Wand2 size={18} />
-              Auto-generar OCs
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/15 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 active:scale-95 transition-all min-h-[48px]"
-            >
-              <Plus size={18} />
-              Agregar producto
-            </button>
-          </div>
+          {configs.length === 0 ? (
+            <>
+              <AlertTriangle size={48} className="mx-auto mb-4 text-amber-400 opacity-70" />
+              <p className="text-[var(--text-2)] font-medium text-lg mb-2">No hay puntos de reorden configurados</p>
+              <p className="text-[var(--text-3)] text-sm mb-6 max-w-md mx-auto">
+                Para generar órdenes de compra automáticamente, primero configura los mínimos y máximos del inventario.
+              </p>
+              <a
+                href="/inventario-real/reorden"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500/15 text-amber-400 font-semibold text-sm hover:bg-amber-500/25 active:scale-95 transition-all min-h-[48px]"
+              >
+                Ir a Puntos de Reorden
+              </a>
+            </>
+          ) : (
+            <>
+              <ShoppingCart size={48} className="mx-auto mb-4 text-[var(--text-3)] opacity-50" />
+              <p className="text-[var(--text-2)] font-medium text-lg mb-2">Sin productos en la orden</p>
+              <p className="text-[var(--text-3)] text-sm mb-6 max-w-md mx-auto">
+                Usa &quot;Auto-generar&quot; para crear órdenes basadas en productos bajo mínimo, o agrega productos manualmente.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={autoGenerate}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-500/15 text-purple-400 font-semibold text-sm hover:bg-purple-500/25 active:scale-95 transition-all min-h-[48px]"
+                >
+                  <Wand2 size={18} />
+                  Auto-generar OCs
+                </button>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/15 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 active:scale-95 transition-all min-h-[48px]"
+                >
+                  <Plus size={18} />
+                  Agregar producto
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -708,10 +727,10 @@ export default function OrdenCompraPage() {
 
             {/* Results */}
             <div className="flex-1 overflow-y-auto px-5 pb-5">
-              {addModalProducts.length === 0 && addSearch.length >= 2 ? (
-                <p className="text-center text-[var(--text-3)] text-sm py-8">Sin resultados</p>
-              ) : addSearch.length < 2 ? (
-                <p className="text-center text-[var(--text-3)] text-sm py-8">Escribe al menos 2 caracteres</p>
+              {addModalProducts.length === 0 && addSearch ? (
+                <p className="text-center text-[var(--text-3)] text-sm py-8">No se encontraron productos</p>
+              ) : addModalProducts.length === 0 ? (
+                <p className="text-center text-[var(--text-3)] text-sm py-8">Sin inventario cargado</p>
               ) : (
                 <div className="space-y-1">
                   {addModalProducts.map(item => {
