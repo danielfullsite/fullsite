@@ -404,9 +404,10 @@ export default function ProduccionPage() {
   // ── Filtered products for search ─────────────────────────────────
 
   const filteredProducts = useMemo(() => {
-    if (!formSearch || formSearch.length < 2) return []
+    const sorted = [...products].sort((a, b) => a.nombre.localeCompare(b.nombre))
+    if (!formSearch) return sorted.slice(0, 15)
     const q = formSearch.toLowerCase()
-    return products.filter(p => p.nombre.toLowerCase().includes(q)).slice(0, 15)
+    return sorted.filter(p => p.nombre.toLowerCase().includes(q)).slice(0, 15)
   }, [products, formSearch])
 
   // ── Filtered log entries ─────────────────────────────────────────
@@ -566,7 +567,7 @@ export default function ProduccionPage() {
                   </div>
                 )}
 
-                {!selectedProduct && formSearch.length >= 2 && filteredProducts.length === 0 && (
+                {!selectedProduct && formSearch && filteredProducts.length === 0 && (
                   <p className="text-xs text-[var(--text-3)] mt-1">Sin resultados. Verifica que el producto tenga receta en pos_recipes.</p>
                 )}
               </div>
