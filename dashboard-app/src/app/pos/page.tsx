@@ -2400,7 +2400,7 @@ function POSContent() {
         setOrderItems(prev => prev.filter(i => i.id !== itemId))
         setSentItemIds(prev => { const next = new Set(prev); next.delete(itemId); return next })
         showToast(`${itemName} transferido a mesa ${targetMesa} — aprobó ${auth.name}`)
-      } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT') {
+      } else if (result.error === 'SOURCE_CONFLICT' || result.error === 'TARGET_CONFLICT' || result.error === 'TARGET_OCC_CONFLICT' || result.error === 'TARGET_CREATE_FAILED') {
         showToast(result.message || 'Conflicto — recarga y reintenta')
         // Reload order from DB to get fresh state
         // The mesa load effect will handle this on next render
