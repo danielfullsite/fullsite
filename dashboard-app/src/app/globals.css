@@ -143,6 +143,10 @@ body:has(.pos-kiosk) {
   --radius: 14px;
   --radius-sm: 10px;
 
+  /* Aliases for component compatibility */
+  --surface-1: var(--surface);
+  --border: var(--line);
+
   color-scheme: dark;
 }
 
@@ -173,6 +177,10 @@ body:has(.pos-kiosk) {
   --shadow-mid:  0 1px 2px rgba(15,23,42,.04), 0 12px 32px rgba(15,23,42,.06);
   --shadow-soft: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.04);
   --shadow-deep: 0 4px 12px rgba(15,23,42,.06), 0 24px 48px rgba(15,23,42,.08);
+
+  /* Aliases for component compatibility */
+  --surface-1: var(--surface);
+  --border: var(--line);
 
   color-scheme: light;
 }
