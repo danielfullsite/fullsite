@@ -1987,7 +1987,7 @@ function POSContent() {
             setOrderNotes('')
           }
         }
-      } catch { /* */ }
+      } catch (err) { console.error('[loadMesaOrder] fetch error:', err) }
       if (!cancelled) setLoadingMesa(false)
     }
     // Safety: ensure loadingMesa is always cleared after 3 seconds max
