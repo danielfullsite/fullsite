@@ -86,7 +86,7 @@ export default function ConciliacionPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
-    getRecentDays(90).then(d => { setSalesData(d); setLoading(false) })
+    getRecentDays(90).then(d => { setSalesData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
   const handleUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
