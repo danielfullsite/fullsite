@@ -19,8 +19,6 @@ export async function seedRestaurant(sb: SupabaseClient, def: RestaurantSeed) {
     address: org.address || null,
     phone: org.phone || null,
     receipt_footer: org.receipt_footer || 'Gracias por tu visita!',
-    plan: org.plan,
-    data_source: org.data_source,
     accent_color: org.accent_color,
     active: true,
     features: JSON.stringify({
@@ -102,15 +100,33 @@ export async function seedRestaurant(sb: SupabaseClient, def: RestaurantSeed) {
 
   const allItems = menu.flatMap(cat => cat.items)
   const meseroNames = staff.filter(s => ['mesero', 'cajero'].includes(s.role)).map(s => s.name)
+  const adminName = staff.find(s => s.role === 'admin')?.name || staff[0]?.name || 'Sistema'
   const pmNames = paymentMethods.map(pm => pm.name)
 
+  const turnoRows = []
   const orderRows = []
+
   for (let day = historicalDays; day >= 1; day--) {
-    const isWeekend = [0, 6].includes(new Date(Date.now() - day * 86400000).getDay())
+    const dayStart = daysAgo(day)
+    dayStart.setHours(8, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setHours(22, 0, 0, 0)
+
+    const turnoId = `seed-${org.id}-d${day}`
+    turnoRows.push({
+      id: turnoId,
+      client_id: org.id,
+      opened_by: adminName,
+      fondo_inicial: 500,
+      opened_at: isoDate(dayStart),
+      closed_at: isoDate(dayEnd),
+    })
+
+    const isWeekend = [0, 6].includes(dayStart.getDay())
     const ordersThisDay = isWeekend ? randInt(22, 38) : randInt(12, 22)
 
     for (let o = 0; o < ordersThisDay; o++) {
-      const created = daysAgo(day)
+      const created = new Date(dayStart.getTime() + randInt(1, 12) * 3600_000)
       const closed = new Date(created.getTime() + randInt(15, 65) * 60_000)
       const numItems = randInt(1, 5)
       const items = Array.from({ length: numItems }, () => {
@@ -125,6 +141,7 @@ export async function seedRestaurant(sb: SupabaseClient, def: RestaurantSeed) {
         id: uuid(),
         client_id: org.id,
         location_id: location.id,
+        turno_id: turnoId,
         mesa: randInt(1, location.mesas),
         mesero: randItem(meseroNames),
         personas: randInt(1, 4),
@@ -142,7 +159,10 @@ export async function seedRestaurant(sb: SupabaseClient, def: RestaurantSeed) {
     }
   }
 
-  // Insert in batches to avoid payload limits
+  // Insert turnos first (orders FK to turnos)
+  await upsertRows(sb, 'pos_turnos', turnoRows, 'id')
+
+  // Insert orders in batches to avoid payload limits
   const BATCH = 200
   for (let i = 0; i < orderRows.length; i += BATCH) {
     const batch = orderRows.slice(i, i + BATCH)
