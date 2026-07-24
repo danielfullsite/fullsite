@@ -36,12 +36,10 @@
 **Archivos:** `dashboard-app/src/app/pos/page.tsx`.
 
 ### POS-04 · Boot offline
-**Estado:** ABIERTO
-**Descripción:** La app Electron carga `page.tsx` desde la URL de Vercel en producción. Si no hay internet al arrancar, la app no carga. Mid-operation offline (después de carga inicial) funciona correctamente.
-**Impacto:** Si internet cae al inicio del turno, todas las terminales quedan inutilizables.
-**Criterio de cierre:** La app arranca desde bundle local (sin internet) y opera en modo offline desde boot.
-**Corresponde a:** P0-4 en `docs/bibles/P0-EXECUTION-PLAN.md` (Local-First Restaurant Runtime).
-**RFC:** `docs/bibles/P0-4-LOCAL-FIRST-RFC.md` aprobado 2026-07-24.
+**Estado:** CLOSED — 2026-07-24 — commit `pendiente`
+**Descripción:** La app Electron cargaba desde la URL de Vercel; sin internet al arrancar, la app no cargaba.
+**Solución:** El SW existente (`public/sw.js`) ya cacheaba el app shell. Gaps cerrados: (1) `cacheMenu()` en `getMenuCategoriesFromDB()` — menú ahora se persiste en IDB y se lee en offline; (2) `fetchMeseros()` — staff se cachea en localStorage y se restaura en offline. Fallback en ambos casos ante network error.
+**Archivos:** `dashboard-app/src/lib/pos-data.ts`.
 
 ---
 

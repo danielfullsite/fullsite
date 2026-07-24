@@ -317,17 +317,20 @@ export function getClientId(): string {
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
     const clientId = _getClientId()
-    if (!clientId) return [] // No client configured — show empty state
+    if (!clientId) return []
 
     const [catRes, itemsRes] = await Promise.all([
       fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_categories?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
       fetch(`${_SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&active=eq.true&order=sort_order.asc`, { headers: _SB_HEADERS, cache: 'no-store' }),
     ])
-    if (!catRes.ok || !itemsRes.ok) return [] // DB error — show empty, not another client's menu
+    if (!catRes.ok || !itemsRes.ok) {
+      // DB error — try IDB cache before returning empty
+      return _getMenuFromCache()
+    }
 
     const cats = await catRes.json()
     const items = await itemsRes.json()
-    if (!cats.length || !items.length) return [] // No menu imported yet — show empty state
+    if (!cats.length || !items.length) return []
 
     const itemsByCat = new Map<string, MenuItem[]>()
     for (const item of items) {
@@ -336,15 +339,33 @@ export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
       itemsByCat.set(item.category_id, arr)
     }
 
-    return cats.map((cat: { id: string; name: string; color: string }) => ({
+    const categories = cats.map((cat: { id: string; name: string; color: string }) => ({
       id: cat.id,
       name: cat.name,
       color: cat.color,
       items: itemsByCat.get(cat.id) || [],
     }))
+
+    // Cache for offline boot (fire-and-forget, never blocks the return)
+    if (typeof window !== 'undefined') {
+      import('@/lib/pos-offline-db').then(m => m.cacheMenu(categories as unknown as Record<string, unknown>[])).catch(() => {})
+    }
+
+    return categories
   } catch {
-    return [] // Network error — show empty, not another client's menu
+    // Network error — serve from IDB cache if available
+    return _getMenuFromCache()
   }
+}
+
+async function _getMenuFromCache(): Promise<MenuCategory[]> {
+  if (typeof window === 'undefined') return []
+  try {
+    const { getCachedMenu } = await import('@/lib/pos-offline-db')
+    const cached = await getCachedMenu()
+    if (cached.length > 0) return cached as unknown as MenuCategory[]
+  } catch {}
+  return []
 }
 
 /** Forma de pago custom (catálogo pos_payment_methods, estilo Wansoft: Rappi, Ubereats, Cortesía...) */
@@ -1056,10 +1077,20 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
       const rows: { name: string }[] = await res.json()
       if (rows.length > 0) {
         MESEROS = rows.map(r => r.name)
+        try { localStorage.setItem('pos_staff_cache', JSON.stringify(MESEROS)) } catch {}
         return MESEROS
       }
     }
-  } catch { /* offline — use fallback */ }
+  } catch {
+    // Network error — try localStorage cache
+    try {
+      const cached = localStorage.getItem('pos_staff_cache')
+      if (cached) {
+        const parsed: string[] = JSON.parse(cached)
+        if (parsed.length > 0) { MESEROS = parsed; return MESEROS }
+      }
+    } catch {}
+  }
 
   return MESEROS
 }
