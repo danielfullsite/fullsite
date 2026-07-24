@@ -2425,7 +2425,8 @@ function POSContent() {
   }, [transferringItem, loadedOrderId, mesero, mesa])
 
   const handleVoidOrder = useCallback(async (reason: string, managerName: string) => {
-    if (saving) return
+    if (operationLock.current) return
+    operationLock.current = true
     setSaving(true)
     const voidTotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0)
     logAudit({
