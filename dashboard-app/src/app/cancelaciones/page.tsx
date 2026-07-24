@@ -14,7 +14,7 @@ export default function CancelacionesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getRecentDays(90).then(d => { setData(d); setLoading(false) })
+    getRecentDays(90).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
   const last30 = data.slice(-30)
