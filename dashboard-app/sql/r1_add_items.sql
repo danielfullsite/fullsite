@@ -15,16 +15,23 @@ AS $fn$
 DECLARE
   v_new_revision bigint;
 BEGIN
+  -- Reject non-array input and empty arrays early to avoid a spurious revision bump.
+  IF jsonb_typeof(p_items) IS DISTINCT FROM 'array' OR jsonb_array_length(p_items) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ITEMS_MUST_BE_NONEMPTY_ARRAY');
+  END IF;
+
   UPDATE pos_orders AS o
   SET
     items = COALESCE(o.items, '[]'::jsonb) || (
       -- Append only items whose id is not already in the order.
       -- DISTINCT ON deduplicates within p_items itself (retry safety).
+      -- Null-id items are excluded to prevent them from bypassing idempotency.
       -- o.items reference reads the pre-update locked-row value (PostgreSQL guarantee).
       SELECT COALESCE(jsonb_agg(new_item), '[]'::jsonb)
       FROM (
         SELECT DISTINCT ON (new_item->>'id') new_item
         FROM   jsonb_array_elements(p_items) new_item
+        WHERE  new_item->>'id' IS NOT NULL
         ORDER  BY new_item->>'id'
       ) deduped
       WHERE NOT EXISTS (
@@ -45,10 +52,11 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'ORDER_CLOSED_OR_NOT_FOUND');
   END IF;
 
+  -- 'requested' is the count received; actual net-new count may be lower on retries.
   RETURN jsonb_build_object(
-    'ok',       true,
-    'revision', v_new_revision,
-    'added',    jsonb_array_length(p_items)
+    'ok',        true,
+    'revision',  v_new_revision,
+    'requested', jsonb_array_length(p_items)
   );
 END;
 $fn$;
