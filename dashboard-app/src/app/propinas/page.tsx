@@ -112,11 +112,11 @@ export default function PropinasPage() {
             <p className="text-[var(--text-2)] text-sm font-medium">Cargando datos...</p>
           </div>
         </div>
-      ) : totalPropinas === 0 && !isRealTipsData ? (
+      ) : data.length === 0 && !isRealTipsData ? (
         <EmptyState
           icon={HandCoins}
           title="Sin datos de propinas"
-          description="Los datos de propinas aparecerán cuando Wansoft los reporte correctamente. El scraper se actualiza cada noche."
+          description="No hay registros de ventas para el periodo. Los datos de propinas aparecerán cuando Wansoft sincronice."
           iconColor="text-blue-500"
           iconBg="bg-blue-500/10"
         />
