@@ -71,7 +71,7 @@ export default function EstadoResultadosPage() {
       }
 
       setLoading(false)
-    })
+    }).catch(e => { console.error('[estado-resultados]', e); setLoading(false) })
   }, [])
 
   const effectiveFoodCostPct = foodCostPct ?? 0.35
