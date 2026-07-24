@@ -758,12 +758,31 @@ OBSERVAR en los primeros 60 segundos después de reconectar:
   ¿Hay algún indicador visual en el POS?
   ¿Cuántos segundos tarda en sincronizar?
 
-RESULTADO:
-  Estado: [ ] PASS  [ ] FAIL  [ ] GAP  [ ] UNKNOWN
-  sync_queue_pending antes de reconectar: _____
-  sync_queue_pending después de sincronizar: _____
-  Tiempo hasta sync completo: _______ segundos
-  Notas:
+RESULTADO FASE 2 (sin internet):
+  Estado: [x] CONDITIONAL PASS
+  Fecha: 2026-07-24 03:32 a.m.
+
+  Evidencia:
+    - Orden de prueba: Mesa 32 · Ribeye Smash Burger · $245 · turno activo Daniel
+    - Toast "Sin conexión — orden guardada localmente" confirmado
+    - Indicador "Pendiente" visible en barra de POS (orden en IndexedDB sync_queue)
+    - Orden llegó a Supabase (id: d661387c) al reconectar vía re-mount del layout
+    - created_at offline: 08:18 UTC / sync: 09:32 UTC (~14 min)
+    - Motor de sync end-to-end CERTIFICADO: guarda → cola → Supabase ✓
+    - Reconciliación correcta: mesa, total, status = enviada ✓
+    - Sin duplicados ✓
+
+  GAP identificado:
+    - syncAll() no dispara en reconexiones silenciosas donde navigator.onLine
+      nunca transiciona (ej. bloqueo vía hosts file)
+    - El intervalo de 30s solo llama updatePendingCount(), no syncAll()
+    - Botón "Pendiente" no dispara syncAll()
+    - Fix aprobado: agregar recovery sync al intervalo periódico
+      (FULLSITE_RECOVERY_SYNC_DISABLED=1 para rollback)
+
+  Para convertir en PASS completo:
+    Implementar recovery sync en usePosOffline.ts y re-ejecutar prueba
+    con reconexión silenciosa confirmando sync dentro de 30 segundos.
 ```
 
 #### F-02 — Órdenes offline visibles en Dashboard

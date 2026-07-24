@@ -60,9 +60,15 @@ export function usePosOffline(): OfflineState {
     window.addEventListener('offline', handleOffline)
 
     // Periodic sync check every 30 seconds when online
-    syncInterval.current = setInterval(() => {
+    // Recovery: also drains pending queue in case online event never fired (silent reconnect gap)
+    // Rollback: localStorage.setItem('FULLSITE_RECOVERY_SYNC_DISABLED','1')
+    syncInterval.current = setInterval(async () => {
       if (navigator.onLine) {
-        updatePendingCount()
+        await updatePendingCount()
+        if (localStorage.getItem('FULLSITE_RECOVERY_SYNC_DISABLED') !== '1') {
+          const queue = await getPendingQueue()
+          if (queue.length > 0) syncNow()
+        }
       }
     }, 30000)
 
