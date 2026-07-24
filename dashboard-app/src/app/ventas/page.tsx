@@ -14,6 +14,7 @@ import { DollarSign, Receipt, Tag, Gift, Store, ShoppingBag, Smartphone, ShieldA
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getDateRange, aggregatePayments, aggregateGrupos, getWansoftData, getDashboardFromPosOrders } from '@/lib/data'
+import { fmtDateMX } from '@/lib/date-mx'
 import { formatCurrency, formatPercent, percentChange } from '@/lib/format'
 import type { WansoftDaily } from '@/lib/types'
 
@@ -101,8 +102,8 @@ export default function VentasPage() {
       const prevFrom = new Date(prevTo)
       prevFrom.setDate(prevFrom.getDate() - diff + 1)
       const prevResult = await getDateRange(
-        prevFrom.toISOString().slice(0, 10),
-        prevTo.toISOString().slice(0, 10)
+        fmtDateMX(prevFrom),
+        fmtDateMX(prevTo)
       )
       setPrevData(prevResult)
 
