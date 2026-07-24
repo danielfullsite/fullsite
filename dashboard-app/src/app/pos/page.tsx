@@ -1723,15 +1723,19 @@ function POSContent() {
     return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval) }
   }, [])
 
-  // Print queue needs_attention tracking
+  // Print queue state — pending/retrying (queue working) vs needs_attention (user action required)
+  const [printPending, setPrintPending] = useState(0)
   const [printNeedsAttention, setPrintNeedsAttention] = useState(0)
   useEffect(() => {
     const update = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail
+      setPrintPending(detail?.pending ?? 0)
       setPrintNeedsAttention(detail?.needsAttention ?? 0)
     }
-    // Check on mount
-    import('@/lib/print-queue').then(m => setPrintNeedsAttention(m.getNeedsAttentionCount())).catch(() => {})
+    import('@/lib/print-queue').then(m => {
+      setPrintPending(m.getPendingCount())
+      setPrintNeedsAttention(m.getNeedsAttentionCount())
+    }).catch(() => {})
     window.addEventListener('print-queue-updated', update)
     return () => window.removeEventListener('print-queue-updated', update)
   }, [])
@@ -2700,7 +2704,9 @@ function POSContent() {
                   total: raceNewItems.reduce((s, i) => s + i.subtotal, 0),
                   descuento: 0, turnoId: turnoId || undefined, createdAt: new Date(),
                 }
-                printByStation(racePrintOrder).catch(() => {})
+                printByStation(racePrintOrder).then(r => {
+                  if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
+                }).catch(() => {})
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
@@ -2783,7 +2789,9 @@ function POSContent() {
               }
               return n
             })
-            printByStation({ ...order, items: conflictNewItems }).catch(() => {})
+            printByStation({ ...order, items: conflictNewItems }).then(r => {
+              if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
+            }).catch(() => {})
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
             try {
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
@@ -2814,7 +2822,9 @@ function POSContent() {
         const offlineNewItems = activeItems.filter(i => !sentItemIds.has(i.id))
         if (offlineNewItems.length > 0) {
           const offlinePrintOrder: Order = { ...order, items: offlineNewItems }
-          printByStation(offlinePrintOrder).catch(() => {})
+          printByStation(offlinePrintOrder).then(r => {
+            if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
+          }).catch(() => {})
         }
       } else {
         showToast('Error al guardar orden — NO se imprimió')
@@ -3338,8 +3348,8 @@ function POSContent() {
         </div>
       </header>
 
-      {/* Print queue needs_attention banner — persistent until resolved */}
-      {printNeedsAttention > 0 && (
+      {/* Print queue banner — yellow while queue retries automatically, red when user action needed */}
+      {printNeedsAttention > 0 ? (
         <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between flex-shrink-0 text-sm font-bold">
           <span>{printNeedsAttention} comanda{printNeedsAttention > 1 ? 's' : ''} sin imprimir</span>
           <button
@@ -3352,7 +3362,12 @@ function POSContent() {
             Reintentar
           </button>
         </div>
-      )}
+      ) : printPending > 0 ? (
+        <div className="bg-yellow-500 text-black px-4 py-2 flex items-center gap-2 flex-shrink-0 text-sm font-semibold">
+          <span className="animate-pulse">●</span>
+          <span>Reintentando impresión...</span>
+        </div>
+      ) : null}
 
       {/* Main Content */}
       {/* Nav overlay */}
