@@ -83,6 +83,8 @@ export default function MeserosPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [selectedMesero, setSelectedMesero] = useState<string>('')
 
+  useEffect(() => { setSelectedMesero('') }, [period])
+
   useEffect(() => {
     async function load() {
       try {
