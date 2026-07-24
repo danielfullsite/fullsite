@@ -1,5 +1,6 @@
 import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
+import { nowMX, fmtDateMX } from './date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -430,12 +431,12 @@ function classifyItemGroup(lower: string): string {
 }
 
 export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
-  const cutoff = new Date()
+  const cutoff = nowMX()
   cutoff.setDate(cutoff.getDate() - days)
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = fmtDateMX(cutoff)
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []
