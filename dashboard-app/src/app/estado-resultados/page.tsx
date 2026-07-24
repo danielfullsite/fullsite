@@ -276,6 +276,9 @@ export default function EstadoResultadosPage() {
               <p className="text-xs text-[var(--text-3)] mb-5">
                 Top platillos por costo — datos reales de Wansoft
                 {foodCostFecha && ` (${foodCostFecha})`}
+                {periodoView !== 'mes' && (
+                  <span className="ml-2 text-amber-500 font-medium">· snapshot independiente del periodo seleccionado</span>
+                )}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
