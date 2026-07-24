@@ -16,7 +16,7 @@ DECLARE
   v_new_revision bigint;
 BEGIN
   -- Reject non-array input and empty arrays early to avoid a spurious revision bump.
-  IF jsonb_typeof(p_items) IS DISTINCT FROM 'array' OR jsonb_array_length(p_items) = 0 THEN
+  IF COALESCE(jsonb_typeof(p_items), '') != 'array' OR jsonb_array_length(p_items) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'error', 'ITEMS_MUST_BE_NONEMPTY_ARRAY');
   END IF;
 
