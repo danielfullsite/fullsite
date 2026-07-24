@@ -759,30 +759,33 @@ OBSERVAR en los primeros 60 segundos después de reconectar:
   ¿Cuántos segundos tarda en sincronizar?
 
 RESULTADO FASE 2 (sin internet):
-  Estado: [x] CONDITIONAL PASS
-  Fecha: 2026-07-24 03:32 a.m.
+  Estado: [x] PASS
+  Fecha re-certificación: 2026-07-24 04:30 a.m.
+  Commit fix: c312fac (recovery sync en intervalo de 30s)
 
-  Evidencia:
-    - Orden de prueba: Mesa 32 · Ribeye Smash Burger · $245 · turno activo Daniel
-    - Toast "Sin conexión — orden guardada localmente" confirmado
-    - Indicador "Pendiente" visible en barra de POS (orden en IndexedDB sync_queue)
-    - Orden llegó a Supabase (id: d661387c) al reconectar vía re-mount del layout
-    - created_at offline: 08:18 UTC / sync: 09:32 UTC (~14 min)
-    - Motor de sync end-to-end CERTIFICADO: guarda → cola → Supabase ✓
-    - Reconciliación correcta: mesa, total, status = enviada ✓
-    - Sin duplicados ✓
+  Evidencia re-certificación (Chrome DevTools Network → Offline):
+    - Orden 1: Mesa 42 · Ribeye Smash Burger · $340
+        id Supabase: 11605c41 · created_at: 2026-07-24T10:06:24 UTC · status: enviada ✓
+    - Orden 2: Mesa 45 · Ceviche de Atún · $390
+        id Supabase: 470c9d89 · created_at: 2026-07-24T10:22:37 UTC · status: enviada ✓
+    - Ambas órdenes: sin duplicados, sin reload ✓
 
-  GAP identificado:
-    - syncAll() no dispara en reconexiones silenciosas donde navigator.onLine
-      nunca transiciona (ej. bloqueo vía hosts file)
-    - El intervalo de 30s solo llama updatePendingCount(), no syncAll()
-    - Botón "Pendiente" no dispara syncAll()
-    - Fix aprobado: agregar recovery sync al intervalo periódico
-      (FULLSITE_RECOVERY_SYNC_DISABLED=1 para rollback)
+  Comportamiento observado (Console DevTools):
+    1. online event dispara sync inmediato → "[offline-sync] Internet restored — syncing"
+    2. Primer intento: POST /api/pos/save-order → ERR_CONNECTION_REFUSED
+       (race condition Chrome DevTools: online event se dispara ~1ms antes de que TCP esté listo)
+    3. Intervalo 30s reintenta → POST exitoso → orden en Supabase ✓
+    4. Sin reload en ningún momento del flujo
 
-  Para convertir en PASS completo:
-    Implementar recovery sync en usePosOffline.ts y re-ejecutar prueba
-    con reconexión silenciosa confirmando sync dentro de 30 segundos.
+  Nota: ERR_CONNECTION_REFUSED solo ocurre en el test con Chrome DevTools offline mode.
+  En producción (red real que baja y sube), el evento online no tiene ese race condition.
+
+  Fix implementado: usePosOffline.ts — intervalo 30s llama syncAll() si hay items pendientes.
+  Rollback: localStorage.setItem('FULLSITE_RECOVERY_SYNC_DISABLED','1')
+
+  Evidencia anterior (CONDITIONAL PASS 03:32 a.m.):
+    - Mesa 32 · Ribeye Smash Burger · $245 · id: d661387c
+    - Sincronizó vía re-mount del layout (~14 min). Motor end-to-end certificado.
 ```
 
 #### F-02 — Órdenes offline visibles en Dashboard

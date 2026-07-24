@@ -226,6 +226,52 @@ function startBridge() {
       return;
     }
 
+    // ── Kiosk exit (diagnostic only — NOT an operational POS capability) ────
+    // Exits fullscreen kiosk so DevTools and other windows become visible.
+    // Trigger from Caja PowerShell: Invoke-WebRequest -Uri "http://127.0.0.1:7717/kiosk/exit" -Method POST
+    if (url === '/kiosk/exit' && req.method === 'POST') {
+      const remoteAddr = req.socket?.remoteAddress || ''
+      if (!remoteAddr.includes('127.0.0.1') && !remoteAddr.includes('::1')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end('{"error":"Forbidden — localhost only"}')
+        return
+      }
+      if (!mainWindow) {
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end('{"error":"Window not ready"}')
+        return
+      }
+      mainWindow.setKiosk(false)
+      mainWindow.setFullScreen(false)
+      console.log('[devtools] Kiosk exited for diagnostics at', new Date().toISOString())
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end('{"ok":true}')
+      return
+    }
+
+    // ── DevTools (diagnostic only — NOT an operational POS capability) ──────
+    // Opens Chromium DevTools in undocked mode for field diagnostics.
+    // Only reachable from 127.0.0.1 (bridge already binds to loopback only).
+    // Trigger from Caja PowerShell: Invoke-WebRequest -Uri "http://127.0.0.1:7717/devtools" -Method POST
+    if (url === '/devtools' && req.method === 'POST') {
+      const remoteAddr = req.socket?.remoteAddress || ''
+      if (!remoteAddr.includes('127.0.0.1') && !remoteAddr.includes('::1')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end('{"error":"Forbidden — localhost only"}')
+        return
+      }
+      if (!mainWindow) {
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end('{"error":"Window not ready"}')
+        return
+      }
+      mainWindow.webContents.openDevTools({ mode: 'undocked' })
+      console.log('[devtools] DevTools opened for diagnostics at', new Date().toISOString())
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end('{"ok":true}')
+      return
+    }
+
     res.writeHead(404); res.end('{"error":"Not found"}');
   });
 

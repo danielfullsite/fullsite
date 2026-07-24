@@ -1178,6 +1178,125 @@ function buildStationTicketBytes(order: Order, station: StationName, items: Orde
   return new Uint8Array(cmds)
 }
 
+// ─── REIMPRESIÓN ─────────────────────────────────────────────────────────────
+
+export interface ReprintOrderContext {
+  id: string
+  mesa: number | null
+  mesero?: string | null
+  notas?: string | null
+}
+
+function buildReprintTicketBytes(
+  order: ReprintOrderContext,
+  station: StationName,
+  items: OrderItem[],
+  options: { batchSeq?: number; sentAt?: string } = {},
+  cols: TicketCols = COLS_BT,
+): Uint8Array {
+  const cmds: number[] = []
+  const now = new Date()
+  const timeStr = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  const label = STATION_LABELS[station]
+
+  cmds.push(ESC, 0x40) // init
+
+  // ★ REIMPRESION ★ — inverted banner
+  cmds.push(ESC, 0x61, 0x01) // center
+  cmds.push(GS, 0x42, 0x01) // invert on
+  cmds.push(ESC, 0x45, 0x01) // bold
+  cmds.push(...textToBytes(` REIMPRESION \n`))
+  cmds.push(GS, 0x42, 0x00) // invert off
+  cmds.push(ESC, 0x45, 0x00)
+
+  // Station label
+  cmds.push(ESC, 0x45, 0x01)
+  cmds.push(GS, 0x21, 0x11)
+  cmds.push(...textToBytes(`${label}\n`))
+  cmds.push(GS, 0x21, 0x00)
+  cmds.push(ESC, 0x45, 0x00)
+
+  cmds.push(...textToBytes(`Mesa ${order.mesa ?? '-'} - ${order.mesero ?? '-'}\n`))
+
+  if (options.batchSeq !== undefined) {
+    cmds.push(ESC, 0x45, 0x01)
+    cmds.push(...textToBytes(`Envio #${options.batchSeq + 1}\n`))
+    cmds.push(ESC, 0x45, 0x00)
+  }
+
+  const origStr = options.sentAt
+    ? `  Orig: ${new Date(options.sentAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+    : ''
+  cmds.push(...textToBytes(`Reimp: ${timeStr}${origStr}\n`))
+  cmds.push(...textToBytes(dashedLine(cols)))
+
+  // Items
+  cmds.push(ESC, 0x61, 0x00) // left
+  cmds.push(ESC, 0x45, 0x01)
+  let lineNum = 0
+  for (const item of items) {
+    if (isTiempoItem(item)) {
+      cmds.push(ESC, 0x61, 0x01)
+      cmds.push(GS, 0x42, 0x01)
+      cmds.push(...textToBytes(` ${item.nombre} \n`))
+      cmds.push(GS, 0x42, 0x00)
+      cmds.push(ESC, 0x61, 0x00)
+      continue
+    }
+    lineNum++
+    cmds.push(GS, 0x21, 0x01)
+    const sillaTag = item.silla && item.silla > 0 ? ` [S${item.silla}]` : ''
+    cmds.push(...textToBytes(`${lineNum} - ${item.cantidad}x ${item.nombre}${sillaTag}\n`))
+    cmds.push(GS, 0x21, 0x00)
+    if (item.modificadores && item.modificadores.length > 0) {
+      cmds.push(...textToBytes(`  >> ${item.modificadores.join(', ')}\n`))
+    }
+  }
+  cmds.push(ESC, 0x45, 0x00)
+
+  if (order.notas) {
+    cmds.push(...textToBytes(dashedLine(cols)))
+    cmds.push(ESC, 0x45, 0x01)
+    cmds.push(...textToBytes(`NOTA: ${order.notas}\n`))
+    cmds.push(ESC, 0x45, 0x00)
+  }
+
+  cmds.push(LF, LF, LF, LF)
+  cmds.push(GS, 0x56, 0x00) // cut
+
+  return new Uint8Array(cmds)
+}
+
+/**
+ * Reprint a kitchen ticket for a specific station.
+ * Items must already be filtered for the target station (and batch if applicable).
+ * Bridge → Bluetooth fallback. Does NOT enqueue for retry — reprint is on-demand only.
+ */
+export async function reprintByStation(
+  order: ReprintOrderContext,
+  station: StationName,
+  items: OrderItem[],
+  options: { batchSeq?: number; sentAt?: string } = {},
+): Promise<{ printed: boolean; error?: string }> {
+  if (items.length === 0) return { printed: false, error: 'Sin items para reimprimir' }
+
+  const bridgeBytes = buildReprintTicketBytes(order, station, items, options, COLS_BRIDGE)
+  if (await bridgePrint(bridgeBytes, station)) return { printed: true }
+
+  const btBytes = buildReprintTicketBytes(order, station, items, options, COLS_BT)
+  const char = await getCharForStation(station)
+  if (char) {
+    try {
+      await writeToPrinter(char, btBytes)
+      return { printed: true }
+    } catch (e) {
+      console.warn(`[printer] reprintByStation BT failed (${station}):`, e)
+    }
+  }
+
+  return { printed: false, error: 'Impresora no disponible' }
+}
+
 /**
  * Print a kitchen ticket for a specific station via Bluetooth ESC/POS.
  * Uses station-specific printer if connected, otherwise falls back to default.

@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X, Settings } from 'lucide-react'
+import { ArrowLeft, Clock, ChefHat, Check, Flame, RefreshCw, Ban, ShieldAlert, X, Settings, Printer } from 'lucide-react'
 import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
   verifyManagerPin, RECIPE_ALIASES, formatMXN,
-  type KitchenOrderFromDB, type RecipeDetail,
+  type KitchenOrderFromDB, type RecipeDetail, type OrderItem,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 
@@ -88,6 +89,17 @@ export default function CocinaPage() {
   const [toast, setToast] = useState<string | null>(null)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
+  const handleReprintBatch = async (order: KitchenOrderFromDB, items: ParsedItem[], batchSeq: number, sentAt: string) => {
+    const printerStation: StationName =
+      stationFilter === 'panaderia' ? 'caja' :
+      stationFilter === 'todo' ? 'cocina' :
+      stationFilter as StationName
+    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
+    const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[], { batchSeq, sentAt })
+    showToast(result.printed ? 'Comanda reimpresa' : `Error: ${result.error ?? 'sin impresora'}`)
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'cocina', mesa: order.mesa, details: { station: printerStation, batchSeq, sentAt } })
+  }
 
   const CANCEL_REASONS = [
     'Cliente cambio de opinion',
@@ -763,7 +775,7 @@ export default function CocinaPage() {
                   {visibleItems.length > 0 && (
                     <button
                       onClick={() => advanceStatus(order.id, order.status, order.mesa, order.mesero)}
-                      className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
+                      className={`w-full py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
                         order.status === 'enviada' ? 'bg-amber-500 hover:bg-amber-400 text-black' :
                         order.status === 'preparando' ? 'bg-emerald-500 hover:bg-emerald-400 text-black' :
                         'bg-slate-600 hover:bg-slate-500 text-white'
@@ -773,6 +785,13 @@ export default function CocinaPage() {
                       {config.nextLabel}
                     </button>
                   )}
+                  <button
+                    onClick={() => handleReprintBatch(order, visibleItems, card.batchSeq, card.batchCreatedAt)}
+                    className="w-full mt-1.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Printer size={14} />
+                    Reimprimir
+                  </button>
                 </div>
               )
             })}

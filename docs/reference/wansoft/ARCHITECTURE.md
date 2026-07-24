@@ -600,9 +600,102 @@ mejores. Y cada item en "No replicar" es una trampa que debemos evitar.
 
 ---
 
+## 15. HALLAZGOS DE RED Y ARQUITECTURA OFFLINE — SESIÓN 2026-07-24
+
+### 15.1 Topología de red confirmada [OBS-WANSOFT]
+
+Evidencia: `ping -a` desde la Caja (192.168.1.71) a cada IP con conexión activa al SQL Server.
+
+| Hostname | IP | Rol observado |
+|---|---|---|
+| Caja (esta máquina) | 192.168.1.71 | SQL Server central, IIS, todos los servicios Wansoft |
+| PDV1 | 192.168.1.68 | Terminal POS cliente |
+| PDV2 | 192.168.1.4 | Terminal POS cliente |
+| PDV3 | 192.168.1.69 | Terminal POS cliente |
+
+**Conexiones TCP activas al puerto 1433 de SQL Server:** PDV1, PDV2, PDV3 vía TCP desde la LAN.
+**Ausentes en el netstat:** ninguna IP de tablet/KDS aparece con conexión TCP a 1433.
+
+[INF] Ningún dispositivo identificado como KDS se conecta directamente a SQL Server. El KDS usa otro canal para acceder a los datos de órdenes.
+
+### 15.2 IIS y la WebApi [OBS-WANSOFT]
+
+- IIS (W3SVC, PID 3408) escucha en `0.0.0.0:80` — accesible desde toda la LAN.
+- `http://localhost` sirve la página de bienvenida predeterminada de IIS (no hay aplicación Wansoft en la raíz).
+- `C:\inetpub\wwwroot` contiene únicamente archivos default de IIS (fechados 01/08/2022): `iisstart.htm`, `iisstart.png`, `aspnet_client`, `web.config`.
+- La aplicación WebApi de Wansoft reside en `C:\NetSilver\WebApi`, no en wwwroot.
+- Estructura observada en `C:\NetSilver\WebApi`: `bin/`, `Global.asax`, `htm/`, `LogDiario/`, `Logs/`, `SmartOELLog/`, `Web.config`.
+
+[INF] La WebApi está hospedada por IIS como un sitio o directorio virtual aparte de la raíz, no en el Default Web Site. Su path físico es `C:\NetSilver\WebApi`.
+
+### 15.3 WebApi: interfaz del Comandero APK [OBS-WANSOFT]
+
+Contenido relevante de `C:\NetSilver\WebApi\Web.config`:
+
+```xml
+<add key="Versión" value="18.0" />
+<add key="ForcedVersion" value="" />
+<!--ForcedVersion es el valor de la versión del apk de comandero con el que
+se desea forzar el funcionamiento de la webapi, cuando ForcedVersion esté vacío,
+la versión de la webapi deberá coincidir con la parte entera de la versión del apk
+comandero-->
+```
+
+- La WebApi es ASP.NET MVC 4.5 (`targetFramework="4.5"`).
+- Versión actual: 18.0. Requiere que el APK de Comandero tenga versión `18.##`.
+- El directorio `htm/` dentro del WebApi contiene únicamente `TicketPagado.htm` — plantilla de recibo, no la interfaz del KDS.
+
+[INF] La WebApi es el punto de entrada HTTP para el APK de Comandero (Android). El APK se comunica con este endpoint a través de la LAN local, no por internet.
+
+### 15.4 RestPrintingApp y el acceso directo ComanderoMovil [OBS-WANSOFT]
+
+Contenido completo de `C:\NetSilver\sf_comandero.bat`:
+
+```bat
+@echo off
+nircmd shortcut "c:\netsilver\NetSilver.RestPrintingApp.exe" "~$folder.startup$" "ComanderoMovil"
+```
+
+- El bat crea un acceso directo en la carpeta Startup de Windows (`~$folder.startup$`) apuntando a `NetSilver.RestPrintingApp.exe`.
+- El nombre del acceso directo es "ComanderoMovil".
+- `NetSilver.RestPrintingApp.exe.config` tiene `TimeInterval: 15` — el intervalo de polling en segundos.
+
+[INF] `RestPrintingApp.exe` arranca con Windows bajo el nombre "ComanderoMovil". Es el daemon de polling que detecta comandas nuevas en SQL Server y las enruta a impresoras. Su relación exacta con la WebApi hospedada en IIS no está completamente determinada por la evidencia disponible: pueden ser dos procesos complementarios (WebApi para el APK, RestPrintingApp para impresión) o RestPrintingApp puede incluir un servidor REST propio además de la WebApi en IIS.
+
+**Lo que sí es observable:** ambos componentes existen de forma independiente. No hay evidencia de que RestPrintingApp.exe sea el host de la WebApi que sirve IIS.
+
+### 15.5 Principio arquitectónico cerrado — independencia de internet [INF]
+
+La investigación en red y archivos de configuración confirma el siguiente principio:
+
+**Wansoft desacopla la operación interna del restaurante de la conectividad externa.**
+
+- POS (PDV1-3 y Caja): se comunican con SQL Server vía TCP dentro de la LAN.
+- KDS (Comandero APK): se comunica con la WebApi vía HTTP dentro de la LAN.
+- Impresión: RestPrintingApp.exe hace polling a SQL Server local y envía a impresoras en la LAN.
+- Internet: solo lo usa el servicio de sincronización (`Wansoft.Synchronization.exe`) para reportar a `wansoft.net` y para integraciones de e-commerce.
+
+Cuando cae internet: POS, KDS, impresión y base de datos siguen funcionando sin interrupción.
+Cuando cae SQL Server: todo se detiene — SQL Server es el único punto de falla real.
+
+Este principio no requiere adoptar las tecnologías de Wansoft (.NET, SQL Server, IIS, APK Android).
+El valor del hallazgo es el principio: internet debe ser sincronización y servicios remotos, no el bus operativo del restaurante.
+
+---
+
+## CHANGELOG
+
+| Fecha | Cambio | Fuente |
+|---|---|---|
+| 2026-06-29 | Documento inicial — auditoría de archivos extraídos de AMALAY | Extracción TeamViewer |
+| 2026-07-24 | Sección 15 — topología de red, IIS/WebApi, sf_comandero.bat, principio arquitectónico offline | Sesión de ingeniería inversa en Caja AMALAY |
+
+---
+
 > Documento de investigacion permanente.
 > Actualizar con hallazgos de la restauracion del .bak y del Shadow Day.
 >
 > Generado 2026-06-29, basado en extraccion de AMALAY Coffee & Market.
 > Fuentes: 2 backups SQL (3.0 GB), 12 configs, 14 DLLs, 47 templates,
 > 8 reportes Excel, WebApi completa.
+> Sección 15 añadida 2026-07-24 — investigación de red en vivo desde la Caja.

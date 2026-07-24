@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Printer } from 'lucide-react'
 import {
   getKitchenOrders, updateOrderStatus, logAudit,
-  type KitchenOrderFromDB,
+  type KitchenOrderFromDB, type OrderItem,
 } from '@/lib/pos-data'
+import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
+import { type StationName } from '@/lib/pos-constants'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -94,7 +97,18 @@ export default function KDSPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
+  const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
   const prevCount = useRef(0)
+
+  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
+    const printerStation: StationName = station === 'panaderia' ? 'caja' : station as StationName
+    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
+    const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[])
+    const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
+    setReprintMsg({ success: result.printed, text: msg })
+    setTimeout(() => setReprintMsg(null), 3000)
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station: printerStation } })
+  }
 
   const fetchOrders = useCallback(async () => {
     const data = await getKitchenOrders()
@@ -421,14 +435,14 @@ export default function KDSPage() {
                   {isDone ? (
                     <button
                       onClick={() => bump(order.id, order.mesa, order.mesero)}
-                      className="mx-3 mb-3 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-lg transition-colors min-h-[56px]"
+                      className="mx-3 mb-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-lg transition-colors min-h-[56px]"
                     >
                       BUMP
                     </button>
                   ) : (
                     <button
                       onClick={() => advance(order.id, order.status, order.mesa, order.mesero)}
-                      className={`mx-3 mb-3 py-4 rounded-xl font-bold text-lg transition-colors min-h-[56px] ${
+                      className={`mx-3 mb-1 py-4 rounded-xl font-bold text-lg transition-colors min-h-[56px] ${
                         isNew
                           ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black'
                           : 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black'
@@ -437,12 +451,25 @@ export default function KDSPage() {
                       {isNew ? 'PREPARAR' : 'LISTA'}
                     </button>
                   )}
+                  <button
+                    onClick={() => handleReprint(order, activeItemsWithIndex.map(i => i.item))}
+                    className="mx-3 mb-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-sm font-medium flex items-center justify-center gap-1.5 min-h-[40px] transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Reimprimir
+                  </button>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {reprintMsg && (
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${reprintMsg.success ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+          {reprintMsg.text}
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes pulse-once {

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine } from 'lucide-react'
-import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
+import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine, Printer } from 'lucide-react'
+import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB, type OrderItem } from '@/lib/pos-data'
 import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -66,6 +67,14 @@ export default function BarraPage() {
   const STATUS_ORDER: Record<string, number> = { enviada: 1, preparando: 2, lista: 3, entregada: 4 }
   const [toast, setToast] = useState<string | null>(null)
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
+
+  const handleReprint = async (order: KitchenOrderFromDB, items: BarraItem[]) => {
+    const printerStation: StationName = stationFilter === 'todo' ? 'barra' : stationFilter as StationName
+    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas ?? null }
+    const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[])
+    showToast(result.printed ? 'Comanda reimpresa' : `Error: ${result.error ?? 'sin impresora'}`)
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'barra', mesa: order.mesa, details: { station: printerStation } })
+  }
 
   const advanceStatus = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     let newStatus = ''
@@ -256,6 +265,13 @@ export default function BarraPage() {
                   >
                     <Check size={18} />
                     {config.nextLabel}
+                  </button>
+                  <button
+                    onClick={() => handleReprint(order, beverageItems)}
+                    className="w-full mt-2 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Printer size={14} />
+                    Reimprimir
                   </button>
                 </div>
               )
