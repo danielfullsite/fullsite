@@ -2374,10 +2374,12 @@ function POSContent() {
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
   // Uses server-side OCC API to prevent race conditions and data loss
   const handleTransferItem = useCallback(async (pin: string, targetMesa: number) => {
+    if (operationLock.current) return
     if (!transferringItem || !loadedOrderId) return
     // Verify supervisor PIN (capitan+)
     const auth = await verifyPinWithMinRole(pin, 'capitan')
     if (!auth) { showToast('PIN no autorizado — se requiere supervisor'); return }
+    operationLock.current = true
 
     const itemName = transferringItem.nombre
     const itemId = transferringItem.id
@@ -2421,6 +2423,7 @@ function POSContent() {
       showToast('Error de red al transferir — intenta de nuevo')
     }
 
+    operationLock.current = false
     setTransferringItem(null)
   }, [transferringItem, loadedOrderId, mesero, mesa])
 
