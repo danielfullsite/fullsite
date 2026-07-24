@@ -233,15 +233,21 @@ export default function MeserosPage() {
       .sort((a, b) => b.totalVentas - a.totalVentas)
   }, [waiterData])
 
-  // Averages for KPI comparison
+  // Averages for KPI comparison — volume-weighted by personas/mesas, NOT simple mean
+  // Simple mean (sum/n) gives equal weight to a waiter who served 5 people and one who served 500.
+  // Weighted average uses the accumulated totals as the denominator.
   const kpiAverages = useMemo(() => {
     if (waiterKpis.length === 0) return { bebidasPorPersona: 0, alimentosPorPersona: 0, ticketPromedio: 0, pctSegundaBebida: 0 }
-    const n = waiterKpis.length
+    const totalPersonas = waiterKpis.reduce((s, w) => s + w.personas, 0)
+    const totalMesas = waiterKpis.reduce((s, w) => s + w.mesas, 0)
+    const totalHH = waiterKpis.reduce((s, w) => s + w.hh, 0)
+    const totalVentas = waiterKpis.reduce((s, w) => s + w.totalVentas, 0)
+    const totalBebida2 = waiterKpis.reduce((s, w) => s + w.bebida2, 0)
     return {
-      bebidasPorPersona: waiterKpis.reduce((s, w) => s + w.bebidasPorPersona, 0) / n,
-      alimentosPorPersona: waiterKpis.reduce((s, w) => s + w.alimentosPorPersona, 0) / n,
-      ticketPromedio: waiterKpis.reduce((s, w) => s + w.ticketPromedio, 0) / n,
-      pctSegundaBebida: waiterKpis.reduce((s, w) => s + w.pctSegundaBebida, 0) / n,
+      bebidasPorPersona: totalPersonas > 0 ? totalHH / totalPersonas : 0,
+      alimentosPorPersona: totalPersonas > 0 ? totalVentas / totalPersonas : 0,
+      ticketPromedio: totalMesas > 0 ? Math.round(totalVentas / totalMesas) : 0,
+      pctSegundaBebida: totalPersonas > 0 ? (totalBebida2 / totalPersonas) * 100 : 0,
     }
   }, [waiterKpis])
 
