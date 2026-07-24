@@ -3,7 +3,7 @@
 // Generates daily accounting entries (pólizas) for Mexican restaurant
 
 import { NextRequest } from 'next/server'
-import { requireAuth } from '@/lib/api-auth'
+import { requireAuth, getClientId } from '@/lib/api-auth'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -121,6 +121,7 @@ async function fetchWansoftDaily(fecha: string) {
 export async function GET(request: NextRequest) {
   const authErr = await requireAuth(request)
   if (authErr) return authErr
+  const clientId = getClientId(request)
   try {
     const { searchParams } = new URL(request.url)
     const fecha = searchParams.get('fecha') || new Date().toISOString().slice(0, 10)
@@ -129,24 +130,25 @@ export async function GET(request: NextRequest) {
 
     // If requesting monthly summary
     if (mes) {
-      return await getResumenMensual(mes, formato)
+      return await getResumenMensual(mes, formato, clientId)
     }
 
     const startOfDay = `${fecha}T00:00:00`
     const endOfDay = `${fecha}T23:59:59`
 
     // Fetch POS orders for the day
+    const cid = encodeURIComponent(clientId)
     const [ordersRes, movementsRes, marketRes, wansoftDay] = await Promise.all([
       fetch(
-        `${SB_URL}/rest/v1/pos_orders?created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_inventory_movements?created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_market_movements?created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetchWansoftDaily(fecha),
@@ -449,13 +451,14 @@ export async function GET(request: NextRequest) {
 
 // ─── Monthly summary ─────────────────────────────
 
-async function getResumenMensual(mes: string, formato: string) {
+async function getResumenMensual(mes: string, formato: string, clientId: string) {
   const startDate = `${mes}-01`
   const endDate = getLastDayOfMonth(mes)
+  const cid = encodeURIComponent(clientId)
 
   const [ordersRes, wansoftRes, movRes] = await Promise.all([
     fetch(
-      `${SB_URL}/rest/v1/pos_orders?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
+      `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
       OPTS
     ),
     fetch(
@@ -463,7 +466,7 @@ async function getResumenMensual(mes: string, formato: string) {
       OPTS
     ),
     fetch(
-      `${SB_URL}/rest/v1/pos_inventory_movements?created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
+      `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
       OPTS
     ),
   ])
