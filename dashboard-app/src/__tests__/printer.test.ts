@@ -35,7 +35,7 @@ describe('formatMXN', () => {
   })
 
   it('handles very large amounts', () => {
-    expect(formatMXN(999999.99)).toBe('$999999.99')
+    expect(formatMXN(999999.99)).toBe('$999,999.99')
   })
 
   it('handles very small amounts', () => {
@@ -51,11 +51,11 @@ describe('formatMXN', () => {
   })
 
   it('handles NaN gracefully', () => {
-    expect(formatMXN(NaN)).toBe('$NaN')
+    expect(formatMXN(NaN)).toBe('$0.00')
   })
 
   it('formats 1234.56 correctly', () => {
-    expect(formatMXN(1234.56)).toBe('$1234.56')
+    expect(formatMXN(1234.56)).toBe('$1,234.56')
   })
 
   it('formats one cent', () => {
@@ -67,7 +67,7 @@ describe('formatMXN', () => {
   })
 
   it('formats typical restaurant bill', () => {
-    expect(formatMXN(2850.50)).toBe('$2850.50')
+    expect(formatMXN(2850.50)).toBe('$2,850.50')
   })
 })
 
@@ -102,8 +102,8 @@ describe('getStationForItem', () => {
     expect(getStationForItem('coffee', 'Americano')).toBe('barra')
   })
 
-  it('routes signature to barra', () => {
-    expect(getStationForItem('signature', 'Dirty Chai')).toBe('barra')
+  it('routes signature to cocina', () => {
+    expect(getStationForItem('signature', 'Dirty Chai')).toBe('cocina')
   })
 
   it('routes jugos to barra', () => {
@@ -130,16 +130,16 @@ describe('getStationForItem', () => {
     expect(getStationForItem('tea', 'Matcha Latte')).toBe('barra')
   })
 
-  it('routes toast to caja', () => {
-    expect(getStationForItem('toast', 'Avocado Toast')).toBe('caja')
+  it('routes toast to cocina', () => {
+    expect(getStationForItem('toast', 'Avocado Toast')).toBe('cocina')
   })
 
-  it('routes bakery to caja', () => {
-    expect(getStationForItem('bakery', 'Croissant')).toBe('caja')
+  it('routes bakery to cocina', () => {
+    expect(getStationForItem('bakery', 'Croissant')).toBe('cocina')
   })
 
-  it('routes postres to caja', () => {
-    expect(getStationForItem('postres', 'Cheesecake')).toBe('caja')
+  it('routes postres to cocina', () => {
+    expect(getStationForItem('postres', 'Cheesecake')).toBe('cocina')
   })
 
   it('routes mkt-cafe to caja', () => {
@@ -210,24 +210,24 @@ describe('getStationByName', () => {
     expect(getStationByName('Soda Italiana')).toBe('barra')
   })
 
-  it('classifies toast as caja', () => {
-    expect(getStationByName('Avocado Toast')).toBe('caja')
+  it('classifies toast as cocina (CAJA_KEYWORDS solo incluye retail/market)', () => {
+    expect(getStationByName('Avocado Toast')).toBe('cocina')
   })
 
-  it('classifies bagel as caja', () => {
-    expect(getStationByName('Bagel con Cream Cheese')).toBe('caja')
+  it('classifies bagel as cocina', () => {
+    expect(getStationByName('Bagel con Cream Cheese')).toBe('cocina')
   })
 
-  it('classifies brownie as caja', () => {
-    expect(getStationByName('Brownie de Chocolate')).toBe('caja')
+  it('classifies brownie as cocina', () => {
+    expect(getStationByName('Brownie de Chocolate')).toBe('cocina')
   })
 
-  it('classifies cheesecake as caja', () => {
-    expect(getStationByName('Cheesecake de Fresa')).toBe('caja')
+  it('classifies cheesecake as cocina', () => {
+    expect(getStationByName('Cheesecake de Fresa')).toBe('cocina')
   })
 
-  it('classifies galleta as caja', () => {
-    expect(getStationByName('Galleta de Avena')).toBe('caja')
+  it('classifies galleta as cocina', () => {
+    expect(getStationByName('Galleta de Avena')).toBe('cocina')
   })
 
   it('classifies chilaquiles as cocina', () => {
@@ -250,8 +250,8 @@ describe('getStationByName', () => {
     expect(getStationByName('CAFÉ AMERICANO')).toBe('barra')
   })
 
-  it('is case insensitive for caja items', () => {
-    expect(getStationByName('BROWNIE DE CHOCOLATE')).toBe('caja')
+  it('is case insensitive for cocina items', () => {
+    expect(getStationByName('BROWNIE DE CHOCOLATE')).toBe('cocina')
   })
 
   it('aguacate matches agua keyword and goes to barra', () => {
@@ -259,12 +259,12 @@ describe('getStationByName', () => {
     expect(getStationByName('Toast de Aguacate')).toBe('barra')
   })
 
-  it('classifies tiramisu as caja', () => {
-    expect(getStationByName('Tiramisú')).toBe('caja')
+  it('classifies tiramisu as cocina', () => {
+    expect(getStationByName('Tiramisú')).toBe('cocina')
   })
 
-  it('classifies concha as caja', () => {
-    expect(getStationByName('Concha de chocolate')).toBe('caja')
+  it('classifies concha as cocina', () => {
+    expect(getStationByName('Concha de chocolate')).toBe('cocina')
   })
 
   it('classifies cerveza as barra', () => {
@@ -335,8 +335,8 @@ describe('STATION_CATEGORIES', () => {
     expect(STATION_CATEGORIES.barra).toContain('coffee')
   })
 
-  it('caja has bakery', () => {
-    expect(STATION_CATEGORIES.caja).toContain('bakery')
+  it('cocina has bakery (panadería va al KDS de cocina)', () => {
+    expect(STATION_CATEGORIES.cocina).toContain('bakery')
   })
 
   it('no category appears in multiple stations', () => {
@@ -355,10 +355,10 @@ describe('STATION_CATEGORIES', () => {
 describe('CATEGORY_TO_STATION', () => {
   it('maps chilaquiles to cocina', () => expect(CATEGORY_TO_STATION.chilaquiles).toBe('cocina'))
   it('maps coffee to barra', () => expect(CATEGORY_TO_STATION.coffee).toBe('barra'))
-  it('maps toast to caja', () => expect(CATEGORY_TO_STATION.toast).toBe('caja'))
-  it('maps bakery to caja', () => expect(CATEGORY_TO_STATION.bakery).toBe('caja'))
+  it('maps toast to cocina', () => expect(CATEGORY_TO_STATION.toast).toBe('cocina'))
+  it('maps bakery to cocina', () => expect(CATEGORY_TO_STATION.bakery).toBe('cocina'))
   it('maps eggs to cocina', () => expect(CATEGORY_TO_STATION.eggs).toBe('cocina'))
-  it('maps signature to barra', () => expect(CATEGORY_TO_STATION.signature).toBe('barra'))
+  it('maps signature to cocina', () => expect(CATEGORY_TO_STATION.signature).toBe('cocina'))
 
   it('every category from STATION_CATEGORIES has reverse mapping', () => {
     for (const [station, cats] of Object.entries(STATION_CATEGORIES)) {

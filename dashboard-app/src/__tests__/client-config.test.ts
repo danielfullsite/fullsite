@@ -68,7 +68,7 @@ describe('getClientConfig', () => {
     })
 
     it('has type', () => {
-      expect(config.type).toBe('Brunch & Café')
+      expect(config.type).toBe('Coffee & Market')
     })
 
     it('has default_theme light', () => {

@@ -12,6 +12,9 @@ const localStorageMock = {
 }
 vi.stubGlobal('localStorage', localStorageMock)
 
+// getActiveClientSlug falls back to process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID in Node env
+process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID = 'amalay'
+
 beforeEach(() => localStorageMock.clear())
 
 // ─── Import after mocking ─────────────────────────────────────────────────

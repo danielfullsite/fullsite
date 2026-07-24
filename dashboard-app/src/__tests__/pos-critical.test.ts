@@ -258,15 +258,14 @@ describe('Pago Mixto + Descuento', () => {
 
   it('propina added correctly on top of discounted total', () => {
     const items = [makeItem('a', 1000, 1)]
-    const totals = calcOrderTotals(items, 200) // subtotal after disc = 800
-    // total = 800 * 1.16 = 928
-    expect(totals.total).toBeCloseTo(928)
+    const totals = calcOrderTotals(items, 200) // subtotal after disc = 800, IVA=0
+    expect(totals.total).toBe(800)
 
-    const tip = calcPropina(totals.total, 15) // 15% of 928 = 139.2 → 139
-    expect(tip).toBe(139)
+    const tip = calcPropina(totals.total, 15) // 15% of 800 = 120
+    expect(tip).toBe(120)
 
     const finalTotal = totalConPropina(totals.total, tip)
-    expect(finalTotal).toBeCloseTo(928 + 139)
+    expect(finalTotal).toBe(920)
   })
 
   it('IVA calculated on discounted subtotal', () => {
@@ -290,7 +289,7 @@ describe('Pago Mixto + Descuento', () => {
     // a=60% → discount 60, b=40% → discount 40
     expect(r1.discount).toBe(60)
     expect(r2.discount).toBe(40)
-    expect(round2(r1.total + r2.total)).toBeCloseTo((1000 - 100) * 1.16)
+    expect(round2(r1.total + r2.total)).toBe(900)
   })
 })
 

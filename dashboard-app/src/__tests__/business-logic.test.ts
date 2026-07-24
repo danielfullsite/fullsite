@@ -98,12 +98,12 @@ describe('Split cuenta parejo (equal split)', () => {
     expect(perPerson).toBe(250)
   })
 
-  it('splits $1160 (with IVA) between 4 personas', () => {
+  it('splits $1000 between 4 personas (IVA incluido en precio)', () => {
     const subtotal = 1000
-    const total = subtotal * (1 + IVA_RATE) // $1160
+    const total = subtotal * (1 + IVA_RATE) // IVA_RATE=0 → total=subtotal
     const personas = 4
     const perPerson = total / personas
-    expect(perPerson).toBe(290)
+    expect(perPerson).toBe(250)
   })
 
   it('handles odd split: $1000 / 3 personas', () => {
@@ -185,7 +185,7 @@ describe('Cortesia (discount) limits', () => {
     const cortesia = 480 // max for 1 person
     const totals = calcOrderTotals(items, cortesia)
     expect(totals.subtotalAfterDiscount).toBe(104) // 584 - 480
-    expect(totals.total).toBeCloseTo(104 * 1.16)
+    expect(totals.total).toBe(104)
   })
 
   it('cortesia cannot exceed subtotal (floor at $0)', () => {
@@ -223,12 +223,12 @@ describe('Station assignment business rules', () => {
     expect(getStationForItem('jugos', 'Jugo de Naranja Natural')).toBe('barra')
   })
 
-  it('toast goes to caja/market', () => {
-    expect(getStationForItem('toast', 'Avocado Toast')).toBe('caja')
+  it('toast goes to cocina (panadería → KDS único)', () => {
+    expect(getStationForItem('toast', 'Avocado Toast')).toBe('cocina')
   })
 
-  it('postres go to caja', () => {
-    expect(getStationForItem('postres', 'New York Cheesecake')).toBe('caja')
+  it('postres go to cocina', () => {
+    expect(getStationForItem('postres', 'New York Cheesecake')).toBe('cocina')
   })
 
   it('all food categories route to cocina', () => {
@@ -239,7 +239,7 @@ describe('Station assignment business rules', () => {
   })
 
   it('all drink categories route to barra', () => {
-    const drinkCats = ['coffee', 'signature', 'jugos', 'fresh', 'smoothies', 'frappes', 'sodas', 'tea', 'alcohol']
+    const drinkCats = ['coffee', 'jugos', 'fresh', 'smoothies', 'frappes', 'sodas', 'tea', 'alcohol']
     for (const cat of drinkCats) {
       expect(CATEGORY_TO_STATION[cat]).toBe('barra')
     }
@@ -261,8 +261,8 @@ describe('Station assignment business rules', () => {
       { name: 'Chilaquiles Verdes', expected: 'cocina' },
       { name: 'Cafe Americano', expected: 'barra' },
       { name: 'Jugo de Naranja', expected: 'barra' },
-      { name: 'Avocado Toast', expected: 'caja' },
-      { name: 'New York Cheesecake', expected: 'caja' },
+      { name: 'Avocado Toast', expected: 'cocina' },
+      { name: 'New York Cheesecake', expected: 'cocina' },
     ]
     for (const item of orderItems) {
       expect(getStationByName(item.name)).toBe(item.expected)
@@ -273,32 +273,32 @@ describe('Station assignment business rules', () => {
 // ─── IVA calculations ─────────────────────────────────────────────────────
 
 describe('IVA calculations (Mexican tax)', () => {
-  it('IVA is 16%', () => {
-    expect(IVA_RATE).toBe(0.16)
+  it('IVA_RATE is 0 — precios incluyen IVA', () => {
+    expect(IVA_RATE).toBe(0)
   })
 
-  it('extracts IVA from total (desglose fiscal)', () => {
-    const total = 1160
-    const subtotal = total / (1 + IVA_RATE)
-    const iva = total - subtotal
-    expect(Math.round(subtotal)).toBe(1000)
-    expect(Math.round(iva)).toBe(160)
+  it('precios son precio final (IVA incluido)', () => {
+    const total = 1000
+    const subtotal = total / (1 + IVA_RATE) // = total (IVA ya incluido)
+    const iva = total - subtotal // = 0
+    expect(subtotal).toBe(1000)
+    expect(iva).toBe(0)
   })
 
-  it('calculates IVA for CFDI: subtotal $500', () => {
+  it('IVA_RATE = 0: no IVA adicional sobre subtotal', () => {
     const subtotal = 500
-    const iva = subtotal * IVA_RATE
-    expect(iva).toBe(80)
-    expect(subtotal + iva).toBe(580)
+    const iva = subtotal * IVA_RATE // = 0
+    expect(iva).toBe(0)
+    expect(subtotal + iva).toBe(500)
   })
 
-  it('IVA applies after discount', () => {
+  it('discount applied correctly (IVA=0, total=subtotalAfterDiscount)', () => {
     const items = [makeItem('x', 1000, 1)]
     const discount = 200
     const totals = calcOrderTotals(items, discount)
     expect(totals.subtotalAfterDiscount).toBe(800)
-    expect(totals.iva).toBeCloseTo(128) // 800 * 0.16
-    expect(totals.total).toBeCloseTo(928) // 800 + 128
+    expect(totals.iva).toBe(0)
+    expect(totals.total).toBe(800)
   })
 })
 
@@ -317,13 +317,12 @@ describe('Propina business rules', () => {
     expect(calcPropina(1000, 20)).toBe(200)
   })
 
-  it('tip is calculated on total (after IVA)', () => {
+  it('tip is calculated on total (precio final, IVA=0)', () => {
     const items = [makeItem('x', 1000, 1)]
     const totals = calcOrderTotals(items)
     const tip = calcPropina(totals.total, 15)
-    // Total = 1000 * 1.16 = 1160
-    expect(totals.total).toBeCloseTo(1160)
-    expect(tip).toBe(Math.round(1160 * 0.15))
+    expect(totals.total).toBe(1000)
+    expect(tip).toBe(150)
   })
 
   it('tip rounds to nearest peso', () => {
@@ -349,8 +348,8 @@ describe('Real AMALAY scenarios', () => {
     ]
     const totals = calcOrderTotals(items)
     expect(totals.subtotal).toBe(758)
-    expect(totals.total).toBeCloseTo(758 * 1.16) // $879.28
-    expect(formatMXN(totals.total)).toMatch(/\$879\.28/)
+    expect(totals.total).toBe(758)
+    expect(formatMXN(totals.total)).toMatch(/\$758\.00/)
   })
 
   it('Chilaquiles + Cafe Americano', () => {
@@ -360,7 +359,7 @@ describe('Real AMALAY scenarios', () => {
     ]
     const totals = calcOrderTotals(items)
     expect(totals.subtotal).toBe(340)
-    expect(totals.total).toBeCloseTo(340 * 1.16)
+    expect(totals.total).toBe(340)
   })
 
   it('High-value mesa: 6 personas, full order with extras and tip', () => {
@@ -375,7 +374,7 @@ describe('Real AMALAY scenarios', () => {
     const expectedSubtotal = (317 * 3) + (287 * 2) + (94 * 4) + (98 * 2) + (130 * 2)
     // 951 + 574 + 376 + 196 + 260 = 2357
     expect(totals.subtotal).toBe(expectedSubtotal)
-    expect(totals.total).toBeCloseTo(expectedSubtotal * 1.16)
+    expect(totals.total).toBe(expectedSubtotal)
 
     const tip = calcPropina(totals.total, 15)
     const finalTotal = totalConPropina(totals.total, tip)
@@ -412,7 +411,7 @@ describe('Real AMALAY scenarios', () => {
 
   it('Beverage detection covers all menu drink categories', () => {
     const drinkCategories = MENU_CATEGORIES.filter(c =>
-      ['coffee', 'jugos', 'fresh', 'smoothies', 'frappes', 'sodas', 'tea', 'alcohol', 'signature'].includes(c.id)
+      ['coffee', 'jugos', 'fresh', 'smoothies', 'frappes', 'sodas', 'tea', 'alcohol'].includes(c.id)
     )
     for (const cat of drinkCategories) {
       for (const item of cat.items) {
@@ -442,7 +441,7 @@ describe('Edge cases', () => {
     const items = Array.from({ length: 100 }, (_, i) => makeItem(`item${i}`, 292, 1))
     const totals = calcOrderTotals(items)
     expect(totals.subtotal).toBe(29200)
-    expect(totals.total).toBeCloseTo(29200 * 1.16)
+    expect(totals.total).toBe(29200)
     expect(isFinite(totals.total)).toBe(true)
   })
 
@@ -457,7 +456,7 @@ describe('Edge cases', () => {
     const items = [makeItem('x', 0.01, 1)]
     const totals = calcOrderTotals(items)
     expect(totals.subtotal).toBe(0.01)
-    expect(totals.total).toBeCloseTo(0.01 * 1.16)
+    expect(totals.total).toBe(0.01)
   })
 
   it('calcItemSubtotal with large extras', () => {

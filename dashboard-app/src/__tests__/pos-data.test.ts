@@ -49,11 +49,10 @@ describe('formatMXN', () => {
   })
 
   it('formats large amount', () => {
-    expect(formatMXN(12345.67)).toBe('$12345.67')
+    expect(formatMXN(12345.67)).toBe('$12,345.67')
   })
 
   it('formats negative amount', () => {
-    // formatMXN uses template literal `$${amount.toFixed(2)}`, so negative sign is after $
     expect(formatMXN(-100)).toBe('$-100.00')
   })
 
@@ -82,9 +81,9 @@ describe('generateId', () => {
     expect(generateId().length).toBeGreaterThan(0)
   })
 
-  it('returns alphanumeric characters', () => {
+  it('returns UUID format characters (hex + hyphens)', () => {
     const id = generateId()
-    expect(id).toMatch(/^[a-z0-9]+$/)
+    expect(id).toMatch(/^[0-9a-f-]+$/)
   })
 
   it('generates unique IDs', () => {
@@ -92,26 +91,25 @@ describe('generateId', () => {
     expect(ids.size).toBe(100)
   })
 
-  it('has consistent length (9 chars)', () => {
-    // substring(2, 11) = 9 characters
+  it('has consistent length (UUID = 36 chars)', () => {
     const id = generateId()
-    expect(id.length).toBe(9)
+    expect(id.length).toBe(36)
   })
 })
 
 // ─── IVA_RATE ─────────────────────────────────────────────────────────────
 
 describe('IVA_RATE', () => {
-  it('is 0.16 (16%)', () => {
-    expect(IVA_RATE).toBe(0.16)
+  it('is 0 (precios incluyen IVA — Mexico IVA-inclusive pricing)', () => {
+    expect(IVA_RATE).toBe(0)
   })
 
-  it('calculates correct IVA for $1000', () => {
-    expect(1000 * IVA_RATE).toBe(160)
+  it('results in zero IVA on top (IVA already included in price)', () => {
+    expect(1000 * IVA_RATE).toBe(0)
   })
 
-  it('calculates correct total with IVA', () => {
-    expect(1000 * (1 + IVA_RATE)).toBe(1160)
+  it('total equals subtotal when IVA is 0', () => {
+    expect(1000 * (1 + IVA_RATE)).toBe(1000)
   })
 })
 
@@ -236,18 +234,6 @@ describe('MENU_CATEGORIES', () => {
 // ─── MESEROS ──────────────────────────────────────────────────────────────
 
 describe('MESEROS', () => {
-  it('has at least 8 meseros', () => {
-    expect(MESEROS.length).toBeGreaterThanOrEqual(8)
-  })
-
-  it('contains Omar Aguilera', () => {
-    expect(MESEROS).toContain('Omar Aguilera')
-  })
-
-  it('contains Brayan Berlanga Solis', () => {
-    expect(MESEROS).toContain('Brayan Berlanga Solis')
-  })
-
   it('all entries are non-empty strings', () => {
     for (const m of MESEROS) {
       expect(typeof m).toBe('string')

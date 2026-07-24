@@ -94,7 +94,10 @@ describe('getStationForItem (fijado de station al agregar)', () => {
 
   it('categorías market → caja', () => {
     expect(getStationForItem('mkt-amalay', 'Semillas Mix')).toBe('caja')
-    expect(getStationForItem('bakery', 'Concha')).toBe('caja')
+  })
+
+  it('categorías panadería → cocina (single KDS at AMALAY)', () => {
+    expect(getStationForItem('bakery', 'Concha')).toBe('cocina')
   })
 
   it('categoría desconocida usa keywords de bebida como fallback', () => {
@@ -109,9 +112,9 @@ describe('getStationByName (legacy, solo órdenes viejas sin station)', () => {
     expect(getStationByName('Limonada Mineral')).toBe('barra')
   })
 
-  it('clasifica panadería/market por keyword', () => {
-    expect(getStationByName('Avocado Toast')).toBe('caja')
-    expect(getStationByName('Brownie de chocolate')).toBe('caja')
+  it('clasifica panadería/bakery → cocina (CAJA_KEYWORDS solo incluye market/retail)', () => {
+    expect(getStationByName('Avocado Toast')).toBe('cocina')
+    expect(getStationByName('Brownie de chocolate')).toBe('cocina')
   })
 
   it('default a cocina', () => {

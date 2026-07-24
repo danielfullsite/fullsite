@@ -18,8 +18,8 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────
 
 describe('POS Constants', () => {
-  it('IVA_RATE is 0.16', () => {
-    expect(IVA_RATE).toBe(0.16)
+  it('IVA_RATE is 0 (precios incluyen IVA — Mexico IVA-inclusive pricing)', () => {
+    expect(IVA_RATE).toBe(0)
   })
 
   it('KITCHEN_ARCHIVE_HOURS is 4', () => {
@@ -180,10 +180,10 @@ describe('STATION_CATEGORIES', () => {
     expect(STATION_CATEGORIES.barra).toContain('frappes')
   })
 
-  it('caja includes toast, bakery, postres', () => {
-    expect(STATION_CATEGORIES.caja).toContain('toast')
-    expect(STATION_CATEGORIES.caja).toContain('bakery')
-    expect(STATION_CATEGORIES.caja).toContain('postres')
+  it('cocina includes toast, bakery, postres (single KDS — panadería va a cocina)', () => {
+    expect(STATION_CATEGORIES.cocina).toContain('toast')
+    expect(STATION_CATEGORIES.cocina).toContain('bakery')
+    expect(STATION_CATEGORIES.cocina).toContain('postres')
   })
 
   it('chilaquiles go to cocina', () => {
@@ -202,8 +202,8 @@ describe('CATEGORY_TO_STATION', () => {
     expect(CATEGORY_TO_STATION['coffee']).toBe('barra')
   })
 
-  it('maps toast to caja', () => {
-    expect(CATEGORY_TO_STATION['toast']).toBe('caja')
+  it('maps toast to cocina', () => {
+    expect(CATEGORY_TO_STATION['toast']).toBe('cocina')
   })
 
   it('maps eggs to cocina', () => {
@@ -214,12 +214,12 @@ describe('CATEGORY_TO_STATION', () => {
     expect(CATEGORY_TO_STATION['jugos']).toBe('barra')
   })
 
-  it('maps bakery to caja', () => {
-    expect(CATEGORY_TO_STATION['bakery']).toBe('caja')
+  it('maps bakery to cocina', () => {
+    expect(CATEGORY_TO_STATION['bakery']).toBe('cocina')
   })
 
-  it('maps postres to caja', () => {
-    expect(CATEGORY_TO_STATION['postres']).toBe('caja')
+  it('maps postres to cocina', () => {
+    expect(CATEGORY_TO_STATION['postres']).toBe('cocina')
   })
 
   it('maps alcohol to barra', () => {
@@ -238,8 +238,8 @@ describe('getStationForItem', () => {
     expect(getStationForItem('coffee', 'Cafe Americano')).toBe('barra')
   })
 
-  it('routes toast category to caja', () => {
-    expect(getStationForItem('toast', 'Avocado Toast')).toBe('caja')
+  it('routes toast category to cocina', () => {
+    expect(getStationForItem('toast', 'Avocado Toast')).toBe('cocina')
   })
 
   it('falls back to barra for unknown category with beverage name', () => {
@@ -275,20 +275,20 @@ describe('getStationByName', () => {
     expect(getStationByName('Jugo de Naranja Natural')).toBe('barra')
   })
 
-  it('routes toast to caja', () => {
-    expect(getStationByName('Avocado Toast')).toBe('caja')
+  it('routes toast to cocina (CAJA_KEYWORDS only covers retail/market)', () => {
+    expect(getStationByName('Avocado Toast')).toBe('cocina')
   })
 
-  it('routes bagel to caja', () => {
-    expect(getStationByName('Salmon Bagel')).toBe('caja')
+  it('routes bagel to cocina', () => {
+    expect(getStationByName('Salmon Bagel')).toBe('cocina')
   })
 
-  it('routes cheesecake to caja', () => {
-    expect(getStationByName('New York Cheesecake')).toBe('caja')
+  it('routes cheesecake to cocina', () => {
+    expect(getStationByName('New York Cheesecake')).toBe('cocina')
   })
 
-  it('routes concha to caja', () => {
-    expect(getStationByName('Concha de Mantequilla')).toBe('caja')
+  it('routes concha to cocina', () => {
+    expect(getStationByName('Concha de Mantequilla')).toBe('cocina')
   })
 
   it('routes chilaquiles to cocina (default)', () => {
@@ -309,19 +309,19 @@ describe('getStationByName', () => {
 
   it('is case-insensitive', () => {
     expect(getStationByName('CAFE AMERICANO')).toBe('barra')
-    expect(getStationByName('avocado toast')).toBe('caja')
+    expect(getStationByName('avocado toast')).toBe('cocina')
   })
 
   it('routes cerveza to barra', () => {
     expect(getStationByName('Cerveza Artesanal')).toBe('barra')
   })
 
-  it('routes carrot cake to caja', () => {
-    expect(getStationByName('Carrot Cake')).toBe('caja')
+  it('routes carrot cake to cocina', () => {
+    expect(getStationByName('Carrot Cake')).toBe('cocina')
   })
 
-  it('routes tiramisu to caja', () => {
-    expect(getStationByName('Tiramisú')).toBe('caja')
+  it('routes tiramisu to cocina', () => {
+    expect(getStationByName('Tiramisú')).toBe('cocina')
   })
 })
 

@@ -215,9 +215,9 @@ describe('getStationForItem — station routing', () => {
     expect(getStationForItem('uuid-456', 'LATTE')).toBe('barra')
   })
 
-  it('Bakery category → caja', () => {
+  it('Bakery category → cocina (panadería va al KDS de cocina)', () => {
     setCategoryNameCache({ 'uuid-789': 'Bakery' })
-    expect(getStationForItem('uuid-789', 'CONCHA')).toBe('caja')
+    expect(getStationForItem('uuid-789', 'CONCHA')).toBe('cocina')
   })
 
   it('unknown category + HEINEKEN → barra (via BEBIDA_KEYWORDS)', () => {

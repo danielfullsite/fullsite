@@ -163,12 +163,12 @@ describe('getModifiersForCategory', () => {
 // ---------------------------------------------------------------------------
 
 describe('POS Constants', () => {
-  it('IVA_RATE is 16%', () => {
-    expect(IVA_RATE).toBe(0.16)
+  it('IVA_RATE is 0 — precios incluyen IVA', () => {
+    expect(IVA_RATE).toBe(0)
   })
 
-  it('MESEROS has at least 8 waiters', () => {
-    expect(MESEROS.length).toBeGreaterThanOrEqual(8)
+  it('MESEROS is populated from DB (default empty array)', () => {
+    expect(MESEROS.length).toBeGreaterThanOrEqual(0)
     for (const m of MESEROS) {
       expect(typeof m).toBe('string')
       expect(m.length).toBeGreaterThan(3)

@@ -64,8 +64,9 @@ describe('calcOrderTotals', () => {
 
     expect(result.subtotal).toBe(292)
     expect(result.subtotalAfterDiscount).toBe(292)
-    expect(result.iva).toBeCloseTo(292 * 0.16)
-    expect(result.total).toBeCloseTo(292 * 1.16)
+    // IVA_RATE = 0 (Mexico IVA-inclusive pricing — IVA ya incluido en precio)
+    expect(result.iva).toBe(0)
+    expect(result.total).toBe(292)
   })
 
   it('sums multiple items correctly', () => {
@@ -78,8 +79,8 @@ describe('calcOrderTotals', () => {
     const result = calcOrderTotals(items)
 
     expect(result.subtotal).toBe(expectedSubtotal)
-    expect(result.iva).toBeCloseTo(expectedSubtotal * 0.16)
-    expect(result.total).toBeCloseTo(expectedSubtotal * 1.16)
+    expect(result.iva).toBe(0)
+    expect(result.total).toBe(expectedSubtotal)
   })
 
   it('applies discount before IVA', () => {
@@ -89,8 +90,8 @@ describe('calcOrderTotals', () => {
 
     expect(result.subtotal).toBe(292)
     expect(result.subtotalAfterDiscount).toBe(242)
-    expect(result.iva).toBeCloseTo(242 * 0.16)
-    expect(result.total).toBeCloseTo(242 * 1.16)
+    expect(result.iva).toBe(0)
+    expect(result.total).toBe(242)
   })
 
   it('does not go negative when discount exceeds subtotal', () => {
@@ -116,11 +117,11 @@ describe('calcOrderTotals', () => {
     const result = calcOrderTotals(items)
 
     expect(result.subtotal).toBe(317)
-    expect(result.total).toBeCloseTo(317 * 1.16)
+    expect(result.total).toBe(317)
   })
 
-  it('uses the correct IVA rate (16%)', () => {
-    expect(IVA_RATE).toBe(0.16)
+  it('uses the correct IVA rate (0 — precios incluyen IVA)', () => {
+    expect(IVA_RATE).toBe(0)
   })
 })
 
@@ -230,24 +231,25 @@ describe('calcSplitPayment', () => {
 
     expect(result.subtotal).toBe(500)
     expect(result.subtotalAfterDiscount).toBe(450)
-    expect(result.total).toBeCloseTo(450 * 1.16)
+    expect(result.total).toBe(450)
   })
 
-  it('calculates cuenta 1 WITHOUT discount during split', () => {
+  it('calculates cuenta 1 WITH prorated discount during split', () => {
     const result = calcSplitPayment(items, assignments, 1, 50)
 
-    // Discount should NOT apply during split
+    // Discount is prorated by subtotal share: cuenta1 = 200/500 = 40% → discount 20
     expect(result.subtotal).toBe(200)
-    expect(result.subtotalAfterDiscount).toBe(200)
-    expect(result.total).toBeCloseTo(200 * 1.16)
+    expect(result.subtotalAfterDiscount).toBe(180)
+    expect(result.total).toBe(180)
   })
 
-  it('calculates cuenta 2 WITHOUT discount during split', () => {
+  it('calculates cuenta 2 WITH prorated discount during split', () => {
     const result = calcSplitPayment(items, assignments, 2, 50)
 
+    // cuenta2 = 300/500 = 60% → discount 30
     expect(result.subtotal).toBe(300)
-    expect(result.subtotalAfterDiscount).toBe(300)
-    expect(result.total).toBeCloseTo(300 * 1.16)
+    expect(result.subtotalAfterDiscount).toBe(270)
+    expect(result.total).toBe(270)
   })
 
   it('split cuenta IVA totals equal full-order IVA (no discount case)', () => {
@@ -390,7 +392,7 @@ describe('Real-world scenarios', () => {
     const totals = calcOrderTotals(items)
     const expectedSubtotal = 584 + 96 + 78 // = 758
     expect(totals.subtotal).toBe(expectedSubtotal)
-    expect(totals.total).toBeCloseTo(expectedSubtotal * 1.16)
+    expect(totals.total).toBe(expectedSubtotal)
 
     const tip = calcPropina(totals.total, 10)
     const finalTotal = totalConPropina(totals.total, tip)
@@ -415,8 +417,8 @@ describe('Real-world scenarios', () => {
 
     expect(c1.subtotal).toBe(544)  // 292 + 252
     expect(c2.subtotal).toBe(143)  // 48 + 95
-    expect(c1.total).toBeCloseTo(544 * 1.16)
-    expect(c2.total).toBeCloseTo(143 * 1.16)
+    expect(c1.total).toBe(544)
+    expect(c2.total).toBe(143)
 
     // Together they equal the full order
     const full = calcOrderTotals(items)
@@ -428,12 +430,12 @@ describe('Real-world scenarios', () => {
     const totals = calcOrderTotals(items, 100)
 
     expect(totals.subtotalAfterDiscount).toBe(900)
-    expect(totals.iva).toBeCloseTo(144) // 900 * 0.16
-    expect(totals.total).toBeCloseTo(1044) // 900 + 144
+    expect(totals.iva).toBe(0)
+    expect(totals.total).toBe(900)
 
     const tip = calcPropina(totals.total, 15)
-    expect(tip).toBe(Math.round(1044 * 0.15)) // 157
-    expect(totalConPropina(totals.total, tip)).toBeCloseTo(1044 + 157)
+    expect(tip).toBe(Math.round(900 * 0.15)) // 135
+    expect(totalConPropina(totals.total, tip)).toBeCloseTo(900 + 135)
   })
 
   it('Edge: order with only $0 market items', () => {
@@ -457,7 +459,7 @@ describe('Real-world scenarios', () => {
     const items = [makeItem('c1', 292, 1, precioExtra)]
     const totals = calcOrderTotals(items)
     expect(totals.subtotal).toBe(352)
-    expect(totals.total).toBeCloseTo(352 * 1.16)
+    expect(totals.total).toBe(352)
   })
 
   it('Edge: discount equal to subtotal results in $0 total', () => {
@@ -512,20 +514,20 @@ describe('calcSplitParejo', () => {
     const r2 = calcSplitParejo(items, 0, 2, 2)
     expect(r1.subtotal).toBe(100)
     expect(r2.subtotal).toBe(100)
-    expect(r1.total).toBeCloseTo(116)
-    expect(r2.total).toBeCloseTo(116)
+    expect(r1.total).toBe(100)
+    expect(r2.total).toBe(100)
   })
 
   it('closes centavos on the last cuenta (total/3 with repeating decimals)', () => {
     const items = [makeItem('a', 100, 1)] // subtotal 100, total 116
     const n = 3
     const rs = [1, 2, 3].map(c => calcSplitParejo(items, 0, n, c))
-    // Cuentas 1-2 pay round2(116/3) = 38.67; last pays remainder 38.66
-    expect(rs[0].total).toBe(38.67)
-    expect(rs[1].total).toBe(38.67)
-    expect(rs[2].total).toBe(38.66)
+    // Cuentas 1-2 pay round2(100/3) = 33.33; last pays remainder 33.34
+    expect(rs[0].total).toBe(33.33)
+    expect(rs[1].total).toBe(33.33)
+    expect(rs[2].total).toBe(33.34)
     const sum = rs.reduce((s, r) => s + r.total, 0)
-    expect(round2(sum)).toBe(116)
+    expect(round2(sum)).toBe(100)
   })
 
   it('sum of N cuentas always equals full total (fuzz over odd amounts)', () => {
@@ -550,15 +552,15 @@ describe('calcSplitParejo', () => {
     const rs = [1, 2, 3].map(c => calcSplitParejo(items, discount, 3, c))
     const discSum = round2(rs.reduce((s, r) => s + r.discount, 0))
     expect(discSum).toBe(50)
-    // Full total: (300-50)*1.16 = 290 → cuentas suman 290
+    // Full total: (300-50)*1 = 250 → cuentas suman 250
     const totalSum = round2(rs.reduce((s, r) => s + r.total, 0))
-    expect(totalSum).toBe(290)
+    expect(totalSum).toBe(250)
   })
 
   it('n=1 (sin split real) paga el total completo', () => {
     const items = [makeItem('a', 250, 1)]
     const r = calcSplitParejo(items, 0, 1, 1)
-    expect(r.total).toBeCloseTo(290)
+    expect(r.total).toBeCloseTo(250)
   })
 })
 
@@ -579,8 +581,8 @@ describe('calcSplitItems', () => {
     const r2 = calcSplitItems(items, { b: 2 }, 2, 100)
     expect(r1.discount).toBe(40)
     expect(r2.discount).toBe(60)
-    // Totals: (200-40)*1.16 + (300-60)*1.16 = 185.60 + 278.40 = 464 = (500-100)*1.16
-    expect(round2(r1.total + r2.total)).toBe(464)
+    // Totals: (200-40) + (300-60) = 160 + 240 = 400 = (500-100)
+    expect(round2(r1.total + r2.total)).toBe(400)
   })
 
   it('discount proration sums to full discount across cuentas', () => {
