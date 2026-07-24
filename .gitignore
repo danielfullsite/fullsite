@@ -40,3 +40,11 @@ skills-lock.json
 .claude/skills/web-*
 .claude/skills/webapp-*
 .claude/skills/xlsx
+
+# Electron build outputs
+electron-app/dist/
+electron-kds/dist/
+electron-dashboard/dist/
+
+# Graphify regenerable cache
+graphify-out/cache/ast/
