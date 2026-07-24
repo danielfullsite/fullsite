@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({ comanda_batches: body.comanda_batches }),
         })
-      } catch { /* non-blocking — KDS will fall back to single card */ }
+      } catch (err) { console.error('[save-order] comanda_batches patch error (non-blocking):', err) }
     }
 
     // ── Step 2: Reconciliation ──
