@@ -30,11 +30,10 @@
 ## P0 — Bloquean cutover
 
 ### POS-03 · Silent print failure
-**Estado:** ABIERTO
+**Estado:** CLOSED — 2026-07-24 — commit `aa0917f`
 **Descripción:** Cuando una impresora falla (sin conexión TCP, bridge caído, error de red), el POS no muestra estado de error observable. El mesero asume que se imprimió. La cocina no recibe la comanda.
-**Impacto:** Órdenes perdidas en cocina sin aviso al mesero. Inaceptable en operación.
-**Criterio de cierre:** Fallo de impresión es visible en el POS y el mesero tiene acción clara (reintentar o notificar). No se necesita intervención técnica para saber si se imprimió.
-**Corresponde a:** P0-2 en `docs/bibles/P0-EXECUTION-PLAN.md` (Reimpresión desde KDS/cocina/barra).
+**Solución:** Banner diferenciado por estado (amarillo = reintentando automáticamente, rojo + botón = acción requerida). Banner aparece inmediatamente al encolar, no después de 2 minutos. Tres call sites silenciosos corregidos (race, OCC conflict, offline paths).
+**Archivos:** `dashboard-app/src/app/pos/page.tsx`.
 
 ### POS-04 · Boot offline
 **Estado:** ABIERTO
