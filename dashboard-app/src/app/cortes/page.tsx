@@ -124,6 +124,19 @@ export default function CortesPage() {
     if (currentWeek.length > 0) {
       weeks.push({ days: currentWeek })
     }
+
+    // Pad first week so each day lands on its correct Mon–Sun row.
+    // Without padding, a period starting on Wednesday renders Wed at the
+    // Monday slot — misaligning all subsequent columns.
+    if (weeks.length > 0 && weeks[0].days.length > 0) {
+      const firstDow = weeks[0].days[0].dow
+      const pad = firstDow === 0 ? 6 : firstDow - 1  // Mon=0 pad, Sun=6 pad
+      if (pad > 0) {
+        const empty = { fecha: '', ventas: 0, dow: -1 }
+        weeks[0] = { days: [...Array(pad).fill(empty), ...weeks[0].days] }
+      }
+    }
+
     return weeks
   }, [periodData])
 
@@ -212,7 +225,8 @@ export default function CortesPage() {
         <div className="flex gap-1 overflow-x-auto pb-2">
           {calendarWeeks.map((week, wi) => (
             <div key={wi} className="flex flex-col gap-1">
-              {week.days.map(day => {
+              {week.days.map((day, di) => {
+                if (!day.fecha) return <div key={`pad-${wi}-${di}`} className="w-16 h-14" />
                 const color = getHeatColor(day.ventas)
                 const dateStr = new Date(day.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
                   day: 'numeric',
