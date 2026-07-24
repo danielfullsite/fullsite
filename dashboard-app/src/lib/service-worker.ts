@@ -5,19 +5,16 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     return null
   }
 
-  // Unregister any existing service worker — SW caching causes stale code issues
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations()
-    for (const reg of registrations) {
-      await reg.unregister()
-    }
-    if (registrations.length > 0) console.log('[SW] Unregistered', registrations.length, 'service workers')
-  } catch {}
+  // Rollback: DevTools → localStorage.setItem('FULLSITE_OFFLINE_DISABLED','1') → reload
+  if (localStorage.getItem('FULLSITE_OFFLINE_DISABLED') === '1') {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (const reg of registrations) await reg.unregister()
+      if (registrations.length > 0) console.log('[SW] Disabled via flag, unregistered', registrations.length, 'workers')
+    } catch {}
+    return null
+  }
 
-  return null
-
-  // Registration disabled — SW caching causes stale POS code
-  /* eslint-disable no-unreachable */
   try {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',

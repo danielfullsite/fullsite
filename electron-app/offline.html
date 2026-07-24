@@ -15,52 +15,235 @@
       height: 100vh;
       text-align: center;
     }
-    .container { max-width: 400px; }
-    .icon { font-size: 64px; margin-bottom: 24px; }
-    h1 { font-size: 28px; margin-bottom: 12px; color: #10b981; }
-    p { font-size: 18px; color: #9ca3af; line-height: 1.5; }
-    .dot { animation: blink 1.5s infinite; }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .container { max-width: 420px; width: 100%; padding: 0 24px; }
+    .icon { font-size: 56px; margin-bottom: 20px; }
+    h1 { font-size: 26px; margin-bottom: 10px; color: #10b981; }
+    .subtitle { font-size: 16px; color: #9ca3af; line-height: 1.5; margin-bottom: 24px; }
+
+    .status-box {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #374151;
+      transition: background .3s;
+    }
+    .dot-green { background: #10b981; }
+    .dot-yellow { background: #eab308; animation: pulse 2s infinite; }
+    .dot-red { background: #ef4444; }
+    .status-label { font-size: 13px; color: #9ca3af; }
+    .status-label.green { color: #10b981; }
+    .status-label.yellow { color: #eab308; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+    .last-boot { font-size: 11px; color: #555; margin-bottom: 20px; min-height: 16px; }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      padding: 14px 24px;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: background .15s;
+    }
+    .btn-primary:hover { background: #059669; }
+    .btn-primary:disabled {
+      background: #1f2937;
+      color: #4b5563;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      display: block;
+      width: 100%;
+      padding: 12px 24px;
+      background: transparent;
+      color: #6b7280;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-secondary:hover { border-color: #6b7280; color: #9ca3af; }
+
+    .continue-hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    .scene-c-msg {
+      background: #1c1000;
+      border: 1px solid #713f12;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #fbbf24;
+      line-height: 1.5;
+      text-align: left;
+      display: none;
+    }
+
+    .auto-retry { font-size: 11px; color: #444; margin-top: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="icon">&#128268;</div>
     <h1>Sin conexion al servidor</h1>
-    <p>Fullsite POS no puede conectarse. Verifica tu conexion a internet.</p>
+    <p class="subtitle">Fullsite POS no puede conectarse.<br>Verifica tu conexion a internet.</p>
 
-    <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin:24px 0;text-align:left">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></span>
-        <span style="font-size:13px;color:#aaa">Impresion disponible</span>
+    <div class="status-box">
+      <div class="status-row">
+        <span class="dot" id="dot-print"></span>
+        <span class="status-label" id="label-print">Verificando impresion...</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block"></span>
-        <span style="font-size:13px;color:#aaa">POS local disponible</span>
+      <div class="status-row">
+        <span class="dot dot-green"></span>
+        <span class="status-label green">POS local disponible</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;animation:pulse 2s infinite"></span>
-        <span style="font-size:13px;color:#eab308">Sin conexion al servidor</span>
+      <div class="status-row">
+        <span class="dot dot-yellow"></span>
+        <span class="status-label yellow">Sin conexion al servidor</span>
       </div>
     </div>
 
-    <p style="font-size:11px;color:#555;margin-bottom:16px" id="lastBoot"></p>
+    <p class="last-boot" id="lastBoot"></p>
 
-    <button onclick="window.location.reload()" style="padding:14px 32px;background:#10b981;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer">Reintentar</button>
-    <p style="font-size:11px;color:#444;margin-top:16px">Reintentando automaticamente cada 10 segundos</p>
+    <!-- Escenario C: primer arranque sin carga previa -->
+    <div class="scene-c-msg" id="sceneCMsg">
+      El modo offline requiere haber iniciado el POS con internet al menos una vez.
+      Conecta internet y vuelve a abrir el POS para instalar la version local.
+    </div>
+
+    <!-- Continuar offline: solo visible si el bridge esta activo -->
+    <button
+      class="btn-primary"
+      id="btn-continue"
+      style="display:none"
+      onclick="continueOffline()">
+      Continuar en modo offline
+    </button>
+    <p class="continue-hint" id="continue-hint" style="display:none">
+      Usa la version cacheada — las ordenes se guardan localmente.
+    </p>
+
+    <button class="btn-secondary" onclick="retryConnection()">Reintentar</button>
+
+    <p class="auto-retry">Reintentando automaticamente cada 10 segundos</p>
   </div>
+
   <script>
-    // Show last successful boot time
+    var POS_URL = 'https://app.fullsite.mx/pos';
+
+    // ── Last boot timestamp ───────────────────────────────────────────────────
     var last = localStorage.getItem('pos_last_boot');
     if (last) {
-      document.getElementById('lastBoot').textContent = 'Ultimo inicio exitoso: ' + new Date(last).toLocaleString('es-MX');
+      document.getElementById('lastBoot').textContent =
+        'Ultimo inicio exitoso: ' + new Date(last).toLocaleString('es-MX');
     }
-    // Auto-retry every 10 seconds — use cors mode so we get a real status
+
+    // ── Escenario C retry state ───────────────────────────────────────────────
+    function getRetryState() {
+      try {
+        var raw = localStorage.getItem('offline_continue_state');
+        if (!raw) return { count: 0, ts: 0 };
+        var s = JSON.parse(raw);
+        // Reset counter if last attempt was over 90 seconds ago
+        if (Date.now() - s.ts > 90000) return { count: 0, ts: 0 };
+        return s;
+      } catch { return { count: 0, ts: 0 }; }
+    }
+
+    function incrementRetry() {
+      var s = getRetryState();
+      var next = { count: s.count + 1, ts: Date.now() };
+      localStorage.setItem('offline_continue_state', JSON.stringify(next));
+      return next.count;
+    }
+
+    // ── Bridge health check ───────────────────────────────────────────────────
+    function checkBridge() {
+      fetch('http://127.0.0.1:7717/health', { cache: 'no-store' })
+        .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
+        .then(function() {
+          // Bridge is up — show real print status and "Continuar" button
+          document.getElementById('dot-print').className = 'dot dot-green';
+          document.getElementById('label-print').textContent = 'Impresion disponible';
+          document.getElementById('label-print').className = 'status-label green';
+
+          var state = getRetryState();
+          var btn = document.getElementById('btn-continue');
+          var hint = document.getElementById('continue-hint');
+          var sceneC = document.getElementById('sceneCMsg');
+
+          if (state.count >= 2) {
+            // Scenario C confirmed — SW has no cache, disable button
+            sceneC.style.display = 'block';
+            btn.style.display = 'none';
+            hint.style.display = 'none';
+          } else {
+            btn.style.display = 'block';
+            hint.style.display = 'block';
+          }
+        })
+        .catch(function() {
+          document.getElementById('dot-print').className = 'dot dot-red';
+          document.getElementById('label-print').textContent = 'Impresion no disponible';
+          document.getElementById('label-print').className = 'status-label';
+        });
+    }
+
+    // ── Button handlers ───────────────────────────────────────────────────────
+    function retryConnection() {
+      window.location.href = POS_URL;
+    }
+
+    function continueOffline() {
+      var count = incrementRetry();
+      if (count >= 2) {
+        // Disable the button and show Scenario C message before navigating
+        document.getElementById('btn-continue').disabled = true;
+        document.getElementById('sceneCMsg').style.display = 'block';
+        document.getElementById('continue-hint').style.display = 'none';
+      }
+      window.location.href = POS_URL;
+    }
+
+    // ── Auto-retry: navigate when server is reachable ─────────────────────────
     setInterval(function() {
-      fetch('https://app.fullsite.mx/pos', { cache: 'no-store' })
-        .then(function(res) { if (res.ok) window.location.href = 'https://app.fullsite.mx/pos'; })
+      fetch(POS_URL, { cache: 'no-store' })
+        .then(function(res) { if (res.ok) window.location.href = POS_URL; })
         .catch(function() {});
     }, 10000);
+
+    // Run bridge check on load
+    checkBridge();
   </script>
 </body>
 </html>
