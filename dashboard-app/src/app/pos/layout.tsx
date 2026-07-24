@@ -74,6 +74,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [staff, setStaff] = useState<StaffMember | null>(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)
+  const [networkError, setNetworkError] = useState(false)
   const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState(0)
@@ -410,6 +411,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           return
         }
       } catch { /* ignore */ }
+      // Network error with no valid cache — distinguish from wrong PIN
+      setNetworkError(true)
+      setPin('')
+      setTimeout(() => setNetworkError(false), 4000)
+      setChecking(false)
+      return
     }
 
     const newAttempts = attempts + 1
@@ -612,6 +619,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         {sessionError && (
           <p className="text-amber-400 text-sm mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
             {sessionError}
+          </p>
+        )}
+        {networkError && (
+          <p className="text-amber-400 text-sm mt-3">
+            Sin conexión — espera un momento e intenta de nuevo
           </p>
         )}
         {error && !isLocked && (

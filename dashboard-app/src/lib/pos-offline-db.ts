@@ -216,6 +216,20 @@ export async function clearAllPending(): Promise<void> {
   tx.objectStore('sync_queue').clear()
 }
 
+export async function clearTerminalItems(): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('sync_queue', 'readwrite')
+  const store = tx.objectStore('sync_queue')
+  const request = store.getAll()
+  request.onsuccess = () => {
+    for (const item of request.result) {
+      if (!item.synced && (!item.endpoint || item.endpoint === 'undefined') && item.retries >= 3) {
+        store.delete(item.id)
+      }
+    }
+  }
+}
+
 export async function clearSyncedItems(): Promise<void> {
   const db = await openDB()
   const tx = db.transaction('sync_queue', 'readwrite')
