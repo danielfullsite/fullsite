@@ -201,6 +201,13 @@ export default function MeserosPage() {
       }
     }
 
+    const safeDiv = (n: number, d: number, label: string): number => {
+      if (d <= 0) return 0
+      const r = n / d
+      if (!Number.isFinite(r)) { console.error(`[meseros] non-finite KPI ${label}: ${n}/${d}`); return 0 }
+      return r
+    }
+
     return Object.entries(map)
       .map(([nombre, d]) => ({
         nombre,
@@ -212,10 +219,10 @@ export default function MeserosPage() {
         postres: d.postres,
         bebida2: d.bebida2,
         dias: d.dias,
-        ticketPromedio: d.totalMesas > 0 ? Math.round(d.totalVentas / d.totalMesas) : 0,
-        bebidasPorPersona: d.totalPersonas > 0 ? d.hh / d.totalPersonas : 0,
-        alimentosPorPersona: d.totalPersonas > 0 ? d.totalVentas / d.totalPersonas : 0,
-        pctSegundaBebida: d.totalPersonas > 0 ? (d.bebida2 / d.totalPersonas) * 100 : 0,
+        ticketPromedio: Math.round(safeDiv(d.totalVentas, d.totalMesas, 'ticketPromedio')),
+        bebidasPorPersona: safeDiv(d.hh, d.totalPersonas, 'bebidasPorPersona'),
+        alimentosPorPersona: safeDiv(d.totalVentas, d.totalPersonas, 'alimentosPorPersona'),
+        pctSegundaBebida: safeDiv(d.bebida2, d.totalPersonas, 'pctSegundaBebida') * 100,
         grupos: Object.entries(d.grupos)
           .map(([cat, total]) => ({ cat, total }))
           .sort((a, b) => b.total - a.total),
