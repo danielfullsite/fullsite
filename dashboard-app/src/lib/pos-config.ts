@@ -45,12 +45,12 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
   return _posConfig
 }
 
-/** Sync version — returns cached config or default. Use getPosClientConfig() for initial load. */
+/** Sync version — returns cached config or empty defaults. Use getPosClientConfig() for initial load. */
 export function getPosConfigSync(): PosClientConfig {
   return _posConfig || {
-    name: 'AMALAY',
-    subtitle: 'Coffee & Market',
-    address: 'San Pedro Garza Garcia, NL',
+    name: '',
+    subtitle: '',
+    address: '',
     phone: '',
     rfc: '',
     ivaRate: 0,

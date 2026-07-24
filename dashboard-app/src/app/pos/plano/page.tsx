@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Users, Clock, DollarSign, AlertTriangle, ExternalLink } from 'lucide-react'
-import { MESAS_CONFIG, formatMXN } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -165,6 +165,7 @@ export default function PlanoPage() {
   const [loading, setLoading] = useState(true)
   const [selectedMesa, setSelectedMesa] = useState<number | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
 
   // Timer tick for elapsed time display
   const [, setTick] = useState(0)
@@ -191,6 +192,17 @@ export default function PlanoPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
+  useEffect(() => {
+    const cid = _cid()
+    fetch(
+      `${SUPABASE_URL}/rest/v1/clients?id=eq.${cid}&select=mesas`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    )
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: { mesas?: number }[]) => setClientMesas(getMesasConfig(cid, rows[0]?.mesas ?? 16)))
+      .catch(() => {})
+  }, [])
+
   // ---------------------------------------------------------------------------
   // Build table state map
   // ---------------------------------------------------------------------------
@@ -201,7 +213,7 @@ export default function PlanoPage() {
   }
 
   const mesaMap = new globalThis.Map<number, Mesa & { resolvedStatus: TableStatus }>()
-  for (const m of MESAS_CONFIG) {
+  for (const m of clientMesas) {
     const order = ordersByMesa.get(m.number)
     if (order) {
       const resolvedStatus: TableStatus = order.status === 'lista' ? 'cuenta' : 'ocupada'

@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { pin, client_id, manager, fingerprint_id, min_role } = await request.json()
-    const clientId = typeof client_id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(client_id) ? client_id : 'amalay'
+    if (typeof client_id !== 'string' || !/^[a-z0-9_-]{1,40}$/i.test(client_id)) {
+      return Response.json({ error: 'client_id requerido' }, { status: 400 })
+    }
+    const clientId = client_id
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 

@@ -8,40 +8,32 @@ describe('getClientIdFromEmail', () => {
     expect(getClientIdFromEmail('ramonfaur.daniel@gmail.com')).toBe('amalay')
   })
 
-  it('maps monica@fullsite.mx to amalay', () => {
-    expect(getClientIdFromEmail('monica@fullsite.mx')).toBe('amalay')
-  })
-
   it('maps demo@fullsite.mx to demo', () => {
     expect(getClientIdFromEmail('demo@fullsite.mx')).toBe('demo')
   })
 
-  it('returns demo for unknown email', () => {
-    expect(getClientIdFromEmail('unknown@example.com')).toBe('demo')
+  it('returns empty string for unknown email (new client gets no hardcoded tenant)', () => {
+    expect(getClientIdFromEmail('unknown@example.com')).toBe('')
   })
 
-  it('returns demo for empty string', () => {
-    expect(getClientIdFromEmail('')).toBe('demo')
+  it('returns empty string for empty string', () => {
+    expect(getClientIdFromEmail('')).toBe('')
   })
 
-  it('is case sensitive (uppercase returns demo)', () => {
-    expect(getClientIdFromEmail('RAMONFAUR.DANIEL@GMAIL.COM')).toBe('demo')
+  it('is case sensitive (uppercase returns empty string)', () => {
+    expect(getClientIdFromEmail('RAMONFAUR.DANIEL@GMAIL.COM')).toBe('')
   })
 
-  it('returns demo for email with extra spaces', () => {
-    expect(getClientIdFromEmail(' ramonfaur.daniel@gmail.com ')).toBe('demo')
+  it('returns empty string for email with extra spaces', () => {
+    expect(getClientIdFromEmail(' ramonfaur.daniel@gmail.com ')).toBe('')
   })
 
-  it('returns demo for partial match', () => {
-    expect(getClientIdFromEmail('ramonfaur.daniel')).toBe('demo')
+  it('returns empty string for partial match', () => {
+    expect(getClientIdFromEmail('ramonfaur.daniel')).toBe('')
   })
 
-  it('returns demo for random string', () => {
-    expect(getClientIdFromEmail('not-an-email')).toBe('demo')
-  })
-
-  it('returns demo for null-ish values (empty)', () => {
-    expect(getClientIdFromEmail('')).toBe('demo')
+  it('returns empty string for random string', () => {
+    expect(getClientIdFromEmail('not-an-email')).toBe('')
   })
 })
 

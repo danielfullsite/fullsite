@@ -122,9 +122,10 @@ export default function OnboardingPage() {
         display_name: info.name,
         city: info.city,
         phone: info.phone,
-        email: info.email,
         timezone: info.timezone,
-        tables_count: info.tables,
+        mesas: info.tables,
+        data_source: 'fullsite',
+        active: true,
       })
 
       // 2. Create staff

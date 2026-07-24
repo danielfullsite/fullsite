@@ -471,7 +471,7 @@ export default function CocinaPage() {
   // isBebida imported from shared constants at top of file
 
   const AREA_KEYWORDS: Record<string, string[]> = {
-    'Cocina': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo amalay', 'combo fit', 'croque', 'bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
+    'Cocina': ['chilaquil', 'enchilada', 'huevo', 'egg', 'omelet', 'benedict', 'machacado', 'half & half', 'pancake', 'waffle', 'french toast', 'panini', 'pizza', 'pasta', 'combo fit', 'croque', 'bowl', 'acai', 'fruit', 'salad', 'ensalada', 'ceviche'],
     'Panadería': ['croissant', 'concha', 'bakery', 'panadería', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
   }
 

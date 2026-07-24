@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
-import { MESAS_CONFIG, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
@@ -149,9 +149,25 @@ export default function MesasPage() {
   const [currentMesero, setCurrentMesero] = useState<string>('')
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
   const [staffName, setStaffName] = useState<string>('')
+  const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
+
+  // Fetch mesa count from clients table to configure floor layout
+  useEffect(() => {
+    const cid = _cid()
+    fetch(
+      `${SUPABASE_URL}/rest/v1/clients?id=eq.${cid}&select=mesas`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    )
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: { mesas?: number }[]) => {
+        const count = rows[0]?.mesas ?? 16
+        setClientMesas(getMesasConfig(cid, count))
+      })
+      .catch(() => {})
+  }, [])
 
   // Staff + turno (estilo Wansoft: "Usuario: X · Turno: N")
   useEffect(() => {
@@ -240,7 +256,7 @@ export default function MesasPage() {
   }
 
   const mesaMap: globalThis.Map<number, Mesa> = new globalThis.Map()
-  for (const m of MESAS_CONFIG) {
+  for (const m of clientMesas) {
     const order = ordersByMesa.get(m.number)
     mesaMap.set(m.number, order ? {
       ...m,
@@ -674,16 +690,18 @@ export default function MesasPage() {
             <RefreshCw size={14} />
           </button>
 
-          {/* View toggle */}
+          {/* View toggle — Plano only for AMALAY (AMALAY-specific floor layout) */}
           <div className="flex items-center bg-[var(--line)] rounded-lg p-0.5 ml-2">
-            <button
-              onClick={() => setViewMode('planograma')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                viewMode === 'planograma' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
-              }`}
-            >
-              <Map size={13} /> Plano
-            </button>
+            {_cid() === 'amalay' && (
+              <button
+                onClick={() => setViewMode('planograma')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'planograma' ? 'bg-slate-600 text-white' : 'text-[var(--text-3)] hover:text-white'
+                }`}
+              >
+                <Map size={13} /> Plano
+              </button>
+            )}
             <button
               onClick={() => setViewMode('grid')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${

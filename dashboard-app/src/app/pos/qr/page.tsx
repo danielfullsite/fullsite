@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, QrCode } from 'lucide-react'
-import { MESAS_CONFIG } from '@/lib/pos-data'
+import { getMesasConfig } from '@/lib/pos-data'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 export default function QRPage() {
   const [baseUrl] = useState(() => {
@@ -11,7 +12,7 @@ export default function QRPage() {
     return process.env.NEXT_PUBLIC_APP_URL || 'https://app.fullsite.mx'
   })
 
-  const tables = MESAS_CONFIG.map(m => m.number)
+  const tables = getMesasConfig(_cid(), 16).map(m => m.number)
 
   return (
     <div className="h-screen flex flex-col text-white bg-[var(--surface)]">

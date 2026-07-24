@@ -238,7 +238,7 @@ const COFFEE_CATEGORIES = ['coffee', 'tea']
 // Items with no modifiers at all (no extras)
 const NO_MODIFIER_CATEGORIES = ['sodas', 'cerveza', 'vinos', 'licores']
 // Bakery/market — no food extras (no queso/aguacate on conchas)
-const BAKERY_CATEGORIES = ['bakery', 'toast', 'postres', 'mkt-cafe', 'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay']
+const BAKERY_CATEGORIES = ['bakery', 'toast', 'postres', 'mkt-cafe', 'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos']
 
 // Category name → modifier type (for DB categories with UUID ids)
 // Mapping validated against AMALAY categories (June 2026):
@@ -1097,25 +1097,38 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
 
 // IVA_RATE lives in pos-constants.ts (single source of truth)
 
-// Mesa config — layout real AMALAY (plano físico, foto 2026-06-10)
+// AMALAY physical floor plan (foto 2026-06-10)
 // Zonas: entrada (45,1-4), lámparas (5-9), pasillo (43,44), terraza (20,21,30-32,40-42),
 // barra (10-12), toldo (50-55), privado (60-63)
-const DEFAULT_MESA_NUMBERS = [
+const AMALAY_MESA_NUMBERS = [
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
   20, 21, 30, 31, 32, 40, 41, 42, 43, 44, 45,
   50, 51, 52, 53, 54, 55, 60, 61, 62, 63,
 ]
-// Capacidades segun las sillas dibujadas en el plano fisico
-const MESA_CAPACITY: Record<number, number> = {
-  30: 8,                // redonda grande terraza (8 sillas)
-  40: 6, 41: 6, 42: 6,  // rectangulares grandes terraza (6 sillas)
-  // resto: 4 sillas
+const AMALAY_MESA_CAPACITY: Record<number, number> = {
+  30: 8,
+  40: 6, 41: 6, 42: 6,
 }
-export const MESAS_CONFIG: Mesa[] = DEFAULT_MESA_NUMBERS.map(n => ({
+// AMALAY-specific layout (kept for backward compat)
+export const MESAS_CONFIG: Mesa[] = AMALAY_MESA_NUMBERS.map(n => ({
   number: n,
-  capacity: MESA_CAPACITY[n] ?? 4,
+  capacity: AMALAY_MESA_CAPACITY[n] ?? 4,
   status: 'disponible' as const,
 }))
+
+/**
+ * Returns mesa config for any client.
+ * - 'amalay' → physical floor plan with exact zone layout
+ * - any other client → sequential mesas 1..count, capacity 4
+ */
+export function getMesasConfig(clientId: string, count: number): Mesa[] {
+  if (clientId === 'amalay') return MESAS_CONFIG
+  return Array.from({ length: count }, (_, i) => ({
+    number: i + 1,
+    capacity: 4,
+    status: 'disponible' as const,
+  }))
+}
 
 export function formatMXN(amount: number): string {
   const safe = typeof amount === 'number' && !isNaN(amount) ? Math.round(amount * 100) / 100 : 0
@@ -1222,7 +1235,10 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
   try {
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': _getClientId(),
+      },
       body: JSON.stringify(payload),
     })
 

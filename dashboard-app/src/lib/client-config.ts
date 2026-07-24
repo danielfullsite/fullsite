@@ -176,12 +176,12 @@ export function getClientConfig(clientId: string): ClientConfig {
   return getClientConfigFallback(clientId)
 }
 
-// Email → client mapping (for login flow)
+// Email → client mapping (legacy fallback — source of truth is client_users table)
+// Only used when user_metadata.client_id and client_users both miss.
 export function getClientIdFromEmail(email: string): string {
   const EMAIL_MAP: Record<string, string> = {
     'ramonfaur.daniel@gmail.com': 'amalay',
-    'monica@fullsite.mx': 'amalay',
     'demo@fullsite.mx': 'demo',
   }
-  return EMAIL_MAP[email] || 'demo'
+  return EMAIL_MAP[email] || ''
 }
