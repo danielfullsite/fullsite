@@ -1117,6 +1117,32 @@ export interface SaveOrderResult {
   inventory_status?: 'COMPLETE' | 'BLOCKED' | 'PENDING' | 'SKIPPED'
 }
 
+/** Result from append-only item add (r1_add_items) */
+export interface AddItemsResult {
+  ok: boolean
+  revision?: number
+  added?: number
+  error?: string
+}
+
+export async function addOrderItems(orderId: string, items: OrderItem[]): Promise<AddItemsResult> {
+  try {
+    const res = await fetch('/api/pos/add-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, items }),
+    })
+    if (!res.ok) {
+      console.error('[addOrderItems] API error:', res.status)
+      return { ok: false, error: 'API_ERROR' }
+    }
+    return await res.json()
+  } catch (err) {
+    console.error('[addOrderItems] network error:', err)
+    return { ok: false, error: 'NETWORK_ERROR' }
+  }
+}
+
 export async function saveOrder(order: Order, saveOperationId?: string): Promise<SaveOrderResult> {
   // ── Turno enforcement: orders MUST have a turno_id ──
   if (!order.turnoId) {
@@ -1350,6 +1376,7 @@ export type AuditAction =
   | 'ticket_reprinted'
   | 'kitchen_item_updated'
   | 'cerrar_app'
+  | 'reprint_comanda'
 
 export interface AuditEvent {
   client_id?: string

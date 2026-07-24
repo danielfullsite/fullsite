@@ -13,6 +13,7 @@ import {
   formatMXN,
   generateId,
   saveOrder,
+  addOrderItems,
   logAudit,
   deductIngredientsForOrder,
   reverseIngredientDeduction,
@@ -2662,25 +2663,57 @@ function POSContent() {
           const raceRows = await raceRes.json()
           if (raceRows.length > 0) {
             const existing = raceRows[0]
-            // Another terminal already created an order — load it instead of creating a duplicate
-            const items = typeof existing.items === 'string' ? JSON.parse(existing.items) : (existing.items || [])
-            const loadedItems = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
-            setOrderItems(loadedItems)
+            const existingRaw = typeof existing.items === 'string' ? JSON.parse(existing.items) : (existing.items || [])
+            const existingActive: OrderItem[] = existingRaw.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
+            const existingIds = new Set(existingActive.map(i => i.id))
+
+            // B's items not yet in A's order — preserve them with a new batch stamp
+            const raceBatchId = generateId()
+            const raceNewItems: OrderItem[] = activeItems
+              .filter(i => !existingIds.has(i.id))
+              .map(i => ({ ...i, comanda_batch_id: i.comanda_batch_id || raceBatchId, comanda_batch_seq: 0 }))
+
+            setOrderItems([...existingActive, ...raceNewItems])
             setOrderId(existing.id)
             setLoadedOrderId(existing.id)
             setLoadedUpdatedAt(existing.updated_at || existing.created_at || null)
             setOrderRevision(existing.order_revision ?? 0)
             if (existing.mesero) setMesero(existing.mesero)
             if (existing.personas) setPersonas(existing.personas)
-            if (existing.status === 'enviada' || existing.status === 'preparando') {
-              setSentItemIds(new Set(loadedItems.map((i: OrderItem) => i.id)))
+
+            if (raceNewItems.length > 0) {
+              const appendResult = await addOrderItems(existing.id, raceNewItems)
+              if (appendResult.ok) {
+                setOrderRevision(appendResult.revision!)
+                const allSentIds = new Set([...existingActive.map(i => i.id), ...raceNewItems.map(i => i.id)])
+                setSentItemIds(allSentIds)
+                const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
+                for (const item of [...existingActive, ...raceNewItems]) {
+                  snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+                }
+                setSentItemSnapshots(snaps)
+                const racePrintOrder: Order = {
+                  id: existing.id, mesa,
+                  mesero: existing.mesero || mesero, personas: existing.personas || personas,
+                  status: 'enviada', items: raceNewItems,
+                  subtotal: raceNewItems.reduce((s, i) => s + i.subtotal, 0), iva: 0,
+                  total: raceNewItems.reduce((s, i) => s + i.subtotal, 0),
+                  descuento: 0, turnoId: turnoId || undefined, createdAt: new Date(),
+                }
+                printByStation(racePrintOrder).catch(() => {})
+                showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
+              } else {
+                showToast('Error al agregar items — intenta de nuevo')
+              }
+            } else {
+              setSentItemIds(new Set(existingActive.map(i => i.id)))
               const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
-              for (const item of loadedItems) {
+              for (const item of existingActive) {
                 snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
               }
               setSentItemSnapshots(snaps)
+              showToast('Orden sincronizada')
             }
-            // Silently load existing order — no toast needed
             setSaving(false); operationLock.current = false
             return
           }
@@ -2734,21 +2767,47 @@ function POSContent() {
     const saveResult = await saveOrder(order, opId)
     if (!saveResult.ok) {
       if (saveResult.conflict) {
-        // Update revision to server's current and let user retry
-        if (saveResult.current_revision != null) {
-          setOrderRevision(saveResult.current_revision)
-          // Also refresh loadedUpdatedAt to prevent false conflict on next try
-          try {
-            const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=updated_at`, {
-              headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+        // Identify net-new items B is trying to send (not yet in kitchen)
+        const conflictNewItems = itemsWithBatch.filter(i => !sentItemIds.has(i.id))
+        if (conflictNewItems.length > 0) {
+          // Append-only: safe without OCC because item IDs are globally unique UUIDs
+          const appendResult = await addOrderItems(order.id, conflictNewItems)
+          if (appendResult.ok) {
+            setOrderRevision(appendResult.revision!)
+            setLoadedOrderId(order.id)
+            setSentItemIds(prev => { const n = new Set(prev); conflictNewItems.forEach(i => n.add(i.id)); return n })
+            setSentItemSnapshots(prev => {
+              const n = { ...prev }
+              for (const item of conflictNewItems) {
+                n[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+              }
+              return n
             })
-            if (freshRes.ok) {
-              const rows = await freshRes.json()
-              if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at)
-            }
-          } catch {}
+            printByStation({ ...order, items: conflictNewItems }).catch(() => {})
+            showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
+            try {
+              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
+                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+              })
+              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
+            } catch {}
+          } else {
+            if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
+            showToast('Error al enviar — intenta de nuevo')
+          }
+        } else {
+          // Only metadata (personas, notas, mesero) conflicted — refresh revision and let user retry
+          if (saveResult.current_revision != null) {
+            setOrderRevision(saveResult.current_revision)
+            try {
+              const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
+                headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` },
+              })
+              if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
+            } catch {}
+          }
+          showToast('Toca Enviar de nuevo')
         }
-        showToast('Toca Enviar de nuevo')
       } else if (saveResult.error === 'OFFLINE_QUEUED') {
         showToast('Sin conexión — orden guardada localmente, se enviará al reconectar')
         // Bridge is local (127.0.0.1:7717) — print even when internet is down
