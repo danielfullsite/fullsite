@@ -2747,6 +2747,12 @@ function POSContent() {
         showToast('Toca Enviar de nuevo')
       } else if (saveResult.error === 'OFFLINE_QUEUED') {
         showToast('Sin conexión — orden guardada localmente, se enviará al reconectar')
+        // Bridge is local (127.0.0.1:7717) — print even when internet is down
+        const offlineNewItems = activeItems.filter(i => !sentItemIds.has(i.id))
+        if (offlineNewItems.length > 0) {
+          const offlinePrintOrder: Order = { ...order, items: offlineNewItems }
+          printByStation(offlinePrintOrder).catch(() => {})
+        }
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }
