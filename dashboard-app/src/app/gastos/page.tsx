@@ -6,6 +6,7 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { nowMX } from '@/lib/date-mx'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -35,7 +36,7 @@ interface Gasto {
 const CATEGORIAS = ['Alimentos', 'Bebidas', 'Limpieza', 'Mantenimiento', 'Nómina', 'Renta', 'Servicios', 'Marketing', 'Equipo', 'Otros']
 
 function getMonthRange() {
-  const now = new Date()
+  const now = nowMX()
   const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${last}`
