@@ -99,7 +99,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         // Use DB logo if available; otherwise fall back to /logos/<clientId>.png
         // Starting from empty prevents flash of wrong tenant logo for unauthenticated sessions
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
-        else setLogoSrc(`/logos/${_cid()}.png`)
+        // No logo configured → leave logoSrc='' (img stays hidden, no 404)
       }).catch(() => {})
     }
   }, [])

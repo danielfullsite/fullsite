@@ -256,25 +256,34 @@ async function main() {
     // ── SECTION 6: Abrir orden ──────────────────────────────────────────────
     section('6. Orden — abrir mesa y ver menú')
 
-    // Try to click "Nueva cuenta" or first available mesa
-    const newOrderBtn = page.locator('button:has-text("Nueva cuenta"), button:has-text("nueva cuenta"), button:has-text("Abrir")').first()
-    const mesaNumBtn = page.locator('button').filter({ hasText: /^1$/ }).first()
-
+    // Mesa cards are divs with onClick (not button) — click bubbles up to handleMesaClick
+    // Strategy: click the large mesa number "1" text — event bubbles to card's onClick handler
     let openedOrder = false
-    for (const btn of [newOrderBtn, mesaNumBtn]) {
-      if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await btn.click()
-        await page.waitForTimeout(2000)
+
+    // Try "Nueva cuenta" button first (if turno is already selected)
+    const newCuentaBtn = page.locator('button').filter({ hasText: /nueva\s+cuenta/i }).first()
+    if (await newCuentaBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await newCuentaBtn.click()
+      await page.waitForTimeout(2000)
+      openedOrder = true
+    }
+
+    if (!openedOrder) {
+      // Mesa cards: click the "1" text which bubbles to the card div's onClick
+      // Use getByText with exact match to target the mesa number heading
+      const mesaOneText = page.getByText('1', { exact: true }).first()
+      if (await mesaOneText.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await mesaOneText.click()
+        await page.waitForTimeout(2500)
         openedOrder = true
-        break
       }
     }
 
     if (!openedOrder) {
-      // Try clicking any grid cell or table item
-      const anyCell = page.locator('[class*="mesa"], [class*="table"], [class*="grid"] > button').first()
-      if (await anyCell.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await anyCell.click()
+      // Final fallback: click any element with "Disponible" text in the mesas grid
+      const disponibleEl = page.locator('text=Disponible').first()
+      if (await disponibleEl.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await disponibleEl.click()
         await page.waitForTimeout(2000)
         openedOrder = true
       }
@@ -343,8 +352,8 @@ async function main() {
 
     // ── SECTION 8: Dashboard ────────────────────────────────────────────────
     section('8. Dashboard — ventas demo')
-    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(4000)
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(8000)   // Dashboard fetches multiple async queries; wait for data
     await shot(page, '08-dashboard')
 
     const dashUrl = page.url()
