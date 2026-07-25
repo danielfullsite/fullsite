@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
-import { getMesasConfig, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
@@ -151,23 +151,40 @@ export default function MesasPage() {
   const [viewMode, setViewMode] = useState<'planograma' | 'grid'>('grid')
   const [staffName, setStaffName] = useState<string>('')
   const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
+  const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
   const [turnoNum, setTurnoNum] = useState<number | null>(null)
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
 
-  // Fetch mesa count from clients table to configure floor layout
+  // Fetch floor plan from DB (pos_mesas); falls back to FLOOR_TABLES if empty
   useEffect(() => {
     const cid = _cid()
-    fetch(
-      `${SUPABASE_URL}/rest/v1/clients?id=eq.${cid}&select=mesas`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    )
-      .then(r => r.ok ? r.json() : [])
-      .then((rows: { mesas?: number }[]) => {
-        const count = rows[0]?.mesas ?? 16
-        setClientMesas(getMesasConfig(cid, count))
-      })
-      .catch(() => {})
+    fetchPosMesas(cid).then(rows => {
+      if (rows.length > 0) {
+        setFloorTables(rows.map(r => ({
+          number: r.number,
+          x: Number(r.x_pct),
+          y: Number(r.y_pct),
+          shape: r.shape as TableShape,
+        })))
+        setClientMesas(rows.map(r => ({
+          number: r.number,
+          capacity: r.capacity,
+          status: 'disponible' as const,
+        })))
+      } else {
+        // fallback: read count from clients table
+        fetch(
+          `${SUPABASE_URL}/rest/v1/clients?id=eq.${cid}&select=mesas`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+        )
+          .then(r => r.ok ? r.json() : [])
+          .then((clients: { mesas?: number }[]) => {
+            setClientMesas(getMesasConfig(cid, clients[0]?.mesas ?? 16))
+          })
+          .catch(() => {})
+      }
+    })
   }, [])
 
   // Staff + turno (estilo Wansoft: "Usuario: X · Turno: N")
@@ -579,7 +596,7 @@ export default function MesasPage() {
   }
 
   const PlanogramaView = () => {
-    const floorNumbers = new Set(FLOOR_TABLES.map(t => t.number))
+    const floorNumbers = new Set(floorTables.map(t => t.number))
     const unassigned = mesas.filter(m => !floorNumbers.has(m.number))
     return (
       <div>
@@ -626,7 +643,7 @@ export default function MesasPage() {
             {getPosConfigSync().name || _cid().toUpperCase()}
           </span>
           {/* Mesas con sillas */}
-          {FLOOR_TABLES.map(ft => (
+          {floorTables.map(ft => (
             <FloorTableNode key={ft.number} ft={ft} />
           ))}
         </div>

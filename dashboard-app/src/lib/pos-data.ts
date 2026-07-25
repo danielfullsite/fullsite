@@ -2037,13 +2037,16 @@ export async function deductIngredientsForOrder(
     // Record resolution path — never skip silently
     if (resolvedVia === 'db') {
       obs.viaDb++
+      resolution.DB_MAPPING.push(item.nombre)
     } else if (resolvedVia === 'fuzzy') {
       obs.viaFuzzy++
       obs.fuzzyItems.push(item.nombre)
+      resolution.FUZZY_FALLBACK.push(item.nombre)
       console.warn(`[deduct:fuzzy] "${item.nombre}" — sin recipe_ref en DB, usando fallback`)
     } else {
       obs.miss++
       obs.missItems.push(item.nombre)
+      resolution.UNRESOLVED.push(item.nombre)
       console.warn(`[deduct:miss] "${item.nombre}" (id=${item.menuItemId}) — sin receta en DB ni fuzzy`)
       continue
     }
@@ -2102,10 +2105,10 @@ export async function deductIngredientsForOrder(
     if (obs.missItems.length  > 0) console.warn(`[deduct:miss-items]  ${obs.missItems.join(', ')}`)
   }
 
-  return { success: true, deductions, alerts }
+  return { success: true, deductions, alerts, resolution }
   } catch (err) {
     console.warn('[deductIngredientsForOrder] Failed:', err)
-    return { success: false, deductions: [], alerts: ['Error al descontar inventario'] }
+    return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], UNRESOLVED: [] } }
   }
 }
 
@@ -2878,4 +2881,31 @@ export async function updateCFDIStatus(
     }
   )
   return res.ok
+}
+
+// ─── Floor plan ───────────────────────────────────────────────────────────────
+
+export interface PosMesa {
+  number: number
+  capacity: number
+  zone: string | null
+  x_pct: number
+  y_pct: number
+  shape: string
+  sort_order: number
+}
+
+/**
+ * Fetches floor plan rows from pos_mesas, ordered by sort_order.
+ * Returns [] on any error — callers must fall back to their hardcoded FLOOR_TABLES.
+ */
+export async function fetchPosMesas(clientId: string): Promise<PosMesa[]> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_mesas?client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&order=sort_order.asc&select=number,capacity,zone,x_pct,y_pct,shape,sort_order`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res.ok) return []
+    return await res.json()
+  } catch { return [] }
 }

@@ -4,15 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Users, Clock, DollarSign, AlertTriangle, ExternalLink } from 'lucide-react'
-import { getMesasConfig, formatMXN } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN, fetchPosMesas } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-import { getActiveClientSlug as _cid } from '@/lib/data'
 
 // ---------------------------------------------------------------------------
 // Floor plan types & layout
@@ -168,12 +166,32 @@ export default function PlanoPage() {
   const [selectedMesa, setSelectedMesa] = useState<number | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
+  const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
 
   // Timer tick for elapsed time display
   const [, setTick] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => setTick(t => t + 1), 30000)
     return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    fetchPosMesas(_cid()).then(rows => {
+      if (rows.length > 0) {
+        setFloorTables(rows.map(r => ({
+          number: r.number,
+          x: Number(r.x_pct),
+          y: Number(r.y_pct),
+          shape: r.shape as TableShape,
+          zone: r.zone ?? 'Sin zona',
+        })))
+        setClientMesas(rows.map(r => ({
+          number: r.number,
+          capacity: r.capacity,
+          status: 'disponible' as const,
+        })))
+      }
+    })
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -457,7 +475,7 @@ export default function PlanoPage() {
             </span>
 
             {/* Tables */}
-            {FLOOR_TABLES.map(ft => {
+            {floorTables.map(ft => {
               const mesa = mesaMap.get(ft.number)
               if (!mesa) return null
               const order = ordersByMesa.get(mesa.number)
@@ -635,7 +653,7 @@ export default function PlanoPage() {
 
                 {/* Zone tag */}
                 {(() => {
-                  const ft = FLOOR_TABLES.find(t => t.number === selectedInfo.number)
+                  const ft = floorTables.find(t => t.number === selectedInfo.number)
                   return ft ? (
                     <span style={{
                       fontSize: 11, fontWeight: 500, color: '#64748b',
@@ -772,7 +790,7 @@ export default function PlanoPage() {
               Ocupacion por zona
             </h3>
             {['Entrada', 'Interior', 'Terraza', 'Barra', 'Pasillo', 'Toldo', 'Privado'].map(zone => {
-              const zoneTables = FLOOR_TABLES.filter(ft => ft.zone === zone)
+              const zoneTables = floorTables.filter(ft => ft.zone === zone)
               const zoneOcupadas = zoneTables.filter(ft => {
                 const m = mesaMap.get(ft.number)
                 return m && m.resolvedStatus !== 'disponible'
