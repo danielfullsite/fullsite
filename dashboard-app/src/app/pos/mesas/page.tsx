@@ -156,22 +156,21 @@ export default function MesasPage() {
   const [showNewCuenta, setShowNewCuenta] = useState(false)
   const [newCuentaName, setNewCuentaName] = useState('')
 
-  // Fetch floor plan from DB (pos_mesas); falls back to FLOOR_TABLES if empty
+  // Fetch mesa list from DB (pos_mesas).
+  // Uses DB for number + capacity; FLOOR_TABLES hardcode drives positions because
+  // mesas/page.tsx and plano/page.tsx use different canvas coordinate systems.
+  // Coordinate unification is tracked separately.
   useEffect(() => {
     const cid = _cid()
     fetchPosMesas(cid).then(rows => {
       if (rows.length > 0) {
-        setFloorTables(rows.map(r => ({
-          number: r.number,
-          x: Number(r.x_pct),
-          y: Number(r.y_pct),
-          shape: r.shape as TableShape,
-        })))
         setClientMesas(rows.map(r => ({
           number: r.number,
           capacity: r.capacity,
           status: 'disponible' as const,
         })))
+        // floorTables not updated from DB here — mesas canvas has different coordinates
+        // than plano canvas (Toldo/Privado at top-right vs bottom). See pos_mesas seed.
       } else {
         // fallback: read count from clients table
         fetch(
