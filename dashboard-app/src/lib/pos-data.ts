@@ -637,6 +637,12 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'te verde': ['te verde'],
 }
 
+// Phase-gate: when set to 'disabled', the fuzzy fallback (RECIPE_ALIASES + name matching)
+// is skipped and only the DB recipe_ref is used. Flip via Vercel env var — no deploy needed.
+// Retirement criteria: 0 fuzzy logs for AMALAY during 7 consecutive days.
+const RECIPE_FALLBACK_ENABLED =
+  (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_RECIPE_FALLBACK : undefined) !== 'disabled'
+
 /** Un pago dentro de una cuenta (pago mixto multi-forma, estilo Wansoft) */
 export interface PagoForma {
   metodo: string
@@ -1738,6 +1744,85 @@ export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]>
   return res.json()
 }
 
+/**
+ * Batch-fetch recipe_ref for a set of menu item IDs.
+ * Returns a Map<menuItemId, recipe_ref> containing only items that have a non-null recipe_ref.
+ * One DB call for the entire order — does not touch pos_recipes_old.
+ */
+async function fetchRecipeRefs(
+  clientId: string,
+  menuItemIds: string[],
+): Promise<Map<string, string>> {
+  if (menuItemIds.length === 0) return new Map()
+  const ids = menuItemIds.map(id => encodeURIComponent(id)).join(',')
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&id=in.(${ids})&select=id,recipe_ref`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res.ok) return new Map()
+    const rows: { id: string; recipe_ref: string | null }[] = await res.json()
+    return new Map(
+      rows
+        .filter(r => r.recipe_ref != null)
+        .map(r => [r.id, r.recipe_ref!])
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+// Fetches all pos_menu_item_recipes for a client — called once per order (Priority 0 lookup)
+async function fetchMenuItemRecipes(clientId: string): Promise<Map<string, string[]>> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_menu_item_recipes?client_id=eq.${clientId}&select=menu_item_name,recipe_name`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res.ok) return new Map()
+    const data = await res.json()
+    const rows: { menu_item_name: string; recipe_name: string }[] = Array.isArray(data) ? data : []
+    const map = new Map<string, string[]>()
+    for (const row of rows) {
+      if (!map.has(row.menu_item_name)) map.set(row.menu_item_name, [])
+      map.get(row.menu_item_name)!.push(row.recipe_name)
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+/**
+ * Returns recipe_ref coverage stats for a client.
+ * Used to decide when to retire the fuzzy fallback.
+ */
+export async function fetchRecipeRefCoverage(clientId: string): Promise<{
+  totalItems: number
+  withRef: number
+  withoutRef: number
+  coveragePct: number
+}> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&active=eq.true&select=id,recipe_ref`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    )
+    if (!res.ok) return { totalItems: 0, withRef: 0, withoutRef: 0, coveragePct: 0 }
+    const rows: { id: string; recipe_ref: string | null }[] = await res.json()
+    const withRef = rows.filter(r => r.recipe_ref != null).length
+    const total = rows.length
+    return {
+      totalItems: total,
+      withRef,
+      withoutRef: total - withRef,
+      coveragePct: total > 0 ? Math.round((withRef / total) * 100) : 0,
+    }
+  } catch {
+    return { totalItems: 0, withRef: 0, withoutRef: 0, coveragePct: 0 }
+  }
+}
+
 export async function saveRecipeRow(row: { menu_item_id: string; menu_item_name: string; ingredient_id: string; quantity: number; unit: string }): Promise<boolean> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_recipes_old`, {
     method: 'POST',
@@ -1859,17 +1944,28 @@ export async function deductIngredientsForOrder(
   items: OrderItem[],
   orderId: string,
   actor: string,
-): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[] }> {
+): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; UNRESOLVED: string[] } }> {
   try {
-  // 1. Get all recipes
+  // 1. Get all recipes and inventory
   const recipes = await getRecipes()
   const inventory = await getInventory()
   const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
 
   const deductions: { ingredient: string; amount: number; unit: string; newStock: number }[] = []
   const alerts: string[] = []
+  const resolution = { DB_MAPPING: [] as string[], FUZZY_FALLBACK: [] as string[], UNRESOLVED: [] as string[] }
 
-  // 2. For each order item, find matching recipe and deduct
+  // 2. Fetch recipe_ref from pos_menu_items for all items in this order (1 DB call)
+  const menuItemIds = [...new Set(items.map(i => i.menuItemId))]
+  const recipeRefMap = await fetchRecipeRefs(_getClientId(), menuItemIds)
+
+  // Observability counters — flushed to console at end of loop
+  const obs = {
+    total: 0, viaDb: 0, viaFuzzy: 0, miss: 0,
+    fuzzyItems: [] as string[], missItems: [] as string[],
+  }
+
+  // 3. For each order item, find matching recipe and deduct
   // Normalize: strip prefixes, size suffixes, temperature variants
   const normalizeRecipeName = (n: string) => n.toLowerCase()
     .replace(/^sprw\s*-\s*/i, '')
@@ -1891,48 +1987,66 @@ export async function deductIngredientsForOrder(
   }
 
   for (const item of items) {
+    obs.total++
     const itemName = item.nombre.toLowerCase()
     const itemNorm = normalizeRecipeName(item.nombre)
     let recipeRows: typeof recipes = []
+    let resolvedVia: 'db' | 'fuzzy' | 'miss' = 'miss'
 
-    // Priority 1: use alias map
-    const aliases = RECIPE_ALIASES[itemName]
-    if (aliases) {
-      for (const alias of aliases) {
-        const rows = recipesByName.get(alias.toLowerCase())
-        if (rows && rows.length > 0) { recipeRows = rows; break }
+    // Path 1: DB recipe_ref — direct lookup, no text matching
+    const recipeRef = recipeRefMap.get(item.menuItemId)
+    if (recipeRef) {
+      const rows = recipesByName.get(recipeRef)
+      if (rows && rows.length > 0) {
+        recipeRows = rows
+        resolvedVia = 'db'
       }
     }
 
-    // Priority 2: exact match on recipe name
-    if (recipeRows.length === 0) {
-      recipeRows = recipesByName.get(itemName) ?? []
-    }
-
-    // Priority 3: normalized match (strips prefixes, sizes, temperature)
-    if (recipeRows.length === 0) {
-      recipeRows = recipesByNorm.get(itemNorm) ?? []
-    }
-
-    // Priority 4: best partial match (normalized)
-    if (recipeRows.length === 0) {
-      let bestMatch: { name: string; rows: typeof recipes } | null = null
-      let bestScore = 0
-      for (const [name, rows] of recipesByNorm) {
-        if (name.length < 3 || itemNorm.length < 3) continue // skip very short names
-        if (name.includes(itemNorm) || itemNorm.includes(name)) {
-          // Score: prefer closest length match (avoid "HUEVO" matching "MACHACADO CON HUEVO")
-          const score = Math.min(name.length, itemNorm.length) / Math.max(name.length, itemNorm.length)
-          if (score > bestScore && score > 0.5) { // at least 50% overlap
-            bestScore = score
-            bestMatch = { name, rows }
-          }
+    // Path 2: Fuzzy fallback (RECIPE_ALIASES + name matching)
+    // Active while NEXT_PUBLIC_RECIPE_FALLBACK !== 'disabled'
+    if (recipeRows.length === 0 && RECIPE_FALLBACK_ENABLED) {
+      // Priority 1: alias map
+      const aliases = RECIPE_ALIASES[itemName]
+      if (aliases) {
+        for (const alias of aliases) {
+          const rows = recipesByName.get(alias.toLowerCase())
+          if (rows && rows.length > 0) { recipeRows = rows; break }
         }
       }
-      if (bestMatch) recipeRows = bestMatch.rows
+      // Priority 2: exact match on recipe name
+      if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
+      // Priority 3: normalized match (strips prefixes, sizes, temperature)
+      if (recipeRows.length === 0) recipeRows = recipesByNorm.get(itemNorm) ?? []
+      // Priority 4: best partial match (normalized)
+      if (recipeRows.length === 0) {
+        let bestMatch: { name: string; rows: typeof recipes } | null = null
+        let bestScore = 0
+        for (const [name, rows] of recipesByNorm) {
+          if (name.length < 3 || itemNorm.length < 3) continue
+          if (name.includes(itemNorm) || itemNorm.includes(name)) {
+            const score = Math.min(name.length, itemNorm.length) / Math.max(name.length, itemNorm.length)
+            if (score > bestScore && score > 0.5) { bestScore = score; bestMatch = { name, rows } }
+          }
+        }
+        if (bestMatch) recipeRows = bestMatch.rows
+      }
+      if (recipeRows.length > 0) resolvedVia = 'fuzzy'
     }
 
-    if (recipeRows.length === 0) continue
+    // Record resolution path — never skip silently
+    if (resolvedVia === 'db') {
+      obs.viaDb++
+    } else if (resolvedVia === 'fuzzy') {
+      obs.viaFuzzy++
+      obs.fuzzyItems.push(item.nombre)
+      console.warn(`[deduct:fuzzy] "${item.nombre}" — sin recipe_ref en DB, usando fallback`)
+    } else {
+      obs.miss++
+      obs.missItems.push(item.nombre)
+      console.warn(`[deduct:miss] "${item.nombre}" (id=${item.menuItemId}) — sin receta en DB ni fuzzy`)
+      continue
+    }
 
     for (const row of recipeRows) {
       const deductAmount = row.quantity * item.cantidad
@@ -1973,6 +2087,19 @@ export async function deductIngredientsForOrder(
       // Update local map
       inv.stock = newStock
     }
+  }
+
+  // Observability summary — one line per order in server logs
+  if (obs.total > 0) {
+    const pDb    = Math.round(obs.viaDb    / obs.total * 100)
+    const pFuzzy = Math.round(obs.viaFuzzy / obs.total * 100)
+    const pMiss  = Math.round(obs.miss     / obs.total * 100)
+    console.info(
+      `[deduct:summary] order=${orderId} items=${obs.total} ` +
+      `db=${obs.viaDb}(${pDb}%) fuzzy=${obs.viaFuzzy}(${pFuzzy}%) miss=${obs.miss}(${pMiss}%)`
+    )
+    if (obs.fuzzyItems.length > 0) console.warn(`[deduct:fuzzy-items] ${obs.fuzzyItems.join(', ')}`)
+    if (obs.missItems.length  > 0) console.warn(`[deduct:miss-items]  ${obs.missItems.join(', ')}`)
   }
 
   return { success: true, deductions, alerts }
