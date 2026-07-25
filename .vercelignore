@@ -1,0 +1,34 @@
+# Vercel deploy ignores — only dashboard-app/ should be deployed
+
+# Electron apps (not deployed to Vercel)
+electron-app/
+electron-kds/
+electron-dashboard/
+print-bridge/
+
+# Agent scripts and data
+agents/
+scripts/
+
+# Docs and strategy
+docs/
+Legal/
+"AMALAY X FULLSITE"/
+
+# Graphify output cache
+graphify-out/
+
+# Wansoft explorer data
+ios/
+
+# Full-site web (separate project)
+fullsite-web/
+
+# Misc
+*.py
+*.sh
+*.asar
+MASTER-INDEX.md
+index.html.backup
+"change the black parts to white.jpg"
+test-cfdi-sample.xml
