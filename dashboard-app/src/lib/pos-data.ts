@@ -613,6 +613,7 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'smoothie pink flamingo': ['smoothie pink flamingo'],
   'smoothie tropical coconut': ['smoothie tropical coconut'],
   // Frappes
+  'frapuccino': ['frapuccino'],
   'frappe matcha': ['frappe matcha'],
   'frappe mango-maracuya': ['frappe mango maracuya'],
   // Pancakes & Waffles
@@ -621,7 +622,9 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'chicken panini': ['turkey pannini', 'turkey panini'],
   // Pizzas & Pastas
   'pasta mamarosa': ['pasta pacceri al pesto'],
-  'pizza pepperoni': ['pizza pepperoni'],
+  'pasta bologese': ['pasta bologese'],
+  'pizza pepperoni': ['pizza peperoni'],
+  'pizza peperoni': ['pizza peperoni'],
   'pizza margarita': ['pizza margarita'],
   // Bowls
   'acai love bowl': ['acai love'],
