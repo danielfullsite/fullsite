@@ -137,36 +137,36 @@ describe('getClientConfig', () => {
       expect(config.id).toBe('demo')
     })
 
-    it('has display_name Casa Montaña', () => {
-      expect(config.display_name).toBe('Casa Montaña')
+    it('has display_name Café Central', () => {
+      expect(config.display_name).toBe('Café Central')
     })
 
-    it('has 28 mesas', () => {
-      expect(config.mesas).toBe(28)
+    it('has 15 mesas', () => {
+      expect(config.mesas).toBe(15)
     })
 
     it('has data_source demo', () => {
       expect(config.data_source).toBe('demo')
     })
 
-    it('has nomina feature enabled', () => {
-      expect(config.features.nomina).toBe(true)
+    it('has nomina feature disabled', () => {
+      expect(config.features.nomina).toBe(false)
     })
 
-    it('has delivery feature enabled', () => {
-      expect(config.features.delivery).toBe(true)
+    it('has delivery feature disabled', () => {
+      expect(config.features.delivery).toBe(false)
     })
 
-    it('has ecommerce feature enabled', () => {
-      expect(config.features.ecommerce).toBe(true)
+    it('has ecommerce feature disabled', () => {
+      expect(config.features.ecommerce).toBe(false)
     })
 
-    it('has resenas feature enabled', () => {
-      expect(config.features.resenas).toBe(true)
+    it('has resenas feature disabled', () => {
+      expect(config.features.resenas).toBe(false)
     })
 
-    it('has giftCards feature enabled', () => {
-      expect(config.features.giftCards).toBe(true)
+    it('has giftCards feature disabled', () => {
+      expect(config.features.giftCards).toBe(false)
     })
 
     it('has meseros array', () => {

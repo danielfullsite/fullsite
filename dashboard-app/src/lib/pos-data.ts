@@ -1772,27 +1772,6 @@ async function fetchRecipeRefs(
   }
 }
 
-// Fetches all pos_menu_item_recipes for a client — called once per order (Priority 0 lookup)
-async function fetchMenuItemRecipes(clientId: string): Promise<Map<string, string[]>> {
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_menu_item_recipes?client_id=eq.${clientId}&select=menu_item_name,recipe_name`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    if (!res.ok) return new Map()
-    const data = await res.json()
-    const rows: { menu_item_name: string; recipe_name: string }[] = Array.isArray(data) ? data : []
-    const map = new Map<string, string[]>()
-    for (const row of rows) {
-      if (!map.has(row.menu_item_name)) map.set(row.menu_item_name, [])
-      map.get(row.menu_item_name)!.push(row.recipe_name)
-    }
-    return map
-  } catch {
-    return new Map()
-  }
-}
-
 /**
  * Returns recipe_ref coverage stats for a client.
  * Used to decide when to retire the fuzzy fallback.

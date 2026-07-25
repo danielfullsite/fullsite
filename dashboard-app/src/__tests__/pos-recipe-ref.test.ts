@@ -294,4 +294,110 @@ describe('deductIngredientsForOrder — resolution paths', () => {
     expect(result.success).toBe(false)
     expect(result.deductions).toHaveLength(0)
   })
+
+  // ── resolution field ────────────────────────────────────────────────────────
+
+  it('resolution.DB_MAPPING populated when recipe_ref resolves', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    mockFetchSequence({
+      recipes: [{ menu_item_name: 'avo toast', ingredient_id: 'avocado', quantity: 0.5, unit: 'pz' }],
+      inventoryRows: [{ ingredient_id: 'avocado', stock: 10, reorder_point: 2 }],
+      ingredientRows: [{ id: 'avocado', name: 'Aguacate', unit: 'pz', category: 'produce', cost_per_unit: 15, yield_factor: 1, active: true }],
+      recipeRefs: [{ id: 'menu-avo', recipe_ref: 'avo toast' }],
+    })
+
+    const result = await deductIngredientsForOrder(
+      [makeItem({ menuItemId: 'menu-avo', nombre: 'AVOCADO TOAST' })],
+      'order-res-db', 'test',
+    )
+
+    expect(result.resolution.DB_MAPPING).toContain('AVOCADO TOAST')
+    expect(result.resolution.FUZZY_FALLBACK).toHaveLength(0)
+    expect(result.resolution.UNRESOLVED).toHaveLength(0)
+  })
+
+  it('resolution.FUZZY_FALLBACK populated when recipe_ref is null but RECIPE_ALIASES resolves', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    mockFetchSequence({
+      recipes: [{ menu_item_name: 'chilaquiles verdes', ingredient_id: 'chile', quantity: 0.1, unit: 'kg' }],
+      inventoryRows: [{ ingredient_id: 'chile', stock: 5, reorder_point: 1 }],
+      ingredientRows: [{ id: 'chile', name: 'Chile Verde', unit: 'kg', category: 'produce', cost_per_unit: 20, yield_factor: 1, active: true }],
+      recipeRefs: [{ id: 'ch1', recipe_ref: null }],
+    })
+
+    const result = await deductIngredientsForOrder(
+      [makeItem({ menuItemId: 'ch1', nombre: 'Chilaquiles Verdes' })],
+      'order-res-fuzzy', 'test',
+    )
+
+    expect(result.resolution.FUZZY_FALLBACK).toContain('Chilaquiles Verdes')
+    expect(result.resolution.DB_MAPPING).toHaveLength(0)
+    expect(result.resolution.UNRESOLVED).toHaveLength(0)
+  })
+
+  it('resolution.UNRESOLVED populated when no recipe found anywhere', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    mockFetchSequence({ recipes: [], inventoryRows: [], ingredientRows: [], recipeRefs: [] })
+
+    const result = await deductIngredientsForOrder(
+      [makeItem({ nombre: 'Platillo Desconocido' })],
+      'order-res-unresolved', 'test',
+    )
+
+    expect(result.resolution.UNRESOLVED).toContain('Platillo Desconocido')
+    expect(result.resolution.DB_MAPPING).toHaveLength(0)
+    expect(result.resolution.FUZZY_FALLBACK).toHaveLength(0)
+  })
+
+  it('resolution reflects all three states in a mixed order', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    mockFetchSequence({
+      recipes: [
+        { menu_item_name: 'avo toast', ingredient_id: 'avocado', quantity: 0.5, unit: 'pz' },
+        { menu_item_name: 'chilaquiles verdes', ingredient_id: 'chile', quantity: 0.1, unit: 'kg' },
+      ],
+      inventoryRows: [
+        { ingredient_id: 'avocado', stock: 10, reorder_point: 2 },
+        { ingredient_id: 'chile', stock: 5, reorder_point: 1 },
+      ],
+      ingredientRows: [
+        { id: 'avocado', name: 'Aguacate', unit: 'pz', category: 'produce', cost_per_unit: 15, yield_factor: 1, active: true },
+        { id: 'chile', name: 'Chile Verde', unit: 'kg', category: 'produce', cost_per_unit: 20, yield_factor: 1, active: true },
+      ],
+      recipeRefs: [
+        { id: 'toast-id', recipe_ref: 'avo toast' },
+        { id: 'chil-id', recipe_ref: null },
+      ],
+    })
+
+    const result = await deductIngredientsForOrder(
+      [
+        makeItem({ menuItemId: 'toast-id', nombre: 'AVOCADO TOAST' }),
+        makeItem({ menuItemId: 'chil-id',  nombre: 'Chilaquiles Verdes' }),
+        makeItem({ menuItemId: 'unk-id',   nombre: 'Platillo Nuevo' }),
+      ],
+      'order-res-mixed', 'test',
+    )
+
+    expect(result.resolution.DB_MAPPING).toEqual(['AVOCADO TOAST'])
+    expect(result.resolution.FUZZY_FALLBACK).toEqual(['Chilaquiles Verdes'])
+    expect(result.resolution.UNRESOLVED).toEqual(['Platillo Nuevo'])
+  })
+
+  it('resolution is empty arrays when function throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+    const result = await deductIngredientsForOrder([makeItem()], 'order-err', 'test')
+    expect(result.success).toBe(false)
+    expect(result.resolution.DB_MAPPING).toHaveLength(0)
+    expect(result.resolution.FUZZY_FALLBACK).toHaveLength(0)
+    expect(result.resolution.UNRESOLVED).toHaveLength(0)
+  })
 })

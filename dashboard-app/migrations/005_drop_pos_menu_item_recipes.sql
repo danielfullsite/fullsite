@@ -1,0 +1,30 @@
+-- Migration 005: Drop pos_menu_item_recipes
+--
+-- Context:
+--   pos_menu_item_recipes was created on 2026-07-24 as part of a P1 design
+--   that was later discarded in favor of recipe_ref (pos_menu_items.recipe_ref
+--   → pos_recipes_old). The table was seeded with 69 rows for client_id='amalay'
+--   but is not referenced by any application code, view, trigger, function, or
+--   RLS policy.
+--
+-- Pre-flight checks (run before executing this migration):
+--   SELECT COUNT(*) FROM pos_menu_item_recipes;                   -- expect 0 or 69 (seed data only)
+--   SELECT table_name FROM information_schema.tables
+--     WHERE table_name = 'pos_menu_item_recipes';                 -- confirms table exists
+--   -- Verify no new code references the table since 2026-07-24
+--
+-- Rollback:
+--   There is no data to restore (seed-only rows, not production data).
+--   If rollback is needed, re-run sql/pos_menu_item_recipes_archive.sql
+--   (create the table structure only — data is not worth preserving).
+--
+-- Execute when:
+--   P1 stable in production:
+--     - DB_MAPPING resolves via recipe_ref for all items with recipe_ref set
+--     - FUZZY_FALLBACK covers items without recipe_ref
+--     - No UNRESOLVED critical items in production logs
+--     - No hidden dependency discovered post-deploy
+--
+-- DO NOT EXECUTE until above conditions are confirmed.
+
+DROP TABLE IF EXISTS pos_menu_item_recipes;
