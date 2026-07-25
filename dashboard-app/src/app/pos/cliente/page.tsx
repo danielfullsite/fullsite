@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { formatMXN, getClientId } from '@/lib/pos-data'
+import { getPosConfigSync, getPosClientConfig } from '@/lib/pos-config'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -34,9 +35,11 @@ interface ActiveOrder {
 export default function ClienteDisplay() {
   const [order, setOrder] = useState<ActiveOrder | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [posConfig, setPosConfig] = useState(getPosConfigSync())
 
   useEffect(() => {
     setMounted(true)
+    getPosClientConfig().then(cfg => { if (cfg) setPosConfig(cfg) }).catch(() => {})
     const fetchLatest = async () => {
       try {
         const res = await fetch(
@@ -66,9 +69,11 @@ export default function ClienteDisplay() {
       {/* Header */}
       <header className="text-center py-6 border-b border-slate-800">
         <span className="text-white font-black text-3xl tracking-tight">
-          AMALAY
+          {posConfig.name || 'Fullsite'}
         </span>
-        <p className="text-emerald-400 text-sm tracking-widest">COFFEE & MARKET</p>
+        {posConfig.subtitle && (
+          <p className="text-emerald-400 text-sm tracking-widest">{posConfig.subtitle}</p>
+        )}
         {order && (
           <p className="text-[var(--text-3)] text-lg mt-2">Mesa {order.mesa}</p>
         )}
@@ -79,7 +84,7 @@ export default function ClienteDisplay() {
         {!order || items.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-[var(--text-2)] text-2xl font-light">Bienvenido a AMALAY</p>
+              <p className="text-[var(--text-2)] text-2xl font-light">Bienvenido a {posConfig.name || 'Fullsite'}</p>
               <p className="text-[var(--text-1)] text-sm mt-2">Tu orden aparecerá aquí</p>
             </div>
           </div>

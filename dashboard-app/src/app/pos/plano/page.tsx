@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Users, Clock, DollarSign, AlertTriangle, ExternalLink } from 'lucide-react'
 import { getMesasConfig, formatMXN } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
+import { getPosConfigSync } from '@/lib/pos-config'
+import { getActiveClientSlug as _cid } from '@/lib/data'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -440,7 +442,7 @@ export default function PlanoPage() {
               borderTop: '2px dashed rgba(255,255,255,0.08)',
             }} />
 
-            {/* AMALAY watermark */}
+            {/* Restaurant watermark */}
             <span style={{
               position: 'absolute',
               left: '80%',
@@ -451,7 +453,7 @@ export default function PlanoPage() {
               fontSize: 13,
               pointerEvents: 'none',
             }}>
-              AMALAY
+              {getPosConfigSync().name || _cid().toUpperCase()}
             </span>
 
             {/* Tables */}

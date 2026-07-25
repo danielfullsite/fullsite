@@ -7,6 +7,7 @@ import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, 
 import { getMesasConfig, formatMXN, logAudit, verifyManagerPin } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { getPosConfigSync } from '@/lib/pos-config'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -620,9 +621,9 @@ export default function MesasPage() {
           <div className="absolute top-[2%] bottom-[2%] border-l-2 border-dashed border-[var(--line)]" style={{ left: '76%' }} />
           {/* Divisor horizontal entre Toldo y Privado */}
           <div className="absolute border-t-2 border-dashed border-[var(--line)]" style={{ left: '77%', right: '1%', top: '55%' }} />
-          {/* Marca AMALAY */}
+          {/* Restaurant watermark */}
           <span className="absolute text-[var(--text-4)] opacity-40 font-bold tracking-[0.3em] text-sm pointer-events-none" style={{ left: '58%', top: '93%' }}>
-            AMALAY
+            {getPosConfigSync().name || _cid().toUpperCase()}
           </span>
           {/* Mesas con sillas */}
           {FLOOR_TABLES.map(ft => (

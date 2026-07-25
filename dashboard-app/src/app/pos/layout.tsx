@@ -80,6 +80,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [lockedUntil, setLockedUntil] = useState(0)
   const [showFingerprintRegister, setShowFingerprintRegister] = useState(false)
   const [registeringFingerprint, setRegisteringFingerprint] = useState(false)
+  const [logoSrc, setLogoSrc] = useState('')
   const [fingerprintMsg, setFingerprintMsg] = useState('')
   const [sessionError, setSessionError] = useState('')
 
@@ -94,7 +95,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // Start print retry loop — processes any queued print jobs from previous sessions
       import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
       // Load client config for receipts, IVA, branding (cached singleton)
-      import('@/lib/pos-config').then(m => m.getPosClientConfig()).catch(() => {})
+      import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(cfg => {
+        // Use DB logo if available; otherwise fall back to /logos/<clientId>.png
+        // Starting from empty prevents flash of wrong tenant logo for unauthenticated sessions
+        if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
+        else setLogoSrc(`/logos/${_cid()}.png`)
+      }).catch(() => {})
     }
   }, [])
 
@@ -535,11 +541,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     >
       <div className="text-center w-full max-w-xs mx-4">
         <div className="mb-8">
-          {/* Restaurant logo — tap 5x to exit kiosk mode */}
+          {/* Restaurant logo — loaded async from DB to prevent tenant bleed-through */}
           <img
-            src={`/logos/${_cid()}.png`}
+            src={logoSrc || 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='}
             alt=""
-            className="h-24 mx-auto mb-4 object-contain"
+            className={`h-24 mx-auto mb-4 object-contain${logoSrc ? '' : ' opacity-0'}`}
             onError={(e) => { const el = e.target as HTMLImageElement; el.style.display = 'none' }}
             onClick={() => {
               const key = 'pos_exit_taps'

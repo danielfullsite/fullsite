@@ -141,13 +141,13 @@ function getClientConfigFallback(clientId: string): ClientConfig {
       receipt_footer: 'Gracias por tu visita!',
     },
     demo: {
-      display_name: 'Casa Montaña',
-      city: 'Valle Oriente, Monterrey, NL',
-      type: 'Casual Dining · Brunch & Cena',
-      mesas: 28,
-      meseros: ['Alejandro Treviño', 'Sofía Garza', 'Diego Cantú', 'Valeria Lozano', 'Emilio Salinas', 'Camila Ruiz', 'Santiago Herrera', 'Isabella Flores'],
+      display_name: 'Café Central',
+      city: 'San Pedro Garza García, NL',
+      type: 'Café & Brunch',
+      mesas: 15,
+      meseros: ['Ana García', 'Luis Martínez', 'María López', 'Carlos Ruiz', 'Sofía Hernández'],
       data_source: 'demo',
-      features: { ...DEFAULT_FEATURES, nomina: true, delivery: true, ecommerce: true, resenas: true, giftCards: true },
+      features: { ...DEFAULT_FEATURES, nomina: false, delivery: false, ecommerce: false, resenas: false, giftCards: false },
     },
   }
 
