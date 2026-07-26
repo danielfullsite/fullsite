@@ -291,3 +291,50 @@ class InventoryPolicyService {
 
 export const inventoryPolicyService = new InventoryPolicyService()
 export { InventoryPolicyService }  // exported for unit tests only
+
+/**
+ * Fire-and-forget telemetry: writes a policy_gate_failure row to
+ * pos_inventory_movements (quantity=0, no stock change).
+ * Idempotent per orderId — skips insert if a record already exists.
+ * Never throws: all exceptions are caught internally.
+ */
+export function logPolicyGateFailure(
+  clientId: string,
+  orderId: string,
+  state: PolicyCacheState,
+  actor: string,
+): void {
+  ;(async () => {
+    try {
+      const check = await fetch(
+        `${SB_URL}/rest/v1/pos_inventory_movements` +
+        `?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&order_id=eq.${encodeURIComponent(orderId)}` +
+        `&movement_type=eq.policy_gate_failure` +
+        `&select=id&limit=1`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' },
+      )
+      if (check.ok) {
+        const existing: unknown[] = await check.json()
+        if (existing.length > 0) return
+      }
+      await fetch(`${SB_URL}/rest/v1/pos_inventory_movements`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json', Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          movement_type: 'policy_gate_failure',
+          quantity: 0,
+          order_id: orderId,
+          actor,
+          notes: JSON.stringify({ state }),
+        }),
+      })
+    } catch {
+      // Telemetry failure — never surfaces to the payment flow
+    }
+  })()
+}
