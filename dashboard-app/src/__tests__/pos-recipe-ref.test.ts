@@ -517,3 +517,75 @@ describe('deductIngredientsForOrder — R1 gate (fail-restrictive)', () => {
     expect(result.deductions[0].ingredient).toBe('Aguacate')
   })
 })
+
+// ─── READY_CACHED integration — full gate chain ────────────────────────────────
+//
+// Uses the REAL inventoryPolicyService singleton (no isReady/getMode spies).
+// Scenario: LKG warm + remote fails → READY_CACHED → gate active:
+//   - recipe item  → R1_OWNED  (Sistema A did not deduct)
+//   - non-recipe   → Sistema A processes it normally
+//
+// This test initializes the real singleton and leaves it READY — it must remain
+// last in the file so it does not affect earlier spy-based tests.
+
+describe('READY_CACHED integration — gate active via LKG cache', () => {
+  it('LKG warm + remote fail → READY_CACHED → recipe item R1_OWNED, non-recipe Sistema A runs', async () => {
+    // ── 1. Seed a warm LKG (1 hour old — well within the 7-day warm window) ──
+    const lkgEntry = JSON.stringify({
+      version: 1,
+      clientId: 'test-client',
+      rows: [{ menu_item_id: 'lkg-recipe-item', inventory_mode: 'recipe' }],
+      savedAt: Date.now() - 3_600_000,  // 1 h ago
+      hash: 'aabb1234',
+    })
+    store['lkg_policy_v1_test-client'] = lkgEntry
+
+    // ── 2. Remote fetch fails (simulate offline / no network) ─────────────────
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no network')))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    // ── 3. Initialize the real singleton — warm LKG applied immediately ───────
+    await inventoryPolicyService.initialize('test-client')
+
+    // ── 4. Assert READY_CACHED: gate is active despite remote failure ─────────
+    expect(inventoryPolicyService.isReady()).toBe(true)
+    expect(inventoryPolicyService.stats().source).toBe('CACHED')
+    expect(inventoryPolicyService.stats().state).toBe('READY')
+    // Recipe item present in LKG → 'recipe'; unknown item → null
+    expect(inventoryPolicyService.getMode('lkg-recipe-item')).toBe('recipe')
+    expect(inventoryPolicyService.getMode('other-menu-id')).toBeNull()
+
+    // ── 5. Swap in deduction fetch mock for the Sistema A call ────────────────
+    mockFetchSequence({
+      recipes:       [{ menu_item_name: 'avo toast', ingredient_id: 'avocado', quantity: 0.5, unit: 'pz' }],
+      inventoryRows: [{ ingredient_id: 'avocado', stock: 8, reorder_point: 2 }],
+      ingredientRows: [{
+        id: 'avocado', name: 'Aguacate', unit: 'pz', category: 'produce',
+        cost_per_unit: 18, yield_factor: 1, active: true,
+      }],
+      recipeRefs: [
+        { id: 'lkg-recipe-item', recipe_ref: null },        // recipe → skipped by gate before ref lookup
+        { id: 'other-menu-id',   recipe_ref: 'avo toast' }, // non-recipe → Sistema A processes
+      ],
+    })
+
+    // ── 6. Call without any isReady/getMode spy — uses real singleton state ───
+    const result = await deductIngredientsForOrder(
+      [
+        makeItem({ menuItemId: 'lkg-recipe-item', nombre: 'Chilaquiles (CACHED)' }),
+        makeItem({ menuItemId: 'other-menu-id',   nombre: 'Avo Toast' }),
+      ],
+      'ready-cached-integration-r1d',
+      'test-actor',
+    )
+
+    // ── 7. Gate was active (READY_CACHED) — recipe item skipped by Sistema A ──
+    expect(result.success).toBe(true)
+    expect(result.resolution.GATE_FAILED).toHaveLength(0)  // gate did NOT fail → no GATE_FAILED
+    expect(result.resolution.R1_OWNED).toContain('Chilaquiles (CACHED)')
+    // Non-recipe item → Sistema A ran → one deduction for Aguacate
+    expect(result.deductions).toHaveLength(1)
+    expect(result.deductions[0].ingredient).toBe('Aguacate')
+  })
+})

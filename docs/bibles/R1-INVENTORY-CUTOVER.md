@@ -511,71 +511,124 @@ El incidente se considera **cerrado** únicamente cuando se cumplen TODOS los si
 - Alternativa A, B o C seleccionada en §8 de este documento
 - Si B o C: clasificación completada o cronograma definido
 
-**C8 — Partición de 48 horas post-deploy**
+**C8 — Partición de 48 horas post-deploy (nivel item)**
 
 Ejecutar exactamente una vez, 48h después del deploy. Reemplazar `C8_DEPLOY_DATE` con el timestamp UTC del deploy (ej. `'2026-07-26 18:00:00+00'`).
 
 **Criterio:** La columna `clasificacion` no debe contener ninguna fila `gate_fallido_o_doble`.
 
+La partición opera a nivel `(order_id, menu_item_id)` — no a nivel de orden completa. Esto evita falsos positivos en órdenes mixtas que contienen items `recipe` y `direct_stock`: el gate solo reporta doble deducción cuando el **mismo ingrediente de la misma receta** fue deducido tanto por R1 como por Sistema A en la misma orden.
+
+Nota técnica: `pos_reconciliation_results.order_id` es `TEXT`; `pos_inventory_movements.order_id` es `UUID`. El join usa `m.order_id::text` para resolver el mismatch de tipos. La columna `pinned_recipe_version_id` en `pos_reconciliation_results` es la versión exacta que R1 usó — se une con `pos_recipe_lines` para obtener los ingredientes.
+
 ```sql
--- C8: clasificación de órdenes cerradas en la ventana post-deploy
-WITH r1_orders AS (
-  SELECT DISTINCT order_id
-  FROM pos_reconciliation_results
-  WHERE client_id = 'amalay'
-    AND created_at >= 'C8_DEPLOY_DATE'
+-- C8: partición a nivel de item (order_id + menu_item_id) — 48h post-deploy
+-- Reemplazar C8_DEPLOY_DATE con el timestamp UTC del deploy.
+--
+-- PASS: clasificacion 'gate_fallido_o_doble' no aparece (o n_items=0)
+-- FAIL: cualquier 'gate_fallido_o_doble' con n_items>0 → gate no funcionó → investigar
+
+WITH
+r1_items AS (
+  -- Items que R1 reconcilió exitosamente en la ventana post-deploy
+  SELECT
+    rr.order_id,                        -- TEXT
+    rr.menu_item_id,
+    rr.pinned_recipe_version_id         -- BIGINT — versión exacta que R1 usó
+  FROM pos_reconciliation_results rr
+  WHERE rr.client_id  = 'amalay'
+    AND rr.result     = 'RECONCILED'
+    AND rr.created_at >= 'C8_DEPLOY_DATE'
 ),
-sistema_a_orders AS (
-  SELECT DISTINCT order_id
-  FROM pos_inventory_movements
-  WHERE client_id = 'amalay'
-    AND movement_type = 'deduction'
-    AND actor != 'r1_reconciler'
-    AND created_at >= 'C8_DEPLOY_DATE'
+r1_ingredients AS (
+  -- Ingredientes exactos de cada item R1, usando la versión pinneada
+  SELECT
+    ri.order_id,
+    ri.menu_item_id,
+    prl.ingredient_id
+  FROM r1_items ri
+  JOIN pos_recipe_lines prl
+    ON prl.recipe_version_id = ri.pinned_recipe_version_id
+   AND prl.client_id         = 'amalay'
+  WHERE ri.pinned_recipe_version_id IS NOT NULL
+),
+sistema_a_deductions AS (
+  -- Deducciones de Sistema A (non-r1) en la ventana post-deploy
+  SELECT DISTINCT
+    m.order_id::text AS order_id,   -- cast UUID → TEXT para el JOIN
+    m.ingredient_id
+  FROM pos_inventory_movements m
+  WHERE m.client_id     = 'amalay'
+    AND m.movement_type = 'deduction'
+    AND m.actor        != 'r1_reconciler'
+    AND m.created_at   >= 'C8_DEPLOY_DATE'
+),
+classified_r1 AS (
+  -- Para cada (order_id, menu_item_id) recipe:
+  --   'gate_fallido_o_doble' → R1 dedujo Y Sistema A también dedujo algún ingrediente de esa receta
+  --   'solo_r1'              → R1 dedujo Y Sistema A no dedujo ningún ingrediente de esa receta
+  SELECT
+    ri.order_id,
+    ri.menu_item_id,
+    CASE
+      WHEN MAX(CASE WHEN sad.ingredient_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      THEN 'gate_fallido_o_doble'
+      ELSE 'solo_r1'
+    END AS clasificacion
+  FROM r1_ingredients ri
+  LEFT JOIN sistema_a_deductions sad
+    ON  sad.order_id      = ri.order_id
+    AND sad.ingredient_id = ri.ingredient_id
+  GROUP BY ri.order_id, ri.menu_item_id
 )
 SELECT
   clasificacion,
-  COUNT(*) AS n
-FROM (
-  SELECT
-    o.id,
-    CASE
-      WHEN r.order_id IS NOT NULL AND a.order_id IS NULL THEN 'solo_r1'
-      WHEN r.order_id IS NOT NULL AND a.order_id IS NOT NULL THEN 'gate_fallido_o_doble'
-      WHEN r.order_id IS NULL AND a.order_id IS NOT NULL THEN 'solo_sistema_a'
-      ELSE 'sin_movimientos'
-    END AS clasificacion
-  FROM pos_orders o
-  LEFT JOIN r1_orders r ON r.order_id = o.id
-  LEFT JOIN sistema_a_orders a ON a.order_id = o.id
-  WHERE o.client_id = 'amalay'
-    AND o.status = 'cerrada'
-    AND o.closed_at >= 'C8_DEPLOY_DATE'
-) t
+  COUNT(*)                                                       AS n_items,
+  ROUND(100.0 * COUNT(*) /
+    NULLIF(SUM(COUNT(*)) OVER (), 0), 1)                         AS pct_recipe_items
+FROM classified_r1
 GROUP BY clasificacion
-ORDER BY n DESC;
--- PASS: 'solo_r1' n>0, sin filas 'gate_fallido_o_doble'
--- FAIL: cualquier fila 'gate_fallido_o_doble' → el gate no funcionó → investigar
+ORDER BY
+  CASE clasificacion
+    WHEN 'gate_fallido_o_doble' THEN 1
+    WHEN 'solo_r1'              THEN 2
+    ELSE 3
+  END;
+-- pct_recipe_items: porcentaje calculado únicamente sobre items recipe (R1-manejados).
+-- 'solo_sistema_a' legítimo (direct_stock/unclassified) no aparece en esta vista.
+-- PASS: 0 filas 'gate_fallido_o_doble'
+-- FAIL: cualquier fila 'gate_fallido_o_doble' → NO proceder a C9/C10
 ```
 
-Para ver el detalle de órdenes problemáticas (si las hay):
+Para ver el detalle de los items problemáticos (si los hay):
 ```sql
-WITH r1_orders AS (
-  SELECT DISTINCT order_id FROM pos_reconciliation_results
-  WHERE client_id = 'amalay' AND created_at >= 'C8_DEPLOY_DATE'
+WITH
+r1_ingredients AS (
+  SELECT rr.order_id, rr.menu_item_id, prl.ingredient_id, rr.pinned_recipe_version_id
+  FROM pos_reconciliation_results rr
+  JOIN pos_recipe_lines prl
+    ON prl.recipe_version_id = rr.pinned_recipe_version_id AND prl.client_id = 'amalay'
+  WHERE rr.client_id  = 'amalay'
+    AND rr.result     = 'RECONCILED'
+    AND rr.created_at >= 'C8_DEPLOY_DATE'
+    AND rr.pinned_recipe_version_id IS NOT NULL
 ),
-sistema_a_orders AS (
-  SELECT DISTINCT order_id FROM pos_inventory_movements
-  WHERE client_id = 'amalay' AND movement_type = 'deduction'
-    AND actor != 'r1_reconciler' AND created_at >= 'C8_DEPLOY_DATE'
+sistema_a_deductions AS (
+  SELECT DISTINCT m.order_id::text AS order_id, m.ingredient_id
+  FROM pos_inventory_movements m
+  WHERE m.client_id = 'amalay' AND m.movement_type = 'deduction'
+    AND m.actor != 'r1_reconciler' AND m.created_at >= 'C8_DEPLOY_DATE'
 )
-SELECT o.id, o.closed_at, o.mesero
-FROM pos_orders o
-JOIN r1_orders r ON r.order_id = o.id
-JOIN sistema_a_orders a ON a.order_id = o.id
-WHERE o.client_id = 'amalay'
-  AND o.status = 'cerrada' AND o.closed_at >= 'C8_DEPLOY_DATE'
-ORDER BY o.closed_at DESC;
+SELECT
+  ri.order_id,
+  ri.menu_item_id,
+  ri.ingredient_id,
+  'gate_fallido_o_doble' AS clasificacion
+FROM r1_ingredients ri
+JOIN sistema_a_deductions sad
+  ON  sad.order_id      = ri.order_id
+  AND sad.ingredient_id = ri.ingredient_id
+ORDER BY ri.order_id, ri.menu_item_id, ri.ingredient_id;
 -- Filas aquí = P0 no resuelto → NO proceder a C9/C10
 ```
 
@@ -598,14 +651,69 @@ WHERE client_id = 'amalay'
 -- WARN: si > 0, revisar causa (arranque sin red, TTL expirado) y documentar
 ```
 
+**Idempotencia de `policy_gate_failure` — migración pendiente de aprobación**
+
+El constraint actual depende de GET-before-POST en `logPolicyGateFailure` (`inventory-policy.ts`). Esto tiene una ventana de race condition si dos terminales procesan la misma orden simultáneamente.
+
+**Constraint verificado:** No existe ningún índice único en `pos_inventory_movements` sobre `(client_id, order_id)`. Solo existe el PK (`id`) y dos FK sobre `product_id` / `reconciliation_result_id`.
+
+**Migración propuesta** (no aplicar sin aprobación de Daniel):
+
+```sql
+-- SEGURO: CONCURRENTLY no bloquea lecturas ni escrituras durante la creación.
+-- Requiere que no existan filas duplicadas en (client_id, order_id) con movement_type='policy_gate_failure'.
+-- Si ya existen duplicados, eliminarlos primero con DELETE ... WHERE ctid NOT IN (SELECT MIN(ctid) ...).
+
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS
+  pos_inventory_movements_gate_failure_uniq
+ON pos_inventory_movements (client_id, order_id)
+WHERE movement_type = 'policy_gate_failure';
+```
+
+**Código actualizado de `logPolicyGateFailure`** (aplicar solo después de la migración):
+
+```typescript
+export function logPolicyGateFailure(
+  clientId: string, orderId: string, state: PolicyCacheState, actor: string,
+): void {
+  ;(async () => {
+    try {
+      // Upsert idempotente: ON CONFLICT (client_id, order_id) DO NOTHING.
+      // Requiere: pos_inventory_movements_gate_failure_uniq (partial unique index).
+      await fetch(
+        `${SB_URL}/rest/v1/pos_inventory_movements` +
+        `?on_conflict=client_id,order_id`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal,resolution=ignore-duplicates',
+          },
+          body: JSON.stringify({
+            client_id: clientId, movement_type: 'policy_gate_failure',
+            quantity: 0, order_id: orderId, actor,
+            notes: JSON.stringify({ state }),
+          }),
+        },
+      )
+    } catch {
+      // Telemetry failure — never surfaces to the payment flow
+    }
+  })()
+}
+```
+
+**Por qué no aplicar el código antes de la migración:** `ON CONFLICT (client_id, order_id) DO NOTHING` sin un unique index sobre esas columnas causa un error PostgreSQL `"no unique or exclusion constraint matching the ON CONFLICT specification"`. Ese error es capturado silenciosamente, pero impide incluso la primera inserción. Aplicar migración primero, luego el código.
+
 **C10 — Aprobación explícita de cierre**
 - Daniel emite la aprobación explícita de cierre del incidente en esta sesión o la siguiente
 - El estado del documento se actualiza a: `Estado: CERRADO — fecha`
 
 ---
 
-*Versión 4 — actualizado 2026-07-26 post-implementación gate fail-restrictive.*  
-*Cambios v4: C8 corregido a query 48h (partición solo_r1/gate_fallido_o_doble), C9 añadido (policy_gate_failure), C10 = aprobación de cierre (renumerado desde C8 v3). Ver R1-REVERSAL-STRATEGY.md para estrategia de reversals.*
+*Versión 5 — actualizado 2026-07-26.*  
+*Cambios v5: C8 corregido a nivel de item (order_id + menu_item_id, ingredientes via pinned_recipe_version_id, cast order_id::text), propuesta de migración idempotencia policy_gate_failure con único parcial. Versión anterior (v4): partición solo a nivel de orden.*
 
 ---
 

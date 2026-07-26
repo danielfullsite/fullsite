@@ -295,7 +295,9 @@ export { InventoryPolicyService }  // exported for unit tests only
 /**
  * Fire-and-forget telemetry: writes a policy_gate_failure row to
  * pos_inventory_movements (quantity=0, no stock change).
- * Idempotent per orderId — skips insert if a record already exists.
+ * Idempotent per orderId — module-level Set guards within-session; GET-before-POST
+ * guards across terminals. True cross-terminal DB idempotency requires the partial
+ * unique index proposed in docs/bibles/R1-INVENTORY-CUTOVER.md §C9.
  * Never throws: all exceptions are caught internally.
  */
 export function logPolicyGateFailure(
