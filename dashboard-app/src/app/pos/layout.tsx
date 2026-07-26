@@ -7,6 +7,9 @@ import { apiUrl } from '@/lib/api-base'
 import { checkActiveSession, registerSession, startHeartbeat, removeSession } from '@/lib/pos-sessions'
 import TurnoGate from '@/components/pos/TurnoGate'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { getEffectiveSetting } from '@/lib/settings'
+import { initStationRouting } from '@/lib/pos-constants'
+import { inventoryPolicyService } from '@/lib/inventory-policy'
 
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -38,7 +41,8 @@ async function ensureAttendanceEntry(staffId: string, staffName: string, method:
 
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 60000 // 1 minute lockout
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+// Resolved at startup from settings contract; fallback = 30 min (registry default)
+let IDLE_TIMEOUT_MS = 30 * 60 * 1000
 
 interface StaffMember {
   id: string
@@ -96,11 +100,20 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
       // Load client config for receipts, IVA, branding (cached singleton)
       import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(cfg => {
-        // Use DB logo if available; otherwise fall back to /logos/<clientId>.png
-        // Starting from empty prevents flash of wrong tenant logo for unauthenticated sessions
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
-        // No logo configured → leave logoSrc='' (img stays hidden, no 404)
       }).catch(() => {})
+      // Load operational settings — idle timeout + station routing override
+      const clientId = _cid()
+      if (clientId) {
+        Promise.all([
+          getEffectiveSetting(clientId, 'pos.idle_timeout_ms'),
+          getEffectiveSetting(clientId, 'pos.station_routing'),
+          inventoryPolicyService.initialize(clientId),
+        ]).then(([idleMs, stationRouting]) => {
+          IDLE_TIMEOUT_MS = idleMs
+          initStationRouting(stationRouting as Record<string, string[]>)
+        }).catch(() => { /* keep module-level defaults */ })
+      }
     }
   }, [])
 
