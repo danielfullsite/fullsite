@@ -651,60 +651,9 @@ WHERE client_id = 'amalay'
 -- WARN: si > 0, revisar causa (arranque sin red, TTL expirado) y documentar
 ```
 
-**Idempotencia de `policy_gate_failure` — migración pendiente de aprobación**
+**Idempotencia de `policy_gate_failure` — migración aplicada 2026-07-26**
 
-El constraint actual depende de GET-before-POST en `logPolicyGateFailure` (`inventory-policy.ts`). Esto tiene una ventana de race condition si dos terminales procesan la misma orden simultáneamente.
-
-**Constraint verificado:** No existe ningún índice único en `pos_inventory_movements` sobre `(client_id, order_id)`. Solo existe el PK (`id`) y dos FK sobre `product_id` / `reconciliation_result_id`.
-
-**Migración propuesta** (no aplicar sin aprobación de Daniel):
-
-```sql
--- SEGURO: CONCURRENTLY no bloquea lecturas ni escrituras durante la creación.
--- Requiere que no existan filas duplicadas en (client_id, order_id) con movement_type='policy_gate_failure'.
--- Si ya existen duplicados, eliminarlos primero con DELETE ... WHERE ctid NOT IN (SELECT MIN(ctid) ...).
-
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS
-  pos_inventory_movements_gate_failure_uniq
-ON pos_inventory_movements (client_id, order_id)
-WHERE movement_type = 'policy_gate_failure';
-```
-
-**Código actualizado de `logPolicyGateFailure`** (aplicar solo después de la migración):
-
-```typescript
-export function logPolicyGateFailure(
-  clientId: string, orderId: string, state: PolicyCacheState, actor: string,
-): void {
-  ;(async () => {
-    try {
-      // Upsert idempotente: ON CONFLICT (client_id, order_id) DO NOTHING.
-      // Requiere: pos_inventory_movements_gate_failure_uniq (partial unique index).
-      await fetch(
-        `${SB_URL}/rest/v1/pos_inventory_movements` +
-        `?on_conflict=client_id,order_id`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal,resolution=ignore-duplicates',
-          },
-          body: JSON.stringify({
-            client_id: clientId, movement_type: 'policy_gate_failure',
-            quantity: 0, order_id: orderId, actor,
-            notes: JSON.stringify({ state }),
-          }),
-        },
-      )
-    } catch {
-      // Telemetry failure — never surfaces to the payment flow
-    }
-  })()
-}
-```
-
-**Por qué no aplicar el código antes de la migración:** `ON CONFLICT (client_id, order_id) DO NOTHING` sin un unique index sobre esas columnas causa un error PostgreSQL `"no unique or exclusion constraint matching the ON CONFLICT specification"`. Ese error es capturado silenciosamente, pero impide incluso la primera inserción. Aplicar migración primero, luego el código.
+Índice creado: `pos_inventory_movements_gate_failure_uniq` — único parcial sobre `(client_id, order_id)` WHERE `movement_type = 'policy_gate_failure'`. Código actualizado a single-POST con `ON CONFLICT DO NOTHING` (eliminado el GET-before-POST). Ver `src/lib/inventory-policy.ts:logPolicyGateFailure`.
 
 **C10 — Aprobación explícita de cierre**
 - Daniel emite la aprobación explícita de cierre del incidente en esta sesión o la siguiente

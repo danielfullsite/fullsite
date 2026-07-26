@@ -295,9 +295,9 @@ export { InventoryPolicyService }  // exported for unit tests only
 /**
  * Fire-and-forget telemetry: writes a policy_gate_failure row to
  * pos_inventory_movements (quantity=0, no stock change).
- * Idempotent per orderId — module-level Set guards within-session; GET-before-POST
- * guards across terminals. True cross-terminal DB idempotency requires the partial
- * unique index proposed in docs/bibles/R1-INVENTORY-CUTOVER.md §C9.
+ * Idempotent at DB level via partial unique index on (client_id, order_id)
+ * WHERE movement_type = 'policy_gate_failure' — ON CONFLICT DO NOTHING.
+ * Module-level Set (_gateFailureOrderIds in pos-data.ts) guards within-session.
  * Never throws: all exceptions are caught internally.
  */
 export function logPolicyGateFailure(
@@ -308,33 +308,25 @@ export function logPolicyGateFailure(
 ): void {
   ;(async () => {
     try {
-      const check = await fetch(
-        `${SB_URL}/rest/v1/pos_inventory_movements` +
-        `?client_id=eq.${encodeURIComponent(clientId)}` +
-        `&order_id=eq.${encodeURIComponent(orderId)}` +
-        `&movement_type=eq.policy_gate_failure` +
-        `&select=id&limit=1`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: 'no-store' },
-      )
-      if (check.ok) {
-        const existing: unknown[] = await check.json()
-        if (existing.length > 0) return
-      }
-      await fetch(`${SB_URL}/rest/v1/pos_inventory_movements`, {
-        method: 'POST',
-        headers: {
-          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-          'Content-Type': 'application/json', Prefer: 'return=minimal',
+      await fetch(
+        `${SB_URL}/rest/v1/pos_inventory_movements?on_conflict=client_id,order_id`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal,resolution=ignore-duplicates',
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            movement_type: 'policy_gate_failure',
+            quantity: 0,
+            order_id: orderId,
+            actor,
+            notes: JSON.stringify({ state }),
+          }),
         },
-        body: JSON.stringify({
-          client_id: clientId,
-          movement_type: 'policy_gate_failure',
-          quantity: 0,
-          order_id: orderId,
-          actor,
-          notes: JSON.stringify({ state }),
-        }),
-      })
+      )
     } catch {
       // Telemetry failure — never surfaces to the payment flow
     }
