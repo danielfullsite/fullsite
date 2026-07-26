@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// ─── Mock logPolicyGateFailure so gate tests don't produce telemetry fetches ──
+vi.mock('@/lib/inventory-policy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/inventory-policy')>()
+  return { ...actual, logPolicyGateFailure: vi.fn() }
+})
+
 // ─── localStorage mock (needed for _getClientId()) ───────────────────────────
 
 const store: Record<string, string> = {}
@@ -25,6 +31,7 @@ import {
   deductIngredientsForOrder,
   type OrderItem,
 } from '@/lib/pos-data'
+import { inventoryPolicyService } from '@/lib/inventory-policy'
 
 // ─── fetchRecipeRefCoverage ───────────────────────────────────────────────────
 
@@ -147,6 +154,13 @@ function mockFetchSequence({
 }
 
 describe('deductIngredientsForOrder — resolution paths', () => {
+  // Policy must be READY for Sistema A to run. These tests verify Sistema A behavior
+  // assuming the gate is active and all test items are non-recipe (mode=null).
+  beforeEach(() => {
+    vi.spyOn(inventoryPolicyService, 'isReady').mockReturnValue(true)
+    vi.spyOn(inventoryPolicyService, 'getMode').mockReturnValue(null)
+  })
+
   it('uses DB path when recipe_ref is set and matching recipe exists', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -398,6 +412,180 @@ describe('deductIngredientsForOrder — resolution paths', () => {
     expect(result.success).toBe(false)
     expect(result.resolution.DB_MAPPING).toHaveLength(0)
     expect(result.resolution.FUZZY_FALLBACK).toHaveLength(0)
+    expect(result.resolution.GATE_FAILED).toHaveLength(0)
     expect(result.resolution.UNRESOLVED).toHaveLength(0)
+  })
+})
+
+// ─── R1 gate — fail-restrictive ────────────────────────────────────────────────
+//
+// When policy is NOT READY, Sistema A must NOT run. R1 already fired at Kitchen Send.
+// The gate is fail-restrictive for inventory: the sale succeeds, stock is untouched by
+// Sistema A, and a policy_gate_failure event is emitted for observability.
+
+describe('deductIngredientsForOrder — R1 gate (fail-restrictive)', () => {
+  it('skips Sistema A entirely when policy is not READY — returns GATE_FAILED', async () => {
+    vi.spyOn(inventoryPolicyService, 'isReady').mockReturnValue(false)
+    vi.spyOn(inventoryPolicyService, 'stats').mockReturnValue({
+      state: 'UNINITIALIZED', clientId: null, itemCount: 0, durationMs: null,
+      contentHash: null, loadedAt: null, failureReason: null, attempts: 0,
+      source: null, cacheAgeMs: null,
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    // Fresh stub — isolates this test from previous fetch history.
+    // logPolicyGateFailure telemetry is fire-and-forget and may call fetch; that's expected.
+    const freshFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', freshFetch)
+
+    const items = [
+      makeItem({ menuItemId: 'recipe-item', nombre: 'Chilaquiles Verdes' }),
+      makeItem({ menuItemId: 'other-item',  nombre: 'Café Americano' }),
+    ]
+    const result = await deductIngredientsForOrder(items, 'gate-fail-order-r1a', 'test')
+
+    // Payment must succeed (no blocking)
+    expect(result.success).toBe(true)
+    // No deductions — Sistema A did not run
+    expect(result.deductions).toHaveLength(0)
+    // All items in GATE_FAILED, nothing in Sistema A resolution buckets
+    expect(result.resolution.GATE_FAILED).toEqual(['Chilaquiles Verdes', 'Café Americano'])
+    expect(result.resolution.R1_OWNED).toHaveLength(0)
+    expect(result.resolution.DB_MAPPING).toHaveLength(0)
+    expect(result.resolution.UNRESOLVED).toHaveLength(0)
+    // pos_recipes_old must NOT be fetched — Sistema A did not run
+    const recipesFetched = freshFetch.mock.calls.some((args: unknown[]) =>
+      String(args[0]).includes('pos_recipes_old')
+    )
+    expect(recipesFetched).toBe(false)
+  })
+
+  it('records policy_gate_failure once per orderId (idempotent)', async () => {
+    vi.spyOn(inventoryPolicyService, 'isReady').mockReturnValue(false)
+    vi.spyOn(inventoryPolicyService, 'stats').mockReturnValue({
+      state: 'FAILED', clientId: 'test-client', itemCount: 0, durationMs: 500,
+      contentHash: null, loadedAt: null, failureReason: 'HTTP 503', attempts: 3,
+      source: null, cacheAgeMs: null,
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }))
+
+    // Two calls with the same orderId (simulate payment retry)
+    await deductIngredientsForOrder([makeItem()], 'gate-idempotent-order-r1b', 'test')
+    await deductIngredientsForOrder([makeItem()], 'gate-idempotent-order-r1b', 'test')
+
+    // policy_gate_failure must be emitted exactly once for this orderId
+    const gateEvents = errorSpy.mock.calls.filter(
+      args => String(args[0]).includes('policy_gate_failure')
+    )
+    expect(gateEvents).toHaveLength(1)
+  })
+
+  it('policy READY + recipe item → R1_OWNED, not GATE_FAILED', async () => {
+    vi.spyOn(inventoryPolicyService, 'isReady').mockReturnValue(true)
+    vi.spyOn(inventoryPolicyService, 'getMode').mockImplementation(
+      (id: string) => (id === 'recipe-menu-id' ? 'recipe' : null)
+    )
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    mockFetchSequence({
+      recipes: [{ menu_item_name: 'avo toast', ingredient_id: 'avocado', quantity: 0.5, unit: 'pz' }],
+      inventoryRows: [{ ingredient_id: 'avocado', stock: 10, reorder_point: 2 }],
+      ingredientRows: [{ id: 'avocado', name: 'Aguacate', unit: 'pz', category: 'produce', cost_per_unit: 15, yield_factor: 1, active: true }],
+      recipeRefs: [
+        { id: 'recipe-menu-id', recipe_ref: 'avo toast' },
+        { id: 'other-menu-id',  recipe_ref: 'avo toast' },
+      ],
+    })
+
+    const result = await deductIngredientsForOrder(
+      [
+        makeItem({ menuItemId: 'recipe-menu-id', nombre: 'Chilaquiles Verdes' }),
+        makeItem({ menuItemId: 'other-menu-id',  nombre: 'Avo Toast' }),
+      ],
+      'gate-ready-recipe-r1c', 'test',
+    )
+
+    expect(result.success).toBe(true)
+    // recipe item is gated → R1_OWNED, not deducted by Sistema A
+    expect(result.resolution.R1_OWNED).toContain('Chilaquiles Verdes')
+    expect(result.resolution.GATE_FAILED).toHaveLength(0)
+    // non-recipe item → Sistema A ran, deduction happened
+    expect(result.deductions).toHaveLength(1)
+    expect(result.deductions[0].ingredient).toBe('Aguacate')
+  })
+})
+
+// ─── READY_CACHED integration — full gate chain ────────────────────────────────
+//
+// Uses the REAL inventoryPolicyService singleton (no isReady/getMode spies).
+// Scenario: LKG warm + remote fails → READY_CACHED → gate active:
+//   - recipe item  → R1_OWNED  (Sistema A did not deduct)
+//   - non-recipe   → Sistema A processes it normally
+//
+// This test initializes the real singleton and leaves it READY — it must remain
+// last in the file so it does not affect earlier spy-based tests.
+
+describe('READY_CACHED integration — gate active via LKG cache', () => {
+  it('LKG warm + remote fail → READY_CACHED → recipe item R1_OWNED, non-recipe Sistema A runs', async () => {
+    // ── 1. Seed a warm LKG (1 hour old — well within the 7-day warm window) ──
+    const lkgEntry = JSON.stringify({
+      version: 1,
+      clientId: 'test-client',
+      rows: [{ menu_item_id: 'lkg-recipe-item', inventory_mode: 'recipe' }],
+      savedAt: Date.now() - 3_600_000,  // 1 h ago
+      hash: 'aabb1234',
+    })
+    store['lkg_policy_v1_test-client'] = lkgEntry
+
+    // ── 2. Remote fetch fails (simulate offline / no network) ─────────────────
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no network')))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    // ── 3. Initialize the real singleton — warm LKG applied immediately ───────
+    await inventoryPolicyService.initialize('test-client')
+
+    // ── 4. Assert READY_CACHED: gate is active despite remote failure ─────────
+    expect(inventoryPolicyService.isReady()).toBe(true)
+    expect(inventoryPolicyService.stats().source).toBe('CACHED')
+    expect(inventoryPolicyService.stats().state).toBe('READY')
+    // Recipe item present in LKG → 'recipe'; unknown item → null
+    expect(inventoryPolicyService.getMode('lkg-recipe-item')).toBe('recipe')
+    expect(inventoryPolicyService.getMode('other-menu-id')).toBeNull()
+
+    // ── 5. Swap in deduction fetch mock for the Sistema A call ────────────────
+    mockFetchSequence({
+      recipes:       [{ menu_item_name: 'avo toast', ingredient_id: 'avocado', quantity: 0.5, unit: 'pz' }],
+      inventoryRows: [{ ingredient_id: 'avocado', stock: 8, reorder_point: 2 }],
+      ingredientRows: [{
+        id: 'avocado', name: 'Aguacate', unit: 'pz', category: 'produce',
+        cost_per_unit: 18, yield_factor: 1, active: true,
+      }],
+      recipeRefs: [
+        { id: 'lkg-recipe-item', recipe_ref: null },        // recipe → skipped by gate before ref lookup
+        { id: 'other-menu-id',   recipe_ref: 'avo toast' }, // non-recipe → Sistema A processes
+      ],
+    })
+
+    // ── 6. Call without any isReady/getMode spy — uses real singleton state ───
+    const result = await deductIngredientsForOrder(
+      [
+        makeItem({ menuItemId: 'lkg-recipe-item', nombre: 'Chilaquiles (CACHED)' }),
+        makeItem({ menuItemId: 'other-menu-id',   nombre: 'Avo Toast' }),
+      ],
+      'ready-cached-integration-r1d',
+      'test-actor',
+    )
+
+    // ── 7. Gate was active (READY_CACHED) — recipe item skipped by Sistema A ──
+    expect(result.success).toBe(true)
+    expect(result.resolution.GATE_FAILED).toHaveLength(0)  // gate did NOT fail → no GATE_FAILED
+    expect(result.resolution.R1_OWNED).toContain('Chilaquiles (CACHED)')
+    // Non-recipe item → Sistema A ran → one deduction for Aguacate
+    expect(result.deductions).toHaveLength(1)
+    expect(result.deductions[0].ingredient).toBe('Aguacate')
   })
 })

@@ -268,6 +268,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 // Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
+import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
@@ -1922,12 +1923,44 @@ export async function logInventoryMovement(movement: {
 
 // ─── Auto-deduction: deduct recipe ingredients when order sent to kitchen ───
 
+// Tracks orderIds that have already emitted policy_gate_failure to prevent duplicate events
+// when deductIngredientsForOrder is retried for the same order within a session.
+const _gateFailureOrderIds = new Set<string>()
+
+function _recordGateFailure(orderId: string, items: OrderItem[], actor: string): void {
+  if (_gateFailureOrderIds.has(orderId)) return
+  _gateFailureOrderIds.add(orderId)
+  const policyState = inventoryPolicyService.stats().state
+  console.error('[policy:gate] policy_gate_failure', { orderId, itemCount: items.length, policyState })
+  console.info('[policy:event] policy_gate_failure', {
+    orderId, itemCount: items.length, items: items.map(i => i.nombre), policyState,
+  })
+  logPolicyGateFailure(_getClientId(), orderId, policyState, actor)
+}
+
 export async function deductIngredientsForOrder(
   items: OrderItem[],
   orderId: string,
   actor: string,
-): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; UNRESOLVED: string[] } }> {
+): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; R1_OWNED: string[]; GATE_FAILED: string[]; UNRESOLVED: string[] } }> {
   try {
+  // Policy must be READY before Sistema A runs.
+  // If policy is UNINITIALIZED/LOADING/FAILED we cannot distinguish recipe items from
+  // unclassified. Skip Sistema A entirely — R1 already fired at Kitchen Send.
+  if (!inventoryPolicyService.isReady()) {
+    _recordGateFailure(orderId, items, actor)
+    console.info(
+      `[deduct:summary] order=${orderId} items=${items.length} gate=FAILED_NO_POLICY ` +
+      `policyState=${inventoryPolicyService.stats().state}`
+    )
+    return {
+      success: true,
+      deductions: [],
+      alerts: [],
+      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: items.map(i => i.nombre), UNRESOLVED: [] },
+    }
+  }
+
   // 1. Get all recipes and inventory
   const recipes = await getRecipes()
   const inventory = await getInventory()
@@ -1935,7 +1968,7 @@ export async function deductIngredientsForOrder(
 
   const deductions: { ingredient: string; amount: number; unit: string; newStock: number }[] = []
   const alerts: string[] = []
-  const resolution = { DB_MAPPING: [] as string[], FUZZY_FALLBACK: [] as string[], UNRESOLVED: [] as string[] }
+  const resolution = { DB_MAPPING: [] as string[], FUZZY_FALLBACK: [] as string[], R1_OWNED: [] as string[], GATE_FAILED: [] as string[], UNRESOLVED: [] as string[] }
 
   // 2. Fetch recipe_ref from pos_menu_items for all items in this order (1 DB call)
   const menuItemIds = [...new Set(items.map(i => i.menuItemId))]
@@ -1943,7 +1976,7 @@ export async function deductIngredientsForOrder(
 
   // Observability counters — flushed to console at end of loop
   const obs = {
-    total: 0, viaDb: 0, viaFuzzy: 0, miss: 0,
+    total: 0, r1Skipped: 0, viaDb: 0, viaFuzzy: 0, miss: 0,
     fuzzyItems: [] as string[], missItems: [] as string[],
   }
 
@@ -1969,6 +2002,16 @@ export async function deductIngredientsForOrder(
   }
 
   for (const item of items) {
+    // R1 gate: skip items owned by R1 — deduction handled by r1_reconcile_item.
+    // Defaults to Alternativa A from §8: only 'recipe' items are gated; 'unclassified'
+    // continue through Sistema A unchanged until §8 decision is made.
+    const mode = inventoryPolicyService.getMode(item.menuItemId)
+    if (mode === 'recipe') {
+      obs.r1Skipped++
+      resolution.R1_OWNED.push(item.nombre)
+      continue
+    }
+
     obs.total++
     const itemName = item.nombre.toLowerCase()
     const itemNorm = normalizeRecipeName(item.nombre)
@@ -2080,7 +2123,7 @@ export async function deductIngredientsForOrder(
     const pFuzzy = Math.round(obs.viaFuzzy / obs.total * 100)
     const pMiss  = Math.round(obs.miss     / obs.total * 100)
     console.info(
-      `[deduct:summary] order=${orderId} items=${obs.total} ` +
+      `[deduct:summary] order=${orderId} items=${obs.total + obs.r1Skipped} gate=ACTIVE r1=${obs.r1Skipped} ` +
       `db=${obs.viaDb}(${pDb}%) fuzzy=${obs.viaFuzzy}(${pFuzzy}%) miss=${obs.miss}(${pMiss}%)`
     )
     if (obs.fuzzyItems.length > 0) console.warn(`[deduct:fuzzy-items] ${obs.fuzzyItems.join(', ')}`)
@@ -2090,7 +2133,7 @@ export async function deductIngredientsForOrder(
   return { success: true, deductions, alerts, resolution }
   } catch (err) {
     console.warn('[deductIngredientsForOrder] Failed:', err)
-    return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], UNRESOLVED: [] } }
+    return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] } }
   }
 }
 

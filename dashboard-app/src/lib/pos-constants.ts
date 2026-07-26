@@ -68,6 +68,24 @@ export const CATEGORY_COLOR_SAFELIST = [
 
 export type StationName = 'cocina' | 'barra' | 'caja'
 
+// Client-level override — loaded at POS startup via initStationRouting()
+// If null, STATION_CATEGORIES (system default) is used.
+let _clientStationOverride: Record<string, StationName> | null = null
+
+/**
+ * Call once at POS startup after loading client config.
+ * routingMap keys are category slugs, values are station names.
+ * Pass null to reset to system defaults.
+ */
+export function initStationRouting(routingMap: Record<string, string[]> | null): void {
+  if (!routingMap) { _clientStationOverride = null; return }
+  const flat: Record<string, StationName> = {}
+  for (const [station, cats] of Object.entries(routingMap)) {
+    for (const cat of cats) flat[cat] = station as StationName
+  }
+  _clientStationOverride = flat
+}
+
 // Category IDs (from MENU_CATEGORIES) routed to each station
 export const STATION_CATEGORIES: Record<StationName, string[]> = {
   cocina: [
@@ -140,6 +158,8 @@ export function setCategoryNameCache(map: Record<string, string>) { _categoryNam
 
 // Fallback: determine station from item name using BEBIDA_KEYWORDS
 export function getStationForItem(categoryId: string, itemName: string): StationName {
+  // Client override takes precedence (loaded via initStationRouting at startup)
+  if (_clientStationOverride?.[categoryId]) return _clientStationOverride[categoryId]
   // Try category-based routing first (static category IDs like 'cerveza', 'coffee')
   if (CATEGORY_TO_STATION[categoryId]) {
     return CATEGORY_TO_STATION[categoryId]
