@@ -12,6 +12,10 @@ import { useEffect, useRef, useState } from 'react'
 const PROTOCOL_VERSION = '1.0'
 const LOCAL_PORT = 7717
 
+// Reconnect delay: exponential backoff, 1s → 2s → 4s → … capped at 30s
+const RECONNECT_INITIAL_MS = 1_000
+const RECONNECT_MAX_MS = 30_000
+
 function getBridgeUrl(): string {
   if (typeof window === 'undefined') return `ws://127.0.0.1:${LOCAL_PORT}/ws`
   // Cross-device: KDS on a different machine points to the POS server's LAN IP
@@ -29,8 +33,9 @@ export function setPosServerHost(ip: string): void {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type BridgeEvent = {
+  id?: string
   type: string
-  payload: unknown
+  payload: Record<string, unknown>
   ts?: number
   sequence?: number
 }
@@ -54,11 +59,20 @@ export class BridgeClient {
   private pingTimer: ReturnType<typeof setInterval> | null = null
   private _connected = false
   private dead = false
+  private _reconnectDelay = RECONNECT_INITIAL_MS
+  private _lastSequence: number
 
   constructor(
     private readonly clientId: string,
     private readonly clientType: 'pos' | 'kds' | 'barra' | 'admin' = 'pos',
-  ) {}
+    private readonly restaurantId?: string,
+    lastSequence = 0,
+  ) {
+    this._lastSequence = lastSequence
+  }
+
+  get connected() { return this._connected }
+  get lastSequence() { return this._lastSequence }
 
   connect() {
     if (this.dead) return
@@ -68,13 +82,25 @@ export class BridgeClient {
 
       this.ws.onopen = () => {
         this._connected = true
-        this._send({ type: 'SUBSCRIBE', client_id: this.clientId, client_type: this.clientType, last_sequence: 0 })
+        this._reconnectDelay = RECONNECT_INITIAL_MS  // reset backoff on successful connection
+        this._send({
+          type: 'SUBSCRIBE',
+          client_id: this.clientId,
+          client_type: this.clientType,
+          restaurant_id: this.restaurantId,
+          last_sequence: this._lastSequence,
+        })
         this.pingTimer = setInterval(() => this._send({ type: 'PING', client_id: this.clientId }), 25_000)
       }
 
       this.ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data as string) as ServerMsg
+          // Track the highest sequence seen for catch-up on reconnect
+          const seq = (msg as { sequence?: number }).sequence
+          if (typeof seq === 'number' && seq > this._lastSequence) {
+            this._lastSequence = seq
+          }
           for (const h of this.handlers) h(msg)
         } catch { /* malformed frame */ }
       }
@@ -82,7 +108,12 @@ export class BridgeClient {
       this.ws.onclose = () => {
         this._connected = false
         if (this.pingTimer) clearInterval(this.pingTimer)
-        if (!this.dead) this.reconnectTimer = setTimeout(() => this.connect(), 3_000)
+        if (!this.dead) {
+          this.reconnectTimer = setTimeout(() => {
+            this._reconnectDelay = Math.min(this._reconnectDelay * 2, RECONNECT_MAX_MS)
+            this.connect()
+          }, this._reconnectDelay)
+        }
       }
 
       this.ws.onerror = () => { this.ws?.close() }
@@ -103,7 +134,26 @@ export class BridgeClient {
     return () => this.handlers.delete(handler)
   }
 
-  get connected() { return this._connected }
+  /**
+   * Send a COMMAND to the local server. Returns the generated command_id.
+   * Caller can match ACK/REJECT responses by command_id.
+   * No-op (returns null) if the WS is not open.
+   */
+  sendCommand(commandType: string, payload: Record<string, unknown>): string | null {
+    if (this.ws?.readyState !== WebSocket.OPEN) return null
+    const commandId = `${this.clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    this._send({
+      type: 'COMMAND',
+      restaurant_id: this.restaurantId,
+      payload: {
+        command_id: commandId,
+        command_type: commandType,
+        client_id: this.clientId,
+        ...payload,
+      },
+    })
+    return commandId
+  }
 
   private _send(data: Record<string, unknown>) {
     if (this.ws?.readyState === WebSocket.OPEN) {
@@ -143,7 +193,9 @@ export function useBridgeClient(
       localStorage.getItem('pos_terminal_id') ||
       `web-${Math.random().toString(36).slice(2, 10)}`
 
-    const client = new BridgeClient(clientId, clientType)
+    const restaurantId = localStorage.getItem('fullsite_client_id') || undefined
+
+    const client = new BridgeClient(clientId, clientType, restaurantId)
 
     const unsub = client.on((msg) => {
       if (msg.type === 'SNAPSHOT' || msg.type === 'PONG') setConnected(true)

@@ -9,7 +9,8 @@ import {
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName } from '@/lib/pos-constants'
-import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
+import { setPosServerHost } from '@/lib/bridge-client'
+import { useKdsWsClient } from '@/hooks/useKdsWsClient'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -88,78 +89,53 @@ function playAlert() {
   } catch { /* audio not available */ }
 }
 
+// ── KDS-02 mode indicator ─────────────────────────────────────────────────
+
+const MODE_PILL = {
+  LAN_PRIMARY:  { dot: 'bg-emerald-500', label: 'LAN' },
+  RECONCILING:  { dot: 'bg-amber-400 animate-pulse', label: '...' },
+  FALLBACK:     { dot: 'bg-orange-400', label: 'Supabase' },
+  OFFLINE:      { dot: 'bg-slate-500', label: '' },
+}
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function KDSPage() {
   const router = useRouter()
-  const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [station, setStation] = useState<Station>('cocina')
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
-  const prevCount = useRef(0)
-  // Idempotency guard: prevents double-tap from firing two concurrent status updates
   const advancingRef = useRef<Set<string>>(new Set())
+  const prevEnviadaRef = useRef(0)
 
-  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
-    const printerStation: StationName = station === 'panaderia' ? 'caja' : station as StationName
-    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
-    const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[])
-    const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
-    setReprintMsg({ success: result.printed, text: msg })
-    setTimeout(() => setReprintMsg(null), 3000)
-    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station: printerStation } })
-  }
+  // ── KDS-02: Local Server as primary ──────────────────────────────────
+  const kdsClient = useKdsWsClient()
+  const orders = kdsClient.orders
 
-  const fetchOrders = useCallback(async () => {
-    let data: KitchenOrderFromDB[]
-    try {
-      data = await getKitchenOrders()
-    } catch {
-      // Offline — merge cached orders from IndexedDB into current state
-      try {
-        const { getCachedOrders } = await import('@/lib/pos-offline-db')
-        const [env, prep, lst] = await Promise.all([
-          getCachedOrders('enviada'),
-          getCachedOrders('preparando'),
-          getCachedOrders('lista'),
-        ])
-        const cached = [...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[]
-        if (cached.length > 0) {
-          setOrders(prev => {
-            const existing = new Set(prev.map(o => o.id))
-            const fresh = cached.filter(o => !existing.has(o.id))
-            return fresh.length > 0 ? [...prev, ...fresh] : prev
-          })
-        }
-      } catch { /* IndexedDB not available */ }
-      return
-    }
-    const now = Date.now()
-    const fourHours = 4 * 60 * 60 * 1000
-    const fresh = data.filter(o => {
-      const age = now - new Date(o.created_at).getTime()
-      return age <= fourHours || o.status === 'lista'
-    })
+  // Sound alert when new enviada orders arrive (works for both LAN and Supabase)
+  useEffect(() => {
+    const n = orders.filter(o => o.status === 'enviada').length
+    if (prevEnviadaRef.current > 0 && n > prevEnviadaRef.current) playAlert()
+    prevEnviadaRef.current = n
+  }, [orders])
 
-    // Sound alert for new orders
-    const newCount = fresh.filter(o => o.status === 'enviada').length
-    if (prevCount.current > 0 && newCount > prevCount.current) {
-      playAlert()
-    }
-    prevCount.current = newCount
-
-    setOrders(fresh)
-    setLastUpdate(new Date())
-    // Restore done items from kds_item_status (separate field, no race with POS items writes)
+  // Reconcile doneItems from server kds_item_status — handles cross-device sync.
+  // In LAN_PRIMARY mode this fires on every DELTA; in FALLBACK on every Supabase poll.
+  // Note: local optimistic updates (from toggleItemDone) are overwritten here once
+  // the server confirms the state — this is intentional (server is authoritative).
+  useEffect(() => {
     const restored = new Set<string>()
-    for (const order of fresh) {
-      // Read from kds_item_status field (new) with fallback to kds_done in items (legacy)
+    for (const order of orders) {
       let kdsStatus: Record<string, boolean> = {}
       if (order.kds_item_status) {
-        try { kdsStatus = typeof order.kds_item_status === 'string' ? JSON.parse(order.kds_item_status) : order.kds_item_status } catch { /* */ }
+        try {
+          kdsStatus = typeof order.kds_item_status === 'string'
+            ? JSON.parse(order.kds_item_status)
+            : order.kds_item_status
+        } catch { /* */ }
       }
       if (Object.keys(kdsStatus).length > 0) {
         for (const [idx, done] of Object.entries(kdsStatus)) {
@@ -173,9 +149,48 @@ export default function KDSPage() {
         })
       }
     }
-    // Replace entire set from DB truth — handles un-done from other devices
-    if (restored.size > 0 || doneItems.size > 0) setDoneItems(restored)
-  }, [])
+    setDoneItems(restored)
+  }, [orders])
+
+  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
+    const printerStation: StationName = station === 'panaderia' ? 'caja' : station as StationName
+    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
+    const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[])
+    const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
+    setReprintMsg({ success: result.printed, text: msg })
+    setTimeout(() => setReprintMsg(null), 3000)
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station: printerStation } })
+  }
+
+  // ── Supabase fallback poll ─────────────────────────────────────────────
+  // Only runs when KDS is not in LAN_PRIMARY mode.
+  const fetchOrdersForFallback = useCallback(async () => {
+    let data: KitchenOrderFromDB[]
+    try {
+      data = await getKitchenOrders()
+    } catch {
+      // Offline — merge IDB-cached orders into fallback state
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const [env, prep, lst] = await Promise.all([
+          getCachedOrders('enviada'),
+          getCachedOrders('preparando'),
+          getCachedOrders('lista'),
+        ])
+        const cached = [...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[]
+        if (cached.length > 0) kdsClient.setFallbackOrders(cached)
+      } catch { /* IndexedDB not available */ }
+      return
+    }
+    const now = Date.now()
+    const fourHours = 4 * 60 * 60 * 1000
+    const fresh = data.filter(o => {
+      const age = now - new Date(o.created_at).getTime()
+      return age <= fourHours || o.status === 'lista'
+    })
+    kdsClient.setFallbackOrders(fresh)
+    setLastUpdate(new Date())
+  }, [kdsClient])
 
   // Register ?bridge=IP on first visit so this device connects to the POS server on LAN
   useEffect(() => {
@@ -186,54 +201,40 @@ export default function KDSPage() {
       setPosServerHost(bridgeHost)
       window.history.replaceState({}, '', window.location.pathname)
     }
+    setMounted(true)
   }, [])
 
-  // Push DELTA events from the POS local server — works cross-device over LAN
-  useBridgeClient((event) => {
-    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
-    if (ORDER_EVENTS.includes(event.type)) {
-      // Cache order from DELTA so this KDS can show it even if Supabase is down
-      if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
-        const p = event.payload as Record<string, unknown>
-        if (p.order_id) {
-          import('@/lib/pos-offline-db').then(({ cacheOrder }) => {
-            cacheOrder({
-              id: p.order_id as string,
-              mesa: p.mesa,
-              mesero: p.mesero,
-              status: 'enviada',
-              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
-              personas: p.personas || 1,
-              total: p.total || 0,
-              turno_id: p.turno_id || null,
-              notas: p.notas || null,
-              comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }).catch(() => {})
-        }
-      }
-      fetchOrders()
-    }
-  }, 'kds')
-
+  // Timer tick for elapsed counters (always)
   useEffect(() => {
-    setMounted(true)
-    fetchOrders()
-    const interval = setInterval(fetchOrders, 2000)
     const timerInterval = setInterval(() => setTick(t => t + 1), 10000)
-    return () => { clearInterval(interval); clearInterval(timerInterval) }
-  }, [fetchOrders])
+    return () => clearInterval(timerInterval)
+  }, [])
+
+  // Supabase polling — active only when NOT in LAN_PRIMARY mode
+  useEffect(() => {
+    if (kdsClient.mode === 'LAN_PRIMARY') {
+      setLastUpdate(new Date())
+      return  // Local Server is delivering updates; no polling needed
+    }
+    fetchOrdersForFallback()
+    const interval = setInterval(fetchOrdersForFallback, 2000)
+    return () => clearInterval(interval)
+  }, [kdsClient.mode, fetchOrdersForFallback])
+
+  // ── KDS actions (dual-write: Local Server + Supabase) ─────────────────
 
   const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
     try {
       const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : 'entregada'
+      // KDS-02: tell Local Server first (broadcasts to POS and other KDS)
+      kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: next })
+      // Supabase write (Phase 1 dual-write; server is not yet authoritative)
       await updateOrderStatus(id, next)
       logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
-      fetchOrders()
+      // In FALLBACK mode refresh from Supabase; in LAN_PRIMARY the DELTA arrives automatically
+      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
     } finally {
       advancingRef.current.delete(id)
     }
@@ -243,9 +244,10 @@ export default function KDSPage() {
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
     try {
+      kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: 'entregada' })
       await updateOrderStatus(id, 'entregada')
       logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
-      fetchOrders()
+      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
     } finally {
       advancingRef.current.delete(id)
     }
@@ -259,7 +261,7 @@ export default function KDSPage() {
         next.delete(key)
       } else {
         next.add(key)
-        // Check if all active items are now done — auto-advance to "lista"
+        // Auto-advance to "lista" when all active items are done
         const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
         const allDone = items.every((item, idx) => {
           if (item.cancelled) return true
@@ -271,8 +273,7 @@ export default function KDSPage() {
         }
       }
 
-      // Persist KDS item statuses to a SEPARATE field (not items) to avoid
-      // race condition with POS writes. KDS writes kds_item_status, POS writes items.
+      // Build kds_item_status map for persistence
       const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
       const kdsStatus: Record<string, boolean> = {}
       items.forEach((item, idx) => {
@@ -280,6 +281,11 @@ export default function KDSPage() {
         const k = `${orderId}-${idx}`
         kdsStatus[`${idx}`] = k === key ? !prev.has(key) : next.has(k)
       })
+
+      // KDS-02: send command to Local Server first
+      kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_status: JSON.stringify(kdsStatus) })
+
+      // Supabase dual-write (KDS writes kds_item_status, POS writes items — no race)
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
         method: 'PATCH',
         headers: {
@@ -314,7 +320,6 @@ export default function KDSPage() {
   const filteredOrders = orders
     .filter(o => o.status !== 'entregada')
     .filter(o => {
-      // all items shown for this station
       const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
       return items.some(item => !item.cancelled && getStation(item) === station)
     })
@@ -336,6 +341,8 @@ export default function KDSPage() {
       stationCounts[s] += qty
     }
   }
+
+  const modePill = MODE_PILL[kdsClient.mode]
 
   if (!mounted) return null
 
@@ -374,7 +381,7 @@ export default function KDSPage() {
           })}
         </div>
 
-        {/* Status summary + clock */}
+        {/* Status summary + connection mode + clock */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 text-sm">
             <span className="flex items-center gap-1.5">
@@ -390,6 +397,13 @@ export default function KDSPage() {
               {orders.filter(o => o.status === 'lista').length}
             </span>
           </div>
+          {/* KDS-02 connection mode indicator */}
+          {modePill.label && (
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${modePill.dot}`} />
+              {modePill.label}
+            </span>
+          )}
           <span className="text-[var(--text-2)] text-xs font-mono">
             {lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
@@ -403,7 +417,9 @@ export default function KDSPage() {
             <div className="text-center text-[var(--text-2)]">
               <p className="text-6xl mb-4">👨‍🍳</p>
               <p className="text-2xl font-bold">Sin ordenes</p>
-              <p className="text-sm mt-1">Actualizando cada 2 segundos</p>
+              <p className="text-sm mt-1">
+                {kdsClient.mode === 'LAN_PRIMARY' ? 'Escuchando en tiempo real' : 'Actualizando cada 2 segundos'}
+              </p>
             </div>
           </div>
         ) : (
@@ -415,13 +431,11 @@ export default function KDSPage() {
               const isPrep = order.status === 'preparando'
               const isDone = order.status === 'lista'
 
-              // Item-level done tracking — use original index (before station filter) for stable keys
               const allItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
               const activeItemsWithIndex = allItems
                 .map((item, idx) => ({ item, originalIndex: idx }))
                 .filter(({ item }) => {
                   if (item.cancelled) return false
-                  // all items shown for this station
                   return getStation(item) === station
                 })
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length

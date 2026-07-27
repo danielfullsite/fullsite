@@ -65,20 +65,82 @@ class RestaurantState {
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  _applyOrderUpserted({ order_id, mesa, items }) {
-    this._orders.set(order_id, { order_id, mesa, items, status: 'abierta' })
-    this._mesas.set(String(mesa), { status: 'ocupada', order_id, locked_by: null })
+  _applyOrderUpserted({ order_id, mesa, items, status }) {
+    const existing = this._orders.get(order_id)
+    if (existing) {
+      // Status update from KDS (preparando / lista / entregada) or POS merge
+      this._orders.set(order_id, {
+        ...existing,
+        status:      status      || existing.status,
+        items:       items != null ? (typeof items === 'string' ? items : JSON.stringify(items)) : existing.items,
+        updated_at:  new Date().toISOString(),
+      })
+    } else {
+      this._orders.set(order_id, {
+        id: order_id, order_id, mesa, status: status || 'abierta',
+        items: typeof items === 'string' ? items : JSON.stringify(items || []),
+        mesero: '', notas: null, kds_item_status: null, comanda_batches: null,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      })
+    }
+    if (mesa != null) this._mesas.set(String(mesa), { status: 'ocupada', order_id, locked_by: null })
     return { changed: ['mesas', 'orders'] }
   }
 
-  _applyOrderSent({ order_id, mesa, items_sent, station }) {
-    const existing = this._kds.find(k => k.order_id === order_id)
-    if (existing) {
-      existing.items_sent = [...(existing.items_sent || []), ...(items_sent || [])]
+  // ORDER_SENT: first round OR additional round from same order.
+  // POS always sends the FULL updated items list on each round.
+  // On first send: store complete order object so KDS can display without Supabase.
+  // On subsequent sends: replace items (preserving kds_item_status — new indices
+  //   are absent from the map which the KDS treats as not-done).
+  _applyOrderSent(payload) {
+    const { order_id, mesa, mesero, status, notas, comanda_batches, personas, total } = payload
+    // Accept both 'items' (POS broadcast) and 'items_sent' (legacy test fixture / old protocol)
+    const items = payload.items ?? payload.items_sent ?? []
+    const itemsStr = typeof items === 'string' ? items : JSON.stringify(items)
+    const combatStr = comanda_batches != null
+      ? (typeof comanda_batches === 'string' ? comanda_batches : JSON.stringify(comanda_batches))
+      : null
+    const existing = this._orders.get(order_id)
+
+    if (existing && existing._kds_sent) {
+      // Additional round — replace items, preserve kds_item_status and immutable fields
+      this._orders.set(order_id, {
+        ...existing,
+        items:            itemsStr,
+        comanda_batches:  combatStr ?? existing.comanda_batches,
+        status:           'enviada',   // new round resets to enviada
+        updated_at:       new Date().toISOString(),
+        // kds_item_status NOT touched — new item indices are simply absent (→ not-done)
+      })
     } else {
-      this._kds.push({ order_id, mesa, items_sent: items_sent || [], sent_at: Date.now(), station })
+      const now = new Date().toISOString()
+      this._orders.set(order_id, {
+        id:               order_id,
+        order_id,
+        mesa:             mesa   ?? null,
+        mesero:           mesero ?? '',
+        status:           status ?? 'enviada',
+        items:            itemsStr,
+        notas:            notas  ?? null,
+        comanda_batches:  combatStr,
+        personas:         personas ?? 1,
+        total:            total    ?? 0,
+        kds_item_status:  null,
+        created_at:       now,
+        updated_at:       now,
+        _kds_sent:        true,   // internal flag: this order has reached kitchen
+      })
     }
-    return { changed: ['kds'] }
+
+    // kds_queue: minimal entry for Supabase-poll STATE_SYNC compatibility
+    const inKds = this._kds.find(k => k.order_id === order_id)
+    if (!inKds) {
+      this._kds.push({ order_id, mesa, items_sent: items || [], sent_at: Date.now() })
+    } else {
+      inKds.items_sent = items || []
+    }
+
+    return { changed: ['orders', 'kds'] }
   }
 
   _applyOrderClosed({ order_id, mesa }) {
@@ -96,15 +158,31 @@ class RestaurantState {
     return { changed: ['mesas', 'orders', 'kds'] }
   }
 
-  _applyKdsItemStatus({ order_id, item_id, status }) {
-    const entry = this._kds.find(k => k.order_id === order_id)
-    if (entry && status === 'entregada') {
-      entry.items_sent = (entry.items_sent || []).filter(i => i.id !== item_id)
-      if (entry.items_sent.length === 0) {
-        this._kds = this._kds.filter(k => k.order_id !== order_id)
+  // KDS_ITEM_STATUS: two protocols supported.
+  // New: kds_item_status = JSON string of the full {idx: bool} map (sent by toggleItemDone).
+  // Legacy: item_id + status='entregada' removes a single item from kds_queue.
+  _applyKdsItemStatus({ order_id, item_id, status, kds_item_status }) {
+    // Update full order object if present
+    const order = this._orders.get(order_id)
+    if (order) {
+      if (kds_item_status !== undefined) {
+        this._orders.set(order_id, {
+          ...order,
+          kds_item_status: typeof kds_item_status === 'string' ? kds_item_status : JSON.stringify(kds_item_status),
+          updated_at: new Date().toISOString(),
+        })
       }
     }
-    return { changed: ['kds'] }
+
+    // Legacy kds_queue cleanup
+    if (status === 'entregada') {
+      const entry = this._kds.find(k => k.order_id === order_id)
+      if (entry) {
+        entry.items_sent = (entry.items_sent || []).filter(i => i.id !== item_id)
+        if (entry.items_sent.length === 0) this._kds = this._kds.filter(k => k.order_id !== order_id)
+      }
+    }
+    return { changed: ['orders', 'kds'] }
   }
 
   _applyMesaLock({ mesa, client_id, expires_ms }) {
@@ -164,9 +242,16 @@ class RestaurantState {
   // ─── Snapshot ────────────────────────────────────────────────────────────
 
   toSnapshot() {
+    // kds_orders: full order objects for every order that has been sent to kitchen
+    // and is not yet closed/cancelled. KDS uses this to render without Supabase.
+    const kds_orders = [...this._orders.values()]
+      .filter(o => o._kds_sent && o.status !== 'entregada' && o.status !== 'cerrada')
+      .map(({ _kds_sent, ...rest }) => rest)  // strip internal flag before sending
+
     return {
       mesas:              Object.fromEntries(this._mesas),
       kds_queue:          [...this._kds],
+      kds_orders,
       turno:              this._turno,
       locks:              Object.fromEntries(this._locks),
       last_supabase_sync: this._lastSupabaseSync,

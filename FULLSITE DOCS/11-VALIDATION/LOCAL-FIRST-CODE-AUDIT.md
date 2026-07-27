@@ -1,5 +1,5 @@
 # Local-First Code Audit Matrix
-<!-- Última actualización: 2026-07-27 (sesión 3). No borrar hallazgos resueltos — marcar Estado. -->
+<!-- Última actualización: 2026-07-27 (sesión 4). No borrar hallazgos resueltos — marcar Estado. -->
 
 ## Leyenda de severidad
 - **CRITICAL** — bloquea la operación del restaurante sin internet
@@ -41,9 +41,9 @@
 | ID | Severidad | Módulo | Archivo/función | Problema | Riesgo offline | Solución | Estado | Commit | Tests | Validación física |
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
 | KDS-01 | CRITICAL | KDS | `pos/kds/page.tsx` `toggleItemDone` | `updateOrderStatus` (advance/bump) ya tenía fallback offline vía IDB. `toggleItemDone` hacía PATCH directo sin queue — solo logueaba el error en red. | Offline: el cocinero marca item listo → state local OK pero no se persiste ni sincroniza. | `.catch` de `toggleItemDone` ahora encola en `fullsite_offline_queue` para sync posterior. | FIXED | — | — | — |
-| KDS-02 | HIGH | KDS | `pos/kds/page.tsx` `fetchOrders` | KDS hace poll a Supabase cada 2s. Solo cuando falla usa IDB como fallback. | Cuando Supabase cae, KDS congela o muestra órdenes desactualizadas. La IDB solo tiene lo que el POS guardó. | KDS debe suscribirse al Local Server (WsHub) como fuente primaria, Supabase como respaldo. | OPEN | — | — | — |
+| KDS-02 | HIGH | KDS | `pos/kds/page.tsx` `useKdsWsClient.ts` | KDS hacía poll a Supabase cada 2s. Solo cuando fallaba usaba IDB como fallback. | Cuando Supabase cae, KDS congela o muestra órdenes desactualizadas. La IDB solo tiene lo que el POS guardó. | `useKdsWsClient` hook: WsHub WS como fuente primaria (LAN_PRIMARY), Supabase poll solo en FALLBACK/OFFLINE. Modos: LAN_PRIMARY / RECONCILING / FALLBACK / OFFLINE. Catch-up con last_sequence, dedup sliding-window 256 IDs, dual-write en acciones KDS. | FIXED | (este commit) | 17 kds-ws.test.js | — |
 | KDS-03 | HIGH | KDS | `public/sw.js` | `pos_orders` NO está en el API cache del Service Worker. | KDS no puede servir órdenes offline desde SW. Solo IDB. | Agregar `pos_orders` al cache del SW, o confiar en IDB + Local Server. | OPEN | — | — | — |
-| KDS-04 | MEDIUM | KDS | `pos/kds/page.tsx` | No se suscribe al WsHub via WebSocket en startup. Usa REST poll (2s) + HTTP bridge eventos. | Latencia 0-2s en actualizaciones cruzadas cuando debería ser <500ms. | Conectar KDS al WsHub `/ws` en mount, aplicar SNAPSHOT + DELTAs. | OPEN | — | — | — |
+| KDS-04 | MEDIUM | KDS | `pos/kds/page.tsx` | No se suscribe al WsHub via WebSocket en startup. Usa REST poll (2s) + HTTP bridge eventos. | Latencia 0-2s en actualizaciones cruzadas cuando debería ser <500ms. | Resuelto por KDS-02: `useKdsWsClient` conecta WsHub WS en mount con SNAPSHOT + DELTAs. | FIXED | (este commit) | — | — |
 
 ---
 
@@ -61,7 +61,7 @@
 
 | ID | Severidad | Módulo | Archivo/función | Problema | Riesgo offline | Solución | Estado | Commit | Tests | Validación física |
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
-| PER-01 | HIGH | IDB | `pos-offline-db.ts` + `offline-sync.ts` | Dos queues paralelas (IDB `sync_queue` + localStorage `fullsite_offline_queue`). Items en una invisible a la otra. | Split-brain: sync puede ignorar items si están en la queue equivocada. | Deprecar `offline-sync.ts`, redirigir todo a IDB. Mantener compatibilidad para items existentes. | OPEN | — | — | — |
+| PER-01 | HIGH | IDB | `pos-offline-db.ts` + `offline-sync.ts` | Dos queues paralelas (IDB `sync_queue` + localStorage `fullsite_offline_queue`). Items en una invisible a la otra. | Split-brain: sync puede ignorar items si están en la queue equivocada. | IDB `sync_queue` es la cola canónica. `drainLocalStorageToIdb()` migra items de localStorage a IDB en startup. Los únicos writes a `fullsite_offline_queue` son emergency-fallback (IDB primero, localStorage solo si IDB falla). | FIXED | a3a47f4 | — | — |
 | PER-02 | HIGH | EventStore | `AGENTS.md` + código | `src/lib/event-store.ts` referenciado en AGENTS.md como contrato formal de "Event store (POS)" pero **el archivo no existe**. | Cualquier import a `event-store.ts` falla en runtime. | Crear el módulo o actualizar AGENTS.md con la abstracción real. | OPEN | — | — | — |
 | PER-03 | MEDIUM | Print | `print-queue.ts` | `recoverFromIDB()` implementado (commit P0.3) pero `_syncQueueToIDB` usa dynamic import fire-and-forget. Si el import falla, IDB no se actualiza. | Print jobs perdidos si IDB import falla al escribir. | Verificar que dynamic import no falla en contexto Electron. Test en Windows. | OPEN | — | — | — |
 | PER-04 | LOW | Turno | `pos/turno/page.tsx` | `turnoId` se persiste en localStorage. Si localStorage se borra (modo privado, policy), turno se pierde. | Turno no recuperable solo desde localStorage en ese caso. | Turno también en IDB (ya implementado P0.1). Doble persistencia. | FIXED | 9cd2d78 | — | — |
@@ -105,42 +105,42 @@
 |--------|----------|------|--------|-----|-------|
 | Cobro | 0 | 0 | 1 | 1 | 1 |
 | Órdenes | 0 | 0 | 1 | 1 | 2 |
-| KDS | 0 | 2 | 1 | 1 | 1 |
+| KDS | 0 | 1 | 0 | 0 | 3 |
 | Navegación | 0 | 0 | 1 | 2 | 0 |
-| Persistencia | 0 | 2 | 1 | 0 | 1 |
-| Sync LAN | 0 | 2 | 1 | 1 | 0 |
-| Configuración | 0 | 1 | 0 | 0 | 3 |
+| Persistencia | 0 | 1 | 1 | 0 | 2 |
+| Sync LAN | 0 | 2 | 2 | 0 | 0 |
+| Configuración | 0 | 2 | 0 | 0 | 2 |
 | Impresión | 0 | 0 | 1 | 0 | 1 |
-| **Total** | **0** | **7** | **7** | **6** | **9** |
+| **Total** | **0** | **6** | **7** | **4** | **11** |
 
-### Circuito offline — estado actual (sesión 3 / CFG-02 resuelto)
+### Circuito offline — estado actual (sesión 4 / KDS-02 + PER-01 resueltos)
 - **Funciona offline**: PIN, turno, mapa de mesas, órdenes, envíos, impresión, cobro, KDS avanzar/completar/item-done
+- **KDS LAN-first**: `useKdsWsClient` — WsHub WS como fuente primaria, Supabase poll solo en FALLBACK/OFFLINE. Modos visuales: LAN / ... / Supabase / (sin señal). 17 tests cubren snapshot, catch-up, second-round, dual-write, mismatch rejection, idempotency.
+- **Queue única**: IDB `sync_queue` es la cola canónica. `drainLocalStorageToIdb()` migra en startup. localStorage solo es emergency-fallback.
 - **Multi-terminal real-time**: broadcast inmediato al Local Server en TODOS los envíos (online y offline)
 - **Timeouts cortos**: conflict-check y race-check abortan en 4s — no más cuelgues en LAN degradada
 - **Identidad validada**: TerminalConfig schema + wizard provisionamiento + ws-hub mismatch rejection
 - **Migración automática**: installs AMALAY existentes migran sin perder IDB / queues / turno
-- **Todavía requiere internet en 1er boot**: KDS startup sin estado previo en IDB, actualizaciones
+- **Todavía requiere internet en 1er boot**: KDS startup sin estado previo en IDB, actualizaciones de SW
 
 ### HIGH restantes — clasificados por impacto
 
-**Operación offline / end-to-end**
-- KDS-02 (HIGH): KDS usa Supabase poll cada 2s — si cae Supabase, pantalla congela. WsHub debería ser fuente primaria.
-- PER-01 (HIGH): Dos queues paralelas (IDB + localStorage) — split-brain silencioso si items caen en la cola equivocada.
-- PER-02 (HIGH): `event-store.ts` referenciado en AGENTS.md pero no existe — cualquier import rompe en runtime.
+**EventStore / Persistencia**
+- PER-02 (HIGH): `event-store.ts` referenciado en AGENTS.md pero no existe — cualquier import rompe en runtime. Investigar qué abstracción cubre esto antes de crear un archivo nuevo.
 
 **Multi-terminal / LAN sync**
 - LAN-01 (HIGH): Local Server en Phase 1 — Supabase sigue siendo autoridad de escritura. Multi-terminal offline diverge.
 - LAN-03 (HIGH): mDNS puede fallar silenciosamente en Windows con múltiples interfaces de red → KDS standalone no encuentra el servidor.
 
-**KDS**
-- KDS-04 (MEDIUM): KDS no se suscribe al WsHub via WebSocket en startup — latencia 0-2s vs <500ms con WS.
-
 **Configuración / Replicabilidad**
 - CFG-01 (HIGH): IPs `192.168.1.21`/`.30` hardcodeadas como DEFAULT_STATIONS — en nueva sucursal no funcionan sin editar el config.
 - CFG-04 (HIGH): Octogent hooks llaman `127.0.0.1:8787` — ECONNREFUSED en cada tool use (no bloquea operación, pero ruido en logs).
 
+**KDS**
+- KDS-03 (HIGH): `pos_orders` no está en el API cache del SW — KDS no puede servir órdenes desde SW offline (IDB + Local Server lo cubren parcialmente).
+
 ### Próximo HIGH recomendado
-**PER-01** (split-brain de queues) — es el que más daño silencioso puede causar en producción: una orden que queda en localStorage no se sincroniza si IDB hace el flush. Una sesión de trabajo resuelve esto y desbloquea PER-02.
+**PER-02** (event-store.ts no existe) — research-first: determinar si el archivo debe crearse, qué debe exportar, y qué tiene que ver con `NdjsonEventStore` en el Local Server. Una sesión de research + decisión arquitectural antes de escribir código.
 
 ---
-*Generado: 2026-07-27 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js*
+*Generado: 2026-07-27 | Sesión 4 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js, useKdsWsClient.ts*
