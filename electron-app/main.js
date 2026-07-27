@@ -299,9 +299,29 @@ function createKdsWindow(x, y, width, height) {
   });
   kdsWindow.setMenu(null);
   kdsWindow.loadURL(KDS_URL);
-  kdsWindow.webContents.on('did-fail-load', () => {
-    kdsWindow.loadFile('offline.html');
+
+  let kdsFailCount = 0;
+  kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
+    if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted
+    const { net } = require('electron');
+    if (!net.online) {
+      kdsFailCount = 0;
+      kdsWindow.loadFile('offline.html', { query: { target: KDS_URL } });
+      return;
+    }
+    kdsFailCount++;
+    if (kdsFailCount <= 3) {
+      // Give SW time to activate from previous session (progressive backoff)
+      setTimeout(() => {
+        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(KDS_URL);
+      }, kdsFailCount * 800);
+    } else {
+      kdsFailCount = 0;
+      kdsWindow.loadFile('offline.html', { query: { target: KDS_URL } });
+    }
   });
+
+  kdsWindow.webContents.on('did-finish-load', () => { kdsFailCount = 0; });
   kdsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   kdsWindow.on('closed', () => { kdsWindow = null; });
   console.log('[kds] KDS window opened on', `${x},${y} ${width}x${height}`);

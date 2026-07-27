@@ -159,7 +159,8 @@
   </div>
 
   <script>
-    var POS_URL = 'https://app.fullsite.mx/pos';
+    // Support ?target= param so the KDS can pass its own URL instead of the default /pos
+    var POS_URL = new URLSearchParams(window.location.search).get('target') || 'https://app.fullsite.mx/pos';
 
     // ── Last boot timestamp ───────────────────────────────────────────────────
     var last = localStorage.getItem('pos_last_boot');
@@ -193,6 +194,22 @@
       if (autoTimer) return; // already running
       var state = getRetryState();
       if (state.count >= 2) return; // SceneC — don't auto-redirect into a blank page
+
+      // Verify the SW has the target URL cached before auto-navigating.
+      // Without this check, if the URL is not cached, we'd navigate → fail →
+      // did-fail-load → offline.html → redirect → fail → infinite loop.
+      if (typeof caches !== 'undefined') {
+        caches.match(POS_URL, { ignoreSearch: true }).then(function(cached) {
+          if (!cached) return; // Not cached — don't auto-redirect, user must wait for network
+          _startCountdown();
+        }).catch(function() { _startCountdown(); }); // caches API error — just try
+      } else {
+        _startCountdown(); // caches API not available (old browser)
+      }
+    }
+
+    function _startCountdown() {
+      if (autoTimer) return;
       var secs = 3;
       var hint = document.getElementById('continue-hint');
       function tick() {
