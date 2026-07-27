@@ -66,9 +66,19 @@ class WsHub {
         clientId = msg.client_id
         if (!clientId) { ws.close(1008, 'Missing client_id'); return }
 
+        // CFG-02: reject terminals with mismatched or missing restaurant_id.
+        // Prevents data mixing when multiple restaurants share the same LAN.
+        const remoteRestaurantId = msg.restaurant_id
+        if (remoteRestaurantId && remoteRestaurantId !== 'unknown' && remoteRestaurantId !== this._restaurantId) {
+          const reason = `restaurant_id mismatch: server=${this._restaurantId} client=${remoteRestaurantId}`
+          console.warn(`[ws-hub] SUBSCRIBE rejected for ${clientId}: ${reason}`)
+          ws.close(1008, reason)
+          return
+        }
+
         this._clients.set(clientId, {
           ws,
-          meta:     { client_id: clientId, client_type: msg.client_type, remote_ip: remoteIp, connected_at: Date.now() },
+          meta:     { client_id: clientId, client_type: msg.client_type, remote_ip: remoteIp, connected_at: Date.now(), restaurant_id: remoteRestaurantId || null },
           lastPong: Date.now(),
         })
 

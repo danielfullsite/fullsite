@@ -158,3 +158,63 @@ describe('WsHub — PING/PONG keepalive', () => {
     ws.close()
   })
 })
+
+// ─── CFG-02: restaurant_id mismatch protection ────────────────────────────────
+
+describe('WsHub — restaurant_id mismatch rejection (CFG-02)', () => {
+  test('SUBSCRIBE with wrong restaurant_id is rejected with close code 1008', async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    await new Promise(resolve => ws.on('open', resolve))
+    ws.send(JSON.stringify({
+      protocol_version: PROTOCOL_VERSION,
+      type:             'SUBSCRIBE',
+      client_id:        'intruder-terminal',
+      client_type:      'pos',
+      restaurant_id:    'wrong-restaurant',   // does NOT match 'test-rest'
+      last_sequence:    -1,
+    }))
+    const { code, reason } = await new Promise(resolve => ws.on('close', (c, r) => resolve({ code: c, reason: r.toString() })))
+    assert.equal(code, 1008, 'server should close with policy violation (1008)')
+    assert.ok(reason.includes('mismatch'), `close reason should mention mismatch (got: "${reason}")`)
+  })
+
+  test('SUBSCRIBE without restaurant_id is accepted (legacy terminals)', async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    await new Promise(resolve => ws.on('open', resolve))
+    ws.send(JSON.stringify({
+      protocol_version: PROTOCOL_VERSION,
+      type:             'SUBSCRIBE',
+      client_id:        'legacy-terminal',
+      client_type:      'pos',
+      // no restaurant_id — legacy terminals that haven't been reprovisioned
+      last_sequence:    -1,
+    }))
+    const msg = await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('timeout')), 2000)
+      ws.on('message', raw => { clearTimeout(t); resolve(JSON.parse(raw.toString())) })
+      ws.on('close', () => { clearTimeout(t); reject(new Error('closed without message')) })
+    })
+    assert.equal(msg.type, 'SNAPSHOT', 'legacy terminal (no restaurant_id) should receive SNAPSHOT')
+    ws.close()
+  })
+
+  test('SUBSCRIBE with matching restaurant_id is accepted', async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${TEST_PORT}/ws`)
+    await new Promise(resolve => ws.on('open', resolve))
+    ws.send(JSON.stringify({
+      protocol_version: PROTOCOL_VERSION,
+      type:             'SUBSCRIBE',
+      client_id:        'matching-terminal',
+      client_type:      'pos',
+      restaurant_id:    'test-rest',   // matches hub restaurantId
+      last_sequence:    -1,
+    }))
+    const msg = await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('timeout')), 2000)
+      ws.on('message', raw => { clearTimeout(t); resolve(JSON.parse(raw.toString())) })
+      ws.on('close', () => { clearTimeout(t); reject(new Error('closed without message')) })
+    })
+    assert.equal(msg.type, 'SNAPSHOT')
+    ws.close()
+  })
+})

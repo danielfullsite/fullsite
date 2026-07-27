@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fullsite POS — Configuración de Terminal</title>
+<style>
+  :root {
+    --bg:       #0c1117;
+    --surface:  #161c26;
+    --card:     #1e2635;
+    --border:   #2a3347;
+    --text:     #e2e8f0;
+    --text2:    #94a3b8;
+    --text3:    #64748b;
+    --accent:   #3b82f6;
+    --accent-h: #2563eb;
+    --success:  #10b981;
+    --warn:     #f59e0b;
+    --danger:   #ef4444;
+    --radius:   10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px;
+  }
+  .logo { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
+
+  /* Steps bar */
+  .steps { display: flex; gap: 6px; margin-bottom: 28px; }
+  .step-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border); transition: background 0.2s;
+  }
+  .step-dot.active  { background: var(--accent); }
+  .step-dot.done    { background: var(--success); }
+
+  /* Card */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 32px; width: 100%; max-width: 520px;
+  }
+  .card h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .card p  { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 20px; }
+
+  /* Form */
+  .field { margin-bottom: 18px; }
+  label  { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+  input, select {
+    width: 100%; padding: 10px 12px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 14px; outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input.error, select.error { border-color: var(--danger); }
+  .field-hint { font-size: 11px; color: var(--text3); margin-top: 5px; }
+  .field-hint.warn { color: var(--warn); }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; margin-top: 24px; }
+  .btn {
+    flex: 1; padding: 11px 20px; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:not(:disabled):hover { background: var(--accent-h); }
+  .btn-secondary { background: var(--border); color: var(--text); flex: 0 0 auto; padding: 11px 18px; }
+  .btn-secondary:hover { background: #334159; }
+  .btn-sm {
+    padding: 7px 14px; font-size: 12px; border-radius: 6px;
+    border: none; cursor: pointer; font-weight: 600;
+    background: var(--surface); color: var(--text2); border: 1px solid var(--border);
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Alert box */
+  .alert {
+    border-radius: 8px; padding: 12px 14px; font-size: 13px; margin-bottom: 18px;
+    display: flex; align-items: flex-start; gap: 10px; line-height: 1.5;
+  }
+  .alert-migrate { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd; }
+  .alert-warn    { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: #fcd34d; }
+  .alert-ok      { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+  .alert-error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* Server list */
+  .server-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .server-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .server-item:hover, .server-item.selected { border-color: var(--accent); }
+  .server-item-name { font-size: 13px; font-weight: 600; }
+  .server-item-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .server-item-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px;
+    border-radius: 4px; background: rgba(16,185,129,0.15); color: #6ee7b7;
+  }
+  .spinner {
+    display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Step 5 — validation summary */
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .check-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .check-mark { font-size: 16px; }
+
+  /* Step 6 — config summary */
+  .config-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .config-table td { padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .config-table td:first-child { color: var(--text3); width: 46%; }
+  .config-table td:last-child  { font-weight: 600; word-break: break-all; }
+
+  /* Hidden */
+  .step-panel { display: none; }
+  .step-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="logo">Fullsite POS</div>
+<div class="subtitle">Asistente de configuración de terminal</div>
+
+<div class="steps" id="stepsBar"></div>
+
+<div class="card">
+  <!-- Step 1: Welcome + migration detection -->
+  <div class="step-panel active" id="step-1">
+    <h2>Terminal sin configurar</h2>
+    <p>Esta terminal no tiene una identidad válida. Necesita configurarse antes de operar.</p>
+    <div id="legacyAlert"></div>
+    <div class="alert alert-warn">
+      <span class="alert-icon">⚠</span>
+      <span>Sin configuración válida, el POS no puede abrir turnos, crear órdenes ni sincronizar datos.</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btnMigrate" style="display:none" onclick="doMigrate()">Migrar configuración anterior</button>
+      <button class="btn btn-primary" onclick="goTo(2)">Configurar nueva terminal →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Restaurant + terminal identity -->
+  <div class="step-panel" id="step-2">
+    <h2>Identidad del restaurante</h2>
+    <p>El Restaurant ID es tu identificador en Fullsite. Encuéntralo en el Dashboard → Configuración → Integraciones.</p>
+    <div class="field">
+      <label>Restaurant ID *</label>
+      <input id="restaurantId" type="text" placeholder="ej. amalay-principal" autocomplete="off" spellcheck="false">
+      <div class="field-hint">Debe coincidir con el client_id de tu cuenta Fullsite.</div>
+    </div>
+    <div class="field">
+      <label>Nombre de esta terminal *</label>
+      <input id="terminalName" type="text" placeholder="ej. Caja Principal" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Rol de la terminal *</label>
+      <select id="terminalRole">
+        <option value="server_pos">Servidor POS (caja principal con Local Server)</option>
+        <option value="pos">POS adicional (caja secundaria)</option>
+        <option value="kds">KDS — Pantalla de cocina</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div class="field-hint">La terminal "Servidor POS" aloja el Local Server y es la única que imprime directo.</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(1)">← Atrás</button>
+      <button class="btn btn-primary" onclick="validateStep2()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Local server host -->
+  <div class="step-panel" id="step-3">
+    <h2>Servidor local</h2>
+    <p id="step3Desc">El POS se comunica con el servidor local en esta red. Para esta terminal, el host es 127.0.0.1 (local).</p>
+    <div class="field">
+      <label>IP del servidor *</label>
+      <div style="display:flex;gap:8px">
+        <input id="serverHost" type="text" placeholder="127.0.0.1" style="flex:1">
+        <button class="btn-sm" onclick="scanLan()">Detectar</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Puerto</label>
+      <input id="serverPort" type="number" value="7717" min="1" max="65535">
+    </div>
+    <div id="scanResults"></div>
+    <div id="step3Alert"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(2)">← Atrás</button>
+      <button class="btn btn-primary" onclick="validateStep3()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Terminal ID -->
+  <div class="step-panel" id="step-4">
+    <h2>Identidad de la terminal</h2>
+    <p>El Terminal ID es un identificador único y estable para este dispositivo físico. No cambia con reinstalaciones.</p>
+    <div class="field">
+      <label>Terminal ID (generado automáticamente)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="terminalId" type="text" readonly style="flex:1;font-family:monospace;font-size:12px;color:var(--text3)">
+        <button class="btn-sm" onclick="regenTerminalId()">Regenerar</button>
+      </div>
+      <div class="field-hint warn">Este ID identifica el hardware. Regenéralo solo en casos excepcionales.</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(3)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(5)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Validation -->
+  <div class="step-panel" id="step-5">
+    <h2>Verificación</h2>
+    <p>Comprobando conectividad y validando identidad antes de guardar.</p>
+    <ul class="check-list" id="checkList"></ul>
+    <div id="step5Alert"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(4)">← Atrás</button>
+      <button class="btn btn-primary" id="btnToSave" disabled onclick="goTo(6)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- Step 6: Confirm + save -->
+  <div class="step-panel" id="step-6">
+    <h2>Resumen de configuración</h2>
+    <p>Revisa los datos antes de guardar. Después la aplicación se reiniciará.</p>
+    <table class="config-table" id="summaryTable"></table>
+    <div id="step6Alert"></div>
+    <div class="btn-row" style="margin-top:22px">
+      <button class="btn btn-secondary" onclick="goTo(5)">← Atrás</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveAndRestart()">Guardar y reiniciar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  currentStep: 1,
+  totalSteps: 6,
+  legacy: null,
+  hostname: '',
+  restaurantId: '',
+  terminalName: '',
+  terminalRole: 'server_pos',
+  terminalId: '',
+  serverHost: '127.0.0.1',
+  serverPort: 7717,
+  serverInfo: null,
+}
+
+// ─── Steps bar ───────────────────────────────────────────────────────────────
+function renderStepsBar() {
+  const bar = document.getElementById('stepsBar')
+  bar.innerHTML = ''
+  for (let i = 1; i <= state.totalSteps; i++) {
+    const d = document.createElement('div')
+    d.className = 'step-dot' + (i < state.currentStep ? ' done' : i === state.currentStep ? ' active' : '')
+    bar.appendChild(d)
+  }
+}
+
+function goTo(n) {
+  document.getElementById(`step-${state.currentStep}`)?.classList.remove('active')
+  state.currentStep = n
+  document.getElementById(`step-${n}`)?.classList.add('active')
+  renderStepsBar()
+  onStepEnter(n)
+}
+
+// ─── Step entry hooks ─────────────────────────────────────────────────────────
+function onStepEnter(n) {
+  if (n === 3) setupStep3()
+  if (n === 4) setupStep4()
+  if (n === 5) runValidation()
+  if (n === 6) buildSummary()
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  renderStepsBar()
+  if (!window.setupBridge) {
+    showAlert('legacyAlert', 'warn', 'No se detectó el bridge de configuración. ¿Estás en Electron?')
+    return
+  }
+  try {
+    const info = await window.setupBridge.getInfo()
+    state.legacy   = info.legacy || null
+    state.hostname = info.hostname || 'terminal'
+
+    // Pre-fill from legacy
+    if (state.legacy) {
+      state.restaurantId = state.legacy.restaurant_id || state.legacy.restaurantId || state.legacy.clientId || ''
+      state.terminalName = state.legacy.terminal_name || state.legacy.instanceName || ''
+      state.terminalRole = state.legacy.terminal_role || 'server_pos'
+      state.terminalId   = state.legacy.terminal_id   || state.legacy.terminalId   || generateUUID()
+    } else {
+      state.terminalId = generateUUID()
+    }
+    state.terminalName = state.terminalName || `Terminal ${state.hostname}`
+
+    if (state.legacy?.restaurant_id || state.legacy?.restaurantId || state.legacy?.clientId) {
+      showAlert('legacyAlert', 'migrate',
+        `Configuración anterior encontrada para "${state.restaurantId}". Puedes migrarla automáticamente o configurar desde cero.`)
+      document.getElementById('btnMigrate').style.display = ''
+    }
+  } catch (e) {
+    showAlert('legacyAlert', 'warn', 'No se pudo cargar la información del sistema: ' + e.message)
+  }
+}
+
+// ─── Step 1: migrate ─────────────────────────────────────────────────────────
+function doMigrate() {
+  if (!state.legacy) return
+  const migrated = {
+    config_version:    1,
+    restaurant_id:     state.restaurantId,
+    terminal_id:       state.terminalId,
+    terminal_role:     state.terminalRole,
+    terminal_name:     state.terminalName,
+    local_server_host: state.legacy.pos_server_ip || '127.0.0.1',
+    local_server_port: 7717,
+    protocol_version:  '1.0',
+    provisioned_at:    new Date().toISOString(),
+    last_validated_at: new Date().toISOString(),
+    client_id:         state.restaurantId,
+    channel:           state.legacy.channel || 'stable',
+    instance_name:     state.terminalName,
+    kds:               state.legacy.kds || false,
+    kds_only:          state.legacy.kds_only || false,
+    pos_server_ip:     state.legacy.pos_server_ip || null,
+    supabaseUrl:       state.legacy.supabaseUrl    || null,
+    supabaseAnonKey:   state.legacy.supabaseAnonKey || null,
+  }
+  syncStateFromConfig(migrated)
+  goTo(5)  // skip to validation — migration pre-fills everything
+}
+
+// ─── Step 2 ───────────────────────────────────────────────────────────────────
+function validateStep2() {
+  const rid  = document.getElementById('restaurantId').value.trim()
+  const name = document.getElementById('terminalName').value.trim()
+  const role = document.getElementById('terminalRole').value
+  clearError('restaurantId'); clearError('terminalName')
+  let ok = true
+  if (!rid || rid === 'unknown') { setError('restaurantId', 'El Restaurant ID es requerido y no puede ser "unknown"'); ok = false }
+  if (!name) { setError('terminalName', 'El nombre de la terminal es requerido'); ok = false }
+  if (!ok) return
+  state.restaurantId = rid
+  state.terminalName = name
+  state.terminalRole = role
+  goTo(3)
+}
+
+// ─── Step 3 ───────────────────────────────────────────────────────────────────
+function setupStep3() {
+  const role = state.terminalRole
+  document.getElementById('serverHost').value = state.serverHost || (role === 'kds' ? '' : '127.0.0.1')
+  document.getElementById('serverPort').value = state.serverPort || 7717
+  const desc = document.getElementById('step3Desc')
+  if (role === 'kds') {
+    desc.textContent = 'Este KDS necesita la IP del servidor POS principal en la red local.'
+  } else {
+    desc.textContent = 'Para esta terminal (Servidor POS), el Local Server corre localmente en 127.0.0.1.'
+    document.getElementById('serverHost').value = '127.0.0.1'
+  }
+}
+
+async function scanLan() {
+  const results = document.getElementById('scanResults')
+  results.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3);margin:10px 0"><div class="spinner"></div> Escaneando red local...</div>'
+  try {
+    const servers = await window.setupBridge.scanLan()
+    if (!servers || servers.length === 0) {
+      results.innerHTML = '<div class="alert alert-warn"><span class="alert-icon">⚠</span><span>No se encontraron servidores Fullsite en la red. Introduce la IP manualmente.</span></div>'
+      return
+    }
+    results.innerHTML = '<div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Servidores encontrados</div>'
+    const list = document.createElement('div')
+    list.className = 'server-list'
+    for (const s of servers) {
+      const item = document.createElement('div')
+      item.className = 'server-item'
+      item.innerHTML = `
+        <div>
+          <div class="server-item-name">${s.instance_name || s.host}</div>
+          <div class="server-item-meta">${s.host}:${s.port} · v${s.version || '?'} · ${s.restaurant_id || '?'}</div>
+        </div>
+        <span class="server-item-badge">Online</span>`
+      item.onclick = () => {
+        document.querySelectorAll('.server-item').forEach(el => el.classList.remove('selected'))
+        item.classList.add('selected')
+        document.getElementById('serverHost').value = s.host
+        document.getElementById('serverPort').value = s.port
+        state.serverInfo = s
+      }
+      list.appendChild(item)
+    }
+    results.appendChild(list)
+  } catch (e) {
+    results.innerHTML = `<div class="alert alert-error"><span class="alert-icon">✕</span><span>Error al escanear: ${e.message}</span></div>`
+  }
+}
+
+async function validateStep3() {
+  const host = document.getElementById('serverHost').value.trim()
+  const port = parseInt(document.getElementById('serverPort').value, 10)
+  clearAlert('step3Alert')
+  if (!host) { showAlert('step3Alert', 'error', 'La IP del servidor es requerida.'); return }
+  if (!port || port < 1 || port > 65535) { showAlert('step3Alert', 'error', 'Puerto inválido.'); return }
+  state.serverHost = host
+  state.serverPort = port
+  goTo(4)
+}
+
+// ─── Step 4 ───────────────────────────────────────────────────────────────────
+function setupStep4() {
+  document.getElementById('terminalId').value = state.terminalId || generateUUID()
+}
+
+function regenTerminalId() {
+  const newId = generateUUID()
+  state.terminalId = newId
+  document.getElementById('terminalId').value = newId
+}
+
+// ─── Step 5: Validation ───────────────────────────────────────────────────────
+async function runValidation() {
+  state.terminalId = document.getElementById('terminalId')?.value || state.terminalId
+  const checks = [
+    { id: 'c1', label: 'Restaurant ID válido',   done: false, ok: null },
+    { id: 'c2', label: 'Terminal ID único',       done: false, ok: null },
+    { id: 'c3', label: 'Conexión al servidor',    done: false, ok: null },
+    { id: 'c4', label: 'Restaurant ID coincide',  done: false, ok: null },
+    { id: 'c5', label: 'WebSocket disponible',    done: false, ok: null },
+    { id: 'c6', label: 'Protocolo compatible',    done: false, ok: null },
+  ]
+
+  document.getElementById('btnToSave').disabled = true
+  clearAlert('step5Alert')
+  renderChecks(checks)
+
+  // c1 — restaurant_id format
+  await delay(80)
+  const rid = state.restaurantId
+  checks[0].ok = rid && rid !== 'unknown' && rid.trim().length >= 2
+  checks[0].done = true
+  renderChecks(checks)
+
+  // c2 — terminal_id format
+  await delay(80)
+  checks[1].ok = /^[0-9a-f-]{8,}$/i.test(state.terminalId)
+  checks[1].done = true
+  renderChecks(checks)
+
+  // c3, c4, c5, c6 — server probe
+  let serverOk = false
+  try {
+    const result = await window.setupBridge.testServer(state.serverHost, state.serverPort)
+    serverOk = result.ok
+
+    checks[2].ok   = result.ok
+    checks[2].done = true
+    renderChecks(checks)
+
+    await delay(80)
+    if (result.ok) {
+      checks[3].ok = !result.restaurant_id || result.restaurant_id === state.restaurantId
+      checks[3].done = true
+      state.serverInfo = result
+
+      if (!checks[3].ok) {
+        showAlert('step5Alert', 'warn',
+          `El servidor tiene restaurant_id "${result.restaurant_id}" pero esta terminal tiene "${state.restaurantId}". Verifica que sea la red correcta.`)
+      }
+    } else {
+      checks[3].ok = null  // skipped
+      checks[3].done = true
+    }
+    renderChecks(checks)
+
+    await delay(80)
+    checks[4].ok   = result.ws_ok ?? result.ok
+    checks[4].done = true
+    checks[5].ok   = result.protocol_ok ?? result.ok
+    checks[5].done = true
+    renderChecks(checks)
+  } catch (e) {
+    checks[2].ok = false; checks[2].done = true
+    checks[3].done = true; checks[4].done = true; checks[5].done = true
+    showAlert('step5Alert', 'warn',
+      `No se pudo conectar al servidor en ${state.serverHost}:${state.serverPort} — ${e.message}. Puedes continuar si el servidor todavía no está corriendo y esta es una instalación nueva.`)
+    renderChecks(checks)
+  }
+
+  const critical = checks[0].ok && checks[1].ok
+  if (critical) {
+    document.getElementById('btnToSave').disabled = false
+    if (!serverOk) {
+      showAlert('step5Alert', 'warn', 'Identidad válida pero el servidor no respondió. Puedes guardar la configuración; el POS conectará cuando el servidor esté disponible.')
+    }
+  } else {
+    showAlert('step5Alert', 'error', 'Corrije los errores antes de continuar.')
+  }
+}
+
+function renderChecks(checks) {
+  const list = document.getElementById('checkList')
+  list.innerHTML = checks.map(c => {
+    let mark, color
+    if (!c.done)      { mark = '<div class="spinner"></div>'; color = '' }
+    else if (c.ok === null) { mark = '—'; color = 'var(--text3)' }
+    else if (c.ok)    { mark = '✓'; color = 'var(--success)' }
+    else              { mark = '✕'; color = 'var(--danger)' }
+    return `<li class="check-item"><span class="check-mark" style="color:${color}">${mark}</span><span>${c.label}</span></li>`
+  }).join('')
+}
+
+// ─── Step 6: Summary + save ───────────────────────────────────────────────────
+function buildSummary() {
+  const rows = [
+    ['Restaurant ID',   state.restaurantId],
+    ['Terminal ID',     state.terminalId],
+    ['Rol',             state.terminalRole],
+    ['Nombre',          state.terminalName],
+    ['Servidor local',  `${state.serverHost}:${state.serverPort}`],
+    ['Protocolo',       '1.0'],
+    ['Provisionado',    new Date().toLocaleString('es-MX')],
+  ]
+  document.getElementById('summaryTable').innerHTML = rows
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v || '—'}</td></tr>`).join('')
+}
+
+async function saveAndRestart() {
+  const btn = document.getElementById('btnSave')
+  btn.disabled = true; btn.textContent = 'Guardando...'
+  clearAlert('step6Alert')
+
+  const config = {
+    config_version:    1,
+    restaurant_id:     state.restaurantId,
+    terminal_id:       state.terminalId,
+    terminal_role:     state.terminalRole,
+    terminal_name:     state.terminalName,
+    local_server_host: state.serverHost,
+    local_server_port: state.serverPort,
+    protocol_version:  '1.0',
+    provisioned_at:    new Date().toISOString(),
+    last_validated_at: new Date().toISOString(),
+    client_id:         state.restaurantId,
+    channel:           (state.legacy?.channel) || 'stable',
+    instance_name:     state.terminalName,
+    kds:               state.legacy?.kds || false,
+    kds_only:          state.legacy?.kds_only || false,
+    pos_server_ip:     state.legacy?.pos_server_ip || (state.terminalRole === 'kds' ? state.serverHost : null),
+    supabaseUrl:       state.legacy?.supabaseUrl || null,
+    supabaseAnonKey:   state.legacy?.supabaseAnonKey || null,
+  }
+
+  try {
+    const result = await window.setupBridge.save(config)
+    if (result.ok) {
+      btn.textContent = 'Reiniciando...'
+      showAlert('step6Alert', 'ok', 'Configuración guardada. Reiniciando Fullsite POS...')
+    } else {
+      btn.disabled = false; btn.textContent = 'Guardar y reiniciar'
+      showAlert('step6Alert', 'error', result.error || 'Error desconocido al guardar la configuración.')
+    }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Guardar y reiniciar'
+    showAlert('step6Alert', 'error', 'Error al guardar: ' + e.message)
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+function showAlert(containerId, type, msg) {
+  const icons = { migrate: 'ℹ', warn: '⚠', ok: '✓', error: '✕' }
+  document.getElementById(containerId).innerHTML =
+    `<div class="alert alert-${type}"><span class="alert-icon">${icons[type] || '•'}</span><span>${msg}</span></div>`
+}
+function clearAlert(id) { document.getElementById(id).innerHTML = '' }
+
+function setError(id, msg) {
+  const el = document.getElementById(id)
+  el?.classList.add('error')
+  const hint = el?.parentElement?.querySelector('.field-hint')
+  if (hint) { hint.textContent = msg; hint.classList.add('warn') }
+}
+function clearError(id) {
+  const el = document.getElementById(id)
+  el?.classList.remove('error')
+}
+
+function syncStateFromConfig(cfg) {
+  state.restaurantId = cfg.restaurant_id || ''
+  state.terminalId   = cfg.terminal_id   || generateUUID()
+  state.terminalRole = cfg.terminal_role || 'server_pos'
+  state.terminalName = cfg.terminal_name || ''
+  state.serverHost   = cfg.local_server_host || '127.0.0.1'
+  state.serverPort   = cfg.local_server_port || 7717
+}
+
+// Pre-fill step 2 fields when entering step 2
+const origGoTo = goTo
+// Override goTo to sync form fields before leaving step 2
+window.goTo = function(n) {
+  if (n > 2) {
+    const rid  = document.getElementById('restaurantId')?.value?.trim()
+    const name = document.getElementById('terminalName')?.value?.trim()
+    const role = document.getElementById('terminalRole')?.value
+    if (rid)  state.restaurantId = rid
+    if (name) state.terminalName = name
+    if (role) state.terminalRole = role
+  }
+  origGoTo(n)
+}
+
+// Initialize step 2 form fields from state when page loads
+function prefillStep2() {
+  const rid  = document.getElementById('restaurantId')
+  const name = document.getElementById('terminalName')
+  const role = document.getElementById('terminalRole')
+  if (rid  && state.restaurantId) rid.value  = state.restaurantId
+  if (name && state.terminalName) name.value = state.terminalName
+  if (role && state.terminalRole) role.value = state.terminalRole
+}
+
+// Re-prefill when navigating to step 2
+const _origOnStepEnter = onStepEnter
+window.onStepEnter = function(n) {
+  _origOnStepEnter(n)
+  if (n === 2) prefillStep2()
+}
+
+init()
+</script>
+</body>
+</html>

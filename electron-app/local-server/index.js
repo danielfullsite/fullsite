@@ -267,8 +267,18 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
  * @returns {{ httpServer, close }}
  */
 async function startLocalServer({ dataDir, port = 7717, config = {} }) {
+  // CFG-02: refuse to start if restaurant identity is missing or invalid.
+  // The Electron main process gate (loadAndValidateConfig) should prevent this,
+  // but the Local Server is the last line of defense.
+  const restaurantId = config.restaurantId || config.clientId
+  if (!restaurantId || restaurantId === 'unknown') {
+    throw Object.assign(
+      new Error('[CFG-02] Local Server refuses to start: restaurant_id is missing or "unknown". Provision this terminal first via the setup wizard.'),
+      { code: 'NOT_PROVISIONED' }
+    )
+  }
+
   const {
-    restaurantId     = config.restaurantId || config.clientId || 'unknown',
     channel          = config.channel || 'stable',
     instanceName     = config.instanceName || `Fullsite POS — ${os.hostname()}`,
     supabaseUrl      = process.env.SUPABASE_URL || '',

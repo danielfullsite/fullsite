@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
 const http = require('http');
 const os   = require('os');
@@ -14,18 +14,14 @@ const KDS_URL = 'https://app.fullsite.mx/pos/kds';
 // Replaces the previous embedded print bridge.
 
 const LOCAL_SERVER_PORT = 7717;
-const APP_CONFIG_PATH   = path.join('C:\\fullsite', 'config.json');
+const LEGACY_CONFIG_PATH   = path.join('C:\\fullsite', 'config.json');
 const PRINTERS_CONFIG_PATH = path.join('C:\\fullsite', 'printers.json');
 
-// ─── APP CONFIG ───────────────────────────────────────────────────────────────
-// C:\fullsite\config.json — optional, controls startup behavior.
-// Keys:
-//   kds:          true  → open KDS window on second display
-//   restaurantId: uuid  → identifies this installation (required for multi-tenant)
-//   channel:      'pilot' | 'stable' | 'development'
-//   instanceName: 'AMALAY Sucursal Principal'
-//   supabaseUrl / supabaseAnonKey: override env if needed
-//   clientId / terminalId: injected into localStorage on boot
+// ─── CONFIG SCHEMA (CFG-02) ───────────────────────────────────────────────────
+// All terminals must have a validated TerminalConfig before operational use.
+// An invalid or missing config puts the terminal in NOT_PROVISIONED state,
+// blocking the Local Server, POS, and KDS from starting.
+const configSchema = require('./local-server/config-schema');
 
 const DEFAULT_STATIONS = {
   cocina: { type: 'tcp', host: '192.168.1.21', port: 9100 },
@@ -33,17 +29,87 @@ const DEFAULT_STATIONS = {
   caja:   { type: 'usb', names: ['TICKET', 'EC01', 'EC TICKET'] },
 };
 
-function loadAppConfig() {
+/**
+ * Return the primary config path: userData first (writable by Electron),
+ * legacy C:\fullsite\ as fallback (read-only on some Windows installs).
+ */
+function getPrimaryConfigPath() {
+  // After app.whenReady(), app.getPath('userData') is available.
+  try { return path.join(app.getPath('userData'), 'config.json'); } catch { return LEGACY_CONFIG_PATH; }
+}
+
+/**
+ * Load, validate, and optionally auto-migrate the terminal config.
+ * Returns { valid, config, migrated, errors, sourcePath }.
+ *
+ * Migration strategy for existing AMALAY installs:
+ *   1. Try primary path (userData/config.json) — new schema
+ *   2. Try legacy path (C:\fullsite\config.json) — old schema
+ *   3. If legacy has a usable restaurantId → auto-migrate to new schema
+ *   4. If nothing works → NOT_PROVISIONED
+ */
+function loadAndValidateConfig() {
+  const primaryPath = getPrimaryConfigPath();
+
+  // 1. Try primary (new schema)
   try {
-    if (fs.existsSync(APP_CONFIG_PATH)) {
-      const data = JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8'));
-      console.log('[config] Loaded config.json:', JSON.stringify(data));
-      return data;
+    if (fs.existsSync(primaryPath)) {
+      const data = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+      const { valid, errors } = configSchema.validate(data);
+      if (valid) {
+        console.log('[config] Valid config loaded from', primaryPath);
+        configSchema.touchValidatedAt(data);
+        return { valid: true, config: data, migrated: false, errors: [], sourcePath: primaryPath };
+      }
+      console.warn('[config] Primary config invalid:', errors);
     }
   } catch (e) {
-    console.warn('[config] Error loading config.json:', e.message);
+    console.warn('[config] Error reading primary config:', e.message);
   }
-  return {};
+
+  // 2. Try legacy path
+  let legacy = null;
+  try {
+    if (fs.existsSync(LEGACY_CONFIG_PATH)) {
+      legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+      console.log('[config] Legacy config found at', LEGACY_CONFIG_PATH);
+
+      // 2a. If legacy is already new schema (migrated manually), validate it
+      const { valid, errors } = configSchema.validate(legacy);
+      if (valid) {
+        console.log('[config] Legacy config is already valid new schema');
+        return { valid: true, config: legacy, migrated: false, errors: [], sourcePath: LEGACY_CONFIG_PATH };
+      }
+
+      // 2b. Auto-migrate legacy to new schema
+      const migrated = configSchema.fromLegacy(legacy);
+      if (migrated) {
+        console.log('[config] Auto-migrated legacy config:', JSON.stringify({ restaurant_id: migrated.restaurant_id, terminal_id: migrated.terminal_id }));
+        // Save migrated config to primary path so future boots use it
+        try {
+          fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+          fs.writeFileSync(primaryPath, JSON.stringify(migrated, null, 2), 'utf8');
+          console.log('[config] Migrated config saved to', primaryPath);
+        } catch (e2) {
+          console.warn('[config] Could not save migrated config:', e2.message);
+        }
+        return { valid: true, config: migrated, migrated: true, errors: [], sourcePath: primaryPath };
+      }
+      console.warn('[config] Legacy config could not be migrated (missing restaurantId)');
+    }
+  } catch (e) {
+    console.warn('[config] Error reading legacy config:', e.message);
+  }
+
+  // 3. NOT_PROVISIONED
+  return {
+    valid: false,
+    config: null,
+    migrated: false,
+    errors: legacy ? ['Legacy config found but lacks a valid restaurant_id'] : ['No config.json found'],
+    sourcePath: primaryPath,
+    legacy,
+  };
 }
 
 function loadStations() {
@@ -56,36 +122,43 @@ function loadStations() {
   } catch (e) {
     console.warn('[config] Error loading printers.json:', e.message);
   }
-  console.log('[config] Using default stations');
+  console.log('[config] No printers.json — using defaults (edit printers.json to configure your IP printers)');
   return { ...DEFAULT_STATIONS };
 }
 
+// Validated config — set in app.whenReady() after provisioning check.
 let appConfig = {};
 let localServer = null; // { httpServer, close, serverId, lanIp, wsHub }
 
+/**
+ * Start the Local Server.
+ * Requires appConfig to have a valid restaurant_id — will throw if not provisioned.
+ */
 async function startLocalServer() {
+  const restaurantId = appConfig.restaurant_id || appConfig.restaurantId || appConfig.clientId || appConfig.client_id;
+  if (!restaurantId || restaurantId === 'unknown') {
+    throw new Error('[CFG-02] Cannot start Local Server: restaurant_id is missing or "unknown". Run the provisioning wizard.');
+  }
+
   const { startLocalServer: start } = require('./local-server');
   const dataDir = app.getPath('userData');
-
   const stations = loadStations();
+
   const cfg = {
-    restaurantId:      appConfig.restaurantId || appConfig.clientId || process.env.FULLSITE_RESTAURANT_ID || 'unknown',
-    channel:           appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
-    instanceName:      appConfig.instanceName || `Fullsite POS — ${require('os').hostname()}`,
-    supabaseUrl:       appConfig.supabaseUrl   || process.env.SUPABASE_URL       || '',
-    supabaseKey:       appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || '',
+    restaurantId,
+    channel:           appConfig.channel        || process.env.FULLSITE_CHANNEL    || 'stable',
+    instanceName:      appConfig.instance_name  || appConfig.instanceName          || `Fullsite POS — ${os.hostname()}`,
+    supabaseUrl:       appConfig.supabaseUrl    || process.env.SUPABASE_URL        || '',
+    supabaseKey:       appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY  || '',
     stations,
     printersConfigPath: PRINTERS_CONFIG_PATH,
-    clientId:          appConfig.clientId,
-    terminalId:        appConfig.terminalId,
+    clientId:          appConfig.client_id      || appConfig.clientId,
+    terminalId:        appConfig.terminal_id    || appConfig.terminalId,
   };
 
   try {
     localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg });
     console.log('[main] Local server started.');
-
-    // Wire diagnostic endpoints that need access to Electron windows
-    // (kiosk/exit and devtools are handled via IPC now — see ipcMain handlers below)
   } catch (e) {
     if (e.code === 'EADDRINUSE') {
       console.log('[main] Port 7717 already in use — another server running, skipping.');
@@ -93,6 +166,120 @@ async function startLocalServer() {
       console.error('[main] Local server failed to start:', e.message);
     }
   }
+}
+
+// ─── IPC: Provisioning handlers ──────────────────────────────────────────────
+
+function registerProvisioningIpc() {
+  const { randomUUID } = require('crypto');
+
+  /** Return system info + any legacy config raw data for the wizard. */
+  ipcMain.handle('provision:get-info', () => {
+    let legacy = null;
+    try {
+      if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
+    } catch {}
+    return { hostname: os.hostname(), platform: process.platform, legacy };
+  });
+
+  /**
+   * Probe the local subnet for Fullsite Local Servers.
+   * Returns Array<{ host, port, restaurant_id, instance_name, version, protocol_version }>.
+   */
+  ipcMain.handle('provision:scan-lan', async () => {
+    const interfaces = os.networkInterfaces();
+    const subnets = new Set(['127.0.0.1']);
+    for (const iface of Object.values(interfaces)) {
+      for (const addr of iface) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          // Extract the subnet and probe .1–.254
+          const parts = addr.address.split('.');
+          const base = parts.slice(0, 3).join('.');
+          for (let i = 1; i <= 254; i++) subnets.add(`${base}.${i}`);
+        }
+      }
+    }
+    const results = [];
+    const probes = [...subnets].map(ip => new Promise(resolve => {
+      const req = http.get(`http://${ip}:${LOCAL_SERVER_PORT}/state`, { timeout: 500 }, res => {
+        let body = '';
+        res.on('data', d => { body += d; if (body.length > 4096) req.destroy(); });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (data.server_id || data.restaurant_id) {
+              results.push({
+                host:             ip,
+                port:             LOCAL_SERVER_PORT,
+                restaurant_id:    data.restaurant_id || null,
+                instance_name:    data.instance_name || null,
+                version:          data.version       || null,
+                protocol_version: data.protocol_version || null,
+              });
+            }
+          } catch {}
+          resolve();
+        });
+      });
+      req.on('error', () => resolve());
+      req.on('timeout', () => { req.destroy(); resolve(); });
+    }));
+    await Promise.all(probes);
+    return results;
+  });
+
+  /** Test connectivity to a specific host:port. */
+  ipcMain.handle('provision:test-server', async (_, host, port) => {
+    const p = port || LOCAL_SERVER_PORT;
+    return new Promise(resolve => {
+      const req = http.get(`http://${host}:${p}/state`, { timeout: 3000 }, res => {
+        let body = '';
+        res.on('data', d => { body += d; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            resolve({
+              ok:               true,
+              restaurant_id:    data.restaurant_id    || null,
+              instance_name:    data.instance_name    || null,
+              version:          data.version          || null,
+              protocol_version: data.protocol_version || null,
+              protocol_ok:      data.protocol_version === configSchema.PROTOCOL_VERSION,
+              ws_ok:            true, // HTTP probe succeeded = WS likely available
+            });
+          } catch {
+            resolve({ ok: false, error: 'Invalid response from server' });
+          }
+        });
+      });
+      req.on('error', e => resolve({ ok: false, error: e.message }));
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Timeout' }); });
+    });
+  });
+
+  /**
+   * Validate and save the provisioned config, then relaunch the app.
+   */
+  ipcMain.handle('provision:save', async (_, config) => {
+    const { valid, errors } = configSchema.validate(config);
+    if (!valid) return { ok: false, error: errors.join('; ') };
+    const primaryPath = getPrimaryConfigPath();
+    try {
+      // Backup the old config if it exists
+      if (fs.existsSync(primaryPath)) {
+        const backup = primaryPath.replace('.json', `.backup-${Date.now()}.json`);
+        try { fs.copyFileSync(primaryPath, backup); } catch {}
+      }
+      fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+      fs.writeFileSync(primaryPath, JSON.stringify(config, null, 2), 'utf8');
+      console.log('[provision] Config saved to', primaryPath);
+      // Relaunch after a short delay so the renderer can show the success state
+      setTimeout(() => { app.relaunch(); app.exit(0); }, 1200);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
 }
 
 // ─── FINGERPRINT SERVICE (embedded) ───────────────────────────────────────
@@ -182,19 +369,20 @@ function createWindow() {
     loadFailCount = 0; // Reset on successful load
     const bootTime = new Date().toISOString();
     const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
-    // Inject identity from config.json — config is authoritative for Electron installs.
-    // Ensures a fresh terminal knows its client without a prior dashboard login.
-    if (appConfig.clientId) {
-      scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(appConfig.clientId))})`);
+    // Inject validated identity from provisioned config into localStorage.
+    // Both new schema keys (restaurant_id, terminal_id) and legacy keys (clientId, terminalId) are supported.
+    const clientId   = appConfig.restaurant_id || appConfig.client_id   || appConfig.restaurantId || appConfig.clientId;
+    const terminalId = appConfig.terminal_id   || appConfig.terminalId;
+    if (clientId) {
+      scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
     }
-    if (appConfig.terminalId) {
-      scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(appConfig.terminalId))})`);
+    if (terminalId) {
+      scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(terminalId))})`);
     }
     mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
 
   // Listen for IPC from renderer (via preload bridge)
-  const { ipcMain } = require('electron');
   ipcMain.on('app-quit', () => { allowClose = true; app.quit(); });
   ipcMain.on('exit-kiosk', () => {
     if (mainWindow) { mainWindow.setKiosk(false); mainWindow.setFullScreen(false); }
@@ -328,6 +516,28 @@ function createKdsWindow(x, y, width, height, urlOverride) {
   console.log('[kds] KDS window opened on', `${x},${y} ${width}x${height}`);
 }
 
+// ─── SETUP WINDOW (NOT_PROVISIONED) ─────────────────────────────────────────
+
+let setupWindow = null;
+
+function createSetupWindow() {
+  setupWindow = new BrowserWindow({
+    title: 'Fullsite POS — Configuración',
+    width: 640, height: 720,
+    resizable: false, frame: true,
+    backgroundColor: '#0c1117',
+    icon: path.join(__dirname, 'icon.png'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-setup.js'),
+    },
+  });
+  setupWindow.loadFile('setup.html');
+  setupWindow.on('closed', () => { setupWindow = null; });
+  console.log('[main] NOT_PROVISIONED — setup window opened');
+}
+
 // ─── APP LIFECYCLE ────────────────────────────────────────────────────────
 
 // Enable WebAuthn (Windows Hello + DigitalPersona 4500 fingerprint reader)
@@ -338,7 +548,6 @@ app.whenReady().then(async () => {
   // Grant WebAuthn/HID permissions automatically (no popup)
   const defaultSession = require('electron').session.defaultSession;
   defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    // Allow all permissions needed for POS (notifications, clipboard, etc.)
     callback(true);
   });
 
@@ -347,7 +556,25 @@ app.whenReady().then(async () => {
     app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
   }
 
-  appConfig = loadAppConfig(); // Load before startLocalServer — config feeds server init
+  // ── CFG-02: Provisioning gate ─────────────────────────────────────────────
+  // Validate config BEFORE starting any operational services.
+  // NOT_PROVISIONED = show setup wizard, block POS/KDS/Local Server.
+  registerProvisioningIpc();
+
+  const configResult = loadAndValidateConfig();
+  if (!configResult.valid) {
+    console.error('[main] NOT_PROVISIONED:', configResult.errors.join('; '));
+    createSetupWindow();
+    return; // Do NOT start Local Server or POS window
+  }
+
+  if (configResult.migrated) {
+    console.log('[main] Config auto-migrated from legacy format.');
+  }
+
+  appConfig = configResult.config;
+  console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
+
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
 
   // ── kds_only mode: dedicated kitchen display machine ──────────────────────
