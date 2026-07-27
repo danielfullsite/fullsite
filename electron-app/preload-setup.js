@@ -33,4 +33,29 @@ contextBridge.exposeInMainWorld('setupBridge', {
    * Returns { ok: true, config } or { ok: false, error } (error='canceled' if dismissed).
    */
   importConfig: () => ipcRenderer.invoke('provision:import-config'),
+
+  // ── CFG-01: Printer configuration ──────────────────────────────────────────
+
+  /** Load current printers config from disk (includes legacy v1 detection). */
+  loadPrinters: () => ipcRenderer.invoke('provision:load-printers'),
+
+  /**
+   * Validate and atomically save a v2 printers config.
+   * @param {{ schema_version: 2, printers: object[], routing: object }} config
+   * @returns {{ ok: boolean, error?: string, path?: string }}
+   */
+  savePrinters: (config) => ipcRenderer.invoke('provision:save-printers', config),
+
+  /**
+   * Test TCP connectivity to a printer. USB/Windows printers return ok:null (untestable).
+   * @param {{ type: string, host?: string, port?: number, names?: string[] }} connection
+   * @returns {{ ok: boolean|null, message?: string, error?: string, code?: string }}
+   */
+  testPrinter: (connection) => ipcRenderer.invoke('provision:test-printer', connection),
+
+  /**
+   * Open a file picker to load a printers.json backup (v1 or v2).
+   * Returns { ok: true, config, migrated } or { ok: false, error }.
+   */
+  importPrinters: () => ipcRenderer.invoke('provision:import-printers'),
 })

@@ -25,7 +25,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--bg); color: var(--text); min-height: 100vh;
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 24px;
+    justify-content: flex-start; padding: 40px 24px 24px;
   }
   .logo { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; margin-bottom: 4px; }
   .subtitle { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
@@ -44,22 +44,26 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 28px 32px; width: 100%; max-width: 520px;
   }
+  .card.printer-step { overflow-y: auto; max-height: calc(100vh - 150px); }
   .card h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
   .card p  { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 20px; }
 
   /* Form */
-  .field { margin-bottom: 18px; }
+  .field { margin-bottom: 16px; }
   label  { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
-  input, select {
+  input, select, textarea {
     width: 100%; padding: 10px 12px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px;
     color: var(--text); font-size: 14px; outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s; font-family: inherit;
   }
-  input:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; line-height: 1.5; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   input.error, select.error { border-color: var(--danger); }
   .field-hint { font-size: 11px; color: var(--text3); margin-top: 5px; }
   .field-hint.warn { color: var(--warn); }
+  .field-row-2 { display: flex; gap: 10px; }
+  .field-row-2 .field { flex: 1; }
 
   /* Buttons */
   .btn-row { display: flex; gap: 10px; margin-top: 24px; }
@@ -74,14 +78,15 @@
   .btn-secondary:hover { background: #334159; }
   .btn-sm {
     padding: 7px 14px; font-size: 12px; border-radius: 6px;
-    border: none; cursor: pointer; font-weight: 600;
-    background: var(--surface); color: var(--text2); border: 1px solid var(--border);
+    border: 1px solid var(--border); cursor: pointer; font-weight: 600;
+    background: var(--surface); color: var(--text2);
   }
   .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm.btn-danger-sm:hover { border-color: var(--danger); color: var(--danger); }
 
   /* Alert box */
   .alert {
-    border-radius: 8px; padding: 12px 14px; font-size: 13px; margin-bottom: 18px;
+    border-radius: 8px; padding: 12px 14px; font-size: 13px; margin-bottom: 16px;
     display: flex; align-items: flex-start; gap: 10px; line-height: 1.5;
   }
   .alert-migrate { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd; }
@@ -112,16 +117,82 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Step 5 — validation summary */
+  /* Step 6 — validation summary */
   .check-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .check-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
   .check-mark { font-size: 16px; }
 
-  /* Step 6 — config summary */
+  /* Step 7 — config summary */
   .config-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .config-table td { padding: 7px 0; border-bottom: 1px solid var(--border); }
   .config-table td:first-child { color: var(--text3); width: 46%; }
   .config-table td:last-child  { font-weight: 600; word-break: break-all; }
+
+  /* ── Printer step (step 5) ───────────────────────────────────────────────── */
+
+  .printer-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+  .printer-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .printer-card-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .printer-card-name { font-size: 13px; font-weight: 600; }
+  .printer-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .printer-card-meta { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: monospace; }
+  .printer-card-routing { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+
+  .status-chip {
+    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+  }
+  .status-chip.disabled { background: rgba(100,116,139,0.2); color: var(--text3); }
+
+  .routing-chip {
+    font-size: 11px; color: var(--text2); background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.15); border-radius: 4px; padding: 2px 7px;
+  }
+
+  .printer-empty-state {
+    text-align: center; padding: 20px 16px;
+    background: var(--surface); border: 1px dashed var(--border); border-radius: 8px;
+    font-size: 13px; color: var(--text3); margin-top: 4px;
+  }
+  .printer-empty-state .empty-sub { font-size: 11px; margin-top: 4px; }
+
+  /* Form header in printer form */
+  .pf-form-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pf-form-header .pf-form-title { font-size: 14px; font-weight: 600; }
+
+  /* Checkbox grid */
+  .checkbox-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 6px;
+  }
+  .chk-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; color: var(--text2); cursor: pointer; user-select: none;
+  }
+  .chk-item input[type=checkbox] {
+    width: auto; padding: 0; margin: 0; cursor: pointer; accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* Routing summary table */
+  .routing-section { margin-top: 14px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: 0.05em;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .routing-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .routing-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .routing-table td:first-child { font-weight: 600; color: var(--text); width: 26%; }
+  .routing-table td:nth-child(2) { color: var(--text3); width: 12%; text-align: center; }
+  .routing-table td:last-child { color: var(--text3); }
 
   /* Hidden */
   .step-panel { display: none; }
@@ -222,48 +293,187 @@
     </div>
   </div>
 
-  <!-- Step 5: Validation -->
+  <!-- ─────────────────────────────────────────────────────────────────────── -->
+  <!-- Step 5: Printer configuration (CFG-01)                                 -->
+  <!-- ─────────────────────────────────────────────────────────────────────── -->
   <div class="step-panel" id="step-5">
+    <h2>Impresoras</h2>
+    <p>Configura las impresoras de esta terminal. Puedes continuar sin impresoras —
+       los trabajos de impresión mostrarán <code style="font-size:11px;background:var(--surface);padding:1px 5px;border-radius:4px">PRINTER_NOT_CONFIGURED</code>
+       hasta que configures una.</p>
+
+    <div id="printerMigrateAlert"></div>
+
+    <!-- ── List panel ──────────────────────────────────────────────────────── -->
+    <div id="pfListPanel">
+      <div id="pfEmpty" class="printer-empty-state">
+        <div>Sin impresoras configuradas</div>
+        <div class="empty-sub">La terminal operará, pero los tickets no se imprimirán.</div>
+      </div>
+      <div id="pfList" class="printer-list"></div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="pfStartAdd()">+ Agregar impresora</button>
+        <button class="btn-sm" id="pfImportBtn" onclick="pfImport()">Importar respaldo...</button>
+      </div>
+
+      <div id="pfRoutingSection" class="routing-section" style="display:none">
+        <div class="section-label">Routing activo</div>
+        <table class="routing-table" id="pfRoutingTable"></table>
+      </div>
+    </div>
+
+    <!-- ── Form panel ─────────────────────────────────────────────────────── -->
+    <div id="pfFormPanel" style="display:none">
+      <div class="pf-form-header">
+        <button class="btn-sm" onclick="pfCancelForm()">← Lista</button>
+        <span class="pf-form-title" id="pfFormTitle">Agregar impresora</span>
+      </div>
+
+      <div class="field">
+        <label>Nombre visible *</label>
+        <input id="pfName" type="text" placeholder="ej. Epson Cocina" oninput="pfAutoId()">
+      </div>
+
+      <div class="field">
+        <label>ID lógico *</label>
+        <div style="display:flex;gap:8px">
+          <input id="pfId" type="text" placeholder="epson-cocina" style="flex:1;font-family:monospace;font-size:12px" oninput="pfIdEdited()">
+          <button class="btn-sm" onclick="pfRegenId()">Auto</button>
+        </div>
+        <div class="field-hint">Solo letras minúsculas, números y guiones. No cambiar después de guardar.</div>
+      </div>
+
+      <div class="field">
+        <label>Tipo de conexión *</label>
+        <select id="pfConn" onchange="pfUpdateConnFields()">
+          <option value="tcp">TCP/IP — red local</option>
+          <option value="windows">Windows — USB / cola de impresión</option>
+        </select>
+      </div>
+
+      <!-- TCP fields -->
+      <div id="pfTcpGroup">
+        <div class="field-row-2">
+          <div class="field">
+            <label>Host / IP *</label>
+            <input id="pfHost" type="text" placeholder="192.168.1.100">
+          </div>
+          <div class="field" style="flex:0 0 110px">
+            <label>Puerto *</label>
+            <input id="pfPort" type="number" value="9100" min="1" max="65535">
+          </div>
+        </div>
+      </div>
+
+      <!-- Windows/USB fields -->
+      <div id="pfWinGroup" style="display:none">
+        <div class="field">
+          <label>Nombre(s) de impresora *</label>
+          <textarea id="pfNames" rows="3" placeholder="TICKET&#10;EC TICKET&#10;EC01"></textarea>
+          <div class="field-hint">Uno por línea. Se intentan en orden hasta encontrar una disponible.</div>
+        </div>
+      </div>
+
+      <!-- Stations -->
+      <div class="field">
+        <label>Estaciones</label>
+        <div class="checkbox-grid" id="pfStations"></div>
+      </div>
+
+      <!-- Document types -->
+      <div class="field">
+        <label>Tipos de documento</label>
+        <div class="checkbox-grid" id="pfDocTypes"></div>
+        <div class="field-hint">Sin selección = acepta todos los tipos de los documentos de las estaciones asignadas.</div>
+      </div>
+
+      <!-- Test result -->
+      <div id="pfTestResult"></div>
+      <!-- Form errors -->
+      <div id="pfFormErrors"></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <button class="btn-sm" id="pfTestBtn" onclick="pfTestConn()">Probar conexión</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-secondary" onclick="pfCancelForm()" style="flex:0 0 auto;padding:8px 16px;font-size:13px">Cancelar</button>
+        <button class="btn btn-primary" onclick="pfSaveForm()" style="flex:0 0 auto;padding:8px 20px;font-size:13px">Guardar impresora</button>
+      </div>
+    </div>
+
+    <!-- Step navigation (hidden while form is open) -->
+    <div id="pfStepNav" class="btn-row" style="margin-top:18px">
+      <button class="btn btn-secondary" onclick="goTo(4)">← Atrás</button>
+      <button class="btn btn-primary" onclick="pfProceed()">Siguiente →</button>
+    </div>
+    <div id="pfProceedAlert"></div>
+  </div>
+
+  <!-- Step 6: Validation (was step 5) -->
+  <div class="step-panel" id="step-6">
     <h2>Verificación</h2>
     <p>Comprobando conectividad y validando identidad antes de guardar.</p>
     <ul class="check-list" id="checkList"></ul>
-    <div id="step5Alert"></div>
+    <div id="step6Alert"></div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goTo(4)">← Atrás</button>
-      <button class="btn btn-primary" id="btnToSave" disabled onclick="goTo(6)">Siguiente →</button>
+      <button class="btn btn-secondary" onclick="goTo(5)">← Atrás</button>
+      <button class="btn btn-primary" id="btnToSave" disabled onclick="goTo(7)">Siguiente →</button>
     </div>
   </div>
 
-  <!-- Step 6: Confirm + save -->
-  <div class="step-panel" id="step-6">
+  <!-- Step 7: Confirm + save (was step 6) -->
+  <div class="step-panel" id="step-7">
     <h2>Resumen de configuración</h2>
     <p>Revisa los datos antes de guardar. Después la aplicación se reiniciará.</p>
     <table class="config-table" id="summaryTable"></table>
-    <div id="step6Alert"></div>
+    <div id="step7Alert"></div>
     <div class="btn-row" style="margin-top:22px">
-      <button class="btn btn-secondary" onclick="goTo(5)">← Atrás</button>
+      <button class="btn btn-secondary" onclick="goTo(6)">← Atrás</button>
       <button class="btn btn-primary" id="btnSave" onclick="saveAndRestart()">Guardar y reiniciar</button>
     </div>
   </div>
 </div>
 
 <script>
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const KNOWN_STATIONS = [
+  { id: 'cocina',     label: 'Cocina' },
+  { id: 'barra',      label: 'Barra' },
+  { id: 'caja',       label: 'Caja' },
+  { id: 'expedicion', label: 'Expedición' },
+  { id: 'bar',        label: 'Bar' },
+]
+
+const KNOWN_DOC_TYPES = [
+  { id: 'kitchen_ticket', label: 'Comanda cocina' },
+  { id: 'bar_ticket',     label: 'Comanda barra' },
+  { id: 'receipt',        label: 'Ticket cliente' },
+  { id: 'pre_ticket',     label: 'Pre-cuenta' },
+  { id: 'invoice',        label: 'Factura' },
+  { id: 'corte',          label: 'Corte de caja' },
+  { id: 'reprint',        label: 'Reimpresión' },
+]
+
+// ─── State ────────────────────────────────────────────────────────────────────
 const state = {
-  currentStep: 1,
-  totalSteps: 6,
-  legacy: null,
-  hostname: '',
-  restaurantId: '',
-  terminalName: '',
-  terminalRole: 'server_pos',
-  terminalId: '',
-  serverHost: '127.0.0.1',
-  serverPort: 7717,
-  serverInfo: null,
+  currentStep:    1,
+  totalSteps:     7,
+  legacy:         null,
+  hostname:       '',
+  restaurantId:   '',
+  terminalName:   '',
+  terminalRole:   'server_pos',
+  terminalId:     '',
+  serverHost:     '127.0.0.1',
+  serverPort:     7717,
+  serverInfo:     null,
+  // CFG-01: printer config
+  printers:       [],
+  printersLoaded: false,
 }
 
-// ─── Steps bar ───────────────────────────────────────────────────────────────
+// ─── Steps bar ────────────────────────────────────────────────────────────────
 function renderStepsBar() {
   const bar = document.getElementById('stepsBar')
   bar.innerHTML = ''
@@ -275,6 +485,10 @@ function renderStepsBar() {
 }
 
 function goTo(n) {
+  // Clean up printer-step class when leaving step 5
+  if (state.currentStep === 5 && n !== 5) {
+    document.querySelector('.card').classList.remove('printer-step')
+  }
   document.getElementById(`step-${state.currentStep}`)?.classList.remove('active')
   state.currentStep = n
   document.getElementById(`step-${n}`)?.classList.add('active')
@@ -286,8 +500,9 @@ function goTo(n) {
 function onStepEnter(n) {
   if (n === 3) setupStep3()
   if (n === 4) setupStep4()
-  if (n === 5) runValidation()
-  if (n === 6) buildSummary()
+  if (n === 5) setupStep5()
+  if (n === 6) runValidation()
+  if (n === 7) buildSummary()
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -302,7 +517,6 @@ async function init() {
     state.legacy   = info.legacy || null
     state.hostname = info.hostname || 'terminal'
 
-    // Pre-fill from legacy
     if (state.legacy) {
       state.restaurantId = state.legacy.restaurant_id || state.legacy.restaurantId || state.legacy.clientId || ''
       state.terminalName = state.legacy.terminal_name || state.legacy.instanceName || ''
@@ -347,7 +561,7 @@ function doMigrate() {
     supabaseAnonKey:   state.legacy.supabaseAnonKey || null,
   }
   syncStateFromConfig(migrated)
-  goTo(5)  // skip to validation — migration pre-fills everything
+  goTo(6)  // skip to validation — migration pre-fills everything
 }
 
 // ─── Step 1: import from backup ──────────────────────────────────────────────
@@ -365,10 +579,9 @@ async function doImport() {
       return
     }
     syncStateFromConfig(result.config)
-    // Preserve legacy-style fields from the imported config so they survive saveAndRestart()
     state.legacy = result.config
     showAlert('legacyAlert', 'ok', `Respaldo cargado para "${result.config.restaurant_id}". Verificando configuración...`)
-    goTo(5)  // jump straight to validation
+    goTo(6)
   } catch (e) {
     showAlert('legacyAlert', 'error', 'Error al importar: ' + e.message)
   } finally {
@@ -464,7 +677,420 @@ function regenTerminalId() {
   document.getElementById('terminalId').value = newId
 }
 
-// ─── Step 5: Validation ───────────────────────────────────────────────────────
+// ─── Step 5: Printer configuration ───────────────────────────────────────────
+
+let pfAutoIdEnabled = true  // auto-fill ID from name until user edits manually
+let pfEditIndex     = -1    // -1 = new, >=0 = editing existing
+
+async function setupStep5() {
+  document.querySelector('.card').classList.add('printer-step')
+
+  if (!state.printersLoaded) {
+    if (window.setupBridge?.loadPrinters) {
+      try {
+        const result = await window.setupBridge.loadPrinters()
+        if (result.state === 'configured' && Array.isArray(result.config?.printers)) {
+          state.printers = result.config.printers
+          if (result.migrated) {
+            showAlert('printerMigrateAlert', 'migrate',
+              'Se encontró configuración de impresoras anterior y fue migrada al nuevo formato v2. Revisa la lista y guarda.')
+          }
+        } else if (result.legacyV1) {
+          showAlert('printerMigrateAlert', 'migrate',
+            'Se encontró configuración de impresoras antigua (v1). Usa "Importar respaldo" para cargarla o agrega las impresoras manualmente.')
+        }
+      } catch (e) {
+        showAlert('printerMigrateAlert', 'warn', 'Error al cargar configuración de impresoras: ' + e.message)
+      }
+    }
+    state.printersLoaded = true
+  }
+
+  pfBuildCheckboxGrids()
+  pfShowList()
+}
+
+function pfBuildCheckboxGrids() {
+  document.getElementById('pfStations').innerHTML = KNOWN_STATIONS.map(s =>
+    `<label class="chk-item"><input type="checkbox" value="${s.id}" class="pfSt"> ${s.label}</label>`
+  ).join('')
+  document.getElementById('pfDocTypes').innerHTML = KNOWN_DOC_TYPES.map(d =>
+    `<label class="chk-item"><input type="checkbox" value="${d.id}" class="pfDt"> ${d.label}</label>`
+  ).join('')
+}
+
+function pfShowList() {
+  document.getElementById('pfListPanel').style.display = ''
+  document.getElementById('pfFormPanel').style.display = 'none'
+  document.getElementById('pfStepNav').style.display = ''
+  pfRenderList()
+}
+
+function pfRenderList() {
+  const list   = document.getElementById('pfList')
+  const empty  = document.getElementById('pfEmpty')
+  const ps     = state.printers
+
+  if (ps.length === 0) {
+    empty.style.display = ''
+    list.innerHTML = ''
+    document.getElementById('pfRoutingSection').style.display = 'none'
+    return
+  }
+
+  empty.style.display = 'none'
+  list.innerHTML = ps.map((p, i) => {
+    const connInfo = p.connection.type === 'tcp'
+      ? `TCP · ${p.connection.host}:${p.connection.port}`
+      : `Windows · ${(p.connection.names || []).join(', ')}`
+    const stations = (p.station_ids || [])
+      .map(s => KNOWN_STATIONS.find(k => k.id === s)?.label || s).join(', ') || '—'
+    const docs = (p.document_types || [])
+      .map(d => KNOWN_DOC_TYPES.find(k => k.id === d)?.label || d).join(', ') || 'Todos'
+    const dot   = p.enabled ? '●' : '○'
+    const color = p.enabled ? 'var(--success)' : 'var(--text3)'
+
+    return `<div class="printer-card">
+      <div class="printer-card-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:${color};font-size:13px">${dot}</span>
+          <span class="printer-card-name">${esc(p.name)}</span>
+          ${!p.enabled ? '<span class="status-chip disabled">Deshabilitada</span>' : ''}
+        </div>
+        <div class="printer-card-actions">
+          <button class="btn-sm" onclick="pfStartEdit(${i})">Editar</button>
+          <button class="btn-sm btn-danger-sm" onclick="pfDelete(${i})" title="Eliminar">✕</button>
+        </div>
+      </div>
+      <div class="printer-card-meta">${esc(connInfo)}</div>
+      <div class="printer-card-routing">
+        <span class="routing-chip">${esc(stations)}</span>
+        <span style="color:var(--text3);font-size:11px">→</span>
+        <span class="routing-chip">${esc(docs)}</span>
+      </div>
+    </div>`
+  }).join('')
+
+  pfRenderRoutingTable()
+}
+
+function pfRenderRoutingTable() {
+  const section  = document.getElementById('pfRoutingSection')
+  const ps       = state.printers.filter(p => p.enabled)
+  const rows     = []
+
+  for (const p of ps) {
+    for (const sid of (p.station_ids || [])) {
+      const docs = p.document_types && p.document_types.length > 0 ? p.document_types : ['(todos)']
+      for (const dt of docs) {
+        const stLabel = KNOWN_STATIONS.find(s => s.id === sid)?.label || sid
+        const dtLabel = KNOWN_DOC_TYPES.find(d => d.id === dt)?.label || dt
+        rows.push({ stLabel, dtLabel, pName: p.name })
+      }
+    }
+  }
+
+  if (!rows.length) { section.style.display = 'none'; return }
+  section.style.display = ''
+  document.getElementById('pfRoutingTable').innerHTML = rows
+    .map(r => `<tr><td>${esc(r.stLabel)}</td><td>→</td><td>${esc(r.dtLabel)}</td><td style="color:var(--text2)">${esc(r.pName)}</td></tr>`)
+    .join('')
+}
+
+// ── Printer form ──────────────────────────────────────────────────────────────
+
+function pfStartAdd() {
+  pfEditIndex     = -1
+  pfAutoIdEnabled = true
+  document.getElementById('pfFormTitle').textContent = 'Agregar impresora'
+  document.getElementById('pfName').value  = ''
+  document.getElementById('pfId').value    = ''
+  document.getElementById('pfConn').value  = 'tcp'
+  document.getElementById('pfHost').value  = ''
+  document.getElementById('pfPort').value  = '9100'
+  document.getElementById('pfNames').value = ''
+  document.querySelectorAll('.pfSt').forEach(el => { el.checked = false })
+  document.querySelectorAll('.pfDt').forEach(el => { el.checked = false })
+  clearAlert('pfTestResult')
+  clearAlert('pfFormErrors')
+  pfUpdateConnFields()
+  pfShowForm()
+}
+
+function pfStartEdit(i) {
+  const p = state.printers[i]
+  if (!p) return
+  pfEditIndex     = i
+  pfAutoIdEnabled = false
+
+  document.getElementById('pfFormTitle').textContent = 'Editar impresora'
+  document.getElementById('pfName').value = p.name
+  document.getElementById('pfId').value   = p.printer_id
+  const ct = p.connection.type === 'usb' ? 'windows' : p.connection.type
+  document.getElementById('pfConn').value = ct
+
+  if (p.connection.type === 'tcp') {
+    document.getElementById('pfHost').value = p.connection.host || ''
+    document.getElementById('pfPort').value = p.connection.port || 9100
+  } else {
+    document.getElementById('pfNames').value = (p.connection.names || []).join('\n')
+  }
+
+  document.querySelectorAll('.pfSt').forEach(el => { el.checked = (p.station_ids || []).includes(el.value) })
+  document.querySelectorAll('.pfDt').forEach(el => { el.checked = (p.document_types || []).includes(el.value) })
+
+  clearAlert('pfTestResult')
+  clearAlert('pfFormErrors')
+  pfUpdateConnFields()
+  pfShowForm()
+}
+
+function pfShowForm() {
+  document.getElementById('pfListPanel').style.display = 'none'
+  document.getElementById('pfFormPanel').style.display = ''
+  document.getElementById('pfStepNav').style.display   = 'none'
+}
+
+function pfCancelForm() { pfShowList() }
+
+function pfUpdateConnFields() {
+  const isTcp = document.getElementById('pfConn').value === 'tcp'
+  document.getElementById('pfTcpGroup').style.display = isTcp ? '' : 'none'
+  document.getElementById('pfWinGroup').style.display = isTcp ? 'none' : ''
+}
+
+function pfAutoId() {
+  if (!pfAutoIdEnabled) return
+  document.getElementById('pfId').value = pfSlugify(document.getElementById('pfName').value)
+}
+
+function pfIdEdited() {
+  pfAutoIdEnabled = false
+}
+
+function pfRegenId() {
+  document.getElementById('pfId').value = pfSlugify(document.getElementById('pfName').value || 'printer')
+  pfAutoIdEnabled = false
+}
+
+function pfSlugify(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40) || 'printer'
+}
+
+function pfIsValidHost(h) {
+  if (!h) return false
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h))
+    return h.split('.').map(Number).every(n => n >= 0 && n <= 255)
+  return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(h)
+}
+
+function pfGetForm() {
+  return {
+    name:            document.getElementById('pfName').value,
+    printer_id:      document.getElementById('pfId').value.trim(),
+    connection_type: document.getElementById('pfConn').value,
+    host:            document.getElementById('pfHost').value.trim(),
+    port:            Number(document.getElementById('pfPort').value),
+    names_raw:       document.getElementById('pfNames').value,
+    station_ids:     [...document.querySelectorAll('.pfSt:checked')].map(el => el.value),
+    document_types:  [...document.querySelectorAll('.pfDt:checked')].map(el => el.value),
+  }
+}
+
+function pfValidate(form) {
+  const errs = []
+  if (!form.name || !form.name.trim()) errs.push('El nombre es requerido.')
+
+  const pid = form.printer_id
+  if (!pid) errs.push('El ID lógico es requerido.')
+  else if (!/^[a-z0-9][a-z0-9-]*$/.test(pid)) errs.push('El ID solo puede tener letras minúsculas, números y guiones.')
+
+  const ct = form.connection_type
+  if (!['tcp','usb','windows'].includes(ct)) {
+    errs.push('Tipo de conexión inválido.')
+  } else if (ct === 'tcp') {
+    if (!form.host) errs.push('El host es requerido para TCP.')
+    else if (!pfIsValidHost(form.host)) errs.push(`Host inválido: "${form.host}".`)
+    if (!form.port || form.port < 1 || form.port > 65535) errs.push('Puerto inválido (1–65535).')
+  } else {
+    const names = form.names_raw.split('\n').map(s => s.trim()).filter(Boolean)
+    if (!names.length) errs.push('Se requiere al menos un nombre de impresora.')
+  }
+
+  // Check duplicate ID (allow same printer while editing)
+  if (pid) {
+    const dup = state.printers.some((p, i) => i !== pfEditIndex && p.printer_id === pid)
+    if (dup) errs.push(`El ID "${pid}" ya está en uso por otra impresora.`)
+  }
+
+  return { valid: errs.length === 0, errors: errs }
+}
+
+function pfSaveForm() {
+  const form = pfGetForm()
+  const { valid, errors } = pfValidate(form)
+  if (!valid) {
+    document.getElementById('pfFormErrors').innerHTML =
+      `<div class="alert alert-error" style="margin-top:10px">` +
+      `<span class="alert-icon">✕</span>` +
+      `<span>${errors.map(esc).join('<br>')}</span></div>`
+    return
+  }
+  clearAlert('pfFormErrors')
+
+  const ct = form.connection_type
+  const connection = ct === 'tcp'
+    ? { type: 'tcp', host: form.host, port: form.port }
+    : { type: ct, names: form.names_raw.split('\n').map(s => s.trim()).filter(Boolean) }
+
+  const existingEnabled = pfEditIndex >= 0 ? state.printers[pfEditIndex]?.enabled : true
+
+  const printer = {
+    printer_id:     form.printer_id,
+    name:           form.name.trim(),
+    enabled:        existingEnabled !== false,
+    connection,
+    station_ids:    form.station_ids,
+    document_types: form.document_types,
+    copies:         1,
+    encoding:       'cp850',
+  }
+
+  if (pfEditIndex >= 0) {
+    state.printers[pfEditIndex] = printer
+  } else {
+    state.printers.push(printer)
+  }
+
+  pfShowList()
+}
+
+async function pfTestConn() {
+  const form = pfGetForm()
+  const resultEl = document.getElementById('pfTestResult')
+
+  if (form.connection_type !== 'tcp') {
+    resultEl.innerHTML = '<div class="alert alert-migrate" style="margin-top:8px">' +
+      '<span class="alert-icon">ℹ</span>' +
+      '<span>Las impresoras Windows/USB no pueden probarse sin imprimir. Guarda la configuración y usa "Imprimir prueba" desde el POS.</span></div>'
+    return
+  }
+
+  if (!form.host || !pfIsValidHost(form.host)) {
+    resultEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px"><span class="alert-icon">✕</span><span>Ingresa un host/IP válido antes de probar.</span></div>'
+    return
+  }
+
+  const btn = document.getElementById('pfTestBtn')
+  btn.disabled = true; btn.textContent = 'Probando...'
+  resultEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text3)"><div class="spinner"></div> Conectando a ${esc(form.host)}:${form.port}...</div>`
+
+  try {
+    if (!window.setupBridge?.testPrinter) {
+      resultEl.innerHTML = '<div class="alert alert-warn" style="margin-top:8px"><span class="alert-icon">⚠</span><span>Prueba de conexión no disponible fuera de Electron.</span></div>'
+      return
+    }
+
+    const r = await window.setupBridge.testPrinter({ type: 'tcp', host: form.host, port: form.port })
+    const CODE_MSG = {
+      'TIMEOUT':             'Timeout — impresora no responde. Verifica que esté encendida y la IP sea correcta.',
+      'PORT_CLOSED':         'Puerto cerrado — la IP es alcanzable pero el puerto rechaza conexiones.',
+      'HOST_NOT_FOUND':      'Host no encontrado — verifica la IP o nombre de host.',
+      'NETWORK_UNREACHABLE': 'Red no alcanzable — el host está en otra subred o hay un firewall.',
+      'INVALID_HOST':        'IP o hostname inválido.',
+      'INVALID_PORT':        'Puerto inválido.',
+    }
+
+    if (r.ok === true) {
+      resultEl.innerHTML = `<div class="alert alert-ok" style="margin-top:8px"><span class="alert-icon">✓</span><span>${esc(r.message || 'Conexión exitosa.')}</span></div>`
+    } else {
+      const msg = CODE_MSG[r.code] || r.error || 'Error desconocido.'
+      resultEl.innerHTML = `<div class="alert alert-error" style="margin-top:8px"><span class="alert-icon">✕</span><span>${esc(msg)}</span></div>`
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="alert alert-error" style="margin-top:8px"><span class="alert-icon">✕</span><span>Error al probar: ${esc(e.message)}</span></div>`
+  } finally {
+    btn.disabled = false; btn.textContent = 'Probar conexión'
+  }
+}
+
+function pfDelete(i) {
+  const p = state.printers[i]
+  if (!p) return
+  if (!confirm(`¿Eliminar la impresora "${p.name}"?\n\nEsta acción no puede deshacerse.`)) return
+  state.printers.splice(i, 1)
+  pfRenderList()
+}
+
+async function pfImport() {
+  if (!window.setupBridge?.importPrinters) {
+    showAlert('printerMigrateAlert', 'warn', 'Importación no disponible fuera de Electron.')
+    return
+  }
+  const btn = document.getElementById('pfImportBtn')
+  btn.disabled = true; btn.textContent = 'Abriendo...'
+  try {
+    const result = await window.setupBridge.importPrinters()
+    if (!result.ok) {
+      if (result.error !== 'canceled') showAlert('printerMigrateAlert', 'error', 'Error al importar: ' + result.error)
+      return
+    }
+    state.printers = result.config.printers || []
+    if (result.migrated) {
+      showAlert('printerMigrateAlert', 'migrate', 'Respaldo importado y migrado de v1 a v2. Revisa las impresoras antes de continuar.')
+    } else {
+      showAlert('printerMigrateAlert', 'ok', `${state.printers.length} impresora(s) importada(s).`)
+    }
+    pfRenderList()
+  } catch (e) {
+    showAlert('printerMigrateAlert', 'error', 'Error al importar: ' + e.message)
+  } finally {
+    btn.disabled = false; btn.textContent = 'Importar respaldo...'
+  }
+}
+
+async function pfProceed() {
+  clearAlert('pfProceedAlert')
+
+  if (state.printers.length === 0) {
+    // PRINTER_NOT_CONFIGURED is valid — proceed with a warning in the final summary
+    goTo(6)
+    return
+  }
+
+  const nav = document.getElementById('pfStepNav')
+  const btn = nav.querySelector('.btn-primary')
+  btn.disabled = true; btn.textContent = 'Guardando...'
+
+  try {
+    if (!window.setupBridge?.savePrinters) {
+      // Non-Electron (dev/test) — skip save
+      goTo(6)
+      return
+    }
+    const config = { schema_version: 2, printers: state.printers, routing: {} }
+    const result = await window.setupBridge.savePrinters(config)
+    if (result.ok) {
+      goTo(6)
+    } else {
+      showAlert('pfProceedAlert', 'error', 'Error al guardar las impresoras: ' + result.error)
+    }
+  } catch (e) {
+    showAlert('pfProceedAlert', 'error', 'Error al guardar: ' + e.message)
+  } finally {
+    btn.disabled = false; btn.textContent = 'Siguiente →'
+  }
+}
+
+// ─── Step 6: Validation ───────────────────────────────────────────────────────
 async function runValidation() {
   state.terminalId = document.getElementById('terminalId')?.value || state.terminalId
   const checks = [
@@ -477,30 +1103,26 @@ async function runValidation() {
   ]
 
   document.getElementById('btnToSave').disabled = true
-  clearAlert('step5Alert')
+  clearAlert('step6Alert')
   renderChecks(checks)
 
-  // c1 — restaurant_id format
   await delay(80)
   const rid = state.restaurantId
   checks[0].ok = rid && rid !== 'unknown' && rid.trim().length >= 2
   checks[0].done = true
   renderChecks(checks)
 
-  // c2 — terminal_id format
   await delay(80)
   checks[1].ok = /^[0-9a-f-]{8,}$/i.test(state.terminalId)
   checks[1].done = true
   renderChecks(checks)
 
-  // c3, c4, c5, c6 — server probe
   let serverOk = false
   try {
     const result = await window.setupBridge.testServer(state.serverHost, state.serverPort)
     serverOk = result.ok
 
-    checks[2].ok   = result.ok
-    checks[2].done = true
+    checks[2].ok = result.ok; checks[2].done = true
     renderChecks(checks)
 
     await delay(80)
@@ -508,27 +1130,23 @@ async function runValidation() {
       checks[3].ok = !result.restaurant_id || result.restaurant_id === state.restaurantId
       checks[3].done = true
       state.serverInfo = result
-
       if (!checks[3].ok) {
-        showAlert('step5Alert', 'warn',
+        showAlert('step6Alert', 'warn',
           `El servidor tiene restaurant_id "${result.restaurant_id}" pero esta terminal tiene "${state.restaurantId}". Verifica que sea la red correcta.`)
       }
     } else {
-      checks[3].ok = null  // skipped
       checks[3].done = true
     }
     renderChecks(checks)
 
     await delay(80)
-    checks[4].ok   = result.ws_ok ?? result.ok
-    checks[4].done = true
-    checks[5].ok   = result.protocol_ok ?? result.ok
-    checks[5].done = true
+    checks[4].ok = result.ws_ok ?? result.ok; checks[4].done = true
+    checks[5].ok = result.protocol_ok ?? result.ok; checks[5].done = true
     renderChecks(checks)
   } catch (e) {
     checks[2].ok = false; checks[2].done = true
     checks[3].done = true; checks[4].done = true; checks[5].done = true
-    showAlert('step5Alert', 'warn',
+    showAlert('step6Alert', 'warn',
       `No se pudo conectar al servidor en ${state.serverHost}:${state.serverPort} — ${e.message}. Puedes continuar si el servidor todavía no está corriendo y esta es una instalación nueva.`)
     renderChecks(checks)
   }
@@ -537,10 +1155,10 @@ async function runValidation() {
   if (critical) {
     document.getElementById('btnToSave').disabled = false
     if (!serverOk) {
-      showAlert('step5Alert', 'warn', 'Identidad válida pero el servidor no respondió. Puedes guardar la configuración; el POS conectará cuando el servidor esté disponible.')
+      showAlert('step6Alert', 'warn', 'Identidad válida pero el servidor no respondió. Puedes guardar la configuración; el POS conectará cuando el servidor esté disponible.')
     }
   } else {
-    showAlert('step5Alert', 'error', 'Corrije los errores antes de continuar.')
+    showAlert('step6Alert', 'error', 'Corrije los errores antes de continuar.')
   }
 }
 
@@ -548,24 +1166,29 @@ function renderChecks(checks) {
   const list = document.getElementById('checkList')
   list.innerHTML = checks.map(c => {
     let mark, color
-    if (!c.done)      { mark = '<div class="spinner"></div>'; color = '' }
+    if (!c.done)        { mark = '<div class="spinner"></div>'; color = '' }
     else if (c.ok === null) { mark = '—'; color = 'var(--text3)' }
-    else if (c.ok)    { mark = '✓'; color = 'var(--success)' }
-    else              { mark = '✕'; color = 'var(--danger)' }
+    else if (c.ok)      { mark = '✓'; color = 'var(--success)' }
+    else                { mark = '✕'; color = 'var(--danger)' }
     return `<li class="check-item"><span class="check-mark" style="color:${color}">${mark}</span><span>${c.label}</span></li>`
   }).join('')
 }
 
-// ─── Step 6: Summary + save ───────────────────────────────────────────────────
+// ─── Step 7: Summary + save ───────────────────────────────────────────────────
 function buildSummary() {
+  const printersSummary = state.printers.length === 0
+    ? 'Sin configurar (PRINTER_NOT_CONFIGURED)'
+    : `${state.printers.filter(p => p.enabled).length} habilitada(s) de ${state.printers.length}`
+
   const rows = [
-    ['Restaurant ID',   state.restaurantId],
-    ['Terminal ID',     state.terminalId],
-    ['Rol',             state.terminalRole],
-    ['Nombre',          state.terminalName],
-    ['Servidor local',  `${state.serverHost}:${state.serverPort}`],
-    ['Protocolo',       '1.0'],
-    ['Provisionado',    new Date().toLocaleString('es-MX')],
+    ['Restaurant ID',  state.restaurantId],
+    ['Terminal ID',    state.terminalId],
+    ['Rol',            state.terminalRole],
+    ['Nombre',         state.terminalName],
+    ['Servidor local', `${state.serverHost}:${state.serverPort}`],
+    ['Impresoras',     printersSummary],
+    ['Protocolo',      '1.0'],
+    ['Provisionado',   new Date().toLocaleString('es-MX')],
   ]
   document.getElementById('summaryTable').innerHTML = rows
     .map(([k, v]) => `<tr><td>${k}</td><td>${v || '—'}</td></tr>`).join('')
@@ -574,7 +1197,7 @@ function buildSummary() {
 async function saveAndRestart() {
   const btn = document.getElementById('btnSave')
   btn.disabled = true; btn.textContent = 'Guardando...'
-  clearAlert('step6Alert')
+  clearAlert('step7Alert')
 
   const config = {
     config_version:    1,
@@ -601,18 +1224,18 @@ async function saveAndRestart() {
     const result = await window.setupBridge.save(config)
     if (result.ok) {
       btn.textContent = 'Reiniciando...'
-      showAlert('step6Alert', 'ok', 'Configuración guardada. Reiniciando Fullsite POS...')
+      showAlert('step7Alert', 'ok', 'Configuración guardada. Reiniciando Fullsite POS...')
     } else {
       btn.disabled = false; btn.textContent = 'Guardar y reiniciar'
-      showAlert('step6Alert', 'error', result.error || 'Error desconocido al guardar la configuración.')
+      showAlert('step7Alert', 'error', result.error || 'Error desconocido al guardar la configuración.')
     }
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Guardar y reiniciar'
-    showAlert('step6Alert', 'error', 'Error al guardar: ' + e.message)
+    showAlert('step7Alert', 'error', 'Error al guardar: ' + e.message)
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0
@@ -627,7 +1250,7 @@ function showAlert(containerId, type, msg) {
   document.getElementById(containerId).innerHTML =
     `<div class="alert alert-${type}"><span class="alert-icon">${icons[type] || '•'}</span><span>${msg}</span></div>`
 }
-function clearAlert(id) { document.getElementById(id).innerHTML = '' }
+function clearAlert(id) { const el = document.getElementById(id); if (el) el.innerHTML = '' }
 
 function setError(id, msg) {
   const el = document.getElementById(id)
@@ -635,9 +1258,11 @@ function setError(id, msg) {
   const hint = el?.parentElement?.querySelector('.field-hint')
   if (hint) { hint.textContent = msg; hint.classList.add('warn') }
 }
-function clearError(id) {
-  const el = document.getElementById(id)
-  el?.classList.remove('error')
+function clearError(id) { document.getElementById(id)?.classList.remove('error') }
+
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 function syncStateFromConfig(cfg) {
@@ -651,8 +1276,11 @@ function syncStateFromConfig(cfg) {
 
 // Pre-fill step 2 fields when entering step 2
 const origGoTo = goTo
-// Override goTo to sync form fields before leaving step 2
 window.goTo = function(n) {
+  // Remove scrollable class when leaving step 5
+  if (state.currentStep === 5 && n !== 5) {
+    document.querySelector('.card').classList.remove('printer-step')
+  }
   if (n > 2) {
     const rid  = document.getElementById('restaurantId')?.value?.trim()
     const name = document.getElementById('terminalName')?.value?.trim()
@@ -664,7 +1292,6 @@ window.goTo = function(n) {
   origGoTo(n)
 }
 
-// Initialize step 2 form fields from state when page loads
 function prefillStep2() {
   const rid  = document.getElementById('restaurantId')
   const name = document.getElementById('terminalName')
@@ -674,7 +1301,6 @@ function prefillStep2() {
   if (role && state.terminalRole) role.value = state.terminalRole
 }
 
-// Re-prefill when navigating to step 2
 const _origOnStepEnter = onStepEnter
 window.onStepEnter = function(n) {
   _origOnStepEnter(n)

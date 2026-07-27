@@ -371,6 +371,114 @@ function registerProvisioningIpc() {
     }
   })
 
+  // ── CFG-01: Printer configuration IPC ──────────────────────────────────────
+
+  /** Load current printers.json state (includes legacy v1 detection for UI banner). */
+  ipcMain.handle('provision:load-printers', () => {
+    const result = loadPrinters()
+    // Also surface raw v1 data if the file exists but wasn't auto-migrated
+    let legacyV1 = null
+    try {
+      if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
+        const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'))
+        if (!raw.schema_version || raw.schema_version < 2) legacyV1 = raw
+      }
+    } catch {}
+    return { ...result, legacyV1 }
+  })
+
+  /**
+   * Validate and atomically save a v2 printers config.
+   * write-tmp → fsync → rename ensures no partial writes corrupt the file.
+   */
+  ipcMain.handle('provision:save-printers', async (_, config) => {
+    const { valid, errors } = printerConfigSchema.validate(config)
+    if (!valid) return { ok: false, error: errors.join('; ') }
+
+    const configPath = getPrinterConfigPath()
+    if (!configPath) return { ok: false, error: 'No se puede determinar la ruta de configuración.' }
+
+    try {
+      const tmpPath = configPath + '.tmp'
+      fs.mkdirSync(path.dirname(configPath), { recursive: true })
+      fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8')
+      fs.renameSync(tmpPath, configPath)
+      // Verify the write succeeded by re-reading
+      const verify = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+      if (verify.schema_version !== 2) throw new Error('Verificación fallida: formato incorrecto después de escritura')
+      console.log('[provision] Printers saved to', configPath)
+      return { ok: true, path: configPath }
+    } catch (e) {
+      // On failure, clean up tmp if left behind
+      try { const tmpPath = configPath + '.tmp'; if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath) } catch {}
+      return { ok: false, error: e.message }
+    }
+  })
+
+  /**
+   * Test TCP connectivity to a printer connection.
+   * USB/Windows printers return ok:null — they can't be probed without printing.
+   */
+  ipcMain.handle('provision:test-printer', async (_, connection) => {
+    if (!connection) return { ok: false, error: 'Sin datos de conexión.', code: 'NO_CONNECTION' }
+
+    if (connection.type !== 'tcp') {
+      return {
+        ok:      null,
+        message: 'Las impresoras Windows/USB no pueden probarse sin imprimir. Guarda y usa "Imprimir prueba" desde el POS.',
+        code:    'UNTESTABLE',
+      }
+    }
+
+    const { host, port } = connection
+    if (!host) return { ok: false, error: 'Host requerido.', code: 'INVALID_HOST' }
+    const p = Number(port)
+    if (!p || p < 1 || p > 65535) return { ok: false, error: 'Puerto inválido.', code: 'INVALID_PORT' }
+
+    const net = require('net')
+    return new Promise(resolve => {
+      const socket  = new net.Socket()
+      const timeout = setTimeout(() => {
+        socket.destroy()
+        resolve({ ok: false, error: `Timeout conectando a ${host}:${p}`, code: 'TIMEOUT' })
+      }, 4000)
+
+      socket.connect(p, host, () => {
+        clearTimeout(timeout)
+        socket.destroy()
+        resolve({ ok: true, message: `Conexión exitosa a ${host}:${p}` })
+      })
+
+      socket.on('error', e => {
+        clearTimeout(timeout)
+        const code = e.code === 'ECONNREFUSED' ? 'PORT_CLOSED'
+                   : e.code === 'ENOTFOUND'    ? 'HOST_NOT_FOUND'
+                   : e.code === 'ENETUNREACH'  ? 'NETWORK_UNREACHABLE'
+                   : 'UNKNOWN'
+        resolve({ ok: false, error: e.message, code })
+      })
+    })
+  })
+
+  /** Import a printers.json backup (v1 or v2) via file dialog. */
+  ipcMain.handle('provision:import-printers', async () => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      title:      'Seleccionar respaldo de impresoras',
+      filters:    [{ name: 'Configuración de Impresoras', extensions: ['json'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
+    try {
+      const raw       = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const validated = printerConfigSchema.loadAndValidate(raw)
+      if (!validated.valid) return { ok: false, error: validated.errors.join('; ') }
+      return { ok: true, config: validated.config, migrated: validated.migrated }
+    } catch (e) {
+      return { ok: false, error: e.message }
+    }
+  })
+
   /**
    * Validate and save the provisioned config, then relaunch the app.
    */
