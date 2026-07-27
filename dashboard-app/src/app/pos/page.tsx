@@ -2656,7 +2656,7 @@ function POSContent() {
     try {
       const checkRes = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${loadedOrderId}&select=updated_at,created_at,status&limit=1`,
-        { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+        { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
       )
       if (checkRes.ok) {
         const rows = await checkRes.json()
@@ -2704,7 +2704,7 @@ function POSContent() {
           : `mesa=eq.${mesa}`
         const raceRes = await fetch(
           `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&${filter}&status=in.(abierta,enviada,preparando)&order=created_at.desc&limit=1`,
-          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store' }
+          { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
         )
         if (raceRes.ok) {
           const raceRows = await raceRes.json()
@@ -2914,6 +2914,27 @@ function POSContent() {
       showToast('Inventario: algunos ingredientes no se pudieron descontar')
     }
     const ok = true
+
+    // Broadcast to local server so KDS on LAN devices updates immediately (not on 5s Supabase poll)
+    fetch('http://127.0.0.1:7717/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command_id: opId,
+        command_type: 'ORDER_SENT',
+        order_id: order.id,
+        mesa: order.mesa,
+        mesero: order.mesero,
+        status: 'enviada',
+        items: order.items,
+        personas: order.personas,
+        total: order.total,
+        turno_id: order.turnoId || null,
+        notas: order.notas || null,
+        comanda_batches: order.comandaBatches || null,
+        client_id: _cid(),
+      }),
+    }).catch(() => {})
 
     // Only print NEW items (not already sent to kitchen)
     const newItems = activeItems.filter(i => !sentItemIds.has(i.id))

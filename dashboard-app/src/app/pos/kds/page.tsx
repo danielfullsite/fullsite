@@ -293,6 +293,11 @@ export default function KDSPage() {
         if (!res.ok) console.error(`[KDS] Failed to persist item status for order ${orderId}: HTTP ${res.status}`)
       }).catch(err => {
         console.error(`[KDS] Network error persisting item status for order ${orderId}:`, err)
+        try {
+          const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+          q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
+          localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
+        } catch { /* noop */ }
       })
 
       return next
