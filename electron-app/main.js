@@ -60,6 +60,7 @@ function loadStations() {
 }
 
 let STATIONS = loadStations();
+let appConfig = {}; // loaded in app.whenReady before createWindow
 
 function printTcp(host, port, data) {
   return new Promise((resolve, reject) => {
@@ -395,9 +396,17 @@ function createWindow() {
 
   // Save last successful boot time for offline.html display
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.executeJavaScript(
-      `localStorage.setItem('pos_last_boot', '${new Date().toISOString()}')`
-    ).catch(() => {});
+    const bootTime = new Date().toISOString();
+    const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
+    // Inject identity from config.json — config is authoritative for Electron installs.
+    // Ensures a fresh terminal knows its client without a prior dashboard login.
+    if (appConfig.clientId) {
+      scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(appConfig.clientId))})`);
+    }
+    if (appConfig.terminalId) {
+      scripts.push(`localStorage.setItem('pos_terminal_id', ${JSON.stringify(String(appConfig.terminalId))})`);
+    }
+    mainWindow.webContents.executeJavaScript(scripts.join('; ')).catch(() => {});
   });
 
   // Listen for IPC from renderer (via preload bridge)
@@ -511,11 +520,11 @@ app.whenReady().then(() => {
 
   startFingerprintService(); // Fingerprint service starts FIRST
   startBridge();             // Print bridge starts SECOND
+  appConfig = loadAppConfig(); // Load before createWindow so did-finish-load can inject identity
   createWindow();            // Then open POS
   setupOfflineRetry();
 
   // Open KDS window if configured
-  const appConfig = loadAppConfig();
   if (appConfig.kds) {
     const { screen } = require('electron');
     const displays = screen.getAllDisplays();

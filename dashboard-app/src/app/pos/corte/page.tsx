@@ -42,7 +42,7 @@ async function getCardCommissionPct(): Promise<number> {
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${getClientId()}&active=eq.true&type=eq.card&select=commission_pct`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     )
     if (!res.ok) return 0
     const rows: { commission_pct: number | string }[] = await res.json()
@@ -53,7 +53,7 @@ async function getCardCommissionPct(): Promise<number> {
 async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc&limit=200`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
   return res.json()
@@ -64,7 +64,7 @@ async function getOrders(dateStr: string): Promise<OrderFromDB[]> {
 async function getOrdersByTurno(turnoId: string): Promise<OrderFromDB[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc&limit=500`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
   return res.json()
@@ -73,7 +73,7 @@ async function getOrdersByTurno(turnoId: string): Promise<OrderFromDB[]> {
 async function getCashMovementsByTurno(turnoId: string): Promise<CashMovement[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}&turno_id=eq.${encodeURIComponent(turnoId)}&order=created_at.desc`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
   return res.json()
@@ -82,7 +82,7 @@ async function getCashMovementsByTurno(turnoId: string): Promise<CashMovement[]>
 async function getCashMovementsByDate(dateStr: string): Promise<CashMovement[]> {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/pos_cash_movements?client_id=eq.${getClientId()}&created_at=gte.${dateStr}T00:00:00&created_at=lte.${dateStr}T23:59:59&order=created_at.desc`,
-    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
   )
   if (!res.ok) return []
   return res.json()

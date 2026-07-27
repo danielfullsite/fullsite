@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v3'
+const CACHE_VERSION = 'v4'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -30,12 +30,14 @@ const STATIC_ASSETS = [
   '/icon-512v2.png',
 ]
 
-// API patterns to cache (Supabase REST)
+// API patterns to cache (Supabase REST) — network-first with offline fallback
 const API_CACHE_PATTERNS = [
   /\/rest\/v1\/pos_menu/,
   /\/rest\/v1\/pos_ingredients/,
   /\/rest\/v1\/pos_recipes/,
   /\/rest\/v1\/pos_staff/,
+  /\/rest\/v1\/pos_payment_methods/,
+  /\/rest\/v1\/pos_turnos/,
 ]
 
 // API patterns that should NEVER be cached (mutations, auth)
@@ -47,14 +49,44 @@ const NEVER_CACHE_PATTERNS = [
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing...')
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      // Cache static assets — don't fail install if some are missing
-      return Promise.allSettled(
-        STATIC_ASSETS.map((url) => cache.add(url).catch(() => {
+    (async () => {
+      // Phase 1: cache HTML app shells
+      const staticCache = await caches.open(STATIC_CACHE)
+      await Promise.allSettled(
+        STATIC_ASSETS.map((url) => staticCache.add(url).catch(() => {
           console.warn(`[SW] Failed to cache: ${url}`)
         }))
       )
-    }).then(() => self.skipWaiting())
+
+      // Phase 2: pre-cache all Next.js JS/CSS chunks by fetching the /pos page HTML
+      // and extracting every /_next/static/ URL. Without this, Electron shows a black
+      // screen when offline — the HTML shell loads but React cannot mount without chunks.
+      try {
+        const posRes = await fetch('/pos', { cache: 'reload' })
+        if (posRes.ok) {
+          const html = await posRes.text()
+          const chunkUrls = []
+          const regex = /"(\/_next\/static\/[^"]+\.(js|css))"/g
+          let m
+          while ((m = regex.exec(html)) !== null) {
+            if (!chunkUrls.includes(m[1])) chunkUrls.push(m[1])
+          }
+          const results = await Promise.allSettled(
+            chunkUrls.map(url =>
+              fetch(url, { cache: 'reload' })
+                .then(r => { if (r.ok) return staticCache.put(url, r) })
+                .catch(() => {})
+            )
+          )
+          const ok = results.filter(r => r.status === 'fulfilled').length
+          console.log(`[SW] Pre-cached ${ok}/${chunkUrls.length} Next.js chunks`)
+        }
+      } catch (e) {
+        console.warn('[SW] Chunk pre-cache skipped (warm-cache will cover on next online load):', e.message)
+      }
+
+      self.skipWaiting()
+    })()
   )
 })
 

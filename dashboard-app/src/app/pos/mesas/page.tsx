@@ -229,7 +229,7 @@ export default function MesasPage() {
       const [ordersRes, resRes] = await Promise.all([
         fetch(
           `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta,entregada)&order=created_at.desc&limit=50`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
         fetch(
           `${SUPABASE_URL}/rest/v1/reservaciones?client_id=eq.${_cid()}&fecha=eq.${new Date().toISOString().split('T')[0]}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`,
@@ -239,8 +239,21 @@ export default function MesasPage() {
       const orders = ordersRes.ok ? await ordersRes.json() : []
       setActiveOrders(orders)
       try { localStorage.setItem('pos_mesas_orders', JSON.stringify({ orders, ts: Date.now() })) } catch {}
+      // Persist to IndexedDB so offline access survives beyond the 30s localStorage TTL
+      if (orders.length > 0) {
+        import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
+          Promise.all((orders as Record<string, unknown>[]).map(o => cacheOrder(o)))
+        ).catch(() => {})
+      }
       setReservas(resRes.ok ? await resRes.json() : [])
-    } catch { /* */ }
+    } catch {
+      // Offline fallback: IndexedDB has orders from last successful online fetch
+      import('@/lib/pos-offline-db').then(({ getCachedOrders }) =>
+        getCachedOrders().then(cached => {
+          if (cached.length > 0) setActiveOrders(cached as unknown as ActiveOrder[])
+        })
+      ).catch(() => {})
+    }
     setLoading(false)
   }, [])
 

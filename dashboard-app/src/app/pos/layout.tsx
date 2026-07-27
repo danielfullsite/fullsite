@@ -93,7 +93,16 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   useEffect(() => {
     if (!swRegistered.current) {
       swRegistered.current = true
-      registerServiceWorker()
+      registerServiceWorker().then(() => {
+        // Warm SW cache with all currently-loaded JS/CSS chunks so the app works offline
+        import('@/lib/service-worker').then(({ precacheUrls }) => {
+          const scripts = Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]'))
+            .map(s => s.src).filter(Boolean)
+          const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+            .map(l => l.href).filter(Boolean)
+          precacheUrls([...scripts, ...links])
+        }).catch(() => {})
+      }).catch(() => {})
       // Auto-sync offline queue when internet returns
       import('@/lib/pos-offline-db').then(m => m.registerAutoSync()).catch(() => {})
       // Start print retry loop — processes any queued print jobs from previous sessions
