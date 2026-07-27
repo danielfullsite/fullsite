@@ -5,6 +5,7 @@ const net = require('net');
 const os = require('os');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
+const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
 
 // ─── PRINT BRIDGE (embedded) ──────────────────────────────────────────────
 // HTTP server on 127.0.0.1:7717 that receives ESC/POS from the POS web app
@@ -24,6 +25,25 @@ const DEFAULT_STATIONS = {
 };
 
 const PRINTERS_CONFIG_PATH = path.join('C:\\fullsite', 'printers.json');
+const APP_CONFIG_PATH = path.join('C:\\fullsite', 'config.json');
+
+// ─── APP CONFIG ───────────────────────────────────────────────────────────────
+// C:\fullsite\config.json — optional, controls which surfaces open at startup.
+// Example: { "kds": true }
+//   kds: true  → open KDS window on second display (if connected)
+
+function loadAppConfig() {
+  try {
+    if (fs.existsSync(APP_CONFIG_PATH)) {
+      const data = JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8'));
+      console.log('[config] Loaded config.json:', JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    console.warn('[config] Error loading config.json:', e.message);
+  }
+  return {};
+}
 
 function loadStations() {
   try {
@@ -349,6 +369,7 @@ function startFingerprintService() {
 // ─── MAIN WINDOW ──────────────────────────────────────────────────────────
 
 let mainWindow = null;
+let kdsWindow = null;
 let allowClose = false;
 
 function createWindow() {
@@ -436,6 +457,39 @@ function setupOfflineRetry() {
   }, 10000);
 }
 
+// ─── KDS WINDOW ───────────────────────────────────────────────────────────
+// Second window for kitchen display. Uses preload-kds.js which sets
+// window.fullsiteApp.surface = 'kds', triggering KDS-specific behavior in the web app.
+// Both windows share the default Electron session → same IndexedDB → offline orders
+// cached by the POS are immediately visible to the KDS, even without internet.
+
+function createKdsWindow(x, y, width, height) {
+  kdsWindow = new BrowserWindow({
+    title: 'Fullsite KDS',
+    x, y, width, height,
+    kiosk: true,
+    fullscreen: true,
+    frame: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-kds.js'),
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    },
+  });
+  kdsWindow.setMenu(null);
+  kdsWindow.loadURL(KDS_URL);
+  kdsWindow.webContents.on('did-fail-load', () => {
+    kdsWindow.loadFile('offline.html');
+  });
+  kdsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  kdsWindow.on('closed', () => { kdsWindow = null; });
+  console.log('[kds] KDS window opened on', `${x},${y} ${width}x${height}`);
+}
+
 // ─── APP LIFECYCLE ────────────────────────────────────────────────────────
 
 // Enable WebAuthn (Windows Hello + DigitalPersona 4500 fingerprint reader)
@@ -459,6 +513,21 @@ app.whenReady().then(() => {
   startBridge();             // Print bridge starts SECOND
   createWindow();            // Then open POS
   setupOfflineRetry();
+
+  // Open KDS window if configured
+  const appConfig = loadAppConfig();
+  if (appConfig.kds) {
+    const { screen } = require('electron');
+    const displays = screen.getAllDisplays();
+    const primary = screen.getPrimaryDisplay();
+    const secondary = displays.find(d => d.id !== primary.id);
+    if (secondary) {
+      const { bounds } = secondary;
+      createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height);
+    } else {
+      console.log('[kds] config.kds=true but no second display found — connect a second screen and restart');
+    }
+  }
 });
 
 app.on('window-all-closed', () => app.quit());
