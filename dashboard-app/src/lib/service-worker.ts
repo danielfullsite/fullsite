@@ -34,6 +34,25 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
       })
     })
 
+    // Auto-update: check every 30 min so mid-day deploys are picked up even if offline
+    setInterval(() => { registration.update().catch(() => {}) }, 30 * 60 * 1000)
+
+    // Also check when the tab comes back to foreground
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registration.update().catch(() => {})
+    })
+
+    // When a new SW takes control, reload automatically if on a safe page (not mid-order)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const path = window.location.pathname
+      if (path === '/pos/mesas') {
+        console.log('[SW] New version ready — reloading mesas')
+        window.location.reload()
+      } else {
+        console.log('[SW] New version ready — will activate on next navigation to mesas')
+      }
+    })
+
     // Register for background sync if supported
     if ('sync' in registration) {
       try {
