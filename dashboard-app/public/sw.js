@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v3'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -130,7 +130,8 @@ async function networkFirstWithCache(request, cacheName) {
     }
     return response
   } catch {
-    const cached = await caches.match(request)
+    // Try exact URL first, then ignore query params (e.g. /pos?mesa=3 → /pos)
+    const cached = await caches.match(request) || await caches.match(request, { ignoreSearch: true })
     if (cached) return cached
     // Return offline page for HTML requests
     if (request.headers.get('accept')?.includes('text/html')) {
