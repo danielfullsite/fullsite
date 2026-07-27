@@ -1,7 +1,7 @@
 // Service Worker — Fullsite POS offline-first
 // Caches app shell, static assets, and API responses for true offline operation
 
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const STATIC_CACHE = `fullsite-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fullsite-dynamic-${CACHE_VERSION}`
 const API_CACHE = `fullsite-api-${CACHE_VERSION}`
@@ -214,27 +214,92 @@ function offlineHTML() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Fullsite POS — Offline</title>
+  <title>Fullsite POS — Sin conexion</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e5e5e5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .container { text-align: center; padding: 2rem; }
+    .container { text-align: center; padding: 2rem; max-width: 420px; }
     .icon { font-size: 4rem; margin-bottom: 1rem; }
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    p { color: #999; margin-bottom: 1.5rem; }
-    button { padding: 0.75rem 2rem; background: #2563eb; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; }
-    button:hover { background: #1d4ed8; }
-    .status { margin-top: 1rem; font-size: 0.875rem; color: #666; }
+    p { color: #999; margin-bottom: 1.5rem; line-height: 1.6; }
+    .btn { display: block; width: 100%; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; margin-bottom: 0.75rem; }
+    .btn-green { background: #10b981; color: #fff; font-weight: 600; }
+    .btn-green:hover { background: #059669; }
+    .btn-outline { background: transparent; color: #6b7280; border: 1px solid #374151; }
+    .btn-outline:hover { color: #9ca3af; border-color: #6b7280; }
+    .hint { font-size: 0.75rem; color: #6b7280; margin-bottom: 1rem; }
+    .scene-c { background: #1c1000; border: 1px solid #713f12; border-radius: 8px; padding: 12px 14px; margin-bottom: 1rem; font-size: 0.8rem; color: #fbbf24; text-align: left; line-height: 1.5; display: none; }
+    .status { margin-top: 1rem; font-size: 0.7rem; color: #444; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="icon">&#128268;</div>
     <h1>Sin conexion</h1>
-    <p>El POS sigue funcionando en modo offline.<br>Las ordenes se sincronizaran cuando vuelva el internet.</p>
-    <button onclick="location.reload()">Reintentar</button>
-    <div class="status">Modo offline activo — datos guardados localmente</div>
+    <p>El POS sigue funcionando en modo offline.<br>Los pedidos se guardan localmente y se sincronizan cuando vuelva el internet.</p>
+    <div class="scene-c" id="sceneC">
+      Para usar modo offline necesitas haber abierto esta pagina con internet al menos una vez. Conecta internet y recarga para instalar la version local.
+    </div>
+    <button class="btn btn-green" id="btnContinue" style="display:none" onclick="goOffline()">
+      Continuar en modo offline
+    </button>
+    <p class="hint" id="hint" style="display:none">Version local disponible — los pedidos se guardan aqui.</p>
+    <button class="btn btn-outline" onclick="location.reload()">Reintentar conexion</button>
+    <div class="status" id="status">Verificando version local...</div>
   </div>
+  <script>
+    var targetUrl = window.location.href;
+
+    async function checkCache() {
+      try {
+        // Search all caches for this URL (ignoring query params like ?bridge=)
+        var cached = await caches.match(targetUrl, { ignoreSearch: true });
+        if (!cached) {
+          var base = window.location.origin + window.location.pathname;
+          cached = await caches.match(base) || await caches.match(base.replace(/\\/$/, ''));
+        }
+        if (cached) {
+          document.getElementById('btnContinue').style.display = 'block';
+          document.getElementById('hint').style.display = 'block';
+          document.getElementById('status').textContent = 'Version local disponible';
+          scheduleAutoRedirect();
+        } else {
+          document.getElementById('sceneC').style.display = 'block';
+          document.getElementById('status').textContent = 'Sin version local — requiere internet para activar';
+        }
+      } catch(e) {
+        document.getElementById('status').textContent = 'Modo offline activo';
+      }
+    }
+
+    var autoTimer = null;
+    function scheduleAutoRedirect() {
+      if (autoTimer) return;
+      var secs = 3;
+      var hint = document.getElementById('hint');
+      function tick() {
+        if (hint) hint.textContent = 'Abriendo en modo offline en ' + secs + 's...';
+        if (secs <= 0) { clearInterval(autoTimer); goOffline(); }
+        secs--;
+      }
+      tick();
+      autoTimer = setInterval(tick, 1000);
+    }
+
+    function goOffline() {
+      if (autoTimer) clearInterval(autoTimer);
+      window.location.reload();
+    }
+
+    // Auto-retry network every 10s
+    setInterval(function() {
+      fetch(targetUrl, { cache: 'no-store' })
+        .then(function(r) { if (r.ok) window.location.reload(); })
+        .catch(function() {});
+    }, 10000);
+
+    checkCache();
+  </script>
 </body>
 </html>`
 }
