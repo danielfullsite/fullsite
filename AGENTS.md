@@ -6,6 +6,10 @@
 
 ---
 
+**Engineering philosophy:** See `ENGINEERING-AXIOMS.md` in this directory. All development decisions should be grounded in those principles.
+
+---
+
 ## 1 · Identidad del repo
 
 - **Nombre:** `fullsite`
