@@ -1373,6 +1373,12 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     )
     if (!res.ok) return []
     orders = await res.json()
+    // Cache para offline — fire and forget, no bloquea
+    if (typeof window !== 'undefined') {
+      import('@/lib/pos-offline-db').then(({ cacheOrder }) =>
+        Promise.all(orders.map(o => cacheOrder(o as unknown as Record<string, unknown>)))
+      ).catch(() => {})
+    }
   } catch {
     // Offline — mostrar las órdenes cacheadas en este dispositivo (IndexedDB)
     if (typeof window === 'undefined') return []

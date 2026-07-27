@@ -170,8 +170,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // Restore session
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('pos_staff')
-      const lastActivity = sessionStorage.getItem('pos_last_activity')
+      const saved = localStorage.getItem('pos_staff')
+      const lastActivity = localStorage.getItem('pos_last_activity')
       if (saved && lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
         if (elapsed < IDLE_TIMEOUT_MS) {
@@ -185,8 +185,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           } catch { /* ignore */ }
         } else {
           // Session expired — clean up server session too
-          sessionStorage.removeItem('pos_staff')
-          sessionStorage.removeItem('pos_last_activity')
+          localStorage.removeItem('pos_staff')
+          localStorage.removeItem('pos_last_activity')
           removeSession().catch(() => {})
         }
       }
@@ -198,7 +198,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   // Idle timeout — track last activity
   const resetIdleTimer = useCallback(() => {
     if (typeof window !== 'undefined' && unlocked) {
-      sessionStorage.setItem('pos_last_activity', Date.now().toString())
+      localStorage.setItem('pos_last_activity', Date.now().toString())
     }
   }, [unlocked])
 
@@ -213,7 +213,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
     // Check idle every minute
     const interval = setInterval(() => {
-      const lastActivity = sessionStorage.getItem('pos_last_activity')
+      const lastActivity = localStorage.getItem('pos_last_activity')
       if (lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
         if (elapsed >= IDLE_TIMEOUT_MS) {
@@ -222,8 +222,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           setUnlocked(false)
           setStaff(null)
           setPin('')
-          sessionStorage.removeItem('pos_staff')
-          sessionStorage.removeItem('pos_last_activity')
+          localStorage.removeItem('pos_staff')
+          localStorage.removeItem('pos_last_activity')
         }
       }
     }, 60000)
@@ -322,8 +322,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         setStaff(member)
         setUnlocked(true)
         setAttempts(0)
-        sessionStorage.setItem('pos_staff', JSON.stringify(member))
-        sessionStorage.setItem('pos_last_activity', Date.now().toString())
+        localStorage.setItem('pos_staff', JSON.stringify(member))
+        localStorage.setItem('pos_last_activity', Date.now().toString())
         // Fullscreen handled by Electron kiosk mode
         requestNotificationPermission().catch(() => {})
         // Go to mesas after fingerprint login
@@ -362,8 +362,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
       setStaff(member)
       setAttempts(0)
-      sessionStorage.setItem('pos_staff', JSON.stringify(member))
-      sessionStorage.setItem('pos_last_activity', Date.now().toString())
+      localStorage.setItem('pos_staff', JSON.stringify(member))
+      localStorage.setItem('pos_last_activity', Date.now().toString())
       setChecking(false)
       // Fullscreen handled by Electron kiosk mode
       // Ask for notification permission after login (non-blocking, user gesture context)
