@@ -396,6 +396,7 @@ function createWindow() {
 
   // Save last successful boot time for offline.html display
   mainWindow.webContents.on('did-finish-load', () => {
+    loadFailCount = 0; // Reset on successful load
     const bootTime = new Date().toISOString();
     const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
     // Inject identity from config.json — config is authoritative for Electron installs.
@@ -419,9 +420,22 @@ function createWindow() {
     if (mainWindow) { mainWindow.setKiosk(true); mainWindow.setFullScreen(true); }
   });
 
+  // Retry counter for offline SW activation timing.
+  // When offline, DNS fails immediately and did-fail-load fires before the SW
+  // activates from the previous session. Retrying 2-3 times gives the SW time
+  // to activate and serve /pos from cache without network.
+  let loadFailCount = 0;
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc) => {
-    console.error(`Load failed: ${errorCode} ${errorDesc}`);
-    mainWindow.loadFile('offline.html');
+    if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted — not a real failure
+    loadFailCount++;
+    console.error(`[main] Load failed (${loadFailCount}): ${errorCode} ${errorDesc}`);
+    if (loadFailCount <= 3) {
+      // Give SW progressively more time to activate from the previous session
+      setTimeout(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(POS_URL); }, loadFailCount * 800);
+    } else {
+      loadFailCount = 0;
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html');
+    }
   });
 
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
