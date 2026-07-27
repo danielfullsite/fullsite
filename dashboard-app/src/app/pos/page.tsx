@@ -2867,6 +2867,26 @@ function POSContent() {
           return n
         })
         setLoadedOrderId(order.id)
+        // Broadcast to local server so KDS on other LAN devices receives the order offline
+        fetch('http://127.0.0.1:7717/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            command_id: opId,
+            command_type: 'ORDER_SENT',
+            order_id: order.id,
+            mesa: order.mesa,
+            mesero: order.mesero,
+            status: 'enviada',
+            items: order.items,
+            personas: order.personas,
+            total: order.total,
+            turno_id: order.turnoId || null,
+            notas: order.notas || null,
+            comanda_batches: order.comandaBatches || null,
+            client_id: _cid(),
+          }),
+        }).catch(() => {})
         // Treat as success — order is locally persisted, navigate back so mesero can serve another table
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')

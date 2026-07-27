@@ -9,7 +9,7 @@ import {
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName } from '@/lib/pos-constants'
-import { useBridgeClient } from '@/lib/bridge-client'
+import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -175,10 +175,45 @@ export default function KDSPage() {
     if (restored.size > 0 || doneItems.size > 0) setDoneItems(restored)
   }, [])
 
-  // Push DELTA events from the local server → immediate refresh without waiting for poll
+  // Register ?bridge=IP on first visit so this device connects to the POS server on LAN
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const bridgeHost = params.get('bridge')
+    if (bridgeHost) {
+      setPosServerHost(bridgeHost)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  // Push DELTA events from the POS local server — works cross-device over LAN
   useBridgeClient((event) => {
     const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
-    if (ORDER_EVENTS.includes(event.type)) fetchOrders()
+    if (ORDER_EVENTS.includes(event.type)) {
+      // Cache order from DELTA so this KDS can show it even if Supabase is down
+      if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
+        const p = event.payload as Record<string, unknown>
+        if (p.order_id) {
+          import('@/lib/pos-offline-db').then(({ cacheOrder }) => {
+            cacheOrder({
+              id: p.order_id as string,
+              mesa: p.mesa,
+              mesero: p.mesero,
+              status: 'enviada',
+              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
+              personas: p.personas || 1,
+              total: p.total || 0,
+              turno_id: p.turno_id || null,
+              notas: p.notas || null,
+              comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }).catch(() => {})
+        }
+      }
+      fetchOrders()
+    }
   }, 'kds')
 
   useEffect(() => {

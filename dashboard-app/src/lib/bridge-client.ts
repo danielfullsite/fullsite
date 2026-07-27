@@ -10,7 +10,21 @@
 import { useEffect, useRef, useState } from 'react'
 
 const PROTOCOL_VERSION = '1.0'
-const WS_URL = 'ws://127.0.0.1:7717/ws'
+const LOCAL_PORT = 7717
+
+function getBridgeUrl(): string {
+  if (typeof window === 'undefined') return `ws://127.0.0.1:${LOCAL_PORT}/ws`
+  // Cross-device: KDS on a different machine points to the POS server's LAN IP
+  const stored = localStorage.getItem('pos_bridge_host')
+  if (stored) return `ws://${stored}:${LOCAL_PORT}/ws`
+  return `ws://127.0.0.1:${LOCAL_PORT}/ws`
+}
+
+/** Call once (e.g. from ?bridge= URL param) to register the POS server IP for this device */
+export function setPosServerHost(ip: string): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem('pos_bridge_host', ip)
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +64,7 @@ export class BridgeClient {
     if (this.dead) return
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return
     try {
-      this.ws = new WebSocket(WS_URL)
+      this.ws = new WebSocket(getBridgeUrl())
 
       this.ws.onopen = () => {
         this._connected = true
@@ -120,7 +134,10 @@ export function useBridgeClient(
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!navigator.userAgent.includes('Electron')) return  // browser-only guard
+    // Connect in Electron OR in any browser with a configured bridge host
+    const isElectron = navigator.userAgent.includes('Electron')
+    const hasBridgeHost = !!localStorage.getItem('pos_bridge_host')
+    if (!isElectron && !hasBridgeHost) return
 
     const clientId =
       localStorage.getItem('pos_terminal_id') ||
