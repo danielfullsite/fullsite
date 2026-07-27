@@ -2,7 +2,7 @@
 // Stores menu, orders, inventory, and sync queue for offline-first operation
 
 const DB_NAME = 'fullsite_pos'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 // ─── Replay Transport Classes ───────────────────────────────────────────────
 // APP_API: replay through application API routes (Next.js /api/pos/*)
@@ -60,6 +60,22 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' })
+      }
+      // v2: offline cache for modifiers and payment methods
+      if (!db.objectStoreNames.contains('modifier_groups')) {
+        db.createObjectStore('modifier_groups', { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains('modifiers')) {
+        db.createObjectStore('modifiers', { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains('item_modifier_links')) {
+        db.createObjectStore('item_modifier_links', { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains('payment_methods')) {
+        db.createObjectStore('payment_methods', { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains('staff')) {
+        db.createObjectStore('staff', { keyPath: 'id' })
       }
     }
   })
@@ -477,6 +493,98 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   // Clean up old synced items
   await clearSyncedItems()
   return { synced, failed }
+}
+
+// ─── Modifier Cache (v2) ─────────────────────────────────────────────────────
+
+export async function cacheModifierData(
+  groups: Record<string, unknown>[],
+  mods: Record<string, unknown>[],
+  links: Record<string, unknown>[],
+): Promise<void> {
+  const db = await openDB()
+  const stores = ['modifier_groups', 'modifiers', 'item_modifier_links'] as const
+  const data = [groups, mods, links]
+  for (let i = 0; i < stores.length; i++) {
+    const tx = db.transaction(stores[i], 'readwrite')
+    const store = tx.objectStore(stores[i])
+    store.clear()
+    for (const item of data[i]) store.put(item)
+  }
+  const metaTx = db.transaction('meta', 'readwrite')
+  metaTx.objectStore('meta').put({ key: 'modifiers_cached_at', value: new Date().toISOString() })
+}
+
+export async function getCachedModifierGroups(): Promise<Record<string, unknown>[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('modifier_groups', 'readonly')
+    const req = tx.objectStore('modifier_groups').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
+}
+
+export async function getCachedModifiers(): Promise<Record<string, unknown>[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('modifiers', 'readonly')
+    const req = tx.objectStore('modifiers').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
+}
+
+export async function getCachedItemModifierLinks(): Promise<Record<string, unknown>[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('item_modifier_links', 'readonly')
+    const req = tx.objectStore('item_modifier_links').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
+}
+
+// ─── Payment Methods Cache (v2) ───────────────────────────────────────────────
+
+export async function cachePaymentMethods(methods: Record<string, unknown>[]): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('payment_methods', 'readwrite')
+  const store = tx.objectStore('payment_methods')
+  store.clear()
+  for (const m of methods) store.put(m)
+  const metaTx = db.transaction('meta', 'readwrite')
+  metaTx.objectStore('meta').put({ key: 'payment_methods_cached_at', value: new Date().toISOString() })
+}
+
+export async function getCachedPaymentMethods(): Promise<Record<string, unknown>[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('payment_methods', 'readonly')
+    const req = tx.objectStore('payment_methods').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
+}
+
+// ─── Staff Cache (v2) ─────────────────────────────────────────────────────────
+
+export async function cacheStaff(staff: Record<string, unknown>[]): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('staff', 'readwrite')
+  const store = tx.objectStore('staff')
+  store.clear()
+  for (const s of staff) store.put(s)
+}
+
+export async function getCachedStaff(): Promise<Record<string, unknown>[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('staff', 'readonly')
+    const req = tx.objectStore('staff').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
 }
 
 // ─── Auto-sync on reconnect ──────────────────────────────────────────────────

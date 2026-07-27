@@ -26,6 +26,7 @@ import {
   getModifiersForCategoryFromDB,
   getModifierGroupsForItem,
   getPaymentMethodsFromDB,
+  prefetchOfflineData,
   getActiveTurno,
   getClientId,
   type RecipeRow,
@@ -1617,6 +1618,8 @@ function POSContent() {
       }
       setPaymentMethodsDB(pm)
       if (turno) setTurnoId(turno.id)
+      // Pre-cache all modifier + payment data for offline cold-start (fire-and-forget)
+      if (navigator.onLine) prefetchOfflineData().catch(() => {})
       // Promos: build category map + load
       const cats = dbMenu.length > 0 ? dbMenu : menuCategories
       categoryMapRef.current = buildCategoryMap(cats)
@@ -2864,6 +2867,10 @@ function POSContent() {
           return n
         })
         setLoadedOrderId(order.id)
+        // Treat as success — order is locally persisted, navigate back so mesero can serve another table
+        sessionStorage.removeItem('pos_staff')
+        sessionStorage.removeItem('pos_last_activity')
+        setTimeout(() => { router.push('/pos/plano') }, 1500)
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }
@@ -3356,6 +3363,14 @@ function POSContent() {
         </div>
         {/* Row 2: Selectors (compact for tablet) */}
         <div className="flex items-center gap-1.5 px-3 py-1 border-t border-[var(--line)]/50 overflow-x-auto">
+          {/* Back to mesa map — always visible in kiosk mode (no browser back button) */}
+          <Link
+            href="/pos/plano"
+            className="flex items-center justify-center w-11 h-11 rounded-lg bg-[var(--line)] border border-slate-600 text-[var(--text-3)] hover:text-white flex-shrink-0 transition-colors"
+            title="Volver al mapa de mesas"
+          >
+            <ArrowLeft size={18} />
+          </Link>
           <div className="flex items-center gap-1 bg-[var(--line)] rounded-lg px-3 py-0.5 border border-slate-600 min-h-[40px]">
             <span className="text-white text-sm font-medium">Mesa</span>
             <input

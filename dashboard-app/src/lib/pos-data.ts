@@ -391,9 +391,23 @@ export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
       `${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${_getClientId()}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
-    if (!res.ok) return []
-    return res.json()
-  } catch { return [] }
+    if (!res.ok) {
+      return _getPaymentMethodsFromCache()
+    }
+    const methods = await res.json() as PaymentMethodDB[]
+    // Fire-and-forget cache for offline boot
+    import('@/lib/pos-offline-db').then(m => m.cachePaymentMethods(methods as unknown as Record<string, unknown>[])).catch(() => {})
+    return methods
+  } catch { return _getPaymentMethodsFromCache() }
+}
+
+async function _getPaymentMethodsFromCache(): Promise<PaymentMethodDB[]> {
+  try {
+    const { getCachedPaymentMethods } = await import('@/lib/pos-offline-db')
+    const cached = await getCachedPaymentMethods()
+    if (cached.length > 0) return cached as unknown as PaymentMethodDB[]
+  } catch {}
+  return []
 }
 
 /** Turno activo (pos_turnos sin closed_at). Devuelve null si no hay turno abierto. */
@@ -549,7 +563,93 @@ export async function getModifierGroupsForItem(itemId: string, categoryId: strin
       // Filter out incompatible groups (e.g. "Término" on coffee, "Shot" on food)
       .filter(g => isGroupCompatible(g.name, categoryId))
   } catch {
+    // Offline — reconstruct from IDB cache
+    return _getModifierGroupsFromCache(itemId, categoryId)
+  }
+}
+
+async function _getModifierGroupsFromCache(itemId: string, categoryId: string): Promise<ModifierGroupDef[]> {
+  try {
+    const { getCachedModifierGroups, getCachedModifiers, getCachedItemModifierLinks } = await import('@/lib/pos-offline-db')
+    const [allGroups, allMods, allLinks] = await Promise.all([
+      getCachedModifierGroups(),
+      getCachedModifiers(),
+      getCachedItemModifierLinks(),
+    ])
+    const groupIds = new Set<string>()
+    for (const l of allLinks) {
+      if ((l as Record<string, unknown>).item_id === itemId) groupIds.add((l as Record<string, unknown>).group_id as string)
+      if ((l as Record<string, unknown>).category_id === categoryId) groupIds.add((l as Record<string, unknown>).group_id as string)
+    }
+    groupIds.delete('quitar')
+    if (groupIds.size === 0) return []
+
+    const groups = allGroups.filter(g => groupIds.has((g as Record<string, unknown>).id as string)) as unknown as { id: string; name: string; level: number; min_selections: number; max_selections: number | null; required: boolean }[]
+    const opts = allMods.filter(o => groupIds.has((o as Record<string, unknown>).group_id as string)) as unknown as { group_id: string; name: string; price: number }[]
+
+    const optsByGroup = new Map<string, ModificadorAgregar[]>()
+    for (const o of opts) {
+      const arr = optsByGroup.get(o.group_id) || []
+      arr.push({ name: o.name, price: Number(o.price) })
+      optsByGroup.set(o.group_id, arr)
+    }
+
+    return groups
+      .map(g => ({
+        id: g.id,
+        name: g.name,
+        level: Number(g.level) || 1,
+        minSelections: Number(g.min_selections) || 0,
+        maxSelections: g.max_selections === null ? null : Number(g.max_selections),
+        required: Boolean(g.required),
+        options: optsByGroup.get(g.id) || [],
+      }))
+      .filter(g => g.options.length > 0)
+      .filter(g => isGroupCompatible(g.name, categoryId))
+  } catch {
     return []
+  }
+}
+
+/**
+ * Pre-fetches all data needed for offline operation and stores it in IndexedDB.
+ * Call once on successful POS init (online session).
+ * Covers: modifier groups, modifiers, item/category modifier links, payment methods, staff list.
+ */
+export async function prefetchOfflineData(): Promise<void> {
+  const cid = _getClientId()
+  try {
+    const [groupsRes, modsRes, itemLinksRes, catLinksRes, methodsRes] = await Promise.all([
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifier_groups?client_id=eq.${cid}&active=eq.true&select=id,name,level,min_selections,max_selections,required,sort_order`, { headers: _SB_HEADERS }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_modifiers?client_id=eq.${cid}&active=eq.true&select=id,group_id,name,price,sort_order`, { headers: _SB_HEADERS }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_item_modifier_groups?client_id=eq.${cid}&select=item_id,group_id`, { headers: _SB_HEADERS }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_category_modifiers?client_id=eq.${cid}&select=category_id,modifier_group_id`, { headers: _SB_HEADERS }),
+      fetch(`${_SUPABASE_URL}/rest/v1/pos_payment_methods?client_id=eq.${cid}&active=eq.true&select=id,name,type,commission_pct&order=name.asc`, { headers: _SB_HEADERS }),
+    ])
+
+    const { cacheModifierData, cachePaymentMethods } = await import('@/lib/pos-offline-db')
+
+    if (groupsRes.ok && modsRes.ok) {
+      const groups = await groupsRes.json() as Record<string, unknown>[]
+      const mods = await modsRes.json() as Record<string, unknown>[]
+      const links: Record<string, unknown>[] = []
+      if (itemLinksRes.ok) {
+        const rows = await itemLinksRes.json() as { item_id: string; group_id: string }[]
+        for (const r of rows) links.push({ id: `item:${r.item_id}:${r.group_id}`, item_id: r.item_id, group_id: r.group_id })
+      }
+      if (catLinksRes.ok) {
+        const rows = await catLinksRes.json() as { category_id: string; modifier_group_id: string }[]
+        for (const r of rows) links.push({ id: `cat:${r.category_id}:${r.modifier_group_id}`, category_id: r.category_id, group_id: r.modifier_group_id })
+      }
+      await cacheModifierData(groups, mods, links)
+    }
+
+    if (methodsRes.ok) {
+      const methods = await methodsRes.json() as Record<string, unknown>[]
+      await cachePaymentMethods(methods)
+    }
+  } catch {
+    // Network error — already cached from previous session
   }
 }
 
@@ -1602,7 +1702,7 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) { // 15 min TTL
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
       return entry.name as string
     }
   } catch { /* ignore */ }
@@ -1638,7 +1738,7 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) { // 15 min TTL
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
       return { name: entry.name, role: entry.role || 'gerente' }
     }
   } catch { /* ignore */ }
@@ -1681,7 +1781,7 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
   try {
     const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
     const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 15 * 60 * 1000) {
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) {
       return { name: entry.name, role: entry.role || minRole }
     }
   } catch { /* ignore */ }
