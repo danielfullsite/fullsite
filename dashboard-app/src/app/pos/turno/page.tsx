@@ -6,6 +6,7 @@ import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Pr
 import { formatMXN, logAudit } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { cacheTurno, getCachedActiveTurno, queueOperation } from '@/lib/pos-offline-db'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -308,9 +309,23 @@ export default function TurnoPage() {
       )
       if (res.ok) {
         const rows = await res.json()
-        setActiveTurno(rows[0] || null)
+        const turno = rows[0] || null
+        setActiveTurno(turno)
+        // Keep IDB in sync so we have a fallback when offline
+        if (turno) {
+          await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
+        }
+        setLoading(false)
+        return
       }
-    } catch { /* */ }
+    } catch { /* offline — fall through to IDB */ }
+    // Offline fallback: read from IndexedDB
+    const cached = await getCachedActiveTurno(_cid())
+    setActiveTurno(cached ? {
+      id: cached.id, opened_by: cached.opened_by, fondo_inicial: cached.fondo_inicial,
+      opened_at: cached.opened_at, closed_by: null, fondo_final: null,
+      efectivo_sistema: null, diferencia: null, closed_at: cached.closed_at || null, notas: cached.notas || null,
+    } : null)
     setLoading(false)
   }
 
@@ -318,31 +333,46 @@ export default function TurnoPage() {
 
   const handleOpenTurno = async () => {
     if (!openedBy.trim() || !fondoInicial) return
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    // Stable UUID: generated once locally, never changes during sync
+    const id = crypto.randomUUID()
+    const openedAt = new Date().toISOString()
+    const fondo = Number(fondoInicial)
+    const turnoData = {
+      id, client_id: _cid(), opened_by: openedBy, fondo_inicial: fondo,
+      opened_at: openedAt,
+    }
+
+    // 1. Write to IDB immediately — shift is open regardless of internet
+    await cacheTurno({ ...turnoData, synced_at: undefined })
+
+    // 2. Optimistically update UI
+    logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo } })
+    showToast(`Turno abierto — Fondo: ${formatMXN(fondo)}`)
+    setActiveTurno({
+      id, opened_by: openedBy, fondo_inicial: fondo, opened_at: openedAt,
+      closed_by: null, fondo_final: null, efectivo_sistema: null, diferencia: null,
+      closed_at: null, notas: null,
+    })
+    setFondoInicial('')
+    setOpenedBy('')
+
+    // 3. Try to sync to Supabase; if offline, queue for later
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos`, {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          id, client_id: _cid(), opened_by: openedBy, fondo_inicial: Number(fondoInicial),
-        }),
+        body: JSON.stringify(turnoData),
       })
       if (res.ok) {
-        logAudit({ action: 'status_changed', actor: openedBy, details: { type: 'turno_opened', fondo: Number(fondoInicial) } })
-        showToast(`Turno abierto — Fondo: ${formatMXN(Number(fondoInicial))}`)
-        setActiveTurno({
-          id, opened_by: openedBy, fondo_inicial: Number(fondoInicial),
-          opened_at: new Date().toISOString(), closed_by: null, fondo_final: null,
-          efectivo_sistema: null, diferencia: null, closed_at: null, notas: null,
-        })
-        setFondoInicial('')
-        setOpenedBy('')
+        await cacheTurno({ ...turnoData, synced_at: new Date().toISOString() })
       } else {
         const err = await res.text().catch(() => res.statusText)
-        showToast(`Error al abrir turno: ${res.status} — ${err}`)
+        console.warn(`[turno] Supabase sync failed (${res.status}): ${err} — queued for retry`)
+        await queueOperation('pos_turnos', 'POST', turnoData, undefined, undefined, 'SUPABASE_REST')
       }
-    } catch (e) {
-      showToast(`Error de red: ${e instanceof Error ? e.message : 'sin conexión'}`)
+    } catch {
+      // Offline — queue for sync when internet returns
+      await queueOperation('pos_turnos', 'POST', turnoData, undefined, undefined, 'SUPABASE_REST')
     }
   }
 
