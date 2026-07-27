@@ -1,36 +1,37 @@
 const { app, BrowserWindow, globalShortcut } = require('electron');
 const path = require('path');
 const http = require('http');
-const net = require('net');
-const os = require('os');
+const os   = require('os');
+const fs   = require('fs');
+const { execSync } = require('child_process');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
 const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
 
-// ─── PRINT BRIDGE (embedded) ──────────────────────────────────────────────
-// HTTP server on 127.0.0.1:7717 that receives ESC/POS from the POS web app
-// and routes to thermal printers via TCP. No separate CMD window needed.
+// ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
+// Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
+// Runs inside the Electron main process — no separate Node.js process needed.
+// Replaces the previous embedded print bridge.
 
-const BRIDGE_PORT = 7717;
-const BRIDGE_HOST = '127.0.0.1';
+const LOCAL_SERVER_PORT = 7717;
+const APP_CONFIG_PATH   = path.join('C:\\fullsite', 'config.json');
+const PRINTERS_CONFIG_PATH = path.join('C:\\fullsite', 'printers.json');
 
-const fs = require('fs');
-const { execSync } = require('child_process');
+// ─── APP CONFIG ───────────────────────────────────────────────────────────────
+// C:\fullsite\config.json — optional, controls startup behavior.
+// Keys:
+//   kds:          true  → open KDS window on second display
+//   restaurantId: uuid  → identifies this installation (required for multi-tenant)
+//   channel:      'pilot' | 'stable' | 'development'
+//   instanceName: 'AMALAY Sucursal Principal'
+//   supabaseUrl / supabaseAnonKey: override env if needed
+//   clientId / terminalId: injected into localStorage on boot
 
-// Station config: loaded from C:\fullsite\printers.json if exists, otherwise defaults
 const DEFAULT_STATIONS = {
   cocina: { type: 'tcp', host: '192.168.1.21', port: 9100 },
   barra:  { type: 'tcp', host: '192.168.1.30', port: 9100 },
   caja:   { type: 'usb', names: ['TICKET', 'EC01', 'EC TICKET'] },
 };
-
-const PRINTERS_CONFIG_PATH = path.join('C:\\fullsite', 'printers.json');
-const APP_CONFIG_PATH = path.join('C:\\fullsite', 'config.json');
-
-// ─── APP CONFIG ───────────────────────────────────────────────────────────────
-// C:\fullsite\config.json — optional, controls which surfaces open at startup.
-// Example: { "kds": true }
-//   kds: true  → open KDS window on second display (if connected)
 
 function loadAppConfig() {
   try {
@@ -48,268 +49,50 @@ function loadAppConfig() {
 function loadStations() {
   try {
     if (fs.existsSync(PRINTERS_CONFIG_PATH)) {
-      const data = JSON.parse(fs.readFileSync(PRINTERS_CONFIG_PATH, 'utf8'));
-      console.log('[bridge] Loaded printers.json');
-      return data.stations || data;
+      const raw = JSON.parse(fs.readFileSync(PRINTERS_CONFIG_PATH, 'utf8'));
+      console.log('[config] Loaded printers.json');
+      return raw.stations || raw;
     }
   } catch (e) {
-    console.warn('[bridge] Error loading printers.json:', e.message);
+    console.warn('[config] Error loading printers.json:', e.message);
   }
-  console.log('[bridge] Using default stations (no printers.json)');
+  console.log('[config] Using default stations');
   return { ...DEFAULT_STATIONS };
 }
 
-let STATIONS = loadStations();
-let appConfig = {}; // loaded in app.whenReady before createWindow
+let appConfig = {};
+let localServer = null; // { httpServer, close, serverId, lanIp, wsHub }
 
-function printTcp(host, port, data) {
-  return new Promise((resolve, reject) => {
-    const socket = new net.Socket();
-    const timeout = setTimeout(() => { socket.destroy(); reject(new Error(`Timeout ${host}:${port}`)); }, 5000);
-    socket.connect(port, host, () => {
-      clearTimeout(timeout);
-      socket.write(data, () => { socket.end(); resolve(); });
-    });
-    socket.on('error', (err) => { clearTimeout(timeout); reject(err); });
-  });
-}
+async function startLocalServer() {
+  const { startLocalServer: start } = require('./local-server');
+  const dataDir = app.getPath('userData');
 
-function printUsb(printerName, data) {
-  const tmpFile = path.join(os.tmpdir(), `fullsite_print_${Date.now()}.bin`);
+  const stations = loadStations();
+  const cfg = {
+    restaurantId:      appConfig.restaurantId || appConfig.clientId || process.env.FULLSITE_RESTAURANT_ID || 'unknown',
+    channel:           appConfig.channel || process.env.FULLSITE_CHANNEL || 'stable',
+    instanceName:      appConfig.instanceName || `Fullsite POS — ${require('os').hostname()}`,
+    supabaseUrl:       appConfig.supabaseUrl   || process.env.SUPABASE_URL       || '',
+    supabaseKey:       appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || '',
+    stations,
+    printersConfigPath: PRINTERS_CONFIG_PATH,
+    clientId:          appConfig.clientId,
+    terminalId:        appConfig.terminalId,
+  };
+
   try {
-    fs.writeFileSync(tmpFile, data);
-    // Try shared printer name first, then direct port
-    try {
-      execSync(`copy /b "${tmpFile}" "\\\\%COMPUTERNAME%\\${printerName}"`, {
-        timeout: 5000, windowsHide: true, shell: 'cmd.exe',
-      });
-    } catch {
-      // Fallback: try via PowerShell raw print
-      execSync(`powershell -Command "Get-Content '${tmpFile}' -Encoding Byte -ReadCount 0 | Out-Printer '${printerName}'"`, {
-        timeout: 8000, windowsHide: true,
-      });
-    }
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch {}
-  }
-}
+    localServer = await start({ dataDir, port: LOCAL_SERVER_PORT, config: cfg });
+    console.log('[main] Local server started.');
 
-async function printToStation(station, data) {
-  const cfg = STATIONS[station];
-  if (!cfg) throw new Error(`Unknown station: ${station}`);
-  // Array of printers: send to ALL (e.g., cocina fria + cocina caliente)
-  if (Array.isArray(cfg)) {
-    const errors = [];
-    for (const printer of cfg) {
-      try {
-        if (printer.type === 'usb') { printUsb((printer.names || [printer.name])[0], data); }
-        else { await printTcp(printer.host, printer.port, data); }
-      } catch (e) { errors.push(e); }
-    }
-    if (errors.length === cfg.length) throw errors[0]; // all failed
-    return; // at least one succeeded
-  }
-  if (cfg.type === 'usb') {
-    const names = cfg.names || [cfg.name];
-    let lastErr;
-    for (const name of names) {
-      try { printUsb(name, data); return; } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('No USB printer found');
-  } else {
-    await printTcp(cfg.host, cfg.port, data);
-  }
-}
-
-// ESC/POS cash drawer kick command
-const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
-
-function parseBody(req) {
-  return new Promise((resolve) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch { resolve({}); } });
-  });
-}
-
-let bridgeServer = null;
-
-function startBridge() {
-  bridgeServer = http.createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-    const url = req.url?.split('?')[0];
-
-    if (url === '/health' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        ok: true, hostname: os.hostname(), app: 'Fullsite POS',
-        stations: Object.entries(STATIONS).map(([name, cfg]) => ({ name, target: `${cfg.host}:${cfg.port}` })),
-      }));
-      return;
-    }
-
-    if (url === '/print' && req.method === 'POST') {
-      try {
-        const body = await parseBody(req);
-        const station = body.station || 'caja';
-        if (!body.data) { res.writeHead(400); res.end('{"error":"Missing data"}'); return; }
-        const bytes = Buffer.from(body.data, 'base64');
-        await printToStation(station, bytes);
-        console.log(`[bridge] ${bytes.length} bytes → ${station}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, station, bytes: bytes.length }));
-      } catch (e) {
-        console.error('[bridge] Print error:', e.message);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-      return;
-    }
-
-    if (url === '/drawer' && req.method === 'POST') {
-      try {
-        await printToStation('caja', DRAWER_KICK);
-        console.log('[bridge] Drawer kicked');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end('{"ok":true}');
-      } catch (e) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-      return;
-    }
-
-    if (url === '/test' && req.method === 'POST') {
-      const results = {};
-      for (const [name, cfg] of Object.entries(STATIONS)) {
-        try {
-          const now = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' });
-          const ticket = Buffer.from(
-            '\x1b\x40\x1b\x61\x01\x1d\x21\x11FULLSITE POS\n\x1d\x21\x00\x1b\x61\x01--- TEST ---\n\n' +
-            `\x1b\x61\x00Estacion: ${name}\nTerminal: ${os.hostname()}\nFecha: ${now}\n\n` +
-            '\x1b\x61\x01Impresora OK\n\n\x1d\x56\x41\x03', 'binary'
-          );
-          await printTcp(cfg.host, cfg.port, ticket);
-          results[name] = 'ok';
-        } catch (e) { results[name] = e.message; }
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, results }));
-      return;
-    }
-
-    // ── Fingerprint proxy: forward /fp/* to fingerprint service on port 7718 ──
-    if (url && url.startsWith('/fp/')) {
-      const fpPath = url.replace('/fp', '');
-      const fpUrl = `http://127.0.0.1:7718${fpPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
-      try {
-        const fpReq = http.request(fpUrl, { method: req.method, timeout: 30000 }, (fpRes) => {
-          res.writeHead(fpRes.statusCode || 200, fpRes.headers);
-          fpRes.pipe(res);
-        });
-        fpReq.on('error', (e) => {
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Fingerprint service not available: ' + e.message }));
-        });
-        req.pipe(fpReq);
-      } catch (e) {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-      return;
-    }
-
-    // ── Printer config: read/update station config without rebuild ──
-    if (url === '/config' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ stations: STATIONS, configPath: PRINTERS_CONFIG_PATH, fromFile: fs.existsSync(PRINTERS_CONFIG_PATH) }));
-      return;
-    }
-
-    if (url === '/config' && req.method === 'POST') {
-      try {
-        const body = await parseBody(req);
-        if (body.stations) {
-          STATIONS = { ...STATIONS, ...body.stations };
-          fs.writeFileSync(PRINTERS_CONFIG_PATH, JSON.stringify(STATIONS, null, 2));
-          console.log('[bridge] Printer config updated and saved to', PRINTERS_CONFIG_PATH);
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, stations: STATIONS }));
-      } catch (e) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-      return;
-    }
-
-    // ── Kiosk exit (diagnostic only — NOT an operational POS capability) ────
-    // Exits fullscreen kiosk so DevTools and other windows become visible.
-    // Trigger from Caja PowerShell: Invoke-WebRequest -Uri "http://127.0.0.1:7717/kiosk/exit" -Method POST
-    if (url === '/kiosk/exit' && req.method === 'POST') {
-      const remoteAddr = req.socket?.remoteAddress || ''
-      if (!remoteAddr.includes('127.0.0.1') && !remoteAddr.includes('::1')) {
-        res.writeHead(403, { 'Content-Type': 'application/json' })
-        res.end('{"error":"Forbidden — localhost only"}')
-        return
-      }
-      if (!mainWindow) {
-        res.writeHead(503, { 'Content-Type': 'application/json' })
-        res.end('{"error":"Window not ready"}')
-        return
-      }
-      mainWindow.setKiosk(false)
-      mainWindow.setFullScreen(false)
-      console.log('[devtools] Kiosk exited for diagnostics at', new Date().toISOString())
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end('{"ok":true}')
-      return
-    }
-
-    // ── DevTools (diagnostic only — NOT an operational POS capability) ──────
-    // Opens Chromium DevTools in undocked mode for field diagnostics.
-    // Only reachable from 127.0.0.1 (bridge already binds to loopback only).
-    // Trigger from Caja PowerShell: Invoke-WebRequest -Uri "http://127.0.0.1:7717/devtools" -Method POST
-    if (url === '/devtools' && req.method === 'POST') {
-      const remoteAddr = req.socket?.remoteAddress || ''
-      if (!remoteAddr.includes('127.0.0.1') && !remoteAddr.includes('::1')) {
-        res.writeHead(403, { 'Content-Type': 'application/json' })
-        res.end('{"error":"Forbidden — localhost only"}')
-        return
-      }
-      if (!mainWindow) {
-        res.writeHead(503, { 'Content-Type': 'application/json' })
-        res.end('{"error":"Window not ready"}')
-        return
-      }
-      mainWindow.webContents.openDevTools({ mode: 'undocked' })
-      console.log('[devtools] DevTools opened for diagnostics at', new Date().toISOString())
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end('{"ok":true}')
-      return
-    }
-
-    res.writeHead(404); res.end('{"error":"Not found"}');
-  });
-
-  bridgeServer.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
-    console.log(`[bridge] Print bridge on http://${BRIDGE_HOST}:${BRIDGE_PORT}`);
-    for (const [name, cfg] of Object.entries(STATIONS)) {
-      console.log(`[bridge]   ${name} → ${cfg.host}:${cfg.port}`);
-    }
-  });
-
-  bridgeServer.on('error', (e) => {
+    // Wire diagnostic endpoints that need access to Electron windows
+    // (kiosk/exit and devtools are handled via IPC now — see ipcMain handlers below)
+  } catch (e) {
     if (e.code === 'EADDRINUSE') {
-      console.log('[bridge] Port 7717 already in use — external bridge running, skipping');
+      console.log('[main] Port 7717 already in use — another server running, skipping.');
     } else {
-      console.error('[bridge] Error:', e.message);
+      console.error('[main] Local server failed to start:', e.message);
     }
-  });
+  }
 }
 
 // ─── FINGERPRINT SERVICE (embedded) ───────────────────────────────────────
@@ -519,7 +302,7 @@ function createKdsWindow(x, y, width, height) {
 app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Grant WebAuthn/HID permissions automatically (no popup)
   const defaultSession = require('electron').session.defaultSession;
   defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -532,9 +315,9 @@ app.whenReady().then(() => {
     app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
   }
 
+  appConfig = loadAppConfig(); // Load before startLocalServer — config feeds server init
   startFingerprintService(); // Fingerprint service starts FIRST
-  startBridge();             // Print bridge starts SECOND
-  appConfig = loadAppConfig(); // Load before createWindow so did-finish-load can inject identity
+  await startLocalServer();  // Local server (replaces embedded bridge) starts SECOND
   createWindow();            // Then open POS
   setupOfflineRetry();
 
@@ -557,7 +340,7 @@ app.on('window-all-closed', () => app.quit());
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
-  if (bridgeServer) bridgeServer.close();
+  if (localServer) { try { localServer.close(); } catch {} }
   if (fingerprintProcess) { fingerprintProcess.kill(); fingerprintProcess = null; }
 });
 
