@@ -6,7 +6,7 @@ const fs   = require('fs');
 const { execSync } = require('child_process');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
-const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
+const KDS_URL = 'https://app.fullsite.mx/pos/kds';
 
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).
@@ -280,7 +280,7 @@ function setupOfflineRetry() {
 // Both windows share the default Electron session → same IndexedDB → offline orders
 // cached by the POS are immediately visible to the KDS, even without internet.
 
-function createKdsWindow(x, y, width, height) {
+function createKdsWindow(x, y, width, height, urlOverride) {
   kdsWindow = new BrowserWindow({
     title: 'Fullsite KDS',
     x, y, width, height,
@@ -297,8 +297,9 @@ function createKdsWindow(x, y, width, height) {
       allowRunningInsecureContent: false,
     },
   });
+  const targetUrl = urlOverride || KDS_URL;
   kdsWindow.setMenu(null);
-  kdsWindow.loadURL(KDS_URL);
+  kdsWindow.loadURL(targetUrl);
 
   let kdsFailCount = 0;
   kdsWindow.webContents.on('did-fail-load', (_event, errorCode) => {
@@ -306,18 +307,18 @@ function createKdsWindow(x, y, width, height) {
     const { net } = require('electron');
     if (!net.online) {
       kdsFailCount = 0;
-      kdsWindow.loadFile('offline.html', { query: { target: KDS_URL } });
+      kdsWindow.loadFile('offline.html', { query: { target: targetUrl } });
       return;
     }
     kdsFailCount++;
     if (kdsFailCount <= 3) {
       // Give SW time to activate from previous session (progressive backoff)
       setTimeout(() => {
-        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(KDS_URL);
+        if (kdsWindow && !kdsWindow.isDestroyed()) kdsWindow.loadURL(targetUrl);
       }, kdsFailCount * 800);
     } else {
       kdsFailCount = 0;
-      kdsWindow.loadFile('offline.html', { query: { target: KDS_URL } });
+      kdsWindow.loadFile('offline.html', { query: { target: targetUrl } });
     }
   });
 
@@ -347,12 +348,31 @@ app.whenReady().then(async () => {
   }
 
   appConfig = loadAppConfig(); // Load before startLocalServer — config feeds server init
-  startFingerprintService(); // Fingerprint service starts FIRST
-  await startLocalServer();  // Local server (replaces embedded bridge) starts SECOND
-  createWindow();            // Then open POS
+  await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
+
+  // ── kds_only mode: dedicated kitchen display machine ──────────────────────
+  // config.json: { "kds_only": true, "pos_server_ip": "192.168.1.71" }
+  // Skips the POS window entirely. Opens the KDS fullscreen on the primary display.
+  // The local server still runs to receive ORDER_SENT events from the POS over LAN.
+  if (appConfig.kds_only) {
+    const { screen } = require('electron');
+    const primary = screen.getPrimaryDisplay();
+    const { bounds } = primary;
+    // Inject the POS server LAN IP so the KDS bridge connects cross-device
+    const kdsUrlWithBridge = appConfig.pos_server_ip
+      ? `${KDS_URL}?bridge=${appConfig.pos_server_ip}`
+      : KDS_URL;
+    createKdsWindow(bounds.x, bounds.y, bounds.width, bounds.height, kdsUrlWithBridge);
+    console.log('[main] kds_only mode — POS window skipped');
+    return;
+  }
+
+  // ── Normal POS mode ───────────────────────────────────────────────────────
+  startFingerprintService();
+  createWindow();
   setupOfflineRetry();
 
-  // Open KDS window if configured
+  // Open KDS window on second display if configured
   if (appConfig.kds) {
     const { screen } = require('electron');
     const displays = screen.getAllDisplays();
