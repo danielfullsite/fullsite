@@ -2854,6 +2854,16 @@ function POSContent() {
             if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
           }).catch(() => {})
         }
+        // Mark all items as sent so UI reflects "enviado" and prevents duplicate Enviar
+        setSentItemIds(prev => { const n = new Set(prev); activeItems.forEach(i => n.add(i.id)); return n })
+        setSentItemSnapshots(prev => {
+          const n = { ...prev }
+          for (const item of activeItems) {
+            n[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+          }
+          return n
+        })
+        setLoadedOrderId(order.id)
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }
@@ -3091,6 +3101,21 @@ function POSContent() {
     if (saveResult.revision != null) setOrderRevision(saveResult.revision)
     if (saveResult.inventory_status === 'BLOCKED') {
       showToast('Inventario: algunos ingredientes no se pudieron descontar')
+    }
+    // Offline: cobro guardado en cola — tratar como éxito, imprimir ticket y limpiar UI
+    if (!saveResult.ok && saveResult.error === 'OFFLINE_QUEUED') {
+      if (pagos.some(p => p.metodo.toLowerCase().includes('efectivo'))) openCashDrawer()
+      handlePrintTicket(order)
+      showToast('Sin conexión — cobro guardado localmente, se sincronizará al reconectar')
+      setSaving(false); operationLock.current = false
+      setOrderItems([]); setCancelledItems(new Set()); setSentItemIds(new Set()); setSentItemSnapshots({})
+      setDiscount(0); setPropina(0)
+      try { localStorage.removeItem(`pos_order_${mesa}`) } catch {}
+      setOrderNotes(''); setShowPayment(false); setShowCashFlow(false); setCashAmount('')
+      setShowMixto(false); setMixtoPagos([]); setMixtoMonto(''); setSillaActual(1)
+      setTiempoFired(0); setSplitPayingCuenta(0); setSplitAssignments({})
+      setSplitCount(0); setSplitMode(null); setSplitParejoN(0); setOrderId(generateId())
+      return
     }
     const ok = saveResult.ok
     if (ok) {

@@ -1408,10 +1408,16 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
     try {
       const { getCachedOrders } = await import('@/lib/pos-offline-db')
       const cached = await getCachedOrders()
-      orders = cached.filter(o =>
-        ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
-        String(o.created_at || o.updated_at || '') >= cutoff
-      ) as unknown as KitchenOrderFromDB[]
+      orders = cached
+        .filter(o =>
+          ['enviada', 'preparando', 'lista'].includes(String(o.status)) &&
+          String(o.created_at || o.updated_at || '') >= cutoff
+        )
+        .map(o => ({
+          ...o,
+          // IndexedDB stores items as JSON string; KDS expects parsed array
+          items: typeof o.items === 'string' ? (() => { try { return JSON.parse(o.items as string) } catch { return [] } })() : (o.items ?? []),
+        })) as unknown as KitchenOrderFromDB[]
     } catch {
       return []
     }
