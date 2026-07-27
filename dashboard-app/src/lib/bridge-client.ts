@@ -6,8 +6,14 @@
 // Protocol v1.0 (see electron-app/local-server/protocol.js):
 //   Client → SUBSCRIBE, COMMAND, PING
 //   Server → SNAPSHOT, DELTA, ACK, REJECT, PONG, UPDATE_AVAILABLE
+//
+// LAN-03: the hook (useBridgeClient) runs ServerDiscovery before connecting.
+//   Discovery validates the server's identity (restaurant_id, protocol_version)
+//   via GET /identity before opening the WebSocket. The discovered endpoint is
+//   persisted in the ServerRegistry for faster subsequent connections.
 
 import { useEffect, useRef, useState } from 'react'
+import { ServerDiscovery, buildDiscoveryConfig, type DiscoveryDiagnostic } from './server-discovery'
 
 const PROTOCOL_VERSION = '1.0'
 const LOCAL_PORT = 7717
@@ -16,12 +22,17 @@ const LOCAL_PORT = 7717
 const RECONNECT_INITIAL_MS = 1_000
 const RECONNECT_MAX_MS = 30_000
 
-function getBridgeUrl(): string {
+function getBridgeUrl(wsUrlOverride?: string): string {
+  if (wsUrlOverride) return wsUrlOverride
   if (typeof window === 'undefined') return `ws://127.0.0.1:${LOCAL_PORT}/ws`
-  // Cross-device: KDS on a different machine points to the POS server's LAN IP
   const stored = localStorage.getItem('pos_bridge_host')
   if (stored) return `ws://${stored}:${LOCAL_PORT}/ws`
   return `ws://127.0.0.1:${LOCAL_PORT}/ws`
+}
+
+/** Convert a discovered HTTP endpoint to the WS URL. */
+function httpToWs(httpEndpoint: string): string {
+  return httpEndpoint.replace(/^http:/, 'ws:').replace(/\/$/, '') + '/ws'
 }
 
 /** Call once (e.g. from ?bridge= URL param) to register the POS server IP for this device */
@@ -67,6 +78,8 @@ export class BridgeClient {
     private readonly clientType: 'pos' | 'kds' | 'barra' | 'admin' = 'pos',
     private readonly restaurantId?: string,
     lastSequence = 0,
+    /** If set, overrides the URL derived from localStorage. Provided by discovery. */
+    private readonly _wsUrl?: string,
   ) {
     this._lastSequence = lastSequence
   }
@@ -78,7 +91,7 @@ export class BridgeClient {
     if (this.dead) return
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return
     try {
-      this.ws = new WebSocket(getBridgeUrl())
+      this.ws = new WebSocket(getBridgeUrl(this._wsUrl))
 
       this.ws.onopen = () => {
         this._connected = true
@@ -164,55 +177,93 @@ export class BridgeClient {
 
 // ── React hook ────────────────────────────────────────────────────────────────
 
+export type DiscoveryState = 'idle' | 'discovering' | 'found' | 'not_found' | 'identity_mismatch' | 'ambiguous'
+
 /**
  * useBridgeClient — subscribe a page to DELTA events from the local server.
  *
- * Only connects inside Electron (navigator.userAgent includes 'Electron').
- * Safe no-op in regular browsers — existing Supabase polling still works.
+ * LAN-03: before opening the WebSocket, runs ServerDiscovery to validate the
+ * server's identity (restaurant_id + protocol_version) via GET /identity.
+ * Only connects to a server whose identity matches the provisioned restaurant.
  *
- * @param onDelta  callback fired on every ORDER_UPSERTED / MESA_LOCK / etc. event
+ * Safe no-op in regular browsers without a configured bridge host.
+ *
+ * @param onDelta     callback fired on every ORDER_UPSERTED / MESA_LOCK / etc.
  * @param clientType  'pos' | 'kds' | 'barra' | 'admin'
- * @returns { connected } — true when WS handshake with local server succeeded
+ * @returns { connected, discoveryState, discoveryDiagnostic }
  */
 export function useBridgeClient(
   onDelta?: (event: BridgeEvent) => void,
   clientType: 'pos' | 'kds' | 'barra' | 'admin' = 'pos',
-): { connected: boolean } {
+): { connected: boolean; discoveryState: DiscoveryState; discoveryDiagnostic: DiscoveryDiagnostic | undefined } {
   const [connected, setConnected] = useState(false)
+  const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('idle')
+  const [discoveryDiagnostic, setDiscoveryDiagnostic] = useState<DiscoveryDiagnostic | undefined>()
   const onDeltaRef = useRef(onDelta)
   onDeltaRef.current = onDelta
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    // Connect in Electron OR in any browser with a configured bridge host
     const isElectron = navigator.userAgent.includes('Electron')
     const hasBridgeHost = !!localStorage.getItem('pos_bridge_host')
     if (!isElectron && !hasBridgeHost) return
+
+    const restaurantId = localStorage.getItem('fullsite_client_id') || undefined
+    if (!restaurantId) return
 
     const clientId =
       localStorage.getItem('pos_terminal_id') ||
       `web-${Math.random().toString(36).slice(2, 10)}`
 
-    const restaurantId = localStorage.getItem('fullsite_client_id') || undefined
+    let client: BridgeClient | null = null
+    let statusInterval: ReturnType<typeof setInterval> | null = null
+    let unsub: (() => void) | null = null
+    let cancelled = false
 
-    const client = new BridgeClient(clientId, clientType, restaurantId)
+    async function setup() {
+      setDiscoveryState('discovering')
 
-    const unsub = client.on((msg) => {
-      if (msg.type === 'SNAPSHOT' || msg.type === 'PONG') setConnected(true)
-      if (msg.type === 'DELTA' && onDeltaRef.current) {
-        onDeltaRef.current((msg as Extract<ServerMsg, { type: 'DELTA' }>).payload.event)
+      const discovery = new ServerDiscovery(buildDiscoveryConfig(restaurantId!))
+      const result = await discovery.discover()
+
+      if (cancelled) return
+
+      if (result.state !== 'found') {
+        setDiscoveryState(result.state as DiscoveryState)
+        setDiscoveryDiagnostic(result.diagnostic)
+        return
       }
+
+      setDiscoveryState('found')
+      setDiscoveryDiagnostic(undefined)
+
+      // Convert the discovered HTTP endpoint to a WS URL
+      const wsUrl = httpToWs(result.endpoint!)
+
+      client = new BridgeClient(clientId, clientType, restaurantId, 0, wsUrl)
+
+      unsub = client.on((msg) => {
+        if (msg.type === 'SNAPSHOT' || msg.type === 'PONG') setConnected(true)
+        if (msg.type === 'DELTA' && onDeltaRef.current) {
+          onDeltaRef.current((msg as Extract<ServerMsg, { type: 'DELTA' }>).payload.event)
+        }
+      })
+
+      client.connect()
+      statusInterval = setInterval(() => setConnected(client?.connected ?? false), 3_000)
+    }
+
+    setup().catch(() => {
+      if (!cancelled) setDiscoveryState('not_found')
     })
 
-    client.connect()
-    const statusInterval = setInterval(() => setConnected(client.connected), 3_000)
-
     return () => {
-      unsub()
-      clearInterval(statusInterval)
-      client.disconnect()
+      cancelled = true
+      if (unsub) unsub()
+      if (statusInterval) clearInterval(statusInterval)
+      client?.disconnect()
     }
   }, [clientType])
 
-  return { connected }
+  return { connected, discoveryState, discoveryDiagnostic }
 }

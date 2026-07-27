@@ -131,6 +131,26 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
 
     const url = req.url?.split('?')[0]
 
+    // ── GET /identity ─────────────────────────────────────────────────────────
+    // Fast identity check for discovery. Returns only the fields needed to
+    // validate that a terminal found the right server before opening a WS.
+    // No auth required — the information is already in mDNS TXT records.
+    if (url === '/identity' && req.method === 'GET') {
+      json(res, 200, {
+        ok:               true,
+        server_id:        serverId,
+        restaurant_id:    restaurantId,
+        branch_id:        config.branchId || null,
+        instance_name:    instanceName,
+        version,
+        protocol_version: PROTOCOL_VERSION,
+        capabilities:     ['orders', 'kds', 'printing', 'mesa-lock', 'sync-queue'],
+        lan_ips:          networkAdapter.getAllLanIps(),
+        ts:               Date.now(),
+      })
+      return
+    }
+
     // ── GET /health ──────────────────────────────────────────────────────────
     if (url === '/health' && req.method === 'GET') {
       const seq = await eventStore.getLastSequence()

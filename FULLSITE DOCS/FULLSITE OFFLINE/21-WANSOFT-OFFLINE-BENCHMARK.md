@@ -15,6 +15,22 @@
 
 ---
 
+## Leyenda de evidencia
+
+Cada afirmación en este documento está clasificada:
+
+| Nivel | Símbolo | Significado |
+|---|---|---|
+| Certificado físicamente | ✅ | Ejecutado en AMALAY, resultado registrado en OFFLINE-CERTIFICATION-RUNBOOK.md |
+| Demostrado en código | 🔵 | Implementación verificable en el repositorio; tests pasan |
+| Demostrado en laboratorio | 🟡 | Verificable localmente pero sin prueba en producción con hardware real y carga real |
+| Inferido | 🟠 | Deducido del modelo de datos, manual de instalación o arquitectura conocida; no observado directamente |
+| Desconocido | ⬜ | No se pudo verificar; no se especula |
+
+En las tablas comparativas, las celdas de Wansoft usan el símbolo cuando la afirmación es inferida o desconocida.
+
+---
+
 ## 1. Principio de autoridad local
 
 La pregunta más importante para evaluar un sistema offline no es "qué funciones tiene" —
@@ -107,7 +123,7 @@ la pérdida de SQL Server detiene todo inmediatamente.
 
 | Capacidad | Wansoft | Fullsite | Fuente |
 |---|---|---|---|
-| POS arranca sin internet | **Sí** (inferido) — SQL Server es local, no remoto | **Sí** — Service Worker + IDB desde SW install | Wansoft: inferido del hecho de que SQL es local; Fullsite: certificado A-01-OFFLINE PASS 2026-07-24 |
+| POS arranca sin internet | **Sí** 🟠 (inferido) — SQL Server es local, no remoto | **Sí** 🔵✅ — Service Worker + IDB desde SW install (certificado A-01-OFFLINE 2026-07-24) | Wansoft: inferido del hecho de que SQL es local; Fullsite: certificado A-01-OFFLINE PASS 2026-07-24 |
 | KDS arranca sin internet | Desconocido — Comandero APK Android, depende de caché del APK | **Sí** — mismo Service Worker, mismo IDB | Wansoft: no documentado; Fullsite: LOCAL_FIRST_ARCHITECTURE.md §KDS |
 | Tiempo de arranque sin internet | Desconocido | ~5 segundos (PIN screen desde SW cache) | Fullsite: evidencia directa OFFLINE-CERTIFICATION-RUNBOOK.md A-01-OFFLINE |
 | Config necesaria para arrancar offline | Desconocido | config.json + primer arranque online exitoso | Fullsite: config-schema.js |
@@ -128,7 +144,7 @@ complejidad adicional (Service Worker, caches) que Wansoft no necesita.
 | Crear orden sin internet | **Sí** — escribe directo a SQL local | **Sí** — IDB local + sync_queue | |
 | Enviar comanda a cocina sin internet | **Sí** — RestPrintingApp imprime de SQL | **Sí** — Local Server broadcast por LAN WS | |
 | Cocina ve la orden sin internet | **Sí** — KDS lee de WebApi que lee de SQL | **Sí** — KDS recibe evento LAN por WS | |
-| Latencia POS → cocina sin internet | ~15 segundos (RestPrintingApp polling SQL) | < 1 segundo (WS push LAN) | **Fullsite gana** |
+| Latencia POS → cocina sin internet | ~15 segundos (RestPrintingApp polling SQL) | < 1 segundo (WS push LAN) 🟡 Demostrado en laboratorio (no medido en campo con carga) | **Fullsite gana** |
 | La orden persiste ante corte de luz | **Sí** — SQL Server con WAL en disco | **Sí** — events.ndjson en disco antes del ACK | |
 | La orden se sincroniza cuando vuelve internet | **No** — SQL Server es la autoridad final, no sincroniza a la nube | **Sí** — sync_queue sube a Supabase en <30s | Diferencia fundamental de modelo |
 
@@ -267,46 +283,64 @@ pero sin las garantías ACID de SQL Server.
 
 ## 4. Ventajas de Fullsite sobre Wansoft en offline
 
-### 4.1 Latencia LAN: push vs polling
+Las ventajas están clasificadas por nivel de evidencia. "Ventaja arquitectónica" significa que el
+diseño la garantiza; "ventaja operativa" significa que fue medida en condiciones de campo.
 
-Wansoft usa un modelo de polling: RestPrintingApp revisa SQL cada 15 segundos, el Comandero KDS
-(Android) hace polling a WebApi en intervalos no documentados. Una comanda enviada por el mesero
-puede tardar hasta 15 segundos en aparecer en cocina.
+### 4.1 Latencia LAN: push vs polling 🟡 Demostrado en laboratorio
 
-Fullsite usa push WebSocket. El evento de ORDER_SENT llega al KDS y a las impresoras en
-milisegundos. Con 30 mesas activas en hora pico, la diferencia entre 15s de latencia y <1s
-es operativamente significativa.
+Wansoft usa polling: RestPrintingApp revisa SQL cada 15 segundos (documentado en ARCHITECTURE.md).
+El Comandero KDS (Android) hace polling a WebApi en intervalos no documentados (⬜ desconocido).
 
-### 4.2 Sincronización bidireccional
+Fullsite usa push WebSocket. El evento ORDER_SENT llega al Local Server y este hace broadcast a
+todos los suscriptores antes de enviar el ACK al POS.
 
-Wansoft no sincroniza sus datos locales a ninguna nube. El gerente de AMALAY no puede
-ver las ventas del día desde su celular mientras está en casa — tiene que estar en el
-restaurante frente a un terminal Wansoft o esperar a que el Wansoft Web Agent scrapeé la
-pantalla. Fullsite sincroniza cada operación a Supabase, lo que alimenta el dashboard
-en tiempo real, los reportes históricos, los agentes IA, y las alertas por Telegram.
+**Qué está demostrado:** la arquitectura push garantiza que la latencia del broadcast sea del orden
+de la latencia de la red LAN, no del intervalo de polling.
 
-### 4.3 KDS en el mismo equipo que el POS
+**Qué no está medido todavía:** latencia real POS → Local Server → KDS en condiciones de campo;
+comportamiento con LAN degradada (>50% packet loss); carga de 30+ mesas activas; reconexiones
+frecuentes; múltiples terminales enviando simultáneamente.
 
-Wansoft siempre requiere un dispositivo Android separado para el KDS (Comandero APK).
-Fullsite puede abrir el KDS en un segundo monitor del mismo SERVER1 con `kds: true` en
-config.json — cero hardware adicional.
+No presentar este punto como ventaja operativa definitiva hasta medir:
+- latencia end-to-end en red LAN real (no localhost)
+- percentil 99 con carga de servicio completa
+- comportamiento cuando el servidor principal tiene carga alta de CPU
 
-### 4.4 Provisioning declarativo
+### 4.2 Datos operativos en la nube 🔵 Demostrado en código
 
-Agregar una terminal nueva en Wansoft requiere acceso a la UI de administración de Wansoft
-o edición manual de la base de datos SQL. En Fullsite, una terminal nueva es un
-`config.json` con `restaurant_id` y un `terminal_id` nuevo. Se puede hacer sin internet,
-sin acceso a la BD, en 5 minutos.
+Wansoft no sincroniza datos operativos a ninguna nube (🟠 inferido del diseño: SQL Server es la
+autoridad final, sin mecanismo de sync cloud documentado). El dueño de AMALAY no puede ver las
+ventas del día desde su celular mientras no esté en el restaurante.
 
-### 4.5 Modelo multi-restaurante desde el día uno
+Fullsite sincroniza cada operación a Supabase vía sync_queue (commit a3a47f4, PER-01). El sync
+fue certificado físicamente el 2026-07-24 (F-01 PASS): dos órdenes offline sincronizadas a
+Supabase en < 30s tras reconexión ✅.
 
-La arquitectura de Fullsite tiene `restaurant_id` en cada evento, cada comando, cada registro.
-La RLS de Supabase separa todos los datos por `client_id`. El Local Server valida que los
-comandos tengan el `restaurant_id` correcto.
+### 4.3 KDS en el mismo equipo que el POS 🔵 Demostrado en código
 
-Wansoft es inherentemente mono-restaurante en una instalación — cada instalación tiene su
-propia base de datos SQL. Para multi-sucursal, requiere configuración manual de la sincronización
-entre instancias.
+Wansoft siempre requiere un dispositivo Android separado para el KDS (Comandero APK, 🟠 inferido:
+no hay documentación de un "KDS en Windows en el mismo equipo").
+
+Fullsite abre el KDS en un segundo monitor del mismo SERVER1 con `kds: true` en config.json,
+dentro del mismo proceso Electron. Implementado en `electron-app/main.js` (commit 3c9dbc0).
+
+### 4.4 Provisioning declarativo 🔵 Demostrado en código
+
+Agregar una terminal nueva en Wansoft requiere acceso a la UI de administración o edición manual
+de la base de datos SQL (🟠 inferido del diseño de SQL Server como fuente de config).
+
+En Fullsite, una terminal nueva es un `config.json` validado por `config-schema.js`. El wizard
+genera la config sin errores manuales. La validación rechaza configs incompletas con errores
+específicos. Implementado y con 35 tests de schema (commit 3c9dbc0).
+
+### 4.5 Agregar terminal sin acceso a la BD 🔵 Demostrado en código
+
+Corolario del 4.4. En Wansoft: requiere SQL (🟠 inferido). En Fullsite: `config.json` + `terminal_id` nuevo.
+
+### 4.6 Dashboard en tiempo real desde cualquier dispositivo 🔵 Demostrado en código / ✅ Validado en AMALAY
+
+Wansoft: los reportes son desde la interfaz Wansoft local (🟠 inferido). Fullsite: Supabase alimenta
+`app.fullsite.mx/dashboard` accesible desde cualquier dispositivo con internet.
 
 ---
 

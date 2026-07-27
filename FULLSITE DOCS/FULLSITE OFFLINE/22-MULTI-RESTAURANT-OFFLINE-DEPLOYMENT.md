@@ -11,6 +11,7 @@
 
 ## Índice
 
+0. [Tres capas que nunca deben mezclarse](#0-tres-capas-que-nunca-deben-mezclarse)
 1. [El contrato del producto](#1-el-contrato-del-producto)
 2. [Schema de configuración](#2-schema-de-configuración)
 3. [Template de configuración genérico](#3-template-de-configuración-genérico)
@@ -23,6 +24,86 @@
 10. [Sync-back cuando vuelve internet](#10-sync-back-cuando-vuelve-internet)
 11. [Agregar terminales nuevas](#11-agregar-terminales-nuevas)
 12. [Checklist de go-live](#12-checklist-de-go-live)
+
+---
+
+## 0. Tres capas que nunca deben mezclarse
+
+Para que Fullsite funcione con cualquier restaurante sin cambiar código, las tres capas del sistema
+deben estar claramente separadas. Confundirlas produce instalaciones que son difíciles de reproducir,
+de actualizar y de soportar.
+
+### Capa 1 — Producto (universal, sin tocar por instalación)
+
+Lo que Fullsite distribuye. Nunca cambia de un cliente a otro.
+
+| Componente | Dónde vive |
+|---|---|
+| Código fuente (Next.js + Node.js + Electron) | Repositorio git |
+| Instalador compilado (`.exe`) | Distribución Electron (Squirrel/NSIS) |
+| Schema de configuración (`config-schema.js`) | Incluido en el instalador |
+| Schema de impresoras (`printers-schema.js`, pendiente) | Incluido en el instalador |
+| Wizard de provisioning | Incluido en el instalador |
+| Validadores de config en arranque | Incluido en el instalador |
+| Tests automatizados | CI/CD |
+| Migraciones de schema (cuando el schema evoluciona) | `fromLegacy()` en config-schema.js |
+| Diagnósticos y health check | Local Server /health + /identity |
+
+**Regla:** si algo de esta capa cambia entre un cliente y otro, es un bug de configuración.
+
+### Capa 2 — Deployment del cliente (específico por sucursal, declarativo)
+
+Lo que cambia de un restaurante a otro. Generado por el wizard, nunca escrito a mano en producción.
+
+| Dato | Dónde vive |
+|---|---|
+| `restaurant_id` (UUID) | Supabase + `config.json` |
+| `branch_id` (UUID, future) | Supabase + `config.json` (pendiente) |
+| `terminal_id` (UUID por máquina) | `config.json` (generado por wizard) |
+| `terminal_name` (nombre humano) | `config.json` |
+| `terminal_role` | `config.json` |
+| `local_server_host` / `local_server_port` | `config.json` |
+| `pos_server_ip` (para terminales KDS/POS adicionales) | `config.json` |
+| IPs de impresoras | `printers.json` |
+| Nombres de impresoras USB | `printers.json` |
+| Estaciones de impresión (cocina, barra, caja...) | `printers.json` |
+| Canal de actualización (`stable` / `pilot`) | `config.json` |
+
+**Regla:** estos valores son específicos de la sucursal, pero su formato y schema son
+universales (misma Capa 1). El wizard genera los archivos; el instalador los valida.
+
+### Capa 3 — Datos operativos (gestionados en Supabase, no en config)
+
+Lo que el restaurante configura en el sistema, no el técnico de instalación.
+
+| Dato | Dónde vive |
+|---|---|
+| Menú (categorías, productos, precios) | Supabase |
+| Modificadores y grupos de modificadores | Supabase |
+| Staff y PINs | Supabase |
+| Mesas y mapa de mesas | Supabase |
+| Métodos de pago | Supabase |
+| Recetas e ingredientes | Supabase |
+| Inventario inicial | Supabase |
+| Permisos por rol | Supabase |
+
+**Regla:** estos datos nunca van en `config.json` ni en `printers.json`. Si alguien propone
+meterlos ahí, es señal de que falta una pantalla de configuración en el dashboard, o que el
+prefetch offline no está cubriendo ese dato.
+
+### El contrato del instalador
+
+```
+un mismo schema (Capa 1)
++ wizard que genera config por sucursal (Capa 2)
++ datos cargados en Supabase (Capa 3)
++ mismo .exe para todos los clientes
+= instalación offline reproducible para cualquier restaurante
+```
+
+El archivo `config.json` es declarativo y específico de la sucursal, pero el contrato
+(schema, validaciones, wizard) es universal. No se copia el mismo `config.json` de AMALAY a
+todos los clientes — se usa el mismo wizard para generar una config válida para cada uno.
 
 ---
 
@@ -632,6 +713,17 @@ Si algún caso falla:
 ---
 
 ## 8. Operación offline
+
+> **Precisión de términos:** "sin internet" = sin acceso a la nube (Supabase, Vercel, etc.) mientras
+> la red local (LAN) sigue activa. "Sin LAN" = una terminal aislada del Local Server, lo que impide
+> la coordinación multi-terminal y la impresión. No son equivalentes.
+>
+> | Estado de red | POS toma órdenes | KDS recibe en tiempo real | Impresión | Supabase |
+> |---|---|---|---|---|
+> | Internet + LAN activos | ✓ | ✓ | ✓ | ✓ |
+> | Sin internet, LAN activa | ✓ | ✓ (WS LAN) | ✓ (Local Server) | ✗ |
+> | LAN caída, Local Server inalcanzable | ✓ (IDB local) | ✗ | ✗ | ✗ (si hay internet) |
+> | Sin internet, sin LAN | ✓ (IDB local) | ✗ | ✗ | ✗ |
 
 ### ¿Qué funciona sin internet?
 

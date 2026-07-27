@@ -74,7 +74,7 @@
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
 | LAN-01 | HIGH | Local Server | `local-server/index.js:17 comment` | Local server en Phase 1: Supabase sigue siendo la autoridad de escritura. Terminal B que recibe ORDER_SENT via WS no puede verificar el estado sin Supabase. | Multi-terminal offline: estado diverge si Supabase no llega. | Phase 2: comandos van al Local Server primero, Supabase en background. Trabajo mayor. | OPEN | — | — | — |
 | LAN-02 | MEDIUM | Local Server | `local-server/adapters/storage/ndjson.js` | `readAfter(seq)` y `markSynced` hacen scan/rewrite del archivo completo. | Con meses de operación, startup lento y I/O alto. | Agregar compactación periódica (snapshot + truncate). Tarea de mantenimiento. | OPEN | — | — | — |
-| LAN-03 | HIGH | Local Server | `local-server/discovery/mdns.js` | mDNS `bonjour-service` puede fallar silenciosamente en Windows con múltiples interfaces de red. | KDS standalone (`kds_only`) no encuentra el servidor si mDNS falla. | Fallback a broadcast UDP o registro manual en config. Documentar pasos manuales. | OPEN | — | — | — |
+| LAN-03 | HIGH | Client | `src/lib/server-discovery.ts`, `src/lib/server-registry.ts`, `local-server/index.js:/identity` | mDNS `bonjour-service` puede fallar silenciosamente en Windows con múltiples interfaces de red. Sin fallback, KDS standalone no encontraba el servidor. | KDS standalone (`kds_only`) no encontraba el servidor si mDNS fallaba. Una terminal podía conectarse a un servidor de otro restaurante sin validación de identidad. | Estrategia escalonada: preferidos → registry → subnet scan (opt-in). Endpoint `GET /identity` valida restaurant_id + protocol_version antes de abrir WS. `ServerRegistry` persiste endpoints exitosos en localStorage por 24h. `useBridgeClient` ejecuta discovery antes de conectar. | FIXED | pendiente | 24 tests (TC-01…TC-13 + Registry + buildDiscoveryConfig) | Pendiente — requiere: Ethernet + WiFi + KDS + internet desconectado + cambio de IP |
 | LAN-04 | MEDIUM | KDS standalone | `electron-app/main.js:363` | `pos_server_ip` se inyecta como `?bridge=IP` en la URL del KDS. No hay validación de que el web app lea ese parámetro. | KDS standalone podría conectarse al bridge incorrecto o no conectarse. | Verificar que `useBridgeClient` lee `?bridge=` correctamente. | OPEN | — | — | — |
 
 ---
@@ -130,7 +130,7 @@
 
 **Multi-terminal / LAN sync**
 - LAN-01 (HIGH): Local Server en Phase 1 — Supabase sigue siendo autoridad de escritura. Multi-terminal offline diverge.
-- LAN-03 (HIGH): mDNS puede fallar silenciosamente en Windows con múltiples interfaces de red → KDS standalone no encuentra el servidor.
+- ~~LAN-03~~ (HIGH): **FIXED** — `ServerDiscovery` + `ServerRegistry` + `GET /identity` + `useBridgeClient` integrado. 24 tests. Pendiente validación física.
 
 **Configuración / Replicabilidad**
 - CFG-01 (HIGH): IPs `192.168.1.21`/`.30` hardcodeadas como DEFAULT_STATIONS — en nueva sucursal no funcionan sin editar el config.
@@ -143,7 +143,7 @@
 
 **LAN-01** (Supabase como autoridad de escritura en Phase 1) — el gap arquitectural más significativo. Los comandos POS van a Supabase primero, luego al Local Server como observación. Multi-terminal offline diverge. Desbloquea que el POS sea verdaderamente offline-first.
 
-**LAN-03** (mDNS silencioso en Windows) — KDS standalone no encuentra servidor si mDNS falla. Afecta a cualquier cliente nuevo con múltiples interfaces de red. Solución concreta: fallback a UDP broadcast o entrada manual en config.
+**CFG-01** (IPs hardcodeadas) — en cualquier cliente nuevo, las impresoras no responden hasta editar `DEFAULT_STATIONS` en código. Reemplazar con provisioning explícito antes del primer servicio.
 
 ---
 *Generado: 2026-07-27 | Sesión 4 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js, useKdsWsClient.ts*
