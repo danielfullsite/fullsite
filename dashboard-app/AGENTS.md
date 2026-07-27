@@ -23,7 +23,7 @@ La tabla distingue dos casos:
 | Autenticación / client_id | **Formal** | `src/lib/auth.ts` o helper `_cid()` | Hardcodear un `client_id`; consultar sin filtrar por cliente |
 | Food cost / costeo | **Formal** | `src/lib/cost-engine/` + `/api/food-cost/calculate` | Calcular costos de platillo o sub-receta en el cliente |
 | Impresión | **Formal** | Print bridge `127.0.0.1:7717` | Llamar a impresoras directamente desde el page |
-| Event store (POS) | **Formal** | `src/lib/event-store.ts` | Mutar estado POS sin generar un evento inmutable primero |
+| Event store (POS) | **Formal** | `bridge-client.ts` → `sendCommand()` genera `command_id` estable → Local Server `CoreEventStore` persiste el evento inmutable en `events.ndjson` antes del ACK. `src/lib/event-store.ts` no existe ni debe crearse — ver `docs/reference/PERSISTENCE-LAYER.md`. | Enviar comandos POS sin `command_id` estable; crear un event store en el browser; mutar Supabase sin generar primero un `command_id` que identifique la operación |
 | Movimientos de caja | **Sin contrato formal** | `pos_cash_movements` via REST (sin módulo propio aún) | Crear lógica de balance directamente en el page; crear el módulo si el flujo crece |
 | Agentes IA | **Sin contrato formal** | `/api/chat`, `/api/coach`, `agent_runs` / `agent_results` (sin orquestador en client) | Lógica de inferencia en el page; llamar a Groq/Claude desde el cliente |
 

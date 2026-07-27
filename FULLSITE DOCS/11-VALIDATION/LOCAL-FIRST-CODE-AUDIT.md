@@ -1,5 +1,5 @@
 # Local-First Code Audit Matrix
-<!-- Última actualización: 2026-07-27 (sesión 4). No borrar hallazgos resueltos — marcar Estado. -->
+<!-- Última actualización: 2026-07-27 (sesión 5 / PER-02). No borrar hallazgos resueltos — marcar Estado. -->
 
 ## Leyenda de severidad
 - **CRITICAL** — bloquea la operación del restaurante sin internet
@@ -62,7 +62,7 @@
 | ID | Severidad | Módulo | Archivo/función | Problema | Riesgo offline | Solución | Estado | Commit | Tests | Validación física |
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
 | PER-01 | HIGH | IDB | `pos-offline-db.ts` + `offline-sync.ts` | Dos queues paralelas (IDB `sync_queue` + localStorage `fullsite_offline_queue`). Items en una invisible a la otra. | Split-brain: sync puede ignorar items si están en la queue equivocada. | IDB `sync_queue` es la cola canónica. `drainLocalStorageToIdb()` migra items de localStorage a IDB en startup. Los únicos writes a `fullsite_offline_queue` son emergency-fallback (IDB primero, localStorage solo si IDB falla). | FIXED | a3a47f4 | — | — |
-| PER-02 | HIGH | EventStore | `AGENTS.md` + código | `src/lib/event-store.ts` referenciado en AGENTS.md como contrato formal de "Event store (POS)" pero **el archivo no existe**. | Cualquier import a `event-store.ts` falla en runtime. | Crear el módulo o actualizar AGENTS.md con la abstracción real. | OPEN | — | — | — |
+| PER-02 | HIGH | EventStore | `dashboard-app/AGENTS.md` | `src/lib/event-store.ts` declarado como "Formal" en AGENTS.md pero no existe — promesa de documentación, no un import real. Investigación completa revela: (1) el Local Server ya tiene `CoreEventStore + NdjsonEventStore` como autoridad durable; (2) persist → state → ACK orden garantizado; (3) replay real en startup; (4) dedup survives restart; (5) gaps reales son non-atomic append+saveCmd y STATE_SYNC inflation del log (Phase 2). El POS no necesita su propio event store. | **Opción A**: corregir AGENTS.md para apuntar a `bridge-client.sendCommand()` + Local Server `CoreEventStore`. No crear nuevo archivo. Gaps de Phase 2 documentados en `docs/reference/PERSISTENCE-LAYER.md`. | FIXED | (este commit) | 8 event-store.test.js existentes; 6 tests adicionales identificados (línea truncada, crash entre append+saveCmd) — por implementar | — |
 | PER-03 | MEDIUM | Print | `print-queue.ts` | `recoverFromIDB()` implementado (commit P0.3) pero `_syncQueueToIDB` usa dynamic import fire-and-forget. Si el import falla, IDB no se actualiza. | Print jobs perdidos si IDB import falla al escribir. | Verificar que dynamic import no falla en contexto Electron. Test en Windows. | OPEN | — | — | — |
 | PER-04 | LOW | Turno | `pos/turno/page.tsx` | `turnoId` se persiste en localStorage. Si localStorage se borra (modo privado, policy), turno se pierde. | Turno no recuperable solo desde localStorage en ese caso. | Turno también en IDB (ya implementado P0.1). Doble persistencia. | FIXED | 9cd2d78 | — | — |
 
@@ -107,11 +107,11 @@
 | Órdenes | 0 | 0 | 1 | 1 | 2 |
 | KDS | 0 | 1 | 0 | 0 | 3 |
 | Navegación | 0 | 0 | 1 | 2 | 0 |
-| Persistencia | 0 | 1 | 1 | 0 | 2 |
+| Persistencia | 0 | 0 | 1 | 0 | 3 |
 | Sync LAN | 0 | 2 | 2 | 0 | 0 |
 | Configuración | 0 | 2 | 0 | 0 | 2 |
 | Impresión | 0 | 0 | 1 | 0 | 1 |
-| **Total** | **0** | **6** | **7** | **4** | **11** |
+| **Total** | **0** | **5** | **7** | **4** | **12** |
 
 ### Circuito offline — estado actual (sesión 4 / KDS-02 + PER-01 resueltos)
 - **Funciona offline**: PIN, turno, mapa de mesas, órdenes, envíos, impresión, cobro, KDS avanzar/completar/item-done
@@ -126,7 +126,7 @@
 ### HIGH restantes — clasificados por impacto
 
 **EventStore / Persistencia**
-- PER-02 (HIGH): `event-store.ts` referenciado en AGENTS.md pero no existe — cualquier import rompe en runtime. Investigar qué abstracción cubre esto antes de crear un archivo nuevo.
+- ~~PER-02~~: Resuelto documentalmente. El Local Server tiene `CoreEventStore + NdjsonEventStore` completos. AGENTS.md corregido. Ver `docs/reference/PERSISTENCE-LAYER.md` para gaps de Phase 2 (non-atomic append+dedup, sin fsync, STATE_SYNC inflation, sin snapshots).
 
 **Multi-terminal / LAN sync**
 - LAN-01 (HIGH): Local Server en Phase 1 — Supabase sigue siendo autoridad de escritura. Multi-terminal offline diverge.
@@ -139,8 +139,11 @@
 **KDS**
 - KDS-03 (HIGH): `pos_orders` no está en el API cache del SW — KDS no puede servir órdenes desde SW offline (IDB + Local Server lo cubren parcialmente).
 
-### Próximo HIGH recomendado
-**PER-02** (event-store.ts no existe) — research-first: determinar si el archivo debe crearse, qué debe exportar, y qué tiene que ver con `NdjsonEventStore` en el Local Server. Una sesión de research + decisión arquitectural antes de escribir código.
+### Próximos HIGH recomendados
+
+**LAN-01** (Supabase como autoridad de escritura en Phase 1) — el gap arquitectural más significativo. Los comandos POS van a Supabase primero, luego al Local Server como observación. Multi-terminal offline diverge. Desbloquea que el POS sea verdaderamente offline-first.
+
+**LAN-03** (mDNS silencioso en Windows) — KDS standalone no encuentra servidor si mDNS falla. Afecta a cualquier cliente nuevo con múltiples interfaces de red. Solución concreta: fallback a UDP broadcast o entrada manual en config.
 
 ---
 *Generado: 2026-07-27 | Sesión 4 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js, useKdsWsClient.ts*
