@@ -13,6 +13,7 @@ import {
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { useBridgeClient } from '@/lib/bridge-client'
 
 
 function getElapsedMinutes(dateStr: string): number {
@@ -225,6 +226,12 @@ export default function CocinaPage() {
     prevOrderCountRef.current = newEnviadas
     setOrders(fresh)
   }
+
+  // Push DELTA events from the local server → immediate refresh without waiting for poll
+  useBridgeClient((event) => {
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+    if (ORDER_EVENTS.includes(event.type)) fetchOrders()
+  }, 'kds')
 
   useEffect(() => {
     setMounted(true)

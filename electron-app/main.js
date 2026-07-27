@@ -210,6 +210,17 @@ function createWindow() {
   let loadFailCount = 0;
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc) => {
     if (errorCode === -3) return; // ERR_ABORTED: SW or redirect intercepted — not a real failure
+
+    // If the device is definitively offline, skip retries — offline.html handles recovery.
+    // net.online mirrors navigator.onLine: false = no network interface at all.
+    const { net } = require('electron');
+    if (!net.online) {
+      console.log(`[main] Device offline (${errorCode}) → loading offline.html immediately`);
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html');
+      return;
+    }
+
+    // Online but slow / transient failure — retry with progressive backoff
     loadFailCount++;
     console.error(`[main] Load failed (${loadFailCount}): ${errorCode} ${errorDesc}`);
     if (loadFailCount <= 3) {

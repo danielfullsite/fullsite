@@ -8,6 +8,7 @@ import { getMesasConfig, formatMXN, fetchPosMesas } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { useBridgeClient } from '@/lib/bridge-client'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -165,7 +166,11 @@ export default function PlanoPage() {
   const [loading, setLoading] = useState(true)
   const [selectedMesa, setSelectedMesa] = useState<number | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const [clientMesas, setClientMesas] = useState<Mesa[]>(() => getMesasConfig(_cid(), 16))
+  // Initialize from FLOOR_TABLES so all tables render immediately (even offline).
+  // fetchPosMesas overrides with DB layout when available.
+  const [clientMesas, setClientMesas] = useState<Mesa[]>(() =>
+    FLOOR_TABLES.map(ft => ({ number: ft.number, capacity: 4, status: 'disponible' as const }))
+  )
   const [floorTables, setFloorTables] = useState<FloorTable[]>(FLOOR_TABLES)
 
   // Timer tick for elapsed time display
@@ -205,6 +210,12 @@ export default function PlanoPage() {
     setLoading(false)
     setLastRefresh(new Date())
   }, [])
+
+  // Push DELTA events from the local server → mesa state updates without waiting 30s
+  useBridgeClient((event) => {
+    const MESA_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'MESA_LOCK', 'MESA_UNLOCK']
+    if (MESA_EVENTS.includes(event.type)) fetchData()
+  }, 'pos')
 
   useEffect(() => {
     fetchData()
@@ -476,8 +487,12 @@ export default function PlanoPage() {
 
             {/* Tables */}
             {floorTables.map(ft => {
-              const mesa = mesaMap.get(ft.number)
-              if (!mesa) return null
+              const mesa = mesaMap.get(ft.number) ?? {
+                number: ft.number,
+                capacity: 4,
+                status: 'disponible' as const,
+                resolvedStatus: 'disponible' as TableStatus,
+              }
               const order = ordersByMesa.get(mesa.number)
               const mins = order ? getMinutes(order.created_at) : 0
               const isAlert = mins >= 90

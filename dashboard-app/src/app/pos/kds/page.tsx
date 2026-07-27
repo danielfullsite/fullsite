@@ -9,6 +9,7 @@ import {
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
 import { type StationName } from '@/lib/pos-constants'
+import { useBridgeClient } from '@/lib/bridge-client'
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -111,7 +112,29 @@ export default function KDSPage() {
   }
 
   const fetchOrders = useCallback(async () => {
-    const data = await getKitchenOrders()
+    let data: KitchenOrderFromDB[]
+    try {
+      data = await getKitchenOrders()
+    } catch {
+      // Offline — merge cached orders from IndexedDB into current state
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const [env, prep, lst] = await Promise.all([
+          getCachedOrders('enviada'),
+          getCachedOrders('preparando'),
+          getCachedOrders('lista'),
+        ])
+        const cached = [...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[]
+        if (cached.length > 0) {
+          setOrders(prev => {
+            const existing = new Set(prev.map(o => o.id))
+            const fresh = cached.filter(o => !existing.has(o.id))
+            return fresh.length > 0 ? [...prev, ...fresh] : prev
+          })
+        }
+      } catch { /* IndexedDB not available */ }
+      return
+    }
     const now = Date.now()
     const fourHours = 4 * 60 * 60 * 1000
     const fresh = data.filter(o => {
@@ -151,6 +174,12 @@ export default function KDSPage() {
     // Replace entire set from DB truth — handles un-done from other devices
     if (restored.size > 0 || doneItems.size > 0) setDoneItems(restored)
   }, [])
+
+  // Push DELTA events from the local server → immediate refresh without waiting for poll
+  useBridgeClient((event) => {
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+    if (ORDER_EVENTS.includes(event.type)) fetchOrders()
+  }, 'kds')
 
   useEffect(() => {
     setMounted(true)

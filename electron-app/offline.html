@@ -187,6 +187,26 @@
       return next.count;
     }
 
+    // ── Auto-redirect countdown (fires when bridge is up + SW has cache) ────────
+    var autoTimer = null;
+    function scheduleAutoRedirect() {
+      if (autoTimer) return; // already running
+      var state = getRetryState();
+      if (state.count >= 2) return; // SceneC — don't auto-redirect into a blank page
+      var secs = 3;
+      var hint = document.getElementById('continue-hint');
+      function tick() {
+        if (hint) hint.textContent = 'Abriendo POS en modo offline en ' + secs + 's...';
+        if (secs <= 0) {
+          clearInterval(autoTimer);
+          continueOffline();
+        }
+        secs--;
+      }
+      tick(); // show immediately, then every second
+      autoTimer = setInterval(tick, 1000);
+    }
+
     // ── Bridge health check ───────────────────────────────────────────────────
     function checkBridge() {
       fetch('http://127.0.0.1:7717/health', { cache: 'no-store' })
@@ -210,6 +230,7 @@
           } else {
             btn.style.display = 'block';
             hint.style.display = 'block';
+            scheduleAutoRedirect(); // auto-enter offline mode in 3s
           }
         })
         .catch(function() {
