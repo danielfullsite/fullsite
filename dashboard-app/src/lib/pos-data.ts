@@ -305,6 +305,13 @@ const _SUPABASE_URL = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_S
 const _SUPABASE_KEY = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' : ''
 const _SB_HEADERS = { apikey: _SUPABASE_KEY, Authorization: `Bearer ${_SUPABASE_KEY}` }
 
+/** fetch() con timeout de 5s — evita que solicitudes colgadas a Supabase freezeen el UI cuando cae internet por cable. */
+export function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id))
+}
+
 /** Get current client ID — delegates to canonical getActiveClientSlug(). */
 function _getClientId(): string {
   return getActiveClientSlug()
@@ -392,14 +399,30 @@ export async function getPaymentMethodsFromDB(): Promise<PaymentMethodDB[]> {
 /** Turno activo (pos_turnos sin closed_at). Devuelve null si no hay turno abierto. */
 export async function getActiveTurno(): Promise<{ id: string; fondo_inicial: number; opened_by: string; opened_at: string } | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${_SUPABASE_URL}/rest/v1/pos_turnos?client_id=eq.${_getClientId()}&closed_at=is.null&select=id,fondo_inicial,opened_by,opened_at&order=opened_at.desc&limit=1`,
       { headers: _SB_HEADERS, cache: 'no-store' }
     )
     if (!res.ok) return null
     const rows = await res.json()
-    return rows[0] || null
-  } catch { return null }
+    const turno = rows[0] || null
+    if (turno && typeof window !== 'undefined') {
+      try { localStorage.setItem('pos_turno_cache', JSON.stringify({ turno, ts: Date.now() })) } catch {}
+    }
+    return turno
+  } catch {
+    // Offline o timeout — usar turno cacheado del mismo día
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('pos_turno_cache')
+        if (raw) {
+          const { turno, ts } = JSON.parse(raw)
+          if (turno && Date.now() - ts < 24 * 3600 * 1000) return turno
+        }
+      } catch {}
+    }
+    return null
+  }
 }
 
 /** Turno activo + detección de turno stale (>18h sin cerrar = probablemente del día anterior) */
@@ -1361,7 +1384,7 @@ export async function getKitchenOrders(): Promise<KitchenOrderFromDB[]> {
 
   let orders: KitchenOrderFromDB[]
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${SUPABASE_URL}/rest/v1/pos_orders?status=in.(enviada,preparando,lista)&client_id=eq.${_getClientId()}&created_at=gte.${cutoff}&order=created_at.desc`,
       {
         headers: {

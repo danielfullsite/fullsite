@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
-import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
@@ -227,11 +227,11 @@ export default function MesasPage() {
   const fetchData = useCallback(async () => {
     try {
       const [ordersRes, resRes] = await Promise.all([
-        fetch(
+        fetchWithTimeout(
           `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${_cid()}&status=in.(enviada,preparando,lista,abierta,entregada)&order=created_at.desc&limit=50`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
-        fetch(
+        fetchWithTimeout(
           `${SUPABASE_URL}/rest/v1/reservaciones?client_id=eq.${_cid()}&fecha=eq.${new Date().toISOString().split('T')[0]}&status=neq.cancelled&order=horario_inicio.asc&select=codigo_reserva,nombre,guests,horario_inicio,espacio,status`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         ),
