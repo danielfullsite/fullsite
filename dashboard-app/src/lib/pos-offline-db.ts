@@ -172,12 +172,15 @@ export async function queueOperation(
   return id
 }
 
-export async function getPendingQueue(): Promise<SyncQueueItem[]> {
+export async function getPendingQueue(actionableOnly = false): Promise<SyncQueueItem[]> {
   const db = await openDB()
   return new Promise((resolve) => {
     const tx = db.transaction('sync_queue', 'readonly')
     const request = tx.objectStore('sync_queue').getAll()
-    request.onsuccess = () => resolve((request.result || []).filter((item: SyncQueueItem) => !item.synced))
+    request.onsuccess = () => {
+      const all = (request.result || []).filter((item: SyncQueueItem) => !item.synced)
+      resolve(actionableOnly ? all.filter((item: SyncQueueItem) => !item.error_class) : all)
+    }
     request.onerror = () => resolve([])
   })
 }

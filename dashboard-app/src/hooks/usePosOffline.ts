@@ -20,7 +20,7 @@ export function usePosOffline(): OfflineState {
 
   const updatePendingCount = useCallback(async () => {
     try {
-      const queue = await getPendingQueue()
+      const queue = await getPendingQueue(true)
       setPendingCount(queue.length)
     } catch {
       // IndexedDB not available
@@ -66,7 +66,7 @@ export function usePosOffline(): OfflineState {
       if (navigator.onLine) {
         await updatePendingCount()
         if (localStorage.getItem('FULLSITE_RECOVERY_SYNC_DISABLED') !== '1') {
-          const queue = await getPendingQueue()
+          const queue = await getPendingQueue(true)
           if (queue.length > 0) syncNow()
         }
       }
