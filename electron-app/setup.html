@@ -145,8 +145,9 @@
       <span class="alert-icon">⚠</span>
       <span>Sin configuración válida, el POS no puede abrir turnos, crear órdenes ni sincronizar datos.</span>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-secondary" id="btnMigrate" style="display:none" onclick="doMigrate()">Migrar configuración anterior</button>
+    <div class="btn-row" style="flex-wrap:wrap;gap:8px">
+      <button class="btn btn-secondary" id="btnMigrate" style="display:none;flex:0 1 auto" onclick="doMigrate()">Migrar config anterior</button>
+      <button class="btn btn-secondary" id="btnImport" style="flex:0 1 auto" onclick="doImport()">Importar respaldo...</button>
       <button class="btn btn-primary" onclick="goTo(2)">Configurar nueva terminal →</button>
     </div>
   </div>
@@ -347,6 +348,32 @@ function doMigrate() {
   }
   syncStateFromConfig(migrated)
   goTo(5)  // skip to validation — migration pre-fills everything
+}
+
+// ─── Step 1: import from backup ──────────────────────────────────────────────
+async function doImport() {
+  if (!window.setupBridge?.importConfig) {
+    showAlert('legacyAlert', 'error', 'Importación no disponible fuera de Electron.')
+    return
+  }
+  const btn = document.getElementById('btnImport')
+  btn.disabled = true; btn.textContent = 'Abriendo...'
+  try {
+    const result = await window.setupBridge.importConfig()
+    if (!result.ok) {
+      if (result.error !== 'canceled') showAlert('legacyAlert', 'error', 'No se pudo importar: ' + result.error)
+      return
+    }
+    syncStateFromConfig(result.config)
+    // Preserve legacy-style fields from the imported config so they survive saveAndRestart()
+    state.legacy = result.config
+    showAlert('legacyAlert', 'ok', `Respaldo cargado para "${result.config.restaurant_id}". Verificando configuración...`)
+    goTo(5)  // jump straight to validation
+  } catch (e) {
+    showAlert('legacyAlert', 'error', 'Error al importar: ' + e.message)
+  } finally {
+    btn.disabled = false; btn.textContent = 'Importar respaldo...'
+  }
 }
 
 // ─── Step 2 ───────────────────────────────────────────────────────────────────

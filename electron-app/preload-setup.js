@@ -27,4 +27,10 @@ contextBridge.exposeInMainWorld('setupBridge', {
    * @returns {{ ok: boolean, error?: string }}
    */
   save: (config) => ipcRenderer.invoke('provision:save', config),
+
+  /**
+   * Open a file picker to load a config.json backup from disk.
+   * Returns { ok: true, config } or { ok: false, error } (error='canceled' if dismissed).
+   */
+  importConfig: () => ipcRenderer.invoke('provision:import-config'),
 })

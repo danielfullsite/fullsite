@@ -293,11 +293,17 @@ export default function KDSPage() {
         if (!res.ok) console.error(`[KDS] Failed to persist item status for order ${orderId}: HTTP ${res.status}`)
       }).catch(err => {
         console.error(`[KDS] Network error persisting item status for order ${orderId}:`, err)
-        try {
-          const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-          q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
-          localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
-        } catch { /* noop */ }
+        // PER-01: try IDB sync_queue first (canonical source of truth)
+        import('@/lib/pos-offline-db').then(({ queueOperation }) =>
+          queueOperation('pos_orders', 'PATCH', { kds_item_status: JSON.stringify(kdsStatus) }, `pos_orders?id=eq.${orderId}`)
+        ).catch(() => {
+          // IDB also unavailable — emergency localStorage buffer (drained to IDB on next startup)
+          try {
+            const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+            q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
+            localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
+          } catch { /* noop */ }
+        })
       })
 
       return next

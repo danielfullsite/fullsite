@@ -774,6 +774,49 @@ export async function markTurnoSynced(id: string): Promise<void> {
   })
 }
 
+// ─── PER-01: drain localStorage emergency buffer into IDB ────────────────────
+// localStorage is the emergency fallback when IDB is unavailable mid-operation.
+// Items written there are invisible to syncAll(). On every startup, we drain
+// them into IDB so they enter the canonical sync queue and are never silently lost.
+//
+// Idempotent: safe to call multiple times. Clears localStorage only after every
+// item has been successfully written to IDB (all-or-nothing, per item).
+export async function drainLocalStorageToIdb(): Promise<void> {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
+  const LS_KEY = 'fullsite_offline_queue'
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return
+    const items: Record<string, unknown>[] = JSON.parse(raw)
+    const unsynced = items.filter(i => !i.synced)
+    if (!unsynced.length) { localStorage.removeItem(LS_KEY); return }
+
+    let allOk = true
+    for (const item of unsynced) {
+      try {
+        const method = (item.method as string | undefined) || 'PATCH'
+        await queueOperation(
+          (item.table as string) || 'pos_orders',
+          method as 'POST' | 'PATCH' | 'DELETE',
+          (item.data as Record<string, unknown>) || {},
+          (item.endpoint as string | undefined),
+          undefined,
+          (item.transport as ReplayTransport | undefined),
+        )
+      } catch {
+        allOk = false
+      }
+    }
+
+    if (allOk) {
+      localStorage.removeItem(LS_KEY)
+      console.log(`[offline-sync] Drained ${unsynced.length} item(s) from localStorage to IDB sync_queue`)
+    }
+  } catch (e) {
+    console.warn('[offline-sync] drainLocalStorageToIdb failed:', e)
+  }
+}
+
 // ─── Auto-sync on reconnect ──────────────────────────────────────────────────
 // When internet returns, automatically sync pending operations.
 
@@ -783,6 +826,9 @@ let isSyncing = false
 export function registerAutoSync() {
   if (autoSyncRegistered || typeof window === 'undefined') return
   autoSyncRegistered = true
+
+  // Drain any emergency localStorage items into IDB before the first sync
+  drainLocalStorageToIdb().catch(() => {})
 
   // 1. On reconnect: sync pending
   window.addEventListener('online', async () => {

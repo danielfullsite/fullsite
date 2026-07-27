@@ -258,6 +258,50 @@ function registerProvisioningIpc() {
   });
 
   /**
+   * Reset this terminal to NOT_PROVISIONED (reprovisioning flow).
+   * Backs up the current config then deletes it, then relaunches into the wizard.
+   * Called from the running POS via window.fullsiteApp.startProvisioning().
+   */
+  ipcMain.handle('provision:reset', async () => {
+    const primaryPath = getPrimaryConfigPath()
+    try {
+      if (fs.existsSync(primaryPath)) {
+        const backup = primaryPath.replace('.json', `.reset-${Date.now()}.json`)
+        try { fs.copyFileSync(primaryPath, backup) } catch {}
+        fs.unlinkSync(primaryPath)
+        console.log('[provision] Config deleted for reprovisioning. Backup at', backup)
+      }
+      setTimeout(() => { app.relaunch(); app.exit(0); }, 500)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  /**
+   * Open a file picker and load a config JSON from a backup file.
+   * Returns { ok, config } on success or { ok: false, error } on failure.
+   * Used by setup.html "Importar desde respaldo" button.
+   */
+  ipcMain.handle('provision:import-config', async () => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      title: 'Seleccionar respaldo de configuración',
+      filters: [{ name: 'Configuración Fullsite', extensions: ['json'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || !result.filePaths.length) return { ok: false, error: 'canceled' }
+    try {
+      const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+      const { valid, errors } = configSchema.validate(data)
+      if (!valid) return { ok: false, error: errors.join('; '), data }
+      return { ok: true, config: data }
+    } catch (e) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  /**
    * Validate and save the provisioned config, then relaunch the app.
    */
   ipcMain.handle('provision:save', async (_, config) => {

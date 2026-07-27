@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Printer, Users, Tag, Wifi, WifiOff, Settings, Shield,
-  RefreshCw, CheckCircle, XCircle, AlertCircle, Monitor, Smartphone,
+  RefreshCw, CheckCircle, XCircle, AlertCircle, Monitor, Smartphone, RotateCcw,
 } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
@@ -28,6 +28,8 @@ export default function ConfigPage() {
   const [promos, setPromos] = useState<{ id: string; name: string; type: string; active: boolean }[]>([])
   const [deviceInfo, setDeviceInfo] = useState({ width: 0, height: 0, userAgent: '', online: true, pwa: false })
   const [syncStatus, setSyncStatus] = useState({ pending: 0, lastSync: '' })
+  const [terminalInfo, setTerminalInfo] = useState({ restaurantId: '', terminalId: '', isElectron: false })
+  const [reprovisionState, setReprovisionState] = useState<'idle' | 'confirm' | 'done'>('idle')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -64,6 +66,13 @@ export default function ConfigPage() {
       const lastSync = localStorage.getItem('pos_last_sync') || ''
       setSyncStatus({ pending: pending.length, lastSync })
     } catch { /* */ }
+
+    // Terminal identity (injected by Electron main on boot)
+    setTerminalInfo({
+      restaurantId: localStorage.getItem('fullsite_client_id') || '',
+      terminalId:   localStorage.getItem('pos_terminal_id') || '',
+      isElectron:   !!(window as unknown as Record<string, unknown>).fullsiteApp,
+    })
 
     setLoading(false)
   }, [])
@@ -236,6 +245,62 @@ export default function ConfigPage() {
             </div>
           </div>
         </section>
+
+        {/* Terminal identity + reprovisioning */}
+        {terminalInfo.isElectron && (
+          <section className="bg-[#111118] rounded-2xl border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <RotateCcw size={20} className="text-emerald-400" /> Terminal
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wide mb-1">Restaurant ID</p>
+                <p className="text-sm font-mono font-bold truncate">{terminalInfo.restaurantId || '—'}</p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wide mb-1">Terminal ID</p>
+                <p className="text-sm font-mono font-bold truncate">{terminalInfo.terminalId || '—'}</p>
+              </div>
+            </div>
+            {reprovisionState === 'idle' && (
+              <button
+                onClick={() => setReprovisionState('confirm')}
+                className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-400 text-sm font-bold hover:bg-red-500/10 transition-colors"
+              >
+                Reprovisionar terminal...
+              </button>
+            )}
+            {reprovisionState === 'confirm' && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-sm text-red-300 font-bold mb-1">Confirmar reprovisioning</p>
+                <p className="text-xs text-white/50 mb-4">La configuracion actual se guardara como respaldo. La aplicacion se reiniciara y mostrara el asistente de configuracion.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setReprovisionState('idle')}
+                    className="flex-1 py-2 rounded-lg bg-white/5 text-sm font-bold text-white/60 hover:bg-white/10"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setReprovisionState('done')
+                      const api = (window as unknown as Record<string, { startProvisioning?: () => Promise<unknown> }>).fullsiteApp
+                      await api?.startProvisioning?.()
+                    }}
+                    className="flex-1 py-2 rounded-lg bg-red-500/20 text-sm font-bold text-red-300 hover:bg-red-500/30"
+                  >
+                    Reprovisionar
+                  </button>
+                </div>
+              </div>
+            )}
+            {reprovisionState === 'done' && (
+              <p className="text-sm text-white/50 text-center py-2">Reiniciando...</p>
+            )}
+          </section>
+        )}
 
       </div>
     </div>
