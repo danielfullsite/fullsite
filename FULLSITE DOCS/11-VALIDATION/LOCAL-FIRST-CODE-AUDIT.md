@@ -1,5 +1,5 @@
 # Local-First Code Audit Matrix
-<!-- Última actualización: 2026-07-27 (sesión 2). No borrar hallazgos resueltos — marcar Estado. -->
+<!-- Última actualización: 2026-07-27 (sesión 3). No borrar hallazgos resueltos — marcar Estado. -->
 
 ## Leyenda de severidad
 - **CRITICAL** — bloquea la operación del restaurante sin internet
@@ -84,8 +84,8 @@
 | ID | Severidad | Módulo | Archivo/función | Problema | Riesgo offline | Solución | Estado | Commit | Tests | Validación física |
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
 | CFG-01 | HIGH | Config | `electron-app/main.js:31-33` | IPs hardcodeadas: `192.168.1.21` (cocina), `192.168.1.30` (barra) como DEFAULT_STATIONS. | En nueva instalación con diferente subred → impresoras no responden. No hay error claro. | Forzar config explícita de impresoras antes de primer servicio. Diagnostic que valide IPs. | OPEN | — | — | — |
-| CFG-02 | CRITICAL | Config | `electron-app/main.js:74` | `restaurantId` defaults a `'unknown'` si `config.json` ausente. | Local server corre sin identidad de tenant. Eventos y mDNS con `restaurant_id: 'unknown'`. | Bloquear startup si `restaurantId` es inválido. Config validator al arrancar. | OPEN | — | — | — |
-| CFG-03 | HIGH | Config | `electron-app/main.js:18-19` | Config en `C:\fullsite\` hardcodeado. | En Windows con permisos restrictivos o instalación en path diferente → config no se lee. | Usar `app.getPath('userData')` como primario, `C:\fullsite\` como fallback documentado. | OPEN | — | — | — |
+| CFG-02 | CRITICAL | Config | `electron-app/main.js` | `restaurantId` defaults a `'unknown'` si `config.json` ausente. Local Server y KDS arrancaban con identidad inválida. | Órdenes, eventos y mDNS con `restaurant_id: 'unknown'`. Datos de cualquier restaurante mezclados. | Formal TerminalConfig schema + loadAndValidateConfig() gate + wizard setup.html + Local Server guard + ws-hub reject + fromLegacy() migration. | FIXED | 3c9dbc0 | 35 schema + 3 ws-hub | — |
+| CFG-03 | HIGH | Config | `electron-app/main.js` | Config en `C:\fullsite\` hardcodeado. | En Windows con permisos restrictivos o instalación en path diferente → config no se lee. | `app.getPath('userData')` como primario, `C:\fullsite\` como fallback. | FIXED | 3c9dbc0 | — | — |
 | CFG-04 | HIGH | Octogent Hook | `.claude/settings.json` | Hook `PreToolUse` HTTP a `127.0.0.1:8787` (Octogent) falla con ECONNREFUSED en cada tool use. | No bloquea código ni tests, pero genera ruido y el tracking de Octogent es ciego. | Arrancar el Worker local de Octogent o eliminar los hooks del proyecto settings. | OPEN | — | — | — |
 
 ---
@@ -109,19 +109,38 @@
 | Navegación | 0 | 0 | 1 | 2 | 0 |
 | Persistencia | 0 | 2 | 1 | 0 | 1 |
 | Sync LAN | 0 | 2 | 1 | 1 | 0 |
-| Configuración | 1 | 3 | 0 | 0 | 0 |
+| Configuración | 0 | 1 | 0 | 0 | 3 |
 | Impresión | 0 | 0 | 1 | 0 | 1 |
-| **Total** | **1** | **9** | **7** | **6** | **6** |
+| **Total** | **0** | **7** | **7** | **6** | **9** |
 
-### Circuito offline — estado actual (sesión 2)
-- **Funciona offline**: PIN, turno, mapa de mesas, órdenes, envíos (+ cierre wizard), impresión, cobro, KDS avanzar/completar/item-done
+### Circuito offline — estado actual (sesión 3 / CFG-02 resuelto)
+- **Funciona offline**: PIN, turno, mapa de mesas, órdenes, envíos, impresión, cobro, KDS avanzar/completar/item-done
 - **Multi-terminal real-time**: broadcast inmediato al Local Server en TODOS los envíos (online y offline)
 - **Timeouts cortos**: conflict-check y race-check abortan en 4s — no más cuelgues en LAN degradada
-- **Todavía requiere internet**: KDS startup sin estado previo en IDB, config de impresoras inicial, actualizaciones
+- **Identidad validada**: TerminalConfig schema + wizard provisionamiento + ws-hub mismatch rejection
+- **Migración automática**: installs AMALAY existentes migran sin perder IDB / queues / turno
+- **Todavía requiere internet en 1er boot**: KDS startup sin estado previo en IDB, actualizaciones
 
-### Hallazgos que bloquean "operación real sin internet de principio a fin"
-1. CFG-02 (restaurantId unknown en nueva instalación) ← tarea pendiente, requiere onboarding wizard
-2. KDS-02/04 (KDS usa Supabase poll, no WsHub) ← trabajo mayor, P1
+### HIGH restantes — clasificados por impacto
+
+**Operación offline / end-to-end**
+- KDS-02 (HIGH): KDS usa Supabase poll cada 2s — si cae Supabase, pantalla congela. WsHub debería ser fuente primaria.
+- PER-01 (HIGH): Dos queues paralelas (IDB + localStorage) — split-brain silencioso si items caen en la cola equivocada.
+- PER-02 (HIGH): `event-store.ts` referenciado en AGENTS.md pero no existe — cualquier import rompe en runtime.
+
+**Multi-terminal / LAN sync**
+- LAN-01 (HIGH): Local Server en Phase 1 — Supabase sigue siendo autoridad de escritura. Multi-terminal offline diverge.
+- LAN-03 (HIGH): mDNS puede fallar silenciosamente en Windows con múltiples interfaces de red → KDS standalone no encuentra el servidor.
+
+**KDS**
+- KDS-04 (MEDIUM): KDS no se suscribe al WsHub via WebSocket en startup — latencia 0-2s vs <500ms con WS.
+
+**Configuración / Replicabilidad**
+- CFG-01 (HIGH): IPs `192.168.1.21`/`.30` hardcodeadas como DEFAULT_STATIONS — en nueva sucursal no funcionan sin editar el config.
+- CFG-04 (HIGH): Octogent hooks llaman `127.0.0.1:8787` — ECONNREFUSED en cada tool use (no bloquea operación, pero ruido en logs).
+
+### Próximo HIGH recomendado
+**PER-01** (split-brain de queues) — es el que más daño silencioso puede causar en producción: una orden que queda en localStorage no se sincroniza si IDB hace el flush. Una sesión de trabajo resuelve esto y desbloquea PER-02.
 
 ---
 *Generado: 2026-07-27 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js*
