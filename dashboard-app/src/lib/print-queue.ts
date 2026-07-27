@@ -1,5 +1,6 @@
 // Print Queue — cola de impresión con retry automático.
-// Persiste en localStorage para sobrevivir recargas de página.
+// localStorage = hot cache (sync API, survives reloads).
+// IDB (print_jobs store v4) = durable backup (survives localStorage wipe & Electron restart).
 //
 // State machine:
 //   pending → retrying → printed           (happy path, bridge UP)
@@ -30,6 +31,7 @@ export interface PrintJob {
 }
 
 const STORAGE_KEY = 'pos_print_queue'
+let _processing = false
 const MAX_RETRIES = 5
 const RETRY_INTERVAL_MS = 15_000 // 15 seconds
 const BRIDGE_URL = 'http://127.0.0.1:7717'
@@ -48,6 +50,61 @@ function saveQueue(queue: PrintJob[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue))
   } catch { /* private mode */ }
+  // IDB write-through — fire and forget, keeps IDB in sync without blocking sync callers
+  _syncQueueToIDB(queue)
+}
+
+function _syncQueueToIDB(queue: PrintJob[]) {
+  import('@/lib/pos-offline-db').then(({ saveIDBPrintJob, deleteIDBPrintJob }) => {
+    for (const job of queue) {
+      saveIDBPrintJob({
+        id: job.id,
+        station: job.station,
+        data: job.data,
+        type: job.type,
+        status: job.status,
+        retries: job.retries,
+        maxRetries: job.maxRetries,
+        createdAt: job.createdAt,
+        lastAttempt: job.lastAttempt,
+        error: job.error,
+        meta: job.meta,
+      }).catch(() => {/* IDB unavailable */})
+    }
+    // Clean printed jobs from IDB (they are complete — no need to keep the payload)
+    const printedIds = queue.filter(j => j.status === 'printed').map(j => j.id)
+    for (const id of printedIds) deleteIDBPrintJob(id).catch(() => {/* */})
+  }).catch(() => {/* dynamic import failed */})
+}
+
+/** On startup: if localStorage queue is empty, restore pending jobs from IDB. */
+export async function recoverFromIDB(): Promise<void> {
+  try {
+    const local = loadQueue()
+    if (local.length > 0) return // localStorage has data — trust it
+
+    const { getIDBPrintJobs } = await import('@/lib/pos-offline-db')
+    const idbJobs = await getIDBPrintJobs()
+    const pending = idbJobs.filter(j => j.status === 'pending' || j.status === 'retrying' || j.status === 'bridge_unavailable')
+    if (pending.length === 0) return
+
+    // Restore as PrintJob objects — reset bridge_unavailable → pending on restart
+    const restored: PrintJob[] = pending.map(j => ({
+      id: j.id,
+      station: j.station,
+      data: j.data,
+      type: j.type as PrintJob['type'],
+      status: j.status === 'bridge_unavailable' ? 'pending' : j.status as PrintJob['status'],
+      retries: j.retries,
+      maxRetries: j.maxRetries,
+      createdAt: j.createdAt,
+      lastAttempt: j.lastAttempt,
+      error: j.error,
+      meta: j.meta,
+    }))
+    saveQueue(restored)
+    console.log(`[print-queue] Recovered ${restored.length} job(s) from IDB after restart`)
+  } catch { /* IDB unavailable — no recovery */ }
 }
 
 // ── Queue operations ────────────────────────────────────────────────────
@@ -224,6 +281,16 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
 }
 
 async function processQueue() {
+  if (_processing) return
+  _processing = true
+  try {
+    await _processQueueInner()
+  } finally {
+    _processing = false
+  }
+}
+
+async function _processQueueInner() {
   const queue = loadQueue()
   // processQueue runs every 15s — only log when there's something to do
   const bridgeUp = await isBridgeHealthy()
@@ -339,7 +406,8 @@ let retryInterval: ReturnType<typeof setInterval> | null = null
 
 export function startRetryLoop() {
   if (retryInterval) return
-  processQueue()
+  // Recover any jobs that were in IDB but not in localStorage (e.g. after Electron restart)
+  recoverFromIDB().then(() => processQueue()).catch(() => processQueue())
   retryInterval = setInterval(processQueue, RETRY_INTERVAL_MS)
   console.log(`[print-queue] Retry loop started (every ${RETRY_INTERVAL_MS / 1000}s)`)
 }

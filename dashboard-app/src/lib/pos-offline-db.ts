@@ -2,7 +2,7 @@
 // Stores menu, orders, inventory, and sync queue for offline-first operation
 
 const DB_NAME = 'fullsite_pos'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 // ─── Replay Transport Classes ───────────────────────────────────────────────
 // APP_API: replay through application API routes (Next.js /api/pos/*)
@@ -87,6 +87,12 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('cash_movements')) {
         const store = db.createObjectStore('cash_movements', { keyPath: 'id' })
         store.createIndex('turno_id', 'turno_id', { unique: false })
+      }
+      // v4: print_jobs — durable print queue survives localStorage wipe and Electron restart
+      if (!db.objectStoreNames.contains('print_jobs')) {
+        const store = db.createObjectStore('print_jobs', { keyPath: 'id' })
+        store.createIndex('status', 'status', { unique: false })
+        store.createIndex('createdAt', 'createdAt', { unique: false })
       }
     }
   })
@@ -596,6 +602,91 @@ export async function getCachedStaff(): Promise<Record<string, unknown>[]> {
     req.onsuccess = () => resolve(req.result || [])
     req.onerror = () => resolve([])
   })
+}
+
+// ─── Orders by Turno ────────────────────────────────────────────────────────
+
+export async function getCachedOrdersByTurno(turnoId: string): Promise<Record<string, unknown>[]> {
+  const all = await getCachedOrders()
+  return all.filter(o => o.turno_id === turnoId)
+}
+
+// ─── Cash Movements by Turno ─────────────────────────────────────────────────
+// Reads from both the cash_movements IDB store and the sync_queue (for queued offline moves).
+
+export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
+  const db = await openDB()
+  // Read from cash_movements store (synced ones)
+  const synced: { type: string; amount: number }[] = await new Promise((resolve) => {
+    const tx = db.transaction('cash_movements', 'readonly')
+    const req = tx.objectStore('cash_movements').index('turno_id').getAll(IDBKeyRange.only(turnoId))
+    req.onsuccess = () => resolve((req.result || []).map((m: Record<string, unknown>) => ({ type: m.type as string, amount: Number(m.amount) || 0 })))
+    req.onerror = () => resolve([])
+  })
+  // Also check sync_queue for unsynced cash movements
+  const pending = await getPendingQueue()
+  const queued = pending
+    .filter(item => item.table === 'pos_cash_movements' && (item.data as Record<string, unknown>).turno_id === turnoId)
+    .map(item => ({
+      type: (item.data as Record<string, unknown>).type as string,
+      amount: Number((item.data as Record<string, unknown>).amount) || 0,
+    }))
+  return [...synced, ...queued]
+}
+
+// ─── Print Jobs (IDB v4) — durable backup for print-queue.ts localStorage ───
+
+export interface IDBPrintJob {
+  id: string
+  station: string
+  data: string
+  type: string
+  status: string
+  retries: number
+  maxRetries: number
+  createdAt: string
+  lastAttempt: string | null
+  error: string | null
+  meta?: { mesa?: number; mesero?: string; orderId?: string }
+}
+
+export async function saveIDBPrintJob(job: IDBPrintJob): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('print_jobs', 'readwrite')
+    tx.objectStore('print_jobs').put(job)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getIDBPrintJobs(): Promise<IDBPrintJob[]> {
+  const db = await openDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction('print_jobs', 'readonly')
+    const req = tx.objectStore('print_jobs').getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => resolve([])
+  })
+}
+
+export async function deleteIDBPrintJob(id: string): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('print_jobs', 'readwrite')
+    tx.objectStore('print_jobs').delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function clearIDBPrintedJobs(): Promise<void> {
+  const db = await openDB()
+  const jobs = await getIDBPrintJobs()
+  const printed = jobs.filter(j => j.status === 'printed')
+  const tx = db.transaction('print_jobs', 'readwrite')
+  const store = tx.objectStore('print_jobs')
+  for (const j of printed) store.delete(j.id)
 }
 
 // ─── Turno (Shift) Offline Support ──────────────────────────────────────────

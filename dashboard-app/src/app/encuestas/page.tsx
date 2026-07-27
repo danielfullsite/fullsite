@@ -11,6 +11,7 @@ import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { getActiveClientSlug } from '@/lib/data'
 import { sbGet, sbPost } from '@/lib/supabase-helpers'
+import { qrToDataURL } from '@/lib/qr'
 
 // ─── Types ───────────────────────────────────────────────────────────
 type QuestionType = 'stars' | 'yesno' | 'text' | 'nps'
@@ -144,11 +145,17 @@ export default function EncuestasPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [saved, setSaved] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [surveyQrDataURL, setSurveyQrDataURL] = useState<string | null>(null)
 
   const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : 'amalay'
   const surveyUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/encuesta/${clientId}`
     : `https://app.fullsite.mx/encuesta/${clientId}`
+
+  // Generate survey QR code locally — no external network required
+  useEffect(() => {
+    qrToDataURL(surveyUrl, { width: 400 }).then(setSurveyQrDataURL).catch(() => {/* */})
+  }, [surveyUrl])
 
   // ─── Load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -564,15 +571,14 @@ export default function EncuestasPage() {
                 Imprime este QR en los tickets para que los clientes accedan a la encuesta.
               </p>
 
-              {/* QR placeholder using API */}
               <div className="flex justify-center mb-3">
                 <div className="w-48 h-48 bg-white rounded-xl p-2 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(surveyUrl)}`}
-                    alt="QR Code"
-                    className="w-full h-full"
-                  />
+                  {surveyQrDataURL ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={surveyQrDataURL} alt="QR Code" className="w-full h-full" />
+                  ) : (
+                    <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  )}
                 </div>
               </div>
 
@@ -588,9 +594,10 @@ export default function EncuestasPage() {
                   </button>
                 </div>
                 <a
-                  href={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(surveyUrl)}`}
+                  href={surveyQrDataURL || '#'}
                   download="encuesta-qr.png"
-                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-[var(--surface-1)] border border-[var(--accent-line)] text-xs font-semibold text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors"
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg bg-[var(--surface-1)] border border-[var(--accent-line)] text-xs font-semibold text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] transition-colors disabled:opacity-50"
+                  aria-disabled={!surveyQrDataURL}
                 >
                   <Download size={14} />
                   Descargar QR (PNG)

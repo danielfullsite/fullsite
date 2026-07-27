@@ -57,26 +57,25 @@ export async function checkActiveSession(staffId: string): Promise<string | null
 
 /**
  * Register a session for this staff member on this terminal.
- * Upserts: if a session already exists for this terminal+staff, update it.
+ * Atomic upsert — uses a deterministic session ID (terminal+client) so a single
+ * POST with Prefer:resolution=merge-duplicates replaces the old DELETE+INSERT race.
+ * Requires UNIQUE constraint on `id` in pos_sessions (PK, always present).
  */
 export async function registerSession(staffId: string, staffName: string): Promise<boolean> {
   if (!SB_URL || !SB_KEY) return true
   const terminalId = getTerminalId()
   const clientId = getClientId()
   const now = new Date().toISOString()
+  // Deterministic ID: always the same for a given terminal+client pair.
+  // This lets PostgREST do ON CONFLICT (id) DO UPDATE instead of DELETE+INSERT.
+  const sessionId = `sess_${terminalId}_${clientId}`
 
   try {
-    // First, delete any old sessions for this terminal (clean slate)
-    await fetch(
-      `${SB_URL}/rest/v1/pos_sessions?terminal_id=eq.${encodeURIComponent(terminalId)}&client_id=eq.${encodeURIComponent(clientId)}`,
-      { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-    )
-
-    // Insert new session
     const res = await fetch(`${SB_URL}/rest/v1/pos_sessions`, {
       method: 'POST',
-      headers: SB_HEADERS,
+      headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({
+        id: sessionId,
         staff_id: staffId,
         staff_name: staffName,
         terminal_id: terminalId,
@@ -85,7 +84,7 @@ export async function registerSession(staffId: string, staffName: string): Promi
         last_heartbeat: now,
       }),
     })
-    return res.ok || res.status === 201
+    return res.ok || res.status === 201 || res.status === 204
   } catch {
     return true // allow if offline
   }

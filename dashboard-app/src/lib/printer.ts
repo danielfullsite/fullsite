@@ -8,10 +8,11 @@ import type { Order, OrderItem } from './pos-data'
 import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
 import { enqueueFailedPrint } from './print-queue'
 import { getPosConfigSync } from './pos-config'
+import { qrToDataURL } from './qr'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
-export function printTicketCSS(order: Order) {
+export async function printTicketCSS(order: Order) {
   const win = window.open('', '_blank', 'width=300,height=600')
   if (!win) return
 
@@ -79,7 +80,7 @@ export function printTicketCSS(order: Order) {
 
   <div class="center" style="margin-top:8px">
     <div style="font-size:9px;font-weight:bold;margin-bottom:4px">FACTURA ELECTRÓNICA</div>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://app.fullsite.mx/factura?order=${order.id}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`)}" style="width:100px;height:100px" />
+    <img src="${await qrToDataURL(`https://app.fullsite.mx/factura?order=${order.id}&total=${order.total}&fecha=${(order.closedAt ? new Date(order.closedAt) : new Date()).toISOString().split('T')[0]}`, { width: 120 })}" style="width:100px;height:100px" />
     <div style="font-size:8px;color:#666;margin-top:2px">Escanea para solicitar tu factura</div>
   </div>
 

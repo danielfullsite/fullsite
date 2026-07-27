@@ -6,7 +6,7 @@ import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Pr
 import { formatMXN, logAudit } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
-import { cacheTurno, getCachedActiveTurno, queueOperation } from '@/lib/pos-offline-db'
+import { cacheTurno, getCachedActiveTurno, queueOperation, getCachedOrdersByTurno } from '@/lib/pos-offline-db'
 
 const StaffShiftPanel = dynamic(() => import('@/components/pos/StaffShiftPanel'), { ssr: false })
 const CierreCajaWizard = dynamic(() => import('@/components/pos/CierreCajaWizard'), { ssr: false })
@@ -53,31 +53,36 @@ function CorteXModal({ turno, onClose }: CorteXModalProps) {
 
   useEffect(() => {
     async function fetchData() {
+      let orders: Record<string, unknown>[] = []
+      let fromNetwork = false
       try {
         const res = await fetch(
           `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&turno_id=eq.${encodeURIComponent(turno.id)}`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(5000) }
         )
-        if (res.ok) {
-          const orders = await res.json()
-          let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
-          let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
-          for (const o of orders) {
-            if (o.status === 'cancelada') { cancelaciones++; continue }
-            if (o.status === 'cerrada') {
-              ticketsCount++
-              totalVentas += Number(o.total) || 0
-              descuentos += Number(o.descuento) || 0
-              propinas += Number(o.propina) || 0
-              const m = (o.metodo_pago || '').toLowerCase()
-              if (m.includes('efectivo') || m.includes('cash')) efectivo += Number(o.total) || 0
-              else if (m.includes('transferencia')) transferencias += Number(o.total) || 0
-              else tarjeta += Number(o.total) || 0
-            }
-          }
-          setData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas })
+        if (res.ok) { orders = await res.json(); fromNetwork = true }
+      } catch { /* fall through */ }
+
+      if (!fromNetwork) {
+        try { orders = await getCachedOrdersByTurno(turno.id) } catch { /* IDB unavailable */ }
+      }
+
+      let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
+      let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
+      for (const o of orders) {
+        if (o.status === 'cancelada') { cancelaciones++; continue }
+        if (o.status === 'cerrada') {
+          ticketsCount++
+          totalVentas += Number(o.total) || 0
+          descuentos += Number(o.descuento) || 0
+          propinas += Number(o.propina) || 0
+          const m = ((o.metodo_pago as string) || '').toLowerCase()
+          if (m.includes('efectivo') || m.includes('cash')) efectivo += Number(o.total) || 0
+          else if (m.includes('transferencia')) transferencias += Number(o.total) || 0
+          else tarjeta += Number(o.total) || 0
         }
-      } catch { /* */ }
+      }
+      setData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas })
       setLoading(false)
     }
     fetchData()

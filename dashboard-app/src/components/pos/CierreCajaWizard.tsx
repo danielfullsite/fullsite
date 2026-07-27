@@ -1,10 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign } from 'lucide-react'
 import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import {
+  closeCachedTurno,
+  queueOperation,
+  getCachedOrdersByTurno,
+  getCachedCashMovsByTurno,
+} from '@/lib/pos-offline-db'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -68,6 +74,7 @@ export default function CierreCajaWizard({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
+  const closingRef = useRef(false)
   const [systemData, setSystemData] = useState({
     efectivo: 0,
     tarjeta: 0,
@@ -81,62 +88,85 @@ export default function CierreCajaWizard({
     retiros: 0,
   })
 
-  // Fetch system sales data for this shift
+  // Fetch system sales data for this shift — IDB-first, Supabase best-effort
   useEffect(() => {
     async function fetchShiftData() {
+      let orders: Record<string, unknown>[] = []
+      let fromNetwork = false
+
+      // Try Supabase with a hard timeout so degraded LAN doesn't freeze the wizard
       try {
         const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&turno_id=eq.${turnoId}`
-        const res = await fetch(queryUrl,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-        )
+        const res = await fetch(queryUrl, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5000),
+        })
         if (res.ok) {
-          const orders = await res.json()
-          let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
-          let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
-
-          for (const order of orders) {
-            if (order.status === 'cancelada') {
-              cancelaciones++
-              continue
-            }
-            if (order.status === 'cerrada') {
-              ticketsCount++
-              totalVentas += Number(order.total) || 0
-              descuentos += Number(order.descuento) || 0
-              propinas += Number(order.propina) || 0
-
-              const method = (order.metodo_pago || '').toLowerCase()
-              if (method.includes('efectivo') || method.includes('cash')) {
-                efectivo += Number(order.total) || 0
-              } else if (method.includes('transferencia')) {
-                transferencias += Number(order.total) || 0
-              } else {
-                tarjeta += Number(order.total) || 0
-              }
-            }
-          }
-
-
-          // Fetch cash movements (depositos / retiros) for this turno
-          let depositos = 0, retiros = 0
-          try {
-            const movRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
-              { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-            )
-            if (movRes.ok) {
-              const movements = await movRes.json()
-              for (const m of movements) {
-                if (m.type === 'deposito') depositos += Number(m.amount) || 0
-                else if (m.type === 'retiro') retiros += Number(m.amount) || 0
-              }
-            }
-          } catch { /* */ }
-
-          setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas, depositos, retiros })
-          setDataLoaded(true)
+          orders = await res.json()
+          fromNetwork = true
         }
-      } catch { /* */ }
+      } catch { /* fall through to IDB */ }
+
+      // IDB fallback — use orders already cached for this turno
+      if (!fromNetwork) {
+        try {
+          orders = await getCachedOrdersByTurno(turnoId)
+        } catch { /* IDB unavailable */ }
+      }
+
+      let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
+      let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
+
+      for (const order of orders) {
+        if (order.status === 'cancelada') { cancelaciones++; continue }
+        if (order.status === 'cerrada') {
+          ticketsCount++
+          totalVentas += Number(order.total) || 0
+          descuentos += Number(order.descuento) || 0
+          propinas += Number(order.propina) || 0
+          const method = ((order.metodo_pago as string) || '').toLowerCase()
+          if (method.includes('efectivo') || method.includes('cash')) {
+            efectivo += Number(order.total) || 0
+          } else if (method.includes('transferencia')) {
+            transferencias += Number(order.total) || 0
+          } else {
+            tarjeta += Number(order.total) || 0
+          }
+        }
+      }
+
+      // Cash movements — Supabase first, IDB fallback
+      let depositos = 0, retiros = 0
+      let movFromNetwork = false
+      try {
+        const movRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
+        )
+        if (movRes.ok) {
+          const movements = await movRes.json()
+          for (const m of movements) {
+            if (m.type === 'deposito') depositos += Number(m.amount) || 0
+            else if (m.type === 'retiro') retiros += Number(m.amount) || 0
+          }
+          movFromNetwork = true
+        }
+      } catch { /* fall through */ }
+
+      if (!movFromNetwork) {
+        try {
+          const movements = await getCachedCashMovsByTurno(turnoId)
+          for (const m of movements) {
+            if (m.type === 'deposito') depositos += m.amount
+            else if (m.type === 'retiro') retiros += m.amount
+          }
+        } catch { /* IDB unavailable */ }
+      }
+
+      setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas, depositos, retiros })
+      // Mark data as loaded even when coming from IDB — user can always close offline
+      setDataLoaded(true)
       setLoading(false)
     }
     fetchShiftData()
@@ -147,47 +177,36 @@ export default function CierreCajaWizard({
   const diferencia = totalContado - efectivoEsperado
 
   const handleSave = async () => {
-    if (!dataLoaded) {
-      setPinError('No se pudieron cargar los datos del turno')
-      return
-    }
-    // Sync barrier: block cierre if there are pending offline writes
-    try {
-      const { getPendingQueue } = await import('@/lib/pos-offline-db')
-      const pending = await getPendingQueue()
-      // Only block on retryable items — terminal errors (STALE_WRITE_CONFLICT,
-      // TERMINAL_NON_RETRYABLE) will never auto-resolve and must not gate cierre.
-      const unsynced = pending.filter((p: { synced: boolean; error_class?: string }) =>
-        !p.synced &&
-        p.error_class !== 'STALE_WRITE_CONFLICT' &&
-        p.error_class !== 'TERMINAL_NON_RETRYABLE'
-      )
-      if (unsynced.length > 0) {
-        setPinError(`${unsynced.length} operaciones pendientes de sincronizar. Espera a que terminen.`)
-        return
-      }
-    } catch { /* IndexedDB unavailable — proceed */ }
+    // Prevent double-tap / concurrent close attempts
+    if (closingRef.current || saving) return
+    closingRef.current = true
+    setSaving(true)
+    setPinError('')
 
     const result = await verifyManagerPinWithRole(pin)
     if (!result) {
       setPinError('PIN invalido')
+      setSaving(false)
+      closingRef.current = false
       return
     }
     if (!hasPermission(result.role, 'corte_z')) {
       setPinError('Este PIN no tiene permiso para cerrar turno')
+      setSaving(false)
+      closingRef.current = false
       return
     }
     const manager = result.name
     setManagerName(manager)
-    setPinError('')
-    setSaving(true)
 
-    const cierreId = `cierre-${Date.now().toString(36)}`
+    // Stable UUID — same ID whether we're online or offline, never changes during sync
+    const cierreId = crypto.randomUUID()
+    const now = new Date().toISOString()
     const cierreData = {
       id: cierreId,
       client_id: _cid(),
       turno_id: turnoId,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: now.split('T')[0],
       fondo_inicial: fondoInicial,
       billetes: JSON.stringify({}),
       monedas: JSON.stringify({}),
@@ -204,42 +223,51 @@ export default function CierreCajaWizard({
       notas: notas || null,
       closed_by: manager,
       approved_by: manager,
-      created_at: new Date().toISOString(),
+      created_at: now,
     }
 
+    const turnoClosePayload = {
+      closed_by: manager,
+      fondo_final: totalContado,
+      efectivo_sistema: efectivoEsperado,
+      diferencia,
+      closed_at: now,
+      notas: notas || null,
+    }
+
+    // 1. Close turno in IDB immediately — survives any network failure
     try {
-      // Save cierre
-      const cierreRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(cierreData),
-      })
-      if (!cierreRes.ok) {
-        setPinError(`Error al guardar cierre (${cierreRes.status})`)
-        setSaving(false)
-        return
-      }
+      await closeCachedTurno(turnoId, totalContado, notas || undefined)
+    } catch { /* IDB unavailable — continue */ }
 
-      // Close the turno
-      const turnoRes = await fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${turnoId}`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          closed_by: manager,
-          fondo_final: totalContado,
-          efectivo_sistema: efectivoEsperado,
-          diferencia,
-          closed_at: new Date().toISOString(),
-          notas: notas || null,
+    // 2. Enqueue both writes to the durable sync queue
+    try {
+      await queueOperation('pos_cierres', 'POST', cierreData, undefined, undefined, 'SUPABASE_REST')
+      await queueOperation('pos_turnos', 'PATCH', turnoClosePayload, undefined, `pos_turnos?id=eq.${turnoId}`, 'SUPABASE_REST')
+    } catch { /* sync queue unavailable — proceed */ }
+
+    // 3. Best-effort Supabase — we don't block onComplete on network
+    try {
+      const [cierreRes, turnoRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/pos_cierres`, {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(cierreData),
+          signal: AbortSignal.timeout(6000),
         }),
-      })
-      if (!turnoRes.ok) {
-        setPinError(`Error al cerrar turno (${turnoRes.status}). El cierre se registró pero el turno no se cerró.`)
-        setSaving(false)
-        return
-      }
+        fetch(`${SUPABASE_URL}/rest/v1/pos_turnos?id=eq.${turnoId}`, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(turnoClosePayload),
+          signal: AbortSignal.timeout(6000),
+        }),
+      ])
+      // If both succeeded, the sync queue items will be deduplicated on next sync
+      if (!cierreRes.ok || !turnoRes.ok) { /* queued — will sync later */ }
+    } catch { /* offline — queued */ }
 
-      // Audit log
+    // 4. Audit log (best-effort)
+    try {
       logAudit({
         action: 'status_changed',
         actor: manager,
@@ -253,37 +281,37 @@ export default function CierreCajaWizard({
           tickets: systemData.ticketsCount,
         },
       })
+    } catch { /* non-blocking */ }
 
-      // Close open attendance sessions — inferred salida, distinguishable from explicit
-      try {
-        const clientId = _cid()
-        const attRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_attendance?client_id=eq.${clientId}&order=registered_at.desc`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-        )
-        if (attRes.ok) {
-          const events = await attRes.json()
-          // Find staff with open entrada (latest event is entrada)
-          const latestByStaff = new Map<string, { type: string; staff_name: string }>()
-          for (const e of events) {
-            if (!latestByStaff.has(e.staff_id)) latestByStaff.set(e.staff_id, { type: e.type, staff_name: e.staff_name })
-          }
-          const openEntries = [...latestByStaff.entries()].filter(([, v]) => v.type === 'entrada')
-          for (const [staffId, { staff_name }] of openEntries) {
-            await fetch(`${SUPABASE_URL}/rest/v1/pos_attendance`, {
-              method: 'POST',
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-              body: JSON.stringify({ client_id: clientId, staff_id: staffId, staff_name, type: 'salida', method: 'inferred_cierre' }),
-            })
-          }
+    // 5. Infer salida for staff still clocked in — best-effort
+    try {
+      const clientId = _cid()
+      const attRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/pos_attendance?client_id=eq.${clientId}&order=registered_at.desc`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store', signal: AbortSignal.timeout(4000) }
+      )
+      if (attRes.ok) {
+        const events = await attRes.json()
+        const latestByStaff = new Map<string, { type: string; staff_name: string }>()
+        for (const e of events) {
+          if (!latestByStaff.has(e.staff_id)) latestByStaff.set(e.staff_id, { type: e.type, staff_name: e.staff_name })
         }
-      } catch { /* non-blocking */ }
+        const openEntries = [...latestByStaff.entries()].filter(([, v]) => v.type === 'entrada')
+        for (const [staffId, { staff_name }] of openEntries) {
+          fetch(`${SUPABASE_URL}/rest/v1/pos_attendance`, {
+            method: 'POST',
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ client_id: clientId, staff_id: staffId, staff_name, type: 'salida', method: 'inferred_cierre' }),
+          }).catch(() => {/* queued manually if needed */})
+        }
+      }
+    } catch { /* non-blocking */ }
 
-      onComplete()
-    } catch {
-      setPinError('Error de conexión al guardar cierre')
-    }
-    setSaving(false)
+    // 6. Clear the turnoId from localStorage so next session starts clean
+    try { localStorage.removeItem('pos_turno_id') } catch { /* */ }
+
+    // 7. Always complete — the restaurant must be able to close the shift offline
+    onComplete()
   }
 
   const handlePrint = () => {
