@@ -67,7 +67,7 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
-import { syncAll, getPendingQueue } from '@/lib/pos-offline-db'
+import { syncAll, getPendingQueue, queueOperation } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
@@ -1310,19 +1310,22 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   const doCashSave = async (manager: string) => {
     const num = parseFloat(amount)
     setSaving(true)
+    const payload = { client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
     try {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       const res = await fetch(`${sbUrl}/rest/v1/pos_cash_movements`, {
         method: 'POST',
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       onConfirm(type, num, reason.trim(), manager)
     } catch {
-      setError('Error al guardar — intenta de nuevo')
-      setSaving(false)
+      // Offline or server error — queue for sync and confirm locally
+      await queueOperation('pos_cash_movements', 'POST', payload as Record<string, unknown>, undefined, undefined, 'SUPABASE_REST')
+      onConfirm(type, num, reason.trim(), manager)
     }
   }
 
@@ -1575,7 +1578,10 @@ function POSContent() {
   // Formas de pago custom desde pos_payment_methods (Rappi, Ubereats, Cortesía...)
   const [paymentMethodsDB, setPaymentMethodsDB] = useState<PaymentMethodDB[]>([])
   // Turno activo — se adjunta turno_id a cada orden cerrada
-  const [turnoId, setTurnoId] = useState<string | null>(null)
+  // Seeded from localStorage so it's available synchronously on cold Electron restart
+  const [turnoId, setTurnoId] = useState<string | null>(() => {
+    try { return localStorage.getItem('pos_turno_id') || null } catch { return null }
+  })
   // Sillas: silla activa para nuevos items (spinner SILLA estilo Wansoft)
   const [sillaActual, setSillaActual] = useState(1)
   // Tiempos: firebutton "Impresión por tiempos"
@@ -1617,7 +1623,13 @@ function POSContent() {
         setCategoryNameCache(nameMap)
       }
       setPaymentMethodsDB(pm)
-      if (turno) setTurnoId(turno.id)
+      if (turno) {
+        setTurnoId(turno.id)
+        try { localStorage.setItem('pos_turno_id', turno.id) } catch { /* ignore */ }
+      } else {
+        // Online but no active turno — clear stale cache
+        try { localStorage.removeItem('pos_turno_id') } catch { /* ignore */ }
+      }
       // Pre-cache all modifier + payment data for offline cold-start (fire-and-forget)
       if (navigator.onLine) prefetchOfflineData().catch(() => {})
       // Promos: build category map + load

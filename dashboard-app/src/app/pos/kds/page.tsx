@@ -100,6 +100,8 @@ export default function KDSPage() {
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
   const prevCount = useRef(0)
+  // Idempotency guard: prevents double-tap from firing two concurrent status updates
+  const advancingRef = useRef<Set<string>>(new Set())
 
   const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
     const printerStation: StationName = station === 'panaderia' ? 'caja' : station as StationName
@@ -225,16 +227,28 @@ export default function KDSPage() {
   }, [fetchOrders])
 
   const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
-    const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : 'entregada'
-    await updateOrderStatus(id, next)
-    logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
-    fetchOrders()
+    if (advancingRef.current.has(id)) return
+    advancingRef.current.add(id)
+    try {
+      const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : 'entregada'
+      await updateOrderStatus(id, next)
+      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
+      fetchOrders()
+    } finally {
+      advancingRef.current.delete(id)
+    }
   }
 
   const bump = async (id: string, mesa: number, mesero: string) => {
-    await updateOrderStatus(id, 'entregada')
-    logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
-    fetchOrders()
+    if (advancingRef.current.has(id)) return
+    advancingRef.current.add(id)
+    try {
+      await updateOrderStatus(id, 'entregada')
+      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
+      fetchOrders()
+    } finally {
+      advancingRef.current.delete(id)
+    }
   }
 
   const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {

@@ -293,6 +293,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin: '___fingerprint___', client_id: _cid(), fingerprint_id: data.staffId }),
+          signal: AbortSignal.timeout(4000),
         })
 
         // Try API first (validates active status), fall back to local cache
@@ -409,10 +410,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
 
     try {
       // Validación server-side (service key) — el cliente ya no lee pos_staff
+      // 4-second timeout: on degraded LAN, browser default is 30-90s — frozen UI
       const res = await fetch(apiUrl('/api/pos/pin'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin, client_id: _cid() }),
+        signal: AbortSignal.timeout(4000),
       })
       if (res.ok) {
         const { staff: member } = await res.json()
