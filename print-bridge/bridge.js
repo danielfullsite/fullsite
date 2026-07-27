@@ -21,36 +21,61 @@ const PORT = 7717
 const HOST = '127.0.0.1'
 
 // ─── STATION CONFIG ─────────────────────────────────────────────────────────
-// Each station maps to a printer. Type can be 'tcp' or 'usb'.
-// Station config: loaded from C:\fullsite\printers.json if exists, otherwise defaults
-// TCP: { type: 'tcp', host: '192.168.1.X', port: 9100 }
-// USB: { type: 'usb', names: ['PRINTER_NAME'] }
+// CFG-01: No hardcoded defaults. Config is loaded from printers.json only.
+// If printers.json is absent or invalid, the bridge starts in
+// PRINTER_NOT_CONFIGURED state — all print requests return an actionable error.
+//
+// Config search order:
+//   1. APPDATA\Fullsite POS\printers.json  (Electron userData path)
+//   2. C:\fullsite\printers.json           (legacy install, migration source)
+//
+// Format: see electron-app/local-server/adapters/printer-config-schema.js
 
-const DEFAULT_STATIONS = {
-  cocina: { type: 'tcp', host: '192.168.1.21', port: 9100 },
-  barra:  { type: 'tcp', host: '192.168.1.30', port: 9100 },
-  caja:   { type: 'tcp', host: '192.168.1.40', port: 9100 },
+const path = require('path')
+const fs   = require('fs')
+
+function getPrinterConfigPaths() {
+  const paths = []
+  const appdata = process.env.APPDATA
+  if (appdata) paths.push(path.join(appdata, 'Fullsite POS', 'printers.json'))
+  paths.push(path.join('C:\\fullsite', 'printers.json'))
+  return paths
 }
 
-const PRINTERS_CONFIG_PATH = require('path').join('C:\\fullsite', 'printers.json')
+// Minimal v1/v2 station resolver for the standalone bridge
+// (The full schema module lives in electron-app; bridge uses a subset)
+function resolveV2Station(config, stationId) {
+  if (!config || !Array.isArray(config.printers)) return []
+  return config.printers.filter(
+    p => p.enabled && Array.isArray(p.station_ids) && p.station_ids.includes(stationId)
+  )
+}
 
 function loadStations() {
-  try {
-    if (require('fs').existsSync(PRINTERS_CONFIG_PATH)) {
-      const data = JSON.parse(require('fs').readFileSync(PRINTERS_CONFIG_PATH, 'utf8'))
-      console.log('[bridge] Loaded printers.json')
-      return data
+  for (const configPath of getPrinterConfigPaths()) {
+    try {
+      if (!fs.existsSync(configPath)) continue
+      const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+      console.log('[bridge] Loaded printers.json from', configPath)
+      // v2 schema
+      if (raw.schema_version === 2 && Array.isArray(raw.printers)) {
+        return { _v2: true, printers: raw.printers, routing: raw.routing || {} }
+      }
+      // v1 schema — return stations map directly
+      if (raw.stations || raw.cocina || raw.barra || raw.caja) {
+        return raw.stations || raw
+      }
+    } catch (e) {
+      console.warn('[bridge] Error loading printers.json from', configPath, e.message)
     }
-  } catch (e) {
-    console.warn('[bridge] Error loading printers.json:', e.message)
   }
-  console.log('[bridge] Using default stations (no printers.json)')
-  return { ...DEFAULT_STATIONS }
+  console.warn('[bridge] PRINTER_NOT_CONFIGURED — no printers.json found. Configure via setup wizard.')
+  return null
 }
 
 let STATIONS = loadStations()
 
-// Default station when none specified
+// Default station when none specified — only used for v1 compat
 const DEFAULT_STATION = 'caja'
 
 // ─── TCP PRINT ──────────────────────────────────────────────────────────────
@@ -112,11 +137,40 @@ function printUsb(printerName, data) {
 // ─── PRINT ROUTER ───────────────────────────────────────────────────────────
 
 async function printToStation(station, data) {
+  if (!STATIONS) {
+    throw Object.assign(
+      new Error('PRINTER_NOT_CONFIGURED: No printers.json found. Use the setup wizard to configure printers.'),
+      { code: 'PRINTER_NOT_CONFIGURED' }
+    )
+  }
+
+  // v2 schema path
+  if (STATIONS._v2) {
+    const printers = resolveV2Station(STATIONS, station)
+    if (!printers.length) {
+      throw new Error(`STATION_NOT_CONFIGURED: No enabled printers for station "${station}"`)
+    }
+    for (const printer of printers) {
+      const conn = printer.connection
+      if (conn.type === 'tcp') {
+        await printTcp(conn.host, conn.port, data)
+      } else if (conn.type === 'usb' || conn.type === 'windows') {
+        const names = conn.names || []
+        let lastErr
+        for (const name of names) {
+          try { await printUsb(name, data); lastErr = null; break } catch (e) { lastErr = e }
+        }
+        if (lastErr) throw lastErr
+      }
+    }
+    return
+  }
+
+  // v1 schema path (legacy)
   const config = STATIONS[station]
   if (!config) {
     throw new Error(`Unknown station: ${station}. Available: ${Object.keys(STATIONS).join(', ')}`)
   }
-
   if (config.type === 'tcp') {
     await printTcp(config.host, config.port, data)
   } else if (config.type === 'usb') {

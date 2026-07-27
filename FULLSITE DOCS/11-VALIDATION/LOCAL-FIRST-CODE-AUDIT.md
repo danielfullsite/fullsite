@@ -83,7 +83,7 @@
 
 | ID | Severidad | Módulo | Archivo/función | Problema | Riesgo offline | Solución | Estado | Commit | Tests | Validación física |
 |----|-----------|--------|-----------------|----------|----------------|----------|--------|--------|-------|-------------------|
-| CFG-01 | HIGH | Config | `electron-app/main.js:31-33` | IPs hardcodeadas: `192.168.1.21` (cocina), `192.168.1.30` (barra) como DEFAULT_STATIONS. | En nueva instalación con diferente subred → impresoras no responden. No hay error claro. | Forzar config explícita de impresoras antes de primer servicio. Diagnostic que valide IPs. | OPEN | — | — | — |
+| CFG-01 | HIGH | Config | `electron-app/main.js`, `local-server/adapters/printer-config-schema.js`, `printer.js`, `print-queue.js` | IPs hardcodeadas (`192.168.1.21`, `.30`) como DEFAULT_STATIONS en `main.js` y `print-bridge/bridge.js`. Sin config → IPs de AMALAY activas en cualquier instalación. | En restaurante diferente → impresoras no responden sin error visible. | Schema v2 declarativo + `loadPrinters()` sin defaults + `PRINTER_NOT_CONFIGURED` explícito + print queue persistente + migración v1→v2 automática para AMALAY + tests 51/51. | FIXED | pendiente | 51 tests (CFG-01 printer-config.test.js) | Pendiente — integrado en demo ficticia |
 | CFG-02 | CRITICAL | Config | `electron-app/main.js` | `restaurantId` defaults a `'unknown'` si `config.json` ausente. Local Server y KDS arrancaban con identidad inválida. | Órdenes, eventos y mDNS con `restaurant_id: 'unknown'`. Datos de cualquier restaurante mezclados. | Formal TerminalConfig schema + loadAndValidateConfig() gate + wizard setup.html + Local Server guard + ws-hub reject + fromLegacy() migration. | FIXED | 3c9dbc0 | 35 schema + 3 ws-hub | — |
 | CFG-03 | HIGH | Config | `electron-app/main.js` | Config en `C:\fullsite\` hardcodeado. | En Windows con permisos restrictivos o instalación en path diferente → config no se lee. | `app.getPath('userData')` como primario, `C:\fullsite\` como fallback. | FIXED | 3c9dbc0 | — | — |
 | CFG-04 | HIGH | Octogent Hook | `.claude/settings.json` | Hook `PreToolUse` HTTP a `127.0.0.1:8787` (Octogent) falla con ECONNREFUSED en cada tool use. | No bloquea código ni tests, pero genera ruido y el tracking de Octogent es ciego. | Arrancar el Worker local de Octogent o eliminar los hooks del proyecto settings. | OPEN | — | — | — |
@@ -133,7 +133,7 @@
 - ~~LAN-03~~ (HIGH): **FIXED** — `ServerDiscovery` + `ServerRegistry` + `GET /identity` + `useBridgeClient` integrado. 24 tests. Pendiente validación física.
 
 **Configuración / Replicabilidad**
-- CFG-01 (HIGH): IPs `192.168.1.21`/`.30` hardcodeadas como DEFAULT_STATIONS — en nueva sucursal no funcionan sin editar el config.
+- ~~CFG-01~~ (HIGH): **FIXED** — schema v2 + `loadPrinters()` sin defaults + `PRINTER_NOT_CONFIGURED` + print queue persistente + migración AMALAY automática. 51 tests.
 - CFG-04 (HIGH): Octogent hooks llaman `127.0.0.1:8787` — ECONNREFUSED en cada tool use (no bloquea operación, pero ruido en logs).
 
 **KDS**
@@ -141,9 +141,9 @@
 
 ### Próximos HIGH recomendados
 
-**LAN-01** (Supabase como autoridad de escritura en Phase 1) — el gap arquitectural más significativo. Los comandos POS van a Supabase primero, luego al Local Server como observación. Multi-terminal offline diverge. Desbloquea que el POS sea verdaderamente offline-first.
+**Demo ficticia** (prerequisito de LAN-01) — validar que el mismo build funciona para un restaurante diferente a AMALAY sin modificar código. CFG-01 + LAN-03 juntos deben hacerlo posible.
 
-**CFG-01** (IPs hardcodeadas) — en cualquier cliente nuevo, las impresoras no responden hasta editar `DEFAULT_STATIONS` en código. Reemplazar con provisioning explícito antes del primer servicio.
+**LAN-01** (Supabase como autoridad de escritura en Phase 1) — el gap arquitectural más significativo. Los comandos POS van a Supabase primero, luego al Local Server como observación. Multi-terminal offline diverge.
 
 ---
 *Generado: 2026-07-27 | Sesión 4 | Auditor: Claude Code | Basado en análisis completo de pos/page.tsx, local-server/, pos-offline-db.ts, kds/page.tsx, layout.tsx, sw.js, useKdsWsClient.ts*

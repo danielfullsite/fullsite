@@ -13,21 +13,18 @@ const KDS_URL = 'https://app.fullsite.mx/pos/kds';
 // Runs inside the Electron main process — no separate Node.js process needed.
 // Replaces the previous embedded print bridge.
 
-const LOCAL_SERVER_PORT = 7717;
-const LEGACY_CONFIG_PATH   = path.join('C:\\fullsite', 'config.json');
-const PRINTERS_CONFIG_PATH = path.join('C:\\fullsite', 'printers.json');
+const LOCAL_SERVER_PORT   = 7717;
+const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
+// CFG-01: printers config lives in Electron userData (same as config.json),
+// with C:\fullsite\ as a read-only migration source only.
+// There are NO default stations — absence of config = PRINTER_NOT_CONFIGURED.
 
 // ─── CONFIG SCHEMA (CFG-02) ───────────────────────────────────────────────────
 // All terminals must have a validated TerminalConfig before operational use.
 // An invalid or missing config puts the terminal in NOT_PROVISIONED state,
 // blocking the Local Server, POS, and KDS from starting.
-const configSchema = require('./local-server/config-schema');
-
-const DEFAULT_STATIONS = {
-  cocina: { type: 'tcp', host: '192.168.1.21', port: 9100 },
-  barra:  { type: 'tcp', host: '192.168.1.30', port: 9100 },
-  caja:   { type: 'usb', names: ['TICKET', 'EC01', 'EC TICKET'] },
-};
+const configSchema        = require('./local-server/config-schema');
+const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
 
 /**
  * Return the primary config path: userData first (writable by Electron),
@@ -112,18 +109,82 @@ function loadAndValidateConfig() {
   };
 }
 
-function loadStations() {
+/**
+ * Return the path where printers.json is stored for this installation.
+ * Primary: Electron userData (writable, per-install)
+ * Legacy migration source: C:\fullsite\printers.json (read-only fallback)
+ */
+function getPrinterConfigPath() {
+  try { return path.join(app.getPath('userData'), 'printers.json'); } catch { return null; }
+}
+const LEGACY_PRINTERS_PATH = path.join('C:\\fullsite', 'printers.json');
+
+/**
+ * CFG-01: Load printer config from disk. Never uses hardcoded defaults.
+ *
+ * Strategy:
+ *   1. Try userData/printers.json (primary, writable)
+ *   2. Try C:\fullsite\printers.json (legacy AMALAY install — auto-migrate v1→v2)
+ *   3. No config → { state: 'not_configured' }
+ *
+ * Returns { state, config, migrated, errors, sourcePath }
+ * state: 'configured' | 'not_configured' | 'invalid'
+ */
+function loadPrinters() {
+  const primaryPath = getPrinterConfigPath();
+
+  // 1. Try primary path
+  if (primaryPath) {
+    try {
+      if (fs.existsSync(primaryPath)) {
+        const raw = JSON.parse(fs.readFileSync(primaryPath, 'utf8'));
+        const result = printerConfigSchema.loadAndValidate(raw);
+        if (result.valid) {
+          if (result.migrated) {
+            try { fs.writeFileSync(primaryPath, JSON.stringify(result.config, null, 2)); } catch {}
+            console.log('[config] Printers: auto-migrated v1→v2 and saved to', primaryPath);
+          } else {
+            console.log('[config] Printers: loaded v2 config from', primaryPath);
+          }
+          return { state: 'configured', config: result.config, migrated: result.migrated, errors: [], sourcePath: primaryPath };
+        }
+        console.warn('[config] Printers: invalid config at', primaryPath, result.errors);
+        return { state: 'invalid', config: null, migrated: false, errors: result.errors, sourcePath: primaryPath };
+      }
+    } catch (e) {
+      console.warn('[config] Printers: error reading', primaryPath, e.message);
+    }
+  }
+
+  // 2. Try legacy path (AMALAY v1 migration source)
   try {
-    if (fs.existsSync(PRINTERS_CONFIG_PATH)) {
-      const raw = JSON.parse(fs.readFileSync(PRINTERS_CONFIG_PATH, 'utf8'));
-      console.log('[config] Loaded printers.json');
-      return raw.stations || raw;
+    if (fs.existsSync(LEGACY_PRINTERS_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(LEGACY_PRINTERS_PATH, 'utf8'));
+      const result = printerConfigSchema.loadAndValidate(raw);
+      if (result.valid) {
+        // Save migrated config to primary path so future boots skip legacy
+        if (primaryPath) {
+          try {
+            fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+            fs.writeFileSync(primaryPath, JSON.stringify(result.config, null, 2));
+            console.log('[config] Printers: migrated legacy config to', primaryPath);
+          } catch (e2) {
+            console.warn('[config] Printers: could not save migrated config:', e2.message);
+          }
+        }
+        return { state: 'configured', config: result.config, migrated: true, errors: [], sourcePath: LEGACY_PRINTERS_PATH };
+      }
+      console.warn('[config] Printers: legacy printers.json invalid:', result.errors);
     }
   } catch (e) {
-    console.warn('[config] Error loading printers.json:', e.message);
+    console.warn('[config] Printers: error reading legacy path:', e.message);
   }
-  console.log('[config] No printers.json — using defaults (edit printers.json to configure your IP printers)');
-  return { ...DEFAULT_STATIONS };
+
+  // 3. No config found — PRINTER_NOT_CONFIGURED
+  // CFG-01: do NOT fall back to hardcoded IPs. The absence of configuration
+  // must be visible and recoverable, not silently wrong.
+  console.log('[config] Printers: no printers.json found — PRINTER_NOT_CONFIGURED state. Use the setup wizard to configure printers.');
+  return { state: 'not_configured', config: null, migrated: false, errors: ['No printers.json found'], sourcePath: primaryPath };
 }
 
 // Validated config — set in app.whenReady() after provisioning check.
@@ -142,18 +203,27 @@ async function startLocalServer() {
 
   const { startLocalServer: start } = require('./local-server');
   const dataDir = app.getPath('userData');
-  const stations = loadStations();
+  const printersResult = loadPrinters();
+  const printerConfigPath = getPrinterConfigPath();
+  const queueFilePath = path.join(dataDir, 'print-queue.json');
+
+  if (printersResult.state === 'not_configured') {
+    console.warn('[main] PRINTER_NOT_CONFIGURED — printing will fail safely until configured via wizard.');
+  } else if (printersResult.state === 'invalid') {
+    console.warn('[main] Printer config invalid:', printersResult.errors);
+  }
 
   const cfg = {
     restaurantId,
-    channel:           appConfig.channel        || process.env.FULLSITE_CHANNEL    || 'stable',
-    instanceName:      appConfig.instance_name  || appConfig.instanceName          || `Fullsite POS — ${os.hostname()}`,
-    supabaseUrl:       appConfig.supabaseUrl    || process.env.SUPABASE_URL        || '',
-    supabaseKey:       appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY  || '',
-    stations,
-    printersConfigPath: PRINTERS_CONFIG_PATH,
-    clientId:          appConfig.client_id      || appConfig.clientId,
-    terminalId:        appConfig.terminal_id    || appConfig.terminalId,
+    channel:            appConfig.channel        || process.env.FULLSITE_CHANNEL    || 'stable',
+    instanceName:       appConfig.instance_name  || appConfig.instanceName          || `Fullsite POS — ${os.hostname()}`,
+    supabaseUrl:        appConfig.supabaseUrl    || process.env.SUPABASE_URL        || '',
+    supabaseKey:        appConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY  || '',
+    printersConfig:     printersResult.config,    // null when not_configured — adapter handles safely
+    printerConfigPath,
+    queueFilePath,
+    clientId:           appConfig.client_id      || appConfig.clientId,
+    terminalId:         appConfig.terminal_id    || appConfig.terminalId,
   };
 
   try {

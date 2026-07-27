@@ -283,7 +283,7 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
 /**
  * @param {{ dataDir: string, port?: number, config: object }} opts
  *   config: { restaurantId, channel, instanceName, supabaseUrl, supabaseKey,
- *             stations, printersConfigPath, clientId }
+ *             printersConfig, printerConfigPath, queueFilePath, clientId }
  * @returns {{ httpServer, close }}
  */
 async function startLocalServer({ dataDir, port = 7717, config = {} }) {
@@ -299,17 +299,20 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   }
 
   const {
-    channel          = config.channel || 'stable',
-    instanceName     = config.instanceName || `Fullsite POS — ${os.hostname()}`,
-    supabaseUrl      = process.env.SUPABASE_URL || '',
-    supabaseKey      = process.env.SUPABASE_ANON_KEY || '',
-    stations         = {},
-    printersConfigPath = null,
+    channel            = config.channel || 'stable',
+    instanceName       = config.instanceName || `Fullsite POS — ${os.hostname()}`,
+    supabaseUrl        = process.env.SUPABASE_URL || '',
+    supabaseKey        = process.env.SUPABASE_ANON_KEY || '',
+    // CFG-01: printersConfig is the validated v2 printers config, or null.
+    // null means PRINTER_NOT_CONFIGURED — printer adapter handles safely.
+    printersConfig     = null,
+    printerConfigPath  = null,
+    queueFilePath      = null,
   } = config
 
   // ── Init adapters ────────────────────────────────────────────────────────
   processAdapter.init({ dataDir })
-  printerAdapter.init({ stations, configPath: printersConfigPath })
+  printerAdapter.init({ printersConfig, configPath: printerConfigPath, queueFilePath })
 
   const version  = processAdapter.getVersion()
   const serverId = loadOrCreateServerId(dataDir)

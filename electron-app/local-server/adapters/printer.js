@@ -1,39 +1,208 @@
 'use strict'
 // ─── Printer Adapter (Windows — Phase 1) ─────────────────────────────────────
-// Extracted from main.js. TCP and USB print routing.
-// Future platforms (macOS, Linux): add an adapter that implements the same interface.
-// The rest of the server calls printToStation() and kickDrawer() — never OS APIs directly.
+// Physical print routing via TCP/IP (ESC/POS on port 9100) and USB/Windows.
+//
+// This adapter is config-driven — it never contains IPs, printer names, or
+// station definitions. All routing is resolved from the v2 printers config
+// via printer-config-schema.resolveStation().
+//
+// Public interface (consumed by the Local Server HTTP router and WS command handler):
+//   init({ printersConfig, queueFilePath })  — call once on startup
+//   printToStation(stationId, data, documentType)  — print bytes to a logical station
+//   kickDrawer()           — open cash drawer on the 'caja' station
+//   buildTestTicket(name, version)  — build ESC/POS test bytes
+//   getStations()          — return { station_id: [printer, ...] } for the /health endpoint
+//   getPrintJobsFailed()   — total failed print attempts since startup
+//   setStations(config)    — update running config + persist (for UI changes)
+//
+// Print queue guarantees:
+//   - Job is written to disk BEFORE the print attempt
+//   - Restart does not lose pending jobs
+//   - Each job has a stable UUID; retries do not generate new jobs
+//   - Manual reprint is flagged as reprint:true
 
-const net  = require('net')
-const fs   = require('fs')
-const path = require('path')
-const os   = require('os')
+const net        = require('net')
+const fs         = require('fs')
+const path       = require('path')
+const os         = require('os')
 const { execSync } = require('child_process')
+const printerSchema = require('./printer-config-schema')
+const printQueue    = require('./print-queue')
 
-let _stations = {}
-let _configPath = null
+let _config       = null   // v2 printers config object
+let _configPath   = null   // path to persist config changes
 let _printJobsFailed = 0
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 
-function init({ stations, configPath }) {
-  _stations   = stations || {}
+/**
+ * @param {{
+ *   printersConfig: object|null,  — validated v2 printers config, or null
+ *   configPath: string|null,
+ *   queueFilePath: string|null,
+ * }} opts
+ */
+function init({ printersConfig, configPath, queueFilePath }) {
+  _config     = printersConfig || null
   _configPath = configPath || null
-}
 
-function getStations()        { return _stations }
-function getPrintJobsFailed() { return _printJobsFailed }
-
-function setStations(stations) {
-  _stations = stations
-  if (_configPath) {
-    try { fs.writeFileSync(_configPath, JSON.stringify({ stations }, null, 2)) } catch {}
+  if (queueFilePath) {
+    printQueue.init({ filePath: queueFilePath })
+    // On startup, retry any pending jobs from previous run
+    _retryPendingJobs().catch(e => console.warn('[printer] Pending job retry error:', e.message))
   }
 }
 
-// ─── TCP ────────────────────────────────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 
-function printTcp(host, port, data) {
+function getStations() {
+  if (!_config || !Array.isArray(_config.printers)) return {}
+  return printerSchema.getConfiguredStations(_config.printers)
+    .reduce((acc, stationId) => {
+      acc[stationId] = _config.printers.filter(
+        p => p.enabled && p.station_ids.includes(stationId)
+      )
+      return acc
+    }, {})
+}
+
+function getPrintJobsFailed() { return _printJobsFailed }
+
+/**
+ * Update the running printer config and persist to disk.
+ * Validates the new config before applying.
+ * Returns { ok, errors }.
+ */
+function setStations(newConfig) {
+  const { valid, errors } = printerSchema.validate(newConfig)
+  if (!valid) return { ok: false, errors }
+  _config = newConfig
+  if (_configPath) {
+    try { fs.writeFileSync(_configPath, JSON.stringify(newConfig, null, 2)) } catch (e) {
+      console.warn('[printer] Could not persist config:', e.message)
+    }
+  }
+  return { ok: true, errors: [] }
+}
+
+/**
+ * Print ESC/POS bytes to a logical station.
+ *
+ * @param {string} stationId   — e.g. 'cocina', 'barra', 'caja'
+ * @param {Buffer} data        — raw ESC/POS bytes
+ * @param {string} [documentType] — e.g. 'kitchen_ticket', 'receipt'
+ * @param {{ reprint?: boolean }} [opts]
+ *
+ * @throws {Error} with code 'PRINTER_NOT_CONFIGURED' if no printers config loaded
+ * @throws {Error} with code 'STATION_NOT_CONFIGURED' if station has no printers
+ * @throws {Error} with code 'ALL_PRINTERS_FAILED' if every printer attempt failed
+ */
+async function printToStation(stationId, data, documentType, opts = {}) {
+  if (!_config || !Array.isArray(_config.printers) || _config.printers.length === 0) {
+    throw Object.assign(
+      new Error(`PRINTER_NOT_CONFIGURED: No printer configuration loaded. Use the setup wizard to configure printers.`),
+      { code: 'PRINTER_NOT_CONFIGURED', station: stationId }
+    )
+  }
+
+  const { printers, diagnostic } = printerSchema.resolveStation(_config.printers, stationId, documentType)
+
+  if (printers.length === 0) {
+    throw Object.assign(
+      new Error(`STATION_NOT_CONFIGURED: No enabled printers found for station "${stationId}". Diagnostic: ${diagnostic}`),
+      { code: 'STATION_NOT_CONFIGURED', station: stationId, diagnostic }
+    )
+  }
+
+  const data_b64 = data.toString('base64')
+  const errors   = []
+  let   succeeded = 0
+
+  for (const printer of printers) {
+    const copies = printer.copies || 1
+    const jobId = printQueue.enqueue({
+      station_id:    stationId,
+      printer_id:    printer.printer_id,
+      printer_name:  printer.name,
+      connection:    printer.connection,
+      document_type: documentType || 'receipt',
+      data_b64,
+      copies,
+      reprint:       opts.reprint || false,
+    })
+
+    printQueue.markPrinting(jobId)
+    let lastError = null
+
+    for (let copy = 0; copy < copies; copy++) {
+      try {
+        await _physicalPrint(printer.connection, data)
+      } catch (e) {
+        lastError = e.message
+      }
+    }
+
+    if (lastError) {
+      _printJobsFailed++
+      errors.push({ printer: printer.name, error: lastError })
+
+      if (printQueue.canRetry(jobId)) {
+        printQueue.markRetrying(jobId, lastError)
+      } else {
+        printQueue.markFailed(jobId, lastError)
+      }
+    } else {
+      printQueue.markPrinted(jobId)
+      succeeded++
+    }
+  }
+
+  if (succeeded === 0) {
+    const msg = errors.map(e => `${e.printer}: ${e.error}`).join('; ')
+    throw Object.assign(
+      new Error(`ALL_PRINTERS_FAILED for station "${stationId}": ${msg}`),
+      { code: 'ALL_PRINTERS_FAILED', station: stationId, errors }
+    )
+  }
+}
+
+// ESC/POS: kick cash drawer on pin 2 (standard RJ-11 port)
+const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa])
+
+async function kickDrawer() {
+  await printToStation('caja', DRAWER_KICK, 'receipt')
+}
+
+function buildTestTicket(stationId, version) {
+  const now = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' })
+  return Buffer.from(
+    '\x1b\x40\x1b\x61\x01\x1d\x21\x11FULLSITE LOCAL\n' +
+    `\x1d\x21\x00\x1b\x61\x01--- TEST ---\n\n` +
+    `\x1b\x61\x00Estacion: ${stationId}\nTerminal: ${os.hostname()}\n` +
+    `Fecha: ${now}\nVersion: ${version}\n\n` +
+    '\x1b\x61\x01Impresora OK\n\n\x1d\x56\x41\x03',
+    'binary'
+  )
+}
+
+// ── Physical print ────────────────────────────────────────────────────────────
+
+async function _physicalPrint(connection, data) {
+  if (connection.type === 'tcp') {
+    await _printTcp(connection.host, connection.port, data)
+  } else if (connection.type === 'usb' || connection.type === 'windows') {
+    const names = connection.names || []
+    let lastErr
+    for (const name of names) {
+      try { _printUsb(name, data); return } catch (e) { lastErr = e }
+    }
+    throw lastErr || new Error('No USB printer names configured')
+  } else {
+    throw new Error(`Unknown connection type: ${connection.type}`)
+  }
+}
+
+function _printTcp(host, port, data) {
   return new Promise((resolve, reject) => {
     const socket  = new net.Socket()
     const timeout = setTimeout(() => { socket.destroy(); reject(new Error(`TCP timeout ${host}:${port}`)) }, 5000)
@@ -45,9 +214,7 @@ function printTcp(host, port, data) {
   })
 }
 
-// ─── USB (Windows) ───────────────────────────────────────────────────────────
-
-function printUsb(printerName, data) {
+function _printUsb(printerName, data) {
   const tmpFile = path.join(os.tmpdir(), `fs_print_${Date.now()}.bin`)
   try {
     fs.writeFileSync(tmpFile, data)
@@ -66,60 +233,48 @@ function printUsb(printerName, data) {
   }
 }
 
-// ─── Router ─────────────────────────────────────────────────────────────────
+// ── Pending job retry on startup ──────────────────────────────────────────────
 
-async function printToStation(station, data) {
-  const cfg = _stations[station]
-  if (!cfg) throw new Error(`Unknown station: ${station}. Available: ${Object.keys(_stations).join(', ')}`)
+async function _retryPendingJobs() {
+  const pending = printQueue.getPendingJobs()
+  if (pending.length === 0) return
 
-  const printers = Array.isArray(cfg) ? cfg : [cfg]
-  const errors = []
-  let succeeded = 0
+  console.log(`[printer] Retrying ${pending.length} pending jobs from previous run...`)
 
-  for (const printer of printers) {
+  for (const job of pending) {
+    if (!printQueue.canRetry(job.job_id)) {
+      printQueue.markFailed(job.job_id, 'Max retry attempts exceeded on startup')
+      continue
+    }
+
+    printQueue.markPrinting(job.job_id)
     try {
-      if (printer.type === 'usb') {
-        const names = printer.names || (printer.name ? [printer.name] : [])
-        let usbErr
-        for (const name of names) {
-          try { printUsb(name, data); usbErr = null; break } catch (e) { usbErr = e }
-        }
-        if (usbErr) throw usbErr
-      } else {
-        await printTcp(printer.host, printer.port, data)
-      }
-      succeeded++
+      const data = Buffer.from(job.data_b64, 'base64')
+      await _physicalPrint(job.connection, data)
+      printQueue.markPrinted(job.job_id)
+      console.log(`[printer] Recovered job ${job.job_id} (${job.printer_name})`)
     } catch (e) {
-      errors.push({ printer, error: e.message })
-      _printJobsFailed++
+      if (printQueue.canRetry(job.job_id)) {
+        printQueue.markRetrying(job.job_id, e.message)
+      } else {
+        printQueue.markFailed(job.job_id, e.message)
+      }
+      console.warn(`[printer] Could not recover job ${job.job_id}:`, e.message)
     }
   }
-
-  if (succeeded === 0) {
-    const msg = errors.map(e => e.error).join('; ')
-    throw new Error(`All printers failed for ${station}: ${msg}`)
-  }
 }
 
-// ESC/POS: kick cash drawer on pin 2
-const DRAWER_KICK = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa])
+// ── Exports ───────────────────────────────────────────────────────────────────
 
-async function kickDrawer() {
-  await printToStation('caja', DRAWER_KICK)
+module.exports = {
+  init,
+  getStations,
+  getPrintJobsFailed,
+  setStations,
+  printToStation,
+  kickDrawer,
+  buildTestTicket,
+  // Exposed for /print-queue HTTP endpoint
+  getQueue: printQueue.getAllJobs,
+  getPendingJobs: printQueue.getPendingJobs,
 }
-
-// ─── Test ticket ────────────────────────────────────────────────────────────
-
-function buildTestTicket(station, version) {
-  const now = new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' })
-  return Buffer.from(
-    '\x1b\x40\x1b\x61\x01\x1d\x21\x11FULLSITE LOCAL\n' +
-    `\x1d\x21\x00\x1b\x61\x01--- TEST ---\n\n` +
-    `\x1b\x61\x00Estacion: ${station}\nTerminal: ${os.hostname()}\n` +
-    `Fecha: ${now}\nVersion: ${version}\n\n` +
-    '\x1b\x61\x01Impresora OK\n\n\x1d\x56\x41\x03',
-    'binary'
-  )
-}
-
-module.exports = { init, getStations, setStations, getPrintJobsFailed, printToStation, kickDrawer, buildTestTicket }
