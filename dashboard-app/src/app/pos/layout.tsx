@@ -412,7 +412,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
           try {
             const pinHash = btoa(pin).slice(0, 8) // short non-reversible token, NOT the PIN
             const cached = JSON.parse(localStorage.getItem('pos_auth_cache') || '{}')
-            cached[pinHash] = { id: member.id, name: member.name, role: member.role, exp: Date.now() + 900_000 }
+            cached[pinHash] = { id: member.id, name: member.name, role: member.role, exp: Date.now() + 28_800_000 }
             localStorage.setItem('pos_auth_cache', JSON.stringify(cached))
           } catch { /* ignore */ }
           unlock(member)

@@ -1992,7 +1992,35 @@ function POSContent() {
             setOrderNotes('')
           }
         }
-      } catch (err) { console.error('[loadMesaOrder] fetch error:', err) }
+      } catch (err) {
+        // Network error — fall back to localStorage cache (stale is better than blank)
+        console.warn('[loadMesaOrder] network error, using cached order:', err)
+        if (!cancelled) {
+          try {
+            const cached = localStorage.getItem(`pos_order_${mesa}`)
+            if (cached) {
+              const c = JSON.parse(cached)
+              if (c.items?.length > 0) {
+                setOrderItems(c.items)
+                setOrderId(c.id || generateId())
+                if (c.mesero) setMesero(c.mesero)
+                if (c.personas) setPersonas(c.personas)
+                if (c.discount != null) setDiscount(c.discount)
+                if (c.notas) setOrderNotes(c.notas)
+                if (c.revision != null) setOrderRevision(c.revision)
+                if (c.updatedAt) setLoadedUpdatedAt(c.updatedAt)
+                setLoadedOrderId(c.id || null)
+                setSentItemIds(new Set(c.items.map((i: OrderItem) => i.id)))
+                const snaps: Record<string, { cantidad: number; modificadores: string[]; notas: string; silla?: number }> = {}
+                for (const item of c.items) {
+                  snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
+                }
+                setSentItemSnapshots(snaps)
+              }
+            }
+          } catch {}
+        }
+      }
       if (!cancelled) setLoadingMesa(false)
     }
     // Safety: ensure loadingMesa is always cleared after 3 seconds max
@@ -2005,7 +2033,7 @@ function POSContent() {
       const cached = localStorage.getItem(`pos_order_${mesa}`)
       if (cached) {
         const c = JSON.parse(cached)
-        if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) {
+        if (c.ts && Date.now() - c.ts < 28_800_000 && c.items?.length > 0) {
           setOrderItems(c.items)
           setOrderId(c.id || generateId())
           if (c.mesero) setMesero(c.mesero)
@@ -2926,7 +2954,7 @@ function POSContent() {
       if (navigator.onLine) {
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { router.push('/pos') }, 1200)
+        setTimeout(() => { router.push('/pos/plano') }, 1200)
       } else {
         showToast('Offline — orden guardada localmente')
       }
