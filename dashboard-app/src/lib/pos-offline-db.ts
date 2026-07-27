@@ -401,6 +401,10 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
     try {
       if (transport === 'APP_API') {
         // ── APP_API replay: through certified application boundary ──
+        // Throttle: space out consecutive print-bearing syncs to prevent printer flooding
+        if (synced > 0 || failed > 0) {
+          await new Promise<void>(r => setTimeout(r, 400))
+        }
         const result = await replayViaAppApi(item)
 
         if (result.ok) {

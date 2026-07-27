@@ -152,7 +152,25 @@ export default function CocinaPage() {
   }
 
   const fetchOrdersInner = async () => {
-    const data = await getKitchenOrders()
+    let data: KitchenOrderFromDB[]
+    try {
+      data = await getKitchenOrders()
+    } catch {
+      // Offline — merge newly-queued orders from IndexedDB into current state
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const [env, prep] = await Promise.all([getCachedOrders('enviada'), getCachedOrders('preparando')])
+        const cached = [...env, ...prep] as unknown as KitchenOrderFromDB[]
+        if (cached.length > 0) {
+          setOrders(prev => {
+            const existing = new Set(prev.map(o => o.id))
+            const fresh = cached.filter(o => !existing.has(o.id))
+            return fresh.length > 0 ? [...prev, ...fresh] : prev
+          })
+        }
+      } catch {}
+      throw new Error('offline')
+    }
 
     // Auto-archive orders older than 4 hours (stuck in enviada/preparando)
     const now = Date.now()
