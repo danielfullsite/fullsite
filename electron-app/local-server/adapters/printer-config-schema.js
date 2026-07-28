@@ -19,6 +19,23 @@ const { randomUUID } = require('crypto')
 
 const SCHEMA_VERSION = 2
 
+/**
+ * Maximum length for a printer_id.
+ *
+ * Why 50:
+ *   - slugifyId() auto-generates IDs ≤ 40 chars (.slice(0, 40)).
+ *     The manual-edit limit must be ≥ 40 or auto-generated IDs would fail validation.
+ *   - 40 + 10 = 50: gives manual editors a 10-char margin above the auto-slug baseline
+ *     (e.g. "epson-cocina" → "epson-cocina-norte-v2" = 22 chars, well within limit).
+ *   - 50 < 63 (DNS label RFC 1035) and < 64 (PostgreSQL identifier limit):
+ *     IDs can serve as subdomain parts or DB column values without truncation.
+ *   - Fits in a routing-table cell at monospace 12px without overflow.
+ *
+ * All consumers of printer_id (print-queue.js, printer.js) treat it as an opaque
+ * string — no consumer hardcodes a length assumption.
+ */
+const MAX_PRINTER_ID_LENGTH = 50
+
 const VALID_CONNECTION_TYPES = ['tcp', 'usb', 'windows']
 
 // These are the document types the system can route.
@@ -111,6 +128,8 @@ function validate(config) {
     // printer_id
     if (!p.printer_id || typeof p.printer_id !== 'string') {
       errors.push(`printers[${i}].printer_id is required`)
+    } else if (p.printer_id.length > MAX_PRINTER_ID_LENGTH) {
+      errors.push(`printers[${i}].printer_id exceeds ${MAX_PRINTER_ID_LENGTH} characters (got ${p.printer_id.length})`)
     } else if (ids.has(p.printer_id)) {
       errors.push(`printers[${i}].printer_id "${p.printer_id}" is duplicate`)
     } else {
@@ -388,6 +407,7 @@ function newPrinterTemplate(stationId) {
 
 module.exports = {
   SCHEMA_VERSION,
+  MAX_PRINTER_ID_LENGTH,
   VALID_CONNECTION_TYPES,
   VALID_DOCUMENT_TYPES,
   VALID_ENCODINGS,

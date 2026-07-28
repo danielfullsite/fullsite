@@ -17,6 +17,7 @@ const {
   slugifyId,
   generatePrinterId,
   parseNames,
+  MAX_PRINTER_ID_LENGTH,
 } = require('../adapters/printer-wizard-logic')
 
 const { validate } = require('../adapters/printer-config-schema')
@@ -186,4 +187,28 @@ test('TC-17 slugifyId — normalizes names to valid IDs', () => {
   // ID must start with letter or number
   const result = slugifyId('--inicio')
   assert.ok(/^[a-z0-9]/.test(result), `ID should start with letter or number, got: ${result}`)
+})
+
+// ── TC-18: printer_id length limit ───────────────────────────────────────────
+
+test('TC-18 validatePrinterForm — printer_id exceeding MAX_PRINTER_ID_LENGTH fails', () => {
+  const longId = 'a'.repeat(MAX_PRINTER_ID_LENGTH + 1)
+  const { valid, errors } = validatePrinterForm(tcpForm({ printer_id: longId }))
+  assert.equal(valid, false)
+  assert.ok(
+    errors.some(e => /superar|exceed|length|largo/i.test(e)),
+    `expected length error, got: ${errors.join('; ')}`
+  )
+})
+
+test('TC-19 validatePrinterForm — printer_id at exactly MAX_PRINTER_ID_LENGTH passes', () => {
+  const exactId = 'a'.repeat(MAX_PRINTER_ID_LENGTH)
+  const { valid, errors } = validatePrinterForm(tcpForm({ printer_id: exactId }))
+  assert.equal(valid, true, `unexpected errors: ${errors.join('; ')}`)
+})
+
+test('TC-20 MAX_PRINTER_ID_LENGTH is exported from wizard-logic and matches schema', () => {
+  const schemaConst = require('../adapters/printer-config-schema').MAX_PRINTER_ID_LENGTH
+  assert.equal(MAX_PRINTER_ID_LENGTH, schemaConst,
+    `wizard-logic exports ${MAX_PRINTER_ID_LENGTH} but schema defines ${schemaConst}`)
 })

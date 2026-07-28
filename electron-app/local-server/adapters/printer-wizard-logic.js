@@ -5,6 +5,10 @@
 
 const schema = require('./printer-config-schema')
 
+// Re-export the canonical constant so wizard UI can receive it via the bridge
+// without duplicating the value. Single source of truth: printer-config-schema.js.
+const MAX_PRINTER_ID_LENGTH = schema.MAX_PRINTER_ID_LENGTH
+
 // ── Labels ────────────────────────────────────────────────────────────────────
 
 const STATION_LABELS = {
@@ -75,6 +79,8 @@ function validatePrinterForm(form) {
   const pid = String(form.printer_id || '').trim()
   if (!pid) {
     errors.push('El ID lógico es requerido.')
+  } else if (pid.length > MAX_PRINTER_ID_LENGTH) {
+    errors.push(`El ID no puede superar ${MAX_PRINTER_ID_LENGTH} caracteres (tiene ${pid.length}).`)
   } else if (!/^[a-z0-9][a-z0-9-]*$/.test(pid)) {
     errors.push('El ID solo puede contener letras minúsculas, números y guiones, y debe comenzar con letra o número.')
   }
@@ -195,6 +201,7 @@ function buildV2Config(printers) {
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
+  MAX_PRINTER_ID_LENGTH,
   STATION_LABELS,
   DOC_TYPE_LABELS,
   slugifyId,

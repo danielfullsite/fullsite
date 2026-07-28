@@ -437,6 +437,11 @@
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Populated from bridge on init (provision:get-info → schemaConstants).
+// Default matches printer-config-schema.js MAX_PRINTER_ID_LENGTH — updated at runtime
+// so the UI and schema always use the same value without duplicating the literal.
+let MAX_PRINTER_ID_LENGTH = 50
+
 const KNOWN_STATIONS = [
   { id: 'cocina',     label: 'Cocina' },
   { id: 'barra',      label: 'Barra' },
@@ -514,6 +519,7 @@ async function init() {
   }
   try {
     const info = await window.setupBridge.getInfo()
+    MAX_PRINTER_ID_LENGTH = info.schemaConstants?.MAX_PRINTER_ID_LENGTH ?? 50
     state.legacy   = info.legacy || null
     state.hostname = info.hostname || 'terminal'
 
@@ -911,6 +917,7 @@ function pfValidate(form) {
 
   const pid = form.printer_id
   if (!pid) errs.push('El ID lógico es requerido.')
+  else if (pid.length > MAX_PRINTER_ID_LENGTH) errs.push(`El ID no puede superar ${MAX_PRINTER_ID_LENGTH} caracteres (tiene ${pid.length}).`)
   else if (!/^[a-z0-9][a-z0-9-]*$/.test(pid)) errs.push('El ID solo puede tener letras minúsculas, números y guiones.')
 
   const ct = form.connection_type

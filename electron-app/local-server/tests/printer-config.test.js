@@ -538,4 +538,28 @@ describe('8. No hardcoded AMALAY IPs in production code', () => {
     assert.ok(!match,
       match ? `Found IP ${match[1]} in printer-config-schema.js` : '')
   })
+
+  test('validate rejects printer_id exceeding MAX_PRINTER_ID_LENGTH', () => {
+    const { MAX_PRINTER_ID_LENGTH } = schema
+    const longId = 'a'.repeat(MAX_PRINTER_ID_LENGTH + 1)
+    const cfg = validV2Config([validTCPPrinter({ printer_id: longId })])
+    const { valid, errors } = schema.validate(cfg)
+    assert.equal(valid, false)
+    assert.ok(errors.some(e => /exceed|length|characters/i.test(e)),
+      `expected length error, got: ${errors.join('; ')}`)
+  })
+
+  test('validate accepts printer_id at exactly MAX_PRINTER_ID_LENGTH', () => {
+    const { MAX_PRINTER_ID_LENGTH } = schema
+    const exactId = 'a'.repeat(MAX_PRINTER_ID_LENGTH)
+    const cfg = validV2Config([validTCPPrinter({ printer_id: exactId })])
+    const { valid, errors } = schema.validate(cfg)
+    assert.equal(valid, true, `unexpected errors: ${errors.join('; ')}`)
+  })
+
+  test('MAX_PRINTER_ID_LENGTH is exported and is a positive integer', () => {
+    const { MAX_PRINTER_ID_LENGTH } = schema
+    assert.ok(typeof MAX_PRINTER_ID_LENGTH === 'number' && MAX_PRINTER_ID_LENGTH > 0,
+      `expected positive number, got ${MAX_PRINTER_ID_LENGTH}`)
+  })
 })

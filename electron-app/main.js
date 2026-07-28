@@ -249,7 +249,12 @@ function registerProvisioningIpc() {
     try {
       if (fs.existsSync(LEGACY_CONFIG_PATH)) legacy = JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf8'));
     } catch {}
-    return { hostname: os.hostname(), platform: process.platform, legacy };
+    return {
+      hostname: os.hostname(),
+      platform: process.platform,
+      legacy,
+      schemaConstants: { MAX_PRINTER_ID_LENGTH: printerConfigSchema.MAX_PRINTER_ID_LENGTH },
+    };
   });
 
   /**
@@ -389,28 +394,60 @@ function registerProvisioningIpc() {
 
   /**
    * Validate and atomically save a v2 printers config.
-   * write-tmp → fsync → rename ensures no partial writes corrupt the file.
+   *
+   * Flow:
+   *   1. validate(memory)   — fail fast, no disk I/O
+   *   2. write tmp          — original configPath untouched
+   *   3. validate(tmp)      — protective pre-rename check; on failure: unlink tmp, return error
+   *   4. rename(tmp→path)   — point of no return; content already verified in step 3
+   *   5. read(path)         — observability only; no rollback on failure
    */
   ipcMain.handle('provision:save-printers', async (_, config) => {
+    // Step 1 — in-memory validation
     const { valid, errors } = printerConfigSchema.validate(config)
     if (!valid) return { ok: false, error: errors.join('; ') }
 
     const configPath = getPrinterConfigPath()
     if (!configPath) return { ok: false, error: 'No se puede determinar la ruta de configuración.' }
 
+    const tmpPath = configPath + '.tmp'
     try {
-      const tmpPath = configPath + '.tmp'
+      // Step 2 — write to tmp (configPath not yet touched)
       fs.mkdirSync(path.dirname(configPath), { recursive: true })
       fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2), 'utf8')
+
+      // Step 3 — validate tmp from disk before rename (protective)
+      let preRead
+      try {
+        preRead = JSON.parse(fs.readFileSync(tmpPath, 'utf8'))
+      } catch (e) {
+        try { fs.unlinkSync(tmpPath) } catch {}
+        return { ok: false, error: 'Pre-rename read-back failed: ' + e.message }
+      }
+      const { valid: preValid, errors: preErrors } = printerConfigSchema.validate(preRead)
+      if (!preValid) {
+        try { fs.unlinkSync(tmpPath) } catch {}
+        return { ok: false, error: 'Pre-rename validation failed: ' + preErrors.join('; ') }
+      }
+
+      // Step 4 — atomic rename; content already verified in step 3
       fs.renameSync(tmpPath, configPath)
-      // Verify the write succeeded by re-reading
-      const verify = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-      if (verify.schema_version !== 2) throw new Error('Verificación fallida: formato incorrecto después de escritura')
-      console.log('[provision] Printers saved to', configPath)
+
+      // Step 5 — post-rename observability only; no rollback
+      try {
+        const canonical = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+        if (canonical.schema_version !== 2) {
+          console.error('[provision] CRITICAL: post-rename schema_version mismatch — filesystem anomaly suspected at', configPath)
+        } else {
+          console.log('[provision] Printers saved to', configPath)
+        }
+      } catch (e) {
+        console.error('[provision] CRITICAL: post-rename read failed (filesystem anomaly):', e.message)
+      }
+
       return { ok: true, path: configPath }
     } catch (e) {
-      // On failure, clean up tmp if left behind
-      try { const tmpPath = configPath + '.tmp'; if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath) } catch {}
+      try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath) } catch {}
       return { ok: false, error: e.message }
     }
   })
