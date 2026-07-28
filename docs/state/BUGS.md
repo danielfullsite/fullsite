@@ -37,9 +37,11 @@
 
 ### POS-04 · Boot offline
 **Estado:** CLOSED — 2026-07-24 — commit `447a777`
+**Scope:** Sub-componente técnico de P0-4. Cubre solo el boot offline del app shell.
 **Descripción:** La app Electron cargaba desde la URL de Vercel; sin internet al arrancar, la app no cargaba.
 **Solución:** El SW existente (`public/sw.js`) ya cacheaba el app shell. Gaps cerrados: (1) `cacheMenu()` en `getMenuCategoriesFromDB()` — menú ahora se persiste en IDB y se lee en offline; (2) `fetchMeseros()` — staff se cachea en localStorage y se restaura en offline. Fallback en ambos casos ante network error.
 **Archivos:** `dashboard-app/src/lib/pos-data.ts`.
+**Nota:** POS-04 CLOSED ≠ P0-4 CLOSED. P0-4 (certificación amplia Local-First) sigue ABIERTO — ver `docs/state/CERTIFICATIONS.md`.
 
 ---
 

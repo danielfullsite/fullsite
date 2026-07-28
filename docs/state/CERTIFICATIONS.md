@@ -70,11 +70,23 @@ Una feature es CERTIFIED cuando:
 
 ---
 
-## P0-4 — Local-First / Boot Offline
+## P0-4 — Local-First / Operación Offline Completa
 
-**Estado:** 🔴 ABIERTO — RFC aprobado 2026-07-24, pendiente implementación
+**Estado:** 🔴 ABIERTO — certificación pendiente hasta OFFLINE-100 CERTIFIED
+
+> **Distinción crítica — Conflicto B resuelto 2026-07-27:**
+> - **POS-04** (en `docs/state/BUGS.md`) = sub-componente técnico **CERRADO** (commit `447a777`, 2026-07-24).
+>   Scope: boot offline del app shell (IDB menú cache + localStorage staff cache).
+> - **P0-4** (este ítem) = certificación amplia de Local-First **ABIERTA**.
+>   Scope: turno offline completo, persistencia local, LAN discovery, sync queue,
+>   recuperación ante fallo, operación multi-terminal, certificación end-to-end.
+>   No se cierra con fixes puntuales — requiere OFFLINE-100 CERTIFIED.
+
+**Progreso interno:** Implementación significativa 2026-07-24 a 2026-07-27
+(turno offline, sync queue, LAN, runbook). No equivale a certificación.
+
 **RFC:** `docs/bibles/P0-4-LOCAL-FIRST-RFC.md`
-**Relacionado con:** POS-04 en `docs/state/BUGS.md`
+**Audit matrix:** `FULLSITE DOCS/11-VALIDATION/LOCAL-FIRST-CODE-AUDIT.md`
 
 ---
 

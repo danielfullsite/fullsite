@@ -1,5 +1,12 @@
 # FULLSITE ROADMAP
 
+> **HISTORICAL — NOT CURRENT SOURCE OF TRUTH**
+> Este documento fue la fuente de P0s hasta 2026-06-30.
+> La fuente vigente de certificaciones y P0s activos es: `docs/state/CERTIFICATIONS.md`
+> Los P0s históricos de este documento que no aparecen en CERTIFICATIONS están clasificados
+> como LEGACY P0 / NEEDS VERIFICATION — ver decisión en `FULLSITE DOCS/00-README/DOCS-MIGRATION-MANIFEST.md` §3 Conflicto A.
+> Última actualización del contenido: 2026-06-30 (concurrencia completada)
+
 > Estado real. No aspiracional.
 > Ningun P1 se toca mientras exista un P0 abierto.
 > Actualizar despues de cada sesion.
