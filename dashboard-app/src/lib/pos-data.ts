@@ -2062,6 +2062,26 @@ export async function logInventoryMovement(movement: {
 // when deductIngredientsForOrder is retried for the same order within a session.
 const _gateFailureOrderIds = new Set<string>()
 
+// Tracks orderIds for which ingredient deduction has already fired in this process.
+// Prevents double-deduction caused by fire-and-forget timing (handlePayment releases
+// operationLock before the deduction Promise resolves) or rapid double-tap on "Cobrar".
+//
+// GROWTH: one 36-byte UUID per paid order. At 200 orders/day ≈ 7 KB/day, ≈ 2.6 MB/year
+// without restart. Lifecycle is bounded by the page/process session. Negligible at
+// current scale. If the process runs weeks without reload, LRU eviction could be added.
+//
+// ERROR BEHAVIOR: if deductIngredientsForOrder() fails after adding orderId here,
+// the catch block removes orderId from this Set so a subsequent retry can proceed.
+// An orderId is only kept permanently after a confirmed successful deduction.
+//
+// SCOPE LIMITS — this Set does NOT protect against:
+//   - Process/tab restart: Set is cleared on page reload.
+//   - Multiple browser tabs or POS terminals on the same order (no shared state).
+//   - Multiple Local Server instances.
+// Distributed idempotency (DB-level check on pos_inventory_movements) is tracked
+// separately as a follow-up after this P0 containment is stable.
+const _deductedOrderIds = new Set<string>()
+
 function _recordGateFailure(orderId: string, items: OrderItem[], actor: string): void {
   if (_gateFailureOrderIds.has(orderId)) return
   _gateFailureOrderIds.add(orderId)
@@ -2095,6 +2115,19 @@ export async function deductIngredientsForOrder(
       resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: items.map(i => i.nombre), UNRESOLVED: [] },
     }
   }
+
+  // Idempotency guard — skip if this order was already deducted in this process.
+  // The policy gate above is not sufficient: it only suppresses telemetry, not writes.
+  if (_deductedOrderIds.has(orderId)) {
+    console.info(`[deduct:idempotent] orderId=${orderId} already deducted this session — skip`)
+    return {
+      success: true,
+      deductions: [],
+      alerts: [],
+      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] },
+    }
+  }
+  _deductedOrderIds.add(orderId)
 
   // 1. Get all recipes and inventory
   const recipes = await getRecipes()
@@ -2267,6 +2300,9 @@ export async function deductIngredientsForOrder(
 
   return { success: true, deductions, alerts, resolution }
   } catch (err) {
+    // Remove orderId so a subsequent retry is not silently blocked by the idempotency guard.
+    // The guard is meant to prevent double-deduction on success, not to block retries after failure.
+    _deductedOrderIds.delete(orderId)
     console.warn('[deductIngredientsForOrder] Failed:', err)
     return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] } }
   }
