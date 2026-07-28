@@ -2066,6 +2066,14 @@ const _gateFailureOrderIds = new Set<string>()
 // Prevents double-deduction caused by fire-and-forget timing (handlePayment releases
 // operationLock before the deduction Promise resolves) or rapid double-tap on "Cobrar".
 //
+// GROWTH: one 36-byte UUID per paid order. At 200 orders/day ≈ 7 KB/day, ≈ 2.6 MB/year
+// without restart. Lifecycle is bounded by the page/process session. Negligible at
+// current scale. If the process runs weeks without reload, LRU eviction could be added.
+//
+// ERROR BEHAVIOR: if deductIngredientsForOrder() fails after adding orderId here,
+// the catch block removes orderId from this Set so a subsequent retry can proceed.
+// An orderId is only kept permanently after a confirmed successful deduction.
+//
 // SCOPE LIMITS — this Set does NOT protect against:
 //   - Process/tab restart: Set is cleared on page reload.
 //   - Multiple browser tabs or POS terminals on the same order (no shared state).
@@ -2292,6 +2300,9 @@ export async function deductIngredientsForOrder(
 
   return { success: true, deductions, alerts, resolution }
   } catch (err) {
+    // Remove orderId so a subsequent retry is not silently blocked by the idempotency guard.
+    // The guard is meant to prevent double-deduction on success, not to block retries after failure.
+    _deductedOrderIds.delete(orderId)
     console.warn('[deductIngredientsForOrder] Failed:', err)
     return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] } }
   }

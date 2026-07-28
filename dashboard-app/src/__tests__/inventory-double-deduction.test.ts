@@ -217,6 +217,59 @@ describe('P0 — inventory double-deduction regression', () => {
     expect(patchCalls).toHaveLength(1)
   })
 
+  it('TC-DD-06: failed deduction is retryable — orderId not permanently blocked in Set', async () => {
+    // If deductIngredientsForOrder() throws (e.g. network error on getRecipes()),
+    // the outer catch must remove orderId from _deductedOrderIds so a retry can proceed.
+    //
+    // NOTE: updateInventoryStock() absorbs its own PATCH errors and returns false —
+    // those never reach the outer catch. We trigger a real outer-catch failure by
+    // making getRecipes() throw on the first call, then succeed on retry.
+    let recipeCallCount = 0
+    const patchCalls: number[] = []
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('pos_recipes_old')) {
+        recipeCallCount++
+        if (recipeCallCount === 1) return Promise.reject(new Error('Network error on first attempt'))
+        return Promise.resolve({ ok: true, json: async () => [
+          { menu_item_name: 'aguacate toast', ingredient_id: 'avocado-id', quantity: 1, unit: 'pz' },
+        ]})
+      }
+      if (url.includes('pos_inventory') && !url.includes('pos_inventory_movements') && opts?.method !== 'PATCH') {
+        return Promise.resolve({ ok: true, json: async () => [
+          { ingredient_id: 'avocado-id', stock: 10, reorder_point: 2 },
+        ]})
+      }
+      if (url.includes('pos_ingredients')) {
+        return Promise.resolve({ ok: true, json: async () => [
+          { id: 'avocado-id', name: 'Aguacate', unit: 'pz', category: 'produce', cost_per_unit: 25, yield_factor: 1, active: true },
+        ]})
+      }
+      if (url.includes('pos_menu_items') && url.includes('recipe_ref')) {
+        return Promise.resolve({ ok: true, json: async () => [{ id: 'menu-avocado', recipe_ref: 'aguacate toast' }]})
+      }
+      if (url.includes('pos_inventory') && opts?.method === 'PATCH') {
+        patchCalls.push(1)
+        return Promise.resolve({ ok: true, json: async () => ({}) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    }))
+
+    const item = makeItem({ cantidad: 1 })
+    const orderId = 'order-retry-dd-06'
+
+    // First call: getRecipes throws → outer catch fires → orderId removed from Set
+    const r1 = await deductIngredientsForOrder([item], orderId, 'test-mesero')
+    expect(r1.success).toBe(false)
+
+    // Retry: orderId must not be blocked by the idempotency guard
+    const r2 = await deductIngredientsForOrder([item], orderId, 'test-mesero')
+    expect(r2.success).toBe(true)
+    expect(r2.deductions).toHaveLength(1)
+    expect(r2.deductions[0].ingredient).toBe('Aguacate')
+    expect(patchCalls).toHaveLength(1)  // exactly one PATCH, from the successful retry
+  })
+
   it('TC-DD-05: movement ledger does not log a deduction entry for the idempotent second call', async () => {
     // The movement log (pos_inventory_movements) must not contain two entries
     // for the same orderId. This would corrupt the audit trail.
