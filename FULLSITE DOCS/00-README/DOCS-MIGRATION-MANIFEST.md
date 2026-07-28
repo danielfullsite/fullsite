@@ -1,6 +1,6 @@
 # DOCS MIGRATION MANIFEST
 
-**Estado:** PREPARACIÓN — ninguna acción física ejecutada  
+**Estado:** EN PROGRESO — Ventana 1 y 2 completadas; Ventana 3 y 4 bloqueadas por workstreams activos  
 **Propósito:** Registrar la decisión de destino de cada documento antes de ejecutar la migración.  
 **Fecha de auditoría:** 2026-07-27  
 **Última actualización:** 2026-07-27  
@@ -9,6 +9,44 @@
 > **INSTRUCCIÓN DE USO:** Este documento NO ejecuta ningún movimiento. Es la fuente de verdad
 > para la ventana controlada de reorganización. Ningún archivo se mueve, elimina ni renombra
 > hasta que exista una autorización explícita por sección.
+
+---
+
+## Estado de ventanas de migración
+
+| Ventana | Contenido | Estado | Commit | Prerequisito |
+|---------|-----------|--------|--------|--------------|
+| Ventana 1 | 19 bibles → archive, wansoft → AMALAY, dashboard-app/docs histórico, stubs, ROADMAP banner | ✅ COMPLETADA | `96be218` (merge `20b3bde`) | — |
+| Ventana 2 | Constitution/ raíz, Security, SQL_MIGRATION runbook, duplicados reference/ eliminados | ✅ COMPLETADA | `394f60c` (merge) | Ventana 1 ✅ |
+| Ventana 3 | `docs/constitution/`, `docs/state/`, `docs/migrations/`, `docs/architecture/`, `docs/runbooks/` | 🔴 BLOQUEADA | — | MT-03 + OFFLINE-100 + CFG-01 Production Acceptance mergeados a main |
+| Ventana 4 | Eliminación de stubs wansoft/, stubs pendientes | 🔴 BLOQUEADA | — | Ventana 3 ✅ |
+
+### Condiciones de desbloqueo para Ventana 3
+
+- [ ] Workstream **MT-03** (orphan references) mergeado a main
+- [ ] Workstream **OFFLINE-100** (offline certification) mergeado a main  
+- [ ] Workstream **CFG-01** (Production Acceptance) mergeado a main
+
+### Conflicto A — Legacy P0s — Resuelto 2026-07-27
+
+| P0 Legacy | Estado final | Decisión Daniel |
+|-----------|--------------|-----------------|
+| Huella digital (DP4500) | CLOSED (código) / NEEDS HARDWARE VERIFICATION | No bloqueante para siguiente cliente si existe flujo sin biometría |
+| Cajón RJ-11 | CLOSED (código) / NEEDS HARDWARE VERIFICATION | Probar físicamente antes de siguiente go-live |
+| Shadow Day | STILL OPEN — gate operacional | No cerrar hasta ejecutar turno completo |
+| IEPS fiscal | DEFERRED — bloqueado por XML CFDI Wansoft | No implementar hasta contar con XML real |
+
+### Conflicto B — POS-04 vs P0-4 — Resuelto 2026-07-27
+
+Documentado en `docs/state/CERTIFICATIONS.md` y `docs/state/BUGS.md`:
+- **POS-04**: sub-componente CLOSED (commit `447a777`) — boot offline del app shell
+- **P0-4**: certificación amplia OPEN — requiere OFFLINE-100 CERTIFIED
+
+### Conflicto C — Sistemas de tracking de bugs — Resuelto 2026-07-27
+
+Modelo adoptado: auditoría detecta → BUGS.md controla el ciclo de vida.
+- `docs/state/BUGS.md`: registro canónico, bug_id, estado, owner
+- `FULLSITE DOCS/11-VALIDATION/LOCAL-FIRST-CODE-AUDIT.md`: evidencia de auditoría; cuando un hallazgo se confirma recibe bug_id y entrada en BUGS.md
 
 ---
 
