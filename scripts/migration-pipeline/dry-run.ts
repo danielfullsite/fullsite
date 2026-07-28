@@ -12,6 +12,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { execSync } from 'child_process'
 import { normalizeCategory, CANONICAL_CATEGORIES } from './maps/categories'
 import { normalizeUnit, UNIT_MAP } from './maps/units'
 import { normalizeName, normalizeForMatching, normalizeDecimal, normalizeBoolean, slugify } from './maps/names'
@@ -19,9 +20,26 @@ import {
   validateIngredient, validateRecipe, findDuplicates,
   generateReport, type ValidationIssue
 } from './validators'
+import { buildSlugIndex, resolveIngredientId } from './lib/resolver'
 
 const useReal = process.argv.includes('--real')
-const baseDir = path.dirname(import.meta.url.replace('file://', ''))
+const scriptDir = path.dirname(import.meta.url.replace('file://', ''))
+
+// When running from a git worktree, untracked source files (agents/wansoft/*.json)
+// live in the main working tree. Resolve the project root via git's common-dir.
+function getProjectRoot(): string {
+  try {
+    const gitDir = execSync('git rev-parse --git-common-dir', { cwd: scriptDir })
+      .toString().trim()
+    const absGitDir = path.isAbsolute(gitDir) ? gitDir : path.join(scriptDir, gitDir)
+    return path.resolve(absGitDir, '..')
+  } catch {
+    return path.resolve(scriptDir, '../..')
+  }
+}
+
+const projectRoot = getProjectRoot()
+const baseDir = scriptDir
 
 // ── Load data ──
 
@@ -37,11 +55,11 @@ function loadJSON(filepath: string): unknown[] {
 }
 
 const ingredientFile = useReal
-  ? path.resolve(baseDir, '../../agents/wansoft/wansoft_products.json')
+  ? path.join(projectRoot, 'agents/wansoft/wansoft_products.json')
   : path.resolve(baseDir, 'fixtures/ingredients.json')
 
 const recipeFile = useReal
-  ? path.resolve(baseDir, '../../agents/wansoft/wansoft_recetas.json')
+  ? path.join(projectRoot, 'agents/wansoft/wansoft_recetas.json')
   : path.resolve(baseDir, 'fixtures/recipes.json')
 
 console.log('═══════════════════════════════════════════')
@@ -100,6 +118,11 @@ for (const raw of rawIngredients) {
   }
 }
 
+// Build slug→id index for resolving recipe ingredient references by name
+const slugIndex = buildSlugIndex(
+  normalizedIngredients.map(i => ({ id: String(i.id), name: String(i.name) }))
+)
+
 // Find duplicates
 const dupes = findDuplicates(normalizedIngredients.map(i => ({ id: String(i.id), name: String(i.name) })))
 
@@ -120,7 +143,7 @@ if (useReal) {
     for (const ing of r.ingredients || []) {
       rawRecipes.push({
         menu_item_name: r.dish,
-        ingredient_id: slugify(ing.product),
+        ingredient_id: resolveIngredientId(slugify(ing.product), slugIndex),
         quantity: ing.qty,
       })
     }
