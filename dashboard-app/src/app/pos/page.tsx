@@ -3211,14 +3211,18 @@ function POSContent() {
       // Split parejo: all cuentas share same items → only cuenta 1 deducts.
       const shouldDeductIngredients = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
       if (shouldDeductIngredients && payingItems.length > 0) {
-        deductIngredientsForOrder(payingItems, payId, mesero || 'POS')
-          .then(result => {
-            if (result.alerts.length > 0) {
-              console.warn('[inventory] Deduction alerts:', result.alerts)
-            }
-            console.log(`[inventory] Deducted ${result.deductions.length} ingredients for ${payingItems.length} items at payment`)
-          })
-          .catch(err => console.error('[inventory] Deduction error (non-blocking):', err))
+        // Awaited so operationLock stays held until the deduction completes.
+        // This closes the race between lock release and the in-flight PATCH.
+        // Catch is intentional: a deduction failure must not fail the payment.
+        try {
+          const deductResult = await deductIngredientsForOrder(payingItems, payId, mesero || 'POS')
+          if (deductResult.alerts.length > 0) {
+            console.warn('[inventory] Deduction alerts:', deductResult.alerts)
+          }
+          console.log(`[inventory] Deducted ${deductResult.deductions.length} ingredients for ${payingItems.length} items at payment`)
+        } catch (err) {
+          console.error('[inventory] Deduction error (non-blocking):', err)
+        }
       }
 
       // Shadow mode (Fullsite OS): pago capturado, fire-and-forget

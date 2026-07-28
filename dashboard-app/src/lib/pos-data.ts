@@ -2062,6 +2062,18 @@ export async function logInventoryMovement(movement: {
 // when deductIngredientsForOrder is retried for the same order within a session.
 const _gateFailureOrderIds = new Set<string>()
 
+// Tracks orderIds for which ingredient deduction has already fired in this process.
+// Prevents double-deduction caused by fire-and-forget timing (handlePayment releases
+// operationLock before the deduction Promise resolves) or rapid double-tap on "Cobrar".
+//
+// SCOPE LIMITS — this Set does NOT protect against:
+//   - Process/tab restart: Set is cleared on page reload.
+//   - Multiple browser tabs or POS terminals on the same order (no shared state).
+//   - Multiple Local Server instances.
+// Distributed idempotency (DB-level check on pos_inventory_movements) is tracked
+// separately as a follow-up after this P0 containment is stable.
+const _deductedOrderIds = new Set<string>()
+
 function _recordGateFailure(orderId: string, items: OrderItem[], actor: string): void {
   if (_gateFailureOrderIds.has(orderId)) return
   _gateFailureOrderIds.add(orderId)
@@ -2095,6 +2107,19 @@ export async function deductIngredientsForOrder(
       resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: items.map(i => i.nombre), UNRESOLVED: [] },
     }
   }
+
+  // Idempotency guard — skip if this order was already deducted in this process.
+  // The policy gate above is not sufficient: it only suppresses telemetry, not writes.
+  if (_deductedOrderIds.has(orderId)) {
+    console.info(`[deduct:idempotent] orderId=${orderId} already deducted this session — skip`)
+    return {
+      success: true,
+      deductions: [],
+      alerts: [],
+      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] },
+    }
+  }
+  _deductedOrderIds.add(orderId)
 
   // 1. Get all recipes and inventory
   const recipes = await getRecipes()
