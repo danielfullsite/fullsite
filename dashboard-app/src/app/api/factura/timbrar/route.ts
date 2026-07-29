@@ -3,7 +3,7 @@
 // y manda el PDF/XML por email al cliente (best-effort).
 
 import { stampCfdi, emailCfdi, isFacturamaConfigured, type CfdiRequestRow } from '@/lib/facturama'
-import { requireAuth } from '@/lib/api-auth'
+import { requireAuth, getSessionUserId } from '@/lib/api-auth'
 import { NextRequest } from 'next/server'
 
 function sbHeaders() {
@@ -28,6 +28,25 @@ export async function POST(req: NextRequest) {
   const authErr = await requireAuth(req)
   if (authErr) return authErr
 
+  // Resolve caller's client_id from DB — never trust request headers
+  const userId = await getSessionUserId(req)
+  const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  let clientId: string | null = null
+  try {
+    const cuRes = await fetch(
+      `${sbUrl}/rest/v1/client_users?user_id=eq.${encodeURIComponent(userId!)}&select=client_id&limit=1`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
+    )
+    if (cuRes.ok) {
+      const rows = await cuRes.json()
+      clientId = Array.isArray(rows) && rows.length > 0 ? rows[0].client_id : null
+    }
+  } catch { /* fall through — clientId stays null */ }
+  if (!clientId) {
+    return Response.json({ ok: false, error: 'No se pudo resolver el cliente del usuario' }, { status: 403 })
+  }
+
   try {
     if (!isFacturamaConfigured()) {
       return Response.json(
@@ -43,10 +62,9 @@ export async function POST(req: NextRequest) {
       ? String(body.payment_form)
       : undefined
 
-    // Cargar la solicitud
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    // Cargar la solicitud — filtrar por client_id para aislamiento de tenant
     const res = await fetch(
-      `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&limit=1`,
+      `${sbUrl}/rest/v1/pos_cfdi_requests?id=eq.${encodeURIComponent(id)}&client_id=eq.${encodeURIComponent(clientId)}&limit=1`,
       { headers: sbHeaders(), cache: 'no-store' }
     )
     if (!res.ok) return Response.json({ ok: false, error: 'No se pudo cargar la solicitud' }, { status: 500 })

@@ -322,6 +322,13 @@ export function getClientId(): string {
   return _getClientId()
 }
 
+/** Returns Authorization header with POS shift token, if one is stored. */
+export function getPOSAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  const token = localStorage.getItem('pos_shift_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export async function getMenuCategoriesFromDB(): Promise<MenuCategory[]> {
   try {
     const clientId = _getClientId()
@@ -1306,7 +1313,7 @@ export async function addOrderItems(orderId: string, items: OrderItem[]): Promis
   try {
     const res = await fetch('/api/pos/add-items', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({ order_id: orderId, items }),
     })
     if (!res.ok) {
@@ -1368,10 +1375,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
   try {
     const res = await fetch('/api/pos/save-order', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-client-id': _getClientId(),
-      },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify(payload),
     })
 
@@ -2563,7 +2567,7 @@ export async function registerMarketMovement(
     const adjustType = type === 'ajuste' ? 'ajuste_absoluto' : type
     const res = await fetch('/api/pos/adjust-market', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({
         menu_item_id: menuItemId,
         adjustment_type: adjustType,
@@ -2616,7 +2620,7 @@ export async function deductMarketStockForOrder(
     // 3. Deduct via serialized authority-aware server RPC
     const res = await fetch('/api/pos/deduct-market', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({ order_id: orderId, actor, items: rpcItems }),
     })
 

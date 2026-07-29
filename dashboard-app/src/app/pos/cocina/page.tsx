@@ -7,7 +7,7 @@ import {
   getKitchenOrders, updateOrderStatus, logAudit, saveOrder,
   updateInventoryStock, logInventoryMovement, getInventory, getRecipes,
   getRecipeDetail,
-  verifyManagerPin, RECIPE_ALIASES, formatMXN,
+  verifyManagerPin, RECIPE_ALIASES, formatMXN, getPOSAuthHeaders,
   type KitchenOrderFromDB, type RecipeDetail, type OrderItem,
 } from '@/lib/pos-data'
 import { isBebida, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
@@ -301,7 +301,7 @@ export default function CocinaPage() {
     const cocinaOpId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const saveRes = await fetch('/api/pos/save-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
       body: JSON.stringify({
         order_id: cancelTarget.orderId,
         expected_revision: order.order_revision ?? 0,

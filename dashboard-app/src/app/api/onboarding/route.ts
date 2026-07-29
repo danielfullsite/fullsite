@@ -9,11 +9,13 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth: require admin secret or valid session
+    // Auth: require admin secret — fail closed if not configured
     const adminSecret = process.env.ONBOARDING_SECRET
+    if (!adminSecret) {
+      return NextResponse.json({ error: 'Onboarding no configurado' }, { status: 503 })
+    }
     const providedSecret = request.headers.get('x-onboarding-secret')
-    // Only enforce secret when ONBOARDING_SECRET is configured (production gate)
-    if (adminSecret && providedSecret !== adminSecret) {
+    if (providedSecret !== adminSecret) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

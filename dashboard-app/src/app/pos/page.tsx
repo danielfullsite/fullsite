@@ -36,6 +36,7 @@ import {
   type PaymentMethodDB,
   type PagoForma,
   updateOrderStatus,
+  getPOSAuthHeaders,
 } from '@/lib/pos-data'
 import { IVA_RATE, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
@@ -2438,7 +2439,7 @@ function POSContent() {
     try {
       const res = await fetch('/api/pos/transfer-item', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({
           client_id: _cid(),
           source_order_id: loadedOrderId,
@@ -2504,7 +2505,7 @@ function POSContent() {
       const voidOpId = genOpId()
       const voidRes = await fetch('/api/pos/save-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({
           order_id: loadedOrderId,
           expected_revision: orderRevision,

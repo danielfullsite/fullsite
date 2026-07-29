@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 /**
  * Phase 3 — Legacy direct-stock sale deduction via serialized authority boundary.
@@ -7,7 +7,9 @@ import { getClientId } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const body = await request.json()
     const { order_id, actor, items } = body
 

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 /**
  * Atomic item transfer between orders.
@@ -27,20 +28,24 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
+
     const body = await request.json()
     const {
-      client_id, source_order_id, item_id, target_mesa,
+      source_order_id, item_id, target_mesa,
       mesero, approved_by, approved_role, source_mesa,
       operation_id // idempotency key to prevent double-transfer on retry
     } = body
 
-    if (!client_id || !source_order_id || !item_id || !target_mesa) {
+    if (!clientId || !source_order_id || !item_id || !target_mesa) {
       return Response.json({ ok: false, error: 'MISSING_PARAMS' }, { status: 400 })
     }
 
     // ── Step 1: Read source order with version ──
     const sourceRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${client_id}&select=id,items,updated_at,mesa,order_revision`,
+      `${sbUrl}/rest/v1/pos_orders?id=eq.${source_order_id}&client_id=eq.${clientId}&select=id,items,updated_at,mesa,order_revision`,
       { headers, cache: 'no-store' }
     )
     if (!sourceRes.ok) return Response.json({ ok: false, error: 'SOURCE_READ_FAILED' }, { status: 502 })
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 2: Read target order (if exists) ──
     const targetRes = await fetch(
-      `${sbUrl}/rest/v1/pos_orders?client_id=eq.${client_id}&mesa=eq.${target_mesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1&select=id,items,updated_at,order_revision`,
+      `${sbUrl}/rest/v1/pos_orders?client_id=eq.${clientId}&mesa=eq.${target_mesa}&status=in.(abierta,enviada,preparando,lista)&order=created_at.desc&limit=1&select=id,items,updated_at,order_revision`,
       { headers, cache: 'no-store' }
     )
     const targetRows = targetRes.ok ? await targetRes.json() : []
@@ -127,7 +132,7 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { ...headers, Prefer: 'return=minimal' },
         body: JSON.stringify({
-          client_id,
+          client_id: clientId,
           mesa: target_mesa,
           mesero: mesero || 'Transferido',
           personas: 1,
@@ -164,7 +169,7 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { ...headers, Prefer: 'return=minimal' },
         body: JSON.stringify({
-          client_id,
+          client_id: clientId,
           order_id: source_order_id,
           action: 'item_transferred',
           actor: mesero || 'Sistema',

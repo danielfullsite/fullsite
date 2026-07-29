@@ -1,13 +1,17 @@
 import { NextRequest } from 'next/server'
+import { issueShiftToken } from '@/lib/shift-token'
 
-// Validación de PIN del POS server-side.
-// El cliente ya no lee pos_staff directamente (anon revocado por RLS);
-// este endpoint consulta con service key y aplica rate limit por IP.
+// PIN validation + shift token issuance.
+// On success returns { staff, shiftToken } — the client stores shiftToken
+// and sends it as Authorization: Bearer <shiftToken> on every POS request.
+// This replaces the btoa(pin) PIN cache (P0-E fix) and provides server-verified
+// identity for all POS API calls (P0-N fix via withPOSAuth).
 
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 300_000 // 5 minutes
-const SUCCESS_RESETS = true // Successful PIN entry resets the counter
 
+// In-memory rate limit (P1 — a DB-persisted limiter is the full fix).
+// Sufficient for authenticated kiosk terminals; brute-force requires network access.
 const attemptsByIp = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(ip: string): boolean {
@@ -20,6 +24,18 @@ function checkRateLimit(ip: string): boolean {
   if (entry.count >= MAX_ATTEMPTS) return false
   entry.count++
   return true
+}
+
+async function respond(staff: { id: string; name: string; role: string }, clientId: string, ip: string) {
+  attemptsByIp.delete(ip)
+  let shiftToken: string | undefined
+  try {
+    shiftToken = await issueShiftToken(staff.id, clientId, staff.role, staff.name)
+  } catch (e) {
+    // SHIFT_TOKEN_SECRET not configured — log and continue without token (degrades to legacy flow)
+    console.error('[pin] issueShiftToken failed (SHIFT_TOKEN_SECRET missing?):', e)
+  }
+  return Response.json({ staff, shiftToken })
 }
 
 export async function POST(request: NextRequest) {
@@ -37,7 +53,7 @@ export async function POST(request: NextRequest) {
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-    // Fingerprint login: look up by staff ID, validate active status
+    // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
       const fpRes = await fetch(
         `${sbUrl}/rest/v1/pos_staff?id=eq.${encodeURIComponent(fingerprint_id)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}&select=id,name,role&limit=1`,
@@ -46,8 +62,7 @@ export async function POST(request: NextRequest) {
       if (fpRes.ok) {
         const rows = await fpRes.json()
         if (Array.isArray(rows) && rows.length > 0) {
-          attemptsByIp.delete(ip)
-          return Response.json({ staff: { id: rows[0].id, name: rows[0].name, role: rows[0].role } })
+          return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, ip)
         }
       }
       return Response.json({ error: 'Empleado no encontrado o desactivado' }, { status: 401 })
@@ -57,9 +72,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'PIN inválido' }, { status: 400 })
     }
 
-    // Role hierarchy: mesero < cajero < capitan < gerente < admin
-    // min_role param: only accept PINs from staff at or above this role level
-    // manager=true is legacy shorthand for min_role='gerente'
+    // Role hierarchy filter
     const ROLE_HIERARCHY: Record<string, number> = { mesero: 1, cajero: 2, capitan: 3, gerente: 4, admin: 5 }
     const effectiveMinRole = min_role || (manager === true ? 'gerente' : null)
     let roleFilter = ''
@@ -70,6 +83,7 @@ export async function POST(request: NextRequest) {
         .map(([role]) => role)
       roleFilter = `&role=in.(${allowedRoles.join(',')})`
     }
+
     const res = await fetch(
       `${sbUrl}/rest/v1/pos_staff?pin=eq.${encodeURIComponent(pin)}&active=eq.true&client_id=eq.${encodeURIComponent(clientId)}${roleFilter}&select=id,name,role&limit=1`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
@@ -77,25 +91,23 @@ export async function POST(request: NextRequest) {
     if (res.ok) {
       const rows = await res.json()
       if (Array.isArray(rows) && rows.length > 0) {
-        // Successful login — reset rate limit for this IP
-        attemptsByIp.delete(ip)
-        return Response.json({ staff: { id: rows[0].id, name: rows[0].name, role: rows[0].role } })
+        return respond({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, clientId, ip)
       }
     }
 
-    // Fallback PIN server-side (env sin NEXT_PUBLIC — nunca llega al cliente)
+    // Fallback PIN — server-side env, never exposed to client
     const fallback = process.env.POS_FALLBACK_PIN
     if (fallback && pin === fallback) {
-      return Response.json({ staff: { id: 'admin', name: 'Admin', role: 'admin' } })
+      return respond({ id: 'admin', name: 'Admin', role: 'admin' }, clientId, ip)
     }
 
-    // MANAGER_PINS server-only (formato "pin:Nombre,pin:Nombre") — reemplaza NEXT_PUBLIC_MANAGER_PINS
+    // MANAGER_PINS — server-side env format "pin:Nombre,pin:Nombre"
     if (manager === true) {
       const raw = process.env.MANAGER_PINS || ''
       for (const entry of raw.split(',')) {
         const [p, name] = entry.split(':')
         if (p && name && p.trim() === pin) {
-          return Response.json({ staff: { id: 'manager', name: name.trim(), role: 'gerente' } })
+          return respond({ id: 'manager', name: name.trim(), role: 'gerente' }, clientId, ip)
         }
       }
     }

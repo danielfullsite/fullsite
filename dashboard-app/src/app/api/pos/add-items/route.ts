@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const body = await request.json()
     const { order_id, items } = body
 

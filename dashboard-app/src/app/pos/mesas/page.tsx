@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Calendar, RefreshCw, Merge, X, Clock, AlertTriangle, LayoutGrid, Map, UserPlus, Lock as LockIcon, Power } from 'lucide-react'
-import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout } from '@/lib/pos-data'
+import { getMesasConfig, formatMXN, logAudit, verifyManagerPin, fetchPosMesas, fetchWithTimeout, getPOSAuthHeaders } from '@/lib/pos-data'
 import type { Mesa } from '@/lib/pos-data'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getPosConfigSync } from '@/lib/pos-config'
@@ -386,7 +386,7 @@ export default function MesasPage() {
       // R2D1B Phase 1: Atomic cross-order merge via revision-aware server boundary
       const mergeRes = await fetch('/api/pos/merge-orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
         body: JSON.stringify({
           target_order_id: tgtOrder.id,
           target_expected_revision: tgtOrder.order_revision ?? 0,

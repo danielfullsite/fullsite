@@ -9,7 +9,19 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 
-const WEBHOOK_SECRET = process.env.UBER_WEBHOOK_SECRET || ''
+
+async function verifyUberSignature(body: string, sig: string): Promise<boolean> {
+  const secret = process.env.UBER_WEBHOOK_SECRET
+  if (!secret) return false
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+  )
+  // Uber sends signature as hex string
+  const sigBytes = Buffer.from(sig.replace('sha256=', ''), 'hex')
+  const bodyBytes = new TextEncoder().encode(body)
+  return crypto.subtle.verify('HMAC', key, sigBytes, bodyBytes)
+}
 
 function sbHeaders() {
   const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -66,20 +78,31 @@ async function acceptOrder(orderId: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Read raw body first so we can verify the signature before parsing
+    const rawBody = await request.text()
+
+    // Verify webhook signature — fail closed if secret not configured
+    const uberSecret = process.env.UBER_WEBHOOK_SECRET
+    if (!uberSecret) {
+      console.error('[uber-webhook] UBER_WEBHOOK_SECRET not configured')
+      return new NextResponse(null, { status: 503 })
+    }
+    const sig = request.headers.get('x-uber-signature') || ''
+    if (!sig) {
+      console.warn('[uber-webhook] Missing x-uber-signature header')
+      return new NextResponse(null, { status: 401 })
+    }
+    const valid = await verifyUberSignature(rawBody, sig)
+    if (!valid) {
+      console.warn('[uber-webhook] Invalid signature — request rejected')
+      return new NextResponse(null, { status: 401 })
+    }
+
+    const body = JSON.parse(rawBody)
     const eventType = body.event_type || body.type || ''
     const orderId = body.meta?.resource_id || body.order_id || body.id || ''
 
     console.log(`[uber-webhook] ${eventType} order=${orderId}`)
-
-    // Verify webhook signature if configured
-    if (WEBHOOK_SECRET) {
-      const sig = request.headers.get('x-uber-signature') || ''
-      // TODO: implement HMAC verification when Uber provides the signing key
-      if (!sig) {
-        console.warn('[uber-webhook] Missing signature')
-      }
-    }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     // Derive client_id from store_id mapping or env default

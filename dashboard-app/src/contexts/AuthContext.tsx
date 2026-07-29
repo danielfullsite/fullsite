@@ -56,9 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // createBrowserClient from @supabase/ssr is a singleton by default
   const supabase = useMemo(() => createClient(), [])
 
-  const loadClientData = useCallback(async (userId: string, userEmail?: string, userMeta?: Record<string, unknown>) => {
-    // Priority 1: user_metadata.client_id (set at signup, instant)
-    const metaClientId = userMeta?.client_id as string | undefined
+  const loadClientData = useCallback(async (userId: string, userEmail?: string, userMeta?: Record<string, unknown>, appMeta?: Record<string, unknown>) => {
+    // Priority 1: app_metadata.client_id (admin-only, not user-writable in Supabase)
+    // Fall back to user_metadata.client_id for users not yet migrated
+    const metaClientId = (appMeta?.client_id ?? userMeta?.client_id) as string | undefined
 
     // Priority 2: client_users table (DB lookup) — también es la fuente de verdad del rol
     let dbClientId: string | null = null
@@ -129,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (parsed.user) {
               setUser(parsed.user)
               setRole(ROLE_MAP[parsed.user.email || ''] || 'staff')
-              await loadClientData(parsed.user.id, parsed.user.email, parsed.user.user_metadata)
+              await loadClientData(parsed.user.id, parsed.user.email, parsed.user.user_metadata, parsed.user.app_metadata)
               setLoading(false)
               return
             }
@@ -142,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentUser)
         if (currentUser) {
           setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
-          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata)
+          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata, currentUser.app_metadata)
         }
       } catch (err) {
         console.error('Error initializing auth:', err)
@@ -168,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch { /* SSR */ }
           }
           setRole(ROLE_MAP[currentUser.email || ''] || 'staff')
-          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata)
+          await loadClientData(currentUser.id, currentUser.email || undefined, currentUser.user_metadata, currentUser.app_metadata)
         } else {
           setClientId(null)
           setClientConfig(null)

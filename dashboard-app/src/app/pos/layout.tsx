@@ -418,28 +418,29 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         signal: AbortSignal.timeout(4000),
       })
       if (res.ok) {
-        const { staff: member } = await res.json()
+        const { staff: member, shiftToken } = await res.json()
         if (member?.id) {
-          // Cache auth token for offline (15 min TTL, no PIN stored)
           try {
-            const pinHash = btoa(pin).slice(0, 8) // short non-reversible token, NOT the PIN
-            const cached = JSON.parse(localStorage.getItem('pos_auth_cache') || '{}')
-            cached[pinHash] = { id: member.id, name: member.name, role: member.role, exp: Date.now() + 28_800_000 }
-            localStorage.setItem('pos_auth_cache', JSON.stringify(cached))
+            if (shiftToken) localStorage.setItem('pos_shift_token', shiftToken)
+            localStorage.setItem('pos_staff_cache', JSON.stringify({
+              id: member.id, name: member.name, role: member.role,
+              exp: Date.now() + 28_800_000,
+            }))
           } catch { /* ignore */ }
           unlock(member)
           return
         }
       }
     } catch {
-      // Sin red (modo offline) — check cached auth tokens (15 min TTL)
+      // Sin red (modo offline) — check server-issued shift token session
       try {
-        const pinHash = btoa(pin).slice(0, 8)
-        const cached = JSON.parse(localStorage.getItem('pos_auth_cache') || '{}')
-        const entry = cached[pinHash]
-        if (entry && entry.exp > Date.now()) {
-          unlock({ id: entry.id, name: entry.name, role: entry.role })
-          return
+        const staffJson = localStorage.getItem('pos_staff_cache')
+        if (staffJson) {
+          const entry = JSON.parse(staffJson)
+          if (entry && entry.exp > Date.now()) {
+            unlock({ id: entry.id, name: entry.name, role: entry.role })
+            return
+          }
         }
       } catch { /* ignore */ }
       // Network error with no valid cache — distinguish from wrong PIN

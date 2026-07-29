@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 /**
  * Atomic mesa merge + reconciliation of every affected order.
@@ -7,7 +7,9 @@ import { getClientId } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const body = await request.json()
     const { target_order_id, target_expected_revision, source_order_id, source_expected_revision,
             merged_items, total, subtotal, iva, personas, notas } = body
@@ -35,6 +37,7 @@ export async function POST(request: NextRequest) {
         p_source_order_id: source_order_id,
         p_source_expected_revision: source_expected_revision ?? 0,
         p_merged_items: merged_items,
+        // TODO P0-F: recalculate totals server-side from pos_menu_items
         p_total: total, p_subtotal: subtotal, p_iva: iva,
         p_personas: personas, p_notas: notas,
       }),

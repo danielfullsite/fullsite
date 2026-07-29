@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 // Lista de empleados para asignaciones (repartidores estilo Wansoft: se eligen
 // de la lista general de empleados, no hay rol "repartidor").
@@ -7,7 +7,9 @@ import { getClientId } from '@/lib/api-auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

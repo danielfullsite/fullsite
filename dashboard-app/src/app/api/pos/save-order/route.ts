@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { getClientId } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -33,7 +33,9 @@ interface SaveResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const clientId = getClientId(request)
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
+    const clientId = auth.clientId
     const body = await request.json()
 
     const { order_id, expected_revision } = body
