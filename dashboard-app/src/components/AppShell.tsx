@@ -11,17 +11,20 @@ import { useEffect, useState } from 'react'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading } = useAuth()
+  const { user, loading, role } = useAuth()
   const [showContent, setShowContent] = useState(false)
 
   // Build offline empaquetado (terminales POS): arrancar directo en /pos.
-  // El gate de PIN del POS funciona sin internet; el login de Supabase no.
+  // Solo aplica a roles operativos; dueño/gerente/capitan siempre ven el dashboard.
   const isOfflineBuild = process.env.NEXT_PUBLIC_CAPACITOR_OFFLINE === '1'
   useEffect(() => {
-    if (isOfflineBuild && pathname === '/') {
-      router.replace('/pos')
+    if (isOfflineBuild && pathname === '/' && !loading) {
+      const isPosOnlyRole = role === 'mesero' || role === 'staff' || role === 'cajero'
+      if (!user || isPosOnlyRole) {
+        router.replace('/pos')
+      }
     }
-  }, [isOfflineBuild, pathname, router])
+  }, [isOfflineBuild, pathname, router, user, role, loading])
 
   const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
   const isPosRoute = pathname.startsWith('/pos')

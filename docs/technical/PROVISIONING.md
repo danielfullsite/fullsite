@@ -161,6 +161,26 @@ vercel alias set <deploy-url> <client>.app.fullsite.mx
 
 ---
 
+## G-012 — auth.users requiere token fields vacíos, no NULL
+
+Al insertar usuarios vía SQL directo en `auth.users`, los campos `confirmation_token`, `recovery_token`, `email_change_token_new` y `email_change` deben ser `''` (string vacío), **no NULL**.
+
+Supabase Auth (Go) hace `Scan` de estos campos a `string` y falla con `converting NULL to string is unsupported` → el usuario no puede hacer login ("Database error querying schema").
+
+El DO block en Step 2 ya incluye estos campos correctamente. Si alguna vez insertas usuarios por otro medio, aplica este fix:
+
+```sql
+UPDATE auth.users
+SET
+  confirmation_token     = COALESCE(confirmation_token, ''),
+  recovery_token         = COALESCE(recovery_token, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  email_change           = COALESCE(email_change, '')
+WHERE email IN ('<email1>', '<email2>');
+```
+
+---
+
 ## Reference: PRUEBA-3
 
 PRUEBA-3 was provisioned on 2026-07-29 using Steps 1–7 above with zero code changes, confirming the invariant. client_id=`prueba-3`, staging project `jkcnxfbbuyyfhwfjizgw`.

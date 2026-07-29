@@ -59,9 +59,12 @@ export default function LoginPage() {
         }))
         // Cookie para el middleware server-side (mismo token; expira con él)
         document.cookie = `fs-at=${data.access_token}; path=/; max-age=${data.expires_in || 3600}; secure; samesite=lax`
-        // Check if demo user → redirect to demo dashboard
-        const clientId = data.user?.user_metadata?.client_id
-        window.location.href = clientId === 'demo' ? '/demo/dashboard' : '/'
+        // Redirect por rol: dueño/gerente/capitan → dashboard; cajero/mesero/staff → POS
+        const clientId = data.user?.user_metadata?.client_id as string | undefined
+        const rawRole = data.user?.user_metadata?.role as string | undefined
+        const { DB_ROLE_MAP, resolveLoginRedirect } = await import('@/lib/roles')
+        const role = rawRole ? (DB_ROLE_MAP[rawRole] ?? null) : null
+        window.location.href = resolveLoginRedirect(role, clientId)
       } else {
         setError('No se pudo crear la sesión.')
         setLoading(false)

@@ -44,3 +44,15 @@ export function resolveRole(dbRole: string | null | undefined, email: string | u
   if (dbRole && DB_ROLE_MAP[dbRole]) return DB_ROLE_MAP[dbRole]
   return ROLE_MAP[email || ''] || 'staff'
 }
+
+// Roles que operan solo en el POS — post-login van a /pos, no al dashboard.
+export const POS_ONLY_ROLES: DashboardRole[] = ['mesero', 'staff', 'cajero']
+
+export function resolveLoginRedirect(
+  role: DashboardRole | null | undefined,
+  clientId: string | null | undefined,
+): string {
+  if (clientId === 'demo') return '/demo/dashboard'
+  if (role && POS_ONLY_ROLES.includes(role)) return '/pos'
+  return '/'
+}

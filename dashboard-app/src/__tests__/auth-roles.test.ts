@@ -9,6 +9,7 @@ vi.mock('@/lib/supabase-browser', () => ({
 }))
 
 import { canAccessPage, type DashboardRole } from '@/contexts/AuthContext'
+import { resolveLoginRedirect } from '@/lib/roles'
 
 // ─── dueño — full access ─────────────────────────────────────────────────
 
@@ -210,5 +211,27 @@ describe('canAccessPage — edge cases', () => {
 
   it('dueño can access empty path', () => {
     expect(canAccessPage('dueño', '')).toBe(true)
+  })
+})
+
+// ─── resolveLoginRedirect — post-login redirect por rol ──────────────────
+
+describe('resolveLoginRedirect', () => {
+  it('dueño → dashboard', () => expect(resolveLoginRedirect('dueño', 'vantara')).toBe('/'))
+  it('gerente → dashboard', () => expect(resolveLoginRedirect('gerente', 'nomada-mini')).toBe('/'))
+  it('capitan → dashboard', () => expect(resolveLoginRedirect('capitan', 'vantara')).toBe('/'))
+  it('cajero → /pos', () => expect(resolveLoginRedirect('cajero', 'vantara')).toBe('/pos'))
+  it('mesero → /pos', () => expect(resolveLoginRedirect('mesero', 'nomada-mini')).toBe('/pos'))
+  it('staff → /pos', () => expect(resolveLoginRedirect('staff', 'prueba-3')).toBe('/pos'))
+  it('demo client → /demo/dashboard sin importar rol', () => expect(resolveLoginRedirect('dueño', 'demo')).toBe('/demo/dashboard'))
+  it('rol null → dashboard (default seguro)', () => expect(resolveLoginRedirect(null, 'vantara')).toBe('/'))
+  it('resultado independiente del tenant para mismo rol', () => {
+    expect(resolveLoginRedirect('dueño', 'vantara')).toBe('/')
+    expect(resolveLoginRedirect('dueño', 'nomada-mini')).toBe('/')
+    expect(resolveLoginRedirect('dueño', 'prueba-3')).toBe('/')
+  })
+  it('mesero en cualquier tenant → /pos', () => {
+    expect(resolveLoginRedirect('mesero', 'vantara')).toBe('/pos')
+    expect(resolveLoginRedirect('mesero', 'nomada-mini')).toBe('/pos')
   })
 })
