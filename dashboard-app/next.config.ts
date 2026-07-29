@@ -44,6 +44,21 @@ const securityHeaders = [
   },
 ];
 
+// SANDBOX_ENV=true → rechaza el build si NEXT_PUBLIC_SUPABASE_URL apunta a AMALAY producción.
+// Este guard corre en el servidor de CI/Vercel, nunca en el browser.
+if (process.env.SANDBOX_ENV === 'true') {
+  const sandboxUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  if (sandboxUrl.includes('qjiomlvudfmzuvqvhwpk')) {
+    throw new Error(
+      '[SANDBOX] NEXT_PUBLIC_SUPABASE_URL apunta al proyecto AMALAY producción (qjiomlvudfmzuvqvhwpk). ' +
+      'El proyecto Vercel fullsite-sandbox debe usar las credenciales de fullsite-sandbox.'
+    );
+  }
+  if (!sandboxUrl) {
+    throw new Error('[SANDBOX] NEXT_PUBLIC_SUPABASE_URL está vacío. Configurar en Vercel → fullsite-sandbox → Env vars.');
+  }
+}
+
 // CAPACITOR_OFFLINE=1 → static export para empaquetar el bundle dentro
 // de la app nativa (POS offline). headers() no aplica en export.
 const isCapacitorOffline = process.env.CAPACITOR_OFFLINE === '1';
