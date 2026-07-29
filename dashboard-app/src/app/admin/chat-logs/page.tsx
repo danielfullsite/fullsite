@@ -156,7 +156,7 @@ export default function ChatLogsPage() {
                         <Clock size={12} />
                         {formatTime(log.created_at)}
                       </span>
-                      {log.client_id !== 'amalay' && (
+                      {log.client_id && (
                         <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full">{log.client_id}</span>
                       )}
                       {log.had_error && log.error_type && (

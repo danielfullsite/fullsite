@@ -20,7 +20,7 @@ interface GiftCard {
   client_id: string
 }
 
-const empty: GiftCard = { code:'', initial_balance:0, current_balance:0, customer_name:'', customer_phone:'', status:'active', expires_at:'', client_id:'amalay' }
+const empty: Omit<GiftCard, 'client_id'> = { code:'', initial_balance:0, current_balance:0, customer_name:'', customer_phone:'', status:'active', expires_at:'' }
 
 const genCode = () => Math.random().toString(36).substring(2,6).toUpperCase() + Math.floor(1000+Math.random()*9000)
 
@@ -90,7 +90,7 @@ export default function TarjetasRegaloPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Tarjetas de Regalo" subtitle="Gestionar gift cards" action={
-        <button onClick={() => setEditing({...empty, code: genCode()})} className="flex items-center gap-1.5 bg-[var(--surface)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--surface-2)]"><Plus size={16}/>Nueva</button>
+        <button onClick={() => setEditing({...empty, code: genCode(), client_id: CLIENT_ID ?? ''})} className="flex items-center gap-1.5 bg-[var(--surface)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--surface-2)]"><Plus size={16}/>Nueva</button>
       }/>
 
       {editing && (

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
-onboard_client.py — Fullsite tenant onboarding in a single command.
+onboard_client.py — Sandbox Client Bootstrap.
+
+NOTA: Esta herramienta aprovisiona clientes en el entorno sandbox para demos
+y validaciones de portabilidad. NO es el flujo de provisioning SaaS definitivo.
+El provisioning de producción requerirá: organizations, branches, memberships,
+capabilities y el flujo de Foundation. Ver sandbox/foundation branch.
+
+Fullsite tenant onboarding in a single command.
 
 Applies migrations (if schema not yet present), creates client, seeds restaurant
 data from a template, creates auth user, links client_users, and validates.
@@ -871,13 +878,24 @@ def run_onboarding(args):
     print("    4. Add domain in Vercel → sandbox.app.fullsite.mx")
 
     if show_password and not dry_run:
-        print()
-        print("  ╔═══════════════════════════════════════════════════════════════╗")
-        print("  ║  OWNER CREDENTIALS — SAVE NOW — NOT STORED ANYWHERE ELSE     ║")
-        print(f"  ║  Email:    {email:<51s}║")
-        print(f"  ║  Password: {owner_pwd:<51s}║")
-        print("  ║  Change before sharing with the client.                      ║")
-        print("  ╚═══════════════════════════════════════════════════════════════╝")
+        if sys.stdout.isatty():
+            # Interactive terminal: show once in-band
+            print()
+            print("  ╔═══════════════════════════════════════════════════════════════╗")
+            print("  ║  OWNER CREDENTIALS — SAVE NOW — NOT STORED ANYWHERE ELSE     ║")
+            print(f"  ║  Email:    {email:<51s}║")
+            print(f"  ║  Password: {owner_pwd:<51s}║")
+            print("  ║  Change before sharing with the client.                      ║")
+            print("  ╚═══════════════════════════════════════════════════════════════╝")
+        else:
+            # Non-interactive (CI, pipe, Vercel): write to file with 0600, never print to stdout
+            cred_path = Path(f"/tmp/fullsite-creds-{client_id}.txt")
+            cred_path.write_text(f"email={email}\npassword={owner_pwd}\nclient_id={client_id}\n")
+            cred_path.chmod(0o600)
+            print()
+            print(f"  Non-interactive mode: credentials written to {cred_path}")
+            print(f"  Read and delete: cat {cred_path} && rm {cred_path}")
+            print(f"  File is 0600 — readable only by current user. Delete after use.")
 
     print()
     print(f"  Cloneability Time: {total:.0f}s ({total/60:.1f} min) automated")

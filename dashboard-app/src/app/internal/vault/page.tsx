@@ -68,6 +68,7 @@ export default function VaultPage() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
+  const [availableClients, setAvailableClients] = useState<{id: string, display_name: string}[]>([])
 
   // Form state
   const [form, setForm] = useState({ client_id: getActiveClientSlug(), category: 'delivery', name: '', username: '', password: '', url: '', notes: '' })
@@ -85,6 +86,13 @@ export default function VaultPage() {
   }
 
   useEffect(() => { fetchCredentials() }, [])
+
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/clients?select=id,display_name&order=display_name.asc`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setAvailableClients(data || []))
+  }, [])
 
   const handleAdd = async () => {
     if (!form.name) return
@@ -167,7 +175,7 @@ export default function VaultPage() {
                 <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}
                   className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-sm">
                   <option value="fullsite">Fullsite (interno)</option>
-                  <option value="amalay">AMALAY</option>
+                  {availableClients.map(c => <option key={c.id} value={c.id}>{c.display_name}</option>)}
                 </select>
               </div>
               <div>
