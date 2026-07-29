@@ -54,6 +54,7 @@ import json
 import os
 import re
 import secrets
+import ssl
 import string
 import subprocess
 import sys
@@ -62,6 +63,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+# Sandbox: bypass SSL cert verification (macOS Python 3.11 cert issue)
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
 # ── Security ──────────────────────────────────────────────────────────────────
 AMALAY_PROJECT_REF = "qjiomlvudfmzuvqvhwpk"
@@ -244,7 +250,7 @@ def _req(method, url, body, headers, timeout=20):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
             raw = r.read()
             return r.status, json.loads(raw) if raw else []
     except urllib.error.HTTPError as e:
@@ -253,6 +259,8 @@ def _req(method, url, body, headers, timeout=20):
             return e.code, json.loads(raw)
         except Exception:
             return e.code, raw
+    except (urllib.error.URLError, OSError) as e:
+        return 0, str(e)
 
 
 def get(url, headers):
@@ -561,7 +569,7 @@ def run_onboarding(args):
             log.warn("Schema not applied yet. Apply migrations first.")
             log.warn("Migrations dir: scripts/sql/sandbox/migrations/")
             log.warn("Or set DATABASE_URL to apply via psql automatically.")
-            if db_url:
+            if db_url and not dry_run:
                 log.section("  Applying migrations via psql")
                 ok = apply_migrations_via_psql(db_url, log)
                 if not ok:
