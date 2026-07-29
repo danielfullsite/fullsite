@@ -1,17 +1,23 @@
-// Clip PinPad API — integración con terminales Clip de AMALAY
-// Flujo: POS envía monto → API crea intención de pago → terminal Clip carga orden → cliente paga → webhook
-// Docs: developer.clip.mx
+// Clip PinPad API — integración con terminales Clip.
+// Auth: requires valid POS shift token or Supabase session (withPOSAuth).
+// API key: reads CLIP_API_KEY env first; client-supplied fallback for migration.
+// TODO P0-I Phase 2: drop client-supplied apiKey; read from credentials_vault by clientId.
 
 import { NextRequest } from 'next/server'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
 
 const CLIP_API_URL = 'https://api-gw.payclip.com/pinpad/v2'
 
 export async function POST(request: NextRequest) {
   try {
-    const { action, apiKey, amount, orderId, deviceSerial, pinpadRequestId } = await request.json()
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
 
+    const { action, apiKey: clientApiKey, amount, orderId, deviceSerial, pinpadRequestId } = await request.json()
+
+    const apiKey = process.env.CLIP_API_KEY || clientApiKey
     if (!apiKey) {
-      return Response.json({ error: 'Clip API key requerido' }, { status: 400 })
+      return Response.json({ error: 'Clip API key no configurado' }, { status: 503 })
     }
 
     const headers = {

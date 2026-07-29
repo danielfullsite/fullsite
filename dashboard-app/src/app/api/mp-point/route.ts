@@ -1,19 +1,23 @@
 import { NextRequest } from 'next/server'
+import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+
+// MP Point Smart API proxy.
+// Auth: requires valid POS shift token or Supabase session (withPOSAuth).
+// accessToken: reads MP_ACCESS_TOKEN env first; client-supplied fallback for
+//   orgs that haven't migrated to server-side key storage yet (P0-H Phase 2).
+// TODO P0-H Phase 2: read accessToken from credentials_vault keyed by clientId;
+//   drop client-supplied accessToken entirely.
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth gate: require either a Supabase session cookie or the x-pos-staff header
-    // that the POS sets from sessionStorage after PIN login.
-    const hasPosStaff = !!request.headers.get('x-pos-staff')
-    const hasSession = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
-    if (!hasPosStaff && !hasSession) {
-      return Response.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const auth = await withPOSAuth(request)
+    if (!auth) return unauthorized()
 
-    const { action, accessToken, deviceId, amount, orderId, paymentIntentId, paymentId, installments, installments_cost, tip_enabled, print_on_terminal, mode } = await request.json()
+    const { action, accessToken: clientToken, deviceId, amount, orderId, paymentIntentId, paymentId, installments, installments_cost, tip_enabled, print_on_terminal, mode } = await request.json()
 
+    const accessToken = process.env.MP_ACCESS_TOKEN || clientToken
     if (!accessToken) {
-      return Response.json({ error: 'Access token requerido' }, { status: 400 })
+      return Response.json({ error: 'MP access token no configurado' }, { status: 503 })
     }
 
     const headers = {

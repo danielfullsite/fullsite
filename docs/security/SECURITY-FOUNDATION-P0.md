@@ -12,20 +12,20 @@
 
 | ID | Título | Estado |
 |---|---|---|
-| P0-A | user_metadata user-writable → privilege escalation | IN_PROGRESS |
-| P0-B | credentials_vault — any authenticated user reads all tenants' keys | IN_PROGRESS |
-| P0-C | clients table — anon enumeration + cross-tenant R/W | IN_PROGRESS |
-| P0-D | Auth tokens in localStorage (XSS → permanent session) | OPEN |
-| P0-E | PIN cache btoa() reversible — not a hash | IN_PROGRESS |
-| P0-F | /api/pos/save-order — no auth + client-provided totals | IN_PROGRESS |
-| P0-G | /api/pos/merge-orders — no auth + client-provided totals | IN_PROGRESS |
-| P0-H | /api/mp-point — forgeable auth header + client-provided amount | OPEN |
-| P0-I | /api/clip-pinpad — unauthenticated + client provides API key + amount | OPEN |
-| P0-J | /api/deepgram-token — returns raw API key to anonymous callers | IN_PROGRESS |
-| P0-K | /api/webhook/ubereats — HMAC verification not implemented | IN_PROGRESS |
-| P0-L | /api/factura/timbrar — no tenant isolation on CFDI lookup | IN_PROGRESS |
-| P0-M | /api/onboarding — open when ONBOARDING_SECRET not set | IN_PROGRESS |
-| P0-N | getClientId() systemic — x-client-id client-controlled, ~25 routes unauth | IN_PROGRESS |
+| P0-A | user_metadata user-writable → privilege escalation | CLOSED |
+| P0-B | credentials_vault — any authenticated user reads all tenants' keys | CLOSED (staging DB) |
+| P0-C | clients table — anon enumeration + cross-tenant R/W | CLOSED (staging DB) |
+| P0-D | Auth tokens in localStorage (XSS → permanent session) | OPEN (Phase 2 — @supabase/ssr) |
+| P0-E | PIN cache btoa() reversible — not a hash | CLOSED |
+| P0-F | /api/pos/save-order — no auth + client-provided totals | CLOSED (auth gate) / OPEN (totals — Phase 2) |
+| P0-G | /api/pos/merge-orders — no auth + client-provided totals | CLOSED (auth gate) / OPEN (totals — Phase 2) |
+| P0-H | /api/mp-point — forgeable auth header + client-provided amount | CLOSED (auth gate) / OPEN (server-side key — Phase 2) |
+| P0-I | /api/clip-pinpad — unauthenticated + client provides API key + amount | CLOSED (auth gate) / OPEN (server-side key — Phase 2) |
+| P0-J | /api/deepgram-token — returns raw API key to anonymous callers | CLOSED |
+| P0-K | /api/webhook/ubereats — HMAC verification not implemented | CLOSED |
+| P0-L | /api/factura/timbrar — no tenant isolation on CFDI lookup | CLOSED |
+| P0-M | /api/onboarding — open when ONBOARDING_SECRET not set | CLOSED |
+| P0-N | getClientId() systemic — x-client-id client-controlled, ~25 routes unauth | CLOSED (withPOSAuth on all mutation routes) |
 
 ---
 
