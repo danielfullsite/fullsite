@@ -1,6 +1,6 @@
 # DOCS MIGRATION MANIFEST
 
-**Estado:** EN PROGRESO — Ventana 1 y 2 completadas; Ventana 3 y 4 bloqueadas por workstreams activos  
+**Estado:** EN PROGRESO — Ventana 1 y 2 completadas; Ventana 3 parcialmente desbloqueada (1/3 deps ✅)  
 **Propósito:** Registrar la decisión de destino de cada documento antes de ejecutar la migración.  
 **Fecha de auditoría:** 2026-07-27  
 **Última actualización:** 2026-07-27  
@@ -23,9 +23,9 @@
 
 ### Condiciones de desbloqueo para Ventana 3
 
-- [ ] Workstream **MT-03** (orphan references) mergeado a main
-- [ ] Workstream **OFFLINE-100** (offline certification) mergeado a main  
-- [ ] Workstream **CFG-01** (Production Acceptance) mergeado a main
+- [x] Workstream **MT-03** (orphan references) — CERRADO en main `4fed28e` / `b86a5d3` (2026-07-27)
+- [ ] Workstream **OFFLINE-100** (offline certification) — pendiente
+- [ ] Workstream **CFG-01** (Production Acceptance) — pendiente
 
 ### Conflicto A — Legacy P0s — Resuelto 2026-07-27
 
@@ -70,7 +70,7 @@ ventana controlada.**
 
 | Ruta | Workstream activo | Commits recientes | Estado freeze | Condición de descongelamiento |
 |------|-------------------|-------------------|---------------|-------------------------------|
-| `docs/migrations/` | Migration Engine (mt-03) | `ad13889`, `2523df0` (2026-07-27) | 🔴 FROZEN-FOR-MOVE | mt-03 completado y mergeado a main |
+| `docs/migrations/` | Migration Engine (mt-03) | `4fed28e`, `b86a5d3` (2026-07-27) | 🟡 FROZEN-PENDING-V3 | MT-03 ✅ mergeado. Descongelado cuando OFFLINE-100 + CFG-01 también en main |
 | `docs/state/` | Multiple (mt-03, offline, CFG) | `ad13889` modifica state/ indirectamente | 🔴 FROZEN-FOR-MOVE | Todos los workstreams activos mergeados |
 | `docs/architecture/` | Offline (OFFLINE-MASTER, PER series) | `a8385f5`, `f5147d9` | 🔴 FROZEN-FOR-MOVE | Offline hardening completado |
 | `docs/architecture/adr/` | Architecture (ADR-CONCURRENCY, otros) | En uso por migration docs | 🔴 FROZEN-FOR-MOVE | Con docs/architecture/ |

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS pos_local_events (
   type           TEXT    NOT NULL,
   ts             BIGINT  NOT NULL,
   terminal_id    UUID,                  -- dispositivo de origen; NULL si server-originated
-  restaurant_id  UUID    NOT NULL,      -- identidad del tenant
+  restaurant_id  TEXT    NOT NULL,      -- identidad del tenant; clients.id es TEXT
   payload        JSONB   NOT NULL,
 
   CONSTRAINT pos_local_events_pkey
@@ -71,7 +71,7 @@ CREATE POLICY pos_local_events_tenant_admin_read
 
 CREATE TABLE IF NOT EXISTS pos_authority_transitions (
   id                         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id              UUID        NOT NULL REFERENCES clients(id),
+  restaurant_id              TEXT        NOT NULL REFERENCES clients(id),
 
   -- Dirección del cambio de autoridad.
   direction                  TEXT        NOT NULL,

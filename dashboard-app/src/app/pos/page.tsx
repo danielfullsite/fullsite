@@ -1626,8 +1626,10 @@ function POSContent() {
       if (turno) {
         setTurnoId(turno.id)
         try { localStorage.setItem('pos_turno_id', turno.id) } catch { /* ignore */ }
-      } else {
-        // Online but no active turno — clear stale cache
+      } else if (navigator.onLine) {
+        // Only clear the cached turno id when we are actually online and confirmed
+        // there is no open turno. Clearing while offline would wipe the localStorage
+        // seed that makes turnoId available after a cold offline restart.
         try { localStorage.removeItem('pos_turno_id') } catch { /* ignore */ }
       }
       // Pre-cache all modifier + payment data for offline cold-start (fire-and-forget)
@@ -1733,8 +1735,8 @@ function POSContent() {
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)
     updateCount()
-    // Periodic sync every 30s
-    const interval = setInterval(() => { if (navigator.onLine) updateCount() }, 30000)
+    // Periodic count refresh every 30s — reads IndexedDB only (no network needed offline)
+    const interval = setInterval(updateCount, 30000)
     return () => { mounted = false; window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); clearInterval(interval) }
   }, [])
 
@@ -2879,6 +2881,12 @@ function POSContent() {
           return n
         })
         setLoadedOrderId(order.id)
+        // Optimistic revision bump: if payment (B-03) also happens offline, its
+        // expected_revision must be 1 higher than this send's queued revision.
+        // If internet returns before payment, saveResult.revision (line ~3161) overrides this.
+        setOrderRevision(prev => prev + 1)
+        // Immediate count refresh: interval only fires every 30s, but IDB is local.
+        getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline
         fetch('http://127.0.0.1:7717/events', {
           method: 'POST',
@@ -3175,6 +3183,7 @@ function POSContent() {
       setShowMixto(false); setMixtoPagos([]); setMixtoMonto(''); setSillaActual(1)
       setTiempoFired(0); setSplitPayingCuenta(0); setSplitAssignments({})
       setSplitCount(0); setSplitMode(null); setSplitParejoN(0); setOrderId(generateId())
+      getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
       return
     }
     const ok = saveResult.ok

@@ -316,9 +316,19 @@ async function replayViaAppApi(item: SyncQueueItem): Promise<AppApiReplayResult>
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const url = `${base}${apiPath}`
 
+  // Pass x-client-id so the route's getClientId() returns the correct client,
+  // same as the original saveOrder call. Without this, p_client_id = '' in the RPC.
+  let clientId = ''
+  if (typeof window !== 'undefined') {
+    try { clientId = localStorage.getItem('fullsite_client_id') || '' } catch {}
+  }
+
   const res = await fetch(url, {
     method: item.method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(clientId ? { 'x-client-id': clientId } : {}),
+    },
     body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
   })
 

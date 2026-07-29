@@ -50,7 +50,20 @@ export default function BarraPage() {
       prevCountRef.current = newEnviadas
       setOrders(allOrders)
     } catch {
-      // Nunca dejar el spinner colgado (p. ej. sin red)
+      // Offline — merge cached orders from IndexedDB into current state
+      // (same pattern as cocina/page.tsx so barra survives reload without internet)
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const [env, prep] = await Promise.all([getCachedOrders('enviada'), getCachedOrders('preparando')])
+        const cached = [...env, ...prep] as unknown as KitchenOrderFromDB[]
+        if (cached.length > 0) {
+          setOrders(prev => {
+            const existing = new Set(prev.map(o => o.id))
+            const fresh = cached.filter(o => !existing.has(o.id))
+            return fresh.length > 0 ? [...prev, ...fresh] : prev
+          })
+        }
+      } catch { /* IndexedDB not available */ }
     } finally {
       setLoading(false)
       setOffline(typeof navigator !== 'undefined' && !navigator.onLine)

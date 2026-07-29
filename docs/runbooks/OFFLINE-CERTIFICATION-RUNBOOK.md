@@ -570,19 +570,35 @@ RESULTADO FASE 2 (sin internet):
 
 #### B-04-OFFLINE — La orden aparece en sync queue
 
-```
-ACCIÓN:
-  Después de B-02-OFFLINE y B-03-OFFLINE, abrir el browser en la Caja
-  y consultar: http://127.0.0.1:7717/health
+> **Nota de implementación (2026-07-28):**
+> El sistema tiene DOS colas separadas:
+> 1. **Browser IndexedDB `sync_queue`** — operaciones Supabase REST pendientes (POST /api/pos/save-order).
+>    Visible en la UI mediante el componente **OfflineIndicator** (esquina superior del POS).
+> 2. **EventStore del bridge `events.ndjson`** — eventos que el bridge local aún no sincronizó.
+>    Visible via `http://127.0.0.1:7717/health` → campo `sync_queue_size` (no `sync_queue_pending`).
+>
+> El bridge NO puede leer el IndexedDB del browser. Verificar ambas colas por separado.
 
-OBSERVAR:
-  ¿El campo sync_queue_pending muestra un número > 0?
+```
+ACCIÓN A — Cola del browser (IndexedDB):
+  En el POS (después de B-02-OFFLINE y B-03-OFFLINE), mirar la esquina
+  superior de la pantalla buscando el OfflineIndicator.
+
+OBSERVAR A:
+  ¿Aparece un indicador con número de operaciones pendientes?
+  Anotar el número exacto.
+
+ACCIÓN B — Cola del bridge (EventStore):
+  En el browser de la Caja: http://127.0.0.1:7717/health
+
+OBSERVAR B:
+  ¿El campo sync_queue_size muestra un número > 0?
   Copiar la respuesta completa.
 
 RESULTADO FASE 2 (sin internet):
   Estado: [ ] PASS  [ ] FAIL  [ ] GAP  [ ] UNKNOWN
-  sync_queue_pending:
-  Respuesta /health:
+  OfflineIndicator (browser IndexedDB): _____ operaciones pendientes
+  sync_queue_size (bridge EventStore):  _____
   Notas:
 ```
 

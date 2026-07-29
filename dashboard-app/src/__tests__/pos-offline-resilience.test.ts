@@ -1077,6 +1077,64 @@ describe('Modifier pricing', () => {
 })
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// turnoId cache lifecycle — cold offline regression (pos/page.tsx:1626-1632)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Replicates the exact branch in pos/page.tsx useEffect that loads turno state.
+// The fix: only removeItem when navigator.onLine is true.
+function applyTurnoResult(
+  turno: { id: string } | null,
+  isOnline: boolean,
+  store: Map<string, string>,
+): void {
+  if (turno) {
+    store.set('pos_turno_id', turno.id)
+  } else if (isOnline) {
+    store.delete('pos_turno_id')
+  }
+  // Offline + no turno → do nothing (preserve whatever seed exists)
+}
+
+describe('turnoId localStorage cache — cold offline regression', () => {
+  it('online + turno found → sets pos_turno_id', () => {
+    const store = new Map<string, string>()
+    applyTurnoResult({ id: 'turno-abc' }, true, store)
+    expect(store.get('pos_turno_id')).toBe('turno-abc')
+  })
+
+  it('online + no turno → removes pos_turno_id', () => {
+    const store = new Map<string, string>([['pos_turno_id', 'stale-turno']])
+    applyTurnoResult(null, true, store)
+    expect(store.has('pos_turno_id')).toBe(false)
+  })
+
+  it('offline + no turno → PRESERVES pos_turno_id (regression fix)', () => {
+    const store = new Map<string, string>([['pos_turno_id', 'turno-from-prior-session']])
+    applyTurnoResult(null, false, store)
+    // Must NOT delete — this was the bug
+    expect(store.get('pos_turno_id')).toBe('turno-from-prior-session')
+  })
+
+  it('offline + no turno + no prior seed → leaves store empty, does not throw', () => {
+    const store = new Map<string, string>()
+    expect(() => applyTurnoResult(null, false, store)).not.toThrow()
+    expect(store.has('pos_turno_id')).toBe(false)
+  })
+
+  it('offline + turno found (from getActiveTurno localStorage cache) → sets id', () => {
+    const store = new Map<string, string>()
+    applyTurnoResult({ id: 'turno-cached-24h' }, false, store)
+    expect(store.get('pos_turno_id')).toBe('turno-cached-24h')
+  })
+
+  it('online + new turno overwrites stale turno id', () => {
+    const store = new Map<string, string>([['pos_turno_id', 'yesterday-turno']])
+    applyTurnoResult({ id: 'todays-turno' }, true, store)
+    expect(store.get('pos_turno_id')).toBe('todays-turno')
+  })
+})
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Additional: Audit action types
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

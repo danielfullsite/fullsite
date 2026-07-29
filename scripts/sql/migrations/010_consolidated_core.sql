@@ -161,7 +161,7 @@ DO 21423 BEGIN
   ALTER TABLE client_users ADD CONSTRAINT client_users_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id);
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 DO 21423 BEGIN
-  ALTER TABLE client_users ADD CONSTRAINT client_users_user_id_fkey FOREIGN KEY (user_id) REFERENCES null();
+  ALTER TABLE client_users ADD CONSTRAINT client_users_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
 EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS credentials_vault (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
