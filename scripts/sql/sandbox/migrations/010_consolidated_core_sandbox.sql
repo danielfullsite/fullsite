@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS agent_results (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE agent_results ADD CONSTRAINT agent_results_client_id_agent_id_fecha_key UNIQUE (client_id, agent_id, fecha);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_agent_results_agent ON public.agent_results USING btree (client_id, agent_id, fecha DESC);
 CREATE TABLE IF NOT EXISTS agent_runs (
   id BIGSERIAL,
@@ -65,27 +65,6 @@ CREATE TABLE IF NOT EXISTS agent_runs (
   PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_created ON public.agent_runs USING btree (agent_id, created_at DESC);
-  id UUID DEFAULT gen_random_uuid() NOT NULL,
-  nombre TEXT NOT NULL,
-  telefono TEXT,
-  fecha DATE NOT NULL,
-  espacio TEXT NOT NULL,
-  horario_inicio TIME WITHOUT TIME ZONE NOT NULL,
-  horario_fin TIME WITHOUT TIME ZONE NOT NULL,
-  guests INTEGER NOT NULL,
-  paquete TEXT,
-  pastel TEXT,
-  entradas TEXT[],
-  deco TEXT,
-  total NUMERIC,
-  status TEXT DEFAULT 'pending'::text NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  codigo_reserva TEXT NOT NULL,
-  PRIMARY KEY (id)
-);
-DO 21423 BEGIN
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
 CREATE TABLE IF NOT EXISTS chat_logs (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   client_id TEXT NOT NULL,
@@ -152,9 +131,9 @@ CREATE TABLE IF NOT EXISTS client_locations (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE client_locations ADD CONSTRAINT client_locations_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS client_users (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   user_id UUID,
@@ -163,12 +142,12 @@ CREATE TABLE IF NOT EXISTS client_users (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE client_users ADD CONSTRAINT client_users_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE client_users ADD CONSTRAINT client_users_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS credentials_vault (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   client_id TEXT DEFAULT 'fullsite'::text NOT NULL,
@@ -219,9 +198,9 @@ CREATE TABLE IF NOT EXISTS delivery_orders (
   closed_at TIMESTAMPTZ,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE delivery_orders ADD CONSTRAINT delivery_orders_platform_platform_order_id_key UNIQUE (platform, platform_order_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_delivery_orders_platform ON public.delivery_orders USING btree (platform, platform_order_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_orders_status ON public.delivery_orders USING btree (client_id, status, created_at DESC);
 CREATE TABLE IF NOT EXISTS events (
@@ -236,9 +215,9 @@ CREATE TABLE IF NOT EXISTS events (
   audit JSONB,
   PRIMARY KEY (sequence)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE events ADD CONSTRAINT events_id_key UNIQUE (id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS memories (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   agent_id TEXT NOT NULL,
@@ -282,9 +261,9 @@ CREATE TABLE IF NOT EXISTS ops_daily (
   rows_aggregated INTEGER DEFAULT 0,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE ops_daily ADD CONSTRAINT ops_daily_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_ops_daily_fecha ON public.ops_daily USING btree (client_id, fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_ops_daily_latest ON public.ops_daily USING btree (client_id, fecha DESC, record_type);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ops_daily_close ON public.ops_daily USING btree (client_id, fecha, record_type) WHERE (record_type = ANY (ARRAY['cierre'::text, 'cierre_wansoft'::text]));
@@ -338,9 +317,9 @@ CREATE TABLE IF NOT EXISTS pos_billing_clients (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_billing_clients ADD CONSTRAINT pos_billing_clients_rfc_client_id_key UNIQUE (rfc, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_cash_movements (
   id BIGSERIAL,
   client_id TEXT NOT NULL,
@@ -360,9 +339,9 @@ CREATE TABLE IF NOT EXISTS pos_category_modifiers (
   modifier_group_id TEXT NOT NULL,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_category_modifiers ADD CONSTRAINT pos_category_modifiers_client_id_category_id_modifier_group_key UNIQUE (client_id, category_id, modifier_group_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_cfdi_requests (
   id TEXT NOT NULL,
   client_id TEXT NOT NULL,
@@ -456,9 +435,9 @@ CREATE TABLE IF NOT EXISTS pos_customers (
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_customers ADD CONSTRAINT pos_customers_client_id_phone_key UNIQUE (client_id, phone);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_pos_customers_client_id ON public.pos_customers USING btree (client_id);
 CREATE INDEX IF NOT EXISTS idx_pos_customers_last_visit ON public.pos_customers USING btree (client_id, last_visit DESC);
 CREATE INDEX IF NOT EXISTS idx_pos_customers_phone ON public.pos_customers USING btree (client_id, phone);
@@ -472,9 +451,9 @@ CREATE TABLE IF NOT EXISTS pos_customer_visits (
   visited_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_customer_visits ADD CONSTRAINT pos_customer_visits_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES pos_customers(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_pos_customer_visits_client ON public.pos_customer_visits USING btree (client_id);
 CREATE INDEX IF NOT EXISTS idx_pos_customer_visits_customer ON public.pos_customer_visits USING btree (customer_id);
 CREATE INDEX IF NOT EXISTS idx_pos_customer_visits_date ON public.pos_customer_visits USING btree (visited_at DESC);
@@ -546,9 +525,9 @@ CREATE TABLE IF NOT EXISTS pos_presentations (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_presentations ADD CONSTRAINT uq_pres_client_code UNIQUE (client_id, code);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_ingredient_presentations (
   id BIGSERIAL,
   client_id TEXT NOT NULL,
@@ -561,12 +540,12 @@ CREATE TABLE IF NOT EXISTS pos_ingredient_presentations (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_ingredient_presentations ADD CONSTRAINT uq_ip_client_ingredient_pres UNIQUE (client_id, ingredient_id, presentation_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_ingredient_presentations ADD CONSTRAINT pos_ingredient_presentations_presentation_id_fkey FOREIGN KEY (presentation_id) REFERENCES pos_presentations(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_ip_ingredient ON public.pos_ingredient_presentations USING btree (ingredient_id);
 CREATE TABLE IF NOT EXISTS pos_ingredients (
   id TEXT NOT NULL,
@@ -587,9 +566,9 @@ CREATE TABLE IF NOT EXISTS pos_ingredients (
   sat_unit_key TEXT,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_ingredients ADD CONSTRAINT uq_ingredients_client_id UNIQUE (client_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_insumos (
   id BIGINT NOT NULL,
   client_id TEXT NOT NULL,
@@ -617,9 +596,9 @@ CREATE TABLE IF NOT EXISTS pos_inventory (
   stock_unit TEXT,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_inventory ADD CONSTRAINT pos_inventory_client_id_ingredient_id_key UNIQUE (client_id, ingredient_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_inventory_alerts (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   client_id TEXT NOT NULL,
@@ -643,9 +622,9 @@ CREATE TABLE IF NOT EXISTS pos_inventory_products (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_inventory_products ADD CONSTRAINT pos_inventory_products_client_id_name_key UNIQUE (client_id, name);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_inv_products_client ON public.pos_inventory_products USING btree (client_id);
 CREATE INDEX IF NOT EXISTS idx_inv_products_name ON public.pos_inventory_products USING btree (name);
 CREATE TABLE IF NOT EXISTS pos_market_stock (
@@ -659,12 +638,12 @@ CREATE TABLE IF NOT EXISTS pos_market_stock (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_market_stock ADD CONSTRAINT pos_market_stock_client_id_menu_item_id_key UNIQUE (client_id, menu_item_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_market_stock ADD CONSTRAINT uq_market_stock_client_item_id UNIQUE (client_id, menu_item_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_market_stock_item ON public.pos_market_stock USING btree (menu_item_id);
 CREATE TABLE IF NOT EXISTS pos_menu_categories (
   id TEXT NOT NULL,
@@ -692,12 +671,12 @@ CREATE TABLE IF NOT EXISTS pos_menu_items (
   aplica_cortesia BOOLEAN DEFAULT true,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_menu_items ADD CONSTRAINT uq_menu_items_client_id UNIQUE (client_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_menu_items ADD CONSTRAINT pos_menu_items_category_id_fkey FOREIGN KEY (category_id) REFERENCES pos_menu_categories(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_menu_items_cat ON public.pos_menu_items USING btree (category_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_client ON public.pos_menu_items USING btree (client_id);
 CREATE TABLE IF NOT EXISTS pos_recipe_versions (
@@ -717,18 +696,18 @@ CREATE TABLE IF NOT EXISTS pos_recipe_versions (
   deactivated_at TIMESTAMPTZ,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_recipe_versions ADD CONSTRAINT pos_recipe_versions_client_id_menu_item_id_id_key UNIQUE (client_id, menu_item_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_recipe_versions ADD CONSTRAINT pos_recipe_versions_client_id_menu_item_id_version_key UNIQUE (client_id, menu_item_id, version);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_recipe_versions ADD CONSTRAINT uq_recipe_versions_client_id UNIQUE (client_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_recipe_versions ADD CONSTRAINT pos_recipe_versions_client_id_menu_item_id_fkey FOREIGN KEY (client_id, client_id, menu_item_id, menu_item_id) REFERENCES pos_menu_items(id, client_id, client_id, id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_recipe_versions ADD CONSTRAINT pos_recipe_versions_client_id_menu_item_id_fkey FOREIGN KEY (client_id, menu_item_id) REFERENCES pos_menu_items(client_id, id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_recipe_active ON public.pos_recipe_versions USING btree (client_id, menu_item_id) WHERE (active = true);
 CREATE TABLE IF NOT EXISTS pos_reconciliation_results (
   id BIGSERIAL,
@@ -747,15 +726,15 @@ CREATE TABLE IF NOT EXISTS pos_reconciliation_results (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_reconciliation_results ADD CONSTRAINT pos_reconciliation_results_client_id_order_id_order_item_id_key UNIQUE (client_id, order_id, order_item_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_reconciliation_results ADD CONSTRAINT pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey FOREIGN KEY (client_id, client_id, client_id, menu_item_id, menu_item_id, menu_item_id, pinned_market_stock_id, pinned_market_stock_id, pinned_market_stock_id) REFERENCES pos_market_stock(menu_item_id, client_id, id, client_id, menu_item_id, id, id, menu_item_id, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_reconciliation_results ADD CONSTRAINT pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey FOREIGN KEY (client_id, client_id, client_id, menu_item_id, menu_item_id, menu_item_id, pinned_recipe_version_id, pinned_recipe_version_id, pinned_recipe_version_id) REFERENCES pos_recipe_versions(id, menu_item_id, client_id, id, menu_item_id, client_id, client_id, id, menu_item_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_reconciliation_results ADD CONSTRAINT pos_reconciliation_results_client_id_menu_item_id_pinned_m_fkey FOREIGN KEY (pinned_market_stock_id) REFERENCES pos_market_stock(id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_reconciliation_results ADD CONSTRAINT pos_reconciliation_results_client_id_menu_item_id_pinned_r_fkey FOREIGN KEY (pinned_recipe_version_id) REFERENCES pos_recipe_versions(id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_recon_results_order ON public.pos_reconciliation_results USING btree (client_id, order_id);
 CREATE TABLE IF NOT EXISTS pos_inventory_movements (
   id BIGSERIAL,
@@ -772,12 +751,12 @@ CREATE TABLE IF NOT EXISTS pos_inventory_movements (
   mutation_revision INTEGER,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_inventory_movements ADD CONSTRAINT pos_inventory_movements_product_id_fkey FOREIGN KEY (product_id) REFERENCES pos_inventory_products(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
   ALTER TABLE pos_inventory_movements ADD CONSTRAINT pos_inventory_movements_reconciliation_result_id_fkey FOREIGN KEY (reconciliation_result_id) REFERENCES pos_reconciliation_results(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_inv_mov_created ON public.pos_inventory_movements USING btree (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inv_mov_product ON public.pos_inventory_movements USING btree (product_id);
 CREATE INDEX IF NOT EXISTS idx_inv_mov_reconciliation ON public.pos_inventory_movements USING btree (reconciliation_result_id) WHERE (reconciliation_result_id IS NOT NULL);
@@ -794,15 +773,15 @@ CREATE TABLE IF NOT EXISTS pos_item_inventory_policy (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_client_id_menu_item_id_key UNIQUE (client_id, menu_item_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_client_id_menu_item_id_fkey FOREIGN KEY (client_id, client_id, menu_item_id, menu_item_id) REFERENCES pos_menu_items(id, client_id, id, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_client_id_menu_item_id_market_st_fkey FOREIGN KEY (client_id, client_id, client_id, menu_item_id, menu_item_id, menu_item_id, market_stock_id, market_stock_id, market_stock_id) REFERENCES pos_market_stock(id, client_id, menu_item_id, client_id, menu_item_id, id, id, client_id, menu_item_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_client_id_menu_item_id_fkey FOREIGN KEY (client_id, menu_item_id) REFERENCES pos_menu_items(client_id, id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_item_inventory_policy ADD CONSTRAINT pos_item_inventory_policy_market_stock_id_fkey FOREIGN KEY (market_stock_id) REFERENCES pos_market_stock(id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_item_modifier_groups (
   client_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
@@ -823,9 +802,9 @@ CREATE TABLE IF NOT EXISTS pos_market_movements (
   mutation_revision INTEGER,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_market_movements ADD CONSTRAINT pos_market_movements_reconciliation_result_id_fkey FOREIGN KEY (reconciliation_result_id) REFERENCES pos_reconciliation_results(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_market_mov_created ON public.pos_market_movements USING btree (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_market_mov_item ON public.pos_market_movements USING btree (menu_item_id);
 CREATE INDEX IF NOT EXISTS idx_mkt_mov_reconciliation ON public.pos_market_movements USING btree (reconciliation_result_id) WHERE (reconciliation_result_id IS NOT NULL);
@@ -853,9 +832,9 @@ CREATE TABLE IF NOT EXISTS pos_modifiers (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_modifiers ADD CONSTRAINT pos_modifiers_group_id_fkey FOREIGN KEY (group_id) REFERENCES pos_modifier_groups(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_modifiers_group ON public.pos_modifiers USING btree (group_id);
 CREATE TABLE IF NOT EXISTS pos_mutation_authority (
   client_id TEXT NOT NULL,
@@ -864,9 +843,9 @@ CREATE TABLE IF NOT EXISTS pos_mutation_authority (
   cutover_by TEXT,
   PRIMARY KEY (client_id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_mutation_authority ADD CONSTRAINT pos_mutation_authority_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_orders (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
   client_id TEXT NOT NULL,
@@ -982,18 +961,18 @@ CREATE TABLE IF NOT EXISTS pos_recipe_lines (
   recipe_unit TEXT,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_recipe_version_id_ingredient_id_key UNIQUE (recipe_version_id, ingredient_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_ingredient_id_fkey FOREIGN KEY (client_id, client_id, ingredient_id, ingredient_id) REFERENCES pos_ingredients(client_id, id, id, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_ingredient_id_fkey1 FOREIGN KEY (client_id, client_id, ingredient_id, ingredient_id) REFERENCES pos_inventory(ingredient_id, client_id, ingredient_id, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
-DO 21423 BEGIN
-  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_recipe_version_id_fkey FOREIGN KEY (client_id, client_id, recipe_version_id, recipe_version_id) REFERENCES pos_recipe_versions(id, client_id, id, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_ingredient_id_fkey FOREIGN KEY (client_id, ingredient_id) REFERENCES pos_ingredients(client_id, id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_ingredient_id_fkey1 FOREIGN KEY (client_id, ingredient_id) REFERENCES pos_inventory(client_id, ingredient_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE pos_recipe_lines ADD CONSTRAINT pos_recipe_lines_client_id_recipe_version_id_fkey FOREIGN KEY (client_id, recipe_version_id) REFERENCES pos_recipe_versions(client_id, id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_recipes (
   id BIGINT NOT NULL,
   client_id TEXT NOT NULL,
@@ -1018,9 +997,9 @@ CREATE TABLE IF NOT EXISTS pos_recipes_old (
   ingredient_type TEXT DEFAULT 'ingredient'::text,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_recipes_old ADD CONSTRAINT pos_recipes_client_id_menu_item_id_ingredient_id_key UNIQUE (client_id, menu_item_id, ingredient_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_retail_items (
   id TEXT DEFAULT (gen_random_uuid())::text NOT NULL,
   client_id TEXT NOT NULL,
@@ -1081,9 +1060,9 @@ CREATE TABLE IF NOT EXISTS pos_staff (
   role_display TEXT DEFAULT 'mesero'::text,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_staff ADD CONSTRAINT unique_pin_per_client UNIQUE (pin, client_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_staff_audit (
   id BIGSERIAL,
   client_id TEXT NOT NULL,
@@ -1124,9 +1103,9 @@ CREATE TABLE IF NOT EXISTS pos_sub_recipes (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_sub_recipes ADD CONSTRAINT uq_sub_recipes_client_name UNIQUE (client_id, name);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_sub_recipes_client ON public.pos_sub_recipes USING btree (client_id);
 CREATE TABLE IF NOT EXISTS pos_sub_recipe_ingredients (
   id BIGSERIAL,
@@ -1138,9 +1117,9 @@ CREATE TABLE IF NOT EXISTS pos_sub_recipe_ingredients (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_sub_recipe_ingredients ADD CONSTRAINT pos_sub_recipe_ingredients_sub_recipe_id_fkey FOREIGN KEY (sub_recipe_id) REFERENCES pos_sub_recipes(id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_sri_ingredient ON public.pos_sub_recipe_ingredients USING btree (ingredient_id);
 CREATE INDEX IF NOT EXISTS idx_sri_sub_recipe ON public.pos_sub_recipe_ingredients USING btree (sub_recipe_id);
 CREATE TABLE IF NOT EXISTS pos_suppliers (
@@ -1166,9 +1145,9 @@ CREATE TABLE IF NOT EXISTS pos_suppliers (
   invoice_period TEXT,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_suppliers ADD CONSTRAINT pos_suppliers_client_name_key UNIQUE (client_id, name);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS pos_turnos (
   id TEXT NOT NULL,
   client_id TEXT NOT NULL,
@@ -1192,9 +1171,9 @@ CREATE TABLE IF NOT EXISTS pos_unit_conversions (
   is_system BOOLEAN DEFAULT false,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE pos_unit_conversions ADD CONSTRAINT uq_uc_client_units UNIQUE (client_id, from_unit, to_unit);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS prospects (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
   nombre TEXT,
@@ -1216,9 +1195,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE push_subscriptions ADD CONSTRAINT push_subscriptions_endpoint_key UNIQUE (endpoint);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_push_client ON public.push_subscriptions USING btree (client_id);
 CREATE TABLE IF NOT EXISTS reservaciones (
   id UUID DEFAULT gen_random_uuid() NOT NULL,
@@ -1256,9 +1235,9 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE reviews ADD CONSTRAINT reviews_review_id_key UNIQUE (review_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS reviews_date_idx ON public.reviews USING btree (date DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS reviews_rating_idx ON public.reviews USING btree (rating);
 CREATE INDEX IF NOT EXISTS reviews_status_idx ON public.reviews USING btree (status);
@@ -1300,6 +1279,6 @@ CREATE TABLE IF NOT EXISTS whatsapp_whitelist (
   created_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (id)
 );
-DO 21423 BEGIN
+DO $$ BEGIN
   ALTER TABLE whatsapp_whitelist ADD CONSTRAINT whatsapp_whitelist_phone_number_key UNIQUE (phone_number);
-EXCEPTION WHEN duplicate_object THEN NULL; END 21423;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
