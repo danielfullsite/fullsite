@@ -274,6 +274,30 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
       return
     }
 
+    // ── /fp/* proxy → fingerprint service on port 7718 ───────────────────────
+    // The web app calls /fp/health, /fp/enroll, /fp/auth, /fp/list via this
+    // proxy so it only needs to know about one local port (7717).
+    if (url?.startsWith('/fp')) {
+      const fpPath = url.slice(3) || '/'
+      const fpQuery = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+      const fpUrl = `http://127.0.0.1:7718${fpPath}${fpQuery}`
+      try {
+        const fpReq = require('http').request(fpUrl, { method: req.method, timeout: 90000 }, fpRes => {
+          res.writeHead(fpRes.statusCode, {
+            'Content-Type': fpRes.headers['content-type'] || 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          })
+          fpRes.pipe(res)
+        })
+        fpReq.on('error', () => json(res, 503, { ok: false, error: 'Fingerprint service not running' }))
+        fpReq.setTimeout(90000, () => { fpReq.destroy(); json(res, 504, { ok: false, error: 'Fingerprint timeout' }) })
+        req.pipe(fpReq)
+      } catch (e) {
+        json(res, 503, { ok: false, error: e.message })
+      }
+      return
+    }
+
     json(res, 404, { error: 'Not found' })
   }
 }
