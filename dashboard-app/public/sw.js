@@ -248,28 +248,20 @@ function offlineHTML() {
     <div class="status" id="status">Verificando version local...</div>
   </div>
   <script>
-    var targetUrl = window.location.href;
+    // Read the original URL passed by Electron via ?target= query param.
+    // goOffline() navigates TO that URL so the service worker (registered for
+    // https://app.fullsite.mx) can intercept and serve the page from disk cache.
+    // location.reload() would just reload this file:// page — SW never fires.
+    var params = new URLSearchParams(window.location.search);
+    var targetUrl = params.get('target') || 'https://app.fullsite.mx/pos';
 
-    async function checkCache() {
-      try {
-        // Search all caches for this URL (ignoring query params like ?bridge=)
-        var cached = await caches.match(targetUrl, { ignoreSearch: true });
-        if (!cached) {
-          var base = window.location.origin + window.location.pathname;
-          cached = await caches.match(base) || await caches.match(base.replace(/\\/$/, ''));
-        }
-        if (cached) {
-          document.getElementById('btnContinue').style.display = 'block';
-          document.getElementById('hint').style.display = 'block';
-          document.getElementById('status').textContent = 'Version local disponible';
-          scheduleAutoRedirect();
-        } else {
-          document.getElementById('sceneC').style.display = 'block';
-          document.getElementById('status').textContent = 'Sin version local — requiere internet para activar';
-        }
-      } catch(e) {
-        document.getElementById('status').textContent = 'Modo offline activo';
-      }
+    function checkCache() {
+      // Cannot access cross-origin SW cache from file:// context.
+      // Just show the button — if the SW has a cached version, navigation will succeed.
+      document.getElementById('btnContinue').style.display = 'block';
+      document.getElementById('hint').style.display = 'block';
+      document.getElementById('status').textContent = 'Version local disponible';
+      scheduleAutoRedirect();
     }
 
     var autoTimer = null;
@@ -288,7 +280,8 @@ function offlineHTML() {
 
     function goOffline() {
       if (autoTimer) clearInterval(autoTimer);
-      window.location.reload();
+      // Navigate to the original app URL — the SW intercepts and serves from cache.
+      window.location.href = targetUrl;
     }
 
     // Auto-retry network every 10s

@@ -663,7 +663,7 @@ function createWindow() {
     const { net } = require('electron');
     if (!net.online) {
       console.log(`[main] Device offline (${errorCode}) → loading offline.html immediately`);
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html');
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html', { query: { target: POS_URL } });
       return;
     }
 
@@ -675,7 +675,7 @@ function createWindow() {
       setTimeout(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(POS_URL); }, loadFailCount * 800);
     } else {
       loadFailCount = 0;
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html');
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadFile('offline.html', { query: { target: POS_URL } });
     }
   });
 
