@@ -12,6 +12,14 @@ import { initStationRouting } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { POSLockContext } from './pos-lock-context'
 
+async function hashPin(pin: string, staffId: string): Promise<string> {
+  try {
+    const data = new TextEncoder().encode(`${pin}:${staffId}`)
+    const buf = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch { return '' }
+}
+
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -429,9 +437,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (member?.id) {
           try {
             if (shiftToken) localStorage.setItem('pos_shift_token', shiftToken)
+            const pinHash = await hashPin(pin, member.id)
             localStorage.setItem('pos_staff_cache', JSON.stringify({
               id: member.id, name: member.name, role: member.role,
               exp: Date.now() + 28_800_000,
+              pin_hash: pinHash,
             }))
           } catch { /* ignore */ }
           unlock(member)
@@ -445,6 +455,23 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (staffJson) {
           const entry = JSON.parse(staffJson)
           if (entry && entry.exp > Date.now()) {
+            // Verify PIN hash when present (new cache entries); old entries without hash pass through
+            if (entry.pin_hash) {
+              const hash = await hashPin(pin, entry.id)
+              if (hash !== entry.pin_hash) {
+                const na = attempts + 1
+                setAttempts(na)
+                setError(true)
+                setPin('')
+                if (na >= MAX_ATTEMPTS) {
+                  setLockedUntil(Date.now() + LOCKOUT_MS)
+                  setTimeout(() => { setLockedUntil(0); setAttempts(0) }, LOCKOUT_MS)
+                }
+                setTimeout(() => setError(false), 1500)
+                setChecking(false)
+                return
+              }
+            }
             // Offline: bypass checkActiveSession (network-dependent) — restore session directly
             const member: StaffMember = { id: entry.id, name: entry.name, role: entry.role }
             setStaff(member)

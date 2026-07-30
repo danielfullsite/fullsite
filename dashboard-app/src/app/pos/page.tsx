@@ -3021,10 +3021,10 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Deduct ingredients at kitchen send time (only new items not yet sent)
+      // Deduct ingredients at kitchen send time (only new items in this batch)
       if (newItems.length > 0) {
         try {
-          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS')
+          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
         } catch (err) {
           console.error('[inventory] Deduction error (non-blocking):', err)
         }
@@ -5135,7 +5135,11 @@ function POSContent() {
                       }
                     } catch {
                       setSaving(false); operationLock.current = false
-                      handlePayment('Tarjeta de crédito')
+                      if (!navigator.onLine) {
+                        showToast('Sin conexión — pago con terminal no disponible offline')
+                      } else {
+                        handlePayment('Tarjeta de crédito')
+                      }
                     }
                   } else {
                     // Sin MP configurado — terminal bancaria standalone (Getnet):

@@ -2101,6 +2101,7 @@ export async function deductIngredientsForOrder(
   items: OrderItem[],
   orderId: string,
   actor: string,
+  batchId?: string,
 ): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; R1_OWNED: string[]; GATE_FAILED: string[]; UNRESOLVED: string[] } }> {
   try {
   // Policy must be READY before Sistema A runs.
@@ -2120,10 +2121,11 @@ export async function deductIngredientsForOrder(
     }
   }
 
-  // Idempotency guard — skip if this order was already deducted in this process.
-  // The policy gate above is not sufficient: it only suppresses telemetry, not writes.
-  if (_deductedOrderIds.has(orderId)) {
-    console.info(`[deduct:idempotent] orderId=${orderId} already deducted this session — skip`)
+  // Idempotency guard — key is orderId:batchId when batchId is provided (kitchen send)
+  // so that additional items sent in a second batch are not skipped.
+  const deductKey = batchId ? `${orderId}:${batchId}` : orderId
+  if (_deductedOrderIds.has(deductKey)) {
+    console.info(`[deduct:idempotent] key=${deductKey} already deducted this session — skip`)
     return {
       success: true,
       deductions: [],
@@ -2131,7 +2133,7 @@ export async function deductIngredientsForOrder(
       resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] },
     }
   }
-  _deductedOrderIds.add(orderId)
+  _deductedOrderIds.add(deductKey)
 
   // 1. Get all recipes and inventory
   const recipes = await getRecipes()
