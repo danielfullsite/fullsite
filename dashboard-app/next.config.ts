@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import path from "path";
 
 const securityHeaders = [
   {
@@ -67,8 +68,12 @@ const nextConfig: NextConfig = isCapacitorOffline
   ? {
       output: 'export',
       images: { unoptimized: true },
+      turbopack: { root: path.join(__dirname) },
     }
   : {
+      // Pin Turbopack workspace root to dashboard-app/ so @/ aliases resolve
+      // correctly when built from a monorepo root (Vercel, CI).
+      turbopack: { root: path.join(__dirname) },
       async headers() {
         return [
           {
