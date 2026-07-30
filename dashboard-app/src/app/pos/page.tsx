@@ -1621,6 +1621,19 @@ function POSContent() {
 
   useEffect(() => {
     (async () => {
+      // Stale-while-revalidate: show IDB-cached menu immediately, then refresh from Supabase.
+      // This eliminates the blank-menu delay on remount (e.g. after send → mesas → new mesa).
+      try {
+        const cached = await getCachedMenu() as unknown as Awaited<ReturnType<typeof getMenuCategoriesFromDB>>
+        if (cached.length > 0) {
+          setMenuCategories(cached)
+          const nameMap: Record<string, string> = {}
+          for (const cat of cached) nameMap[cat.id] = cat.name
+          setCategoryNameCache(nameMap)
+          categoryMapRef.current = buildCategoryMap(cached)
+        }
+      } catch { /* ignore */ }
+
       const [r, i, dbMenu, pm, turno] = await Promise.all([
         getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurno(),
       ])
@@ -1634,17 +1647,6 @@ function POSContent() {
         setCategoryNameCache(nameMap)
         // Persist for offline cold-start
         cacheMenu(dbMenu as unknown as Record<string, unknown>[]).catch(() => {})
-      } else {
-        // Offline: use IDB cache so the catalog still appears
-        try {
-          const cached = await getCachedMenu() as unknown as typeof dbMenu
-          if (cached.length > 0) {
-            setMenuCategories(cached)
-            const nameMap: Record<string, string> = {}
-            for (const cat of cached) nameMap[cat.id] = cat.name
-            setCategoryNameCache(nameMap)
-          }
-        } catch { /* ignore */ }
       }
       setPaymentMethodsDB(pm)
       if (turno) {
