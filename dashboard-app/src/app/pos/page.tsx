@@ -2779,7 +2779,8 @@ function POSContent() {
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
                 setSaving(false); operationLock.current = false
                 await new Promise(r => setTimeout(r, 15000))
-                sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
+                sessionStorage.removeItem('pos_staff')
+                sessionStorage.removeItem('pos_last_activity')
                 router.push('/pos/plano'); lock()
                 return
               } else {
@@ -2874,7 +2875,8 @@ function POSContent() {
             } catch {}
             setSaving(false); operationLock.current = false
             await new Promise(r => setTimeout(r, 15000))
-            sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
+            sessionStorage.removeItem('pos_staff')
+            sessionStorage.removeItem('pos_last_activity')
             router.push('/pos/plano'); lock()
             return
           } else {
@@ -2940,10 +2942,10 @@ function POSContent() {
             client_id: _cid(),
           }),
         }).catch(() => {})
-        // Treat as success — 1.2s so user reads toast and printer finishes, then lock
+        // Treat as success — wait so user reads toast and printer finishes, then lock
+        await new Promise(r => setTimeout(r, 15000))
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        await new Promise(r => setTimeout(r, 15000))
         router.push('/pos/plano')
         lock()
       } else if (saveResult.error === 'SESSION_EXPIRED') {
@@ -3073,10 +3075,10 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // After send: 1.2s so user reads toast and printer finishes, then navigate + lock
+      // After send: wait so user reads toast and printer finishes, then navigate + lock
+      await new Promise(r => setTimeout(r, 15000))
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      await new Promise(r => setTimeout(r, 15000))
       router.push('/pos/plano')
       lock()
     } finally {
