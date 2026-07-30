@@ -6,7 +6,7 @@ const fs   = require('fs');
 const { execSync } = require('child_process');
 
 const POS_URL = 'https://app.fullsite.mx/pos';
-const KDS_URL = 'https://app.fullsite.mx/pos/kds';
+const KDS_URL = 'https://app.fullsite.mx/kds';
 
 // ─── LOCAL SERVER ─────────────────────────────────────────────────────────────
 // Fullsite Local Server (WS hub + print bridge + mDNS + heartbeat).

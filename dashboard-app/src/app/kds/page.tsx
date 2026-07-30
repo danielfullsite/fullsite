@@ -1,0 +1,527 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Printer } from 'lucide-react'
+import {
+  getKitchenOrders, updateOrderStatus, logAudit,
+  type KitchenOrderFromDB, type OrderItem,
+} from '@/lib/pos-data'
+import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
+import { type StationName } from '@/lib/pos-constants'
+import { setPosServerHost } from '@/lib/bridge-client'
+import { useKdsWsClient } from '@/hooks/useKdsWsClient'
+
+declare global { interface Window { fullsiteApp?: { quit: () => void; isElectron?: boolean } } }
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function elapsed(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
+}
+
+function timerColor(mins: number): string {
+  if (mins <= 10) return 'text-emerald-400'
+  if (mins <= 20) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function timerBg(mins: number): string {
+  if (mins <= 10) return 'bg-emerald-500/10 border-emerald-500/30'
+  if (mins <= 20) return 'bg-amber-500/10 border-amber-500/30'
+  return 'bg-red-500/10 border-red-500/30'
+}
+
+interface ParsedItem {
+  nombre?: string
+  name?: string
+  cantidad?: number
+  quantity?: number
+  modificadores?: string[]
+  notas?: string
+  cancelled?: boolean
+  station?: string
+}
+
+const STATION_KEYWORDS: Record<string, string[]> = {
+  barra: ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
+  panaderia: ['croissant', 'concha', 'bakery', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
+}
+
+function getStation(item: ParsedItem): string {
+  if (item.station === 'barra') return 'barra'
+  if (item.station === 'caja') return 'panaderia'
+  const name = (item.nombre || item.name || '').toLowerCase()
+  if (item.station === 'cocina') {
+    if (STATION_KEYWORDS.panaderia.some(kw => name.includes(kw))) return 'panaderia'
+    return 'cocina'
+  }
+  for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
+    if (keywords.some(kw => name.includes(kw))) return station
+  }
+  return 'cocina'
+}
+
+// ── Sound ────────────────────────────────────────────────────────────────
+
+function playAlert() {
+  try {
+    const ctx = new AudioContext()
+    const freqs = [880, 1100, 880]
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      osc.type = 'sine'
+      gain.gain.value = 0.4
+      osc.start(ctx.currentTime + i * 0.2)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.2 + 0.3)
+      osc.stop(ctx.currentTime + i * 0.2 + 0.3)
+    })
+  } catch { /* audio not available */ }
+}
+
+const MODE_PILL = {
+  LAN_PRIMARY:  { dot: 'bg-emerald-500', label: 'LAN' },
+  RECONCILING:  { dot: 'bg-amber-400 animate-pulse', label: '...' },
+  FALLBACK:     { dot: 'bg-orange-400', label: 'Supabase' },
+  OFFLINE:      { dot: 'bg-slate-500', label: '' },
+}
+
+// ── Component ────────────────────────────────────────────────────────────
+
+export default function KDSStandalone() {
+  const station = 'cocina'
+  const [mounted, setMounted] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [, setTick] = useState(0)
+  const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
+  const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const advancingRef = useRef<Set<string>>(new Set())
+  const prevEnviadaRef = useRef(0)
+
+  const kdsClient = useKdsWsClient()
+  const orders = kdsClient.orders
+
+  useEffect(() => {
+    const n = orders.filter(o => o.status === 'enviada').length
+    if (prevEnviadaRef.current > 0 && n > prevEnviadaRef.current) playAlert()
+    prevEnviadaRef.current = n
+  }, [orders])
+
+  useEffect(() => {
+    const restored = new Set<string>()
+    for (const order of orders) {
+      let kdsStatus: Record<string, boolean> = {}
+      if (order.kds_item_status) {
+        try {
+          kdsStatus = typeof order.kds_item_status === 'string'
+            ? JSON.parse(order.kds_item_status)
+            : order.kds_item_status
+        } catch { /* */ }
+      }
+      if (Object.keys(kdsStatus).length > 0) {
+        for (const [idx, done] of Object.entries(kdsStatus)) {
+          if (done) restored.add(`${order.id}-${idx}`)
+        }
+      } else {
+        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        items.forEach((item, idx) => {
+          if ((item as ParsedItem & { kds_done?: boolean }).kds_done) restored.add(`${order.id}-${idx}`)
+        })
+      }
+    }
+    setDoneItems(restored)
+  }, [orders])
+
+  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
+    const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
+    const result = await reprintByStation(ctx, 'cocina' as StationName, items as unknown as OrderItem[])
+    const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
+    setReprintMsg({ success: result.printed, text: msg })
+    setTimeout(() => setReprintMsg(null), 3000)
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station: 'cocina' } })
+  }
+
+  const fetchOrdersForFallback = useCallback(async () => {
+    let data: KitchenOrderFromDB[]
+    try {
+      data = await getKitchenOrders()
+    } catch {
+      try {
+        const { getCachedOrders } = await import('@/lib/pos-offline-db')
+        const [env, prep, lst] = await Promise.all([
+          getCachedOrders('enviada'),
+          getCachedOrders('preparando'),
+          getCachedOrders('lista'),
+        ])
+        const cached = [...env, ...prep, ...lst] as unknown as KitchenOrderFromDB[]
+        if (cached.length > 0) kdsClient.setFallbackOrders(cached)
+      } catch { /* IndexedDB not available */ }
+      return
+    }
+    const now = Date.now()
+    const fourHours = 4 * 60 * 60 * 1000
+    const fresh = data.filter(o => {
+      const age = now - new Date(o.created_at).getTime()
+      return age <= fourHours || o.status === 'lista'
+    })
+    kdsClient.setFallbackOrders(fresh)
+    setLastUpdate(new Date())
+  }, [kdsClient])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const bridgeHost = params.get('bridge')
+    if (bridgeHost) {
+      setPosServerHost(bridgeHost)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    const timerInterval = setInterval(() => setTick(t => t + 1), 10000)
+    return () => clearInterval(timerInterval)
+  }, [])
+
+  useEffect(() => {
+    if (kdsClient.mode === 'LAN_PRIMARY') {
+      setLastUpdate(new Date())
+      return
+    }
+    fetchOrdersForFallback()
+    const interval = setInterval(fetchOrdersForFallback, 2000)
+    return () => clearInterval(interval)
+  }, [kdsClient.mode, fetchOrdersForFallback])
+
+  const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
+    if (advancingRef.current.has(id)) return
+    advancingRef.current.add(id)
+    try {
+      const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : 'entregada'
+      kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: next })
+      await updateOrderStatus(id, next)
+      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
+      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
+    } finally {
+      advancingRef.current.delete(id)
+    }
+  }
+
+  const bump = async (id: string, mesa: number, mesero: string) => {
+    if (advancingRef.current.has(id)) return
+    advancingRef.current.add(id)
+    try {
+      kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: 'entregada' })
+      await updateOrderStatus(id, 'entregada')
+      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
+      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
+    } finally {
+      advancingRef.current.delete(id)
+    }
+  }
+
+  const toggleItemDone = (orderId: string, itemIndex: number, order: KitchenOrderFromDB) => {
+    const key = `${orderId}-${itemIndex}`
+    setDoneItems(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+        const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+        const allDone = items.every((item, idx) => {
+          if (item.cancelled) return true
+          const k = `${orderId}-${idx}`
+          return k === key || prev.has(k)
+        })
+        if (allDone && order.status === 'preparando') {
+          advance(orderId, order.status, order.mesa, order.mesero)
+        }
+      }
+
+      const items: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+      const kdsStatus: Record<string, boolean> = {}
+      items.forEach((item, idx) => {
+        if (item.cancelled) return
+        const k = `${orderId}-${idx}`
+        kdsStatus[`${idx}`] = k === key ? !prev.has(key) : next.has(k)
+      })
+
+      kdsClient.sendCommand('KDS_ITEM_STATUS', { order_id: orderId, kds_item_status: JSON.stringify(kdsStatus) })
+
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ kds_item_status: JSON.stringify(kdsStatus) }),
+      }).catch(() => {
+        import('@/lib/pos-offline-db').then(({ queueOperation }) =>
+          queueOperation('pos_orders', 'PATCH', { kds_item_status: JSON.stringify(kdsStatus) }, `pos_orders?id=eq.${orderId}`)
+        ).catch(() => {
+          try {
+            const q = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
+            q.push({ table: 'pos_orders', method: 'PATCH', endpoint: `pos_orders?id=eq.${orderId}`, data: { kds_item_status: JSON.stringify(kdsStatus) }, timestamp: Date.now(), synced: false })
+            localStorage.setItem('fullsite_offline_queue', JSON.stringify(q))
+          } catch { /* noop */ }
+        })
+      })
+
+      return next
+    })
+  }
+
+  const filteredOrders = orders
+    .filter(o => o.status !== 'entregada')
+    .filter(o => {
+      const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
+      return items.some(item => !item.cancelled && getStation(item) === station)
+    })
+    .sort((a, b) => {
+      const p: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
+      const ps = (p[a.status] || 3) - (p[b.status] || 3)
+      if (ps !== 0) return ps
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+
+  const modePill = MODE_PILL[kdsClient.mode]
+
+  if (!mounted) return null
+
+  return (
+    <div className="h-screen flex flex-col bg-black text-white select-none overflow-hidden" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 flex-shrink-0" style={{ background: '#111' }}>
+        <div className="flex items-center gap-3">
+          <span className="text-white font-black text-xl tracking-widest uppercase">Cocina</span>
+          <div className="flex items-center gap-3 text-sm ml-4">
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-white/40" />
+              {orders.filter(o => o.status === 'enviada').length} nueva{orders.filter(o => o.status === 'enviada').length !== 1 ? 's' : ''}
+            </span>
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              {orders.filter(o => o.status === 'preparando').length} prep
+            </span>
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              {orders.filter(o => o.status === 'lista').length} lista{orders.filter(o => o.status === 'lista').length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {modePill.label && (
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${modePill.dot}`} />
+              {modePill.label}
+            </span>
+          )}
+          <span className="text-slate-500 text-xs font-mono">
+            {lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+          {/* X button — only visible in Electron */}
+          {typeof window !== 'undefined' && window.fullsiteApp && (
+            <button
+              onClick={() => setShowExitConfirm(true)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-600 hover:text-white transition-colors"
+              title="Cerrar KDS"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Orders grid */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {filteredOrders.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-slate-500">
+              <p className="text-5xl mb-4">👨‍🍳</p>
+              <p className="text-2xl font-bold text-slate-300">Sin ordenes</p>
+              <p className="text-sm mt-1">
+                {kdsClient.mode === 'LAN_PRIMARY' ? 'Escuchando en red local' : 'Actualizando cada 2 segundos'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {filteredOrders.map(order => {
+              const mins = elapsed(order.created_at)
+              const isNew = order.status === 'enviada'
+              const isPrep = order.status === 'preparando'
+              const isDone = order.status === 'lista'
+
+              const allItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+              const activeItemsWithIndex = allItems
+                .map((item, idx) => ({ item, originalIndex: idx }))
+                .filter(({ item }) => !item.cancelled && getStation(item) === station)
+              const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
+              const totalCount = activeItemsWithIndex.length
+
+              const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
+              const headerBg = isNew ? 'bg-white text-black' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
+
+              return (
+                <div
+                  key={order.id}
+                  className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''}`}
+                  style={{ background: '#1a1a1a' }}
+                >
+                  <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl font-black">{order.mesa || 'D'}</span>
+                      <div className="leading-tight">
+                        <p className="text-sm font-black uppercase tracking-wide">{isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}</p>
+                        <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isPrep && totalCount > 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-black/20">
+                          {doneCount}/{totalCount}
+                        </span>
+                      )}
+                      <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border ${timerBg(mins)}`}>
+                        <span className={`text-lg font-mono font-black ${timerColor(mins)}`}>{mins}m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isPrep && totalCount > 0 && (
+                    <div className="h-1 bg-slate-700">
+                      <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(doneCount / totalCount) * 100}%` }} />
+                    </div>
+                  )}
+
+                  <div className="flex-1 px-4 py-3 space-y-0.5">
+                    {activeItemsWithIndex.map(({ item, originalIndex }) => {
+                      const itemKey = `${order.id}-${originalIndex}`
+                      const itemDone = doneItems.has(itemKey)
+                      const canToggle = isPrep
+
+                      return (
+                        <button
+                          key={originalIndex}
+                          type="button"
+                          disabled={!canToggle}
+                          onClick={() => canToggle && toggleItemDone(order.id, originalIndex, order)}
+                          className={`flex items-start gap-2 w-full text-left rounded-lg px-2 py-1.5 min-h-[48px] transition-colors ${
+                            canToggle ? 'active:bg-slate-700/50 cursor-pointer' : 'cursor-default'
+                          } ${itemDone ? 'opacity-60' : ''}`}
+                        >
+                          {canToggle && (
+                            <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                              itemDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'
+                            }`}>
+                              {itemDone && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                          )}
+                          <span className={`font-bold text-base min-w-[28px] ${itemDone ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                            {item.cantidad || item.quantity || 1}x
+                          </span>
+                          <div className="flex-1">
+                            <p className={`text-sm font-medium ${itemDone ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                              {item.nombre || item.name}
+                            </p>
+                            {item.modificadores && item.modificadores.length > 0 && (
+                              <p className={`text-xs ${itemDone ? 'text-emerald-600/60 line-through' : 'text-amber-400/80'}`}>
+                                {item.modificadores.join(' · ')}
+                              </p>
+                            )}
+                            {item.notas && (
+                              <p className={`text-xs italic ${itemDone ? 'text-sky-600/60 line-through' : 'text-sky-300/80'}`}>
+                                {item.notas}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {isDone ? (
+                    <button
+                      onClick={() => bump(order.id, order.mesa, order.mesero)}
+                      className="mx-3 mb-1 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-lg transition-colors min-h-[56px]"
+                    >
+                      BUMP
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => advance(order.id, order.status, order.mesa, order.mesero)}
+                      className={`mx-3 mb-1 py-4 rounded-xl font-bold text-lg transition-colors min-h-[56px] ${
+                        isNew
+                          ? 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black'
+                          : 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black'
+                      }`}
+                    >
+                      {isNew ? 'PREPARAR' : 'LISTA'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleReprint(order, activeItemsWithIndex.map(i => i.item))}
+                    className="mx-3 mb-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium flex items-center justify-center gap-1.5 min-h-[40px] transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Reimprimir
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {reprintMsg && (
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${reprintMsg.success ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+          {reprintMsg.text}
+        </div>
+      )}
+
+      {/* Exit confirmation overlay */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-6 shadow-2xl">
+            <p className="text-white text-xl font-bold">¿Cerrar el KDS?</p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="px-8 py-3 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-bold text-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { window.fullsiteApp?.quit() }}
+                className="px-8 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-lg"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes pulse-once {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+          50% { box-shadow: 0 0 0 8px rgba(255,255,255,0.15); }
+        }
+        .animate-pulse-once { animation: pulse-once 1s ease-in-out 2; }
+      `}</style>
+    </div>
+  )
+}
