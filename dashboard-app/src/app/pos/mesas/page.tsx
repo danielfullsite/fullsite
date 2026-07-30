@@ -225,6 +225,17 @@ export default function MesasPage() {
   }, [])
 
   const fetchData = useCallback(async () => {
+    // When offline: skip network entirely, serve from cache immediately.
+    // Avoids cascading timeouts that degrade the UI after hours without internet.
+    if (!navigator.onLine) {
+      import('@/lib/pos-offline-db').then(({ getCachedOrders }) =>
+        getCachedOrders().then(cached => {
+          if (cached.length > 0) setActiveOrders(cached as unknown as ActiveOrder[])
+        })
+      ).catch(() => {})
+      setLoading(false)
+      return
+    }
     try {
       const [ordersRes, resRes] = await Promise.all([
         fetchWithTimeout(

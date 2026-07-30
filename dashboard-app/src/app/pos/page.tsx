@@ -1963,6 +1963,7 @@ function POSContent() {
     const loadMesaOrder = async () => {
       try {
         // Cuenta por nombre: busca por customer_name; mesa: busca por número
+        if (!navigator.onLine) throw new Error('offline')
         const filter = clienteNombre
           ? `customer_name=eq.${encodeURIComponent(clienteNombre)}`
           : `mesa=eq.${mesa}`
