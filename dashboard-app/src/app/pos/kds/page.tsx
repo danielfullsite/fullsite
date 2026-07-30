@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { Printer } from 'lucide-react'
 import {
   getKitchenOrders, updateOrderStatus, logAudit,
@@ -100,9 +99,10 @@ const MODE_PILL = {
 
 // ── Component ────────────────────────────────────────────────────────────
 
+declare global { interface Window { fullsiteApp?: { quit: () => void; isElectron?: boolean } } }
+
 export default function KDSPage() {
-  const router = useRouter()
-  const [station, setStation] = useState<Station>('cocina')
+  const station: Station = 'cocina'
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0) // force re-render for timer updates
@@ -348,38 +348,10 @@ export default function KDSPage() {
 
   return (
     <div className="h-screen flex flex-col bg-black text-white select-none overflow-hidden">
-      {/* Top bar — minimal, touch targets */}
+      {/* Top bar — cocina only, X to close */}
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface)] border-b border-slate-800 flex-shrink-0">
-        {/* Back button + Station filter tabs */}
-        <div className="flex gap-1.5 items-center">
-          <button
-            onClick={() => { router.push('/pos') }}
-            className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 flex items-center justify-center mr-2 text-white"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          </button>
-          {(Object.keys(STATION_CONFIG) as Station[]).map(s => {
-            const cfg = STATION_CONFIG[s]
-            const count = stationCounts[s]
-            const active = station === s
-            return (
-              <button
-                key={s}
-                onClick={() => setStation(s)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-h-[48px] ${
-                  active ? `${cfg.bg} text-white` : 'bg-[var(--surface-2)] text-[var(--text-3)] hover:bg-[var(--line)]'
-                }`}
-              >
-                {cfg.label}
-                {count > 0 && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-[var(--surface)]/20' : 'bg-slate-600'}`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        {/* Title */}
+        <span className="text-white font-bold text-lg tracking-wide">COCINA</span>
 
         {/* Status summary + connection mode + clock */}
         <div className="flex items-center gap-4">
@@ -407,6 +379,13 @@ export default function KDSPage() {
           <span className="text-[var(--text-2)] text-xs font-mono">
             {lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
+          <button
+            onClick={() => { if (typeof window !== 'undefined' && window.fullsiteApp) { window.fullsiteApp.quit() } }}
+            className="w-9 h-9 rounded-xl bg-slate-700 hover:bg-red-600 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+            title="Cerrar KDS"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
       </div>
 
