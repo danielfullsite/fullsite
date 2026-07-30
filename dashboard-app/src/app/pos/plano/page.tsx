@@ -332,9 +332,6 @@ export default function PlanoPage() {
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
-              Plano del Restaurante
-            </h1>
             <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
               Actualizado {lastRefresh.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
               {' '} -- Auto-refresh 30s

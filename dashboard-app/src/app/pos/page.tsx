@@ -131,6 +131,7 @@ import {
 } from '@/lib/mercadopago'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { usePOSLock } from './pos-lock-context'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const POSCopilot = dynamic(() => import('@/components/POSCopilot'), { ssr: false })
@@ -1486,6 +1487,7 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
 function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { lock } = usePOSLock()
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
@@ -2928,10 +2930,10 @@ function POSContent() {
             client_id: _cid(),
           }),
         }).catch(() => {})
-        // Treat as success — order is locally persisted, navigate back so mesero can serve another table
+        // Treat as success — order is locally persisted, lock so next mesero can sign in
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { router.push('/pos/plano') }, 1500)
+        lock()
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }
@@ -3026,8 +3028,14 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Eduardo Jul 21: inventory deduction moved to payment time (Batch 3)
-      // Deduction now happens in handlePayment after successful save
+      // Deduct ingredients at kitchen send time (only new items not yet sent)
+      if (newItems.length > 0) {
+        try {
+          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS')
+        } catch (err) {
+          console.error('[inventory] Deduction error (non-blocking):', err)
+        }
+      }
 
       setLoadedOrderId(orderId)
       // Read server's actual updated_at + order_number (triggers set these)
@@ -3048,15 +3056,10 @@ function POSContent() {
         localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ id: orderId, items: activeItems, mesero, personas, discount, notas: orderNotes, revision: saveResult.revision ?? orderRevision, updatedAt: new Date().toISOString(), ts: Date.now() }))
         localStorage.removeItem(`pos_draft_${mesa}`) // clear draft after successful save
       } catch {}
-      // Eduardo Jul 21: ALL roles return to lock screen after send.
-      // Prevents next mesero from operating on wrong session.
-      if (navigator.onLine) {
-        sessionStorage.removeItem('pos_staff')
-        sessionStorage.removeItem('pos_last_activity')
-        setTimeout(() => { router.push('/pos/plano') }, 1200)
-      } else {
-        showToast('Offline — orden guardada localmente')
-      }
+      // After send: lock so next mesero must sign in with their PIN
+      sessionStorage.removeItem('pos_staff')
+      sessionStorage.removeItem('pos_last_activity')
+      lock()
     } finally {
       operationLock.current = false
       setSaving(false)
@@ -3235,25 +3238,8 @@ function POSContent() {
         }
       }
 
-      // Eduardo Jul 21: deduct ingredients at PAYMENT, not at kitchen send.
-      // Simpler: deduct full quantity of paying items once. No delta tracking needed.
-      // Split: only deduct items being paid in this cuenta (payingItems).
-      // Split parejo: all cuentas share same items → only cuenta 1 deducts.
-      const shouldDeductIngredients = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
-      if (shouldDeductIngredients && payingItems.length > 0) {
-        // Awaited so operationLock stays held until the deduction completes.
-        // This closes the race between lock release and the in-flight PATCH.
-        // Catch is intentional: a deduction failure must not fail the payment.
-        try {
-          const deductResult = await deductIngredientsForOrder(payingItems, payId, mesero || 'POS')
-          if (deductResult.alerts.length > 0) {
-            console.warn('[inventory] Deduction alerts:', deductResult.alerts)
-          }
-          console.log(`[inventory] Deducted ${deductResult.deductions.length} ingredients for ${payingItems.length} items at payment`)
-        } catch (err) {
-          console.error('[inventory] Deduction error (non-blocking):', err)
-        }
-      }
+      // Ingredient deduction happens at kitchen send time (not here).
+      // Market stock (retail items) still deducts at payment below.
 
       // Shadow mode (Fullsite OS): pago capturado, fire-and-forget
       publishEvent('payments.payment.captured.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {

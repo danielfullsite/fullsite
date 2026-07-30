@@ -10,6 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
+import { POSLockContext } from './pos-lock-context'
 
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -444,7 +445,14 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (staffJson) {
           const entry = JSON.parse(staffJson)
           if (entry && entry.exp > Date.now()) {
-            unlock({ id: entry.id, name: entry.name, role: entry.role })
+            // Offline: bypass checkActiveSession (network-dependent) — restore session directly
+            const member: StaffMember = { id: entry.id, name: entry.name, role: entry.role }
+            setStaff(member)
+            setUnlocked(true)
+            setAttempts(0)
+            sessionStorage.setItem('pos_staff', JSON.stringify(member))
+            sessionStorage.setItem('pos_last_activity', Date.now().toString())
+            setChecking(false)
             return
           }
         }
@@ -549,20 +557,22 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <div className="pos-kiosk" style={{
-      background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
-      colorScheme:'dark',
-      // Force all CSS variables to dark values for POS
-      // @ts-expect-error CSS custom properties
-      '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
-      '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
-      '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
-      '--text-4':'rgba(255,255,255,0.25)',
-    }}>
-      <TurnoGate staff={staff!}>
-        {children}
-      </TurnoGate>
-    </div>
+    <POSLockContext.Provider value={{ lock: () => setUnlocked(false) }}>
+      <div className="pos-kiosk" style={{
+        background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
+        colorScheme:'dark',
+        // Force all CSS variables to dark values for POS
+        // @ts-expect-error CSS custom properties
+        '--bg':'#0a0a0f','--bg-1':'#0f0f14','--surface':'#111118','--surface-2':'#1a1a24',
+        '--line':'rgba(255,255,255,0.08)','--line-soft':'rgba(255,255,255,0.04)',
+        '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
+        '--text-4':'rgba(255,255,255,0.25)',
+      }}>
+        <TurnoGate staff={staff!}>
+          {children}
+        </TurnoGate>
+      </div>
+    </POSLockContext.Provider>
   )
 
   const remainingAttempts = MAX_ATTEMPTS - attempts
