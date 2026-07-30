@@ -709,6 +709,7 @@ function createWindow() {
     }
   });
   try { globalShortcut.register('CommandOrControl+Shift+Q', () => { allowClose = true; app.quit(); }); } catch {}
+  try { globalShortcut.register('F12', () => { if (mainWindow) mainWindow.webContents.toggleDevTools(); }); } catch {}
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
