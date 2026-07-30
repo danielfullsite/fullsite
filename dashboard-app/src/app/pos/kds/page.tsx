@@ -153,7 +153,7 @@ export default function KDSPage() {
   }, [orders])
 
   const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
-    const printerStation: StationName = station === 'panaderia' ? 'caja' : station as StationName
+    const printerStation: StationName = 'cocina'
     const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
     const result = await reprintByStation(ctx, printerStation, items as unknown as OrderItem[])
     const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
