@@ -68,14 +68,11 @@ const nextConfig: NextConfig = isCapacitorOffline
   ? {
       output: 'export',
       images: { unoptimized: true },
-      outputFileTracingRoot: path.join(__dirname),
       turbopack: { root: path.join(__dirname) },
     }
   : {
-      // Both fields must match or Next.js ignores turbopack.root.
-      // Vercel forces outputFileTracingRoot to repo root; we override it
-      // here to dashboard-app/ so @/ aliases resolve from the right place.
-      outputFileTracingRoot: path.join(__dirname),
+      // Pin Turbopack workspace root to dashboard-app/ so @/ aliases resolve
+      // correctly when built from a monorepo root (Vercel, CI).
       turbopack: { root: path.join(__dirname) },
       async headers() {
         return [
