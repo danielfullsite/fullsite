@@ -1634,6 +1634,9 @@ function POSContent() {
         }
       } catch { /* ignore */ }
 
+      // When offline: IDB cache is already shown above — skip all network calls.
+      if (!navigator.onLine) return
+
       const [r, i, dbMenu, pm, turno] = await Promise.all([
         getRecipes(), getIngredients(), getMenuCategoriesFromDB(), getPaymentMethodsFromDB(), getActiveTurno(),
       ])
