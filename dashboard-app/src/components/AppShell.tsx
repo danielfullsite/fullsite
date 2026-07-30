@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const publicPages = ['/login', '/onboarding', '/seguridad', '/privacidad', '/terminos', '/reservar', '/factura', '/demo-live', '/cocina', '/barra']
   const isPosRoute = pathname.startsWith('/pos')
-  const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra')
+  const isKdsRoute = pathname.startsWith('/cocina') || pathname.startsWith('/barra') || pathname.startsWith('/kds')
   const isDemoRoute = pathname.startsWith('/demo')
   const isPublicPage = publicPages.includes(pathname) || isPosRoute || isKdsRoute || isDemoRoute
 
