@@ -72,8 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
       const cu = clientUser as { client_id: string; role: string | null } | null
       dbClientId = cu?.client_id || null
-      setRole(resolveRole(cu?.role || null, userEmail))
-    } catch { /* table might not exist for new installs */ }
+      // Role: DB row wins; fall back to app_metadata.role (admin-set, not user-writable)
+      const effectiveRole = cu?.role || (appMeta?.role as string | undefined) || null
+      setRole(resolveRole(effectiveRole, userEmail))
+    } catch { /* table might not exist for new installs */
+      // If DB query fails entirely, still try app_metadata.role
+      const metaRole = appMeta?.role as string | undefined
+      if (metaRole) setRole(resolveRole(metaRole, userEmail))
+    }
 
     // Priority 3: email-to-client mapping
     const emailClientId = getClientIdFromEmail(userEmail || '')
