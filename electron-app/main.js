@@ -630,7 +630,7 @@ function createWindow() {
     const scripts = [`localStorage.setItem('pos_last_boot', ${JSON.stringify(bootTime)})`];
     // Inject validated identity from provisioned config into localStorage.
     // Both new schema keys (restaurant_id, terminal_id) and legacy keys (clientId, terminalId) are supported.
-    const clientId   = appConfig.restaurant_id || appConfig.client_id   || appConfig.restaurantId || appConfig.clientId;
+    const clientId   = (appConfig.restaurant_id || appConfig.client_id   || appConfig.restaurantId || appConfig.clientId || '').toLowerCase().trim();
     const terminalId = appConfig.terminal_id   || appConfig.terminalId;
     if (clientId) {
       scripts.push(`localStorage.setItem('fullsite_client_id', ${JSON.stringify(String(clientId))})`);
