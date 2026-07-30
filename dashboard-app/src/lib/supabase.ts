@@ -11,7 +11,28 @@ export function getSupabase() {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required')
     }
-    _client = createClient(supabaseUrl, supabaseAnonKey)
+    // Wrap fetch with a 4s timeout so ALL Supabase calls (auth refresh,
+    // REST, realtime handshake) abort quickly when the network cable is
+    // physically disconnected — prevents Electron renderer freeze.
+    const fetchWithTimeout: typeof fetch = (input, init) => {
+      const ctrl = new AbortController()
+      const tid = setTimeout(() => ctrl.abort(), 4000)
+      // Merge with any existing signal from the caller
+      const signal = (init?.signal)
+        ? (() => {
+            // Abort if EITHER our timeout OR the caller's signal fires
+            const merged = new AbortController()
+            const done = () => merged.abort()
+            ctrl.signal.addEventListener('abort', done, { once: true })
+            init.signal.addEventListener('abort', done, { once: true })
+            return merged.signal
+          })()
+        : ctrl.signal
+      return fetch(input, { ...init, signal }).finally(() => clearTimeout(tid))
+    }
+    _client = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { fetch: fetchWithTimeout },
+    })
   }
   return _client
 }
