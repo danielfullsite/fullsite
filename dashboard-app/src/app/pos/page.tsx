@@ -2774,10 +2774,14 @@ function POSContent() {
                   total: raceNewItems.reduce((s, i) => s + i.subtotal, 0),
                   descuento: 0, turnoId: turnoId || undefined, createdAt: new Date(),
                 }
-                printByStation(racePrintOrder).then(r => {
-                  if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
-                }).catch(() => {})
+                const racePrint = await printByStation(racePrintOrder)
+                if (racePrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${racePrint.failed.join(', ')}`)
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
+                setSaving(false); operationLock.current = false
+                await new Promise(r => setTimeout(r, 1200))
+                sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
+                router.push('/pos/plano'); lock()
+                return
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
               }
@@ -2859,9 +2863,8 @@ function POSContent() {
               }
               return n
             })
-            printByStation({ ...order, items: conflictNewItems }).then(r => {
-              if (r.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${r.failed.join(', ')}`)
-            }).catch(() => {})
+            const conflictPrint = await printByStation({ ...order, items: conflictNewItems })
+            if (conflictPrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${conflictPrint.failed.join(', ')}`)
             showToast(`${conflictNewItems.length} item${conflictNewItems.length !== 1 ? 's' : ''} enviados`)
             try {
               const freshRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${order.id}&select=updated_at`, {
@@ -2869,6 +2872,11 @@ function POSContent() {
               })
               if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
             } catch {}
+            setSaving(false); operationLock.current = false
+            await new Promise(r => setTimeout(r, 1200))
+            sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
+            router.push('/pos/plano'); lock()
+            return
           } else {
             if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
             showToast('Error al enviar — intenta de nuevo')
