@@ -2927,6 +2927,11 @@ function POSContent() {
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
         lock()
+      } else if (saveResult.error === 'SESSION_EXPIRED') {
+        showToast('Sesión expirada — ingresa tu PIN de nuevo')
+        setSaving(false); operationLock.current = false
+        lock()
+        return
       } else {
         showToast('Error al guardar orden — NO se imprimió')
       }

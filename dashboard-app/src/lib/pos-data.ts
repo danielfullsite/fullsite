@@ -1381,6 +1381,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
 
     if (!res.ok) {
       console.warn(`[saveOrder] API error: ${res.status}`)
+      if (res.status === 401) return { ok: false, error: 'SESSION_EXPIRED' }
       return { ok: false, error: 'API_ERROR' }
     }
 
