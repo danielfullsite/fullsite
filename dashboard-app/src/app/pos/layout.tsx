@@ -399,7 +399,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (biometricAvailable) {
         let serviceHasTemplates = true
         try {
-          const listRes = await fetch('http://127.0.0.1:7717/fp/list', { signal: AbortSignal.timeout(2000) })
+          const listRes = await fetch('http://127.0.0.1:7718/list', { signal: AbortSignal.timeout(2000) })
           const listData = await listRes.json()
           serviceHasTemplates = listData.count > 0 && listData.enrolled?.includes(member.id)
         } catch { serviceHasTemplates = false }

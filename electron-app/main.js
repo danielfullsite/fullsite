@@ -833,6 +833,8 @@ app.whenReady().then(async () => {
   }
 
   appConfig = configResult.config;
+  // Dedicated KDS build always opens in kds_only mode regardless of saved config
+  if (app.getName() === 'Fullsite KDS') appConfig.kds_only = true;
   console.log(`[main] Provisioned: restaurant_id=${appConfig.restaurant_id} terminal_id=${appConfig.terminal_id} role=${appConfig.terminal_role}`);
 
   await startLocalServer();   // Local server starts first (provides WS hub for KDS events)
