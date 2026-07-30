@@ -83,4 +83,7 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   org: "fullsite",
   project: "apple",
+  // Skip source map upload when SENTRY_AUTH_TOKEN is absent (Vercel build)
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  telemetry: false,
 });
