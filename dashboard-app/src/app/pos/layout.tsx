@@ -424,6 +424,8 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
     }
 
     try {
+      // Skip network entirely when offline — go straight to local cache
+      if (!navigator.onLine) throw new Error('offline')
       // Validación server-side (service key) — el cliente ya no lee pos_staff
       // 4-second timeout: on degraded LAN, browser default is 30-90s — frozen UI
       const res = await fetch(apiUrl('/api/pos/pin'), {
