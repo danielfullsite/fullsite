@@ -43,6 +43,7 @@ export default function BarraPage() {
 
   const fetchOrders = async () => {
     try {
+      if (!navigator.onLine) throw new Error('offline')
       const allOrders = await getKitchenOrders()
       // Store all orders — filtering happens at render time based on stationFilter
       const newEnviadas = allOrders.filter(o => o.status === 'enviada').length

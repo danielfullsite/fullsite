@@ -155,6 +155,7 @@ export default function CocinaPage() {
   const fetchOrdersInner = async () => {
     let data: KitchenOrderFromDB[]
     try {
+      if (!navigator.onLine) throw new Error('offline')
       data = await getKitchenOrders()
     } catch {
       // Offline — merge newly-queued orders from IndexedDB into current state
