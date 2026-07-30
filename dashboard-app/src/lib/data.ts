@@ -50,7 +50,7 @@ export function getActiveClientSlug(): string {
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem('fullsite_client_id')
-      if (stored) return stored
+      if (stored) return stored.toLowerCase().trim()
     } catch { /* private browsing */ }
   }
   return process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || ''
