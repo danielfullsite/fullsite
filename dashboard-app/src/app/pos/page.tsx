@@ -2778,7 +2778,7 @@ function POSContent() {
                 if (racePrint.failed.length > 0) showToast(`⚠ Impresora sin conexión: ${racePrint.failed.join(', ')}`)
                 showToast(`${raceNewItems.length} item${raceNewItems.length !== 1 ? 's' : ''} enviados`)
                 setSaving(false); operationLock.current = false
-                await new Promise(r => setTimeout(r, 1200))
+                await new Promise(r => setTimeout(r, 15000))
                 sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
                 router.push('/pos/plano'); lock()
                 return
@@ -2873,7 +2873,7 @@ function POSContent() {
               if (freshRes.ok) { const rows = await freshRes.json(); if (rows[0]?.updated_at) setLoadedUpdatedAt(rows[0].updated_at) }
             } catch {}
             setSaving(false); operationLock.current = false
-            await new Promise(r => setTimeout(r, 1200))
+            await new Promise(r => setTimeout(r, 15000))
             sessionStorage.removeItem('pos_staff'); sessionStorage.removeItem('pos_last_activity')
             router.push('/pos/plano'); lock()
             return
@@ -2943,7 +2943,7 @@ function POSContent() {
         // Treat as success — 1.2s so user reads toast and printer finishes, then lock
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        await new Promise(r => setTimeout(r, 1200))
+        await new Promise(r => setTimeout(r, 15000))
         router.push('/pos/plano')
         lock()
       } else if (saveResult.error === 'SESSION_EXPIRED') {
@@ -3076,7 +3076,7 @@ function POSContent() {
       // After send: 1.2s so user reads toast and printer finishes, then navigate + lock
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      await new Promise(r => setTimeout(r, 1200))
+      await new Promise(r => setTimeout(r, 15000))
       router.push('/pos/plano')
       lock()
     } finally {
