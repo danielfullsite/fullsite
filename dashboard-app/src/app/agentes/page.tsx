@@ -411,7 +411,7 @@ export default function AgentesPage() {
           const count = events.filter(e => e.agent_id === id).length
           return (
             <button key={id}
-              onClick={() => setFilterAgent(prev => prev === id ? null : id)}
+              onClick={() => setFilterAgent((prev: AgentId | null) => prev === id ? null : id)}
               className={`inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-semibold rounded-full border transition-colors ${filterAgent === id ? `border-current ${AGENT_COLORS[id]}` : 'border-[var(--border)] text-[var(--text-3)] hover:text-[var(--text-2)]'}`}
             >
               <Icon size={11} />
@@ -430,7 +430,7 @@ export default function AgentesPage() {
           const count = events.filter(e => e.severity === sev).length
           return (
             <button key={sev}
-              onClick={() => setFilterSev(prev => prev === sev ? null : sev)}
+              onClick={() => setFilterSev((prev: Severity | null) => prev === sev ? null : sev)}
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full border transition-colors ${filterSev === sev ? `border-current ${cfg.bg} ${cfg.text}` : 'border-[var(--border)] text-[var(--text-3)] hover:text-[var(--text-2)]'}`}
             >
               <SevIcon size={11} />
