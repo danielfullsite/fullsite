@@ -1220,9 +1220,9 @@ async function saveAndRestart() {
     client_id:         state.restaurantId,
     channel:           (state.legacy?.channel) || 'stable',
     instance_name:     state.terminalName,
-    kds:               state.legacy?.kds || false,
-    kds_only:          state.legacy?.kds_only || false,
-    pos_server_ip:     state.legacy?.pos_server_ip || (state.terminalRole === 'kds' ? state.serverHost : null),
+    kds:               state.terminalRole === 'kds' ? true : (state.legacy?.kds || false),
+    kds_only:          state.terminalRole === 'kds' ? true : (state.legacy?.kds_only || false),
+    pos_server_ip:     state.terminalRole === 'kds' ? state.serverHost : (state.legacy?.pos_server_ip || null),
     supabaseUrl:       state.legacy?.supabaseUrl || null,
     supabaseAnonKey:   state.legacy?.supabaseAnonKey || null,
   }
