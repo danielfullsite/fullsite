@@ -1473,7 +1473,7 @@ export async function printUpdateByStation(
   order: Order,
   allChanges: ItemChange[]
 ): Promise<{ printed: boolean; failed: string[] }> {
-  if (comandasMuted() || allChanges.length === 0) return { printed: false, failed: [] }
+  if (allChanges.length === 0) return { printed: false, failed: [] }
 
   // Group changes by station
   const byStation: Record<StationName, ItemChange[]> = { cocina: [], barra: [], caja: [] }
@@ -1520,10 +1520,6 @@ export async function printUpdateByStation(
  * for each station that has items. Adds 200ms delay between tickets.
  */
 export async function printByStation(order: Order): Promise<{ printed: boolean; failed: string[] }> {
-  if (comandasMuted()) {
-    console.log('[printer] printByStation OMITIDO — modo piloto (comandas muteadas)')
-    return { printed: false, failed: [] }
-  }
   const split = splitOrderByStation(order)
   const stations: StationName[] = ['cocina', 'barra', 'caja']
   let printed = false

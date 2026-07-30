@@ -1512,10 +1512,16 @@ function POSContent() {
   })
   const [mesa, setMesa] = useState<number>(initialMesa)
 
-  // Persist order items to localStorage on every change (8h TTL, survives offline navigation)
+  // Persist order items to localStorage on every change (8h TTL, survives offline navigation).
+  // Merge into any existing cache entry to preserve fields (id, revision, mesero) written
+  // by the success path, so the lazy-init still finds the order id on fast remounts.
   useEffect(() => {
     if (mesa > 0) {
-      try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ts: Date.now(), items: orderItems })) } catch { /* ignore */ }
+      try {
+        const existing = localStorage.getItem(`pos_order_${mesa}`)
+        const prev = existing ? JSON.parse(existing) : {}
+        localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ...prev, ts: Date.now(), items: orderItems }))
+      } catch { /* ignore */ }
     }
   }, [orderItems, mesa])
 
@@ -1806,10 +1812,13 @@ function POSContent() {
     setBtConnecting(false)
   }
 
-  // Modo piloto: mute de comandas físicas (solo Wansoft imprime ese día).
-  // Toggle protegido con PIN de gerente + evento de auditoría.
+  // Modo piloto: mute de comandas físicas (Wansoft pilot ended — gate removed from printer.ts).
+  // Flag cleared on startup so stale pilot-period values don't persist across devices.
   const [comandasOff, setComandasOff] = useState(false)
-  useEffect(() => { setComandasOff(comandasMuted()) }, [])
+  useEffect(() => {
+    try { localStorage.removeItem('pos_comandas_muted') } catch {}
+    setComandasOff(false)
+  }, [])
 
   // Pin prompt state (replaces window.prompt for kiosk/PWA compatibility)
   const [pinPrompt, setPinPrompt] = useState<{ title: string; onSubmit: (pin: string) => void } | null>(null)
