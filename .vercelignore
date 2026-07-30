@@ -6,9 +6,9 @@ electron-kds/
 electron-dashboard/
 print-bridge/
 
-# Agent scripts and data
-agents/
-scripts/
+# Agent scripts and data (only repo-root dirs, not dashboard-app/src/lib/agents/)
+/agents/
+/scripts/
 
 # Docs and strategy
 docs/
