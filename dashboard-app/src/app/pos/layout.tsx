@@ -584,7 +584,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   }
 
   if (unlocked) return (
-    <POSLockContext.Provider value={{ lock: () => setUnlocked(false) }}>
+    <POSLockContext.Provider value={{ lock: () => { setUnlocked(false); setPin('') } }}>
       <div className="pos-kiosk" style={{
         background:'#0a0a0f', color:'#fff', minHeight:'100dvh', overflow:'auto',
         colorScheme:'dark',
