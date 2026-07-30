@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     }
     const clientId = client_id
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // pos_staff has anon_read policy → anon key is sufficient for PIN lookup
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
