@@ -2781,7 +2781,7 @@ function POSContent() {
                 await new Promise(r => setTimeout(r, 15000))
                 sessionStorage.removeItem('pos_staff')
                 sessionStorage.removeItem('pos_last_activity')
-                router.push('/pos/plano'); lock()
+                router.push('/pos/mesas'); lock()
                 return
               } else {
                 showToast('Error al agregar items — intenta de nuevo')
@@ -2877,7 +2877,7 @@ function POSContent() {
             await new Promise(r => setTimeout(r, 15000))
             sessionStorage.removeItem('pos_staff')
             sessionStorage.removeItem('pos_last_activity')
-            router.push('/pos/plano'); lock()
+            router.push('/pos/mesas'); lock()
             return
           } else {
             if (saveResult.current_revision != null) setOrderRevision(saveResult.current_revision)
@@ -2946,7 +2946,7 @@ function POSContent() {
         await new Promise(r => setTimeout(r, 15000))
         sessionStorage.removeItem('pos_staff')
         sessionStorage.removeItem('pos_last_activity')
-        router.push('/pos/plano')
+        router.push('/pos/mesas')
         lock()
       } else if (saveResult.error === 'SESSION_EXPIRED') {
         showToast('Sesión expirada — ingresa tu PIN de nuevo')
@@ -3079,7 +3079,7 @@ function POSContent() {
       await new Promise(r => setTimeout(r, 15000))
       sessionStorage.removeItem('pos_staff')
       sessionStorage.removeItem('pos_last_activity')
-      router.push('/pos/plano')
+      router.push('/pos/mesas')
       lock()
     } finally {
       operationLock.current = false
