@@ -1491,7 +1491,6 @@ function POSContent() {
   const initialCuenta = searchParams.get('cuenta') || ''
   // Cuenta por nombre (estilo Wansoft): sin mesa → mesa 0
   const initialMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 1)
-  console.log('[mesa-debug] POS render: searchParams.mesa=', searchParams.get('mesa'), 'initialMesa=', initialMesa, 'URL=', typeof window !== 'undefined' ? window.location.search : 'SSR')
 
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
@@ -1511,10 +1510,7 @@ function POSContent() {
     } catch {}
     return []
   })
-  const [mesa, setMesa] = useState<number>(() => {
-    console.log('[mesa-debug] useState(mesa) init: initialMesa=', initialMesa)
-    return initialMesa
-  })
+  const [mesa, setMesa] = useState<number>(initialMesa)
 
   // Persist order items to localStorage on every change (8h TTL, survives offline navigation)
   useEffect(() => {
@@ -1526,9 +1522,8 @@ function POSContent() {
   // Sync mesa state when searchParams change (client-side navigation from mesas/plano)
   const urlMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 0)
   useEffect(() => {
-    console.log('[mesa-debug] urlMesa effect fired: urlMesa=', urlMesa, 'current mesa=', mesa)
     if (urlMesa > 0 && urlMesa !== mesa) {
-      console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', urlMesa, '(reason: URL sync)')
+      setOrderItems([])
       setMesa(urlMesa)
     }
   }, [urlMesa])
@@ -1953,7 +1948,6 @@ function POSContent() {
   const [loadingMesa, setLoadingMesa] = useState(false)
   useEffect(() => {
     let cancelled = false
-    console.log('[mesa-debug] order load effect triggered: mesa=', mesa, 'clienteNombre=', clienteNombre || '(none)')
     setLoadingMesa(true)
     const loadMesaOrder = async () => {
       try {
@@ -1968,7 +1962,6 @@ function POSContent() {
         if (cancelled) return // mesa changed while fetching
         if (res.ok) {
           const rows = await res.json()
-          console.log('[mesa-debug] order load result: mesa=', mesa, 'rows=', rows.length, rows.length > 0 ? `order.mesa=${rows[0].mesa} order.id=${rows[0].id}` : '(no order)')
           if (cancelled) return // mesa changed during JSON parse
           if (rows.length > 0) {
             const order = rows[0]
@@ -3457,7 +3450,6 @@ function POSContent() {
                   logAudit({ order_id: orderId, action: 'status_changed', actor: mesero, mesa, details: { type: 'mesa_moved', from: mesa, to: newMesa } })
                   showToast(`Mesa ${mesa} → Mesa ${newMesa}`)
                 }
-                console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', newMesa, '(reason: spinner header)')
                 setMesa(newMesa)
                 router.replace(`/pos?mesa=${newMesa}`)
               }}
@@ -3608,7 +3600,7 @@ function POSContent() {
                   type="number"
                   value={mesa}
                   onWheel={e => e.currentTarget.blur()}
-                  onChange={e => { const v = Number(e.target.value) || 1; console.log('[mesa-debug] setMesa: prev=', mesa, '→ next=', v, '(reason: spinner compact)'); setMesa(v); router.replace(`/pos?mesa=${v}`) }}
+                  onChange={e => { const v = Number(e.target.value) || 1; setMesa(v); router.replace(`/pos?mesa=${v}`) }}
                   min={1}
                   max={999}
                   className="w-14 text-center bg-transparent border border-[var(--line)] rounded-lg text-white font-bold text-base mx-1 py-0.5 focus:border-emerald-500 focus:outline-none"
@@ -3930,14 +3922,12 @@ function POSContent() {
                       const newMesa = parseInt(input, 10)
                       if (isNaN(newMesa) || newMesa <= 0) { showToast('Numero de mesa invalido'); return }
                       const oldMesa = mesa
-                      console.log('[mesa-debug] setMesa: prev=', oldMesa, '→ next=', newMesa, '(reason: transfer)')
                       setMesa(newMesa)
                       // Persist to Supabase — keep current status (or 'enviada' if unknown)
                       if (orderId && loadedOrderId) {
                         await updateOrderStatus(orderId, 'enviada', { mesa: newMesa })
                       } else {
                         // New unsaved order — block transfer, must send to kitchen first
-                        console.log('[mesa-debug] setMesa: prev=', newMesa, '→ next=', oldMesa, '(reason: transfer revert no order)')
                         setMesa(Number(oldMesa))
                         showToast('Envia la orden a cocina antes de transferir mesa')
                         setPinPrompt(null)
