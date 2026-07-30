@@ -107,28 +107,48 @@ export default function CortePage() {
   // 'turno' = corte del turno activo (por turno_id); 'dia' = corte histórico por fecha
   const [corteMode, setCorteMode] = useState<'turno' | 'dia'>('turno')
 
+  const [offlineMode, setOfflineMode] = useState(false)
+
   const fetchData = async () => {
     setLoading(true)
-    const [a, pct, t, pm] = await Promise.all([
-      getAuditLog(200),
-      getCardCommissionPct(),
-      getActiveTurno(),
-      getPaymentMethodsFromDB(),
-    ])
-    // Por turno si hay turno abierto; si no, fallback a fecha
-    const o = corteMode === 'turno' && t
-      ? await getOrdersByTurno(t.id)
-      : await getOrders(selectedDate)
-    const cm = corteMode === 'turno' && t
-      ? await getCashMovementsByTurno(t.id)
-      : await getCashMovementsByDate(selectedDate)
-    setOrders(o)
-    setCashMovements(cm)
-    setAuditLog(a)
-    setCardPct(pct)
-    setTurno(t)
-    setPaymentMethods(pm)
-    setLoading(false)
+    try {
+      const [a, pct, t, pm] = await Promise.all([
+        getAuditLog(200),
+        getCardCommissionPct(),
+        getActiveTurno(),
+        getPaymentMethodsFromDB(),
+      ])
+      // Por turno si hay turno abierto; si no, fallback a fecha
+      const o = corteMode === 'turno' && t
+        ? await getOrdersByTurno(t.id)
+        : await getOrders(selectedDate)
+      const cm = corteMode === 'turno' && t
+        ? await getCashMovementsByTurno(t.id)
+        : await getCashMovementsByDate(selectedDate)
+      setOrders(o)
+      setCashMovements(cm)
+      setAuditLog(a)
+      setCardPct(pct)
+      setTurno(t)
+      setPaymentMethods(pm)
+      setOfflineMode(false)
+    } catch {
+      // Offline fallback — load from IndexedDB so gerente can still see corte
+      setOfflineMode(true)
+      try {
+        const { getCachedActiveTurno, getCachedOrdersByTurno, getCachedPaymentMethods } = await import('@/lib/pos-offline-db')
+        const cachedTurno = await getCachedActiveTurno(getClientId())
+        if (cachedTurno) {
+          const cachedOrders = await getCachedOrdersByTurno(cachedTurno.id)
+          setOrders(cachedOrders as unknown as OrderFromDB[])
+          setTurno({ id: cachedTurno.id, fondo_inicial: cachedTurno.fondo_inicial, opened_by: cachedTurno.opened_by, opened_at: cachedTurno.opened_at })
+        }
+        const cachedPMs = await getCachedPaymentMethods()
+        setPaymentMethods(cachedPMs as unknown as PaymentMethodDB[])
+      } catch { /* IDB unavailable — show empty corte */ }
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Reabrir cuenta
@@ -422,6 +442,15 @@ export default function CortePage() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Offline banner */}
+          {offlineMode && (
+            <div className="mb-6 bg-amber-900/30 border border-amber-600/50 rounded-xl px-5 py-3 flex items-center gap-3">
+              <AlertTriangle size={18} className="text-amber-400 flex-shrink-0" />
+              <p className="text-amber-300 text-sm font-medium">
+                Sin conexión — mostrando datos desde caché local. Los totales pueden estar incompletos.
+              </p>
+            </div>
+          )}
           {/* Alerta turno abierto demasiado tiempo */}
           {turno && (() => {
             const hoursOpen = (Date.now() - new Date(turno.opened_at).getTime()) / (1000 * 60 * 60)
