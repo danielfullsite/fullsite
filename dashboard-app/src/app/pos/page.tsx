@@ -68,7 +68,7 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
-import { syncAll, getPendingQueue, queueOperation } from '@/lib/pos-offline-db'
+import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
@@ -1503,7 +1503,7 @@ function POSContent() {
         const cached = localStorage.getItem(`pos_order_${m}`)
         if (cached) {
           const c = JSON.parse(cached)
-          if (c.ts && Date.now() - c.ts < 300000 && c.items?.length > 0) return c.items
+          if (c.ts && Date.now() - c.ts < 28_800_000 && c.items?.length > 0) return c.items
         }
       }
     } catch {}
@@ -1513,6 +1513,13 @@ function POSContent() {
     console.log('[mesa-debug] useState(mesa) init: initialMesa=', initialMesa)
     return initialMesa
   })
+
+  // Persist order items to localStorage on every change (8h TTL, survives offline navigation)
+  useEffect(() => {
+    if (mesa > 0) {
+      try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ts: Date.now(), items: orderItems })) } catch { /* ignore */ }
+    }
+  }, [orderItems, mesa])
 
   // Sync mesa state when searchParams change (client-side navigation from mesas/plano)
   const urlMesa = initialCuenta ? 0 : (Number(searchParams.get('mesa')) || 0)
@@ -1622,6 +1629,19 @@ function POSContent() {
         const nameMap: Record<string, string> = {}
         for (const cat of dbMenu) nameMap[cat.id] = cat.name
         setCategoryNameCache(nameMap)
+        // Persist for offline cold-start
+        cacheMenu(dbMenu as unknown as Record<string, unknown>[]).catch(() => {})
+      } else {
+        // Offline: use IDB cache so the catalog still appears
+        try {
+          const cached = await getCachedMenu() as unknown as typeof dbMenu
+          if (cached.length > 0) {
+            setMenuCategories(cached)
+            const nameMap: Record<string, string> = {}
+            for (const cat of cached) nameMap[cat.id] = cat.name
+            setCategoryNameCache(nameMap)
+          }
+        } catch { /* ignore */ }
       }
       setPaymentMethodsDB(pm)
       if (turno) {

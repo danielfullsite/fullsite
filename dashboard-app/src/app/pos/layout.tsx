@@ -226,6 +226,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (lastActivity) {
         const elapsed = Date.now() - parseInt(lastActivity)
         if (elapsed >= IDLE_TIMEOUT_MS) {
+          // Don't lock while offline — staff can't re-auth without network
+          // and we don't want to lose an active shift due to a cable outage.
+          if (!navigator.onLine) {
+            sessionStorage.setItem('pos_last_activity', Date.now().toString())
+            return
+          }
           // Lock the POS + clean up server session
           removeSession().catch(() => {})
           setUnlocked(false)
