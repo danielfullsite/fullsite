@@ -32,6 +32,19 @@ const printQueue    = require('./print-queue')
 let _config       = null   // v2 printers config object
 let _configPath   = null   // path to persist config changes
 let _printJobsFailed = 0
+let _recoveryInterval = null
+
+// Errors that mean "printer unreachable" — infrastructure, not content.
+// These jobs park as `recoverable` and are re-queued when the printer comes back.
+const RECOVERABLE_ERROR_PATTERNS = [
+  'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ENETUNREACH',
+  'ETIMEDOUT', 'TCP timeout', 'EHOSTUNREACH',
+]
+
+function _isRecoverableError(errorMsg) {
+  if (!errorMsg) return false
+  return RECOVERABLE_ERROR_PATTERNS.some(p => errorMsg.includes(p))
+}
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -48,8 +61,17 @@ function init({ printersConfig, configPath, queueFilePath }) {
 
   if (queueFilePath) {
     printQueue.init({ filePath: queueFilePath })
-    // On startup, retry any pending jobs from previous run
+    // On startup, retry any pending or recoverable jobs from previous run
     _retryPendingJobs().catch(e => console.warn('[printer] Pending job retry error:', e.message))
+    // Periodic recovery: re-queue recoverable jobs every 60s (Wansoft polls every 15s indefinitely).
+    // This ensures printer-unavailable jobs are retried without manual intervention.
+    if (_recoveryInterval) clearInterval(_recoveryInterval)
+    _recoveryInterval = setInterval(() => {
+      const revived = printQueue.retryRecoverableJobs()
+      if (revived.length > 0) {
+        _retryPendingJobs().catch(e => console.warn('[printer] Recovery retry error:', e.message))
+      }
+    }, 60_000)
   }
 }
 
@@ -148,6 +170,10 @@ async function printToStation(stationId, data, documentType, opts = {}) {
 
       if (printQueue.canRetry(jobId)) {
         printQueue.markRetrying(jobId, lastError)
+      } else if (_isRecoverableError(lastError)) {
+        // Infrastructure failure (printer unreachable) — park as recoverable.
+        // The 60s recovery interval will re-queue when the printer comes back.
+        printQueue.markRecoverable(jobId, lastError)
       } else {
         printQueue.markFailed(jobId, lastError)
       }
@@ -236,6 +262,9 @@ function _printUsb(printerName, data) {
 // ── Pending job retry on startup ──────────────────────────────────────────────
 
 async function _retryPendingJobs() {
+  // On startup, also revive recoverable jobs from previous run — printer may be back.
+  printQueue.retryRecoverableJobs()
+
   const pending = printQueue.getPendingJobs()
   if (pending.length === 0) return
 
@@ -256,6 +285,8 @@ async function _retryPendingJobs() {
     } catch (e) {
       if (printQueue.canRetry(job.job_id)) {
         printQueue.markRetrying(job.job_id, e.message)
+      } else if (_isRecoverableError(e.message)) {
+        printQueue.markRecoverable(job.job_id, e.message)
       } else {
         printQueue.markFailed(job.job_id, e.message)
       }
@@ -277,4 +308,5 @@ module.exports = {
   // Exposed for /print-queue HTTP endpoint
   getQueue: printQueue.getAllJobs,
   getPendingJobs: printQueue.getPendingJobs,
+  getRecoverableJobs: printQueue.getRecoverableJobs,
 }

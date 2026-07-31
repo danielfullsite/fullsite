@@ -145,7 +145,10 @@ class NdjsonEventStore extends EventStore {
         return line
       }
     })
-    fs.writeFileSync(this._logPath, updated.join('\n') + '\n', 'utf8')
+    // Atomic write: write to tmp then rename so a crash mid-write never corrupts the log.
+    const tmp = this._logPath + '.tmp'
+    fs.writeFileSync(tmp, updated.join('\n') + '\n', 'utf8')
+    fs.renameSync(tmp, this._logPath)
   }
 
   // ─── Diagnostic ─────────────────────────────────────────────────────────

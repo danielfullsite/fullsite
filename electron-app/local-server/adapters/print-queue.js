@@ -12,7 +12,8 @@
 //
 // Job status lifecycle:
 //   pending → printing → printed
-//          ↘ retrying ↗ ↘ failed
+//          ↘ retrying ↗ ↘ failed        (content error — non-recoverable)
+//                        ↘ recoverable  (printer unavailable — re-queued on health restore)
 //   Any state → cancelled (manual)
 //
 // File format: single JSON array (queue is small; NDJSON not warranted here).
@@ -23,7 +24,7 @@ const path    = require('path')
 const os      = require('os')
 const { randomUUID } = require('crypto')
 
-const VALID_STATUSES = ['pending', 'printing', 'printed', 'retrying', 'failed', 'cancelled']
+const VALID_STATUSES = ['pending', 'printing', 'printed', 'retrying', 'failed', 'recoverable', 'cancelled']
 const MAX_ATTEMPTS   = 3
 const JOB_TTL_MS     = 24 * 60 * 60 * 1000   // drop printed/failed jobs older than 24h on load
 
@@ -115,6 +116,46 @@ function markCancelled(jobId) {
   return _transition(jobId, 'cancelled')
 }
 
+/**
+ * Mark a job as recoverable — printer was unavailable (connection error), not a content error.
+ * Unlike `failed`, recoverable jobs are preserved by GC and can be re-queued via retryRecoverableJobs().
+ * Call this instead of markFailed() when the print error is infrastructure (bridge down, printer offline).
+ */
+function markRecoverable(jobId, errorMsg) {
+  return _transition(jobId, 'recoverable', j => {
+    j.last_error = errorMsg || 'Printer unavailable'
+  })
+}
+
+/**
+ * Re-queue all recoverable jobs as pending (resets attempts to 0).
+ * Call this when printer health is restored — bridge reconnect, USB re-plug, etc.
+ * Returns array of revived job_ids.
+ */
+function retryRecoverableJobs() {
+  const recoverable = _jobs.filter(j => j.status === 'recoverable')
+  if (recoverable.length === 0) return []
+  for (const job of recoverable) {
+    const idx = _jobs.findIndex(j => j.job_id === job.job_id)
+    if (idx >= 0) {
+      _jobs[idx] = {
+        ..._jobs[idx],
+        status: 'pending',
+        attempts: 0,
+        updated_at: new Date().toISOString(),
+      }
+    }
+  }
+  _persist()
+  const ids = recoverable.map(j => j.job_id)
+  console.log(`[print-queue] Revived ${ids.length} recoverable job(s):`, ids)
+  return ids
+}
+
+function getRecoverableJobs() {
+  return _jobs.filter(j => j.status === 'recoverable')
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 function getJob(jobId) {
@@ -196,7 +237,7 @@ function _gcOld() {
   const cutoff = Date.now() - JOB_TTL_MS
   const before = _jobs.length
   _jobs = _jobs.filter(j => {
-    if (j.status === 'pending' || j.status === 'retrying') return true  // keep pending always
+    if (j.status === 'pending' || j.status === 'retrying' || j.status === 'recoverable') return true
     return new Date(j.created_at).getTime() > cutoff
   })
   if (_jobs.length < before) {
@@ -215,6 +256,9 @@ module.exports = {
   markFailed,
   markRetrying,
   markCancelled,
+  markRecoverable,
+  retryRecoverableJobs,
+  getRecoverableJobs,
   getJob,
   getAllJobs,
   getPendingJobs,

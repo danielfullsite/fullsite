@@ -72,6 +72,7 @@ export class BridgeClient {
   private dead = false
   private _reconnectDelay = RECONNECT_INITIAL_MS
   private _lastSequence: number
+  private _reconnectCount = 0
 
   constructor(
     private readonly clientId: string,
@@ -86,6 +87,7 @@ export class BridgeClient {
 
   get connected() { return this._connected }
   get lastSequence() { return this._lastSequence }
+  get reconnectCount() { return this._reconnectCount }
 
   connect() {
     if (this.dead) return
@@ -120,6 +122,7 @@ export class BridgeClient {
 
       this.ws.onclose = () => {
         this._connected = false
+        this._reconnectCount++
         if (this.pingTimer) clearInterval(this.pingTimer)
         if (!this.dead) {
           this.reconnectTimer = setTimeout(() => {
@@ -219,6 +222,7 @@ export function useBridgeClient(
     let statusInterval: ReturnType<typeof setInterval> | null = null
     let unsub: (() => void) | null = null
     let cancelled = false
+    let rediscovering = false
 
     async function setup() {
       setDiscoveryState('discovering')
@@ -240,17 +244,41 @@ export function useBridgeClient(
       // Convert the discovered HTTP endpoint to a WS URL
       const wsUrl = httpToWs(result.endpoint!)
 
-      client = new BridgeClient(clientId, clientType, restaurantId, 0, wsUrl)
+      // Restore last known sequence so the server only sends events we haven't seen.
+      // Without this, every page load replays the full event history (KDS-03 fix).
+      const seqKey = `pos_bridge_last_seq_${clientType}`
+      const savedSeq = parseInt(localStorage.getItem(seqKey) || '0', 10) || 0
+
+      client = new BridgeClient(clientId, clientType, restaurantId, savedSeq, wsUrl)
 
       unsub = client.on((msg) => {
         if (msg.type === 'SNAPSHOT' || msg.type === 'PONG') setConnected(true)
         if (msg.type === 'DELTA' && onDeltaRef.current) {
           onDeltaRef.current((msg as Extract<ServerMsg, { type: 'DELTA' }>).payload.event)
         }
+        // Persist lastSequence so next page load resumes from here, not from 0.
+        const seq = (msg as { sequence?: number }).sequence
+        if (typeof seq === 'number' && seq > 0) {
+          try { localStorage.setItem(seqKey, String(seq)) } catch {}
+        }
       })
 
       client.connect()
-      statusInterval = setInterval(() => setConnected(client?.connected ?? false), 3_000)
+      statusInterval = setInterval(() => {
+        setConnected(client?.connected ?? false)
+        // Re-run full discovery when the server IP may have changed (DHCP renew, server restart).
+        // After 5 failed reconnects the current WS URL is likely stale — re-discover before continuing.
+        if (!rediscovering && client && !client.connected && client.reconnectCount > 5) {
+          rediscovering = true
+          client.disconnect()
+          if (unsub) { unsub(); unsub = null }
+          client = null
+          setDiscoveryState('discovering')
+          setup()
+            .catch(() => { if (!cancelled) setDiscoveryState('not_found') })
+            .finally(() => { rediscovering = false })
+        }
+      }, 3_000)
     }
 
     setup().catch(() => {

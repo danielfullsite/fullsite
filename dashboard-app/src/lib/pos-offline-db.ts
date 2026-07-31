@@ -259,11 +259,36 @@ export async function clearTerminalItems(): Promise<void> {
   const request = store.getAll()
   request.onsuccess = () => {
     for (const item of request.result) {
-      if (!item.synced && (!item.endpoint || item.endpoint === 'undefined') && item.retries >= 3) {
+      // Only delete items that have been explicitly classified as terminal errors
+      // AND have exhausted all retries. Items without error_class may still recover.
+      if (!item.synced && item.error_class !== undefined && item.retries >= 5) {
         store.delete(item.id)
       }
     }
   }
+}
+
+export interface SyncQueueSummary {
+  pending: number     // items in queue, not yet synced, no terminal error
+  terminal: number    // items with STALE_WRITE_CONFLICT or TERMINAL_NON_RETRYABLE
+  conflicts: number   // items with conflict: true (subset of terminal, for display)
+  exhausted: number   // items with retries >= 5 but no error_class (transient failures that ran out)
+}
+
+export async function getSyncQueueSummary(): Promise<SyncQueueSummary> {
+  const queue = await getPendingQueue()
+  let pending = 0, terminal = 0, conflicts = 0, exhausted = 0
+  for (const item of queue) {
+    if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
+      terminal++
+      if (item.conflict) conflicts++
+    } else if (item.retries >= 5) {
+      exhausted++
+    } else {
+      pending++
+    }
+  }
+  return { pending, terminal, conflicts, exhausted }
 }
 
 export async function clearSyncedItems(): Promise<void> {
