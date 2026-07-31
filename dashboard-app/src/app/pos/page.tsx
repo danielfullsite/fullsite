@@ -72,6 +72,14 @@ import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu } fr
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
+  type MpPaymentRecovery,
+  type MpPaymentState,
+  loadMpRecovery,
+  persistMpRecovery,
+  clearMpRecovery as clearMpRecoveryStore,
+  needsOperatorAttention,
+} from '@/lib/mp-payment-recovery'
+import {
   ChefHat,
   Grid3X3,
   Minus,
@@ -2289,6 +2297,15 @@ function POSContent() {
   const operationLock = useRef(false)
   const genOpId = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
+  // COB-017: MP Point payment recovery — persists the gap between MP_APPROVED and FULLSITE_RECORDED
+  const [mpRecovery, setMpRecovery] = useState<MpPaymentRecovery | null>(null)
+  useEffect(() => {
+    const r = loadMpRecovery(mesa)
+    if (r) setMpRecovery(r)
+  }, [mesa])
+  const updateMpRecovery = (r: MpPaymentRecovery) => { persistMpRecovery(r); setMpRecovery(r) }
+  const clearMpRecovery = () => { clearMpRecoveryStore(mesa); setMpRecovery(null) }
+
   const lastReprintRef = useRef<number>(0)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = (msg: string) => {
@@ -3141,16 +3158,28 @@ function POSContent() {
       showToast('Primero envía la orden a cocina antes de cobrar')
       return
     }
+    // COB-017: block opening payment modal when an MP recovery is pending resolution
+    if (needsOperatorAttention(mpRecovery)) {
+      showToast('Pago MP pendiente de registrar — usa el botón de reintento')
+      return
+    }
     setVerifiedPersonas(personas)
     setCustomPersonas('')
     setShowPersonVerify(true)
   }
 
-  const handlePayment = async (method: string) => {
+  // _mpOpId: provided by the MP Point recovery flow — same opId reused on retry for idempotent write
+  const handlePayment = async (method: string, _mpOpId?: string) => {
+    // COB-017: block a new normal payment while an MP recovery requires attention.
+    // When _mpOpId is provided, this IS the recovery retry — skip the guard.
+    if (!_mpOpId && needsOperatorAttention(mpRecovery)) {
+      showToast('Pago MP pendiente de registrar — usa el botón de reintento')
+      return
+    }
     if (operationLock.current) return
     operationLock.current = true
     setSaving(true)
-    const opId = genOpId()
+    const opId = _mpOpId ?? genOpId()
     try {
 
     // Turno must still be active at payment time
@@ -3364,8 +3393,78 @@ function POSContent() {
     setShowDiscount(false)
   }
 
+  // COB-017: MP recovery retry — reuses the original opId for idempotent DB write.
+  // Side effects (ticket, drawer) will only fire if saveOrder confirms ok === true;
+  // for card payments there is no cash drawer, so the only duplicate risk is the ticket,
+  // which is acceptable during a manual reconciliation scenario.
+  const handleMpRecoveryRetry = async () => {
+    if (!mpRecovery || operationLock.current) return
+    updateMpRecovery({ ...mpRecovery, state: 'FULLSITE_PENDING' as MpPaymentState })
+    try {
+      await handlePayment('Tarjeta de crédito', mpRecovery.opId)
+      clearMpRecovery()
+    } catch (err) {
+      updateMpRecovery({ ...mpRecovery, state: 'RECONCILIATION_REQUIRED' as MpPaymentState, error: String(err) })
+    }
+  }
+
+  const handleMpMarkManual = () => {
+    if (!mpRecovery) return
+    const marked: MpPaymentRecovery = { ...mpRecovery, state: 'FAILED_MANUAL_REVIEW' as MpPaymentState }
+    updateMpRecovery(marked)
+    void logAudit({
+      order_id: mpRecovery.orderId, action: 'mp_payment_marked_manual_review',
+      actor: mesero, mesa,
+      details: { intentId: mpRecovery.intentId, amount: mpRecovery.amount },
+    })
+  }
+
   return (
     <div className="pos-kiosk h-dvh flex flex-col text-white overflow-hidden select-none" style={{'--bg':'#000000','--surface':'#0a0a0c','--surface-2':'#0f1014','--panel':'#0b0b0e','--line':'#1c1d22','--line-soft':'#141519','--text-1':'#f5f5f7','--text-2':'#c4c4cc','--text-3':'#87878f','--text-4':'#555560','--accent':'#10b981','--accent-bright':'#34d399','--accent-deep':'#059669','--accent-soft':'rgba(16,185,129,0.12)','--accent-line':'rgba(16,185,129,0.28)',background:'#0a0a0f',color:'#fff',colorScheme:'dark'} as React.CSSProperties}>
+
+      {/* COB-017: MP Payment Recovery Banner — shown when MP captured money but Fullsite failed to record */}
+      {needsOperatorAttention(mpRecovery) && mpRecovery && (
+        <div className="fixed top-0 left-0 right-0 z-[200] bg-red-950 border-b-2 border-red-500 px-4 py-3 flex flex-col gap-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-red-200 font-bold text-sm leading-tight">
+                {mpRecovery.state === 'FAILED_MANUAL_REVIEW'
+                  ? 'Pago MP marcado para revisión manual'
+                  : 'Pago aprobado en terminal — registro pendiente en Fullsite'}
+              </p>
+              <p className="text-red-300/80 text-xs mt-0.5">
+                Mesa {mpRecovery.mesa} · {formatMXN(mpRecovery.amount)} · {new Date(mpRecovery.timestamp).toLocaleTimeString('es-MX')} · ID: <span className="font-mono">{mpRecovery.intentId.slice(-8)}</span>
+              </p>
+            </div>
+            {mpRecovery.state !== 'FAILED_MANUAL_REVIEW' && (
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={handleMpRecoveryRetry}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold px-3 py-2 rounded-lg"
+                >
+                  Reintentar
+                </button>
+                <button
+                  onClick={handleMpMarkManual}
+                  className="bg-red-900 hover:bg-red-800 text-red-300 text-xs font-bold px-3 py-2 rounded-lg border border-red-700"
+                >
+                  Marcar manual
+                </button>
+              </div>
+            )}
+            {mpRecovery.state === 'FAILED_MANUAL_REVIEW' && (
+              <button
+                onClick={clearMpRecovery}
+                className="bg-red-900 hover:bg-red-800 text-red-300 text-xs font-bold px-3 py-2 rounded-lg border border-red-700 flex-shrink-0"
+              >
+                Resuelto
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top Bar */}
       <header className="pos-safe-top flex flex-col bg-[var(--surface-2)] border-b border-[var(--line)] flex-shrink-0">
         {/* Row 1: Logo + Hamburger + Ready badge + Staff + Clock */}
@@ -5171,7 +5270,40 @@ function POSContent() {
                             const statusData = await statusRes.json()
                             if (statusData.state === 'FINISHED') {
                               clearInterval(mpPollRef.current!); mpPollRef.current = null
-                              handlePayment('Tarjeta de crédito')
+                              // COB-017: persist MP_APPROVED with a stable opId BEFORE calling handlePayment.
+                              // If handlePayment throws (JS exception, not network), the recovery record
+                              // survives in localStorage so the operator can retry with the same opId
+                              // → saveOrder is idempotent (save_operation_id deduplication at DB level).
+                              const recoveryOpId = genOpId()
+                              const mpRec: MpPaymentRecovery = {
+                                state: 'MP_APPROVED',
+                                intentId,
+                                orderId,
+                                opId: recoveryOpId,
+                                amount: payTotal + propina,
+                                mesa,
+                                mesero,
+                                timestamp: new Date().toISOString(),
+                              }
+                              updateMpRecovery(mpRec)
+                              try {
+                                await handlePayment('Tarjeta de crédito', recoveryOpId)
+                                clearMpRecovery()
+                              } catch (err) {
+                                const failed: MpPaymentRecovery = {
+                                  ...mpRec,
+                                  state: 'RECONCILIATION_REQUIRED' as MpPaymentState,
+                                  error: String(err),
+                                }
+                                updateMpRecovery(failed)
+                                setSaving(false)
+                                operationLock.current = false
+                                void logAudit({
+                                  order_id: orderId, action: 'mp_payment_recovery_required',
+                                  actor: mesero, mesa,
+                                  details: { intentId, amount: payTotal + propina, error: String(err), opId: recoveryOpId },
+                                })
+                              }
                             } else if (statusData.state === 'CANCELED' || statusData.state === 'ERROR' || attempts > 60) {
                               clearInterval(mpPollRef.current!); mpPollRef.current = null
                               setSaving(false); operationLock.current = false

@@ -1574,6 +1574,8 @@ export type AuditAction =
   | 'kitchen_item_updated'
   | 'cerrar_app'
   | 'reprint_comanda'
+  | 'mp_payment_recovery_required'
+  | 'mp_payment_marked_manual_review'
 
 export interface AuditEvent {
   client_id?: string

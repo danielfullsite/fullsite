@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // ─── Reproduce core POS logic inline (same pattern as data-integrity.test.ts) ──
 
@@ -1823,5 +1823,180 @@ describe('KDS-013 — batch-aware reprint item isolation', () => {
     // Elapsed for batch 2 is shorter than elapsed for the full order
     const orderAge = new Date(batchTwoCreatedAt).getTime() - new Date(orderCreatedAt).getTime()
     expect(orderAge).toBe(20 * 60 * 1000) // 20 min
+  })
+})
+
+// ─── COB-017 — MP Point state machine: FINISHED → fallo → recovery ──────────
+//
+// Inline implementation of mp-payment-recovery.ts logic so tests run in
+// node environment (no DOM/localStorage available from vitest.config).
+// A plain-object mock stands in for localStorage. Tests verify:
+//   1. State machine transitions persist opId unchanged (idempotency key)
+//   2. RECONCILIATION_REQUIRED surfaces on loadMpRecovery (operator attention)
+//   3. MP_APPROVED on reload also surfaces (app crashed before FULLSITE_RECORDED)
+//   4. Successful retry state (FULLSITE_RECORDED) does NOT surface
+//   5. clearMpRecovery removes the record
+//   6. needsOperatorAttention flags the correct states
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('COB-017 — MP Point payment recovery state machine', () => {
+  type MpPaymentState =
+    | 'MP_STARTED' | 'MP_APPROVED' | 'FULLSITE_PENDING' | 'FULLSITE_RECORDED'
+    | 'RECONCILIATION_REQUIRED' | 'RECONCILED' | 'FAILED_MANUAL_REVIEW'
+
+  interface MpPaymentRecovery {
+    state: MpPaymentState
+    intentId: string
+    orderId: string
+    opId: string // never changes across retries
+    amount: number
+    mesa: number
+    mesero: string
+    timestamp: string
+    error?: string
+  }
+
+  // In-memory localStorage mock (reset per test)
+  let store: Record<string, string>
+  const mockLS = {
+    getItem: (k: string) => store[k] ?? null,
+    setItem: (k: string, v: string) => { store[k] = v },
+    removeItem: (k: string) => { delete store[k] },
+    clear: () => { store = {} },
+  }
+
+  const storageKey = (mesa: number) => `mp_recovery_${mesa}`
+
+  const loadMpRecovery = (mesa: number): MpPaymentRecovery | null => {
+    const raw = mockLS.getItem(storageKey(mesa))
+    if (!raw) return null
+    const r = JSON.parse(raw) as MpPaymentRecovery
+    if (r.state === 'MP_APPROVED' || r.state === 'RECONCILIATION_REQUIRED' || r.state === 'FAILED_MANUAL_REVIEW') return r
+    return null
+  }
+  const persistMpRecovery = (r: MpPaymentRecovery) => mockLS.setItem(storageKey(r.mesa), JSON.stringify(r))
+  const clearMpRecovery = (mesa: number) => mockLS.removeItem(storageKey(mesa))
+  const needsOperatorAttention = (r: MpPaymentRecovery | null): boolean =>
+    !!r && (r.state === 'MP_APPROVED' || r.state === 'RECONCILIATION_REQUIRED' || r.state === 'FAILED_MANUAL_REVIEW')
+  const transition = (r: MpPaymentRecovery, next: MpPaymentState, extra?: Partial<MpPaymentRecovery>): MpPaymentRecovery => {
+    const updated = { ...r, state: next, ...extra }
+    persistMpRecovery(updated)
+    return updated
+  }
+
+  const makeRecovery = (overrides?: Partial<MpPaymentRecovery>): MpPaymentRecovery => ({
+    state: 'MP_APPROVED',
+    intentId: 'INTENT-ABC123',
+    orderId: 'ORDER-001',
+    opId: 'OP-IDEMPOTENT-KEY',
+    amount: 350.00,
+    mesa: 5,
+    mesero: 'Omar Aguilera',
+    timestamp: '2026-07-31T14:30:00.000Z',
+    ...overrides,
+  })
+
+  beforeEach(() => { store = {} })
+
+  it('loadMpRecovery devuelve null cuando localStorage vacío', () => {
+    expect(loadMpRecovery(5)).toBeNull()
+  })
+
+  it('loadMpRecovery devuelve null para FULLSITE_RECORDED — no requiere atención', () => {
+    persistMpRecovery(makeRecovery({ state: 'FULLSITE_RECORDED' }))
+    expect(loadMpRecovery(5)).toBeNull()
+  })
+
+  it('loadMpRecovery devuelve null para FULLSITE_PENDING — estado efímero en vuelo', () => {
+    persistMpRecovery(makeRecovery({ state: 'FULLSITE_PENDING' }))
+    expect(loadMpRecovery(5)).toBeNull()
+  })
+
+  it('loadMpRecovery devuelve record para RECONCILIATION_REQUIRED', () => {
+    const r = makeRecovery({ state: 'RECONCILIATION_REQUIRED', error: 'TypeError: Cannot read...' })
+    persistMpRecovery(r)
+    expect(loadMpRecovery(5)).toEqual(r)
+  })
+
+  it('loadMpRecovery devuelve record para MP_APPROVED — app exited after MP captured', () => {
+    const r = makeRecovery({ state: 'MP_APPROVED' })
+    persistMpRecovery(r)
+    const loaded = loadMpRecovery(5)
+    expect(loaded?.state).toBe('MP_APPROVED')
+    expect(loaded?.intentId).toBe('INTENT-ABC123')
+  })
+
+  it('opId no cambia a través de múltiples transiciones — garantía de idempotencia en retry', () => {
+    const original = makeRecovery()
+    let current = transition(original, 'FULLSITE_PENDING')
+    current = transition(current, 'RECONCILIATION_REQUIRED', { error: 'saveOrder failed' })
+    // On retry: transitions back to FULLSITE_PENDING with same opId
+    current = transition(current, 'FULLSITE_PENDING')
+
+    expect(current.opId).toBe('OP-IDEMPOTENT-KEY')
+    const stored = JSON.parse(mockLS.getItem(storageKey(5))!)
+    expect(stored.opId).toBe('OP-IDEMPOTENT-KEY')
+  })
+
+  it('clearMpRecovery elimina el record — después de retry exitoso', () => {
+    persistMpRecovery(makeRecovery({ state: 'RECONCILIATION_REQUIRED' }))
+    expect(loadMpRecovery(5)).not.toBeNull()
+    clearMpRecovery(5)
+    expect(loadMpRecovery(5)).toBeNull()
+    expect(mockLS.getItem(storageKey(5))).toBeNull()
+  })
+
+  it('needsOperatorAttention es true para MP_APPROVED', () => {
+    expect(needsOperatorAttention(makeRecovery({ state: 'MP_APPROVED' }))).toBe(true)
+  })
+
+  it('needsOperatorAttention es true para RECONCILIATION_REQUIRED', () => {
+    expect(needsOperatorAttention(makeRecovery({ state: 'RECONCILIATION_REQUIRED' }))).toBe(true)
+  })
+
+  it('needsOperatorAttention es true para FAILED_MANUAL_REVIEW', () => {
+    expect(needsOperatorAttention(makeRecovery({ state: 'FAILED_MANUAL_REVIEW' }))).toBe(true)
+  })
+
+  it('needsOperatorAttention es false para FULLSITE_RECORDED', () => {
+    expect(needsOperatorAttention(makeRecovery({ state: 'FULLSITE_RECORDED' }))).toBe(false)
+  })
+
+  it('needsOperatorAttention es false para null', () => {
+    expect(needsOperatorAttention(null)).toBe(false)
+  })
+
+  it('recovery sobrevive a simulación de reload — persiste y recarga correctamente', () => {
+    const r = makeRecovery({ state: 'RECONCILIATION_REQUIRED', error: 'JS exception in handlePayment' })
+    persistMpRecovery(r)
+
+    // Simulate reload: load from scratch
+    const reloaded = loadMpRecovery(5)
+    expect(reloaded).not.toBeNull()
+    expect(reloaded!.intentId).toBe('INTENT-ABC123')
+    expect(reloaded!.opId).toBe('OP-IDEMPOTENT-KEY')
+    expect(reloaded!.amount).toBe(350.00)
+    expect(reloaded!.state).toBe('RECONCILIATION_REQUIRED')
+  })
+
+  it('retry exitoso: RECONCILIATION_REQUIRED → FULLSITE_RECORDED → cleared, no queda en storage', () => {
+    const r = makeRecovery({ state: 'RECONCILIATION_REQUIRED' })
+    persistMpRecovery(r)
+
+    // Simulate successful retry
+    transition(r, 'FULLSITE_PENDING')
+    transition(r, 'FULLSITE_RECORDED')
+    clearMpRecovery(5)
+
+    expect(loadMpRecovery(5)).toBeNull()
+    expect(mockLS.getItem(storageKey(5))).toBeNull()
+  })
+
+  it('scoped por mesa: recovery en mesa 3 no interfiere con mesa 5', () => {
+    persistMpRecovery(makeRecovery({ state: 'RECONCILIATION_REQUIRED', mesa: 3, orderId: 'ORDER-M3' }))
+    persistMpRecovery(makeRecovery({ state: 'FULLSITE_RECORDED', mesa: 5, orderId: 'ORDER-M5' }))
+
+    expect(loadMpRecovery(3)?.orderId).toBe('ORDER-M3')
+    expect(loadMpRecovery(5)).toBeNull() // FULLSITE_RECORDED no surfaced
   })
 })
