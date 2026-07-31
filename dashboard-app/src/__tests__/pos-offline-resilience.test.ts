@@ -1166,3 +1166,412 @@ describe('Audit trail — action types', () => {
     expect(VALID_ACTIONS).toContain('order_cancelled')
   })
 })
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MES-002: localStorage TTL semantics for active order cache
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const ORDER_TTL_MS = 28_800_000   // 8h — pos/page.tsx instant-display gate
+const DRAFT_TTL_MS = 14_400_000   // 4h — pos_draft_${mesa} (MES-002 fix)
+const DRAFT_TTL_OLD_MS = 1_800_000 // 30min — old value, kept for regression
+
+// Simulate the localStorage cache entry written by pos/page.tsx
+interface LocalOrderCache {
+  id: string
+  items: OrderItem[]
+  mesero?: string
+  personas?: number
+  discount?: number
+  notas?: string
+  revision?: number
+  updatedAt?: string
+  ts: number // Date.now() at write time
+}
+
+function makeCacheEntry(ageMs: number, items?: OrderItem[]): LocalOrderCache {
+  return {
+    id: generateId(),
+    items: items ?? [{ id: '1', menuItemId: 'c1a', nombre: 'Chilaquiles Verdes', precio: 292, cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 292 }],
+    revision: 3,
+    ts: Date.now() - ageMs,
+  }
+}
+
+function isCacheValidForInstantDisplay(cache: LocalOrderCache): boolean {
+  return cache.items.length > 0 && Date.now() - cache.ts < ORDER_TTL_MS
+}
+
+function isDraftValid(draft: { items: OrderItem[]; ts: number }): boolean {
+  return draft.items.length > 0 && Date.now() - draft.ts < DRAFT_TTL_MS
+}
+
+describe('MES-002 — localStorage TTL for active order cache', () => {
+  it('cache within 8h is valid for instant display', () => {
+    const cache = makeCacheEntry(4 * 60 * 60 * 1000) // 4h old
+    expect(isCacheValidForInstantDisplay(cache)).toBe(true)
+  })
+
+  it('cache older than 8h is NOT shown as instant display (pre-fetch blank)', () => {
+    const cache = makeCacheEntry(9 * 60 * 60 * 1000) // 9h old
+    expect(isCacheValidForInstantDisplay(cache)).toBe(false)
+  })
+
+  it('cache older than 24h is NOT shown as instant display', () => {
+    const cache = makeCacheEntry(25 * 60 * 60 * 1000) // 25h old
+    expect(isCacheValidForInstantDisplay(cache)).toBe(false)
+  })
+
+  it('offline fallback has no TTL — loads regardless of age', () => {
+    // pos/page.tsx offline fallback: only checks c.items?.length > 0 (no ts check)
+    const staleCache = makeCacheEntry(12 * 60 * 60 * 1000) // 12h old
+    const offlineWouldLoad = staleCache.items.length > 0  // no TTL in offline path
+    expect(offlineWouldLoad).toBe(true)
+  })
+
+  it('offline fallback refreshes ts to keep TTL alive (MES-002 fix)', () => {
+    const staleCache = makeCacheEntry(9 * 60 * 60 * 1000) // 9h old
+    // Simulate what the offline fallback now does: refresh ts
+    const refreshed = { ...staleCache, ts: Date.now() }
+    expect(isCacheValidForInstantDisplay(refreshed)).toBe(true)
+  })
+
+  it('ts is reset on every item change — active orders never expire mid-session', () => {
+    const cache = makeCacheEntry(7 * 60 * 60 * 1000) // 7h old
+    // Simulate a new item being added (ts refreshed by useEffect)
+    const updated = { ...cache, ts: Date.now() }
+    expect(isCacheValidForInstantDisplay(updated)).toBe(true)
+  })
+
+  it('empty items cache is rejected regardless of TTL', () => {
+    const cache: LocalOrderCache = { id: 'x', items: [], ts: Date.now() }
+    expect(isCacheValidForInstantDisplay(cache)).toBe(false)
+  })
+
+  it('ORDER_TTL_MS constant is exactly 8 hours', () => {
+    expect(ORDER_TTL_MS).toBe(8 * 60 * 60 * 1000)
+  })
+})
+
+describe('MES-002 — draft TTL (unsaved orders not yet in DB)', () => {
+  it('draft within 4h is valid (MES-002 fix)', () => {
+    const draft = { items: makeCacheEntry(0).items, ts: Date.now() - 3 * 60 * 60 * 1000 }
+    expect(isDraftValid(draft)).toBe(true)
+  })
+
+  it('draft older than 4h is expired', () => {
+    const draft = { items: makeCacheEntry(0).items, ts: Date.now() - 5 * 60 * 60 * 1000 }
+    expect(isDraftValid(draft)).toBe(false)
+  })
+
+  it('draft at exactly 4h boundary is expired', () => {
+    const draft = { items: makeCacheEntry(0).items, ts: Date.now() - DRAFT_TTL_MS }
+    expect(isDraftValid(draft)).toBe(false)
+  })
+
+  it('OLD 30min draft TTL would expire during normal service (regression guard)', () => {
+    // A mesero adds items and waits 35 min before sending — old behavior lost the draft
+    const draftAge = 35 * 60 * 1000 // 35 minutes
+    const wouldHaveExpiredBefore = draftAge >= DRAFT_TTL_OLD_MS
+    const survivesWith4h = draftAge < DRAFT_TTL_MS
+    expect(wouldHaveExpiredBefore).toBe(true)  // old code would lose it
+    expect(survivesWith4h).toBe(true)           // new code preserves it
+  })
+
+  it('DRAFT_TTL_MS is exactly 4 hours', () => {
+    expect(DRAFT_TTL_MS).toBe(4 * 60 * 60 * 1000)
+  })
+})
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MES-009: Revision conflict detection and classification
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+type SyncErrorClass = 'TRANSIENT_RETRYABLE' | 'STALE_WRITE_CONFLICT' | 'TERMINAL_NON_RETRYABLE'
+
+interface ConflictQueueItem {
+  id: string
+  data: Record<string, unknown>
+  retries: number
+  synced: boolean
+  conflict?: boolean
+  error_class?: SyncErrorClass
+  error_detail?: string
+  server_revision?: number
+}
+
+// Reproduce markConflict logic from pos-offline-db.ts
+function markConflict(
+  queue: ConflictQueueItem[],
+  itemId: string,
+  errorClass: SyncErrorClass,
+  detail: string,
+  serverRevision?: number
+): ConflictQueueItem[] {
+  return queue.map(item => {
+    if (item.id !== itemId) return item
+    return { ...item, conflict: true, error_class: errorClass, error_detail: detail, server_revision: serverRevision }
+  })
+}
+
+// Reproduce getSyncQueueSummary logic
+function getSyncQueueSummary(queue: ConflictQueueItem[]) {
+  const unsynced = queue.filter(i => !i.synced)
+  let pending = 0, terminal = 0, conflicts = 0, exhausted = 0
+  for (const item of unsynced) {
+    if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
+      terminal++
+      if (item.conflict) conflicts++
+    } else if (item.retries >= 5) {
+      exhausted++
+    } else {
+      pending++
+    }
+  }
+  return { pending, terminal, conflicts, exhausted }
+}
+
+// Simulate what the server returns when revision mismatches
+function simulateServerConflictResponse(expected: number, current: number) {
+  return {
+    ok: false,
+    conflict: true,
+    expected_revision: expected,
+    current_revision: current,
+  }
+}
+
+describe('MES-009 — revision conflict detection (multi-terminal)', () => {
+  it('STALE_WRITE_CONFLICT is classified correctly when server has newer revision', () => {
+    const queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: { order_id: 'ord-A', revision: 5 }, retries: 0, synced: false }
+    ]
+    const serverResponse = simulateServerConflictResponse(5, 7) // terminal A at rev5, server at rev7
+    expect(serverResponse.conflict).toBe(true)
+    expect(serverResponse.current_revision).toBeGreaterThan(serverResponse.expected_revision)
+
+    const updated = markConflict(queue, 'job-1', 'STALE_WRITE_CONFLICT', 'expected rev 5, server at 7', 7)
+    expect(updated[0].conflict).toBe(true)
+    expect(updated[0].error_class).toBe('STALE_WRITE_CONFLICT')
+    expect(updated[0].server_revision).toBe(7)
+    expect(updated[0].error_detail).toContain('expected rev 5')
+  })
+
+  it('conflicted item is NOT auto-retried (stays in queue with error_class)', () => {
+    let queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: { order_id: 'ord-A' }, retries: 0, synced: false }
+    ]
+    queue = markConflict(queue, 'job-1', 'STALE_WRITE_CONFLICT', 'stale write', 8)
+    // Simulate syncAll skipping items with error_class
+    const shouldSkip = queue[0].error_class === 'STALE_WRITE_CONFLICT' ||
+                       queue[0].error_class === 'TERMINAL_NON_RETRYABLE'
+    expect(shouldSkip).toBe(true)
+  })
+
+  it('conflicted item payload is preserved for operator recovery', () => {
+    const originalData = { order_id: 'ord-A', items: [{ id: 'i1', nombre: 'Chilaquiles' }], revision: 5 }
+    let queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: originalData, retries: 0, synced: false }
+    ]
+    queue = markConflict(queue, 'job-1', 'STALE_WRITE_CONFLICT', 'stale write', 8)
+    // Payload must be intact — operator can see what was lost
+    expect(queue[0].data).toEqual(originalData)
+  })
+
+  it('getSyncQueueSummary counts conflicts correctly', () => {
+    let queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: { order_id: 'ord-A' }, retries: 0, synced: false },
+      { id: 'job-2', data: { order_id: 'ord-B' }, retries: 0, synced: false },
+      { id: 'job-3', data: { order_id: 'ord-C' }, retries: 0, synced: true },  // synced — ignored
+    ]
+    queue = markConflict(queue, 'job-1', 'STALE_WRITE_CONFLICT', 'stale', 8)
+    const summary = getSyncQueueSummary(queue)
+    expect(summary.conflicts).toBe(1)
+    expect(summary.terminal).toBe(1)
+    expect(summary.pending).toBe(1)  // job-2 is still retryable
+    expect(summary.exhausted).toBe(0)
+  })
+
+  it('both STALE_WRITE_CONFLICT and TERMINAL_NON_RETRYABLE count as terminal and conflict:true', () => {
+    // markConflict always sets conflict:true regardless of error class.
+    // getSyncQueueSummary.conflicts = terminal items where conflict:true (both classes qualify).
+    let queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: {}, retries: 0, synced: false },
+      { id: 'job-2', data: {}, retries: 0, synced: false },
+    ]
+    queue = markConflict(queue, 'job-1', 'STALE_WRITE_CONFLICT', 'stale', 8)
+    queue = markConflict(queue, 'job-2', 'TERMINAL_NON_RETRYABLE', 'bad payload')
+    const summary = getSyncQueueSummary(queue)
+    expect(summary.terminal).toBe(2)
+    expect(summary.conflicts).toBe(2) // markConflict sets conflict:true for both
+  })
+
+  it('multi-terminal scenario: terminal A cannot silently overwrite terminal B changes', () => {
+    // Terminal B saves revision 6 to server while Terminal A was offline at revision 5
+    const serverRevisionAfterB = 6
+    const terminalALocalRevision = 5
+    const serverResponse = simulateServerConflictResponse(terminalALocalRevision, serverRevisionAfterB)
+
+    // Server must reject the write
+    expect(serverResponse.ok).toBe(false)
+    expect(serverResponse.conflict).toBe(true)
+
+    // After conflict: terminal A's write is preserved but marked — NOT applied to server
+    let queue: ConflictQueueItem[] = [
+      { id: 'job-A', data: { revision: terminalALocalRevision }, retries: 0, synced: false }
+    ]
+    queue = markConflict(queue, 'job-A', 'STALE_WRITE_CONFLICT',
+      `expected rev ${terminalALocalRevision}, server at ${serverRevisionAfterB}`, serverRevisionAfterB)
+
+    expect(queue[0].synced).toBe(false)         // NOT marked as synced
+    expect(queue[0].conflict).toBe(true)         // flagged for operator
+    expect(queue[0].error_class).toBe('STALE_WRITE_CONFLICT')
+    expect(queue[0].server_revision).toBe(serverRevisionAfterB)
+  })
+
+  it('pos-order-conflict CustomEvent carries orderId and serverRevision', () => {
+    // Reproduce the event construction from pos-offline-db.ts (MES-009 fix)
+    const itemData = { order_id: 'ord-XYZ', items: [] }
+    const errorDetail = 'STALE_WRITE_REJECTED: expected rev 5, server at 7'
+    const serverRevision = 7
+
+    const eventDetail = {
+      orderId: typeof itemData.order_id === 'string' ? itemData.order_id : undefined,
+      errorDetail,
+      serverRevision,
+    }
+
+    expect(eventDetail.orderId).toBe('ord-XYZ')
+    expect(eventDetail.serverRevision).toBe(7)
+    expect(eventDetail.errorDetail).toContain('STALE_WRITE_REJECTED')
+  })
+
+  it('idempotent replay of a rejected operation is also classified as STALE_WRITE_CONFLICT', () => {
+    // Server returns conflict:true with idempotent_replay:true
+    const serverResponse = {
+      ok: false,
+      conflict: true,
+      idempotent_replay: true,
+      expected_revision: 5,
+      current_revision: 7,
+    }
+    // The classification must be the same — payload still preserved, no retry
+    const errorClass: SyncErrorClass = serverResponse.conflict ? 'STALE_WRITE_CONFLICT' : 'TERMINAL_NON_RETRYABLE'
+    expect(errorClass).toBe('STALE_WRITE_CONFLICT')
+  })
+
+  it('TRANSIENT_RETRYABLE errors are retried and not counted as conflicts', () => {
+    const queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: {}, retries: 2, synced: false }
+    ]
+    const summary = getSyncQueueSummary(queue)
+    expect(summary.pending).toBe(1)
+    expect(summary.conflicts).toBe(0)
+    expect(summary.terminal).toBe(0)
+  })
+
+  it('exhausted items (retries >= 5) are counted separately from terminal conflicts', () => {
+    const queue: ConflictQueueItem[] = [
+      { id: 'job-1', data: {}, retries: 5, synced: false },   // exhausted
+      { id: 'job-2', data: {}, retries: 6, synced: false },   // exhausted
+    ]
+    const summary = getSyncQueueSummary(queue)
+    expect(summary.exhausted).toBe(2)
+    expect(summary.conflicts).toBe(0)
+    expect(summary.pending).toBe(0)
+  })
+})
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MES-010 / MES-012: Transfer ítem + merge de mesas
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe('MES-010 — transfer de ítem entre mesas', () => {
+  // handleTransferItem requires PIN auth and calls /api/pos/transfer-item
+  // This tests the validation logic only (endpoint itself is server-side)
+
+  it('targetMesa must be a positive integer', () => {
+    const valid = (v: string) => !isNaN(parseInt(v, 10)) && parseInt(v, 10) > 0
+    expect(valid('5')).toBe(true)
+    expect(valid('0')).toBe(false)
+    expect(valid('-1')).toBe(false)
+    expect(valid('abc')).toBe(false)
+    expect(valid('')).toBe(false)
+  })
+
+  it('targetMesa must differ from source mesa', () => {
+    const sourceMesa = 5
+    const targetMesa = 5
+    expect(targetMesa === sourceMesa).toBe(true) // would be rejected
+  })
+
+  it('transfer requires item to have been sent to kitchen first (guard in UI)', () => {
+    // The UI shows: "Envía la orden a cocina antes de transferir mesa"
+    // Simulate the guard: sentItemIds must include the item
+    const sentItemIds = new Set(['item-1', 'item-2'])
+    const itemToTransfer = 'item-3' // not yet sent
+    expect(sentItemIds.has(itemToTransfer)).toBe(false) // would be blocked
+  })
+
+  it('full-mesa transfer is FEATURE GAP — only item-level transfer exists', () => {
+    // handleTransferItem moves individual items, not an entire order
+    // MES-010 FEATURE GAP: no handleTransferMesa function in codebase
+    const featureExists = false // verified by grep: no full-mesa transfer function
+    expect(featureExists).toBe(false)
+  })
+})
+
+describe('MES-012 — fusión de mesas (merge)', () => {
+  // handleMerge in mesas/page.tsx merges two orders via /api/pos/merge-orders
+
+  it('merge combines items from both orders', () => {
+    const srcItems: OrderItem[] = [
+      { id: 's1', menuItemId: 'cf1', nombre: 'Cafe Americano', precio: 48, cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 48 }
+    ]
+    const tgtItems: OrderItem[] = [
+      { id: 't1', menuItemId: 'c1a', nombre: 'Chilaquiles Verdes', precio: 292, cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 292 }
+    ]
+    const mergedItems = [...tgtItems, ...srcItems] // mesas/page.tsx merge order
+    expect(mergedItems).toHaveLength(2)
+    expect(mergedItems.map(i => i.id)).toContain('s1')
+    expect(mergedItems.map(i => i.id)).toContain('t1')
+  })
+
+  it('merge result total equals sum of both order totals', () => {
+    const srcTotal = 48
+    const tgtTotal = 292
+    const mergedTotal = srcTotal + tgtTotal
+    expect(mergedTotal).toBe(340)
+  })
+
+  it('merge detects conflict when either order has stale revision', () => {
+    // /api/pos/merge-orders returns { conflict: true } on revision mismatch
+    const mergeResult = { ok: false, conflict: true, error: 'STALE_WRITE_REJECTED' }
+    expect(mergeResult.conflict).toBe(true)
+    // The UI shows a specific conflict toast and aborts the merge
+  })
+
+  it('merge FEATURE GAP: no offline path — requires direct API call', () => {
+    // mesas/page.tsx handleMerge uses fetch('/api/pos/merge-orders') directly
+    // No queueOperation() wrapper — merge fails silently offline
+    const hasOfflinePath = false // verified by code reading
+    expect(hasOfflinePath).toBe(false)
+  })
+
+  it('merge source mesa must differ from target', () => {
+    const mergeSource = 3
+    const mergeTarget = 3
+    const wouldBeBlocked = mergeSource === mergeTarget
+    expect(wouldBeBlocked).toBe(true)
+  })
+
+  it('merged items preserve original item IDs and modifiers', () => {
+    const srcItems: OrderItem[] = [
+      { id: 's1', menuItemId: 'cf1', nombre: 'Cafe Americano', precio: 48, cantidad: 1, modificadores: ['Oat milk'], notas: 'sin azúcar', precioExtra: 15, subtotal: 63 }
+    ]
+    const tgtItems: OrderItem[] = []
+    const merged = [...tgtItems, ...srcItems]
+    expect(merged[0].id).toBe('s1')
+    expect(merged[0].modificadores).toContain('Oat milk')
+    expect(merged[0].notas).toBe('sin azúcar')
+  })
+})

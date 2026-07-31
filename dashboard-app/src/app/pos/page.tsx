@@ -2019,7 +2019,7 @@ function POSContent() {
               const draft = localStorage.getItem(`pos_draft_${mesa}`)
               if (draft) {
                 const d = JSON.parse(draft)
-                if (d.items?.length > 0 && d.ts && Date.now() - d.ts < 1800000) { // 30 min TTL
+                if (d.items?.length > 0 && d.ts && Date.now() - d.ts < 14400000) { // 4h TTL — mesero puede añadir ítems y esperar sin perder el draft
                   setOrderItems(d.items)
                   setOrderId(d.orderId || generateId())
                   if (d.mesero) setMesero(d.mesero)
@@ -2064,6 +2064,8 @@ function POSContent() {
                   snaps[item.id] = { cantidad: item.cantidad, modificadores: [...(item.modificadores || [])], notas: item.notas || '', silla: item.silla }
                 }
                 setSentItemSnapshots(snaps)
+                // MES-002: keep TTL alive during offline — prevents blank pre-fetch flash on next reload
+                try { localStorage.setItem(`pos_order_${mesa}`, JSON.stringify({ ...c, ts: Date.now() })) } catch {}
               }
             }
           } catch {}
@@ -2166,6 +2168,21 @@ function POSContent() {
     window.addEventListener('pos-order-synced', handler)
     return () => window.removeEventListener('pos-order-synced', handler)
   }, [orderId, orderRevision])
+
+  // MES-009: surface STALE_WRITE_CONFLICT to operator the moment syncAll detects it
+  useEffect(() => {
+    const conflictHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      const isCurrentOrder = detail?.orderId === orderId
+      showToast(
+        isCurrentOrder
+          ? `Conflicto de versión en mesa ${mesa} — recarga para ver el estado actual`
+          : 'Conflicto de sincronización en una orden — revisa la cola de pendientes'
+      )
+    }
+    window.addEventListener('pos-order-conflict', conflictHandler)
+    return () => window.removeEventListener('pos-order-conflict', conflictHandler)
+  }, [orderId, mesa])
 
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)

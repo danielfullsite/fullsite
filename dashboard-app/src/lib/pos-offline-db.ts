@@ -498,6 +498,15 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           // TERMINAL — preserve payload, mark conflict, NO retry, NO overwrite, NO direct PATCH
           console.error(`[offline-sync] ${result.detail}`)
           await markConflict(item.id, 'STALE_WRITE_CONFLICT', result.detail!, result.serverRevision)
+          // MES-009: notify active POS page immediately so operator sees it (not just DevTools)
+          if (typeof window !== 'undefined') {
+            const itemOrderId = typeof (item.data as Record<string, unknown>).order_id === 'string'
+              ? (item.data as Record<string, unknown>).order_id as string
+              : undefined
+            window.dispatchEvent(new CustomEvent('pos-order-conflict', {
+              detail: { orderId: itemOrderId, errorDetail: result.detail, serverRevision: result.serverRevision }
+            }))
+          }
           failed++
         } else if (result.errorClass === 'TERMINAL_NON_RETRYABLE') {
           console.error(`[offline-sync] TERMINAL: ${result.detail}`)
