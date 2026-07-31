@@ -7,7 +7,7 @@ import {
   type KitchenOrderFromDB, type OrderItem,
 } from '@/lib/pos-data'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
-import { type StationName } from '@/lib/pos-constants'
+import { type StationName, getStationByName } from '@/lib/pos-constants'
 import { setPosServerHost } from '@/lib/bridge-client'
 import { useKdsWsClient } from '@/hooks/useKdsWsClient'
 
@@ -40,25 +40,16 @@ interface ParsedItem {
   notas?: string
   cancelled?: boolean
   station?: string
+  comanda_batch_id?: string
 }
 
-const STATION_KEYWORDS: Record<string, string[]> = {
-  barra: ['cafe', 'café', 'cappuccino', 'capuchino', 'latte', 'americano', 'mocca', 'matcha', 'chai', 'smoothie', 'frappe', 'jugo', 'limonada', 'fresco', 'soda', 'coca', 'agua', 'te ', 'té ', 'mimosa', 'chamoyada', 'cerveza', 'vino', 'tisana'],
-  panaderia: ['croissant', 'concha', 'bakery', 'postre', 'cheesecake', 'carrot cake', 'toast', 'bagel', 'galleta', 'brownie', 'crunchy'],
-}
-
-function getStation(item: ParsedItem): string {
-  if (item.station === 'barra') return 'barra'
-  if (item.station === 'caja') return 'panaderia'
-  const name = (item.nombre || item.name || '').toLowerCase()
-  if (item.station === 'cocina') {
-    if (STATION_KEYWORDS.panaderia.some(kw => name.includes(kw))) return 'panaderia'
-    return 'cocina'
-  }
-  for (const [station, keywords] of Object.entries(STATION_KEYWORDS)) {
-    if (keywords.some(kw => name.includes(kw))) return station
-  }
-  return 'cocina'
+// Resolve which station an item belongs to.
+// Trusts item.station (set by POS at order time) as primary source.
+// Falls back to name-based detection from pos-constants for legacy orders
+// that predate the item.station field.
+function resolveItemStation(item: ParsedItem): string {
+  if (item.station) return item.station
+  return getStationByName(item.nombre || item.name || '')
 }
 
 // ── Sound ────────────────────────────────────────────────────────────────
@@ -92,12 +83,16 @@ const MODE_PILL = {
 // ── Component ────────────────────────────────────────────────────────────
 
 export default function KDSStandalone() {
-  const station = 'cocina'
+  // Station identity — read from ?station= URL param on mount, persisted to localStorage.
+  // Defaults to 'cocina' so an unconfigured terminal still shows the kitchen.
+  // To open as barra: /kds?station=barra  (Electron appends this from config.json kds_station)
+  const [station, setStation] = useState<string>('cocina')
   const [mounted, setMounted] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [, setTick] = useState(0)
   const [doneItems, setDoneItems] = useState<Set<string>>(new Set())
   const [reprintMsg, setReprintMsg] = useState<{ success: boolean; text: string } | null>(null)
+  const [statusMsg, setStatusMsg] = useState<{ success: boolean; text: string } | null>(null)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const advancingRef = useRef<Set<string>>(new Set())
   const prevEnviadaRef = useRef(0)
@@ -136,13 +131,13 @@ export default function KDSStandalone() {
     setDoneItems(restored)
   }, [orders])
 
-  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[]) => {
+  const handleReprint = async (order: KitchenOrderFromDB, items: ParsedItem[], batchSeq?: number, sentAt?: string) => {
     const ctx: ReprintOrderContext = { id: order.id, mesa: order.mesa, mesero: order.mesero, notas: order.notas }
-    const result = await reprintByStation(ctx, 'cocina' as StationName, items as unknown as OrderItem[])
+    const result = await reprintByStation(ctx, station as StationName, items as unknown as OrderItem[], batchSeq !== undefined ? { batchSeq, sentAt: sentAt ?? order.created_at } : undefined)
     const msg = result.printed ? 'Reimpreso' : (result.error ?? 'Error al imprimir')
     setReprintMsg({ success: result.printed, text: msg })
     setTimeout(() => setReprintMsg(null), 3000)
-    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station: 'cocina' } })
+    void logAudit({ order_id: order.id, action: 'reprint_comanda', actor: 'kds', mesa: order.mesa, details: { station } })
   }
 
   const fetchOrdersForFallback = useCallback(async () => {
@@ -176,8 +171,18 @@ export default function KDSStandalone() {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const bridgeHost = params.get('bridge')
-    if (bridgeHost) {
-      setPosServerHost(bridgeHost)
+    if (bridgeHost) setPosServerHost(bridgeHost)
+    // Station identity — URL param wins; fall back to persisted value from last session
+    const stationParam = params.get('station')
+    if (stationParam) {
+      const s = stationParam.toLowerCase()
+      setStation(s)
+      localStorage.setItem('kds_station', s)
+    } else {
+      const saved = localStorage.getItem('kds_station')
+      if (saved) setStation(saved)
+    }
+    if (bridgeHost || stationParam) {
       window.history.replaceState({}, '', window.location.pathname)
     }
     setMounted(true)
@@ -201,12 +206,29 @@ export default function KDSStandalone() {
   const advance = async (id: string, currentStatus: string, mesa: number, mesero: string) => {
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
+    const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : currentStatus === 'lista' ? 'entregada' : null
+    if (!next) { advancingRef.current.delete(id); return }
+    // KDS-020: optimistic update for FALLBACK/OFFLINE — immediate visual feedback before async write
+    if (kdsClient.mode !== 'LAN_PRIMARY') {
+      kdsClient.setFallbackOrders(orders.map(o => o.id === id ? { ...o, status: next } : o))
+    }
     try {
-      const next = currentStatus === 'enviada' ? 'preparando' : currentStatus === 'preparando' ? 'lista' : 'entregada'
       kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: next })
-      await updateOrderStatus(id, next)
-      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
-      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
+      const ok = await updateOrderStatus(id, next)
+      if (!ok) {
+        // Server rejected while online — rollback optimistic update
+        if (kdsClient.mode !== 'LAN_PRIMARY') {
+          kdsClient.setFallbackOrders(orders.map(o => o.id === id ? { ...o, status: currentStatus } : o))
+        }
+        setStatusMsg({ success: false, text: 'Error al guardar — intenta de nuevo' })
+        setTimeout(() => setStatusMsg(null), 3000)
+        return
+      }
+      void logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: currentStatus, to: next, mesero } })
+      if (kdsClient.mode !== 'LAN_PRIMARY' && typeof navigator !== 'undefined' && !navigator.onLine) {
+        setStatusMsg({ success: true, text: 'Avanzado · se sincroniza al reconectar' })
+        setTimeout(() => setStatusMsg(null), 3000)
+      }
     } finally {
       advancingRef.current.delete(id)
     }
@@ -215,11 +237,22 @@ export default function KDSStandalone() {
   const bump = async (id: string, mesa: number, mesero: string) => {
     if (advancingRef.current.has(id)) return
     advancingRef.current.add(id)
+    // KDS-020: optimistic update — remove order from visible list immediately
+    if (kdsClient.mode !== 'LAN_PRIMARY') {
+      kdsClient.setFallbackOrders(orders.map(o => o.id === id ? { ...o, status: 'entregada' } : o))
+    }
     try {
       kdsClient.sendCommand('ORDER_UPSERTED', { order_id: id, mesa, status: 'entregada' })
-      await updateOrderStatus(id, 'entregada')
-      logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
-      if (kdsClient.mode !== 'LAN_PRIMARY') fetchOrdersForFallback()
+      const ok = await updateOrderStatus(id, 'entregada')
+      if (!ok) {
+        if (kdsClient.mode !== 'LAN_PRIMARY') {
+          kdsClient.setFallbackOrders(orders.map(o => o.id === id ? { ...o, status: 'lista' } : o))
+        }
+        setStatusMsg({ success: false, text: 'Error al guardar — intenta de nuevo' })
+        setTimeout(() => setStatusMsg(null), 3000)
+        return
+      }
+      void logAudit({ order_id: id, action: 'status_changed', actor: 'KDS', mesa, details: { from: 'lista', to: 'entregada', mesero } })
     } finally {
       advancingRef.current.delete(id)
     }
@@ -283,7 +316,7 @@ export default function KDSStandalone() {
     .filter(o => o.status !== 'entregada')
     .filter(o => {
       const items: ParsedItem[] = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
-      return items.some(item => !item.cancelled && getStation(item) === station)
+      return items.some(item => !item.cancelled && resolveItemStation(item) === station)
     })
     .sort((a, b) => {
       const p: Record<string, number> = { enviada: 0, preparando: 1, lista: 2 }
@@ -291,6 +324,29 @@ export default function KDSStandalone() {
       if (ps !== 0) return ps
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
+
+  // KDS-013: expand filteredOrders → per-batch cards so multi-round orders show separate cards
+  interface KDSBatchCard {
+    order: typeof orders[0]
+    batchId: string | null
+    batchSeq: number
+    batchCreatedAt: string
+  }
+  const kdsCards: KDSBatchCard[] = []
+  for (const order of filteredOrders) {
+    const allBatchItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
+    let batchMeta: Record<string, { seq?: number; created_at?: string }> = {}
+    try { batchMeta = typeof order.comanda_batches === 'string' ? JSON.parse(order.comanda_batches || '{}') : ((order.comanda_batches as unknown as Record<string, { seq?: number; created_at?: string }>) ?? {}) } catch {}
+    const batchIds = [...new Set(allBatchItems.map(i => i.comanda_batch_id).filter((b): b is string => !!b))]
+    if (batchIds.length <= 1) {
+      kdsCards.push({ order, batchId: null, batchSeq: 0, batchCreatedAt: order.created_at })
+    } else {
+      for (const bid of batchIds) {
+        kdsCards.push({ order, batchId: bid, batchSeq: batchMeta[bid]?.seq ?? 0, batchCreatedAt: batchMeta[bid]?.created_at ?? order.created_at })
+      }
+    }
+  }
+  kdsCards.sort((a, b) => new Date(a.batchCreatedAt).getTime() - new Date(b.batchCreatedAt).getTime())
 
   const modePill = MODE_PILL[kdsClient.mode]
 
@@ -301,7 +357,9 @@ export default function KDSStandalone() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 flex-shrink-0" style={{ background: '#111' }}>
         <div className="flex items-center gap-3">
-          <span className="text-white font-black text-xl tracking-widest uppercase">Cocina</span>
+          <span className="text-white font-black text-xl tracking-widest uppercase">
+            {station.charAt(0).toUpperCase() + station.slice(1)}
+          </span>
           <div className="flex items-center gap-3 text-sm ml-4">
             <span className="flex items-center gap-1.5 text-slate-400">
               <span className="w-2.5 h-2.5 rounded-full bg-white/40" />
@@ -355,8 +413,9 @@ export default function KDSStandalone() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {filteredOrders.map(order => {
-              const mins = elapsed(order.created_at)
+            {kdsCards.map(card => {
+              const order = card.order
+              const mins = elapsed(card.batchCreatedAt)
               const isNew = order.status === 'enviada'
               const isPrep = order.status === 'preparando'
               const isDone = order.status === 'lista'
@@ -364,22 +423,29 @@ export default function KDSStandalone() {
               const allItems: ParsedItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
               const activeItemsWithIndex = allItems
                 .map((item, idx) => ({ item, originalIndex: idx }))
-                .filter(({ item }) => !item.cancelled && getStation(item) === station)
+                .filter(({ item }) => !item.cancelled && (!card.batchId || item.comanda_batch_id === card.batchId) && resolveItemStation(item) === station)
+              if (activeItemsWithIndex.length === 0) return null
               const doneCount = activeItemsWithIndex.filter(({ originalIndex }) => doneItems.has(`${order.id}-${originalIndex}`)).length
               const totalCount = activeItemsWithIndex.length
 
               const borderColor = isNew ? 'border-white/40' : isPrep ? 'border-amber-500/50' : 'border-emerald-500/50'
               const headerBg = isNew ? 'bg-white text-black' : isPrep ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'
+              const cardKey = card.batchId ? `${order.id}-${card.batchId}` : order.id
 
               return (
                 <div
-                  key={order.id}
+                  key={cardKey}
                   className={`rounded-2xl border-2 ${borderColor} flex flex-col overflow-hidden ${isNew ? 'animate-pulse-once' : ''}`}
                   style={{ background: '#1a1a1a' }}
                 >
                   <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
                     <div className="flex items-center gap-3">
                       <span className="text-3xl font-black">{order.mesa || 'D'}</span>
+                      {card.batchSeq > 0 && (
+                        <span className="text-xs font-bold opacity-60 bg-black/20 px-1.5 py-0.5 rounded">
+                          R{card.batchSeq + 1}
+                        </span>
+                      )}
                       <div className="leading-tight">
                         <p className="text-sm font-black uppercase tracking-wide">{isNew ? 'NUEVA' : isPrep ? 'PREPARANDO' : 'LISTA'}</p>
                         <p className="text-xs opacity-70">{order.mesero?.split(' ').slice(0, 2).join(' ')}</p>
@@ -473,7 +539,7 @@ export default function KDSStandalone() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleReprint(order, activeItemsWithIndex.map(i => i.item))}
+                    onClick={() => handleReprint(order, activeItemsWithIndex.map(i => i.item), card.batchId ? card.batchSeq : undefined, card.batchId ? card.batchCreatedAt : undefined)}
                     className="mx-3 mb-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium flex items-center justify-center gap-1.5 min-h-[40px] transition-colors"
                   >
                     <Printer className="w-4 h-4" />
@@ -489,6 +555,11 @@ export default function KDSStandalone() {
       {reprintMsg && (
         <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${reprintMsg.success ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
           {reprintMsg.text}
+        </div>
+      )}
+      {statusMsg && (
+        <div className={`fixed bottom-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-bold shadow-lg z-50 ${statusMsg.success ? 'bg-slate-700 text-white' : 'bg-red-600 text-white'}`}>
+          {statusMsg.text}
         </div>
       )}
 

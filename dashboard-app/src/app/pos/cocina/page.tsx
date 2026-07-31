@@ -392,16 +392,29 @@ export default function CocinaPage() {
       return
     }
 
+    // KDS-020: optimistic update — immediate UI feedback before async write
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o))
+
     try {
-      await updateOrderStatus(id, newStatus)
-      logAudit({
+      const ok = await updateOrderStatus(id, newStatus)
+      if (!ok) {
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o))
+        showToast('Error al cambiar estado — intenta de nuevo')
+        return
+      }
+      void logAudit({
         order_id: id, action: 'status_changed', actor: 'Cocina', mesa,
         details: { from: currentStatus, to: newStatus, mesero },
       })
-      fetchOrders()
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        showToast('Avanzado · se sincroniza al reconectar')
+      } else {
+        fetchOrders()
+      }
     } catch (err) {
       console.error('Error advancing status:', err)
-      alert('Error al cambiar estado. Intenta de nuevo.')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o))
+      showToast('Error al cambiar estado — intenta de nuevo')
     }
   }
 
