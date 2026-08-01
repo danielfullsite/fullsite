@@ -2,7 +2,10 @@
 // GET /api/integrations/uber-eats/stores
 //
 // Sandbox-only diagnostic endpoint. Requires:
-//   Authorization: Bearer <SUPABASE_SERVICE_KEY>
+//   Authorization: Bearer <INTEGRATION_ADMIN_SECRET>
+//
+// INTEGRATION_ADMIN_SECRET is a dedicated secret for internal admin endpoints.
+// It must NOT be SUPABASE_SERVICE_KEY — that key is for DB operations only.
 //
 // Returns: store_id, name, env, count — no tokens, no credentials, no POS data.
 // Used during B-3 setup to discover provider_store_id before inserting
@@ -18,22 +21,25 @@ interface UberStoreRow {
 }
 
 function checkAuth(request: NextRequest): boolean {
-  const adminKey = process.env.SUPABASE_SERVICE_KEY
-  if (!adminKey) return false
+  const adminSecret = process.env.INTEGRATION_ADMIN_SECRET
+  if (!adminSecret) return false
   const auth = request.headers.get('authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  return token.length > 0 && token === adminKey
+  return token.length > 0 && token === adminSecret
 }
 
 export async function GET(request: NextRequest) {
   const correlationId = crypto.randomUUID()
 
-  // Guard 0: SUPABASE_SERVICE_KEY must exist (used both for auth and DB writes)
+  // Guard 0: required server-side secrets must exist
   if (!process.env.SUPABASE_SERVICE_KEY) {
     return NextResponse.json({ error: 'not_configured', correlation_id: correlationId }, { status: 503 })
   }
+  if (!process.env.INTEGRATION_ADMIN_SECRET) {
+    return NextResponse.json({ error: 'not_configured', correlation_id: correlationId }, { status: 503 })
+  }
 
-  // Guard 1: admin authentication
+  // Guard 1: admin authentication via dedicated INTEGRATION_ADMIN_SECRET
   if (!checkAuth(request)) {
     return NextResponse.json({ error: 'unauthorized', correlation_id: correlationId }, { status: 401 })
   }

@@ -14,9 +14,10 @@ const authorizeUrl = (): string =>
     ? 'https://login.uber.com/oauth/v2/authorize'
     : 'https://sandbox-login.uber.com/oauth/v2/authorize'
 
-// Uber docs: Testing → test-api.uber.com  /  Production → api.uber.com
-const apiBase = (): string =>
-  isProduction() ? 'https://api.uber.com' : 'https://test-api.uber.com'
+// Uber Eats Marketplace API base — same host for sandbox and production.
+// Auth URLs differ (sandbox-login.uber.com vs login.uber.com) but the REST API
+// always targets api.uber.com. Confirmed: GET /v1/eats/stores docs show api.uber.com.
+const API_BASE = 'https://api.uber.com'
 
 // Scopes required for POS integration.
 // eats.pos_provisioning covers order + store management in one scope (production).
@@ -135,7 +136,7 @@ export async function uberFetch(
   const scope = opts.scope ?? 'eats.order'
   const token = await getUberAccessToken(scope)
   const { scope: _scope, ...rest } = opts
-  return fetch(`${apiBase()}${path}`, {
+  return fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: {
       'Content-Type': 'application/json',
