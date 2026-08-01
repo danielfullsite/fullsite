@@ -20,13 +20,10 @@ function redirectUri(req: NextRequest): string {
 
 export async function GET(request: NextRequest) {
   const correlationId = crypto.randomUUID()
-  const t0 = Date.now()
-  console.log(`[USL-INITIATE][1] request_received cid=${correlationId} url=${request.url}`)
 
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get('store_id') || ''
   const clientId = searchParams.get('client_id') || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || 'amalay'
-  console.log(`[USL-INITIATE][2] params_validated store_id=${storeId} client_id=${clientId} +${Date.now() - t0}ms`)
 
   if (!storeId) {
     return NextResponse.json({ error: 'store_id is required' }, { status: 400 })
@@ -39,13 +36,9 @@ export async function GET(request: NextRequest) {
   try {
     authUrl = buildUberAuthUrl(state, callbackUri)
   } catch (e) {
-    console.log(`[USL-INITIATE][ERR] buildUberAuthUrl threw: ${String(e)} +${Date.now() - t0}ms`)
     return NextResponse.json({ error: 'oauth_config_error', detail: String(e) }, { status: 503 })
   }
-  console.log(`[USL-INITIATE][3] state_and_url_built auth_host=${new URL(authUrl).host} callback=${callbackUri} +${Date.now() - t0}ms`)
 
-  console.log(`[USL-INITIATE][4] audit_log_start +${Date.now() - t0}ms`)
-  const tAudit = Date.now()
   await auditLog({
     provider: 'ubereats',
     client_id: clientId,
@@ -53,7 +46,6 @@ export async function GET(request: NextRequest) {
     action: 'usl.initiate',
     request: { store_id: storeId, redirect_uri: callbackUri },
   })
-  console.log(`[USL-INITIATE][5] audit_log_done duration=${Date.now() - tAudit}ms +${Date.now() - t0}ms`)
 
   const response = NextResponse.redirect(authUrl)
   // State cookie: httpOnly, Secure, SameSite=Lax, 10-minute TTL
@@ -64,6 +56,5 @@ export async function GET(request: NextRequest) {
     maxAge: 600,
     path: '/api/integrations/uber-eats/auth',
   })
-  console.log(`[USL-INITIATE][6] returning_302 redirect_to=${new URL(authUrl).host} total=${Date.now() - t0}ms`)
   return response
 }

@@ -7,14 +7,14 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
 | Capa | Estado |
 |---|---|
-| DB migration staging | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
-| Integration Framework código | ✓ En `main` local — pendiente push a origin |
+| DB migration producción | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
+| Integration Framework código | ✓ En `main`, desplegado en Vercel |
 | **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
-| **Categoría B** (sandbox con Uber real) | **DESBLOQUEADA — B-1..B-5 COMPLETOS** |
+| **Categoría B** (sandbox con Uber real) | **EN PROGRESO — B-1..B-5 COMPLETOS, UBER-001 PASS** |
 | Deployment público | ✓ COMPLETO — commit `bbf6bea`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
-| Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `sandbox-client` |
+| Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
 
 ## Categoría A — CERRADA
 
@@ -157,27 +157,51 @@ VALUES ('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client');
 
 ## Categoría B — Tests con Uber real (requiere B-1..B-5)
 
-| ID | Capability | Paso | Evidencia requerida |
-|---|---|---|---|
-| UBER-001 | OAuth/USL | GET /auth/initiate?store_id=TEST | Redirect a Uber, tokens en `integration_providers` |
-| UBER-002 | Store Mapping | Verificar B-5 activo | store_id → client_id, webhook de test store resuelto |
-| UBER-003 | Upload Menu | POST /api/integrations/uber-eats/menu | 200 OK, menú visible en Uber app sandbox |
-| UBER-005 | Mark OOS | POST /menu {action:"oos"} | Item no disponible en sandbox app |
-| UBER-006 | Restore Item | POST /menu {action:"restore"} | Item disponible de nuevo |
-| UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` |
-| UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed |
-| UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` |
-| UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` |
-| UBER-012 | Accept | Automático tras nuevo pedido | `auditLog action=order.accept`, status 200 |
-| UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado |
-| UBER-013 | Deny | POST /order {action:"deny",reason:"ITEM_UNAVAILABLE"} | Deny enviado a Uber, `auditLog` |
-| UBER-014 | Cancel | POST /order {action:"cancel",reason:"CUSTOMER_CALLED_TO_CANCEL"} | Cancel enviado |
-| UBER-015 | Mark Ready | Click "Lista para recoger" en /pos/delivery | `markOrderReady` llamado, `auditLog` |
-| UBER-016 | Dup Webhook | Uber reintenta webhook procesado | 200 sin duplicate en `delivery_orders` |
-| UBER-017 | Invalid Signature | POST con sig inválida | 401 |
-| UBER-018 | Retry | Fallo transitorio en `withRetry` | Log de retry, éxito en intento N |
-| UBER-019 | DLQ | Error forzado en handler | Fila en `integration_webhook_dlq` |
-| UBER-020 | Reconciliation | POST /reconcile con órdenes stuck >30min | Órdenes resueltas |
+| ID | Capability | Paso | Evidencia requerida | Estado |
+|---|---|---|---|---|
+| UBER-001 | OAuth/USL | GET /auth/initiate?store_id=TEST | Redirect a Uber, tokens en `integration_providers` | **PASS** |
+| UBER-002 | Store Mapping | Verificar B-5 activo | store_id → client_id, webhook de test store resuelto | — |
+
+### UBER-001 — Evidencia
+
+```
+Test ID:          UBER-001
+Capability:       OAuth / USL (Activate Integration)
+Timestamp UTC:    2026-08-01T19:55:46Z
+Provider store:   633b57d4-237a-5a32-b249-7ceb795f1d35
+Correlation ID:   363c79d9-c265-4cf0-b7fe-a08ec0cda863
+Verdict:          PASS
+
+integration_providers (1 fila):
+  provider=ubereats, client_id=amalay, status=active
+  scopes=["eats.pos_provisioning","offline_access"]
+  token_expires_at=2026-08-31T19:55:46Z
+  created_at=2026-08-01T19:43:16Z
+
+integration_audit_log:
+  action=usl.initiate → action=usl.connected (mismo segundo)
+  response_summary.expires_in=2592000
+```
+
+---
+
+| UBER-003 | Upload Menu | POST /api/integrations/uber-eats/menu | 200 OK, menú visible en Uber app sandbox | — |
+| UBER-005 | Mark OOS | POST /menu {action:"oos"} | Item no disponible en sandbox app | — |
+| UBER-006 | Restore Item | POST /menu {action:"restore"} | Item disponible de nuevo | — |
+| UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado | — |
+| UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` | — |
+| UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed | — |
+| UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` | — |
+| UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` | — |
+| UBER-012 | Accept | Automático tras nuevo pedido | `auditLog action=order.accept`, status 200 | — |
+| UBER-013 | Deny | POST /order {action:"deny",reason:"ITEM_UNAVAILABLE"} | Deny enviado a Uber, `auditLog` | — |
+| UBER-014 | Cancel | POST /order {action:"cancel",reason:"CUSTOMER_CALLED_TO_CANCEL"} | Cancel enviado | — |
+| UBER-015 | Mark Ready | Click "Lista para recoger" en /pos/delivery | `markOrderReady` llamado, `auditLog` | — |
+| UBER-016 | Dup Webhook | Uber reintenta webhook procesado | 200 sin duplicate en `delivery_orders` | — |
+| UBER-017 | Invalid Signature | POST con sig inválida | 401 | — |
+| UBER-018 | Retry | Fallo transitorio en `withRetry` | Log de retry, éxito en intento N | — |
+| UBER-019 | DLQ | Error forzado en handler | Fila en `integration_webhook_dlq` | — |
+| UBER-020 | Reconciliation | POST /reconcile con órdenes stuck >30min | Órdenes resueltas | — |
 
 ## Plantilla de evidencia por capability
 

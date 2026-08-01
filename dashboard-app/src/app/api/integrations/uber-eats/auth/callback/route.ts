@@ -155,7 +155,6 @@ export async function GET(request: NextRequest) {
 
   } catch (e) {
     const msg = String(e)
-    console.log(`[USL-CALLBACK][ERR] cid=${correlationId} error=${msg}`)
     const reason = msg.includes('upsertProvider') || msg.includes('upsertStoreMapping')
       ? 'db_write_failed'
       : 'token_exchange_failed'
