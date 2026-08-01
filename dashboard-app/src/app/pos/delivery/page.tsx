@@ -9,9 +9,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, RefreshCw, Clock, ChefHat, PackageCheck,
-  Truck, CheckCircle2, ShoppingBag, DollarSign,
+  Truck, CheckCircle2, ShoppingBag, DollarSign, XCircle, Ban,
 } from 'lucide-react'
 import { formatMXN, logAudit, getClientId } from '@/lib/pos-data'
+import { CANCEL_REASON_LABELS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
+import type { UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -157,20 +159,32 @@ export default function DeliveryPage() {
   }
 
   const handleStatusChange = async (order: DeliveryOrder, newStatus: 'preparando' | 'lista') => {
-    const extra: Record<string, unknown> = {}
-    if (newStatus === 'lista') extra.updated_at = new Date().toISOString()
-    await patchOrder(order.id, { status: newStatus, ...extra })
+    await patchOrder(order.id, { status: newStatus, updated_at: new Date().toISOString() })
+    // When marking lista → notify Uber that order is ready for pickup
+    if (newStatus === 'lista' && order.platform === 'ubereats' && order.platform_order_id) {
+      fetch('/api/integrations/uber-eats/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.platform_order_id, action: 'ready' }),
+      }).catch(e => console.warn('[delivery] mark-ready failed:', e))
+    }
     logAudit({
       action: 'delivery_status_changed',
       actor: actorName,
-      details: {
-        delivery_id: order.id,
-        platform: order.platform,
-        from: order.status,
-        to: newStatus,
-        cliente: order.customer_name,
-      },
+      details: { delivery_id: order.id, platform: order.platform, from: order.status, to: newStatus, cliente: order.customer_name },
     })
+  }
+
+  const handleCancel = async (order: DeliveryOrder, reason: UberCancelReason) => {
+    await patchOrder(order.id, { status: 'cancelada', updated_at: new Date().toISOString() })
+    if (order.platform === 'ubereats' && order.platform_order_id) {
+      fetch('/api/integrations/uber-eats/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.platform_order_id, action: 'cancel', reason }),
+      }).catch(e => console.warn('[delivery] cancel failed:', e))
+    }
+    logAudit({ action: 'order_cancelled', actor: actorName, details: { delivery_id: order.id, platform: order.platform, reason, cliente: order.customer_name } })
   }
 
   return (
@@ -263,6 +277,7 @@ export default function DeliveryPage() {
                       key={o.id}
                       order={o}
                       onStatusChange={handleStatusChange}
+                      onCancel={handleCancel}
                     />
                   ))}
                 </div>
@@ -277,7 +292,7 @@ export default function DeliveryPage() {
                 </h2>
                 <div className="space-y-3">
                   {completedOrders.map(o => (
-                    <OrderCard key={o.id} order={o} onStatusChange={handleStatusChange} />
+                    <OrderCard key={o.id} order={o} onStatusChange={handleStatusChange} onCancel={handleCancel} />
                   ))}
                 </div>
               </section>
@@ -321,10 +336,13 @@ function StatCard({
 function OrderCard({
   order,
   onStatusChange,
+  onCancel,
 }: {
   order: DeliveryOrder
   onStatusChange: (order: DeliveryOrder, status: 'preparando' | 'lista') => void
+  onCancel: (order: DeliveryOrder, reason: UberCancelReason) => void
 }) {
+  const [showCancelMenu, setShowCancelMenu] = useState(false)
   const platform = PLATFORM_STYLE[order.platform] || PLATFORM_STYLE.ubereats
   const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.nueva
   const StatusIcon = statusCfg.icon
@@ -390,31 +408,67 @@ function OrderCard({
         </div>
       )}
 
-      {/* Action buttons (kitchen status only) */}
+      {/* Action buttons (kitchen status + cancel) */}
       {!isCompleted && (
-        <div className="flex gap-2 pt-1">
-          {order.status === 'nueva' && (
-            <button
-              onClick={() => onStatusChange(order, 'preparando')}
-              className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
-            >
-              <ChefHat size={18} />
-              Preparando
-            </button>
-          )}
-          {order.status === 'preparando' && (
-            <button
-              onClick={() => onStatusChange(order, 'lista')}
-              className="flex-1 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
-            >
-              <PackageCheck size={18} />
-              Lista para recoger
-            </button>
-          )}
-          {order.status === 'lista' && (
-            <div className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 font-bold text-sm min-h-[48px] flex items-center justify-center gap-2">
-              <Truck size={18} />
-              Esperando repartidor de {platform.label}
+        <div className="space-y-2 pt-1">
+          <div className="flex gap-2">
+            {order.status === 'nueva' && (
+              <button
+                onClick={() => onStatusChange(order, 'preparando')}
+                className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
+              >
+                <ChefHat size={18} />
+                Preparando
+              </button>
+            )}
+            {order.status === 'preparando' && (
+              <button
+                onClick={() => onStatusChange(order, 'lista')}
+                className="flex-1 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm min-h-[48px] flex items-center justify-center gap-2 transition-colors"
+              >
+                <PackageCheck size={18} />
+                Lista para recoger
+              </button>
+            )}
+            {order.status === 'lista' && (
+              <div className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 font-bold text-sm min-h-[48px] flex items-center justify-center gap-2">
+                <Truck size={18} />
+                Esperando repartidor de {platform.label}
+              </div>
+            )}
+            {/* Cancel button — available for nueva and preparando */}
+            {['nueva', 'preparando'].includes(order.status) && (
+              <button
+                onClick={() => setShowCancelMenu(v => !v)}
+                className="w-12 h-12 rounded-xl bg-red-600/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0 active:bg-red-600/30"
+                aria-label="Cancelar orden"
+              >
+                <XCircle size={20} />
+              </button>
+            )}
+          </div>
+          {/* Cancel reason picker */}
+          {showCancelMenu && (
+            <div className="bg-[#1a0a0a] border border-red-500/30 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Ban size={13} />
+                Razón de cancelación
+              </p>
+              {(Object.entries(CANCEL_REASON_LABELS) as [UberCancelReason, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => { setShowCancelMenu(false); onCancel(order, key) }}
+                  className="w-full text-left px-3 py-2.5 rounded-lg bg-white/5 hover:bg-red-600/20 text-white/70 hover:text-red-300 text-sm font-medium transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowCancelMenu(false)}
+                className="w-full text-center text-white/30 text-xs py-1"
+              >
+                Cerrar
+              </button>
             </div>
           )}
         </div>
