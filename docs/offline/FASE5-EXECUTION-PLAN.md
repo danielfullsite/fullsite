@@ -1,8 +1,53 @@
-# P0-4 — Offline Fase 5: Plan de Ejecución Física (4h)
+# P0-4 — Offline Fase 5: Protocolo de Certificación Física (4h)
+
+> **PROTOCOLO OFICIAL — CONGELADO v1.0 · 2026-07-31**  
+> Todo restaurante nuevo debe superar exactamente esta prueba antes de considerarse listo para producción.  
+> Cualquier cambio a este documento requiere incrementar la versión y aprobación explícita.
 
 > **Propósito:** Certificación física E4. Sin código. Sin DevTools. Sin intervención técnica.  
 > **Fuente canónica:** `docs/offline/RUNBOOK.md`  
 > **Estado:** PENDING — esperando ejecución física en AMALAY
+
+---
+
+## Tabla de referencia rápida — Escenarios
+
+| ID | Descripción | Tiempo esperado | Owner | Severidad si falla |
+|---|---|---|---|---|
+| PRE-01–07 | Preflight completo | 30 min | Técnico | P0 — aborta la prueba |
+| T+00 | Desconexión WAN | 5 min | Técnico | P0 |
+| F5-01 | Abrir turno | 2 min | Gerente | P1 |
+| F5-02 | Login PIN ×3 terminales | 3 min | Operador | P0 |
+| F5-03 | Abrir mesas simultáneas | 5 min | Operador | P0 |
+| F5-04 | Agregar ítems | 5 min | Operador | P1 |
+| F5-05 | Enviar a Cocina y Barra | 10 min | Operador | P0 |
+| F5-06 | Agregar ítem post-envío | 5 min | Operador | P1 |
+| F5-07 | Cancelar ítem | 3 min | Operador | P1 |
+| F5-08 | Transferir mesa | 5 min | Operador | P1 |
+| F5-09 | Unir mesas | 5 min | Operador | P2 |
+| F5-10 | Pago efectivo | 3 min | Cajero | P0 |
+| F5-11 | Pago tarjeta manual | 3 min | Cajero | P0 |
+| F5-12 | Pago transferencia | 3 min | Cajero | P1 |
+| F5-13 | Depósito de caja | 3 min | Gerente | P1 |
+| F5-14 | Retiro de caja | 3 min | Gerente | P1 |
+| F5-15 | Reiniciar PDV1 | 5 min | Técnico | P0 |
+| F5-16 | Reiniciar KDS Cocina | 3 min | Técnico | P0 |
+| F5-17 | Nueva orden post-reinicio | 5 min | Operador | P0 |
+| F5-18 | Simular falla impresora | 5 min | Técnico | P0 |
+| F5-19 | Recuperación impresora | 5 min | Técnico | P0 |
+| F5-20 | Orden delivery | 10 min | Operador | P2 |
+| F5-21 | Conteo de estado T+3h | 5 min | Observador | N/A — solo captura |
+| F5-22 | GUARD-08 previo al cierre | 5 min | Gerente | P1 |
+| F5-23 | Contar efectivo | 5 min | Cajero | P1 |
+| F5-24 | Cierre de turno con PIN | 3 min | Gerente | P0 |
+| F5-25 | Arqueo post-cierre | 5 min | Gerente | P0 |
+| F5-26 | Restaurar WAN | 3 min | Técnico | P0 |
+| F5-27 | Sync automático | 5 min | Observador | P0 |
+| F5-28 | Replay completo | 10 min | Técnico | P0 |
+| F5-29 | Cero duplicados | 5 min | Técnico | P0 |
+| F5-30 | Comparación local vs Supabase | 5 min | Técnico | P0 |
+
+> Tiempo total mínimo (sin buffer): ~165 min. La prueba se diseña para 240 min para absorber incidentes, flujo real de comensales y tiempos de recuperación.
 
 ---
 
@@ -451,21 +496,99 @@ INCIDENTE #1
 
 ---
 
+## MÉTRICAS DE RECURSOS
+
+Capturar en cuatro snapshots: T+30, T+90, T+180, T+240 (post-sync).  
+En Caja: Task Manager Windows → proceso Electron. En browser: OfflineIndicator visual.  
+Bridge: GET http://192.168.1.71:7717/health.
+
+| Snapshot | Hora | CPU Electron % | RAM Electron MB | Bridge sync_queue | Bridge print_queue | IDB Caja | IDB PDV1 | IDB PDV2 | Notas |
+|---|---|---|---|---|---|---|---|---|---|
+| T+30  | | | | | | | | | |
+| T+90  | | | | | | | | | |
+| T+180 | | | | | | | | | |
+| T+240 | | | | | | | | | |
+
+**Umbrales de alerta** (no son gates automáticos, requieren investigación si se superan):
+
+| Métrica | Umbral de alerta |
+|---|---|
+| CPU Electron | > 80% sostenido ≥ 5 min |
+| RAM Electron | > 800 MB |
+| Bridge sync_queue | > 50 items acumulados |
+| Bridge print_queue | > 5 items pendientes |
+| IDB sync_queue cualquier terminal | > 30 items acumulados |
+
+---
+
 ## GATES — La fase falla automáticamente si:
 
-- [ ] Se perdió una orden (no aparece en Supabase después del Replay)
-- [ ] Una orden quedó duplicada en Supabase
-- [ ] KDS o Barra no recibieron una comanda enviada (sin falla de hardware)
-- [ ] Una impresión se perdió sin quedar en cola de retry
-- [ ] Un pago o movimiento de caja quedó duplicado
-- [ ] El cierre de turno tiene inconsistencia en el arqueo
-- [ ] El Replay quedó incompleto (operaciones faltantes)
-- [ ] Conflicto de concurrencia silencioso (dos terminales con datos divergentes)
-- [ ] Se abrió DevTools para continuar operando
-- [ ] Se editó JSON, SQL, IP o variable durante la prueba
-- [ ] Intervención técnica fue necesaria para que el sistema continuara
+- [ ] Se perdió una orden (no aparece en Supabase después del Replay) · **P0**
+- [ ] Una orden quedó duplicada en Supabase · **P0**
+- [ ] KDS o Barra no recibieron una comanda enviada (sin falla de hardware) · **P0**
+- [ ] Una impresión se perdió sin quedar en cola de retry · **P0**
+- [ ] Un pago o movimiento de caja quedó duplicado · **P0**
+- [ ] El cierre de turno tiene inconsistencia en el arqueo · **P0**
+- [ ] El Replay quedó incompleto (operaciones faltantes) · **P0**
+- [ ] Conflicto de concurrencia silencioso (dos terminales con datos divergentes) · **P0**
+- [ ] Se abrió DevTools para continuar operando · **P0 — invalida la sesión**
+- [ ] Se editó JSON, SQL, IP o variable durante la prueba · **P0 — invalida la sesión**
+- [ ] Intervención técnica fue necesaria para que el sistema continuara · **P0**
+- [ ] CPU > 80% sostenido ≥ 5 min sin recuperación · **P1**
+- [ ] RAM > 800 MB sin recuperación tras reinicio · **P1**
 
-Si algún gate falla → registrar en incidente, capturar evidencia, detener solo ese caso, corregir, re-ejecutar ese caso.
+Si un gate P0 falla → registrar en incidente, capturar evidencia, detener solo ese caso, corregir, re-ejecutar ese caso.  
+Si fallan ≥2 gates P0 distintos → la prueba se clasifica FAIL y debe re-ejecutarse completa.
+
+---
+
+## OFFLINE RELIABILITY SCORE (ORS)
+
+Calcular al terminar T+240, antes del veredicto.
+
+### Fórmula
+
+| Componente | Pts máx | Cálculo |
+|---|---|---|
+| **Integridad de datos** | 40 | 40 − (20 × pérdidas_de_orden) − (20 × duplicados). Mín 0. |
+| **Continuidad operativa** | 30 | 30 − (5 × intervenciones_humanas) − (10 × incidentes_P0_no_recuperados). Mín 0. |
+| **Velocidad de recuperación** | 20 | Sync ≤ 60s: +10 / ≤ 120s: +5 / >120s: +0. Impresora auto: +5 / manual: +2. POS reinicia ≤ 30s: +5 / >30s: +2. |
+| **Paridad multi-terminal** | 10 | Los 3 POS sin divergencia: +10. 1 con divergencia recuperada: +5. 2+: +0. |
+| **TOTAL** | **100** | |
+
+### Tabla de cálculo ORS
+
+```
+INTEGRIDAD DE DATOS                              pts
+  Pérdidas de orden:       __ × −20 =         ____
+  Duplicados:              __ × −20 =         ____
+  Subtotal (máx 40, mín 0):                   ____
+
+CONTINUIDAD OPERATIVA
+  Intervenciones humanas:  __ × −5  =         ____
+  Incidentes P0 sin recuperación: __ × −10 = ____
+  Subtotal (base 30, mín 0):                  ____
+
+VELOCIDAD DE RECUPERACIÓN
+  Sync tras WAN restore (______s):            ____
+  Recuperación impresora (auto/manual):        ____
+  Reinicio POS en ___s:                        ____
+  Subtotal:                                    ____
+
+PARIDAD MULTI-TERMINAL
+  Divergencias observadas: __
+  Subtotal:                                    ____
+
+ORS TOTAL:                                     ____/100
+```
+
+### Umbrales de veredicto
+
+| ORS | Veredicto |
+|---|---|
+| ≥ 80 | **PASS** — apto para producción |
+| 70–79 | **PARTIAL** — blockers documentados, puede ir a producción con mitigaciones |
+| < 70 | **FAIL** — re-ejecutar Fase 5 completa |
 
 ---
 
@@ -474,6 +597,7 @@ Si algún gate falla → registrar en incidente, capturar evidencia, detener sol
 ```
 P0-4 — Offline Fase 5
 Estado: PASS / PARTIAL / FAIL
+ORS: ____/100
 Duración real:
 Hardware:
   Caja: commit ______  Electron ______
@@ -502,6 +626,9 @@ Estado final Supabase:
   pos_orders con turno: ______  Diff vs local: ______
   pos_cierres: ______
   pos_cash_movements: ______
+Métricas de recursos:
+  CPU pico Electron: ______%  RAM pico: ______MB
+  Bridge queue pico: ______  IDB queue pico (Caja): ______
 Gaps encontrados:
 Commits (fixes durante la prueba):
 Docs actualizados:
@@ -521,5 +648,6 @@ Veredicto:
 
 ---
 
-> Documento listo para ejecución. No hay nada que revisar antes de llevar hardware.  
-> Llevar impreso o en tablet secundaria durante la prueba.
+> **PROTOCOLO OFICIAL CONGELADO — v1.0 · 2026-07-31**  
+> Este documento es el estándar de certificación offline para todos los restaurantes de Fullsite.  
+> No se modifica sin incrementar la versión. Llevar impreso o en tablet secundaria durante la prueba.
