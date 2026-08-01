@@ -1,23 +1,29 @@
 // Uber Eats OAuth — client_credentials (M2M) + authorization code (USL) flows.
 // M2M tokens are cached in memory per scope until 60s before expiry.
 // USL tokens are stored in integration_providers via service role.
+//
+// Domain mapping (Uber official docs):
+//   Sandbox:    auth  → sandbox-login.uber.com   API → test-api.uber.com
+//   Production: auth  → auth.uber.com             API → api.uber.com
+// Mixing auth domain with API domain causes 401 from Uber.
 
 const isProduction = (): boolean => process.env.UBER_ENV === 'production'
 
-const loginUrl = (): string =>
+// Exported for testing — guarantees domain isolation between environments
+export const getLoginUrl = (): string =>
   isProduction()
-    ? 'https://login.uber.com/oauth/v2/token'
+    ? 'https://auth.uber.com/oauth/v2/token'
     : 'https://sandbox-login.uber.com/oauth/v2/token'
 
-const authorizeUrl = (): string =>
+export const getAuthorizeUrl = (): string =>
   isProduction()
-    ? 'https://login.uber.com/oauth/v2/authorize'
+    ? 'https://auth.uber.com/oauth/v2/authorize'
     : 'https://sandbox-login.uber.com/oauth/v2/authorize'
 
-// Uber Eats Marketplace API base — same host for sandbox and production.
-// Auth URLs differ (sandbox-login.uber.com vs login.uber.com) but the REST API
-// always targets api.uber.com. Confirmed: GET /v1/eats/stores docs show api.uber.com.
-const API_BASE = 'https://api.uber.com'
+export const getApiBase = (): string =>
+  isProduction()
+    ? 'https://api.uber.com'
+    : 'https://test-api.uber.com'
 
 // Scopes required for POS integration.
 // eats.pos_provisioning covers order + store management in one scope (production).
@@ -40,14 +46,26 @@ export async function getUberAccessToken(scope = 'eats.order'): Promise<string> 
     throw new Error('[uber-oauth] UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
   }
 
-  const r = await fetch(loginUrl(), {
+  const authHost = getLoginUrl()
+  // TEMPORARY DIAGNOSTIC — host + status + scopes returned, never the token
+  console.log(`[uber-oauth] token_request host=${authHost} scope=${scope}`)
+
+  const r = await fetch(authHost, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials', scope }),
   })
-  if (!r.ok) throw new Error(`[uber-oauth] ${r.status}: ${await r.text()}`)
 
-  const data = (await r.json()) as { access_token: string; expires_in: number }
+  // TEMPORARY DIAGNOSTIC
+  console.log(`[uber-oauth] token_response status=${r.status} ok=${r.ok}`)
+
+  if (!r.ok) throw new Error(`[uber-oauth] token request failed ${r.status}: ${await r.text()}`)
+
+  const data = (await r.json()) as { access_token: string; expires_in: number; scope?: string }
+
+  // TEMPORARY DIAGNOSTIC — scopes returned by Uber, never the token value
+  console.log(`[uber-oauth] token_scopes scopes_returned=${data.scope ?? 'not_returned'} expires_in=${data.expires_in}`)
+
   tokenCache.set(scope, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }
@@ -82,7 +100,7 @@ export function buildUberAuthUrl(state: string, redirectUri: string, scopes = US
     state,
     scope: scopes.join(' '),
   })
-  return `${authorizeUrl()}?${params.toString()}`
+  return `${getAuthorizeUrl()}?${params.toString()}`
 }
 
 export interface UberTokenResponse {
@@ -96,7 +114,7 @@ export interface UberTokenResponse {
 /** Exchange an authorization code for access + refresh tokens (USL callback). */
 export async function exchangeUberCode(code: string, redirectUri: string): Promise<UberTokenResponse> {
   const { clientId, clientSecret } = clientCredentials()
-  const r = await fetch(loginUrl(), {
+  const r = await fetch(getLoginUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -114,7 +132,7 @@ export async function exchangeUberCode(code: string, redirectUri: string): Promi
 /** Exchange a refresh_token for a new access_token. */
 export async function refreshUberToken(refreshToken: string): Promise<UberTokenResponse> {
   const { clientId, clientSecret } = clientCredentials()
-  const r = await fetch(loginUrl(), {
+  const r = await fetch(getLoginUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,7 +154,7 @@ export async function uberFetch(
   const scope = opts.scope ?? 'eats.order'
   const token = await getUberAccessToken(scope)
   const { scope: _scope, ...rest } = opts
-  return fetch(`${API_BASE}${path}`, {
+  return fetch(`${getApiBase()}${path}`, {
     ...rest,
     headers: {
       'Content-Type': 'application/json',
