@@ -1,0 +1,664 @@
+# Golden POS Skeleton
+
+> **Status:** Living document — update incrementally, never rewrite wholesale.  
+> **Owner:** Platform Engineering  
+> **Created:** 2026-07-31  
+> **Last Updated:** 2026-07-31  
+> **Related:** `GOLDEN-SKELETON.md` (PR gate), `docs/feos/OVERVIEW.md`, `docs/architecture/SYSTEM-ARCHITECTURE.md`
+
+---
+
+## Platform North Star
+
+> **Fullsite es la plataforma operacional autónoma para restaurantes — el sistema que se administra a sí mismo.**
+
+El objetivo no es construir un POS mejor que Wansoft.  
+El objetivo no es un Dashboard más completo que Toast.  
+El objetivo es que los restaurantes no necesiten administrar software.
+
+Un restaurante en Fullsite define sus reglas una vez — su menú, su equipo, sus políticas. Después, la plataforma opera, monitorea, certifica, recupera y optimiza de forma continua, sin intervención.
+
+**El restaurante del futuro en Fullsite:**
+
+- Abre sin que nadie configure nada el día de apertura.
+- Recibe una alerta cuando la impresora va a fallar, antes de que falle.
+- Ve su food cost en tiempo real, con recomendaciones ya calculadas.
+- Tiene un agente que ajusta su inventario antes de un stockout.
+- Tiene un estado digital completo: cada terminal, KDS, impresora, agente, queue y certificación — visibles desde FEOS.
+- Cuando algo falla, el sistema intenta resolverlo solo. Si no puede, escala con contexto completo.
+
+**Toda decisión de diseño, arquitectura o priorización se evalúa contra esta visión.**
+
+---
+
+## Platform Philosophy
+
+Fullsite no es un POS. No es un Dashboard. No es FEOS.
+
+**Fullsite es una plataforma operacional para restaurantes** — un sistema que se administra a sí mismo, donde las personas únicamente definen reglas, objetivos y excepciones.
+
+Cada decisión de diseño, arquitectura o implementación debe responder estas 10 preguntas:
+
+| # | Pregunta | Si la respuesta es "No"... |
+|---|---|---|
+| Q-01 | ¿Es 100% clonable para cualquier restaurante? | Es deuda de clonabilidad — documenta y convierte en FEOS backlog |
+| Q-02 | ¿Es 100% multi-tenant sin excepción? | Es hardcode — elimina o mueve a config en DB |
+| Q-03 | ¿Puede administrarse desde FEOS sin tocar código? | Es config atrapada en código — mueve a FEOS |
+| Q-04 | ¿Puede automatizarse completamente? | Documenta el gap en §Zero Human Operations |
+| Q-05 | ¿Puede operar 24/7 sin intervención humana? | Diseña para resiliencia, no para soporte |
+| Q-06 | ¿Puede monitorearse en tiempo real? | Agrega observability antes de cerrar el módulo |
+| Q-07 | ¿Puede certificarse automáticamente? | Agrega al módulo Auto-Certification de FEOS |
+| Q-08 | ¿Puede recuperarse solo de fallos? | Diseña self-healing antes de declarar production-ready |
+| Q-09 | ¿Puede ser administrado por IA? | El agente existe, ¿tiene los datos para actuar? |
+| Q-10 | ¿Escala a 1,000 restaurantes sin cambiar código? | No escala — rediseña desde el contrato |
+
+**Si la respuesta a cualquier pregunta es "no":** documenta el gap, crea el item en FEOS backlog, y define el criterio de aceptación. El gap no es un fallo — es un item del roadmap de la plataforma.
+
+---
+
+## 0. Golden Skeleton Family
+
+The Golden Skeleton is not a single document. It is a family of four canonical blueprints that evolve together and share the same design goals.
+
+| Document | Status | Scope |
+|---|---|---|
+| **Golden POS Skeleton** (this) | Active | Terminal app — orders, kitchen, caja, inventory, staff |
+| **Golden Dashboard Skeleton** | Stub — to be created | Management layer — analytics, finance, admin, agents |
+| **Golden FEOS Skeleton** | Stub — to be created | Control plane — config, provisioning, monitoring, automation |
+| **Golden Foundation Skeleton** | Stub — to be created | Shared infrastructure — offline engine, bridge, printer, auth, multi-tenant DB |
+
+**Rule:** Every capability that ships must belong to exactly one skeleton. No capability lives in two skeletons.
+
+---
+
+## 1. Design Goals
+
+These goals are permanent. Every PR, ADR, and design decision in Fullsite is evaluated against them. A decision that violates a design goal requires a documented exception.
+
+| # | Goal | Definition |
+|---|---|---|
+| G-01 | **100% clonable** | Any restaurant can be provisioned without touching source code. |
+| G-02 | **100% multi-tenant** | No row, query, or constant belongs to a specific client by default. |
+| G-03 | **Offline-first** | Core POS operations work indefinitely without internet. Data reconciles on reconnect. |
+| G-04 | **LAN-first** | Kitchen display, printers, and terminals communicate over LAN. Cloud is for sync, not for operations. |
+| G-05 | **FEOS-ready** | Every configurable aspect of the platform has a FEOS module that will eventually own it. No dead-end configuration. |
+| G-06 | **AI-ready** | Every operational data point is observable by agents. Every alert has a structured response path. |
+| G-07 | **Zero hardcodes** | No client name, category slug, RFC, phone number, or staff name exists in source code. |
+| G-08 | **Zero client-specific logic** | No `if client_id === 'amalay'` branch anywhere in the platform. Feature differences live in feature flags. |
+| G-09 | **Zero manual provisioning** | A new restaurant goes from contract to operational in one automated flow, with no SSH, no SQL console, no manual config editing. |
+| G-10 | **Enterprise-ready** | Audit log, RLS, role-based access, and data isolation that passes SOC 2 review. |
+| G-11 | **Wansoft reliability as minimum baseline** | Every module the platform shares with Wansoft must match or exceed Wansoft's operational reliability. Regressing below Wansoft is a P0. |
+| G-12 | **Modern SaaS architecture** | Multi-tenant DB, feature flags by plan, config in DB not code, automated CI/CD. |
+
+---
+
+## 2. Platform Lifecycle
+
+Every feature — regardless of domain — must pass through this pipeline before General Availability. Features can exist at any stage; their stage determines what they can claim.
+
+```
+IDEA → ARCH → ADR → IMPL → CERT → AMALAY → SKELETON → FEOS → AUTO → AI → GA
+```
+
+| Stage | Definition | Exit Criterion |
+|---|---|---|
+| **IDEA** | Concept defined, problem understood | Written one-pager |
+| **ARCH** | Architecture decided, contracts drafted | Architecture doc in `docs/architecture/` |
+| **ADR** | Decision recorded with alternatives and rationale | ADR in `docs/adr/` |
+| **IMPL** | Code exists and passes tests | PR merged, tests green |
+| **CERT** | Smoke-tested in staging, offline certified if applicable | Certification doc in `docs/certifications/` |
+| **AMALAY** | Running in production, battle-tested | 30+ days live with zero P0 regressions |
+| **SKELETON** | Capability extracted to platform, zero AMALAY-specific code | Listed in this document, no hardcodes |
+| **FEOS** | Control plane module owns configuration | FEOS module accepts declarative config |
+| **AUTO** | Provisioning and monitoring fully automated | Runbook eliminated for this module |
+| **AI** | Agent monitors, predicts, and responds | Agent in `agents/` with verified outcomes |
+| **GA** | Available to all clients without restriction | Feature flag removed, default enabled |
+
+---
+
+## 3. Platform Maturity Model
+
+Every restaurant on Fullsite moves through these levels. Every module must declare what level it enables and what level is required for it to function.
+
+| Level | Name | Definition | What Fullsite Enables |
+|---|---|---|---|
+| **L1** | **Installs** | Restaurant provisions and runs the app for the first time. POS takes an order. | Terminal provisioning, menu setup wizard, first order flow |
+| **L2** | **Operates** | Restaurant runs day-to-day without external help. Staff trained, caja works, reports readable. | Turno/corte, kitchen routing, printer bridge, offline queue |
+| **L3** | **Self-certifies** | Restaurant verifies its own operational readiness. Runs certification checks before each service. | Auto-Certification module in FEOS, offline smoke tests |
+| **L4** | **Self-heals** | Restaurant recovers from failures without operator intervention. Printer jams re-queue. Sync gaps fill. | Recovery queue, auto-reconnect, FEOS Observability Hub alerts |
+| **L5** | **Self-optimizes** | Restaurant improves performance using AI insights without external analysis. Menu, staffing, cost. | Menu Engineering, Staffing Optimizer, Food Cost agent |
+| **L6** | **Self-operates** | Restaurant handles scheduling, procurement, and staff allocation with minimal human intervention. | Supplier agent, reorder automation, predictive staffing |
+
+**Current AMALAY level:** Between L3 and L4 depending on the module.  
+**Target for GA:** Every client reaches L3 within 30 days of installation.
+
+---
+
+## 4. Platform Scores
+
+### 4.1 Platform Readiness Score
+
+Scores reflect multi-tenant deployment readiness, not feature completeness. A module at 100% means it ships to a new client with zero manual intervention and zero AMALAY-specific code.
+
+| Module | Score | Blocking Issues | Maturity Level | Last Updated |
+|---|---|---|---|---|
+| POS Core (orders, tables, caja) | **98%** | AMALAY category slugs in pos-constants.ts | L4 | 2026-07-31 |
+| Offline Engine (IDB, sync, outbox) | **93%** | KDS sync CODE ONLY — pending smoke test | L4 | 2026-07-31 |
+| KDS (kitchen display, routing) | **91%** | AMALAY station routing as default | L3 | 2026-07-31 |
+| Staff & Auth (PIN, fingerprint, roles) | **88%** | Hardcoded mesero fallback in client-config.ts | L3 | 2026-07-31 |
+| Inventory (stock, recipes, food cost) | **82%** | 17 SQL tables with DEFAULT 'amalay' | L2 | 2026-07-31 |
+| Dashboard Analytics | **78%** | Real-time gaps, no multi-tenant agent data | L2 | 2026-07-31 |
+| Finance (corte, conciliacion, CFDI) | **73%** | CFDI requires RFC per client (config, not code) | L2 | 2026-07-31 |
+| AI & Agents (26 agents) | **65%** | Agents need more evidence loop, FP calibration | L2 | 2026-07-31 |
+| Provisioning | **38%** | Mostly manual — no automated flow end-to-end | L1 | 2026-07-31 |
+| FEOS (control plane) | **12%** | Architecture defined, implementation minimal | L1 | 2026-07-31 |
+
+**Update rule:** When a blocking issue is resolved, update score and date. Never inflate a score without evidence.
+
+---
+
+### 4.2 Platform Autonomy Score
+
+Readiness measures completeness. Autonomy measures self-management. A module can be 100% ready and 5% autonomous — that means it works perfectly but requires a human for every operation.
+
+**Autonomy scale:**
+
+| Level | Range | Meaning |
+|---|---|---|
+| Manual | 0–20% | No automation — every action requires a human |
+| Assisted | 21–40% | Automation exists but must be human-initiated each time |
+| Hybrid | 41–60% | System handles routine cases; human handles exceptions |
+| Supervised | 61–80% | System handles almost everything; human reviews summaries |
+| Autonomous | 81–100% | System self-manages; humans define rules and exceptions only |
+
+**Platform goal:** 70%+ average autonomy across all modules within 12 months. Every FEOS module implemented adds 5–15% to the modules it owns.
+
+| Module | Score | Bottleneck | Path to +20% | Last Updated |
+|---|---|---|---|---|
+| Offline Engine | **80%** | Conflict resolution requires operator decision | Automated conflict resolution; notify only on ambiguous cases | 2026-07-31 |
+| POS Core | **70%** | Station config and category routing need one-time manual setup | FEOS Kitchen Manager: drag-drop routing, zero code | 2026-07-31 |
+| KDS | **65%** | New station = code change + redeploy | FEOS Kitchen Manager: add station name → instant | 2026-07-31 |
+| Agents / AI | **55%** | FP threshold calibration and outcome tagging are manual | Self-calibrating thresholds based on confirmed outcomes | 2026-07-31 |
+| Staff & Auth | **50%** | Role assignment and biometric enrollment are manual | FEOS Staff Manager guided onboarding + enrollment wizard | 2026-07-31 |
+| Printing | **45%** | Manual IP entry on setup; manual restart on printer jam | mDNS auto-discovery; print queue auto-drains on reconnect | 2026-07-31 |
+| Inventory Tracking | **40%** | Reorder and receiving are manual; count requires human action | Auto-reorder alerts with approval flow; guided receiving via OC match | 2026-07-31 |
+| Backup & Recovery | **30%** | Supabase auto-backup exists but restoration and DR are manual | Automated restore verification; FEOS DR wizard | 2026-07-31 |
+| Health Monitoring | **15%** | Alerts exist but no automated recovery or escalation | FEOS Observability Hub: auto-restart, escalation paths | 2026-07-31 |
+| Kitchen Config | **10%** | Routing rules live in code; any change needs a deploy | FEOS Kitchen Manager: rules in DB, zero deploy | 2026-07-31 |
+| Provisioning | **5%** | Entire flow is manual: SQL, Supabase dashboard, config.json | FEOS Installer: name + plan → everything automated in <5min | 2026-07-31 |
+| Certification | **5%** | Manual checklist walkthrough per installation | FEOS Auto-Certification: post-provisioning suite runs automatically | 2026-07-31 |
+| FEOS | **5%** | Architecture defined, implementation minimal | FEOS implementation is the autonomy roadmap | 2026-07-31 |
+
+---
+
+## Zero Human Operations
+
+**Goal:** Every release reduces the number of operations that require human intervention. When an operation reaches 90%+ automation, it moves to "archived" state — no longer tracked here.
+
+**Tracking rule:** The `Auto%` column reflects today's reality, not the target. Never inflate.
+
+| ID | Operation | Current State | Target State | FEOS Module | Auto% | Human Remaining |
+|---|---|---|---|---|---|---|
+| ZHO-01 | Create restaurant | SQL + Supabase dashboard manually | FEOS wizard: name + plan → tenant created | Restaurant Manager | 5% | Sign contract |
+| ZHO-02 | Create admin user | Manual Supabase invite | FEOS IAM: email → invite → access granted | IAM | 10% | Enter email |
+| ZHO-03 | Add team member | Manual SQL insert in client_users | FEOS IAM: invite by role | IAM | 10% | Select role + enter email |
+| ZHO-04 | Multi-user org / teams | Does not exist | FEOS IAM Groups | IAM | 0% | Approve members |
+| ZHO-05 | Provision terminal | onboard_client.py + manual config.json edit | FEOS Installer: terminal boots, downloads config | Installer & Provisioning | 15% | Connect to LAN |
+| ZHO-06 | Configure printers | Manual IP entry in config.json | mDNS auto-discovery + FEOS Printer Manager | Printer Manager | 10% | Select paper format |
+| ZHO-07 | Configure kitchen routing | Edit lib/settings.ts + redeploy | FEOS Kitchen Manager: drag categories to stations | Kitchen Manager | 10% | Assign categories to stations |
+| ZHO-08 | Register fingerprints | Physical enrollment on terminal, manual | FEOS Staff Manager guided enrollment flow | Staff Manager | 0% | Physical touch required (permanent) |
+| ZHO-09 | Add KDS station | Edit pos-constants.ts + redeploy | FEOS Kitchen Manager: add name → instant deploy | Kitchen Manager | 5% | Name the station |
+| ZHO-10 | Update routing rules | Edit code + redeploy | FEOS Kitchen Manager UI — zero deploy | Kitchen Manager | 10% | Drag categories |
+| ZHO-11 | Update terminal app | Manual Electron release + user installs | FEOS Auto-Update: silent in maintenance window | Terminal Manager | 20% | Approve maintenance window |
+| ZHO-12 | Rotate secrets / tokens | Manual GitHub Secrets + Supabase dashboard | FEOS IAM: auto-rotation on schedule | IAM | 5% | Approve rotation event |
+| ZHO-13 | Restart failing service | SSH or TeamViewer | FEOS Observability Hub auto-restart + alert | Observability Hub | 5% | Acknowledge alert |
+| ZHO-14 | Health checks | Manual monitoring, no real-time view | FEOS Observability Hub: heartbeat + agent alerting | Observability Hub | 15% | Respond to P0 alerts |
+| ZHO-15 | Certify installation | Manual checklist walkthrough per install | FEOS Auto-Certification: suite runs post-provisioning | Auto-Certification | 10% | Approve cert report |
+| ZHO-16 | Toggle feature flags | Manual JSON edit in Supabase clients table | FEOS Feature Flags UI: click toggle | Feature Flags | 15% | Click toggle |
+| ZHO-17 | Enable / create agents | Edit GitHub Actions YAML + commit | FEOS Agent Manager: enable per restaurant | Agent Manager | 20% | Select agents to enable |
+| ZHO-18 | View logs / observability | Raw Supabase query or GitHub Actions logs | FEOS Observability Hub: structured log viewer | Observability Hub | 10% | View dashboard |
+| ZHO-19 | Recover stuck offline queue | Manual IDB inspection + reset | Auto-drain on reconnect; alert on conflict only | Offline Platform | 60% | Acknowledge conflict |
+| ZHO-20 | Database backup | Supabase automatic but unverified | Verified nightly backup + weekly restore test | FEOS / Supabase | 40% | Review backup health report |
+| ZHO-21 | Database restoration | Manual Supabase point-in-time restore | FEOS DR wizard: select window + confirm | FEOS DR | 0% | Confirm restore window |
+| ZHO-22 | Deploy new version | Manual Vercel dashboard or CLI | CI/CD: auto-deploy to staging → manual prod approval | FEOS CI/CD | 40% | Approve prod promotion |
+| ZHO-23 | Onboard / train staff | Daniel or Eduardo on-site | AI onboarding wizard + AI Coach | FEOS + Agent | 10% | Complete wizard |
+| ZHO-24 | Change plan / features | Manual JSON edit in Supabase | FEOS Restaurant Manager: select plan → applied | Restaurant Manager | 15% | Select plan |
+| ZHO-25 | Seed default data for new client | Manual SQL execution | FEOS Installer: auto-seed on provisioning | Installer | 5% | Approve seed schema |
+
+**Current manual operation count: 25**  
+**Target: ≤5 operations requiring human intervention by end of FEOS Phase 2**
+
+---
+
+## 5. Capability Matrix
+
+Capabilities are the unit of the platform — not screens, not modules. A restaurant doesn't buy "the orders page"; it buys the ability to take, modify, split, and replay orders.
+
+**Column legend:**
+- **P** — Platform: included in every installation, no flag required
+- **FLG** — Feature flag: gated by `clients.features` or plan
+- **FEOS** — Control plane: FEOS module will own configuration of this capability
+- **AGT** — Agent: an AI agent monitors or handles this capability
+- **OFFL** — Offline: works without internet connection
+- **CERT** — Requires certification before client use
+- **WS** — Wansoft parity: `✓` at/above, `~` partial, `✗` below
+- **Owner** — Single responsible system
+
+### 5.1 Orders
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Take Order | ✓ | — | — | — | ✓ | ✓ | ✓ | POS | <1s registration, works offline |
+| Modify Item | ✓ | — | — | — | ✓ | ✓ | ✓ | POS | Modifier change persists before print |
+| Add Note | ✓ | — | — | — | ✓ | — | ✓ | POS | Note routes to KDS |
+| Split Order | ✓ | — | — | — | ✓ | — | ~ | POS | N-way split, each printable |
+| Merge Tables | ✓ | — | — | — | ✓ | — | ✗ | POS | Merge preserves full audit trail |
+| Transfer Table | ✓ | — | — | — | ✓ | — | ~ | POS | Transfer logged, assigned mesero updated |
+| Apply Discount | ✓ | — | FEOS | AGT | ✓ | — | ✓ | POS | Discount catalog from DB, not code |
+| Cancel Item | ✓ | — | FEOS | AGT | ✓ | — | ✓ | POS | Cancellation reason required, logged |
+| Cancel Order | ✓ | — | FEOS | AGT | ✓ | — | ✓ | POS | Manager auth required above threshold |
+| Refund | ✓ | — | — | — | — | — | ✓ | POS | Creates credit note, audit entry |
+| Print Pre-ticket | ✓ | — | FEOS | — | ✓ | — | ✓ | POS + Local Server | Prints to correct station, <3s |
+| Print Final Ticket | ✓ | — | FEOS | — | ✓ | ✓ | ✓ | POS + Local Server | Reprints survive restart |
+| Offline Queue | ✓ | — | — | — | ✓ | ✓ | ~ | Offline Platform | Orders queue, sync on reconnect, 0 loss |
+| Replay | ✓ | — | — | — | ✓ | ✓ | ✗ | Offline Platform | Idempotent replay from event log |
+| KDS Route | ✓ | — | FEOS | — | ✓ | ✓ | ✓ | Local Server | Item reaches station in <100ms |
+| Audit Log | ✓ | — | FEOS | AGT | ✓ | — | ✓ | Platform | Every state change recorded, immutable |
+
+### 5.2 Inventory
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Track Stock | ✓ | — | — | AGT | ✓ | — | ✓ | Platform | Weighted avg cost, real-time balance |
+| Receive Inventory | ✓ | — | — | — | ✓ | — | ✓ | Dashboard | Links to OC, updates cost_per_unit |
+| Physical Count | ✓ | — | — | — | ✓ | — | ✓ | POS | Offline count, syncs on reconnect |
+| Record Waste | ✓ | — | — | AGT | ✓ | — | ✓ | POS | Waste reason required, immutable ledger |
+| Transfer Between Locations | ✓ | — | — | — | — | — | ✓ | Dashboard | Both sides logged simultaneously |
+| Reorder Alert | ✓ | — | FEOS | AGT | — | — | ~ | Agent | Alert fires before stockout, not after |
+| Recipe Costing | ✓ | — | — | AGT | — | — | ✓ | Platform | Auto-updates food cost % on cost change |
+| Production Recording | ✓ | — | — | — | ✓ | — | ✓ | POS | Deducts ingredients per recipe |
+| Purchase Order | ✓ | — | — | AGT | — | — | ✓ | Dashboard | Multi-supplier, approval optional |
+| Food Cost % | ✓ | — | — | AGT | — | — | ~ | Platform | Real-time %, not end-of-day |
+
+### 5.3 Kitchen & KDS
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Display Orders | ✓ | — | FEOS | — | ✓ | ✓ | ✓ | Local Server | <100ms from order to KDS display |
+| Route by Station | ✓ | — | FEOS | — | ✓ | ✓ | ~ | Local Server | Routing rules in DB, no redeploy |
+| Acknowledge Item | ✓ | — | — | — | ✓ | — | ✓ | Local Server | Ack propagates to POS in real-time |
+| Order Timer | ✓ | — | — | AGT | ✓ | — | ~ | Local Server | Alert at configured threshold |
+| 86 Item | ✓ | — | — | — | ✓ | — | ✓ | POS | Item hides from POS immediately |
+| Batch Print | ✓ | — | FEOS | — | ✓ | ✓ | ✓ | Local Server | Batch reprints survive power cycle |
+| Multi-station | ✓ | — | FEOS | — | ✓ | ✓ | ✓ | FEOS | Add station = config only, no code |
+
+### 5.4 Staff & Auth
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Register Staff | ✓ | — | FEOS | — | — | — | ✓ | FEOS / Dashboard | Staff active within 1 min of creation |
+| PIN Authentication | ✓ | — | — | — | ✓ | ✓ | ✓ | Local Server | <2s auth, works offline |
+| Fingerprint Auth | ✓ | — | — | — | ✓ | ✓ | ✗ | Local Server | <1s biometric, PIN fallback |
+| Role-Based Permissions | ✓ | — | FEOS | — | ✓ | — | ~ | Platform | Configurable per role, not per person |
+| Attendance Tracking | ✓ | — | — | AGT | ✓ | — | ✓ | Platform | Clock-in/out from fingerprint or PIN |
+| Shift Tracking | ✓ | — | — | — | ✓ | — | ✓ | POS | Turno tied to mesero, not terminal |
+| Sales by Staff | ✓ | — | — | AGT | — | — | ✓ | Dashboard | Real-time, by period |
+| Tips Tracking | ✓ | — | — | AGT | — | — | ~ | Dashboard | Per-mesero, per-service |
+
+### 5.5 Finance
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Corte Z | ✓ | — | — | — | ✓ | ✓ | ✓ | POS | Full corte in <30s, audit complete |
+| Cash Reconciliation | ✓ | — | — | AGT | ✓ | — | ✓ | POS | Difference flagged with reason |
+| Payment Methods | ✓ | — | FEOS | — | ✓ | — | ✓ | Dashboard | Methods seeded on provisioning, config in DB |
+| CFDI Facturación | — | FLG | — | — | — | — | ✗ | Platform | Requires RFC config, not code change |
+| P&L / Estado Resultados | ✓ | — | — | — | — | — | ✗ | Dashboard | Auto-generated from POS data |
+| Supplier Reconciliation | ✓ | — | — | AGT | — | — | ~ | Dashboard | OC vs invoice vs receipt match |
+| Multi-payment Split | ✓ | — | — | — | ✓ | — | ~ | POS | Cash + card + transfer in one ticket |
+| Cuentas por Cobrar | ✓ | — | — | — | — | — | ~ | Dashboard | Credit tracked, age visible |
+
+### 5.6 Offline
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Order Queue | ✓ | — | — | — | ✓ | ✓ | ~ | Offline Platform | 8h no internet, 0 lost orders |
+| Menu Cache | ✓ | — | — | — | ✓ | ✓ | ✓ | Offline Platform | Menu loads <500ms from IDB |
+| Conflict Detection | ✓ | — | — | — | ✓ | ✓ | ✗ | Offline Platform | Stale write detected, operator notified |
+| Sync on Reconnect | ✓ | — | — | — | ✓ | ✓ | ~ | Offline Platform | Full sync in <60s after reconnect |
+| Idempotent Replay | ✓ | — | — | — | ✓ | ✓ | ✗ | Offline Platform | Duplicate submit = same result |
+| Offline Indicator | ✓ | — | — | — | ✓ | — | ✗ | POS | Visible status at all times |
+| Print Queue Persistence | ✓ | — | — | — | ✓ | ✓ | ~ | Local Server | Print jobs survive power cycle |
+
+### 5.7 Provisioning
+
+| Capability | P | FLG | FEOS | AGT | OFFL | CERT | WS | Owner | Acceptance Criteria |
+|---|---|---|---|---|---|---|---|---|---|
+| Create Tenant | — | — | FEOS | — | — | — | ✗ | FEOS | Client row + schema + seed in <5min automated |
+| Deploy App | — | — | FEOS | — | — | — | ✗ | FEOS | Vercel deploy triggered by FEOS, not manual |
+| Terminal Config | ✓ | — | FEOS | — | — | — | ✗ | FEOS | Config generated by FEOS, downloaded to terminal |
+| Seed Defaults | — | — | FEOS | — | — | — | ✗ | FEOS | Payment methods, units, settings on creation |
+| Certify Installation | — | — | FEOS | — | — | ✓ | ✗ | FEOS | Auto-cert runs after provisioning, report generated |
+| Monitor Health | — | — | FEOS | AGT | — | — | ✗ | FEOS | Heartbeat, alert on silence |
+| Update Terminal | — | — | FEOS | — | — | — | ✗ | FEOS | Auto-update in maintenance window |
+
+---
+
+## 6. Desired State
+
+Each module must answer: **what does FEOS take over and what human intervention remains?**
+
+### 6.1 Printer Configuration
+
+| Stage | Today (manual) | Desired State (automated) | Human intervention |
+|---|---|---|---|
+| Detect | Admin enters IP manually | mDNS auto-discovery via Local Server | Replace physical hardware only |
+| Configure | Edit config.json on terminal | FEOS Printer Manager pushes config | Select paper format and station |
+| Certify | None | Auto-certify on successful test print | Approve before going live |
+| Monitor | None — failures are silent | Heartbeat + alert on silence | Acknowledge critical alert |
+| Recover | Manual restart | Print queue auto-drains on reconnect | None |
+
+### 6.2 New Restaurant Provisioning
+
+| Stage | Today | Desired State | Human intervention |
+|---|---|---|---|
+| Create tenant | Manual SQL + Supabase dashboard | FEOS wizard: name + plan → creates everything | Sign contract |
+| Configure app | Edit env vars + Vercel deploy | FEOS triggers Vercel deploy automatically | Select plan features |
+| Provision terminal | onboard_client.py + config.json manual | FEOS generates config, terminal downloads on first boot | Connect terminal to LAN |
+| Seed defaults | Manual SQL seed | Automated: payment methods, units, settings | None |
+| Certify | None | FEOS runs certification suite, issues cert | Walk through checklist once |
+| Train | Daniel trains on-site | Interactive onboarding wizard + AI guide | Complete onboarding wizard |
+| Go live | Daniel authorizes | FEOS unlocks production features after cert | Press "Go Live" in FEOS |
+
+### 6.3 KDS Station Addition
+
+| Stage | Today | Desired State | Human intervention |
+|---|---|---|---|
+| Add station | Edit pos-constants.ts, redeploy | FEOS Kitchen Manager: add station name | Name the station |
+| Configure routing | Edit settings.ts defaults | FEOS drag-and-drop routing UI | Assign categories to station |
+| Provision terminal | Install Electron, edit config.json | FEOS generates terminal config, downloads on boot | Connect device to LAN |
+| Certify latency | None | Auto-cert: test order → measure KDS arrival | Approve if <100ms |
+| Monitor | None | FEOS alerts if KDS stops acknowledging | Investigate hardware |
+
+---
+
+## 7. Wansoft Benchmark
+
+**Rule:** No module that exists in both platforms can regress below Wansoft's operational reliability. This benchmark is permanent — it does not expire when we "surpass" Wansoft.
+
+| Module | Fullsite Current | Wansoft | Gap | Decision | Acceptance Criteria |
+|---|---|---|---|---|---|
+| Order Entry | Web POS, LAN, offline-capable | Dedicated Windows app, local DB | Ahead on offline, behind on desktop UX | Match UX, keep offline advantage | <1s order, works 8h offline |
+| KDS Display | WebSocket LAN <100ms | Hardware KDS display, dedicated | Behind on hardware reliability | Achieve software parity + persistence | <100ms routing, survives power cycle |
+| Offline Orders | IDB + outbox queue, idempotent | Local SQL server (always-on) | Behind (Wansoft never goes offline) | Exceed: IDB + replay + conflict detect | 8h operation, 0 data loss, idempotent |
+| Thermal Printing | Bridge :7717, TCP/USB, queue persistence | Direct driver, auto-reconnect | Partial parity | Match: auto-reconnect, offline queue | Prints survive restart, queue persists |
+| Inventory Count | Web form + IDB cache | Dedicated module with barcode scanner | Behind on barcode | Match: barcode + offline count | Scan → update <500ms, works offline |
+| Staff Authentication | PIN + biometric fingerprint | PIN only | Ahead | Maintain biometric | <2s auth, biometric optional |
+| Corte Z | Wizard + audit log | Dedicated workflow | Parity | Maintain | <30s, full audit, reprint available |
+| Reporting | Real-time dashboard + AI | End-of-day reports | Ahead | Maintain + extend with AI | Real-time + 15+ AI insights/week |
+| Recipe Management | Web form + Excel import | Dedicated module | Parity | Match + add bulk import | <5min to add full recipe BOM |
+| Purchase Orders | Web form, multi-supplier | Full OC module with approval | Parity | Match + add approval flow | OC → receipt → inventory update |
+| Food Cost | Real-time % by dish | End-of-day summary | Ahead | Maintain + improve accuracy | Live % on every ticket |
+| Staff Scheduling | None (manual) | Basic schedule view | Behind | Build in FEOS | Weekly schedule, shift alerts |
+| Agents / AI | 26+ autonomous agents | Zero AI | Far ahead | Maintain advantage | 15+ verified insights/week per client |
+| CFDI | Facturapi integration | Native CFDI | Partial parity | Match | CFDI 4.0 from POS in <30s |
+
+---
+
+## 8. Module Audit
+
+Ownership taxonomy:
+- **POS** — POS terminal app
+- **Dashboard** — Management web app
+- **Platform** — Shared infrastructure (offline, bridge, auth)
+- **Local Server** — Electron local server :7717
+- **FEOS** — Control plane (current or future)
+- **Agent** — AI agent layer
+- **Config** — Determined by per-restaurant configuration in DB
+
+### 8.1 POS Terminal — Module Registry
+
+| Module | Route | Lifecycle Stage | Data at Min.0 | Owner | AMALAY Debt |
+|---|---|---|---|---|---|
+| Order Screen | `/pos` | AMALAY | Empty — requires menu | POS | Category slugs in pos-constants.ts |
+| Floor Plan | `/pos/plano` + `/pos/mesas` | AMALAY | Default 16 tables | POS | None |
+| Order History | `/pos/historial` | AMALAY | Empty | POS | None |
+| Audit Log | `/pos/auditoria` | AMALAY | Empty | Platform | `pos_audit_log` DEFAULT 'amalay' |
+| QR Menu | `/pos/qr` + `/menu/[mesa]` | AMALAY | Auto-generated | POS | None |
+| Customer Display | `/pos/cliente` | AMALAY | Requires branding config | POS | None |
+| KDS | `/pos/kds` | AMALAY (CODE ONLY offline) | Empty | Local Server | AMALAY as default station |
+| Cocina View | `/pos/cocina` | AMALAY | Empty | Dashboard | AMALAY category filters hardcoded |
+| Bar Station | `/pos/barra` | AMALAY | Config-dependent | Config | None |
+| Auto 86 | `/auto86` | AMALAY | Empty | POS | None |
+| Turno | `/pos/turno` | AMALAY | Requires ≥1 staff | POS | None |
+| Corte Z | `/pos/corte` | AMALAY | Requires open turno | POS | CierreCajaWizard no offline fallback |
+| Inventory (quick) | `/pos/inventario` | AMALAY | Empty | POS | SQL DEFAULT 'amalay' |
+| Physical Count | `/pos/inventario-fisico` | AMALAY | Requires ingredients | POS | None |
+| Waste Log | `/pos/merma` | AMALAY | Empty | POS | SQL DEFAULT 'amalay' |
+| Recipes | `/pos/recetas` | AMALAY | Empty | Dashboard | SQL DEFAULT 'amalay' |
+| Purchase Orders | `/pos/compras` + `/pos/orden-compra` | AMALAY | Requires suppliers | Dashboard | SQL DEFAULT 'amalay' |
+| Supplier Invoices | `/pos/recepcion-factura` + `/pos/facturas-proveedor` | AMALAY | Empty | Dashboard | None |
+| Food Cost | `/pos/food-cost` | AMALAY | N/A until recipes exist | Platform | None |
+| Staff Mgmt | `/pos/staff` | AMALAY | Empty | FEOS | Hardcoded mesero fallback in client-config.ts |
+| Staff Analytics | `/pos/staff-analytics` | AMALAY | Empty | Dashboard | None |
+| Fingerprint | `/pos/huella` | AMALAY | No enrollments | Local Server | None |
+| Attendance | `/pos/asistencia` | AMALAY | Empty | Platform | None |
+| Facturación CFDI | `/pos/facturacion` | AMALAY | Requires RFC config | Platform | Requires RFC per client (config, not debt) |
+| Delivery | `/pos/delivery` | IMPL | Requires delivery config | Platform | None |
+| Panadería | `/pos/panaderia` | AMALAY | **AMALAY ONLY** | AMALAY | Full route — needs feature flag guard |
+| Market Inventory | `/pos/inventario-market` | AMALAY | **AMALAY ONLY** | AMALAY | Needs `posTienda` feature flag guard |
+
+### 8.2 Dashboard — Module Registry (abbreviated)
+
+| Module | Route | Stage | Min.0 State | Owner |
+|---|---|---|---|---|
+| Dashboard Principal | `/` | AMALAY | KPIs at zero | Dashboard |
+| Ventas | `/ventas` | AMALAY | Empty | Dashboard |
+| Meseros | `/meseros` | AMALAY | Empty until first turno | Dashboard |
+| Platillos | `/platillos` | AMALAY | Empty | Dashboard |
+| Tendencias | `/tendencias` | AMALAY | Requires 7+ days | Dashboard |
+| Inventario Real | `/inventario-real/*` | AMALAY | Empty until ingredients loaded | Dashboard |
+| Estado de Resultados | `/estado-resultados` | AMALAY | Empty | Dashboard |
+| Conciliación | `/conciliacion` | AMALAY | Empty | Dashboard |
+| AI Chat | `/chat` | AMALAY | Immediate | Agent |
+| Agentes (26+) | `/agentes/*` | AMALAY | Enabled on provisioning | Agent |
+| Configuración | `/configuracion` | IMPL | Requires restaurant data | → FEOS |
+| Sucursales | `/sucursales` | IMPL | Requires restaurant data | → FEOS |
+| Seguridad | `/seguridad` | IMPL | — | → FEOS |
+| Certificados | `/certificados` | IMPL | — | → FEOS |
+| Mission Control | `/mission-control` | IMPL | — | → FEOS |
+
+---
+
+## 9. AMALAY Debt Registry
+
+Specific locations where AMALAY-specific code exists in the platform. Each item must be resolved before the module reaches the SKELETON stage.
+
+| ID | Location | Type | Description | Fix | Priority |
+|---|---|---|---|---|---|
+| D-01 | `lib/client-config.ts` FALLBACKS.amalay | Hardcode | 11 mesero names, RFC AFO200806JI0, phone 8115324371, address | Replace with empty generic fallback. No client data in code. | P0 |
+| D-02 | `lib/client-config.ts` EMAIL_MAP | Hardcode | `'ramonfaur.daniel@gmail.com' → 'amalay'` | Remove. Use `client_users.client_id` as source of truth. Error on miss. | P0 |
+| D-03 | `lib/settings.ts` `pos.station_routing` default | Hardcode | Default routing includes `mkt-amalay`, `mkt-vitaminas`, `mkt-regalos` | Clean default to generic cocina/barra only. AMALAY routes in DB. | P0 |
+| D-04 | `lib/pos-constants.ts` STATION_CATEGORIES | Hardcode | Same mkt-* slugs in category routing constants | Remove mkt-* entries. Routing from DB per client. | P0 |
+| D-05 | `lib/pos-data.ts` comment + MARKET_CATEGORIES | Hardcode | Top comment: "AMALAY real menu". MARKET_CATEGORIES has mkt-* slugs | Remove comment. MARKET_CATEGORIES from DB groups. | P1 |
+| D-06 | `lib/pos-constants.ts` BAKERY_CATEGORIES | Hardcode | Bakery category slugs for AMALAY's bakery section | Convert to feature flag `pos.bakery_station` with configurable categories | P1 |
+| D-07 | `app/pos/panaderia/page.tsx` | AMALAY route | Bakery production display — AMALAY only | Add `if (!config.features.pos?.bakery_station) redirect('/pos')` | P1 |
+| D-08 | `app/pos/inventario-market/page.tsx` | AMALAY route | Retail market inventory — AMALAY only | Add `if (!config.features.posTienda) redirect('/pos')` | P1 |
+| D-09 | 17 SQL tables | SQL default | `client_id TEXT DEFAULT 'amalay'` | Apply `004_remove_amalay_defaults.sql`. Verify all INSERTs explicit. | P0 |
+
+**SQL migration:**
+
+```sql
+-- 004_remove_amalay_defaults.sql
+-- Verify every INSERT passes client_id explicitly before applying.
+ALTER TABLE pos_orders               ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_audit_log            ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_inventory            ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_inventory_movements  ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_ingredients          ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_recipes              ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_purchase_orders      ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_sessions             ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_inventory_products   ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE pos_customers            ALTER COLUMN client_id DROP DEFAULT;
+ALTER TABLE agent_runs               ALTER COLUMN client_id DROP DEFAULT;
+
+ALTER TABLE pos_orders               ALTER COLUMN client_id SET NOT NULL;
+ALTER TABLE pos_audit_log            ALTER COLUMN client_id SET NOT NULL;
+ALTER TABLE pos_inventory            ALTER COLUMN client_id SET NOT NULL;
+ALTER TABLE pos_ingredients          ALTER COLUMN client_id SET NOT NULL;
+ALTER TABLE pos_recipes              ALTER COLUMN client_id SET NOT NULL;
+ALTER TABLE pos_sessions             ALTER COLUMN client_id SET NOT NULL;
+```
+
+---
+
+## 10. Minute 0 State
+
+What exists the moment a new restaurant is provisioned, before any operator action.
+
+### Auto-seeded on provisioning
+
+| What | How | Table |
+|---|---|---|
+| 1 row in `clients` | FEOS wizard | `clients` |
+| Plan + feature flags | Selected at creation | `clients.plan` + `clients.features` |
+| 1 admin user | Owner email | `client_users` |
+| Payment methods (4) | Seed: Efectivo, T.Crédito, T.Débito, Transferencia | `pos_payment_methods` |
+| Units of measure (7) | Seed: g, ml, pz, kg, lt, caja, bolsa | `pos_units` |
+| Default settings | Registry in `lib/settings.ts` (DB override = null → uses defaults) | `clients.pos_settings` |
+| Terminal config | FEOS generates, terminal downloads on first boot | Local file |
+| AI Agents enabled | All 26 agents activated with `client_slug` | GitHub Actions |
+| Onboarding wizard | Active until completed | UI state |
+
+### Empty — operator fills during setup
+
+| What | When needed |
+|---|---|
+| Menu / platillos | **Day 0 blocker** — POS cannot take orders without menu |
+| Staff / meseros | **Day 0 blocker** — cannot open turno without ≥1 staff |
+| Tables config | Default: 16 numbered tables. Customizable but not blocking. |
+| Ingredients / inventory | Optional. POS works without active inventory. |
+| Recipes | Optional. Food cost shows N/A until configured. |
+| Suppliers | Optional. Purchase orders work without pre-loaded suppliers. |
+| Printers | Configured during physical installation or via FEOS Printer Manager. |
+| Fingerprint enrollments | Enrolled during physical installation. |
+| Orders, sales, reports | Generated by operation — day 1+. |
+
+---
+
+## Digital Twin + Self-Healing
+
+Each restaurant has a **live digital state** inside FEOS — a real-time representation of its entire operational environment. The twin is read by the Observability Hub, written by agents and terminals, and drives automated recovery before any human is involved.
+
+### What the Digital Twin tracks
+
+| Entity | State tracked |
+|---|---|
+| Terminals | Online/offline, version, last heartbeat, config hash |
+| KDS displays | Station, latency, last ack, queue depth |
+| Printers | Reachable, paper status, last successful print, queue size |
+| Offline queue | Pending items, oldest item age, sync lag |
+| Agents | Last run, status, FP rate, last alert generated |
+| Certifications | Valid/expired, last cert date, failing checks |
+| Staff | Active sessions, open turnos, auth method in use |
+| Inventory | Critical items below reorder, last sync timestamp |
+| App version | Terminal version vs latest stable, update pending |
+
+**Implementation:** `feos_restaurant_state` table — one row per entity per restaurant. Agents write. FEOS reads. Edge functions trigger on state changes.
+
+### Self-Healing Tiers
+
+| Tier | Trigger | System Action | Human Involvement |
+|---|---|---|---|
+| **T1 Auto-heal** | Known failure pattern | Resolves automatically | None — log only |
+| **T2 Assisted** | Unusual but recoverable state | Attempts fix, notifies on completion | Acknowledge |
+| **T3 Escalate** | Unresolvable or data-risk | Alerts with full context + recommended action | Decide + act |
+| **T4 Critical** | Data loss or security risk | Escalates immediately, freezes affected component | Immediate action required |
+
+### Failure → Response Matrix
+
+| Failure | Tier | Automated Response |
+|---|---|---|
+| Printer stops responding | T1 | Retry connection, flush queue, log |
+| KDS latency >500ms | T1 | Alert kitchen, attempt reconnect, log |
+| Offline queue >50 items for >10min | T2 | Force sync attempt, alert manager |
+| Terminal config mismatch detected | T2 | Push correct config, request restart |
+| Sync conflict detected | T3 | Freeze conflicting order, alert with both versions |
+| Certification expired | T3 | Alert FEOS, block new terminals from production |
+| DB connection lost | T4 | Full offline mode, alert, persist all state locally |
+
+---
+
+## 11. FEOS Boundary
+
+What currently lives in the app that belongs in FEOS. Migration is incremental — nothing moves until FEOS has the module ready.
+
+| Currently in app | Moves to FEOS | FEOS Module | Phase |
+|---|---|---|---|
+| `/configuracion` | Restaurant configuration | Restaurant Manager | 2 |
+| `/sucursales` | Branch management | Restaurant Manager | 2 |
+| `/seguridad` | IAM, MFA, permissions | IAM & Security | 2 |
+| `/certificados` | Installation certification | Auto-Certification | 3 |
+| `/mission-control` | Real-time restaurant state | Observability Hub | 2 |
+| `/admin/usuarios` | Team access management | Staff Manager + IAM | 2 |
+| Electron `config.json` | Terminal configuration | Terminal Manager | 2 |
+| `lib/settings.ts` station routing | Kitchen routing visual | Kitchen Manager | 3 |
+| Printer IP config | Printer fleet management | Printer Manager | 3 |
+| `clients.features` | Feature toggle per restaurant | Feature Flags | 2 |
+| `onboard_client.py` | 8-step automated wizard | Installer & Provisioning | 2 |
+
+**Rule:** Until FEOS has the module, the app keeps the functionality. No capability gap between today and FEOS migration.
+
+---
+
+## 12. Implementation Sequence
+
+Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–10 complete the skeleton.
+
+| Step | Action | Files | Effort | Unlocks |
+|---|---|---|---|---|
+| 1 | Eliminate `DEFAULT 'amalay'` from 17 tables | `004_remove_amalay_defaults.sql` | 4h | Multi-tenant data safety |
+| 2 | Clean hardcoded fallback in client-config.ts | `lib/client-config.ts` | 1h | No AMALAY data in code |
+| 3 | Remove AMALAY category slugs from constants | `lib/pos-constants.ts`, `lib/settings.ts` | 2h | Clean routing defaults |
+| 4 | Add feature flag guard to panadería + market routes | `app/pos/panaderia/page.tsx`, `app/pos/inventario-market/page.tsx` | 30min | Routes hidden for other clients |
+| 5 | Onboarding wizard — empty menu → setup CTA | `app/pos/page.tsx` | 4h | Day 0 UX for new restaurant |
+| 6 | Auto-seed on provisioning | `onboard_client.py` + FEOS Provisioning | 3h | No manual seed SQL |
+| 7 | Export 194 RLS policies to SQL migration | `supabase/migrations/004_rls_policies.sql` | 3h | Reproducible tenant isolation |
+| 8 | Dynamic menu categories from DB | `lib/pos-data.ts`, `lib/pos-constants.ts` | 6h | Zero hardcoded categories |
+| 9 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
+| 10 | Smoke test with VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
+
+---
+
+## Execution Priority
+
+**Documentation phase is closed.** The next releases execute in this order. No P(n+1) starts until P(n) has at least one milestone in production with evidence of clonability.
+
+| Priority | Initiative | First Milestone | Unlocks |
+|---|---|---|---|
+| **P0** | FEOS Core — Organization, Restaurants, Users, Roles | Multi-tenant auth without hardcodes. ZHO-01/02/03 resolved. | Every subsequent item |
+| **P1** | Golden Dashboard Skeleton | Zero AMALAY references. Dashboard clonable to second client. | Demo 24/7 |
+| **P2** | Golden FEOS Skeleton | Canonical doc + first FEOS module live (Restaurant Manager) | Control Center |
+| **P3** | Demo 24/7 clonable | `sandbox.app.fullsite.mx` fully operational for VANTARA + NÓMADA-MINI | Client demos without AMALAY |
+| **P4** | Control Center (`app.fullsite.mx`) | Org → restaurants → users → permissions flow, end-to-end | Multi-client self-service |
+| **P5** | Integration Platform | Uber/Rappi/Didi under common adapter architecture — one integration pattern for all | Revenue diversification |
+| **P6** | AI Platform | All 26+ agents manageable from FEOS Agent Manager. Enable/disable/calibrate per restaurant. | Agent-as-a-service |
+| **P7** | Digital Twin + Self-Healing | FEOS Observability Hub live. `feos_restaurant_state` populated. T1 auto-heal for printers + KDS. | Autonomous operations |
+
+**Execution Mode (permanent rule):** Every new document, ADR, or architectural decision ends in implementation. Ideas enter the Platform Lifecycle pipeline — no document that doesn't map to a specific Implementation milestone is merged into `docs/`.
+
+---
+
+## 13. Governance
+
+**Update rule:** Update this document when a fact changes — not when you think about changing it.  
+**Section ownership:** Each section can be updated independently. No section owns another.  
+**No rewrites:** Append or replace individual sections. Never regenerate this file wholesale.  
+**Evidence requirement:** Readiness scores require a date and a blocking-issue list. A score with no evidence is invalid.  
+**PR gate:** This document does not replace `GOLDEN-SKELETON.md` (the 5-question PR gate). Both are required.  
+**Versioning:** When a major structural change is needed, create `GOLDEN-POS-SKELETON-v2.md` and deprecate this file with a pointer.
+
+**Living document / auto-scoring (future state):** Platform Readiness and Autonomy scores are currently updated manually. The target is for these scores to be calculated automatically from: CI test results, certification suite outputs, `feos_restaurant_state` health data, and agent run outcomes. When auto-scoring is live, the `Last Updated` column in §4 is replaced by a build badge. Until then: never update a score without a date and a linked blocking-issue change.
+
+**Execution Mode (permanent):** This document is closed for major additions. New concepts enter as ADRs in `docs/adr/` and are promoted here only when they reach the SKELETON stage of the Platform Lifecycle. The ratio of docs-to-code must decrease with every release.
