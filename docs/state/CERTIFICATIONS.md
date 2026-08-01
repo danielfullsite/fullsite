@@ -205,6 +205,15 @@ La OCS certifica módulos del POS de forma independiente. El cierre de todos los
 **Gaps deferred:** GAP-D (FLOOR_TABLES hardcoded — Golden Skeleton)
 **Referencia:** `docs/certifications/OCS-P2.5.7-ORDERS.md`
 
+### P2.5.8 — Pagos / Cobro / Propinas / MP Point
+
+**Estado:** CERTIFIED — 2026-07-31
+**Scope:** Efectivo, tarjeta manual, transferencia, mixto, propinas, descuentos, split parejo + por items, cierre de orden, MP Point + recovery, reintentos, idempotencia, ticket final, cajón, auditoría, operación offline, reconexión, doble intento, refresh/reinicio durante pago, reconciliación
+**Fix incluido:** PAY-GAP-01 — `IVA_RATE` → `getIvaRate()` en `pos-calculations.ts` (4 sitios) y `pos/page.tsx` (7 sitios). Affects `calcOrderTotals`, `calcSplitParejo`, `calcSplitItems`, `handlePayment`, split UI.
+**Gaps P2 documentados:** PAY-GAP-02 (ticket duplicado en crash MP entre save y clearMpRecovery — tarjeta only, sin cajón) · PAY-GAP-03 (total no recalculado server-side desde items)
+**Tests:** 1 843/1 843 PASS
+**Referencia:** `docs/certifications/OCS-P2.5.8-PAGOS.md`
+
 ---
 
 ## Milestone: POS V2 Operational Certification

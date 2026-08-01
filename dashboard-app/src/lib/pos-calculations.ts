@@ -4,7 +4,7 @@
  * Extracted from pos/page.tsx so they can be tested independently.
  */
 
-import { IVA_RATE } from './pos-constants'
+import { getIvaRate } from './pos-constants'
 import type { OrderItem } from './pos-data'
 
 // ─── Item subtotal ─────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export interface OrderTotals {
 export function calcOrderTotals(items: Pick<OrderItem, 'subtotal'>[], discount = 0): OrderTotals {
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
   const subtotalAfterDiscount = Math.max(0, subtotal - discount)
-  const iva = subtotalAfterDiscount * IVA_RATE
+  const iva = subtotalAfterDiscount * getIvaRate()
   const total = subtotalAfterDiscount + iva
   return { subtotal, subtotalAfterDiscount, iva, total }
 }
@@ -116,7 +116,7 @@ export function calcSplitParejo(
 ): SplitPaymentTotals {
   const fullSubtotal = items.reduce((s, i) => s + i.subtotal, 0)
   const fullAfterDisc = Math.max(0, fullSubtotal - discount)
-  const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+  const fullTotal = fullAfterDisc + fullAfterDisc * getIvaRate()
   const isLast = cuenta === n
   const each = (full: number) => isLast
     ? round2(full - round2(full / n) * (n - 1))
@@ -128,7 +128,7 @@ export function calcSplitParejo(
     subtotal,
     discount: disc,
     subtotalAfterDiscount,
-    iva: subtotalAfterDiscount * IVA_RATE,
+    iva: subtotalAfterDiscount * getIvaRate(),
     total: each(fullTotal),
   }
 }
@@ -148,7 +148,7 @@ export function calcSplitItems(
   const fullSubtotal = items.reduce((s, i) => s + i.subtotal, 0)
   const disc = fullSubtotal > 0 ? round2(discount * (subtotal / fullSubtotal)) : 0
   const subtotalAfterDiscount = Math.max(0, subtotal - disc)
-  const iva = subtotalAfterDiscount * IVA_RATE
+  const iva = subtotalAfterDiscount * getIvaRate()
   return {
     payingItems,
     subtotal,

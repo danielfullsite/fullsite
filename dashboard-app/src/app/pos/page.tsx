@@ -38,10 +38,11 @@ import {
   updateOrderStatus,
   getPOSAuthHeaders,
 } from '@/lib/pos-data'
-import { IVA_RATE, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
+import { getIvaRate, TIEMPO_ITEM_ID, isTiempoItem, getStationForItem, setCategoryNameCache, _categoryNameCache } from '@/lib/pos-constants'
 import { calcSplitParejo, calcSplitItems } from '@/lib/pos-calculations'
 import { publishEvent, getDeviceId } from '@/lib/events'
 import { apiUrl } from '@/lib/api-base'
+import { getBridgeUrl } from '@/lib/bridge-url'
 import type { OrderItem, MenuItem, Order } from '@/lib/pos-data'
 import {
   printByStation,
@@ -2750,7 +2751,7 @@ function POSContent() {
   }, [activeItems.length, subtotal, allPromos.length])
 
   const subtotalAfterDiscount = Math.round(Math.max(0, subtotal - discount) * 100) / 100
-  const iva = Math.round(subtotalAfterDiscount * IVA_RATE * 100) / 100
+  const iva = Math.round(subtotalAfterDiscount * getIvaRate() * 100) / 100
   const total = Math.round((subtotalAfterDiscount + iva) * 100) / 100
 
   // Concurrency check: verify order hasn't been modified by another terminal
@@ -2999,7 +3000,7 @@ function POSContent() {
         // Immediate count refresh: interval only fires every 30s, but IDB is local.
         getPendingQueue().then(q => setPendingSync(q.length)).catch(() => {})
         // Broadcast to local server so KDS on other LAN devices receives the order offline
-        fetch('http://127.0.0.1:7717/events', {
+        fetch(`${getBridgeUrl()}/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3042,7 +3043,7 @@ function POSContent() {
     const ok = true
 
     // Broadcast to local server so KDS on LAN devices updates immediately (not on 5s Supabase poll)
-    fetch('http://127.0.0.1:7717/events', {
+    fetch(`${getBridgeUrl()}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3253,10 +3254,10 @@ function POSContent() {
       paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
       payDiscount = discount
       const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
-      payTotal = paySubtotalAfterDiscount + paySubtotalAfterDiscount * IVA_RATE
+      payTotal = paySubtotalAfterDiscount + paySubtotalAfterDiscount * getIvaRate()
     }
     const paySubtotalAfterDiscount = Math.max(0, paySubtotal - payDiscount)
-    const payIva = paySubtotalAfterDiscount * IVA_RATE
+    const payIva = paySubtotalAfterDiscount * getIvaRate()
     const payId = splitPayingCuenta > 0 ? `${orderId}-C${splitPayingCuenta}` : orderId
 
     // Desglose de pagos (multi-forma estilo Wansoft). Pago simple → 1 elemento.
@@ -4803,7 +4804,7 @@ function POSContent() {
                 {(() => {
                   const fullSubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
                   const fullAfterDisc = Math.max(0, fullSubtotal - discount)
-                  const fullTotal = fullAfterDisc + fullAfterDisc * IVA_RATE
+                  const fullTotal = fullAfterDisc + fullAfterDisc * getIvaRate()
                   const perPerson = fullTotal / splitParejoN
                   return (
                     <div className="text-center mb-6">
@@ -4867,7 +4868,7 @@ function POSContent() {
                     const cNum = idx + 1
                     const cItems = activeItems.filter(i => (splitAssignments[i.id] || 1) === cNum)
                     const cTotal = cItems.reduce((s, i) => s + i.subtotal, 0)
-                    const cWithIva = cTotal + cTotal * IVA_RATE
+                    const cWithIva = cTotal + cTotal * getIvaRate()
                     return (
                       <div key={cNum} className={`${CUENTA_BG[cNum]} border rounded-xl p-3 text-center`}>
                         <p className={`${CUENTA_TEXT[cNum]} text-xs font-bold mb-1`}>CUENTA {cNum}</p>
@@ -5198,10 +5199,10 @@ function POSContent() {
                 paySubtotal = activeItems.reduce((s, i) => s + i.subtotal, 0)
                 payDiscountLocal = discount
                 const sub = Math.max(0, paySubtotal - payDiscountLocal)
-                payTotal = sub + sub * IVA_RATE
+                payTotal = sub + sub * getIvaRate()
               }
               const paySubAfterDisc = Math.max(0, paySubtotal - payDiscountLocal)
-              const payIva = paySubAfterDisc * IVA_RATE
+              const payIva = paySubAfterDisc * getIvaRate()
               const cuentaLabel = splitPayingCuenta > 0 ? ` — Cuenta ${splitPayingCuenta} de ${totalCuentas}` : ''
 
               return (<>

@@ -639,7 +639,7 @@ The motor operativo gets certified before the control plane that will manage it.
 
 | Priority | Initiative | First Milestone | Unlocks |
 |---|---|---|---|
-| **P0** | Operational Certification Suite — P2.5.4 ✓ P2.5.5 ✓ P2.5.6 ✓ P2.5.7 ✓ — remaining: P2.5.8 Pagos, Offline sync smoke test | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
+| **P0** | Operational Certification Suite — P2.5.4 ✓ P2.5.5 ✓ P2.5.6 ✓ P2.5.7 ✓ P2.5.8 ✓ — remaining: P2.5.9 Offline sync smoke test | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
 | **P1** | Golden Skeleton execution — eliminate all AMALAY debt | Zero hardcodes. D-01 through D-09 resolved. Minute 0 functional for any client. | Clonable product |
 | **P2** | FEOS Core — Organizations, Restaurants, Users, Roles, Permissions | Org → restaurant → user → role flow. ZHO-01/02/03/04 resolved. Multi-tenant auth without hardcodes. | Control Plane |
 | **P3** | Demo 24/7 — provision a restaurant fully from FEOS, zero code | `sandbox.app.fullsite.mx` operational. VANTARA + NÓMADA-MINI live. No manual SQL. | Client demos without AMALAY |
