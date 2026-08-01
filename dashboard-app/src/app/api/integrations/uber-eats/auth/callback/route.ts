@@ -43,7 +43,7 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
   scope: string
 }): Promise<void> {
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-  await fetch(`${SB_URL()}/rest/v1/integration_providers`, {
+  const r = await fetch(`${SB_URL()}/rest/v1/integration_providers`, {
     method: 'POST',
     headers: {
       ...sbHeaders(),
@@ -63,10 +63,14 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
       updated_at: new Date().toISOString(),
     }),
   })
+  if (!r.ok) {
+    const body = await r.text()
+    throw new Error(`[uber-usl] upsertProvider failed ${r.status}: ${body}`)
+  }
 }
 
 async function upsertStoreMapping(clientId: string, storeId: string): Promise<void> {
-  await fetch(`${SB_URL()}/rest/v1/integration_store_mappings`, {
+  const r = await fetch(`${SB_URL()}/rest/v1/integration_store_mappings`, {
     method: 'POST',
     headers: {
       ...sbHeaders(),
@@ -82,6 +86,10 @@ async function upsertStoreMapping(clientId: string, storeId: string): Promise<vo
       updated_at: new Date().toISOString(),
     }),
   })
+  if (!r.ok) {
+    const body = await r.text()
+    throw new Error(`[uber-usl] upsertStoreMapping failed ${r.status}: ${body}`)
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -92,7 +100,7 @@ export async function GET(request: NextRequest) {
   const correlationId = crypto.randomUUID()
 
   const errorUrl = (reason: string) =>
-    `/dashboard/integrations?status=error&provider=ubereats&reason=${encodeURIComponent(reason)}`
+    `/dashboard/integrations?status=error&provider=ubereats&reason=${encodeURIComponent(reason)}&correlation_id=${correlationId}`
 
   // Handle Uber denying the authorization
   if (error) {
@@ -147,10 +155,13 @@ export async function GET(request: NextRequest) {
 
   } catch (e) {
     const msg = String(e)
+    const reason = msg.includes('upsertProvider') || msg.includes('upsertStoreMapping')
+      ? 'db_write_failed'
+      : 'token_exchange_failed'
     await auditLog({
       provider: 'ubereats', client_id: clientId, correlation_id: correlationId,
-      action: 'usl.error', response: { error: msg },
+      action: 'usl.error', response: { error: msg, reason },
     })
-    return NextResponse.redirect(new URL(errorUrl('token_exchange_failed'), request.url))
+    return NextResponse.redirect(new URL(errorUrl(reason), request.url))
   }
 }
