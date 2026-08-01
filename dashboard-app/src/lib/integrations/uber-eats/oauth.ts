@@ -1,5 +1,6 @@
-// Uber Eats OAuth — client_credentials token management with in-process cache.
-// Tokens are cached in memory per scope until 60s before expiry.
+// Uber Eats OAuth — client_credentials (M2M) + authorization code (USL) flows.
+// M2M tokens are cached in memory per scope until 60s before expiry.
+// USL tokens are stored in integration_providers via service role.
 
 const isProduction = (): boolean => process.env.UBER_ENV === 'production'
 
@@ -8,7 +9,17 @@ const loginUrl = (): string =>
     ? 'https://login.uber.com/oauth/v2/token'
     : 'https://sandbox-login.uber.com/oauth/v2/token'
 
+const authorizeUrl = (): string =>
+  isProduction()
+    ? 'https://login.uber.com/oauth/v2/authorize'
+    : 'https://sandbox-login.uber.com/oauth/v2/authorize'
+
 const API_BASE = 'https://api.uber.com'
+
+// Scopes required for POS integration.
+// eats.pos_provisioning covers order + store management in one scope (production).
+// In sandbox, use eats.order + eats.store (pos_provisioning may not be available).
+export const USL_SCOPES = ['eats.order', 'eats.store', 'eats.report']
 
 interface CachedToken {
   token: string
@@ -37,6 +48,82 @@ export async function getUberAccessToken(scope = 'eats.order'): Promise<string> 
   tokenCache.set(scope, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }
+
+// ─── USL (Universal Sign-on Link) — Authorization Code Flow ──────────────────
+//
+// Flow:
+//   1. Merchant clicks "Connect" in Uber Eats Portal or our dashboard
+//   2. We redirect to Uber's OAuth page (buildUberAuthUrl)
+//   3. After merchant authorizes, Uber redirects to /auth/callback?code=X&state=Y
+//   4. We exchange the code for access_token + refresh_token (exchangeUberCode)
+//   5. We store tokens in integration_providers (service role)
+//   6. We associate the store in integration_store_mappings
+//
+// State/CSRF: caller generates a random UUID, stores in httpOnly cookie,
+// verifies on callback, clears cookie after use.
+
+function clientCredentials() {
+  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
+  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
+  if (!clientId || !clientSecret) throw new Error('[uber-usl] UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
+  return { clientId, clientSecret }
+}
+
+/** Build the Uber OAuth authorization URL for the USL redirect. */
+export function buildUberAuthUrl(state: string, redirectUri: string, scopes = USL_SCOPES): string {
+  const { clientId } = clientCredentials()
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    state,
+    scope: scopes.join(' '),
+  })
+  return `${authorizeUrl()}?${params.toString()}`
+}
+
+export interface UberTokenResponse {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  scope: string
+  token_type: string
+}
+
+/** Exchange an authorization code for access + refresh tokens (USL callback). */
+export async function exchangeUberCode(code: string, redirectUri: string): Promise<UberTokenResponse> {
+  const { clientId, clientSecret } = clientCredentials()
+  const r = await fetch(loginUrl(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
+  })
+  if (!r.ok) {
+    const err = await r.text()
+    throw new Error(`[uber-usl] code exchange failed ${r.status}: ${err}`)
+  }
+  return r.json() as Promise<UberTokenResponse>
+}
+
+/** Exchange a refresh_token for a new access_token. */
+export async function refreshUberToken(refreshToken: string): Promise<UberTokenResponse> {
+  const { clientId, clientSecret } = clientCredentials()
+  const r = await fetch(loginUrl(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+  })
+  if (!r.ok) throw new Error(`[uber-usl] refresh failed ${r.status}: ${await r.text()}`)
+  return r.json() as Promise<UberTokenResponse>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** Authenticated fetch to Uber API — always uses Bearer token for the given scope. */
 export async function uberFetch(
