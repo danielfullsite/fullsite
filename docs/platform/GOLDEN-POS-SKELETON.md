@@ -637,7 +637,7 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 | 6 | Auto-seed on provisioning | `onboard_client.py` + FEOS Provisioning | 3h | No manual seed SQL |
 | 7 | Export 194 RLS policies to SQL migration | `supabase/migrations/004_rls_policies.sql` | 3h | Reproducible tenant isolation |
 | 8 | Dynamic menu categories from DB | `lib/pos-data.ts`, `lib/pos-constants.ts` | 6h | Zero hardcoded categories |
-| 9 | Parameterize delivery-worker webhook parsers (D-10) | `cloudflare/delivery-worker/src/index.ts` | 2h | Delivery integrations multi-tenant |
+| 9 | Tenant resolution por DB en delivery-worker (D-10) | `cloudflare/delivery-worker/src/index.ts` | 3h | `provider_store_id → integration_store_mappings → client_id`. Fail-closed + DLQ si no hay mapping. |
 | 10 | Fetch meseros from DB in chat/voice AI context (D-11) | `api/chat/route.ts`, `api/voice/route.ts` | 2h | AI context correcto para cualquier cliente |
 | 11 | Review escalation desde clients table (D-12) | `agents/reviews-manager/worker/src/lib/groq-api.ts` | 1h | Review agent multi-tenant |
 | 12 | Eliminar email-to-role fallback (D-14) | `lib/roles.ts` | 30min | Auth sin datos AMALAY |
