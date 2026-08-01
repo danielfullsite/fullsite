@@ -25,10 +25,9 @@ export const getApiBase = (): string =>
     ? 'https://api.uber.com'
     : 'https://test-api.uber.com'
 
-// Scopes required for POS integration.
-// eats.pos_provisioning covers order + store management in one scope (production).
-// In sandbox, use eats.order + eats.store (pos_provisioning may not be available).
-export const USL_SCOPES = ['eats.order', 'eats.store', 'eats.report']
+// eats.pos_provisioning is the single approved scope for Eats Marketplace POS apps.
+// It covers order management, store management, and menu operations.
+export const USL_SCOPES = ['eats.pos_provisioning']
 
 interface CachedToken {
   token: string
@@ -36,7 +35,7 @@ interface CachedToken {
 }
 const tokenCache = new Map<string, CachedToken>()
 
-export async function getUberAccessToken(scope = 'eats.order'): Promise<string> {
+export async function getUberAccessToken(scope = 'eats.pos_provisioning'): Promise<string> {
   const cached = tokenCache.get(scope)
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
 
@@ -139,7 +138,7 @@ export async function uberFetch(
   path: string,
   opts: RequestInit & { scope?: string } = {}
 ): Promise<Response> {
-  const scope = opts.scope ?? 'eats.order'
+  const scope = opts.scope ?? 'eats.pos_provisioning'
   const token = await getUberAccessToken(scope)
   const { scope: _scope, ...rest } = opts
   return fetch(`${getApiBase()}${path}`, {

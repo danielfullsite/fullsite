@@ -57,7 +57,7 @@ export async function uploadMenu(
     const r = await withRetry(
       () => uberFetch(`/v1/eats/stores/${storeId}/menus`, {
         method: 'PUT',
-        scope: 'eats.store',
+        scope: 'eats.pos_provisioning',
         body: JSON.stringify(menu),
       }),
       { maxAttempts: 3, baseDelayMs: 1000 }
@@ -85,7 +85,7 @@ export async function markItemsOOS(
   try {
     const r = await withRetry(
       () => uberFetch(`/v1/eats/stores/${storeId}/items/deactivations`, {
-        method: 'POST', scope: 'eats.store',
+        method: 'POST', scope: 'eats.pos_provisioning',
         body: JSON.stringify({ items }),
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
@@ -112,7 +112,7 @@ export async function restoreItems(
   try {
     const r = await withRetry(
       () => uberFetch(`/v1/eats/stores/${storeId}/items/activations`, {
-        method: 'POST', scope: 'eats.store',
+        method: 'POST', scope: 'eats.pos_provisioning',
         body: JSON.stringify({ item_ids: itemIds }),
       }),
       { maxAttempts: 3, baseDelayMs: 500 }

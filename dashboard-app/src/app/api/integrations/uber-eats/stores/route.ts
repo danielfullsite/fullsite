@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   try {
     const r = await uberFetch('/v1/eats/stores', {
       method: 'GET',
-      scope: 'eats.store',
+      scope: 'eats.pos_provisioning',
       headers: { 'Accept-Encoding': 'gzip' },
     })
 

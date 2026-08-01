@@ -487,8 +487,7 @@ describe('CAT-A-039..043: USL / OAuth Flow', () => {
     const url = buildUberAuthUrl('state', 'https://app.fullsite.mx/callback', USL_SCOPES)
     const parsed = new URL(url)
     const scope = parsed.searchParams.get('scope') ?? ''
-    expect(scope).toContain('eats.order')
-    expect(scope).toContain('eats.store')
+    expect(scope).toContain('eats.pos_provisioning')
   })
 
   it('CAT-A-042: CSRF state format is uuid|store_id|client_id', () => {

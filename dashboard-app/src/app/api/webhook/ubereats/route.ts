@@ -49,7 +49,7 @@ async function getUberToken(): Promise<string | null> {
   const r = await fetch(loginUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials&scope=eats.order`,
+    body: `client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials&scope=eats.pos_provisioning`,
   })
   if (!r.ok) return null
   const data = await r.json()
