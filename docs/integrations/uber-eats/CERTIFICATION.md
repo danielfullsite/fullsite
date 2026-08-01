@@ -160,7 +160,7 @@ VALUES ('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client');
 | ID | Capability | Paso | Evidencia requerida | Estado |
 |---|---|---|---|---|
 | UBER-001 | OAuth/USL | GET /auth/initiate?store_id=TEST | Redirect a Uber, tokens en `integration_providers` | **PASS** |
-| UBER-002 | Store Mapping | Verificar B-5 activo | store_id → client_id, webhook de test store resuelto | — |
+| UBER-002 | Store Mapping | Verificar B-5 activo | store_id → client_id, webhook de test store resuelto | **PASS** |
 
 ### UBER-001 — Evidencia
 

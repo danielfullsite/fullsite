@@ -1,0 +1,67 @@
+name: UBER-003 Menu Upload Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  menu-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload test menu to Uber sandbox
+        env:
+          APP_URL: https://app.fullsite.mx
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$APP_URL/api/integrations/uber-eats/menu" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "store_id": "633b57d4-237a-5a32-b249-7ceb795f1d35",
+              "menu": {
+                "menus": [{
+                  "id": "menu-amalay-main",
+                  "title": {"en": "AMALAY Menu"},
+                  "service_availability": [{
+                    "day_of_week": ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"],
+                    "time_period": [{"start_time": "00:00", "end_time": "23:59"}]
+                  }],
+                  "category_ids": ["cat-chilaquiles"]
+                }],
+                "categories": [{
+                  "id": "cat-chilaquiles",
+                  "title": {"en": "Chilaquiles & Enchiladas"},
+                  "entities": [{"id": "item-chilaquiles-verdes", "type": "ITEM"}]
+                }],
+                "items": [{
+                  "id": "item-chilaquiles-verdes",
+                  "external_data": "chilaquiles-verdes",
+                  "title": {"en": "Chilaquiles Verdes"},
+                  "description": {"en": "Totopos en salsa verde con crema, queso y cebolla"},
+                  "price_info": {"price": 13500, "currency_code": "MXN"},
+                  "tax_info": {"tax_rate": 0.16}
+                }]
+              }
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP: $HTTP_CODE"
+          echo "Body: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "RESULT=PASS" >> $GITHUB_ENV
+          else
+            echo "RESULT=FAIL (HTTP $HTTP_CODE)" >> $GITHUB_ENV
+          fi
+
+          echo "BODY=$BODY" >> $GITHUB_ENV
+          echo "HTTP_CODE=$HTTP_CODE" >> $GITHUB_ENV
+
+      - name: Notify Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+        run: |
+          MSG="*UBER-003 Menu Upload*%0A%0AStatus: $RESULT%0AHTTP: $HTTP_CODE%0ABody: $BODY"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID&text=$MSG&parse_mode=Markdown" > /dev/null
+          echo "Telegram notified"
