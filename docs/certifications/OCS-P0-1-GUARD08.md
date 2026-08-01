@@ -2,7 +2,7 @@
 
 **Módulo:** CierreCajaWizard · turno/page  
 **Estado:** CERTIFIED — 2026-07-31  
-**Commit:** _pendiente_ (este documento se adjunta al commit del cierre)  
+**Commits:** `f8aef64` feat(P0-1/GUARD-08): soft-block cierre con órdenes abiertas + escalación gerente · `dd81739` chore(db): migration 012 GUARD-08  
 **Tests E2:** 27 nuevos · 1,870 suite completa · 0 regresiones
 
 ---

@@ -3,7 +3,9 @@
 > **Fuente de verdad para el estado de certificación.**
 > Regla: solo pasar a PASS con evidencia archivada.
 > Regla: nunca reabrir un PASS sin evidencia de regresión.
-> Última actualización: 2026-07-31
+> Regla: este archivo es el índice — nunca la fuente primaria de evidencia.
+> Regla: toda entrada debe referenciar un documento de evidencia que exista en disco.
+> Última actualización: 2026-08-01
 
 ---
 
@@ -224,3 +226,21 @@ La OCS certifica módulos del POS de forma independiente. El cierre de todos los
 **Estado:** BLOQUEADO — todos los P0s deben estar CERTIFIED primero
 
 Requisitos completos en `docs/feos/EXECUTION-PLAN.md`.
+
+---
+
+## P1 — Golden Skeleton (PENDING-GATE)
+
+**Estado del track:** PENDING-GATE — no puede iniciar hasta que el milestone POS V2 Operational Certification esté CLOSED.
+
+**Registro:** `docs/certifications/P1-GOLDEN-SKELETON-REGISTRY.md`
+
+| Certificación | Scope | Estado |
+|---|---|---|
+| GS-01 — Hardcodes | Cero refs AMALAY en código fuera de whitelist | PENDING-GATE |
+| GS-02 — Onboarding pipeline | `provision_client` → cliente operativo sin pasos manuales | PENDING-GATE |
+| GS-03 — Aislamiento multi-tenant | RLS + `auth_tenant` verificados en todas las tablas | PENDING-GATE |
+| GS-04 — POS cloneable | Shadow Day completado en cliente #2 sin intervención técnica | PENDING-GATE |
+| GS-05 — Sandbox environment | 9-step sandbox milestone CLOSED + reset verificado | PENDING-GATE |
+
+Ninguna entrada de esta tabla puede avanzar mientras el gate esté OPEN.
