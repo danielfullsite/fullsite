@@ -249,7 +249,9 @@ Estado Supabase post-cierre:
 ═══════════════════════════════════════════════
 
 OC-01 a OC-12:
-  OC-01 4h offline:        [ ] PASS  [ ] FAIL  (scope reducido a 30min — registrar)
+  OC-01 4h offline:        [ ] PASS  [ ] FAIL  [ ] DEFERRED
+    Motivo OC-01: smoke test 90–120 min ejecutado. Certificación de 4h
+    queda pendiente de ventana operacional completa.
   OC-02 Sin pérdida:       [ ] PASS  [ ] FAIL
   OC-03 Sync completo:     [ ] PASS  [ ] FAIL
   OC-04 Sin duplicados:    [ ] PASS  [ ] FAIL
@@ -274,6 +276,20 @@ Docs actualizados:
   [ ] CERTIFICATIONS.md (P2.5.9)
   [ ] GOLDEN-POS-SKELETON.md (P0 completado)
 
+═══════════════════════════════════════════════
+
+Operational Readiness:
+  POS            [ ] Ready
+  Caja           [ ] Ready
+  KDS            [ ] Ready
+  Barra          [ ] Ready
+  Print          [ ] Ready
+  Bridge         [ ] Ready
+  Offline Replay [ ] Ready
+  Shadow Day     [ ] Pending  [ ] Ready
+  Golden Skeleton[ ] Blocked  [ ] Ready
+  Cliente #2     [ ] Blocked  [ ] Ready
+
 Veredicto:
   _______________________________________________________________
 
@@ -282,8 +298,18 @@ Firma Daniel: _________________  Fecha: ________________
 
 ---
 
-## Nota sobre OC-01 (4 horas)
+## Lecciones aprendidas
 
-OC-01 pide 4 horas de operación offline. El smoke test cubre ~30 minutos de operación real. Si OC-01–OC-08, OC-11, OC-12 pasan y no hay pérdida ni duplicados, se puede certificar el módulo con OC-01 en **PASS PARCIAL** (arquitectura validada, duración reducida). Documentar explícitamente si se opta por esta ruta.
+*(Completar post-ejecución)*
 
-La certificación completa de OC-01 en operación real de turno (5–6 horas) puede completarse en la siguiente visita a AMALAY sin reabrir los demás criterios.
+**¿Qué salió mejor de lo esperado?**
+
+**¿Qué salió peor?**
+
+**¿Qué automatizaríamos antes del siguiente cliente?**
+
+**¿Qué cambiaríamos del protocolo de prueba?**
+
+**¿Qué debe incorporarse al Golden Skeleton?**
+
+**¿Qué debe convertirse en un módulo FEOS?**
