@@ -8,6 +8,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
+import { getStoredTokenForStore } from '@/lib/integrations/uber-eats/oauth'
 
 function checkAuth(request: NextRequest): boolean {
   const expected = (process.env.INTEGRATION_ADMIN_SECRET ?? '').trim()
@@ -18,22 +19,6 @@ function checkAuth(request: NextRequest): boolean {
   try {
     return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(provided, 'utf8'))
   } catch { return false }
-}
-
-async function getToken(): Promise<string | null> {
-  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
-  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
-  if (!clientId || !clientSecret) return null
-
-  // Try without scope first — sandbox utility endpoints may not need eats.pos_provisioning
-  const r = await fetch('https://sandbox-login.uber.com/oauth/v2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
-  })
-  if (!r.ok) return null
-  const data = (await r.json()) as { access_token?: string }
-  return data.access_token ?? null
 }
 
 export async function POST(request: NextRequest) {
@@ -47,9 +32,11 @@ export async function POST(request: NextRequest) {
   const { store_id } = (await request.json().catch(() => ({}))) as { store_id?: string }
   const storeId = store_id || '633b57d4-237a-5a32-b249-7ceb795f1d35'
 
-  const token = await getToken()
-  if (!token) {
-    return NextResponse.json({ error: 'token_failed' }, { status: 502 })
+  let token: string
+  try {
+    token = await getStoredTokenForStore(storeId)
+  } catch (e) {
+    return NextResponse.json({ error: 'token_failed', detail: String(e) }, { status: 502 })
   }
 
   const r = await fetch(`https://test-api.uber.com/v1/eats/sandbox/store/${storeId}/order`, {
