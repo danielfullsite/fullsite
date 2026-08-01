@@ -55,7 +55,7 @@ export async function uploadMenu(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/menus`, {
+      () => uberFetch(`/v2/eats/stores/${storeId}/menus`, {
         method: 'PUT',
         storeId,
         body: JSON.stringify(menu),
@@ -84,7 +84,7 @@ export async function markItemsOOS(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/items/deactivations`, {
+      () => uberFetch(`/v2/eats/stores/${storeId}/items/deactivations`, {
         method: 'POST', storeId,
         body: JSON.stringify({ items }),
       }),
@@ -111,7 +111,7 @@ export async function restoreItems(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/items/activations`, {
+      () => uberFetch(`/v2/eats/stores/${storeId}/items/activations`, {
         method: 'POST', storeId,
         body: JSON.stringify({ item_ids: itemIds }),
       }),

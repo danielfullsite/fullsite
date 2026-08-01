@@ -14,7 +14,7 @@ export async function pauseStore(
   if (durationMinutes) body.duration = durationMinutes * 60
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/status`, {
+      () => uberFetch(`/v2/eats/stores/${storeId}/status`, {
         method: 'POST', storeId, body: JSON.stringify(body),
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
@@ -39,7 +39,7 @@ export async function activateStore(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/status`, { method: 'DELETE', storeId }),
+      () => uberFetch(`/v2/eats/stores/${storeId}/status`, { method: 'DELETE', storeId }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     const errText = r.ok ? undefined : await r.text()
@@ -62,7 +62,7 @@ export async function getStoreStatus(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/stores/${storeId}/status`, { method: 'GET', storeId }),
+      () => uberFetch(`/v2/eats/stores/${storeId}/status`, { method: 'GET', storeId }),
       { maxAttempts: 2, baseDelayMs: 300 }
     )
     if (!r.ok) return { ok: false, error: await r.text() }
