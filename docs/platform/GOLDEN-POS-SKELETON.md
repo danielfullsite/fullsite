@@ -474,6 +474,25 @@ Ownership taxonomy:
 
 Specific locations where AMALAY-specific code exists in the platform. Each item must be resolved before the module reaches the SKELETON stage.
 
+### Integration Tenant Resolution Rule (formalizado 2026-08-01)
+
+Applies to ALL current and future delivery integrations (Uber Eats, Rappi, DiDi, and any future provider):
+
+```
+provider_store_id
+      ↓
+integration_store_mappings (DB lookup)
+      ↓
+client_id
+
+If mapping not found → FAIL CLOSED:
+  - DLQ / quarantine (no retry to live orders)
+  - audit log entry with correlation_id
+  - ZERO fallback to any tenant (including AMALAY)
+```
+
+No integration may hardcode a `client_id`. No integration may use a request header as the primary tenant resolver. The `integration_store_mappings` table is the single source of truth.
+
 | ID | Location | Type | Description | Fix | Priority |
 |---|---|---|---|---|---|
 | D-01 | `lib/client-config.ts` FALLBACKS.amalay | Hardcode | 11 mesero names, RFC AFO200806JI0, phone 8115324371, address | Replace with empty generic fallback. No client data in code. | P0 |
@@ -658,15 +677,30 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 
 The motor operativo gets certified before the control plane that will manage it. No P(n+1) starts until P(n) has at least one milestone in production with evidence of clonability.
 
-| Priority | Initiative | First Milestone | Unlocks |
+### Work classification (formalizado 2026-08-01)
+
+Every active work item belongs to exactly one category:
+
+| Cat | Name | Rule |
+|---|---|---|
+| **A** | Critical path | Delays this item → delays the next major platform milestone |
+| **B** | Parallel | Generates value, but does not move the date of the next milestone |
+| **C** | External | Blocked by a third party (Uber, SAT, Facturapi, vendors, etc.) |
+
+**If a Cat B item is consuming capacity that a Cat A item needs → Cat B pauses.**  
+**If a Cat C item unblocks → it may become Cat A or B at that point.**
+
+### Active roadmap
+
+| Priority | Initiative | Category | Unlocks |
 |---|---|---|---|
-| **P0** | Operational Certification Suite — P2.5.4 ✓ P2.5.5 ✓ P2.5.6 ✓ P2.5.7 ✓ P2.5.8 ✓ — remaining: P2.5.9 Offline sync smoke test | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
-| **P1** | Golden Skeleton execution — eliminate all AMALAY debt | Zero hardcodes. D-01 through D-09 resolved. Minute 0 functional for any client. | Clonable product |
-| **P2** | FEOS Core — Organizations, Restaurants, Users, Roles, Permissions | Org → restaurant → user → role flow. ZHO-01/02/03/04 resolved. Multi-tenant auth without hardcodes. | Control Plane |
-| **P3** | Demo 24/7 — provision a restaurant fully from FEOS, zero code | `sandbox.app.fullsite.mx` operational. VANTARA + NÓMADA-MINI live. No manual SQL. | Client demos without AMALAY |
-| **P4** | FEOS module expansion | Terminal Manager, Kitchen Manager, Feature Flags, Observability Hub, Auto-Certification, Agent Manager | ZHO count <10 |
-| **P5** | AI Ops — Digital Twin, Self-Healing, Auto Recovery | `feos_restaurant_state` live. T1 auto-heal for printers + KDS. 24/7 autonomous operation. | Autonomous platform |
-| **P6** | Integration Platform | Uber/Rappi/Didi/payments/invoicing under one common adapter architecture | Revenue diversification |
+| **P0** | Offline Fase 5 — ejecución física en AMALAY | **A** | P0 DONE → P1 arranca |
+| **P0** | OCS P2.5.9 Offline/Sync smoke test | **A** | Completa certificación OCS |
+| **P1** | Golden Skeleton — eliminar AMALAY debt D-01…D-20 | **A** | Clonable product → Cliente #2 |
+| **P2** | FEOS Core — Orgs, Restaurants, Users, Roles | **A** | Control plane |
+| **PAE** | Platform Acceptance Environment | **A** | Gate antes de Cliente #2 |
+| **Uber Eats** | Sandbox (B-1…B-6) + Categoría B + ticket Uber | **B** (paralelo) + **C** (B-3, B-6 Uber) | Revenue diversification |
+| **P0-3** | CSD Facturapi / SAT | **C** | CFDI en producción |
 
 ### Pre-Implementation Gate
 
