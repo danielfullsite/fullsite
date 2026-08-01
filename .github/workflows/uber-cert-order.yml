@@ -7,44 +7,17 @@ jobs:
   simulate-order:
     runs-on: ubuntu-latest
     env:
-      UBER_CLIENT_ID: ${{ secrets.UBER_CLIENT_ID }}
-      UBER_CLIENT_SECRET: ${{ secrets.UBER_CLIENT_SECRET }}
-      STORE_ID: "633b57d4-237a-5a32-b249-7ceb795f1d35"
-      SANDBOX_AUTH: "https://sandbox-login.uber.com/oauth/v2/token"
-      SANDBOX_API: "https://test-api.uber.com"
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
 
     steps:
-      - name: Get client_credentials token (no scope)
+      - name: Trigger sandbox order via Fullsite endpoint
         run: |
-          RESP=$(curl -s -X POST "$SANDBOX_AUTH" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "client_id=$UBER_CLIENT_ID&client_secret=$UBER_CLIENT_SECRET&grant_type=client_credentials")
-          echo "Token response: $RESP"
-          TOKEN=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))")
-          if [ -z "$TOKEN" ]; then
-            echo "TOKEN_SCOPE_ERROR=1" >> $GITHUB_ENV
-            # Try with eats.pos_provisioning scope
-            RESP2=$(curl -s -X POST "$SANDBOX_AUTH" \
-              -H "Content-Type: application/x-www-form-urlencoded" \
-              -d "client_id=$UBER_CLIENT_ID&client_secret=$UBER_CLIENT_SECRET&grant_type=client_credentials&scope=eats.pos_provisioning")
-            echo "Scoped response: $RESP2"
-            TOKEN=$(echo "$RESP2" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))")
-          fi
-          echo "UBER_TOKEN=$TOKEN" >> $GITHUB_ENV
-
-      - name: Create sandbox test order
-        run: |
-          if [ -z "$UBER_TOKEN" ]; then
-            echo "No token — cannot create order"
-            echo "ORDER_RESULT=NO_TOKEN" >> $GITHUB_ENV
-            exit 0
-          fi
-
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
-            "$SANDBOX_API/v1/eats/sandbox/store/$STORE_ID/order" \
-            -H "Authorization: Bearer $UBER_TOKEN" \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"type":"delivery"}')
+            -d '{"store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
 
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
@@ -53,10 +26,10 @@ jobs:
           echo "ORDER_HTTP=$HTTP_CODE" >> $GITHUB_ENV
           echo "ORDER_BODY=$BODY" >> $GITHUB_ENV
 
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            echo "ORDER_RESULT=ORDER_SENT" >> $GITHUB_ENV
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "ORDER_RESULT=PASS" >> $GITHUB_ENV
           else
-            echo "ORDER_RESULT=FAILED_$HTTP_CODE" >> $GITHUB_ENV
+            echo "ORDER_RESULT=FAIL_$HTTP_CODE" >> $GITHUB_ENV
           fi
 
       - name: Notify Telegram
