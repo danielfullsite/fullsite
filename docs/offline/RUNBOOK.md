@@ -58,11 +58,35 @@ netsh advfirewall firewall delete rule name="BLOCK-INTERNET-TEST"
 ```
 Luego verificar: `ping 192.168.1.68` responde, `ping 8.8.8.8` no responde.
 
+### Configurar Bridge URL en terminales secundarias (PDV1/PDV2/PDV3)
+
+El Print Bridge corre **solo en Caja** (`192.168.1.71`) y escucha en `0.0.0.0:7717` (toda la LAN).
+Las terminales secundarias deben apuntarle explícitamente — de lo contrario usarían su propio `127.0.0.1` donde no hay bridge.
+
+**En cada PDV (PDV1=192.168.1.68, PDV2=192.168.1.4, PDV3=192.168.1.69):**
+1. Abrir el POS → ir a `Configuración` (esquina superior derecha)
+2. Sección **Print Bridge** → campo **URL del Bridge**
+3. Ingresar: `http://192.168.1.71:7717`
+4. Presionar **Guardar**
+5. Verificar que el status cambia a "Online" — si no: confirmar que el bridge.exe está corriendo en Caja y que ambos están en la misma red
+
+**Verificación rápida desde el browser del PDV:**
+```
+http://192.168.1.71:7717/health
+```
+Debe responder JSON con `{"ok":true,...}`.
+
+> La URL persiste en `localStorage` del dispositivo. Se configura una vez y sobrevive recargas.
+
+---
+
 **Antes de desconectar internet:**
 - [ ] La Caja tiene el POS abierto y funcionando normalmente
+- [ ] Bridge URL configurada en PDV1/PDV2/PDV3 (ver sección arriba)
 - [ ] Hay al menos una orden activa en pantalla
 - [ ] El KDS está mostrando órdenes
-- [ ] Confirmar que `/health` responde: abrir `http://127.0.0.1:7717/health` en el browser de la Caja
+- [ ] Confirmar que `/health` responde en Caja: `http://127.0.0.1:7717/health`
+- [ ] Confirmar que `/health` responde desde PDV1: `http://192.168.1.71:7717/health`
 
 ---
 

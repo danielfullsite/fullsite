@@ -7,6 +7,7 @@ import {
   RefreshCw, CheckCircle, XCircle, AlertCircle, Monitor, Smartphone, RotateCcw,
 } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { getBridgeUrl, setBridgeUrl, DEFAULT_BRIDGE_URL } from '@/lib/bridge-url'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -31,6 +32,8 @@ export default function ConfigPage() {
   const [terminalInfo, setTerminalInfo] = useState({ restaurantId: '', terminalId: '', isElectron: false })
   const [reprovisionState, setReprovisionState] = useState<'idle' | 'confirm' | 'done'>('idle')
   const [loading, setLoading] = useState(true)
+  const [bridgeUrlInput, setBridgeUrlInput] = useState('')
+  const [bridgeUrlSaved, setBridgeUrlSaved] = useState(false)
 
   useEffect(() => {
     // Device info
@@ -42,8 +45,11 @@ export default function ConfigPage() {
       pwa: window.matchMedia('(display-mode: standalone)').matches,
     })
 
+    // Bridge URL config (secondary terminals set this to Caja's LAN IP)
+    setBridgeUrlInput(getBridgeUrl())
+
     // Bridge health
-    fetch('http://127.0.0.1:7717/health', { signal: AbortSignal.timeout(3000) })
+    fetch(`${getBridgeUrl()}/health`, { signal: AbortSignal.timeout(3000) })
       .then(r => r.json())
       .then(d => {
         setBridgeOnline(true)
@@ -117,7 +123,7 @@ export default function ConfigPage() {
           </div>
           {bridgeOnline ? (
             <>
-              <p className="text-sm text-white/50 mb-3">Servicio local en 127.0.0.1:7717 — conecta el POS con las impresoras.</p>
+              <p className="text-sm text-white/50 mb-3">Conectado en <span className="font-mono text-white/70">{getBridgeUrl()}</span> — {bridgeStations.length} estación(es).</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {bridgeStations.map(s => (
                   <div key={s} className="bg-white/5 rounded-xl p-4 text-center border border-white/5">
@@ -130,12 +136,37 @@ export default function ConfigPage() {
             </>
           ) : bridgeOnline === false ? (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-              <p className="text-sm text-red-400 font-bold">Bridge no detectado</p>
-              <p className="text-xs text-white/40 mt-1">Asegurate de que fullsite-print-bridge.exe este corriendo en esta terminal. Doble click al .exe en C:\fullsite\</p>
+              <p className="text-sm text-red-400 font-bold">Bridge no detectado en <span className="font-mono">{getBridgeUrl()}</span></p>
+              <p className="text-xs text-white/40 mt-1">Terminal Caja: asegurate de que fullsite-print-bridge.exe esté corriendo. Terminal secundaria: configura la URL del bridge abajo.</p>
             </div>
           ) : (
             <p className="text-sm text-white/30">Verificando conexión...</p>
           )}
+
+          {/* Bridge URL — configurable per terminal for PDV1/PDV2/PDV3 */}
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">URL del Bridge</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={bridgeUrlInput}
+                onChange={e => { setBridgeUrlInput(e.target.value); setBridgeUrlSaved(false) }}
+                placeholder={DEFAULT_BRIDGE_URL}
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50"
+              />
+              <button
+                onClick={() => {
+                  setBridgeUrl(bridgeUrlInput)
+                  setBridgeUrlSaved(true)
+                  setTimeout(() => setBridgeUrlSaved(false), 2000)
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 text-sm font-bold hover:bg-emerald-500/25 transition-colors whitespace-nowrap"
+              >
+                {bridgeUrlSaved ? 'Guardado' : 'Guardar'}
+              </button>
+            </div>
+            <p className="text-[10px] text-white/25 mt-1.5">PDV1-3: usar IP de Caja, ej. <span className="font-mono">http://192.168.1.71:7717</span>. Caja: dejar vacío.</p>
+          </div>
         </section>
 
         {/* Staff */}

@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { ArrowLeft, Activity, Printer, Wifi, WifiOff, AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, Fingerprint, Database, Globe, Server, User } from 'lucide-react'
 import { getActiveClientSlug as _cid } from '@/lib/data'
 
+import { getBridgeUrl } from '@/lib/bridge-url'
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-const BRIDGE_URL = 'http://127.0.0.1:7717'
 
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
@@ -43,8 +44,8 @@ export default function MonitorPage() {
       const [ordersRes, printRes, bridgeRes, fpRes, supabaseRes, alertsRes, cfdiRes, turnoRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status,total,propina,metodo_pago,pagos`, { headers: H }),
         fetch(`${SUPABASE_URL}/rest/v1/pos_print_jobs?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status`, { headers: H }).catch(() => null),
-        fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
-        fetch(`${BRIDGE_URL}/fp/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+        fetch(`${getBridgeUrl()}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+        fetch(`${getBridgeUrl()}/fp/health`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
         fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${cid}&select=id&limit=1`, { headers: H }).catch(() => null),
         fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_alerts?client_id=eq.${cid}&resolved=eq.false&select=id`, { headers: H }).catch(() => null),
         fetch(`${SUPABASE_URL}/rest/v1/pos_cfdi_requests?client_id=eq.${cid}&created_at=gte.${today}T00:00:00&select=status`, { headers: H }).catch(() => null),
@@ -185,7 +186,7 @@ export default function MonitorPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {[
-                { label: 'Print Bridge', ok: data.bridge.online, detail: data.bridge.online ? `Online · ${data.bridge.stations.length} estaciones · uptime ${Math.floor(data.bridge.uptime / 60)}min` : 'No responde en 127.0.0.1:7717', icon: Server },
+                { label: 'Print Bridge', ok: data.bridge.online, detail: data.bridge.online ? `Online · ${data.bridge.stations.length} estaciones · uptime ${Math.floor(data.bridge.uptime / 60)}min` : `No responde en ${getBridgeUrl()}`, icon: Server },
                 { label: 'Huella Digital', ok: data.fingerprint.online, detail: data.fingerprint.online ? 'Servicio activo' : 'No responde en /fp/health', icon: Fingerprint },
                 { label: 'Supabase', ok: data.supabase.online, detail: data.supabase.online ? 'Conectado' : 'Sin conexión a Supabase', icon: Database },
                 { label: 'Internet', ok: data.internet.online, detail: data.internet.online ? 'Conectado' : 'Sin conexión a internet', icon: Globe },

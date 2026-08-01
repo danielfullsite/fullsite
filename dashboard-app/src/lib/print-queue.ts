@@ -12,6 +12,8 @@
 //
 // Retries only count real print attempts. Bridge-down skips don't consume retries.
 
+import { getBridgeUrl } from './bridge-url'
+
 export interface PrintJob {
   id: string
   station: string
@@ -34,7 +36,6 @@ const STORAGE_KEY = 'pos_print_queue'
 let _processing = false
 const MAX_RETRIES = 5
 const RETRY_INTERVAL_MS = 15_000 // 15 seconds
-const BRIDGE_URL = 'http://127.0.0.1:7717'
 const BRIDGE_HEALTH_TIMEOUT_MS = 800
 const BRIDGE_UNAVAILABLE_ESCALATION_MS = 120_000 // 2 minutes → needs_attention
 
@@ -247,7 +248,7 @@ async function isBridgeHealthy(): Promise<boolean> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), BRIDGE_HEALTH_TIMEOUT_MS)
-    const res = await fetch(`${BRIDGE_URL}/health`, { signal: ctrl.signal })
+    const res = await fetch(`${getBridgeUrl()}/health`, { signal: ctrl.signal })
     clearTimeout(t)
     _bridgeUp = res.ok
   } catch {
@@ -261,7 +262,7 @@ async function isBridgeHealthy(): Promise<boolean> {
 async function attemptPrint(job: PrintJob): Promise<boolean> {
   try {
     if (job.type === 'drawer') {
-      const res = await fetch(`${BRIDGE_URL}/drawer`, {
+      const res = await fetch(`${getBridgeUrl()}/drawer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ station: job.station }),
@@ -269,7 +270,7 @@ async function attemptPrint(job: PrintJob): Promise<boolean> {
       return res.ok
     }
 
-    const res = await fetch(`${BRIDGE_URL}/print`, {
+    const res = await fetch(`${getBridgeUrl()}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ station: job.station, data: job.data }),

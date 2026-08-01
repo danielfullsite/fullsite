@@ -9,6 +9,7 @@ import { getStationForItem, STATION_LABELS, isTiempoItem, getIvaRate, type Stati
 import { enqueueFailedPrint } from './print-queue'
 import { getPosConfigSync } from './pos-config'
 import { qrToDataURL } from './qr'
+import { getBridgeUrl } from './bridge-url'
 
 // ─── PRINT CSS (works on any device) ────────────────────────────────────────
 
@@ -149,20 +150,28 @@ function textToBytes(text: string): number[] {
 }
 
 // ─── PRINT BRIDGE (servicio local en la terminal Windows) ──────────────────
-// fullsite-os/tools/print-bridge — escucha en 127.0.0.1:7717 y entrega bytes
+// fullsite-os/tools/print-bridge — escucha en 0.0.0.0:7717 y entrega bytes
 // ESC/POS a impresoras USB/red. Localhost está exento de mixed-content, así
 // que el POS en HTTPS puede llamarlo. Primera opción de impresión; si no
 // responde se cae a Bluetooth y luego a CSS.
+// La URL es configurable por terminal vía localStorage FULLSITE_BRIDGE_URL —
+// terminales secundarias (PDV1-3) apuntan a la IP de Caja (ej. 192.168.1.71:7717).
 
-const BRIDGE_URL = 'http://127.0.0.1:7717'
 const BRIDGE_HEALTH_TTL_MS = 5_000
 
 let bridgeAvailable: boolean | null = null
 let bridgeLastCheck = 0
+let lastCheckedBridgeUrl = ''
 
 async function isBridgeAvailable(): Promise<boolean> {
   if (typeof window === 'undefined') return false
+  const bridgeUrl = getBridgeUrl()
   const now = Date.now()
+  // Invalidate cache if the configured URL changed (e.g. tech updated it mid-session)
+  if (bridgeUrl !== lastCheckedBridgeUrl) {
+    bridgeAvailable = null
+    lastCheckedBridgeUrl = bridgeUrl
+  }
   if (bridgeAvailable !== null && now - bridgeLastCheck < BRIDGE_HEALTH_TTL_MS) {
     return bridgeAvailable
   }
@@ -170,13 +179,13 @@ async function isBridgeAvailable(): Promise<boolean> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 800)
-    const res = await fetch(`${BRIDGE_URL}/health`, { signal: ctrl.signal })
+    const res = await fetch(`${bridgeUrl}/health`, { signal: ctrl.signal })
     clearTimeout(t)
     bridgeAvailable = res.ok
   } catch {
     bridgeAvailable = false
   }
-  if (bridgeAvailable) console.log('[printer] Print bridge detectado en', BRIDGE_URL)
+  if (bridgeAvailable) console.log('[printer] Print bridge detectado en', bridgeUrl)
   return bridgeAvailable
 }
 
@@ -221,7 +230,7 @@ function bytesToBase64(data: Uint8Array): string {
 async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<boolean> {
   if (!(await isBridgeAvailable())) return false
   try {
-    const res = await fetch(`${BRIDGE_URL}/print`, {
+    const res = await fetch(`${getBridgeUrl()}/print`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...(station ? { station } : {}), data: bytesToBase64(bytes) }),
@@ -244,7 +253,7 @@ async function bridgePrint(bytes: Uint8Array, station?: StationName): Promise<bo
 async function bridgeDrawer(): Promise<boolean> {
   if (!(await isBridgeAvailable())) return false
   try {
-    const res = await fetch(`${BRIDGE_URL}/drawer`, {
+    const res = await fetch(`${getBridgeUrl()}/drawer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
