@@ -68,7 +68,7 @@ import {
   buildCategoryMap,
 } from '@/lib/pos-promos'
 import { getActiveCombos, applyCombo, type Combo } from '@/lib/pos-combos'
-import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu } from '@/lib/pos-offline-db'
+import { syncAll, getPendingQueue, queueOperation, cacheMenu, getCachedMenu, cacheCashMovement } from '@/lib/pos-offline-db'
 import { sendNotification } from '@/lib/service-worker'
 import { getPermissions } from '@/lib/pos-permissions'
 import {
@@ -1320,7 +1320,9 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
   const doCashSave = async (manager: string) => {
     const num = parseFloat(amount)
     setSaving(true)
-    const payload = { client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
+    // Stable id — ensures idempotency whether we save online or queue offline
+    const id = crypto.randomUUID()
+    const payload = { id, client_id: _cid(), turno_id: turnoId, type, amount: num, reason: reason.trim(), actor, approved_by: manager }
     try {
       const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -1331,9 +1333,14 @@ function CashMovementModal({ turnoId, actor, onConfirm, onCancel }: CashMovement
         signal: AbortSignal.timeout(5000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      // Write-through cache — mirror to IDB even though Supabase succeeded.
+      // Guarantees the wizard sees this movement if connectivity drops before cierre.
+      cacheCashMovement({ id, client_id: payload.client_id, turno_id: turnoId ?? '', type, amount: num, reason: reason.trim(), actor, approved_by: manager })
+        .catch(() => { /* IDB unavailable — sync_queue is the fallback */ })
       onConfirm(type, num, reason.trim(), manager)
     } catch {
-      // Offline or server error — queue for sync and confirm locally
+      // Offline or server error — queue for sync and confirm locally.
+      // getCachedCashMovsByTurno also reads sync_queue, so the wizard sees it.
       await queueOperation('pos_cash_movements', 'POST', payload as Record<string, unknown>, undefined, undefined, 'SUPABASE_REST')
       onConfirm(type, num, reason.trim(), manager)
     }
@@ -2426,7 +2433,7 @@ function POSContent() {
   }, [])
 
   // Cancel item (requires reason + manager PIN — NEVER delete)
-  const handleCancelItem = useCallback((reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
+  const handleCancelItem = useCallback(async (reason: string, managerName: string, options: { prepared: boolean; voided: boolean }) => {
     if (!cancellingItem) return
     const { prepared, voided } = options
     const action = voided ? 'item_voided' as const : 'item_cancelled' as const
@@ -2470,20 +2477,49 @@ function POSContent() {
     } else {
       showToast(`${cancellingItem.nombre} cancelado — aprobado por ${managerName}`)
     }
-    // Save to DB so KDS reflects cancellation
+    // Persist to DB via OCC-safe endpoint so KDS reflects cancellation.
+    // APP_API transport required — SUPABASE_REST MUST NOT mutate pos_orders.
     const effectiveOrderId = loadedOrderId || orderId
     if (effectiveOrderId) {
-      const updatedItems = orderItems.map(i => {
-        if (i.id === cancellingItem.id) return { ...i, cancelled: true }
-        return i
-      })
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pos_orders?id=eq.${effectiveOrderId}`, {
-        method: 'PATCH',
-        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ items: JSON.stringify(updatedItems), updated_at: new Date().toISOString() }),
-      }).catch(err => console.error('[cancel] DB save failed:', err))
+      const cancelOpId = genOpId()
+      const cancelBody = {
+        client_id: _cid(),
+        order_id: effectiveOrderId,
+        item_id: cancellingItem.id,
+        voided,
+        operation_id: cancelOpId,
+        mesero,
+        reason,
+        manager: managerName,
+      }
+      try {
+        const res = await fetch('/api/pos/cancel-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
+          body: JSON.stringify(cancelBody),
+          signal: AbortSignal.timeout(5000),
+        })
+        const result = res.ok ? await res.json() : { ok: false }
+        if (result.conflict) {
+          // Local state already updated — the item is cancelled in UI.
+          // OCC conflict means DB has a newer revision; the cancel will replay on next send.
+          showToast('Conflicto de versión — cancelación local aplicada, se sincronizará al próximo envío')
+        } else if (!result.ok && !result.already_applied) {
+          throw new Error(`cancel-item API error: ${result.error || res.status}`)
+        }
+      } catch (err) {
+        // Offline or API error: queue for replay with APP_API transport
+        console.warn('[cancel] Queuing offline:', err)
+        try {
+          const { queueOperation } = await import('@/lib/pos-offline-db')
+          await queueOperation('pos_orders', 'POST', cancelBody as unknown as Record<string, unknown>, '/api/pos/cancel-item', '0', 'APP_API')
+        } catch {
+          // IDB unavailable — local state is the truth until next send overwrites DB
+          console.error('[cancel] Failed to queue offline — cancellation is local only until next send')
+        }
+      }
     }
-  }, [cancellingItem, orderId, mesero, mesa, orderItems, loadedOrderId])
+  }, [cancellingItem, orderId, mesero, mesa, loadedOrderId])
 
   // Void entire order
   // Eduardo Jul 21 (Batch 8): Transfer individual platillo to another mesa
