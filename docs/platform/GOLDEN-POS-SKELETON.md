@@ -660,6 +660,31 @@ Before implementing any significant feature, answer these 4 questions. If any an
 
 **Execution Mode (permanent rule):** Every new document, ADR, or architectural decision ends in implementation. Ideas enter the Platform Lifecycle pipeline — no document that doesn't map to a specific Implementation milestone is merged into `docs/`. Each implementation ends with its certification, consolidation in `docs/`, and commit.
 
+### Definition of Done
+
+No phase advances because "it's almost there." Each phase closes only when all criteria are met.
+
+| Phase | Closed when... |
+|---|---|
+| **P0 — Operational Certification Suite** | All modules certified. P0/P1 gaps resolved. Evidence consolidated in `docs/certifications/`. Parity or superiority vs Wansoft on equivalent flows. |
+| **P1 — Golden Skeleton** | Any restaurant provisions from Minute 0 with zero AMALAY-specific logic. D-01 through D-09 from AMALAY Debt Registry resolved and verified. |
+| **P2 — FEOS Core** | Multiple organizations, restaurants, users, roles, and permissions working end-to-end. ZHO-01/02/03/04 resolved with evidence. |
+| **P3 — Demo 24/7** | Creating an org + restaurant from FEOS produces a fully operational Dashboard, POS, and KDS — zero code touched, zero manual SQL. |
+
+### Development Cycle
+
+Every implementation follows this permanent cycle. AMALAY remains the operational reference — if it doesn't work reliably there, it does not reach the Skeleton or the Control Plane.
+
+```
+Implementation → AMALAY → Certification → Golden Skeleton → FEOS
+```
+
+- **Implementation:** code exists, tests pass
+- **AMALAY:** runs reliably in production — 30+ days or explicit sign-off
+- **Certification:** smoke test + certification doc in `docs/certifications/`
+- **Golden Skeleton:** zero AMALAY-specific code in this module
+- **FEOS:** control plane module owns configuration, no manual intervention needed
+
 ---
 
 ## 13. Governance
