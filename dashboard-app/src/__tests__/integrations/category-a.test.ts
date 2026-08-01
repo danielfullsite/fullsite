@@ -510,9 +510,9 @@ describe('CAT-A-039..043: USL / OAuth Flow', () => {
   })
 })
 
-// ─── CAT-A-044..048: Store Mapping ───────────────────────────────────────────
+// ─── CAT-A-044..047e: Store Mapping ──────────────────────────────────────────
 
-describe('CAT-A-044..048: Store Mapping', () => {
+describe('CAT-A-044..047e: Store Mapping + Fail-Closed (P0)', () => {
   it('CAT-A-044: normalizer uses provided storeId', () => {
     const order = normalizeUberOrder({ id: 'ord-1', cart: { items: [] } }, 'STORE-ABC', 'client-A', 'c1')
     expect(order.provider_store_id).toBe('STORE-ABC')
@@ -522,12 +522,11 @@ describe('CAT-A-044..048: Store Mapping', () => {
   it('CAT-A-045: different store IDs produce independent orders', () => {
     const o1 = normalizeUberOrder({ id: 'ord-X', cart: { items: [] } }, 'STORE-1', 'client-1', 'c1')
     const o2 = normalizeUberOrder({ id: 'ord-X', cart: { items: [] } }, 'STORE-2', 'client-2', 'c1')
-    // Same order_id but different stores → same idempotency_key (provider_order_id is unique per Uber)
     expect(o1.provider_store_id).not.toBe(o2.provider_store_id)
     expect(o1.client_id).not.toBe(o2.client_id)
   })
 
-  it('CAT-A-046: webhook handler queries store_mappings before falling back to env', async () => {
+  it('CAT-A-046: webhook handler queries integration_store_mappings for every event', async () => {
     const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
     const urlsQueried: string[] = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
@@ -541,19 +540,105 @@ describe('CAT-A-044..048: Store Mapping', () => {
     expect(storeMappingQuery).toContain('provider=eq.ubereats')
   })
 
-  it('CAT-A-047: unknown store falls back gracefully (no crash)', async () => {
+  // P0 — Fail-closed: unknown store must never route to another tenant
+  it('CAT-A-047: unknown store → no delivery_order created (fail closed)', async () => {
     const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
-    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+    const deliveryPostUrls: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, opts) => {
+      const url = input.toString()
+      if (url.includes('delivery_orders') && opts?.method === 'POST') deliveryPostUrls.push(url)
+      if (url.includes('integration_store_mappings')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-001', status: 'failed', correlation_id: 'c-001' }]), { status: 200 }))
+    })
+    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-ua-001', resource: { store: { store_id: 'UNKNOWN-STORE-P0' } } } })
+    const res = await POST(req)
+    expect(res.status).toBe(200) // ACK contract: always 200 to Uber
+    expect(deliveryPostUrls).toHaveLength(0) // no delivery_order persisted
+  })
+
+  it('CAT-A-047b: unknown store → DLQ quarantine entry created', async () => {
+    const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
+    const dlqInserts: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, opts) => {
+      const url = input.toString()
+      if (url.includes('integration_webhook_dlq') && opts?.method === 'POST') dlqInserts.push(url)
+      if (url.includes('integration_store_mappings')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-002', status: 'failed', correlation_id: 'c-002' }]), { status: 200 }))
+    })
+    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-ua-002', resource: { store: { store_id: 'UNKNOWN-STORE-P0' } } } })
+    await POST(req)
+    expect(dlqInserts.length).toBeGreaterThan(0)
+  })
+
+  it('CAT-A-047c: unknown store → audit log action=webhook.unmapped_store with provider_store_id', async () => {
+    const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
+    const auditBodies: Record<string, unknown>[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, opts) => {
+      const url = input.toString()
+      if (url.includes('integration_audit_log') && opts?.method === 'POST') {
+        auditBodies.push(JSON.parse(opts.body as string) as Record<string, unknown>)
+      }
+      if (url.includes('integration_store_mappings')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-003', status: 'failed', correlation_id: 'c-003' }]), { status: 200 }))
+    })
+    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-ua-003', resource: { store: { store_id: 'UNKNOWN-STORE-P0' } } } })
+    await POST(req)
+    const unmappedLog = auditBodies.find(b => b.action === 'webhook.unmapped_store')
+    expect(unmappedLog).toBeDefined()
+    const reqSummary = unmappedLog?.request_summary as Record<string, unknown>
+    expect(reqSummary?.provider_store_id).toBe('UNKNOWN-STORE-P0')
+  })
+
+  it('CAT-A-047d: unknown store → no other tenant client_id used in any DB write', async () => {
+    const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
+    const writeBodies: Record<string, unknown>[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, opts) => {
+      const url = input.toString()
+      if (opts?.method === 'POST' && opts.body) {
+        try { writeBodies.push(JSON.parse(opts.body as string) as Record<string, unknown>) } catch { /* ignore */ }
+      }
+      if (url.includes('integration_store_mappings')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-004', status: 'failed', correlation_id: 'c-004' }]), { status: 200 }))
+    })
+    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-ua-004', resource: { store: { store_id: 'UNKNOWN-STORE-P0' } } } })
+    await POST(req)
+    // None of the writes should carry a non-null client_id
+    const writesWithClientId = writeBodies.filter(b => b.client_id != null && b.client_id !== null)
+    expect(writesWithClientId).toHaveLength(0)
+  })
+
+  it('CAT-A-047e: valid mapping present → order processed with correct client_id (exactly once)', async () => {
+    const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
+    const deliveryPosts: Record<string, unknown>[] = []
+    let webhookEvtInserts = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, opts) => {
       const url = input.toString()
       if (url.includes('integration_store_mappings')) {
-        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 })) // no mapping
+        return Promise.resolve(new Response(JSON.stringify([{ client_id: 'client-verified' }]), { status: 200 }))
       }
-      return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-001', status: 'received', correlation_id: 'c-001' }]), { status: 200 }))
+      if (url.includes('integration_webhook_events') && opts?.method === 'POST') {
+        webhookEvtInserts++
+        return Promise.resolve(new Response(JSON.stringify([{ id: 'evt-005', status: 'received', correlation_id: 'c-005' }]), { status: 200 }))
+      }
+      if (url.includes('delivery_orders') && opts?.method === 'POST') {
+        deliveryPosts.push(JSON.parse(opts.body as string) as Record<string, unknown>)
+        return Promise.resolve(new Response(JSON.stringify([{ id: 'uber-ord-ua-005' }]), { status: 200 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
     })
-    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-001', resource: { store: { store_id: 'UNKNOWN-STORE' } } } })
+    const req = webhookRequest({ event_type: 'orders.notification', meta: { resource_id: 'ord-ua-005', resource: { store: { store_id: 'MAPPED-STORE' } } } })
     const res = await POST(req)
-    // Falls back to env or default client — doesn't crash
     expect(res.status).toBe(200)
+    expect(webhookEvtInserts).toBe(1) // dedup gate triggered exactly once
+    expect(deliveryPosts.some(p => p.client_id === 'client-verified')).toBe(true)
   })
 })
 

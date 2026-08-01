@@ -1,4 +1,13 @@
 /**
+ * DEPRECATED — Replaced by Integration Framework v1.
+ * New webhook endpoint: /api/integrations/uber-eats/webhook (Next.js App Router)
+ * Reasons for deprecation:
+ *   - Hardcodes client_id='amalay' (violates multi-tenant isolation)
+ *   - No HMAC verification, no deduplication, no DLQ, no audit log
+ *   - No correlation IDs
+ * Do not route new Uber Eats webhooks here. Keep for Rappi/Didi until those providers
+ * have their own integration framework adapters.
+ *
  * Delivery Worker — Receives webhooks from Uber Eats, Rappi, Didi Food
  * Saves orders to Supabase delivery_orders table
  * Sends notification to Telegram

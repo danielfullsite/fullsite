@@ -43,25 +43,81 @@ async function verifySignature(rawBody: string, sigHeader: string): Promise<bool
   return crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(rawBody))
 }
 
-// ─── Store → Client mapping (DB-first, env fallback) ─────────────────────────
+// ─── Store → Client mapping (DB-only, no fallback) ───────────────────────────
+// Returns null if the store_id has no row in integration_store_mappings.
+// Callers must quarantine the event — never fall back to another tenant's client_id.
 
-async function resolveClientId(storeId: string): Promise<string> {
-  if (storeId) {
-    const r = await fetch(
-      `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}&select=client_id&limit=1`,
-      { headers: sbHeaders() }
-    ).catch(() => null)
-    if (r?.ok) {
-      const rows = (await r.json()) as Array<{ client_id: string }>
-      if (rows[0]?.client_id) return rows[0].client_id
-    }
-  }
-  // Env-var fallback for backwards compat
-  try {
-    const map = JSON.parse(process.env.UBER_STORE_CLIENT_MAP || '{}') as Record<string, string>
-    if (storeId && map[storeId]) return map[storeId]
-  } catch { /* invalid JSON */ }
-  return process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || 'amalay'
+async function resolveClientId(storeId: string): Promise<string | null> {
+  if (!storeId) return null
+  const r = await fetch(
+    `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}&select=client_id&limit=1`,
+    { headers: sbHeaders() }
+  ).catch(() => null)
+  if (!r?.ok) return null
+  const rows = (await r.json()) as Array<{ client_id: string }>
+  return rows[0]?.client_id ?? null
+}
+
+// ─── Quarantine — unmapped store ─────────────────────────────────────────────
+// Called when provider_store_id has no integration_store_mappings entry.
+// Inserts webhook_events (failed) + DLQ + audit log, then ACKs 200 to Uber.
+// UNIQUE(provider, provider_event_id) deduplicates Uber retries automatically.
+
+async function quarantineUnmappedStore(
+  storeId: string,
+  providerEventId: string,
+  eventType: string,
+  payload: unknown,
+  correlationId: string
+): Promise<void> {
+  const failureReason = `unmapped_store: provider_store_id="${storeId}" has no entry in integration_store_mappings`
+
+  const r = await fetch(`${SB_URL()}/rest/v1/integration_webhook_events`, {
+    method: 'POST',
+    headers: {
+      ...sbHeaders(),
+      Prefer: 'return=representation,resolution=ignore-duplicates',
+    },
+    body: JSON.stringify({
+      provider: 'ubereats',
+      provider_event_id: providerEventId,
+      event_type: eventType,
+      correlation_id: correlationId,
+      store_id: storeId,
+      client_id: null,
+      payload,
+      status: 'failed',
+      last_error: failureReason,
+      attempts: 0,
+    }),
+  }).catch(() => null)
+
+  const rows = r?.ok ? (await r.json()) as WebhookEventRow[] : []
+  const eventId = rows[0]?.id ?? null
+
+  await fetch(`${SB_URL()}/rest/v1/integration_webhook_dlq`, {
+    method: 'POST',
+    headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      webhook_event_id: eventId,
+      provider: 'ubereats',
+      event_type: eventType,
+      client_id: null,
+      payload,
+      failure_reason: failureReason,
+    }),
+  }).catch(() => {})
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: null,
+    correlation_id: correlationId,
+    action: 'webhook.unmapped_store',
+    request: { provider_store_id: storeId, event_type: eventType, provider_event_id: providerEventId },
+    response: { quarantined: true },
+  })
+
+  console.warn(`[uber-webhook-v2] UNMAPPED_STORE quarantined store="${storeId}" event="${providerEventId}" correlation=${correlationId}`)
 }
 
 // ─── Webhook event dedup ─────────────────────────────────────────────────────
@@ -246,8 +302,13 @@ export async function POST(request: NextRequest) {
   // Generate a stable event ID for dedup: Uber sends event_id in some versions
   const providerEventId = (body.event_id ?? body.uuid ?? `${eventType}:${orderId}`) as string
 
-  // Step 3 — Resolve client
+  // Step 3 — Resolve client (fail closed — no fallback to any tenant)
   const clientId = await resolveClientId(storeId)
+  if (!clientId) {
+    const quarantineCorrelationId = crypto.randomUUID()
+    await quarantineUnmappedStore(storeId, providerEventId, eventType, body, quarantineCorrelationId)
+    return new NextResponse(null, { status: 200 })
+  }
 
   // Step 4 — Dedup
   const { row: eventRow, isDuplicate } = await upsertWebhookEvent(

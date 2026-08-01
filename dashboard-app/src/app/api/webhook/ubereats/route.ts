@@ -1,11 +1,9 @@
-// Uber Eats Webhook — receives order notifications from Uber Eats Marketplace API.
-// Uber sends POST to this URL when:
-// - New order placed (orders.notification)
-// - Order cancelled by customer
-// - Order status updates
+// DEPRECATED — Replaced by /api/integrations/uber-eats/webhook/route.ts (Integration Framework v1).
+// This route lacks: deduplication, DLQ, correlation IDs, audit log, multi-tenant mapping.
+// It must not receive new Uber traffic. Update the webhook URL in Uber Developer Console to
+// the new route before decommissioning. Retained only during transition.
 //
-// The webhook creates/updates delivery_orders in Supabase and the POS/kitchen
-// picks them up automatically (existing polling in pos/page.tsx and cocina/page.tsx).
+// Uber Eats Webhook — receives order notifications from Uber Eats Marketplace API.
 
 import { type NextRequest, NextResponse } from 'next/server'
 
@@ -104,15 +102,25 @@ export async function POST(request: NextRequest) {
 
     console.log(`[uber-webhook] ${eventType} order=${orderId}`)
 
-    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    // Derive client_id from store_id mapping or env default
-    // For multi-tenant: UBER_STORE_CLIENT_MAP='{"store123":"client_a","store456":"client_b"}'
+    // Resolve client_id from integration_store_mappings — no fallback (fail closed).
     const storeId = body.meta?.resource?.store?.store_id || body.store_id || ''
-    let clientId = process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || ''
-    try {
-      const storeMap = JSON.parse(process.env.UBER_STORE_CLIENT_MAP || '{}')
-      if (storeMap[storeId]) clientId = storeMap[storeId]
-    } catch { /* invalid JSON, use default */ }
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    let clientId: string | null = null
+    if (storeId) {
+      const mappingRes = await fetch(
+        `${sbUrl}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}&select=client_id&limit=1`,
+        { headers: sbHeaders() }
+      ).catch(() => null)
+      if (mappingRes?.ok) {
+        const rows = await mappingRes.json() as Array<{ client_id: string }>
+        clientId = rows[0]?.client_id ?? null
+      }
+    }
+    if (!clientId) {
+      // Unknown store — ACK to Uber but do not persist (no fallback to any tenant)
+      console.warn(`[uber-webhook-legacy] UNMAPPED_STORE store="${storeId}" event="${eventType}" — dropping silently. Migrate to /api/integrations/uber-eats/webhook.`)
+      return new NextResponse(null, { status: 200 })
+    }
 
     // Handle different event types
     if (eventType === 'orders.notification' || eventType === 'orders.created') {
