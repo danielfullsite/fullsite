@@ -46,26 +46,14 @@ export async function getUberAccessToken(scope = 'eats.order'): Promise<string> 
     throw new Error('[uber-oauth] UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
   }
 
-  const authHost = getLoginUrl()
-  // TEMPORARY DIAGNOSTIC — host + status + scopes returned, never the token
-  console.log(`[uber-oauth] token_request host=${authHost} scope=${scope}`)
-
-  const r = await fetch(authHost, {
+  const r = await fetch(getLoginUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials', scope }),
   })
-
-  // TEMPORARY DIAGNOSTIC
-  console.log(`[uber-oauth] token_response status=${r.status} ok=${r.ok}`)
-
   if (!r.ok) throw new Error(`[uber-oauth] token request failed ${r.status}: ${await r.text()}`)
 
   const data = (await r.json()) as { access_token: string; expires_in: number; scope?: string }
-
-  // TEMPORARY DIAGNOSTIC — scopes returned by Uber, never the token value
-  console.log(`[uber-oauth] token_scopes scopes_returned=${data.scope ?? 'not_returned'} expires_in=${data.expires_in}`)
-
   tokenCache.set(scope, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }

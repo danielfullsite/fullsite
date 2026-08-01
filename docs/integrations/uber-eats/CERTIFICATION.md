@@ -10,11 +10,11 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | DB migration staging | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
 | Integration Framework código | ✓ En `main` local — pendiente push a origin |
 | **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
-| Categoría B (sandbox con Uber real) | BLOQUEADA — requiere B-1..B-5 |
-| Deployment público | BLOCKER B-1 — ~28 commits locales sin pushear |
-| Env vars Vercel (UBER_*) | BLOCKER B-2 |
-| Webhook registrado en Uber | BLOCKER B-4 — depende de B-1 |
-| Store mapping test store | BLOCKER B-5 — depende de B-3 |
+| **Categoría B** (sandbox con Uber real) | **DESBLOQUEADA — B-1..B-5 COMPLETOS** |
+| Deployment público | ✓ COMPLETO — commit `bbf6bea`, CI green |
+| Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
+| Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
+| Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `sandbox-client` |
 
 ## Categoría A — CERRADA
 
@@ -150,10 +150,10 @@ VALUES ('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client');
 - [x] USL implementado: `/api/integrations/uber-eats/auth/initiate` + `/auth/callback`
 - [x] **Categoría A cerrada: 67/67 tests PASS — commits `15f5523` + `efbc2dc`**
 - [x] **B-1** Push `main` → Vercel deploy — COMPLETO (commit `bbf6bea`, CI green, webhook 200)
-- [ ] **B-2** Vars en Vercel: `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`, `UBER_WEBHOOK_SECRET` (Signing Key BASIC_HMAC), `UBER_ENV=sandbox`, `UBER_REDIRECT_URI` — redeploy incluido
-- [ ] **B-3** `provider_store_id` del test store obtenido de Uber Developer Console
-- [ ] **B-4** Webhook URL actualizada a v2 en Uber (BASIC_HMAC + Signing Key sin cambio); Redirect URI configurada — ejecutable en paralelo con B-2
-- [ ] **B-5** Store mapping insertado: `('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client')`
+- [x] **B-2** Vars en Vercel: `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`, `UBER_WEBHOOK_SECRET` (Signing Key BASIC_HMAC), `UBER_ENV=sandbox`, `UBER_REDIRECT_URI` — redeploy incluido
+- [x] **B-3** `provider_store_id` obtenido vía `GET /api/integrations/uber-eats/stores` — `633b57d4-237a-5a32-b249-7ceb795f1d35` (Amalay Coffee & Market) — COMPLETO
+- [x] **B-4** Webhook URL actualizada a v2 en Uber (BASIC_HMAC + Signing Key sin cambio); Redirect URI configurada — COMPLETO
+- [x] **B-5** Mapping insertado en staging: `('ubereats', '633b57d4-237a-5a32-b249-7ceb795f1d35', 'sandbox-client')` — COMPLETO (2026-08-01T08:43:57Z)
 
 ## Categoría B — Tests con Uber real (requiere B-1..B-5)
 
