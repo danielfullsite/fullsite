@@ -117,8 +117,12 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       // Start print retry loop — processes any queued print jobs from previous sessions
       import('@/lib/print-queue').then(m => m.startRetryLoop()).catch(() => {})
       // Load client config for receipts, IVA, branding (cached singleton)
-      import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(cfg => {
+      import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(async cfg => {
         if (cfg?.logoUrl) setLogoSrc(cfg.logoUrl)
+        if (cfg?.ivaRate !== undefined) {
+          const { setIvaRate } = await import('@/lib/pos-constants')
+          setIvaRate(cfg.ivaRate)
+        }
       }).catch(() => {})
       // Load operational settings — idle timeout + station routing override
       const clientId = _cid()
@@ -316,7 +320,15 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         if (staffRes.ok) {
           try {
             const staffData = await staffRes.json()
-            if (staffData.staff) member = staffData.staff
+            if (staffData.staff) {
+              member = staffData.staff
+              // Refresh offline cache so it survives a future storage-cleared offline session
+              try {
+                const fpMap = JSON.parse(localStorage.getItem('pos_fingerprint_staff') || '{}')
+                fpMap[data.staffId] = member
+                localStorage.setItem('pos_fingerprint_staff', JSON.stringify(fpMap))
+              } catch {}
+            }
           } catch {}
         }
         if (!member) {

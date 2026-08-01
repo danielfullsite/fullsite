@@ -142,7 +142,7 @@ Scores reflect multi-tenant deployment readiness, not feature completeness. A mo
 
 | Module | Score | Blocking Issues | Maturity Level | Last Updated |
 |---|---|---|---|---|
-| POS Core (orders, tables, caja) | **98%** | AMALAY category slugs in pos-constants.ts | L4 | 2026-07-31 |
+| POS Core (orders, tables, caja) | **99%** | AMALAY category slugs in pos-constants.ts | L4 | 2026-07-31 |
 | Offline Engine (IDB, sync, outbox) | **93%** | KDS sync CODE ONLY — pending smoke test | L4 | 2026-07-31 |
 | KDS (kitchen display, routing) | **91%** | AMALAY station routing as default | L3 | 2026-07-31 |
 | Staff & Auth (PIN, fingerprint, roles) | **88%** | Hardcoded mesero fallback in client-config.ts | L3 | 2026-07-31 |
@@ -639,7 +639,7 @@ The motor operativo gets certified before the control plane that will manage it.
 
 | Priority | Initiative | First Milestone | Unlocks |
 |---|---|---|---|
-| **P0** | Operational Certification Suite — close P2.5.6 + remaining modules | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
+| **P0** | Operational Certification Suite — P2.5.4 ✓ P2.5.5 ✓ P2.5.6 ✓ — remaining: Pagos, Print, Offline sync smoke test | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
 | **P1** | Golden Skeleton execution — eliminate all AMALAY debt | Zero hardcodes. D-01 through D-09 resolved. Minute 0 functional for any client. | Clonable product |
 | **P2** | FEOS Core — Organizations, Restaurants, Users, Roles, Permissions | Org → restaurant → user → role flow. ZHO-01/02/03/04 resolved. Multi-tenant auth without hardcodes. | Control Plane |
 | **P3** | Demo 24/7 — provision a restaurant fully from FEOS, zero code | `sandbox.app.fullsite.mx` operational. VANTARA + NÓMADA-MINI live. No manual SQL. | Client demos without AMALAY |
