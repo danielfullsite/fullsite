@@ -200,9 +200,10 @@ La OCS certifica módulos del POS de forma independiente. El cierre de todos los
 **Superficies:** `pos/page.tsx` (5,714 líneas) · `pos/plano/page.tsx` · `pos/mesas/page.tsx`
 **Criterios:** 9/9 PASS (OC-01 a OC-09)
 **Fix incluido:** GAP-A — `handleCancelItem` reemplazado de raw PATCH a `/api/pos/cancel-item` (OCC + APP_API queue)
+**Fix incluido:** ORD-GAP-01 — `setIvaRate(cfg.ivaRate)` wired en layout.tsx bootstrap (229/229 tests PASS)
 **Gaps tracked:** GAP-C (addOrderItems offline, MED, P2 backlog) · GAP-E (cambiar mesero raw PATCH, LOW, P3 backlog)
 **Gaps deferred:** GAP-D (FLOOR_TABLES hardcoded — Golden Skeleton)
-**Artifact:** https://claude.ai/code/artifact/7e88503c-3277-4863-b9a3-695d473ebfe0
+**Referencia:** `docs/certifications/OCS-P2.5.7-ORDERS.md`
 
 ---
 

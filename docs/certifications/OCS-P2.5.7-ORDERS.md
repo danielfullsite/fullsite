@@ -1,4 +1,4 @@
-# OCS P2.5.6 — Órdenes / Flujo Principal: Certificación
+# OCS P2.5.7 — Órdenes / Flujo Principal: Certificación
 
 > **Status:** CERTIFIED — 2026-07-31  
 > **Suite:** Operational Certification Suite v1  
@@ -131,10 +131,11 @@ import('@/lib/pos-config').then(m => m.getPosClientConfig()).then(async cfg => {
 |---|---|---|---|
 | P2.5.4 — Caja | CERTIFIED | CAJ-GAP-01..04 resueltos | 2026-07-31 |
 | P2.5.5 — KDS | CERTIFIED | KDS-GAP-01..04 resueltos | 2026-07-31 |
-| P2.5.6 — Órdenes | CERTIFIED | ORD-GAP-01 resuelto | 2026-07-31 |
+| P2.5.6 — Impresión | CERTIFIED | PRN-GAP-01..03 resueltos | 2026-07-31 |
+| P2.5.7 — Órdenes | CERTIFIED | ORD-GAP-01 resuelto | 2026-07-31 |
 
 ---
 
 ## Siguiente módulo
 
-**P2.5.7 — Pagos (cobro, métodos, propinas, MP Point)**
+**P2.5.8 — Pagos (cobro, métodos, propinas, MP Point)**

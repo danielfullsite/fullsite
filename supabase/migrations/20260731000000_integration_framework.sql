@@ -1,14 +1,31 @@
 -- Integration Framework — tables for Uber Eats and future providers.
 -- Apply via: supabase db push OR Supabase Dashboard → SQL Editor
+--
+-- ROLLBACK (execute in dependency order):
+--   ALTER TABLE delivery_orders DROP COLUMN IF EXISTS webhook_event_id;
+--   DROP TABLE IF EXISTS integration_webhook_dlq;
+--   DROP TABLE IF EXISTS integration_audit_log;
+--   DROP TABLE IF EXISTS integration_webhook_events;
+--   DROP TABLE IF EXISTS integration_store_mappings;
+--   DROP TABLE IF EXISTS integration_providers;
 
 -- ─── Provider accounts (OAuth credentials per client + provider) ─────────────
+-- IMPORTANT: oauth_client_secret_enc and access_token_enc are named _enc for
+-- future use but are NOT currently encrypted at rest. Today credentials live in
+-- environment variables (UBER_CLIENT_ID, UBER_CLIENT_SECRET etc.) and this table
+-- exists to support multi-tenant credential storage in a future phase.
+-- Do NOT store real secrets here until an encryption layer is in place.
+--
+-- provider_version: tracks which adapter version is active for each integration.
+-- Increment when a breaking change is made to the adapter (e.g. "1.0.0" → "2.0.0").
 CREATE TABLE IF NOT EXISTS integration_providers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id text NOT NULL,
   provider text NOT NULL CHECK (provider IN ('ubereats', 'rappi', 'didi', 'clip', 'mercadopago')),
+  provider_version text NOT NULL DEFAULT '1.0.0',
   provider_account_id text,
   oauth_client_id text,
-  oauth_client_secret_enc text,          -- stored encrypted; never query raw
+  oauth_client_secret_enc text,
   access_token_enc text,
   token_expires_at timestamptz,
   scopes text[] DEFAULT '{}',
@@ -97,6 +114,20 @@ BEGIN
   END IF;
 END $$;
 
+-- ─── TTL policy (implement as scheduled job — not automated here) ────────────
+-- These tables grow without bound. Recommended retention when volume justifies it:
+--
+--   integration_webhook_events (processed events only — keep failed/dlq indefinitely):
+--     DELETE FROM integration_webhook_events
+--       WHERE status = 'processed' AND created_at < now() - interval '30 days';
+--
+--   integration_audit_log:
+--     DELETE FROM integration_audit_log
+--       WHERE created_at < now() - interval '90 days';
+--
+-- Run as a Supabase scheduled function or GitHub Actions cron.
+-- Do NOT delete 'failed' or 'dlq' rows automatically — they require manual review.
+
 -- ─── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_iwh_events_status
   ON integration_webhook_events (provider, status, created_at);
@@ -131,13 +162,10 @@ CREATE POLICY "service_all" ON integration_webhook_dlq
 CREATE POLICY "service_all" ON integration_audit_log
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Anon can insert webhook events (webhook handler uses anon key in some configs)
-CREATE POLICY "anon_insert_webhook_events" ON integration_webhook_events
-  FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "anon_insert_audit_log" ON integration_audit_log
-  FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "anon_insert_dlq" ON integration_webhook_dlq
-  FOR INSERT TO anon WITH CHECK (true);
--- Anon needs to read store_mappings to resolve client_id
+-- Anon read on store_mappings — allows the dashboard UI to resolve store names
+-- without service role. Webhook handler uses service_role (bypasses RLS).
+-- No anon INSERT on any integration table: all writes go through server-side
+-- routes that require SUPABASE_SERVICE_KEY. This prevents external actors from
+-- contaminating integration_webhook_events with fake event IDs.
 CREATE POLICY "anon_read_store_mappings" ON integration_store_mappings
   FOR SELECT TO anon USING (true);
