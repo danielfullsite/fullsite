@@ -360,10 +360,14 @@ async function handleNewOrder(
   correlationId: string
 ): Promise<void> {
   // Get full order details from Uber (required before accept per certification)
-  const detailsResult = await getOrderDetails(orderId, correlationId)
-  const orderPayload = detailsResult.ok && detailsResult.order
-    ? detailsResult.order as Record<string, unknown>
-    : rawPayload as Record<string, unknown>
+  const detailsResult = await getOrderDetails(orderId, correlationId, storeId)
+  // Fallback: Uber sends the order object inside meta.resource of the webhook envelope.
+  // normalizeUberOrder expects a direct order object — extract it when the API call fails.
+  const envelope = rawPayload as Record<string, unknown>
+  const metaResource = ((envelope.meta as Record<string, unknown>)?.resource) as Record<string, unknown> | undefined
+  const orderPayload = (detailsResult.ok && detailsResult.order
+    ? detailsResult.order
+    : metaResource ?? rawPayload) as Record<string, unknown>
 
   // Normalize
   const canonicalOrder = normalizeUberOrder(orderPayload, storeId, clientId, correlationId)
@@ -377,7 +381,7 @@ async function handleNewOrder(
   if (!persistResult.was_duplicate) {
     console.log(`[uber-webhook-v2] Order ${orderId} persisted. Accepting...`)
     // Accept — Type A operation: Uber confirms externally
-    const acceptResult = await acceptOrder(orderId, correlationId)
+    const acceptResult = await acceptOrder(orderId, correlationId, 20, storeId)
     if (!acceptResult.ok) {
       // Log accept failure but don't throw — order is in DB, accept can be retried from delivery page
       console.warn(`[uber-webhook-v2] Accept failed for ${orderId}: ${acceptResult.error}`)

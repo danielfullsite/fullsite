@@ -11,12 +11,13 @@ export const ADAPTER_VERSION = '1.0.0'
 
 export async function getOrderDetails(
   orderId: string,
-  correlationId: string
+  correlationId: string,
+  storeId?: string
 ): Promise<{ ok: boolean; order?: unknown; error?: string }> {
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET' }),
+      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET', storeId }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -35,7 +36,8 @@ export async function getOrderDetails(
 export async function acceptOrder(
   orderId: string,
   correlationId: string,
-  minutesToReady = 20
+  minutesToReady = 20,
+  storeId?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
   try {
@@ -43,6 +45,7 @@ export async function acceptOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/accept_pos_order`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Accepted by Fullsite POS', minutes_to_ready: minutesToReady }),
+        storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -57,7 +60,8 @@ export async function acceptOrder(
 export async function denyOrder(
   orderId: string,
   reason: UberDenyReason,
-  correlationId: string
+  correlationId: string,
+  storeId?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
   try {
@@ -65,6 +69,7 @@ export async function denyOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/deny_pos_order`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
+        storeId,
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -79,7 +84,8 @@ export async function denyOrder(
 export async function cancelOrder(
   orderId: string,
   reason: UberCancelReason,
-  correlationId: string
+  correlationId: string,
+  storeId?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
   try {
@@ -87,6 +93,7 @@ export async function cancelOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
+        storeId,
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -100,7 +107,8 @@ export async function cancelOrder(
 
 export async function markOrderReady(
   orderId: string,
-  correlationId: string
+  correlationId: string,
+  storeId?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const t0 = Date.now()
   try {
@@ -108,6 +116,7 @@ export async function markOrderReady(
       () => uberFetch(`/v1/eats/orders/${orderId}/ready_for_pickup`, {
         method: 'POST',
         body: JSON.stringify({}),
+        storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
