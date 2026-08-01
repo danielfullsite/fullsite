@@ -633,20 +633,32 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 
 ## Execution Priority
 
-**Documentation phase is closed.** The next releases execute in this order. No P(n+1) starts until P(n) has at least one milestone in production with evidence of clonability.
+**Documentation phase is closed. Implementation sets the pace.**
+
+The motor operativo gets certified before the control plane that will manage it. No P(n+1) starts until P(n) has at least one milestone in production with evidence of clonability.
 
 | Priority | Initiative | First Milestone | Unlocks |
 |---|---|---|---|
-| **P0** | FEOS Core — Organization, Restaurants, Users, Roles | Multi-tenant auth without hardcodes. ZHO-01/02/03 resolved. | Every subsequent item |
-| **P1** | Golden Dashboard Skeleton | Zero AMALAY references. Dashboard clonable to second client. | Demo 24/7 |
-| **P2** | Golden FEOS Skeleton | Canonical doc + first FEOS module live (Restaurant Manager) | Control Center |
-| **P3** | Demo 24/7 clonable | `sandbox.app.fullsite.mx` fully operational for VANTARA + NÓMADA-MINI | Client demos without AMALAY |
-| **P4** | Control Center (`app.fullsite.mx`) | Org → restaurants → users → permissions flow, end-to-end | Multi-client self-service |
-| **P5** | Integration Platform | Uber/Rappi/Didi under common adapter architecture — one integration pattern for all | Revenue diversification |
-| **P6** | AI Platform | All 26+ agents manageable from FEOS Agent Manager. Enable/disable/calibrate per restaurant. | Agent-as-a-service |
-| **P7** | Digital Twin + Self-Healing | FEOS Observability Hub live. `feos_restaurant_state` populated. T1 auto-heal for printers + KDS. | Autonomous operations |
+| **P0** | Operational Certification Suite — close P2.5.6 + remaining modules | Core POS certified end-to-end: orders, offline, KDS, print, caja | Confidence to clone |
+| **P1** | Golden Skeleton execution — eliminate all AMALAY debt | Zero hardcodes. D-01 through D-09 resolved. Minute 0 functional for any client. | Clonable product |
+| **P2** | FEOS Core — Organizations, Restaurants, Users, Roles, Permissions | Org → restaurant → user → role flow. ZHO-01/02/03/04 resolved. Multi-tenant auth without hardcodes. | Control Plane |
+| **P3** | Demo 24/7 — provision a restaurant fully from FEOS, zero code | `sandbox.app.fullsite.mx` operational. VANTARA + NÓMADA-MINI live. No manual SQL. | Client demos without AMALAY |
+| **P4** | FEOS module expansion | Terminal Manager, Kitchen Manager, Feature Flags, Observability Hub, Auto-Certification, Agent Manager | ZHO count <10 |
+| **P5** | AI Ops — Digital Twin, Self-Healing, Auto Recovery | `feos_restaurant_state` live. T1 auto-heal for printers + KDS. 24/7 autonomous operation. | Autonomous platform |
+| **P6** | Integration Platform | Uber/Rappi/Didi/payments/invoicing under one common adapter architecture | Revenue diversification |
 
-**Execution Mode (permanent rule):** Every new document, ADR, or architectural decision ends in implementation. Ideas enter the Platform Lifecycle pipeline — no document that doesn't map to a specific Implementation milestone is merged into `docs/`.
+### Pre-Implementation Gate
+
+Before implementing any significant feature, answer these 4 questions. If any answer indicates AMALAY-specific or manual, redesign before implementing.
+
+| # | Question | If "No"... |
+|---|---|---|
+| I-01 | ¿Esto pertenece al producto o es específico de AMALAY? | No implementar — o generalizar primero |
+| I-02 | ¿Puede configurarse desde FEOS en lugar de quedar hardcodeado? | Diseñar el punto de configuración antes de escribir el código |
+| I-03 | ¿Puede automatizarlo un agente en lugar de requerir una persona? | Documentar en ZHO y diseñar el path de automatización |
+| I-04 | ¿Será reutilizable por cualquier restaurante nuevo sin modificar código? | Replantear el diseño — no es plataforma, es deuda |
+
+**Execution Mode (permanent rule):** Every new document, ADR, or architectural decision ends in implementation. Ideas enter the Platform Lifecycle pipeline — no document that doesn't map to a specific Implementation milestone is merged into `docs/`. Each implementation ends with its certification, consolidation in `docs/`, and commit.
 
 ---
 
