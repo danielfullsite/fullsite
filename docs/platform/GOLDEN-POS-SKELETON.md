@@ -484,14 +484,18 @@ Specific locations where AMALAY-specific code exists in the platform. Each item 
 | D-06 | `lib/pos-constants.ts` BAKERY_CATEGORIES | Hardcode | Bakery category slugs for AMALAY's bakery section | Convert to feature flag `pos.bakery_station` with configurable categories | P1 |
 | D-07 | `app/pos/panaderia/page.tsx` | AMALAY route | Bakery production display — AMALAY only | Add `if (!config.features.pos?.bakery_station) redirect('/pos')` | P1 |
 | D-08 | `app/pos/inventario-market/page.tsx` | AMALAY route | Retail market inventory — AMALAY only | Add `if (!config.features.posTienda) redirect('/pos')` | P1 |
-| D-09 | 17 SQL tables | SQL default | `client_id TEXT DEFAULT 'amalay'` | Apply `004_remove_amalay_defaults.sql`. Verify all INSERTs explicit. | P0 |
-| D-10 | `cloudflare/delivery-worker/src/index.ts:60,91,122` | Hardcode | `client_id: 'amalay'` en los 3 parsers de webhook (Uber, Rappi, Didi) | Extraer `client_id` del contexto del webhook (header `X-Client-Id` o URL path). | P0 |
+| D-09 | 17 SQL tables + `reservaciones` | SQL default | `client_id TEXT DEFAULT 'amalay'` (17 POS tables + tabla `reservaciones`) | Apply `004_remove_amalay_defaults.sql`. Agregar `reservaciones` al script. Verify all INSERTs explicit. | P0 |
+| D-10 | `cloudflare/delivery-worker/src/index.ts:60,91,122` | Hardcode | `client_id: 'amalay'` en los 3 parsers de webhook (Uber, Rappi, Didi) | Resolución de tenant por lookup DB: `provider_store_id → integration_store_mappings → client_id`. Fail-closed si no existe mapping: DLQ + audit log con `correlation_id`. Nunca fallback a AMALAY ni a ningún otro tenant. | P0 |
 | D-11 | `dashboard-app/src/app/api/chat/route.ts:765` + `api/voice/route.ts:392` | Hardcode | Lista de meseros AMALAY hardcodeada en contexto de IA | Leer desde `pos_staff WHERE client_id = current_client` en tiempo real. | P0 |
 | D-12 | `agents/reviews-manager/worker/src/lib/groq-api.ts:32,46,50` | Hardcode | `hola@cafeamalay.com` hardcodeado en lógica de escalación de reseñas | Leer email de escalación desde `clients.support_email` o config del cliente. | P0 |
 | D-13 | `electron-kds/main.js:57` | Hardcode | URL de Supabase auth hardcodeada (`qjiomlvudfmzuvqvhwpk`) | Leer desde variable de entorno `SUPABASE_URL` — fallo explícito si ausente. | P1 |
 | D-14 | `dashboard-app/src/lib/roles.ts:28` | Hardcode | `'ramonfaur.daniel@gmail.com' → 'dueño'` fallback de rol | Eliminar. Roles vienen exclusivamente de `client_users.role`. | P1 |
 | D-15 | `cloudflare/orquestador-worker/src/lib/claude-api.ts:5-39` | Hardcode | SYSTEM_PROMPT con contexto de negocio AMALAY (Mónica, Plaza Duendes, horarios) | Cargar contexto desde `clients` table en runtime. Prompt genérico + datos del cliente. | P1 |
 | D-16 | `.github/scripts/client_config.py:21` (y 9+ scripts Python) | Default | `get_client()` retorna `'amalay'` si `CLIENT_ID` no está en env | Eliminar default. Requerir `CLIENT_ID` env var. Fallo explícito si ausente. | P1 |
+| D-17 | `api/integrations/uber-eats/webhook/route.ts:64`, `auth/initiate/route.ts:24`, `auth/callback/route.ts:121` | Default / Fallback silencioso | Tres rutas Next.js de Uber Eats defaultean a `'amalay'`. La de callback es crítica: tokens OAuth se guardan bajo tenant equivocado si el state falla. | Requerir `NEXT_PUBLIC_DEFAULT_CLIENT_ID` explícito; throw en callback si state es inválido, sin fallback. | P1 |
+| D-18 | `dashboard-app/src/app/api/agents/cron/route.ts:22` | Default | `process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID \|\| 'amalay'` — cron de agentes IA corre para AMALAY si env var ausente | Requerir env var. Retornar 400 si ausente — nunca defaultear a un cliente específico. | P1 |
+| D-19 | `dashboard-app/src/app/api/backup/route.ts:8` | Hardcode | `BACKUP_ADMINS = Set(['ramonfaur.daniel@gmail.com', 'monica@fullsite.mx'])` — endpoint de backup solo accesible por 2 personas | Leer admins desde `client_users WHERE role = 'dueño' AND client_id = current_client`. | P1 |
+| D-20 | Schema SQL: tabla `amalay_reservaciones` | Schema debt | Tabla dedicada AMALAY sin `client_id` — existe en migraciones aunque el código ya usa `reservaciones` genérica | Eliminar tabla + triggers + vistas + constraints de `amalay_reservaciones` en nueva migración. | P1 |
 
 **SQL migration:**
 
@@ -639,8 +643,12 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 | 12 | Eliminar email-to-role fallback (D-14) | `lib/roles.ts` | 30min | Auth sin datos AMALAY |
 | 13 | Orquestador SYSTEM_PROMPT dinámico (D-15) | `cloudflare/orquestador-worker/src/lib/claude-api.ts` | 3h | War Room multi-tenant |
 | 14 | Python scripts: CLIENT_ID requerido (D-16) | `.github/scripts/client_config.py` + 8 scripts | 2h | Automation sin default AMALAY |
-| 15 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
-| 16 | Smoke test con VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
+| 15 | Uber Eats routes: requerir env var, throw en callback (D-17) | `api/integrations/uber-eats/webhook`, `auth/initiate`, `auth/callback` | 1h | OAuth tokens al tenant correcto |
+| 16 | Cron route: requerir env var (D-18) | `api/agents/cron/route.ts` | 30min | Agentes IA corren para cliente correcto |
+| 17 | Backup admins desde DB (D-19) | `api/backup/route.ts` | 1h | Export de backup accesible para cualquier dueño |
+| 18 | Eliminar tabla amalay_reservaciones (D-20) | Nueva migración SQL | 1h | Schema limpio, sin tablas AMALAY dedicadas |
+| 19 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
+| 20 | Smoke test con VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
 
 ---
 
