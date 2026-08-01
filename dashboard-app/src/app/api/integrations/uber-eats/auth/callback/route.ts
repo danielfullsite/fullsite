@@ -43,7 +43,7 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
   scope: string
 }): Promise<void> {
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-  const r = await fetch(`${SB_URL()}/rest/v1/integration_providers`, {
+  const r = await fetch(`${SB_URL()}/rest/v1/integration_providers?on_conflict=client_id,provider`, {
     method: 'POST',
     headers: {
       ...sbHeaders(),
@@ -70,7 +70,7 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
 }
 
 async function upsertStoreMapping(clientId: string, storeId: string): Promise<void> {
-  const r = await fetch(`${SB_URL()}/rest/v1/integration_store_mappings`, {
+  const r = await fetch(`${SB_URL()}/rest/v1/integration_store_mappings?on_conflict=provider,provider_store_id`, {
     method: 'POST',
     headers: {
       ...sbHeaders(),
