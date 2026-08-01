@@ -17,6 +17,10 @@ function sbHeaders() {
 const STUCK_THRESHOLD_MINUTES = 30
 
 export async function POST(request: NextRequest) {
+  if (!process.env.SUPABASE_SERVICE_KEY) {
+    return NextResponse.json({ ok: false, error: 'SUPABASE_SERVICE_KEY not configured' }, { status: 503 })
+  }
+
   const correlationId = crypto.randomUUID()
   const { client_id } = await request.json().catch(() => ({})) as { client_id?: string }
 

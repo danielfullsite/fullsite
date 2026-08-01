@@ -203,12 +203,18 @@ async function persistOrder(
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  // Step 1 — HMAC verification
+  // Step 0 — Fail fast on missing required secrets
   const webhookSecret = process.env.UBER_WEBHOOK_SECRET
   if (!webhookSecret) {
     console.error('[uber-webhook-v2] UBER_WEBHOOK_SECRET not configured')
     return new NextResponse(null, { status: 503 })
   }
+  if (!process.env.SUPABASE_SERVICE_KEY) {
+    console.error('[uber-webhook-v2] SUPABASE_SERVICE_KEY not configured')
+    return new NextResponse(null, { status: 503 })
+  }
+
+  // Step 1 — HMAC verification
 
   const rawBody = await request.text()
   const sig = request.headers.get('x-uber-signature') ?? ''
