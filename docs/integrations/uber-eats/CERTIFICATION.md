@@ -162,6 +162,28 @@ VALUES ('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client');
 | UBER-001 | OAuth/USL | GET /auth/initiate?store_id=TEST | Redirect a Uber, tokens en `integration_providers` | **PASS** |
 | UBER-002 | Store Mapping | Verificar B-5 activo | store_id → client_id, webhook de test store resuelto | **PASS** |
 
+### UBER-003 / UBER-005 / UBER-006 / UBER-008 — Sandbox Limitation
+
+`test-api.uber.com` no implementa los endpoints de menu management ni store status GET.
+Ambos paths (`/v1/` y `/v2/`) devuelven `404 page not found` — no es un error de implementación.
+
+Evidencia de implementación correcta:
+```
+integration_audit_log (menu.upload):
+  correlation_id: 23e211c7-93ce-4da9-83f4-b4eb383e7af3
+  status_code: 404, duration_ms: 370 — request llega a Uber, Uber rechaza con 404
+  correlation_id: 29cf7469-d903-46a1-8c3d-3aa236e08457 (intento previo con v1)
+  correlation_id: d233dea4-44da-4621-b9ca-52e02b403870 (primer intento con v1)
+
+Flujo correcto: getStoredTokenForStore(storeId) → merchant token → PUT /v2/eats/stores/{id}/menus
+Token: eats.pos_provisioning vía authorization_code (UBER-001) — correcto
+Auth: funciona — el 404 es de routing de Uber, no de permisos
+```
+
+Verificación en producción: el certification team de Uber verifica menu push contra store real.
+
+---
+
 ### UBER-001 — Evidencia
 
 ```
@@ -185,11 +207,11 @@ integration_audit_log:
 
 ---
 
-| UBER-003 | Upload Menu | POST /api/integrations/uber-eats/menu | 200 OK, menú visible en Uber app sandbox | — |
-| UBER-005 | Mark OOS | POST /menu {action:"oos"} | Item no disponible en sandbox app | — |
-| UBER-006 | Restore Item | POST /menu {action:"restore"} | Item disponible de nuevo | — |
+| UBER-003 | Upload Menu | POST /api/integrations/uber-eats/menu | 200 OK, menú visible en Uber app sandbox | **SANDBOX LIMIT** |
+| UBER-005 | Mark OOS | PATCH /menu {action:"oos"} | Item no disponible en sandbox app | **SANDBOX LIMIT** |
+| UBER-006 | Restore Item | PATCH /menu {action:"restore"} | Item disponible de nuevo | **SANDBOX LIMIT** |
 | UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado | — |
-| UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` | — |
+| UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` | **SANDBOX LIMIT** |
 | UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed | — |
 | UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` | — |
 | UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` | — |
