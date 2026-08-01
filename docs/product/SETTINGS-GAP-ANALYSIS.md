@@ -8,7 +8,7 @@
 > reemplazar con mejores decisiones de arquitectura.
 >
 > Fecha: 2026-07-25
-> Input: `docs/bibles/FULLSITE-SETTINGS-BIBLE.md`
+> Input: `docs/product/SETTINGS-BIBLE.md`
 
 ---
 

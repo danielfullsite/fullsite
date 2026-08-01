@@ -1270,7 +1270,7 @@ A partir de la versión 2.1 de esta spec, el modelo está **congelado**. Todo ca
 
 ### Formato de un RFC
 
-Archivo: `docs/bibles/RFCs/RFC-{número}-{slug}.md`
+Archivo: `docs/product/RFC-{número}-{slug}.md`
 
 ```markdown
 # RFC-{N}: {Título corto}
@@ -1338,7 +1338,7 @@ _v2.1 — 2026-07-23 — Ownership Boundaries + Domain Events + RFC Process. Est
 
 Esta spec define el contrato. El milestone define cuándo el contrato demostró funcionar en operación real.
 
-Ver criterios completos en: `docs/bibles/P0-EXECUTION-PLAN.md § Milestone`
+Ver criterios completos en: `docs/feos/EXECUTION-PLAN.md § Milestone`
 
 Requisitos resumidos: 4 P0 CERTIFIED + 7 días consecutivos en AMALAY sin incidentes P0.
 Solo cuando ese milestone se cumple puede comenzar la fase de P1 Features.

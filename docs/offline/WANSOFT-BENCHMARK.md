@@ -1,9 +1,9 @@
 # Benchmark Offline: Wansoft vs Fullsite
 
-> Fuentes: `docs/reference/wansoft/ARCHITECTURE.md`, `docs/reference/wansoft/CAJA-SPEC.md`,
-> `docs/reference/wansoft/DATA-MODEL.md`, `docs/reference/wansoft/BACKOFFICE-KNOWLEDGE.md`,
-> `docs/product/WANSOFT-POS-BIBLE.md`, `docs/runbooks/OFFLINE-CERTIFICATION-RUNBOOK.md`,
-> `FULLSITE DOCS/03-LOCAL-FIRST/LOCAL_FIRST_ARCHITECTURE.md`.
+> Fuentes: `docs/knowledge/wansoft/ARCHITECTURE.md`, `docs/knowledge/wansoft/CAJA-SPEC.md`,
+> `docs/knowledge/wansoft/DATA-MODEL.md`, `docs/knowledge/wansoft/BACKOFFICE-KNOWLEDGE.md`,
+> `docs/knowledge/wansoft/BIBLE.md`, `docs/offline/RUNBOOK.md`,
+> `docs/architecture/LOCAL-FIRST.md`.
 >
 > Metodología: análisis documental + prueba de campo en AMALAY (2026-07-24).
 > Para Wansoft: lo que está **documentado** se marca como tal. Lo que fue **inferido**

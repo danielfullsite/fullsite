@@ -112,7 +112,7 @@ Respuesta:
 
 Wansoft es la referencia. No el enemigo.
 
-20 lecciones documentadas en `docs/reference/wansoft/BACKOFFICE-KNOWLEDGE.md`.
+20 lecciones documentadas en `docs/knowledge/wansoft/BACKOFFICE-KNOWLEDGE.md`.
 Las más importantes:
 
 **1. La operación tiene lógica que no está en el código.**

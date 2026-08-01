@@ -13,7 +13,7 @@
 | README de migración | ❌ falta | No existe `docs/migrations/README.md` ni instrucciones en `scripts/migration-pipeline/` |
 | Setup local para desarrollo | ❌ falta | No hay script `setup.sh` ni documentación de env vars para correr los scripts localmente |
 | Fixtures / datos demo | ⚠️ parcial | `scripts/migration-pipeline/fixtures/recipes.json` y `ingredients.json` existen, pero son de AMALAY, no datos neutros para demos |
-| Documentación de Wansoft disponible | ✅ existe | `docs/reference/wansoft/` tiene 5 archivos: ARCHITECTURE.md, DATA-MODEL.md, BACKOFFICE-KNOWLEDGE.md, PORTAL-MAP.md, CAJA-SPEC.md |
+| Documentación de Wansoft disponible | ✅ existe | `docs/knowledge/wansoft/` tiene 5 archivos: ARCHITECTURE.md, DATA-MODEL.md, BACKOFFICE-KNOWLEDGE.md, PORTAL-MAP.md, CAJA-SPEC.md |
 | Diagramas de flujo | ⚠️ parcial | CLAUDE.md tiene diagrama ASCII del sistema general. No hay diagrama del flujo de migración específicamente. Este documento (01-current-data-flow.md) lo suple. |
 | Tests de migración | ❌ falta | No se encontraron tests para los scripts de migración. El dry-run es el único mecanismo de validación, pero no es un test automatizado. |
 | Scripts reproducibles end-to-end | ⚠️ parcial | `dry-run.ts` es reproducible. `migrate-wansoft-to-supabase.py` requiere los JSONs de input que no están en git. |
@@ -36,7 +36,7 @@ Lista priorizada de tareas que no rompen nada y tienen resultado claro.
 | T-03 | Corregir `CLIENT_ID` hardcoded | Cambiar `CLIENT_ID = "amalay"` en `migrate-wansoft-to-supabase.py:22` por `CLIENT_ID = os.environ.get("CLIENT_ID", "amalay")`. | 30min | Ninguno | `scripts/migrate-wansoft-to-supabase.py` |
 | T-04 | Crear fixtures neutros | Crear `scripts/migration-pipeline/fixtures/demo_ingredients.json` y `demo_recipes.json` con 10-15 productos de un restaurante ficticio (no AMALAY). | 1h | Entender el schema esperado | `scripts/migration-pipeline/fixtures/` |
 | T-05 | Investigar causa del 65% de rechazo | Correr `npx tsx scripts/migration-pipeline/dry-run.ts --real` y analizar el `dry-run-report.json` para identificar la causa exacta de los orphan references. | 2h | JSONs en `agents/wansoft/` (en el repo principal) | `scripts/migration-pipeline/dry-run.ts` |
-| T-06 | Documentar schema de `wansoft_data` | Leer `wansoft_inventory_sync.py` completamente y documentar las keys usadas y su estructura JSON esperada. | 1h | Ninguno | `docs/reference/wansoft/WANSOFT-DATA-SCHEMA.md` (nuevo) |
+| T-06 | Documentar schema de `wansoft_data` | Leer `wansoft_inventory_sync.py` completamente y documentar las keys usadas y su estructura JSON esperada. | 1h | Ninguno | `docs/knowledge/wansoft/WANSOFT-DATA-SCHEMA.md` (nuevo) |
 | T-07 | Agregar README a `scripts/migration-pipeline/` | Instrucciones para: instalar dependencias, correr dry-run con fixtures, correr dry-run con datos reales, interpretar el reporte. | 1h | T-02 | `scripts/migration-pipeline/README.md` |
 | T-08 | Extractar RLS policies del esquema | Conectar a Supabase con `pg_get_functiondef()` para obtener los 194 RLS policies y agregarlos a `scripts/sql/migrations/003_rls_policies.sql`. | 3h | Acceso a Supabase | `scripts/sql/migrations/003_rls_policies.sql` |
 | T-09 | Crear glosario Wansoft → Fullsite | Tabla markdown: término Wansoft → término Fullsite → tabla SQL → notas. Ej: Platillo → Product → `pos_menu_items`. | 2h | Ninguno (ya está en DATA-MODEL.md parcialmente) | `docs/migrations/GLOSSARY.md` |

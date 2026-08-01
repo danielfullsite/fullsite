@@ -222,7 +222,7 @@ Solo ejecutar si Bloques 1–3 resultaron en PASS.
 
 - [ ] Reconectar WAN si sigue desconectado
 - [ ] Verificar que el POS funciona normalmente (crear y cerrar una orden de prueba)
-- [ ] Actualizar el runbook en `docs/runbooks/OFFLINE-CERTIFICATION-RUNBOOK.md` con los resultados
+- [ ] Actualizar el runbook en `docs/offline/RUNBOOK.md` con los resultados
 - [ ] Si B-01-OFFLINE es PASS → actualizar estado a PASS en runbook y en memoria
 - [ ] Si F-01 real conditions PASS → agregar evidencia con WAN cable en el caso F-01 del runbook
 

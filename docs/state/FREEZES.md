@@ -30,7 +30,7 @@ Si una implementación necesita cambiar el modelo, el flujo o una invariante: pr
 **Condición de descongelamiento:**
 POS V2 Operational Certification completada (los 4 P0s CERTIFIED + 7 días de operación sostenida en AMALAY).
 
-**Referencia:** `docs/bibles/P0-EXECUTION-PLAN.md` §Regla de arquitectura post-freeze
+**Referencia:** `docs/feos/EXECUTION-PLAN.md` §Regla de arquitectura post-freeze
 
 ---
 

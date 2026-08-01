@@ -12,7 +12,7 @@
 - **Antes de empezar:** verifica que el bug no esté ya cerrado o en progreso
 - **Al cerrar:** cambia el estado a `CLOSED`, agrega el commit hash y la fecha
 - **Al reabrir:** requiere evidencia — ver `docs/state/CERTIFICATIONS.md`
-- **P0 operacionales:** los 4 P0s del Architecture Freeze viven en `docs/bibles/P0-EXECUTION-PLAN.md`. Este archivo trackea bugs de código.
+- **P0 operacionales:** los 4 P0s del Architecture Freeze viven en `docs/feos/EXECUTION-PLAN.md`. Este archivo trackea bugs de código.
 
 ---
 

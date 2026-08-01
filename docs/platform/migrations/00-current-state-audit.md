@@ -56,8 +56,8 @@ Fullsite tiene una infraestructura de migración parcialmente construida, orient
 - `/agents/wansoft-explorer/src/` (estructura confirmada, no leídos individualmente)
 - `/agents/wansoft/*.json` — muestras de: `wansoft_products.json`, `wansoft_recetas.json`, `wansoft_existencias.json`, `wansoft_existencias_20260707.json`, `wansoft_proveedores.json`, `wansoft_platillos.json`, `wansoft_modificadores.json`, `wansoft_costos.json`
 - `/docs/archive/manual-migracion-wansoft.md`
-- `/docs/reference/wansoft/DATA-MODEL.md`
-- `/docs/reference/wansoft/ARCHITECTURE.md`
+- `/docs/knowledge/wansoft/DATA-MODEL.md`
+- `/docs/knowledge/wansoft/ARCHITECTURE.md`
 - `/.github/workflows/` — listado completo (48 workflows)
 - `/dashboard-app/migrations/` — 5 archivos SQL (existencia confirmada)
 - `/dashboard-app/sql/` — archivos clave confirmados

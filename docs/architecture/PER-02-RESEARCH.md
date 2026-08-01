@@ -259,7 +259,7 @@ Crear `event-store.ts` en el POS crearía una quinta fuente de verdad sin valor 
 
 **Qué cambia:**
 - `dashboard-app/AGENTS.md`: la fila "Event store (POS)" se actualiza con los módulos reales
-- `FULLSITE DOCS/11-VALIDATION/LOCAL-FIRST-CODE-AUDIT.md`: PER-02 → FIXED (documentación)
+- `docs/offline/CODE-AUDIT.md`: PER-02 → FIXED (documentación)
 - Este documento queda como referencia canónica
 
 ---

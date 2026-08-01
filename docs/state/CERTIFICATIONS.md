@@ -1,9 +1,9 @@
 # Certificaciones — Fullsite
 
 > **Fuente de verdad para el estado de certificación.**
-> Regla: solo pasar a PASS con evidencia archivada. Ver criterios en `docs/bibles/P0-EXECUTION-PLAN.md`.
+> Regla: solo pasar a PASS con evidencia archivada.
 > Regla: nunca reabrir un PASS sin evidencia de regresión.
-> Última actualización: 2026-07-24
+> Última actualización: 2026-07-31
 
 ---
 
@@ -12,15 +12,39 @@
 Una feature es CERTIFIED cuando:
 1. Fue probada en operación real (no en staging, no en prueba de escritorio)
 2. La evidencia está archivada (video, logs, commit)
-3. Los criterios de aceptación definidos en el P0 Execution Plan se cumplen sin excepción
+3. Los criterios de aceptación definidos se cumplen sin excepción
 
 "Parece funcionar" no es CERTIFIED. "Eduardo lo usó y no se quejó" no es CERTIFIED.
 
 ---
 
+## Gate obligatorio: Shadow Day
+
+Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Cliente #2 en adelante). Sin Shadow Day aprobado, no hay Go-Live — sin excepción.
+
+**Criterio de aprobación:** al final del Shadow Day, el gerente abre turno, toma 10 órdenes, las envía a cocina, cobra, imprime ticket y cierra turno — sin ayuda de soporte.
+
+**Protocolo:**
+- Se ejecuta el día anterior al Go-Live (día -1)
+- Wansoft activo + Fullsite activo en paralelo — las transacciones reales van en Wansoft
+- El equipo opera Fullsite durante turno completo
+- Soporte Daniel observa sin intervenir
+- Si el gerente no alcanza el criterio de autonomía: Go-Live se pospone, no se negocia
+
+**Estado por cliente:**
+
+| Cliente | Fecha | Resultado | Evidencia |
+|---|---|---|---|
+| AMALAY | 2026-07-15 | PASS — Eduardo Esquivel | Visita 1 `docs/customers/amalay/LOG.md` |
+| Cliente #2 | Pendiente | — | — |
+
+**PRR:** PRR-19 en `docs/certifications/PRR-v1.md` (OPEN para Cliente #2)
+
+---
+
 ## R1 — Field Certification
 
-**Estado:** ✅ PASS — 2026-07-16
+**Estado:** PASS — 2026-07-16
 **Scope:** 12 casos de prueba de campo (R1 Field Cert)
 **Resultado:** 12/12 PASS. Observación 48h completada el 2026-07-17.
 **Regla:** R0 y R0.5 en HOLD. No reabrir sin evidencia de regresión. Ver `docs/state/FREEZES.md`.
@@ -29,7 +53,7 @@ Una feature es CERTIFIED cuando:
 
 ## Offline — F-01 (Frontend)
 
-**Estado:** ✅ PASS — commit `c312fac`
+**Estado:** PASS — commit `c312fac`
 **Scope:** Operación offline en mid-session (después de carga inicial con internet)
 **Resultado:** F-01 PASS. La app opera sin internet una vez cargada.
 **Limitación conocida:** El boot offline (POS-04) no está certificado — ver `docs/state/BUGS.md`.
@@ -38,63 +62,109 @@ Una feature es CERTIFIED cuando:
 
 ## Offline — B-01 (Backend sync)
 
-**Estado:** 🟡 FIX DEPLOYED — commit `2edcca1` — sin certificar
+**Estado:** FIX DEPLOYED — commit `2edcca1` — sin certificar
 **Scope:** Sincronización de cola offline al reconectar
 **Fix desplegado:** 2026-07-23
-**Pendiente:** Sesión de certificación de campo. Ver `docs/runbooks/CERTIFICATION-SESSION-2026-07-27.md`.
+**Pendiente:** Sesión de certificación de campo. Ver `docs/certifications/CERTIFICATION-SESSION-2026-07-27.md`.
 **Bug activo:** PIN bug post-restart — posible race condition. Fix UI del networkError en commit `9de0ab1`. Sin certificar.
+
+---
+
+## Concurrencia x3 — CLOSED
+
+**Estado:** CLOSED — 2026-06-30
+**Scope:** Tres condiciones de carrera identificadas en multi-terminal antes del Go-Live
+**Evidencia:** `docs/archive/migration-plans/ROADMAP-2026-06-30.md` (3 checkboxes ✓); P0-1 AMALAY CERTIFIED commit `91379b5`
+
+| Fix | Descripción | Fecha |
+|---|---|---|
+| C1 | `updated_at` en `handlePayment` — previene doble cobro en cobro concurrente | 2026-06-30 |
+| C2 | Fix 409 en sync offline — idempotencia al reconectar con cola pendiente | 2026-06-30 |
+| C3 | Separar KDS writes del campo `items` — evita race condition en cocina | 2026-06-30 |
+
+**Modelo canónico:** `docs/constitution/CONCURRENCY.md`
+**ADR:** `docs/adr/ADR-001-CONCURRENCY.md`
+
+**Nota:** estos 3 parches resuelven los race conditions identificados a 2026-06-30. La certificación de campo de multi-terminal bajo carga máxima (2 tablets paralelas en hora pico) es parte de P0-4.
+
+---
+
+## IEPS — DEFERRED
+
+**Estado:** DEFERRED — bloqueado externamente, sin fecha
+**Scope:** Modelo fiscal IEPS en facturación CFDI 4.0 (IEPS desglosado en el XML)
+**Blocker:** XML de factura con IEPS de Wansoft — sin fecha de entrega comprometida por Wansoft
+
+**Qué se necesita para desbloquearlo:**
+1. Obtener una factura XML real de Wansoft con IEPS desglosado
+2. Validar estructura contra Facturapi
+3. Implementar cálculo de IEPS en `pos_orders` (probablemente como campo adicional)
+4. P0-3 (CSD Facturapi) debe estar CERTIFIED antes de probar IEPS en producción
+
+**ADR:** `docs/adr/ADR-002-FISCAL-MODEL.md`
+
+**Nota:** en el ROADMAP 2026-06-30, IEPS figuraba como P0 junto con XML CFDI validado. Ambos se clasifican DEFERRED porque el blocker es externo (Wansoft, sin SLA). No ocupan slot en el backlog activo hasta que el blocker se resuelva.
 
 ---
 
 ## P0-1 — Cierre con órdenes abiertas
 
-**Estado:** 🔴 ABIERTO — diseño aprobado, pendiente implementación
-**Referencia:** `docs/bibles/P0-EXECUTION-PLAN.md`
+**Estado:** ABIERTO — diseño aprobado, pendiente implementación
+**Referencia:** `docs/feos/EXECUTION-PLAN.md`
 
 ---
 
 ## P0-2 — Reimpresión desde KDS/cocina/barra
 
-**Estado:** 🟡 EN VALIDACIÓN — código completo 2026-07-23
-**Pendiente:** Gate técnico y gate de campo
-**Referencia:** `docs/bibles/P0-EXECUTION-PLAN.md`
+**Estado:** EN VALIDACIÓN — código completo 2026-07-23; commit `636771a` (batch-aware reprint)
+**Pendiente:** Gate de campo
+**Referencia:** `docs/feos/EXECUTION-PLAN.md`
 **Relacionado con:** POS-03 en `docs/state/BUGS.md`
 
 ---
 
-## P0-3 — CSD Facturama
+## P0-3 — CSD Facturapi
 
-**Estado:** 🔴 ABIERTO — acción de Daniel
-**Deadline:** 2026-08-03
-**Referencia:** `docs/bibles/P0-EXECUTION-PLAN.md`
+**Estado:** ABIERTO — acción de Andy ante SAT
+**Blocker:** Andy tramita CSD ante SAT — estimado agosto 2026
+**Referencia:** `docs/feos/EXECUTION-PLAN.md`
+**Nota:** Facturapi (no Facturama) — PAC elegido para CFDI 4.0. Ver `docs/adr/ADR-002-FISCAL-MODEL.md`.
 
 ---
 
 ## P0-4 — Local-First / Operación Offline Completa
 
-**Estado:** 🔴 ABIERTO — certificación pendiente hasta OFFLINE-100 CERTIFIED
+**Estado:** ABIERTO — Fase 5 (certificación de campo) pendiente
 
-> **Distinción crítica — Conflicto B resuelto 2026-07-27:**
+> **Distinción crítica:**
 > - **POS-04** (en `docs/state/BUGS.md`) = sub-componente técnico **CERRADO** (commit `447a777`, 2026-07-24).
 >   Scope: boot offline del app shell (IDB menú cache + localStorage staff cache).
 > - **P0-4** (este ítem) = certificación amplia de Local-First **ABIERTA**.
->   Scope: turno offline completo, persistencia local, LAN discovery, sync queue,
->   recuperación ante fallo, operación multi-terminal, certificación end-to-end.
->   No se cierra con fixes puntuales — requiere OFFLINE-100 CERTIFIED.
+>   Scope: turno offline completo, persistencia local, sync queue, recuperación ante fallo,
+>   multi-terminal, certificación end-to-end. Requiere Offline Certification Suite v1 PASS.
 
-**Progreso interno:** Implementación significativa 2026-07-24 a 2026-07-27
-(turno offline, sync queue, LAN, runbook). No equivale a certificación.
+**Progreso:** Fases 1-4 COMPLETE. Fase 5 (prueba de 4h continuas en hardware de AMALAY) PENDIENTE.
+Ver `docs/certifications/OFFLINE-SUITE-v1.md` y `docs/offline/RUNBOOK.md`.
 
-**RFC:** `docs/bibles/P0-4-LOCAL-FIRST-RFC.md`
-**Audit matrix:** `FULLSITE DOCS/11-VALIDATION/LOCAL-FIRST-CODE-AUDIT.md`
+**RFC:** `docs/product/LOCAL-FIRST-RFC.md`
+**Audit matrix:** `docs/offline/CODE-AUDIT.md`
 
 ---
+
+## Hardware-contingent — DEFERRED
+
+Estos ítems figuraban como P0 en el ROADMAP 2026-06-30. Fueron reclasificados a P1 antes del Go-Live porque el blocker es de hardware, no de software.
+
+| Ítem | Blocker | Estado actual | Tracking |
+|---|---|---|---|
+| Huella digital gerente | Lector DP4500 pendiente de instalación en AMALAY | P1-02 OPEN | `docs/customers/amalay/DEPLOYMENT-STATE.md` |
+| Cajón de dinero — apertura desde cualquier impresora | Configuración física RJ-11 | P1-03 OPEN | `docs/customers/amalay/DEPLOYMENT-STATE.md` |
 
 ---
 
 ## OCS — Operational Certification Suite (v1, iniciada 2026-07-31)
 
-La OCS es la suite de certificación por módulo para POS V2. Cada módulo se certifica de forma independiente antes de avanzar al siguiente. El cierre de todos los módulos OCS equivale a la certificación de POS V2.
+La OCS certifica módulos del POS de forma independiente. El cierre de todos los módulos OCS equivale a la certificación de POS V2.
 
 **Criterio de cierre por módulo:**
 1. Código implementado
@@ -104,19 +174,26 @@ La OCS es la suite de certificación por módulo para POS V2. Cada módulo se ce
 
 ### P2.5.4 — Caja (Turno, Movimientos, Arqueo)
 
-**Estado:** ✅ CERTIFIED — 2026-07-31  
-**Tests:** 27 nuevos E2 + 1 759 suite completa · 0 regresiones  
-**Gaps resueltos:** CAJ-GAP-01 PASS · CAJ-GAP-02 PASS · CAJ-GAP-03 PASS · CAJ-GAP-04 P3 DOC  
+**Estado:** CERTIFIED — 2026-07-31
+**Tests:** 27 nuevos E2 + 1,759 suite completa · 0 regresiones
+**Gaps resueltos:** CAJ-GAP-01 PASS · CAJ-GAP-02 PASS · CAJ-GAP-03 PASS · CAJ-GAP-04 P3 DOC
 **Referencia:** `docs/certifications/OCS-P2.5.4-CAJA.md`
 
-### P2.5.5 — KDS / Cocina
+### P2.5.5 — KDS / Cocina / Barra
 
-**Estado:** 🔴 PENDIENTE — próximo módulo
+**Estado:** CERTIFIED — 2026-07-31
+**Tests:** 24 nuevos E2 + 1,783 suite completa · 0 regresiones
+**Gaps resueltos:** KDS-GAP-01 PASS · KDS-GAP-02 PASS · KDS-GAP-03 PASS · KDS-GAP-04 P3 DOC
+**Referencia:** `docs/certifications/OCS-P2.5.5-KDS.md`
+
+### P2.5.6 — Próximo módulo
+
+**Estado:** PENDIENTE
 
 ---
 
 ## Milestone: POS V2 Operational Certification
 
-**Estado:** 🔴 BLOQUEADO — todos los P0s deben estar CERTIFIED primero
+**Estado:** BLOQUEADO — todos los P0s deben estar CERTIFIED primero
 
-Requisitos completos en `docs/bibles/P0-EXECUTION-PLAN.md`.
+Requisitos completos en `docs/feos/EXECUTION-PLAN.md`.

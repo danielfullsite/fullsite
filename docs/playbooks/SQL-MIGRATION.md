@@ -375,7 +375,7 @@ En `docs/state/CERTIFICATIONS.md`, actualizar el estado del ítem correspondient
 **Evidencia:** Video sesión campo, order_id XXXX, audit log screenshot
 ```
 
-**Regla:** No marcar como CERTIFIED sin evidencia de campo. Ver criterios en `docs/bibles/P0-EXECUTION-PLAN.md`.
+**Regla:** No marcar como CERTIFIED sin evidencia de campo. Ver criterios en `docs/feos/EXECUTION-PLAN.md`.
 
 ---
 

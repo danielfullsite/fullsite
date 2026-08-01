@@ -309,7 +309,7 @@ Ventana: 33 dias (certificado de facturacion de Wansoft vence 3 ago 2026).
 | Principios | `/FULLSITE-PRINCIPLES.md` |
 | Roadmap | `/ROADMAP.md` |
 | Documentacion | `/docs/` (7 carpetas, 19 docs activos) |
-| Wansoft reference | `/docs/reference/wansoft/` (4 archivos, 3.21 GB en Desktop) |
+| Wansoft reference | `docs/knowledge/wansoft/` (5 archivos) |
 | Memoria persistente | `~/.claude/projects/-Users-danielrg/memory/` |
 
 ### Deuda tecnica conocida

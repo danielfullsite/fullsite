@@ -308,7 +308,7 @@ Los CSDs tienen vigencia de ~2 años. El de AMALAY venció sin que hubiera un pr
 
 ## P0-4 — Local-First Restaurant Runtime & Offline Continuity  `DESIGN GATE`
 
-> RFC completo: `docs/bibles/P0-4-LOCAL-FIRST-RFC.md`
+> RFC completo: `docs/product/LOCAL-FIRST-RFC.md`
 > Principio rector: Internet es sincronización y servicios remotos, no el bus operativo del restaurante.
 > Este P0 no es implementable hasta que el RCA técnico (Fase 0 del RFC) esté completo y la arquitectura aprobada.
 
