@@ -139,6 +139,7 @@ certifications/
   OCS-P2.5.5-KDS.md          OCS KDS/Cocina/Barra — CERTIFIED 2026-07-31. 24 tests E2, 0 regresiones.
   OCS-P2.5.6-IMPRESION.md    OCS Impresión/Print Bridge — CERTIFIED 2026-07-31. 23 tests E2, 0 regresiones.
   OCS-P2.5.7-ORDERS.md       OCS Órdenes/Flujo Principal — CERTIFIED 2026-07-31. ORD-GAP-01 resuelto. 229 tests.
+  OCS-P0-1-GUARD08.md        OCS P0-1 GUARD-08 — CERTIFIED 2026-07-31. Soft-block + escalación. 27 tests E2.
   OCS-P2.5.8-PAGOS.md        OCS Pagos completo — CERTIFIED 2026-07-31. PAY-GAP-01 resuelto. 1843 tests.
   KDS-WANSOFT-GAP-ANALYSIS.md  Revisión funcional KDS vs Wansoft. 6 gaps (2×P2, 4×P3).
 ```

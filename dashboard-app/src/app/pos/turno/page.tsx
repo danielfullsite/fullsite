@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Printer, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, DoorOpen, DoorClosed, DollarSign, Clock, Users, FileText, Printer, X, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { formatMXN, logAudit } from '@/lib/pos-data'
 import dynamic from 'next/dynamic'
 import { getActiveClientSlug as _cid } from '@/lib/data'
@@ -298,6 +298,8 @@ export default function TurnoPage() {
   const [tab, setTab] = useState<'turno' | 'personal'>('turno')
   const [showCierreWizard, setShowCierreWizard] = useState(false)
   const [showCorteX, setShowCorteX] = useState(false)
+  // GUARD-08: banner if the previous cierre had open orders
+  const [orphanCierre, setOrphanCierre] = useState<{ count: number; nota: string | null } | null>(null)
 
   // Open shift state
   const [fondoInicial, setFondoInicial] = useState('')
@@ -320,6 +322,20 @@ export default function TurnoPage() {
         if (turno) {
           await cacheTurno({ ...turno, client_id: _cid(), synced_at: new Date().toISOString() })
         }
+        // GUARD-08: check if previous cierre had open orders — show banner if so
+        try {
+          const cierreRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/pos_cierres?client_id=eq.${_cid()}&cierre_con_ordenes_abiertas=eq.true&order=created_at.desc&limit=1&select=ordenes_pendientes,cierre_nota`,
+            { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) }
+          )
+          if (cierreRes.ok) {
+            const [lastCierre] = await cierreRes.json()
+            if (lastCierre) {
+              const count = (lastCierre.ordenes_pendientes || []).length
+              setOrphanCierre({ count, nota: lastCierre.cierre_nota || null })
+            }
+          }
+        } catch { /* columns not yet migrated or offline — skip banner */ }
         setLoading(false)
         return
       }
@@ -439,6 +455,30 @@ export default function TurnoPage() {
               </div>
             ) : activeTurno ? (
               <div className="max-w-md mx-auto space-y-4">
+                {/* GUARD-08: orphan orders banner */}
+                {orphanCierre && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-amber-400 text-sm">
+                            Cierre anterior con {orphanCierre.count} orden{orphanCierre.count !== 1 ? 'es' : ''} abierta{orphanCierre.count !== 1 ? 's' : ''}
+                          </p>
+                          {orphanCierre.nota && (
+                            <p className="text-xs text-[var(--text-3)] mt-0.5">Motivo: {orphanCierre.nota}</p>
+                          )}
+                          <p className="text-xs text-[var(--text-3)] mt-1">
+                            Verifica el mapa de mesas para localizar las órdenes huérfanas.
+                          </p>
+                        </div>
+                      </div>
+                      <button onClick={() => setOrphanCierre(null)} className="text-[var(--text-3)] hover:text-[var(--text-1)] flex-shrink-0">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Active turno info */}
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6">
                   <div className="flex items-center gap-3 mb-4">

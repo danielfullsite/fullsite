@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign } from 'lucide-react'
+import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, ShieldAlert } from 'lucide-react'
 import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
@@ -11,6 +11,14 @@ import {
   getCachedOrdersByTurno,
   getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
+import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
+import {
+  filterOpenOrders,
+  validateEscalationNota,
+  withEscalationPayload,
+  openOrderStatusLabel,
+  type OpenOrder,
+} from '@/lib/pos-cierre-guard'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -75,6 +83,18 @@ export default function CierreCajaWizard({
   const [saving, setSaving] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
   const closingRef = useRef(false)
+  // GUARD-08: stable UUID across retries within this wizard session
+  const cierreIdRef = useRef<string>(crypto.randomUUID())
+  // GUARD-08: open orders check
+  const [openOrders, setOpenOrders] = useState<OpenOrder[]>([])
+  const [openOrdersLoaded, setOpenOrdersLoaded] = useState(false)
+  // GUARD-08: manager escalation
+  const [escalationActive, setEscalationActive] = useState(false)
+  const [escalationPin, setEscalationPin] = useState('')
+  const [escalationNota, setEscalationNota] = useState('')
+  const [escalationError, setEscalationError] = useState('')
+  const [escalationAuthorizedBy, setEscalationAuthorizedBy] = useState<string | null>(null)
+  const [escalationSaving, setEscalationSaving] = useState(false)
   const [systemData, setSystemData] = useState({
     efectivo: 0,
     tarjeta: 0,
@@ -84,6 +104,8 @@ export default function CierreCajaWizard({
     cancelaciones: 0,
     descuentos: 0,
     propinas: 0,
+    propinaEfectivo: 0,
+    propinasNoEfectivo: 0,
     depositos: 0,
     retiros: 0,
   })
@@ -94,9 +116,10 @@ export default function CierreCajaWizard({
       let orders: Record<string, unknown>[] = []
       let fromNetwork = false
 
-      // Try Supabase with a hard timeout so degraded LAN doesn't freeze the wizard
+      // Try Supabase with a hard timeout so degraded LAN doesn't freeze the wizard.
+      // Include pagos for accurate split-payment propina attribution.
       try {
-        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina&client_id=eq.${_cid()}&turno_id=eq.${turnoId}`
+        const queryUrl = `${SUPABASE_URL}/rest/v1/pos_orders?select=total,metodo_pago,status,descuento,propina,pagos&client_id=eq.${_cid()}&turno_id=eq.${turnoId}`
         const res = await fetch(queryUrl, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           cache: 'no-store',
@@ -115,66 +138,67 @@ export default function CierreCajaWizard({
         } catch { /* IDB unavailable */ }
       }
 
-      let efectivo = 0, tarjeta = 0, transferencias = 0, totalVentas = 0
-      let ticketsCount = 0, cancelaciones = 0, descuentos = 0, propinas = 0
-
-      for (const order of orders) {
-        if (order.status === 'cancelada') { cancelaciones++; continue }
-        if (order.status === 'cerrada') {
-          ticketsCount++
-          totalVentas += Number(order.total) || 0
-          descuentos += Number(order.descuento) || 0
-          propinas += Number(order.propina) || 0
-          const method = ((order.metodo_pago as string) || '').toLowerCase()
-          if (method.includes('efectivo') || method.includes('cash')) {
-            efectivo += Number(order.total) || 0
-          } else if (method.includes('transferencia')) {
-            transferencias += Number(order.total) || 0
-          } else {
-            tarjeta += Number(order.total) || 0
-          }
-        }
-      }
-
       // Cash movements — Supabase first, IDB fallback
-      let depositos = 0, retiros = 0
-      let movFromNetwork = false
+      let cashMovements: { type: string; amount: number }[] = []
       try {
         const movRes = await fetch(
           `${SUPABASE_URL}/rest/v1/pos_cash_movements?turno_id=eq.${turnoId}&select=type,amount`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
         )
-        if (movRes.ok) {
-          const movements = await movRes.json()
-          for (const m of movements) {
-            if (m.type === 'deposito') depositos += Number(m.amount) || 0
-            else if (m.type === 'retiro') retiros += Number(m.amount) || 0
-          }
-          movFromNetwork = true
-        }
+        if (movRes.ok) cashMovements = await movRes.json()
       } catch { /* fall through */ }
 
-      if (!movFromNetwork) {
+      if (cashMovements.length === 0) {
         try {
-          const movements = await getCachedCashMovsByTurno(turnoId)
-          for (const m of movements) {
-            if (m.type === 'deposito') depositos += m.amount
-            else if (m.type === 'retiro') retiros += m.amount
-          }
+          cashMovements = await getCachedCashMovsByTurno(turnoId)
         } catch { /* IDB unavailable */ }
       }
 
-      setSystemData({ efectivo, tarjeta, transferencias, totalVentas, ticketsCount, cancelaciones, descuentos, propinas, depositos, retiros })
-      // Mark data as loaded even when coming from IDB — user can always close offline
+      // Use the shared computeOrderSummary — same logic as Corte page
+      const summary = computeOrderSummary(
+        orders as unknown as Parameters<typeof computeOrderSummary>[0],
+        cashMovements,
+      )
+
+      setSystemData({
+        efectivo: summary.efectivo,
+        tarjeta: summary.tarjeta,
+        transferencias: summary.transferencias,
+        totalVentas: summary.totalVentas,
+        ticketsCount: summary.ticketsCount,
+        cancelaciones: summary.cancelaciones,
+        descuentos: summary.descuentos,
+        propinas: summary.propinas,
+        propinaEfectivo: summary.propinaEfectivo,
+        propinasNoEfectivo: summary.propinasNoEfectivo,
+        depositos: summary.depositos,
+        retiros: summary.retiros,
+      })
       setDataLoaded(true)
+
+      // GUARD-08: fetch open orders for this turno (best-effort — offline skips guard)
+      try {
+        const openRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/pos_orders?select=id,mesa,mesero,status,total&client_id=eq.${_cid()}&turno_id=eq.${turnoId}&status=in.(enviada,preparando,lista)`,
+          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(4000) }
+        )
+        if (openRes.ok) {
+          const raw = await openRes.json()
+          setOpenOrders(filterOpenOrders(raw))
+        }
+      } catch { /* offline — allow close without guard */ }
+      setOpenOrdersLoaded(true)
+
       setLoading(false)
     }
     fetchShiftData()
   }, [turnoId])
 
   const totalContado = Number(cashInput) || 0
-  const efectivoEsperado = fondoInicial + systemData.efectivo + systemData.depositos - systemData.retiros
-  const diferencia = totalContado - efectivoEsperado
+  const { efectivoEsperado, diferencia } = calcEfectivoEsperado(
+    summaryToArqueoInput(systemData, fondoInicial),
+    totalContado,
+  )
 
   const handleSave = async () => {
     // Prevent double-tap / concurrent close attempts
@@ -199,32 +223,37 @@ export default function CierreCajaWizard({
     const manager = result.name
     setManagerName(manager)
 
-    // Stable UUID — same ID whether we're online or offline, never changes during sync
-    const cierreId = crypto.randomUUID()
+    // Stable UUID — generated once at wizard mount, same across all retries
+    const cierreId = cierreIdRef.current
     const now = new Date().toISOString()
-    const cierreData = {
-      id: cierreId,
-      client_id: _cid(),
-      turno_id: turnoId,
-      fecha: now.split('T')[0],
-      fondo_inicial: fondoInicial,
-      billetes: JSON.stringify({}),
-      monedas: JSON.stringify({}),
-      total_contado: totalContado,
-      efectivo_sistema: efectivoEsperado,
-      tarjeta_sistema: systemData.tarjeta,
-      transferencias_sistema: systemData.transferencias,
-      diferencia,
-      total_ventas: systemData.totalVentas,
-      tickets_count: systemData.ticketsCount,
-      cancelaciones: systemData.cancelaciones,
-      descuentos: systemData.descuentos,
-      propinas: systemData.propinas,
-      notas: notas || null,
-      closed_by: manager,
-      approved_by: manager,
-      created_at: now,
-    }
+    const cierreData = withEscalationPayload(
+      {
+        id: cierreId,
+        client_id: _cid(),
+        turno_id: turnoId,
+        fecha: now.split('T')[0],
+        fondo_inicial: fondoInicial,
+        billetes: JSON.stringify({}),
+        monedas: JSON.stringify({}),
+        total_contado: totalContado,
+        efectivo_sistema: efectivoEsperado,
+        tarjeta_sistema: systemData.tarjeta,
+        transferencias_sistema: systemData.transferencias,
+        diferencia,
+        total_ventas: systemData.totalVentas,
+        tickets_count: systemData.ticketsCount,
+        cancelaciones: systemData.cancelaciones,
+        descuentos: systemData.descuentos,
+        propinas: systemData.propinas,
+        notas: notas || null,
+        closed_by: manager,
+        approved_by: manager,
+        created_at: now,
+      },
+      openOrders,
+      escalationAuthorizedBy,
+      escalationNota.trim() || null,
+    )
 
     const turnoClosePayload = {
       closed_by: manager,
@@ -314,6 +343,34 @@ export default function CierreCajaWizard({
     onComplete()
   }
 
+  // GUARD-08: verify manager PIN + note before allowing close with open orders
+  const handleEscalation = async () => {
+    setEscalationError('')
+    const notaValidation = validateEscalationNota(escalationNota)
+    if (!notaValidation.valid) {
+      setEscalationError(notaValidation.error!)
+      return
+    }
+    if (!escalationPin || escalationPin.length < 4) {
+      setEscalationError('PIN inválido')
+      return
+    }
+    setEscalationSaving(true)
+    const result = await verifyManagerPinWithRole(escalationPin)
+    if (!result) {
+      setEscalationError('PIN inválido')
+      setEscalationSaving(false)
+      return
+    }
+    if (!hasPermission(result.role, 'corte_z')) {
+      setEscalationError('Este PIN no tiene permiso para autorizar el cierre')
+      setEscalationSaving(false)
+      return
+    }
+    setEscalationAuthorizedBy(result.name)
+    setEscalationSaving(false)
+  }
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=400,height=600')
     if (!printWindow) return
@@ -342,9 +399,10 @@ export default function CierreCajaWizard({
       <p style="font-weight:bold;margin:4px 0">CONTROL DE EFECTIVO</p>
       <div class="row"><span>Fondo inicial:</span><span>${formatMXN(fondoInicial)}</span></div>
       <div class="row"><span>+ Ventas efectivo:</span><span>${formatMXN(systemData.efectivo)}</span></div>
-      <div class="row"><span>+ Propinas efectivo:</span><span>${formatMXN(systemData.propinas)}</span></div>
+      ${systemData.propinaEfectivo > 0 ? `<div class="row"><span>+ Propinas efectivo:</span><span>${formatMXN(systemData.propinaEfectivo)}</span></div>` : ''}
       ${systemData.depositos > 0 ? `<div class="row"><span>+ Depósitos:</span><span>${formatMXN(systemData.depositos)}</span></div>` : ''}
       ${systemData.retiros > 0 ? `<div class="row"><span>- Retiros:</span><span>${formatMXN(systemData.retiros)}</span></div>` : ''}
+      ${systemData.propinasNoEfectivo > 0 ? `<div class="row"><span>- Propinas tarj/transf:</span><span>${formatMXN(systemData.propinasNoEfectivo)}</span></div>` : ''}
       <div class="row total"><span>= Efectivo esperado:</span><span>${formatMXN(efectivoEsperado)}</span></div>
       <div class="row"><span>Efectivo contado:</span><span>${formatMXN(totalContado)}</span></div>
       <div class="diff">Diferencia: ${diferencia >= 0 ? '+' : ''}${formatMXN(diferencia)}</div>
@@ -380,7 +438,11 @@ export default function CierreCajaWizard({
             <DollarSign size={24} className="text-emerald-400" />
             <div>
               <h2 className="text-lg font-bold text-[var(--text-1)]">Cierre de Caja</h2>
-              <p className="text-xs text-[var(--text-3)]">Paso {step} de 2</p>
+              <p className="text-xs text-[var(--text-3)]">
+                {openOrdersLoaded && openOrders.length > 0 && !escalationAuthorizedBy
+                  ? 'Verificación previa'
+                  : `Paso ${step} de 2`}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--line)]">
@@ -388,6 +450,111 @@ export default function CierreCajaWizard({
           </button>
         </div>
 
+        {/* GUARD-08: show open-orders screen before letting the wizard proceed */}
+        {openOrdersLoaded && openOrders.length > 0 && !escalationAuthorizedBy ? (
+          <div className="p-5 space-y-4">
+            <div className="flex items-center gap-3 text-amber-400">
+              <ShieldAlert size={22} className="flex-shrink-0" />
+              <div>
+                <p className="font-bold">Hay órdenes abiertas en este turno</p>
+                <p className="text-xs text-[var(--text-3)] mt-0.5">
+                  No puedes cerrar el turno mientras existan órdenes activas.
+                </p>
+              </div>
+            </div>
+
+            {/* Open orders list */}
+            <div className="bg-[var(--line)] rounded-xl overflow-hidden">
+              <div className="grid grid-cols-4 text-xs text-[var(--text-3)] px-4 py-2 border-b border-[var(--surface-2)]">
+                <span>Mesa</span><span>Mesero</span><span>Estado</span><span className="text-right">Total</span>
+              </div>
+              {openOrders.map((o) => (
+                <div key={o.id} className="grid grid-cols-4 text-sm px-4 py-2.5 border-b border-[var(--surface-2)] last:border-0">
+                  <span className="font-medium text-[var(--text-1)]">{o.mesa || '—'}</span>
+                  <span className="text-[var(--text-2)] truncate">{o.mesero}</span>
+                  <span className="text-amber-400 text-xs">{openOrderStatusLabel(o.status)}</span>
+                  <span className="text-right font-medium text-[var(--text-1)]">{formatMXN(o.total)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Option A */}
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl border border-[var(--line)] text-[var(--text-2)] hover:bg-[var(--line)] transition-colors text-sm font-medium"
+            >
+              Volver al POS y cerrar las órdenes
+            </button>
+
+            {/* Option B: manager escalation */}
+            {!escalationActive ? (
+              <button
+                onClick={() => setEscalationActive(true)}
+                className="w-full py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+              >
+                <ShieldAlert size={16} />
+                Autorizar cierre con órdenes abiertas (Gerente)
+              </button>
+            ) : (
+              <div className="bg-[var(--line)] rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-amber-400">Autorización de gerente requerida</p>
+                <p className="text-xs text-[var(--text-3)]">
+                  Las órdenes abiertas quedarán registradas en el cierre. El turno que abra a continuación verá una alerta.
+                </p>
+                <div>
+                  <label className="text-xs text-[var(--text-3)] block mb-1">PIN de gerente</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={8}
+                    value={escalationPin}
+                    onChange={(e) => { setEscalationPin(e.target.value.replace(/\D/g, '')); setEscalationError('') }}
+                    placeholder="PIN"
+                    className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-4 py-2.5 text-center text-xl tracking-[0.4em] text-[var(--text-1)] focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--text-3)] block mb-1">
+                    Motivo del cierre (mínimo 10 caracteres)
+                  </label>
+                  <textarea
+                    value={escalationNota}
+                    onChange={(e) => { setEscalationNota(e.target.value); setEscalationError('') }}
+                    placeholder="Ej: Cliente abandonó la orden. Turno siguiente debe revisar mesa 5."
+                    rows={2}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2 text-sm text-[var(--text-1)] focus:outline-none focus:border-amber-500 resize-none"
+                  />
+                </div>
+                {escalationError && (
+                  <p className="text-red-400 text-xs flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    {escalationError}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setEscalationActive(false); setEscalationPin(''); setEscalationNota(''); setEscalationError('') }}
+                    className="flex-1 py-2.5 rounded-lg border border-[var(--line)] text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--surface-2)] text-sm transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleEscalation}
+                    disabled={escalationSaving || escalationPin.length < 4 || !escalationNota.trim()}
+                    className="flex-1 py-2.5 rounded-lg bg-amber-500 text-black font-bold text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
+                  >
+                    {escalationSaving ? (
+                      <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin inline-block" />
+                    ) : (
+                      'Confirmar autorización'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Progress bar */}
         <div className="h-1 bg-[var(--line)]">
           <div
@@ -577,6 +744,8 @@ export default function CierreCajaWizard({
               Siguiente <ArrowRight size={16} />
             </button>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

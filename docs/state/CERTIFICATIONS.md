@@ -109,8 +109,11 @@ Shadow Day es un gate explícito antes de Go-Live para todo cliente nuevo (Clien
 
 ## P0-1 — Cierre con órdenes abiertas
 
-**Estado:** ABIERTO — diseño aprobado, pendiente implementación
-**Referencia:** `docs/feos/EXECUTION-PLAN.md`
+**Estado:** CERTIFIED — 2026-07-31
+**Tests:** 27 nuevos E2 + 1,870 suite completa · 0 regresiones
+**Implementación:** soft-block guard + escalación gerente (PIN + nota ≥10 chars) + banner en turno siguiente
+**Migración:** `ALTER TABLE pos_cierres ADD COLUMN IF NOT EXISTS cierre_con_ordenes_abiertas...` (ver `OCS-P0-1-GUARD08.md`)
+**Referencia:** `docs/certifications/OCS-P0-1-GUARD08.md` · `docs/feos/EXECUTION-PLAN.md`
 
 ---
 
