@@ -205,6 +205,18 @@ export function getStationByName(name: string): StationName {
   return 'cocina'
 }
 
+/**
+ * Resolve station for an OrderItem: honours the pre-computed item.station when
+ * present (set at order-creation time by category), normalises the legacy
+ * alias 'bar' → 'barra', and falls back to name-based detection otherwise.
+ */
+export function resolveItemStation(item: { station?: string; nombre?: string; name?: string }): StationName {
+  if (item.station === 'barra' || item.station === 'bar') return 'barra'
+  if (item.station === 'caja') return 'caja'
+  if (item.station === 'cocina') return 'cocina'
+  return getStationByName(item.nombre ?? item.name ?? '')
+}
+
 // ── Tiempos de platillo (estilo Wansoft: separador "XX TIEMPO: N XX" como partida $0.00) ──
 export const TIEMPO_ITEM_ID = '__tiempo__'
 

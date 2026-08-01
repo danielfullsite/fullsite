@@ -661,6 +661,12 @@ export async function getCachedOrdersByTurno(turnoId: string): Promise<Record<st
 // ─── Cash Movements by Turno ─────────────────────────────────────────────────
 // Reads from both the cash_movements IDB store and the sync_queue (for queued offline moves).
 
+export async function cacheCashMovement(movement: Record<string, unknown>): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction('cash_movements', 'readwrite')
+  tx.objectStore('cash_movements').put(movement)
+}
+
 export async function getCachedCashMovsByTurno(turnoId: string): Promise<{ type: string; amount: number }[]> {
   const db = await openDB()
   // Read from cash_movements store (synced ones)

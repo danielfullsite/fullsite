@@ -1407,7 +1407,7 @@ function normalizeModifiers(mods: string[] | undefined): string {
 /** Compare a sent snapshot against current item, return changes */
 export function detectItemChanges(
   sent: { cantidad: number; modificadores: string[]; notas: string; silla?: number },
-  current: OrderItem
+  current: { cantidad: number; modificadores: string[]; notas: string; silla?: number; nombre?: string; subtotal?: number; menuItemId?: string; station?: string }
 ): { field: string; from: string; to: string }[] {
   const changes: { field: string; from: string; to: string }[] = []
   if (sent.cantidad !== current.cantidad) {

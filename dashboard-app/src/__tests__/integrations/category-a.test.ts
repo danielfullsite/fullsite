@@ -48,7 +48,7 @@ function webhookRequest(
 }
 
 /** Build fetch mock responses keyed by URL substring. */
-function buildFetchMock(routes: Record<string, unknown>): ReturnType<typeof vi.fn> {
+function buildFetchMock(routes: Record<string, unknown>): typeof fetch {
   return vi.fn((input: RequestInfo | URL) => {
     const url = input.toString()
     for (const [pattern, body] of Object.entries(routes)) {
@@ -57,11 +57,11 @@ function buildFetchMock(routes: Record<string, unknown>): ReturnType<typeof vi.f
       }
     }
     return Promise.resolve(new Response('', { status: 200 }))
-  })
+  }) as unknown as typeof fetch
 }
 
 /** Minimal fetch mock that lets the webhook handler complete without real calls. */
-function minimalWebhookMock(overrides: Record<string, unknown> = {}): ReturnType<typeof vi.fn> {
+function minimalWebhookMock(overrides: Record<string, unknown> = {}): typeof fetch {
   return buildFetchMock({
     integration_store_mappings: [{ client_id: 'sandbox-client' }],
     integration_webhook_events: [{ id: 'evt-test-001', status: 'received', correlation_id: 'corr-test-001' }],
@@ -366,48 +366,48 @@ describe('CAT-A-030..034: Audit Log + Redaction', () => {
 
   it('CAT-A-031: sensitive keys are redacted in request payload', async () => {
     let capturedBody: Record<string, unknown> | null = null
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, opts) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (_url: unknown, opts: RequestInit | undefined) => {
       capturedBody = JSON.parse(opts?.body as string) as Record<string, unknown>
       return new Response('', { status: 200 })
-    })
+    }) as unknown as typeof fetch)
     await auditLog({
       provider: 'ubereats',
       action: 'order.accept',
       request: { access_token: 'should-be-redacted', order_id: 'preserved' },
     })
-    const req = capturedBody?.request_summary as Record<string, unknown>
+    const req = (capturedBody as Record<string, unknown> | null)?.request_summary as Record<string, unknown>
     expect(req?.access_token).toBe('***REDACTED***')
     expect(req?.order_id).toBe('preserved')
   })
 
   it('CAT-A-032: authorization header is redacted', async () => {
     let capturedBody: Record<string, unknown> | null = null
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, opts) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (_url: unknown, opts: RequestInit | undefined) => {
       capturedBody = JSON.parse(opts?.body as string) as Record<string, unknown>
       return new Response('', { status: 200 })
-    })
+    }) as unknown as typeof fetch)
     await auditLog({
       provider: 'ubereats',
       action: 'order.get_details',
       request: { authorization: 'Bearer real-token', store_id: 'preserved' },
     })
-    const req = capturedBody?.request_summary as Record<string, unknown>
+    const req = (capturedBody as Record<string, unknown> | null)?.request_summary as Record<string, unknown>
     expect(req?.authorization).toBe('***REDACTED***')
     expect(req?.store_id).toBe('preserved')
   })
 
   it('CAT-A-033: nested sensitive key is redacted', async () => {
     let capturedBody: Record<string, unknown> | null = null
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, opts) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (_url: unknown, opts: RequestInit | undefined) => {
       capturedBody = JSON.parse(opts?.body as string) as Record<string, unknown>
       return new Response('', { status: 200 })
-    })
+    }) as unknown as typeof fetch)
     await auditLog({
       provider: 'ubereats',
       action: 'store.status_update',
       request: { nested: { password: 'secret123', label: 'visible' } },
     })
-    const nested = (capturedBody?.request_summary as Record<string, unknown>)?.nested as Record<string, unknown>
+    const nested = ((capturedBody as Record<string, unknown> | null)?.request_summary as Record<string, unknown>)?.nested as Record<string, unknown>
     expect(nested?.password).toBe('***REDACTED***')
     expect(nested?.label).toBe('visible')
   })
