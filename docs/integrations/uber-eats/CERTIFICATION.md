@@ -108,9 +108,10 @@ El endpoint `https://app.fullsite.mx/api/integrations/uber-eats/webhook` NO est�
 Las siguientes variables NO están configuradas en el proyecto Vercel `fullsite`:
 
 ```
-UBER_CLIENT_ID          — de Uber Developer Console → sandbox app
-UBER_CLIENT_SECRET      — de Uber Developer Console → sandbox app
-UBER_WEBHOOK_SECRET     — string aleatorio generado por Fullsite (no por Uber)
+UBER_CLIENT_ID          — Application ID de Fullsite POS Sandbox (Uber Developer Console)
+UBER_CLIENT_SECRET      — Client Secret de la sandbox app — solo para OAuth / token exchange
+UBER_WEBHOOK_SECRET     — Signing Key del portal Uber (sección Webhooks → BASIC_HMAC)
+                          NO usar el Client Secret; son claves distintas con propósitos distintos
 UBER_ENV                — valor: sandbox
 UBER_REDIRECT_URI       — https://app.fullsite.mx/api/integrations/uber-eats/auth/callback
 ```
@@ -148,10 +149,10 @@ VALUES ('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client');
 - [x] DB migration aplicada en staging: `supabase/migrations/20260731000000_integration_framework.sql`
 - [x] USL implementado: `/api/integrations/uber-eats/auth/initiate` + `/auth/callback`
 - [x] **Categoría A cerrada: 67/67 tests PASS — commits `15f5523` + `efbc2dc`**
-- [ ] **B-1** Push `main` → Vercel deploy
-- [ ] **B-2** `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`, `UBER_WEBHOOK_SECRET`, `UBER_ENV=sandbox`, `UBER_REDIRECT_URI`
+- [x] **B-1** Push `main` → Vercel deploy — COMPLETO (commit `bbf6bea`, CI green, webhook 200)
+- [ ] **B-2** Vars en Vercel: `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`, `UBER_WEBHOOK_SECRET` (Signing Key BASIC_HMAC), `UBER_ENV=sandbox`, `UBER_REDIRECT_URI` — redeploy incluido
 - [ ] **B-3** `provider_store_id` del test store obtenido de Uber Developer Console
-- [ ] **B-4** Webhook URL registrada: `https://app.fullsite.mx/api/integrations/uber-eats/webhook`
+- [ ] **B-4** Webhook URL actualizada a v2 en Uber (BASIC_HMAC + Signing Key sin cambio); Redirect URI configurada — ejecutable en paralelo con B-2
 - [ ] **B-5** Store mapping insertado: `('ubereats', '<UBER_TEST_STORE_ID>', 'sandbox-client')`
 
 ## Categoría B — Tests con Uber real (requiere B-1..B-5)
