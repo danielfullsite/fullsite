@@ -485,6 +485,13 @@ Specific locations where AMALAY-specific code exists in the platform. Each item 
 | D-07 | `app/pos/panaderia/page.tsx` | AMALAY route | Bakery production display — AMALAY only | Add `if (!config.features.pos?.bakery_station) redirect('/pos')` | P1 |
 | D-08 | `app/pos/inventario-market/page.tsx` | AMALAY route | Retail market inventory — AMALAY only | Add `if (!config.features.posTienda) redirect('/pos')` | P1 |
 | D-09 | 17 SQL tables | SQL default | `client_id TEXT DEFAULT 'amalay'` | Apply `004_remove_amalay_defaults.sql`. Verify all INSERTs explicit. | P0 |
+| D-10 | `cloudflare/delivery-worker/src/index.ts:60,91,122` | Hardcode | `client_id: 'amalay'` en los 3 parsers de webhook (Uber, Rappi, Didi) | Extraer `client_id` del contexto del webhook (header `X-Client-Id` o URL path). | P0 |
+| D-11 | `dashboard-app/src/app/api/chat/route.ts:765` + `api/voice/route.ts:392` | Hardcode | Lista de meseros AMALAY hardcodeada en contexto de IA | Leer desde `pos_staff WHERE client_id = current_client` en tiempo real. | P0 |
+| D-12 | `agents/reviews-manager/worker/src/lib/groq-api.ts:32,46,50` | Hardcode | `hola@cafeamalay.com` hardcodeado en lógica de escalación de reseñas | Leer email de escalación desde `clients.support_email` o config del cliente. | P0 |
+| D-13 | `electron-kds/main.js:57` | Hardcode | URL de Supabase auth hardcodeada (`qjiomlvudfmzuvqvhwpk`) | Leer desde variable de entorno `SUPABASE_URL` — fallo explícito si ausente. | P1 |
+| D-14 | `dashboard-app/src/lib/roles.ts:28` | Hardcode | `'ramonfaur.daniel@gmail.com' → 'dueño'` fallback de rol | Eliminar. Roles vienen exclusivamente de `client_users.role`. | P1 |
+| D-15 | `cloudflare/orquestador-worker/src/lib/claude-api.ts:5-39` | Hardcode | SYSTEM_PROMPT con contexto de negocio AMALAY (Mónica, Plaza Duendes, horarios) | Cargar contexto desde `clients` table en runtime. Prompt genérico + datos del cliente. | P1 |
+| D-16 | `.github/scripts/client_config.py:21` (y 9+ scripts Python) | Default | `get_client()` retorna `'amalay'` si `CLIENT_ID` no está en env | Eliminar default. Requerir `CLIENT_ID` env var. Fallo explícito si ausente. | P1 |
 
 **SQL migration:**
 
@@ -626,8 +633,14 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 | 6 | Auto-seed on provisioning | `onboard_client.py` + FEOS Provisioning | 3h | No manual seed SQL |
 | 7 | Export 194 RLS policies to SQL migration | `supabase/migrations/004_rls_policies.sql` | 3h | Reproducible tenant isolation |
 | 8 | Dynamic menu categories from DB | `lib/pos-data.ts`, `lib/pos-constants.ts` | 6h | Zero hardcoded categories |
-| 9 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
-| 10 | Smoke test with VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
+| 9 | Parameterize delivery-worker webhook parsers (D-10) | `cloudflare/delivery-worker/src/index.ts` | 2h | Delivery integrations multi-tenant |
+| 10 | Fetch meseros from DB in chat/voice AI context (D-11) | `api/chat/route.ts`, `api/voice/route.ts` | 2h | AI context correcto para cualquier cliente |
+| 11 | Review escalation desde clients table (D-12) | `agents/reviews-manager/worker/src/lib/groq-api.ts` | 1h | Review agent multi-tenant |
+| 12 | Eliminar email-to-role fallback (D-14) | `lib/roles.ts` | 30min | Auth sin datos AMALAY |
+| 13 | Orquestador SYSTEM_PROMPT dinámico (D-15) | `cloudflare/orquestador-worker/src/lib/claude-api.ts` | 3h | War Room multi-tenant |
+| 14 | Python scripts: CLIENT_ID requerido (D-16) | `.github/scripts/client_config.py` + 8 scripts | 2h | Automation sin default AMALAY |
+| 15 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
+| 16 | Smoke test con VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
 
 ---
 
