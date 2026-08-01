@@ -680,8 +680,48 @@ No phase advances because "it's almost there." Each phase closes only when all c
 | Phase | Closed when... |
 |---|---|
 | **P0 — Operational Certification Suite** | All modules certified. P0/P1 gaps resolved. Evidence consolidated in `docs/certifications/`. Parity or superiority vs Wansoft on equivalent flows. |
-| **P1 — Golden Skeleton** | Any restaurant provisions from Minute 0 with zero AMALAY-specific logic. D-01 through D-09 from AMALAY Debt Registry resolved and verified. |
+| **P1 — Golden Skeleton** | Debt Registry P0+P1 items = 0. Smoke test NÓMADA-MINI passes. See P1 exit gate below. |
 | **P2 — FEOS Core** | Multiple organizations, restaurants, users, roles, and permissions working end-to-end. ZHO-01/02/03/04 resolved with evidence. |
+
+#### P1 Exit Gate — Reglas formales (formalizado 2026-08-01)
+
+**Criterio de cierre por ítem del Debt Registry:**
+
+Una deuda (D-XX) solo se marca cerrada cuando existe evidencia objetiva:
+1. Commit con el fix identificable
+2. Tests que demuestren que la dependencia desapareció (grep, suite, o prueba funcional)
+3. Para P0: demostración funcional de que el módulo afectado opera para un restaurante nuevo sin depender de AMALAY
+
+"El código se ve bien" no cierra ningún ítem.
+
+**Clasificación durante P1:**
+
+| Prioridad | Definición | Ejemplos |
+|---|---|---|
+| P0 | Bloquea Minute 0 o rompe multi-tenencia | D-01, D-03, D-04, D-09, D-10, D-11, D-12 |
+| P1 | Impide que el Skeleton sea completamente genérico | D-05, D-06, D-07, D-08, D-13, D-14, D-15, D-16 |
+| P2/P3 | No bloquea clonabilidad — ejecutar después del smoke test | HC-08, HC-09, HC-10 |
+
+**Gate de salida:**
+
+- Debt Registry debe llegar a **P0 = 0 y P1 = 0** antes del smoke test NÓMADA-MINI
+- Si durante el smoke test aparece una nueva dependencia AMALAY: registrar como D-xx, corregir, repetir el smoke test
+- El objetivo es que el Skeleton salga realmente independiente, no "suficientemente bueno"
+- Si durante la implementación aparecen nuevas dependencias reales: ampliar el registro, no cerrar P1 con deuda oculta
+
+**Smoke test NÓMADA-MINI (criterio de aceptación final):**
+
+```
+1. python3 scripts/onboard_client.py --client-id nomada --display-name "Nómada Mini"
+2. Login con credenciales del restaurante nuevo (ningún token ni cookie de AMALAY)
+3. POS carga sin datos de AMALAY visibles en ninguna pantalla
+4. Tomar una orden → enviar a cocina → cobrar → imprimir ticket
+5. AI Chat responde con contexto de "Nómada Mini", no de AMALAY
+6. Dashboard KPIs en cero — no hay datos de otro restaurante visibles
+7. grep -r "amalay" src/ lib/ app/ (excluir docs/) → 0 hits relevantes
+```
+
+Si cualquier paso falla → nueva deuda D-xx → fix → repetir desde paso 1.
 | **P3 — Demo 24/7** | Creating an org + restaurant from FEOS produces a fully operational Dashboard, POS, and KDS — zero code touched, zero manual SQL. |
 
 ### Development Cycle
