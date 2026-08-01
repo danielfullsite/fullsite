@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fullsite — Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #0a0a0a;
+    --white: #ffffff;
+    --gray-50: #fafafa;
+    --gray-100: #f4f4f5;
+    --gray-200: #e4e4e7;
+    --gray-400: #a1a1aa;
+    --gray-500: #71717a;
+    --gray-600: #52525b;
+    --gray-700: #3f3f46;
+    --gray-800: #27272a;
+    --gray-900: #18181b;
+    --emerald: #10b981;
+    --emerald-dark: #059669;
+    --emerald-light: #d1fae5;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--white);
+    color: var(--gray-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    padding: 80px 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .slide-number {
+    position: absolute;
+    bottom: 40px;
+    right: 60px;
+    font-size: 13px;
+    color: var(--gray-400);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  .slide-question {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--emerald);
+    font-weight: 600;
+    margin-bottom: 40px;
+  }
+
+  /* ===== SLIDE 1: Cover ===== */
+  .slide-cover {
+    background: var(--black);
+    color: var(--white);
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .slide-cover .logo {
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+
+  .slide-cover .logo span {
+    color: var(--emerald);
+  }
+
+  .slide-cover .tagline {
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--gray-400);
+    letter-spacing: 0.02em;
+    max-width: 600px;
+  }
+
+  .slide-cover .contact {
+    position: absolute;
+    bottom: 50px;
+    font-size: 14px;
+    color: var(--gray-500);
+    font-weight: 400;
+  }
+
+  .slide-cover .date {
+    position: absolute;
+    top: 50px;
+    right: 60px;
+    font-size: 13px;
+    color: var(--gray-600);
+    font-weight: 500;
+  }
+
+  /* ===== Typography ===== */
+  h1 {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 32px;
+    max-width: 800px;
+  }
+
+  h2 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+    max-width: 750px;
+  }
+
+  h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--gray-800);
+  }
+
+  .lead {
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--gray-600);
+    max-width: 700px;
+    margin-bottom: 40px;
+    font-weight: 400;
+  }
+
+  .body-text {
+    font-size: 18px;
+    line-height: 1.7;
+    color: var(--gray-700);
+    max-width: 680px;
+  }
+
+  .body-text + .body-text { margin-top: 20px; }
+
+  .highlight {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--black);
+    line-height: 1.5;
+    margin-top: 40px;
+    max-width: 650px;
+    border-left: 4px solid var(--emerald);
+    padding-left: 24px;
+  }
+
+  .punchline {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--black);
+    margin-top: 48px;
+    letter-spacing: -0.01em;
+  }
+
+  .punchline-sub {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--gray-600);
+    margin-top: 8px;
+  }
+
+  /* ===== Stat blocks ===== */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin-top: 40px;
+    max-width: 900px;
+  }
+
+  .stat-block {
+    border-left: 3px solid var(--emerald);
+    padding-left: 20px;
+  }
+
+  .stat-number {
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--black);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin-top: 8px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* ===== Insight cards ===== */
+  .insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 40px;
+    max-width: 900px;
+  }
+
+  .insight-card {
+    background: var(--gray-50);
+    border-radius: 12px;
+    padding: 28px;
+    border: 1px solid var(--gray-200);
+  }
+
+  .insight-card .tag {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+    color: var(--emerald-dark);
+    margin-bottom: 12px;
+  }
+
+  .insight-card .finding {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--gray-900);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+
+  .insight-card .detail {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+
+  /* ===== Evidence table ===== */
+  .evidence-table {
+    margin-top: 36px;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  .evidence-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 20px 0;
+  }
+
+  .evidence-row:first-child {
+    border-top: 2px solid var(--black);
+  }
+
+  .evidence-what {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+    padding-right: 32px;
+  }
+
+  .evidence-why {
+    font-size: 15px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+
+  /* ===== Flywheel ===== */
+  .flywheel-container {
+    display: flex;
+    align-items: center;
+    gap: 80px;
+    margin-top: 40px;
+  }
+
+  .flywheel-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .flywheel-step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+  }
+
+  .flywheel-step .icon {
+    width: 36px;
+    height: 36px;
+    background: var(--emerald);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .flywheel-step .text {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--gray-800);
+  }
+
+  .flywheel-arrow {
+    text-align: center;
+    color: var(--gray-300);
+    font-size: 20px;
+    padding: 2px 0 2px 18px;
+  }
+
+  .flywheel-quote {
+    max-width: 350px;
+  }
+
+  .flywheel-quote .big {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--black);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .flywheel-quote .sub {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--emerald);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin-top: 4px;
+  }
+
+  .flywheel-quote .explain {
+    margin-top: 24px;
+    font-size: 15px;
+    color: var(--gray-500);
+    line-height: 1.6;
+  }
+
+  /* ===== Matrix ===== */
+  .matrix-container {
+    margin-top: 40px;
+    position: relative;
+    width: 700px;
+    height: 420px;
+  }
+
+  .matrix-bg {
+    position: absolute;
+    inset: 40px 0 0 60px;
+    border-left: 2px solid var(--gray-200);
+    border-bottom: 2px solid var(--gray-200);
+  }
+
+  .matrix-label-y {
+    position: absolute;
+    left: 0;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gray-400);
+  }
+
+  .matrix-label-y.top { top: 60px; }
+  .matrix-label-y.bottom { bottom: 20px; }
+
+  .matrix-label-x {
+    position: absolute;
+    bottom: -30px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gray-400);
+  }
+
+  .matrix-label-x.left { left: 80px; }
+  .matrix-label-x.right { right: 20px; }
+
+  .matrix-dot {
+    position: absolute;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .matrix-dot.legacy {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    border: 1px solid var(--gray-200);
+  }
+
+  .matrix-dot.fullsite {
+    background: var(--emerald);
+    color: white;
+    font-size: 15px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+  }
+
+  /* ===== Wedge reasons ===== */
+  .wedge-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-top: 36px;
+    max-width: 900px;
+  }
+
+  .wedge-item {
+    padding: 24px;
+    border-radius: 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+  }
+
+  .wedge-item h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 8px;
+  }
+
+  .wedge-item p {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+
+  .wedge-item .number {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--emerald);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  /* ===== Founder ===== */
+  .founder-blocks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 36px;
+    max-width: 900px;
+  }
+
+  .founder-block {
+    border-left: 3px solid var(--emerald);
+    padding-left: 20px;
+  }
+
+  .founder-block .instead {
+    font-size: 14px;
+    color: var(--gray-400);
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .founder-block .did {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 6px;
+  }
+
+  .founder-block .proof {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+
+  /* ===== Business model ===== */
+  .biz-stages {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 28px;
+    margin-top: 36px;
+    max-width: 900px;
+  }
+
+  .biz-stage {
+    text-align: center;
+    padding: 32px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    position: relative;
+  }
+
+  .biz-stage .stage-num {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--emerald);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+  }
+
+  .biz-stage h4 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 8px;
+  }
+
+  .biz-stage p {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+
+  .biz-stage.active {
+    background: var(--black);
+    border-color: var(--black);
+  }
+
+  .biz-stage.active h4 { color: var(--white); }
+  .biz-stage.active p { color: var(--gray-400); }
+  .biz-stage.active .stage-num { color: var(--emerald); }
+
+  .biz-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 20px;
+    max-width: 900px;
+    font-size: 14px;
+    color: var(--gray-400);
+  }
+
+  /* ===== Round ===== */
+  .round-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    margin-top: 36px;
+    max-width: 900px;
+  }
+
+  .round-uses h4 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gray-400);
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+
+  .round-use {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 15px;
+  }
+
+  .round-use .label { color: var(--gray-700); }
+  .round-use .amount { font-weight: 700; color: var(--black); }
+
+  .milestones h4 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gray-400);
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+
+  .milestone {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+  }
+
+  .milestone .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--emerald);
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .milestone .text {
+    font-size: 15px;
+    color: var(--gray-700);
+    line-height: 1.4;
+  }
+
+  /* ===== Vision slide ===== */
+  .slide-vision {
+    background: var(--black);
+    color: var(--white);
+    text-align: center;
+    align-items: center;
+  }
+
+  .slide-vision .vision-text {
+    font-size: 32px;
+    font-weight: 300;
+    line-height: 1.6;
+    max-width: 700px;
+    color: var(--gray-400);
+  }
+
+  .slide-vision .vision-bold {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.6;
+    max-width: 700px;
+    color: var(--white);
+    margin-top: 32px;
+  }
+
+  .slide-vision .vision-italic {
+    font-size: 22px;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--emerald);
+    margin-top: 40px;
+    max-width: 600px;
+  }
+
+  .slide-vision .started {
+    font-size: 20px;
+    color: var(--gray-500);
+    margin-top: 48px;
+    font-weight: 400;
+  }
+
+  /* ===== Closing ===== */
+  .slide-close {
+    background: var(--black);
+    color: var(--white);
+    text-align: center;
+    align-items: center;
+  }
+
+  .slide-close .logo {
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+  }
+
+  .slide-close .logo span { color: var(--emerald); }
+
+  .slide-close .tagline {
+    font-size: 20px;
+    color: var(--gray-500);
+    margin-top: 16px;
+    font-weight: 300;
+  }
+
+  .slide-close .contact-info {
+    margin-top: 48px;
+    font-size: 16px;
+    color: var(--gray-400);
+    line-height: 2;
+  }
+
+  /* ===== Appendix ===== */
+  .slide-appendix {
+    background: var(--gray-50);
+    padding: 60px 120px;
+  }
+
+  .slide-appendix h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--gray-400);
+    font-weight: 700;
+    margin-bottom: 32px;
+  }
+
+  .appendix-section {
+    margin-bottom: 36px;
+  }
+
+  .appendix-section h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 16px;
+  }
+
+  .app-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .app-table th {
+    text-align: left;
+    padding: 10px 16px;
+    background: var(--gray-200);
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .app-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-600);
+  }
+
+  .app-table td:first-child { font-weight: 500; color: var(--gray-800); }
+
+  .watermark {
+    position: absolute;
+    top: 40px;
+    left: 60px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-300);
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== AI examples ===== */
+  .ai-example {
+    background: var(--gray-900);
+    border-radius: 12px;
+    padding: 28px;
+    font-family: 'Inter', monospace;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--gray-300);
+    margin-top: 12px;
+    max-width: 600px;
+    margin-bottom: 24px;
+  }
+
+  .ai-example .alert-tag {
+    color: var(--emerald);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+  }
+
+  .ai-example .value {
+    color: var(--white);
+    font-weight: 600;
+  }
+
+  /* ===== Print ===== */
+  @media print {
+    .slide { min-height: 100vh; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @page {
+    size: 16in 9in;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== SLIDE 1: COVER ==================== -->
+<div class="slide slide-cover">
+  <div class="date">Julio 2026 | Confidencial</div>
+  <div class="logo">FULL<span>SITE</span></div>
+  <div class="tagline">The Intelligence Layer for Restaurant Operations.</div>
+  <div class="contact">Daniel Ramonfaur &nbsp;|&nbsp; daniel@fullsite.mx &nbsp;|&nbsp; fullsite.mx</div>
+</div>
+
+<!-- ==================== SLIDE 2: THE SHIFT ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">El cambio &mdash; Por que este problema importa</div>
+  <h1>El software de restaurantes lleva 20 anos haciendo lo mismo.</h1>
+  <div class="lead">
+    Registra la venta. Registra el corte. Registra la cancelacion.
+  </div>
+  <div class="body-text">
+    Pero no dice por que el food cost subio. No dice que proveedor esta fallando. No dice que platillos estan perdiendo dinero.
+  </div>
+  <div class="body-text">
+    El dueno se entera al dia siguiente. Cuando ya perdio dinero.
+  </div>
+  <div class="highlight">Registrar no es operar.<br>La siguiente generacion de software no registra. Decide.</div>
+  <div class="slide-number">02</div>
+</div>
+
+<!-- ==================== SLIDE 3: TIMING ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">La oportunidad &mdash; Por que ahora</div>
+  <h2>Tres cosas cambiaron al mismo tiempo.</h2>
+
+  <div class="body-text" style="margin-bottom: 28px;">
+    <strong>Los modelos de IA ya razonan sobre operaciones.</strong><br>
+    Pueden cruzar 903 dias de ventas con 615 recetas y 202 proveedores y encontrar que tu platillo estrella depende de un ingrediente de $5 que compras a un solo proveedor.
+  </div>
+
+  <div class="body-text" style="margin-bottom: 28px;">
+    <strong>La infraestructura cloud elimino la barrera de entrada.</strong><br>
+    Lo que antes requeria anos de desarrollo e instalacion local, hoy se despliega en minutos como una app web.
+  </div>
+
+  <div class="body-text">
+    <strong>La arquitectura legacy hace extremadamente dificil incorporar inteligencia en tiempo real.</strong><br>
+    No es que no quieran. Es que el costo de la transicion es prohibitivo.
+  </div>
+
+  <div class="highlight">La ventana para construir la nueva categoria esta abierta.</div>
+  <div class="slide-number">03</div>
+</div>
+
+<!-- ==================== SLIDE 4: WHAT ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">El producto &mdash; Que hacen exactamente</div>
+  <h2>La capa de inteligencia sobre toda la operacion de un restaurante.</h2>
+  <div class="lead">No un POS. No un dashboard. No un chatbot. Un sistema que ingiere cada evento operativo y lo convierte en decisiones.</div>
+
+  <div class="ai-example">
+    <div class="alert-tag">ALERTA DE COSTOS</div><br>
+    El food cost de tus <span class="value">chilaquiles</span> subio de <span class="value">16%</span> a <span class="value">23%</span>.<br>
+    El tomate aumento 40% esta semana.<br>
+    ¿Ajustas porcion o precio?
+  </div>
+
+  <div class="ai-example">
+    <div class="alert-tag">ALERTA DE FRAUDE</div><br>
+    <span class="value">Oscar</span> cancelo <span class="value">3 platillos</span> en 45 minutos.<br>
+    Su promedio es 0.8 por turno.<br>
+    Probabilidad de anomalia: <span class="value">94%</span>.
+  </div>
+
+  <div class="ai-example">
+    <div class="alert-tag">COMPRA SUGERIDA</div><br>
+    Se te acaba el <span class="value">aguacate</span> en 2 dias.<br>
+    Tu proveedor entrega en 24h.<br>
+    ¿Genero la orden de compra?
+  </div>
+
+  <div class="slide-number">04</div>
+</div>
+
+<!-- ==================== SLIDE 5: INSIGHTS ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Inteligencia &mdash; Ya funciona</div>
+  <h2>Con un solo restaurante, encontramos lo que 20 anos de software nunca detecto.</h2>
+
+  <div class="insights-grid">
+    <div class="insight-card">
+      <div class="tag">Costos</div>
+      <div class="finding">5 platillos se venden con margen negativo.</div>
+      <div class="detail">Una totebag de $75 tiene costo de $1,000. Invisible hasta hoy.</div>
+    </div>
+    <div class="insight-card">
+      <div class="tag">Cadena de suministro</div>
+      <div class="finding">56 platillos dependen de una flor de $5.</div>
+      <div class="detail">Un solo proveedor abastece toda la cadena critica de frutas y verduras.</div>
+    </div>
+    <div class="insight-card">
+      <div class="tag">Revenue</div>
+      <div class="finding">26 platillos generan el 80% del ingreso.</div>
+      <div class="detail">CHILAQUILES = 17.2% de todas las ventas. Un solo platillo.</div>
+    </div>
+    <div class="insight-card">
+      <div class="tag">Calidad de datos</div>
+      <div class="finding">439 de 615 recetas tienen un solo ingrediente.</div>
+      <div class="detail">81 ingredientes son referencias rotas. El software anterior nunca lo detecto.</div>
+    </div>
+  </div>
+
+  <div class="punchline">Esto con un restaurante.</div>
+  <div class="punchline-sub">Imagina con 100.</div>
+  <div class="slide-number">05</div>
+</div>
+
+<!-- ==================== SLIDE 6: EVIDENCE ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Ejecucion &mdash; Pueden ejecutar</div>
+  <h2>No estamos pidiendo dinero para construir. Estamos pidiendo dinero para ganar.</h2>
+
+  <div class="evidence-table">
+    <div class="evidence-row">
+      <div class="evidence-what">903 dias de operacion continua modelados</div>
+      <div class="evidence-why">No es un piloto. Son 2.5 anos de operacion real.</div>
+    </div>
+    <div class="evidence-row">
+      <div class="evidence-what">Cutover completo del sistema lider</div>
+      <div class="evidence-why">Estamos reemplazando al incumbente en produccion. 8 julio 2026.</div>
+    </div>
+    <div class="evidence-row">
+      <div class="evidence-what">Reverse engineering: 211 pantallas, 822 SPs</div>
+      <div class="evidence-why">Entendemos al lider mejor que sus propios equipos.</div>
+    </div>
+    <div class="evidence-row">
+      <div class="evidence-what">30 agentes de IA corriendo 24/7</div>
+      <div class="evidence-why">No es roadmap. Ya esta en produccion.</div>
+    </div>
+    <div class="evidence-row">
+      <div class="evidence-what">615 recetas + 522 platillos + 202 proveedores</div>
+      <div class="evidence-why">La migracion funciona y es rapida.</div>
+    </div>
+    <div class="evidence-row">
+      <div class="evidence-what">Arquitectura offline-first con sync</div>
+      <div class="evidence-why">Resuelto el problema #1 de software en LATAM.</div>
+    </div>
+  </div>
+
+  <div class="slide-number">06</div>
+</div>
+
+<!-- ==================== SLIDE 7: FLYWHEEL ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Moat &mdash; Por que ganan</div>
+  <h2>Cada restaurante hace mas inteligente a todos los demas.</h2>
+
+  <div class="flywheel-container">
+    <div class="flywheel-steps">
+      <div class="flywheel-step"><div class="icon">1</div><div class="text">+1 Restaurante</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon">2</div><div class="text">Mas eventos operativos</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon">3</div><div class="text">Mejores modelos</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon">4</div><div class="text">Mejores decisiones</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon">5</div><div class="text">Mas valor por restaurante</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon">6</div><div class="text">Menor churn + mas referidos</div></div>
+      <div class="flywheel-arrow">&darr;</div>
+      <div class="flywheel-step"><div class="icon" style="background: var(--black);">+1</div><div class="text">Siguiente restaurante</div></div>
+    </div>
+
+    <div class="flywheel-quote">
+      <div class="big">Los datos no son el moat.</div>
+      <div class="sub">Las decisiones aprendidas si.</div>
+      <div class="explain">
+        Eso no se replica con mas ingenieros. Se replica con mas restaurantes. Cada uno alimenta modelos que mejoran las recomendaciones para todos los demas.
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-number">07</div>
+</div>
+
+<!-- ==================== SLIDE 8: POSITIONING ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Categoria &mdash; Por que no otro POS</div>
+  <h2>Fullsite no compite con POS. Crea la categoria.</h2>
+
+  <div class="matrix-container">
+    <div class="matrix-bg"></div>
+
+    <div class="matrix-label-y top">Inteligencia operativa</div>
+    <div class="matrix-label-y bottom">Registro de transacciones</div>
+    <div class="matrix-label-x left">Punto de venta</div>
+    <div class="matrix-label-x right">Sistema operativo</div>
+
+    <!-- Bottom left: basic POS -->
+    <div class="matrix-dot legacy" style="left: 120px; bottom: 70px;">Poster</div>
+    <div class="matrix-dot legacy" style="left: 220px; bottom: 90px;">Clip</div>
+
+    <!-- Bottom right: legacy OS -->
+    <div class="matrix-dot legacy" style="right: 100px; bottom: 80px;">Wansoft</div>
+    <div class="matrix-dot legacy" style="right: 60px; bottom: 130px;">SoftRestaurant</div>
+
+    <!-- Top right: Fullsite -->
+    <div class="matrix-dot fullsite" style="right: 40px; top: 60px;">FULLSITE</div>
+  </div>
+
+  <div class="body-text" style="margin-top: 20px;">
+    Los POS basicos digitalizaron la caja pero no operan el negocio.<br>
+    Los sistemas completos operan el negocio pero con tecnologia de hace 20 anos.<br>
+    <strong>Nadie ha construido un sistema operativo con inteligencia.</strong>
+  </div>
+
+  <div class="slide-number">08</div>
+</div>
+
+<!-- ==================== SLIDE 9: WHY RESTAURANTS ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Mercado &mdash; Por que restaurantes</div>
+  <h2>El mejor punto de entrada para inteligencia operativa.</h2>
+
+  <div class="wedge-grid">
+    <div class="wedge-item">
+      <div class="number">Alta complejidad</div>
+      <h4>Inventario perecedero + personal rotativo</h4>
+      <p>El 35-45% del ingreso se va en insumos. Multiples canales: salon, llevar, delivery. Rotacion de personal cada 3 meses.</p>
+    </div>
+    <div class="wedge-item">
+      <div class="number">Baja sofisticacion</div>
+      <h4>90% usa software legacy o nada</h4>
+      <p>El lider del mercado en Mexico corre en tecnologia de 2007. No tiene IA, no tiene real-time, no tiene mobile.</p>
+    </div>
+    <div class="wedge-item">
+      <div class="number">Alta frecuencia</div>
+      <h4>Cientos de eventos operativos al dia</h4>
+      <p>Transacciones diarias. Compras semanales. Rotacion mensual. Cada operacion alimenta los modelos.</p>
+    </div>
+    <div class="wedge-item">
+      <div class="number">Alto dolor</div>
+      <h4>Decisiones a ciegas</h4>
+      <p>El dueno promedio no sabe su food cost real. No sabe que platillos pierden dinero. No sabe si un empleado esta robando.</p>
+    </div>
+  </div>
+
+  <div class="stat-row" style="margin-top: 36px;">
+    <div class="stat-block">
+      <div class="stat-number">600K+</div>
+      <div class="stat-label">Restaurantes en Mexico</div>
+    </div>
+    <div class="stat-block">
+      <div class="stat-number">$850M</div>
+      <div class="stat-label">Mercado de software (USD)</div>
+    </div>
+    <div class="stat-block">
+      <div class="stat-number">~0%</div>
+      <div class="stat-label">Usan inteligencia operativa</div>
+    </div>
+  </div>
+
+  <div class="slide-number">09</div>
+</div>
+
+<!-- ==================== SLIDE 10: FOUNDER ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Equipo &mdash; Por que este founder</div>
+  <h2>Construi Fullsite porque veia a mis gerentes tomar decisiones con informacion que llegaba tarde.</h2>
+
+  <div class="founder-blocks">
+    <div class="founder-block">
+      <div class="instead">En lugar de entrevistar restauranteros</div>
+      <div class="did">Opere uno.</div>
+      <div class="proof">AMALAY Coffee & Market. $31M MXN en ventas 2025. 40 empleados. Operacion real, no simulacion.</div>
+    </div>
+    <div class="founder-block">
+      <div class="instead">En lugar de estudiar al incumbente</div>
+      <div class="did">Lo desmonte pieza por pieza.</div>
+      <div class="proof">211 pantallas. 822 stored procedures. 150+ endpoints. Todo documentado en "La Biblia de Wansoft".</div>
+    </div>
+    <div class="founder-block">
+      <div class="instead">En lugar de hacer un MVP</div>
+      <div class="did">Reemplace el sistema completo.</div>
+      <div class="proof">Cutover en produccion: 8 julio 2026. No validacion de concepto — reemplazo real.</div>
+    </div>
+    <div class="founder-block">
+      <div class="instead">En lugar de contratar un equipo</div>
+      <div class="did">Construi todo solo.</div>
+      <div class="proof">POS, KDS, print bridge, 30 agentes IA, dashboard, sync engine, event store, permisos granulares.</div>
+    </div>
+  </div>
+
+  <div class="highlight" style="margin-top: 36px;">
+    Acceso operativo + obsesion + capacidad tecnica.<br>
+    No conozco a nadie mas que sea dueno de restaurante e ingeniero de software al mismo tiempo.
+  </div>
+
+  <div class="slide-number">10</div>
+</div>
+
+<!-- ==================== SLIDE 11: BUSINESS MODEL ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">Modelo &mdash; Como escala</div>
+  <h2>Entrada &rarr; Inteligencia &rarr; Red</h2>
+
+  <div class="biz-stages">
+    <div class="biz-stage">
+      <div class="stage-num">Fase 1 &mdash; Entrada</div>
+      <h4>POS</h4>
+      <p>Setup gratuito. Adopcion inmediata. Reemplazo directo del sistema actual. El POS es la puerta, no el producto.</p>
+    </div>
+    <div class="biz-stage active">
+      <div class="stage-num">Fase 2 &mdash; Retencion</div>
+      <h4>Inteligencia</h4>
+      <p>Food cost en tiempo real. Alertas de fraude. Prediccion de demanda. Compras sugeridas. El valor que retiene al cliente.</p>
+    </div>
+    <div class="biz-stage">
+      <div class="stage-num">Fase 3 &mdash; Escala</div>
+      <h4>Red</h4>
+      <p>Benchmarks anonimos. Compras grupales. Predicciones cruzadas. Cada restaurante amplifica el valor para todos.</p>
+    </div>
+  </div>
+
+  <div class="highlight" style="margin-top: 40px;">El modelo expande revenue por cliente sin expandir costo de servicio.</div>
+
+  <div class="slide-number">11</div>
+</div>
+
+<!-- ==================== SLIDE 12: THE ROUND ==================== -->
+<div class="slide">
+  <div class="watermark">FULLSITE</div>
+  <div class="slide-question">La ronda &mdash; Por que invertir hoy</div>
+  <h2>$500K USD &nbsp;|&nbsp; Pre-seed &nbsp;|&nbsp; SAFE</h2>
+
+  <div class="round-grid">
+    <div class="round-uses">
+      <h4>Uso de fondos</h4>
+      <div class="round-use">
+        <span class="label">CTO + equipo de ingenieria</span>
+        <span class="amount">$250K</span>
+      </div>
+      <div class="round-use">
+        <span class="label">Go-to-market Monterrey</span>
+        <span class="amount">$150K</span>
+      </div>
+      <div class="round-use">
+        <span class="label">Operaciones + legal</span>
+        <span class="amount">$100K</span>
+      </div>
+    </div>
+
+    <div class="milestones">
+      <h4>Hitos a 12 meses</h4>
+      <div class="milestone"><div class="dot"></div><div class="text">50 restaurantes activos en Monterrey</div></div>
+      <div class="milestone"><div class="dot"></div><div class="text">$200K MXN MRR</div></div>
+      <div class="milestone"><div class="dot"></div><div class="text">Food cost engine + compras en produccion</div></div>
+      <div class="milestone"><div class="dot"></div><div class="text">Aplicacion a YC W27</div></div>
+    </div>
+  </div>
+
+  <div class="highlight" style="margin-top: 40px;">
+    Esta ronda se trata de ganar Monterrey antes de que alguien mas se de cuenta de que la categoria cambio.
+  </div>
+
+  <div class="body-text" style="margin-top: 24px; font-size: 16px;">
+    El cutover del piloto es la proxima semana.
+    El ex-director comercial del incumbente esta disponible para liderar ventas.
+    Los primeros 100 restaurantes a migrar estan identificados.
+  </div>
+
+  <div class="slide-number">12</div>
+</div>
+
+<!-- ==================== SLIDE 13: VISION ==================== -->
+<div class="slide slide-vision">
+  <div class="vision-text">
+    Hace veinte anos, el software aprendio<br>a registrar transacciones.
+  </div>
+  <div class="vision-bold">
+    La proxima decada sera cuando<br>aprenda a operar negocios.
+  </div>
+  <div class="vision-italic">
+    Every physical business eventually becomes<br>an intelligence business.
+  </div>
+  <div class="started">Y nosotros ya empezamos.</div>
+  <div class="slide-number" style="color: var(--gray-600);">13</div>
+</div>
+
+<!-- ==================== SLIDE 14: CLOSE ==================== -->
+<div class="slide slide-close">
+  <div class="logo">FULL<span>SITE</span></div>
+  <div class="tagline">The Intelligence Layer for Restaurant Operations.</div>
+  <div class="contact-info">
+    Daniel Ramonfaur<br>
+    daniel@fullsite.mx<br>
+    fullsite.mx
+  </div>
+  <div class="slide-number" style="color: var(--gray-600);">14</div>
+</div>
+
+<!-- ==================== APPENDIX ==================== -->
+<div class="slide slide-appendix">
+  <h2>Appendix &mdash; Datos de respaldo</h2>
+
+  <div class="appendix-section">
+    <h3>Operacion del piloto (AMALAY Coffee & Market, Monterrey)</h3>
+    <table class="app-table">
+      <tr><th>Periodo</th><th>Ventas</th></tr>
+      <tr><td>903 dias modelados (total)</td><td>$73.7M MXN</td></tr>
+      <tr><td>2024</td><td>$27.8M MXN</td></tr>
+      <tr><td>2025</td><td>$31.1M MXN</td></tr>
+      <tr><td>2026 (6 meses)</td><td>$14.7M MXN</td></tr>
+      <tr><td>Promedio diario</td><td>$81,565 MXN</td></tr>
+    </table>
+  </div>
+
+  <div class="appendix-section">
+    <h3>Inteligencia generada</h3>
+    <table class="app-table">
+      <tr><th>Hallazgo</th><th>Detalle</th></tr>
+      <tr><td>Pareto de revenue</td><td>26 platillos (19.3%) = 80% del ingreso</td></tr>
+      <tr><td>Food cost cocina</td><td>24.9% promedio (industria target: 25-35%)</td></tr>
+      <tr><td>Margenes negativos</td><td>5 platillos detectados automaticamente</td></tr>
+      <tr><td>Dependencias criticas</td><td>56 platillos dependen de 1 ingrediente de $5</td></tr>
+      <tr><td>Riesgo de proveedor</td><td>1 proveedor abastece 40% de ingredientes criticos</td></tr>
+      <tr><td>Calidad de datos</td><td>439/615 recetas incompletas, nunca detectado</td></tr>
+    </table>
+  </div>
+
+  <div class="appendix-section">
+    <h3>Datos migrados del incumbente</h3>
+    <table class="app-table">
+      <tr><th>Dataset</th><th>Registros</th></tr>
+      <tr><td>Platillos (menu)</td><td>522</td></tr>
+      <tr><td>Recetas con ingredientes</td><td>615</td></tr>
+      <tr><td>Productos de inventario</td><td>3,000+</td></tr>
+      <tr><td>Costos por producto</td><td>878</td></tr>
+      <tr><td>Proveedores</td><td>202</td></tr>
+      <tr><td>Modificadores y asignaciones</td><td>114 / 517</td></tr>
+      <tr><td>Ventas historicas</td><td>903 dias</td></tr>
+    </table>
+  </div>
+
+  <div class="appendix-section">
+    <h3>Stack tecnico</h3>
+    <p style="font-size: 14px; color: var(--gray-600); line-height: 1.8;">
+      Next.js 15 (PWA offline-first) &nbsp;|&nbsp; Supabase (PostgreSQL) &nbsp;|&nbsp; Vercel &nbsp;|&nbsp; Claude API &nbsp;|&nbsp; 30 agentes autonomos &nbsp;|&nbsp; Bridge Node.js ESC/POS &nbsp;|&nbsp; IndexedDB sync engine &nbsp;|&nbsp; Event store append-only
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

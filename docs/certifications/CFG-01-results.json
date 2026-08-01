@@ -1,0 +1,254 @@
+{
+  "passed": 33,
+  "failed": 0,
+  "manual": 8,
+  "total": 41,
+  "results": [
+    {
+      "id": "F-01",
+      "status": "PASS",
+      "desc": "Norte Demo fixture validates against schema v2",
+      "detail": ""
+    },
+    {
+      "id": "F-02",
+      "status": "PASS",
+      "desc": "Fixture contains zero AMALAY references",
+      "detail": ""
+    },
+    {
+      "id": "F-03",
+      "status": "PASS",
+      "desc": "All printer_ids are unique in fixture",
+      "detail": ""
+    },
+    {
+      "id": "F-04",
+      "status": "PASS",
+      "desc": "All printer_ids ≤ 50 chars",
+      "detail": ""
+    },
+    {
+      "id": "N-01",
+      "status": "PASS",
+      "desc": "No printers.json present — clean slate confirmed",
+      "detail": ""
+    },
+    {
+      "id": "N-05",
+      "status": "PASS",
+      "desc": "loadPrinters returns not_configured when file absent → PRINTER_NOT_CONFIGURED path active",
+      "detail": ""
+    },
+    {
+      "id": "N-06",
+      "status": "PASS",
+      "desc": "TCP printer (epson-tm-t88-cocina) builds correctly from form",
+      "detail": ""
+    },
+    {
+      "id": "N-08",
+      "status": "PASS",
+      "desc": "Second TCP printer (star-tsp100-barra) with 2 doc types builds correctly",
+      "detail": ""
+    },
+    {
+      "id": "N-09",
+      "status": "PASS",
+      "desc": "Windows/USB printer (ec-caja-norte) with 3 fallback names builds correctly",
+      "detail": ""
+    },
+    {
+      "id": "N-10",
+      "status": "PASS",
+      "desc": "Routing table: 6 rows, stations: barra, caja, cocina",
+      "detail": ""
+    },
+    {
+      "id": "N-13",
+      "status": "PASS",
+      "desc": "Windows/USB printer returns ok:null + UNTESTABLE code (no network call)",
+      "detail": ""
+    },
+    {
+      "id": "N-15",
+      "status": "PASS",
+      "desc": "Invalid IP (999.0.0.1) rejected with host error",
+      "detail": ""
+    },
+    {
+      "id": "N-16",
+      "status": "PASS",
+      "desc": "Port 0 rejected with port error",
+      "detail": ""
+    },
+    {
+      "id": "N-17",
+      "status": "PASS",
+      "desc": "Duplicate printer_id detected by checkDuplicateId",
+      "detail": ""
+    },
+    {
+      "id": "N-18",
+      "status": "PASS",
+      "desc": "Delete: 4 → 3 printers; barra×kitchen_ticket routing removed",
+      "detail": ""
+    },
+    {
+      "id": "N-19",
+      "status": "PASS",
+      "desc": "Atomic save OK → printers.json written (3 printers), .tmp cleaned up, post-rename verify OK",
+      "detail": ""
+    },
+    {
+      "id": "N-20",
+      "status": "PASS",
+      "desc": "printers.json on disk has zero AMALAY references. IDs: epson-tm-t88-cocina, star-tsp100-barra, ec-caja-norte",
+      "detail": ""
+    },
+    {
+      "id": "N-21",
+      "status": "PASS",
+      "desc": "Corrupted file handled gracefully: SyntaxError: Expected property name or '}' in JSON at positi",
+      "detail": ""
+    },
+    {
+      "id": "N-22",
+      "status": "PASS",
+      "desc": "Write to read-only dir returns error: EACCES: permission denied, open '/var/folders/z9/7hn1x4dx7_x",
+      "detail": ""
+    },
+    {
+      "id": "N-23",
+      "status": "PASS",
+      "desc": "rename() failure path: catch block cleans up tmp, original untouched [code review]",
+      "detail": ""
+    },
+    {
+      "id": "N-24",
+      "status": "PASS",
+      "desc": "ENOSPC path: writeFileSync throws → catch → unlinkSync(tmp) → { ok:false } [code review]",
+      "detail": ""
+    },
+    {
+      "id": "N-32",
+      "status": "PASS",
+      "desc": "post-rename verify: failure logs CRITICAL, no rollback, ok:true returned [code review]",
+      "detail": ""
+    },
+    {
+      "id": "N-25",
+      "status": "PASS",
+      "desc": "Double-click: first save succeeds, second blocked by duplicate ID check → 1 printer only",
+      "detail": ""
+    },
+    {
+      "id": "N-27",
+      "status": "PASS",
+      "desc": "MAX_PRINTER_ID_LENGTH=50: id[51] rejected, id[50] accepted",
+      "detail": ""
+    },
+    {
+      "id": "N-27b",
+      "status": "PASS",
+      "desc": "Schema validate() also rejects long printer_id — double barrier confirmed",
+      "detail": ""
+    },
+    {
+      "id": "N-28",
+      "status": "PASS",
+      "desc": "IPv6 addresses rejected by isValidHost: ::1, 2001:db8::1, ::ffff:192.0.2.1 → all false [gap documented]",
+      "detail": ""
+    },
+    {
+      "id": "N-29",
+      "status": "PASS",
+      "desc": "All injection strings blocked at isValidHost() + validatePrinterForm() before IPC",
+      "detail": ""
+    },
+    {
+      "id": "N-30",
+      "status": "PASS",
+      "desc": "Port 65536 rejected with port error",
+      "detail": ""
+    },
+    {
+      "id": "COMPAT-01",
+      "status": "PASS",
+      "desc": "AMALAY-style printers.json validates without modification — no regression",
+      "detail": ""
+    },
+    {
+      "id": "COMPAT-02",
+      "status": "PASS",
+      "desc": "All known AMALAY printer IDs fit within MAX_PRINTER_ID_LENGTH=50",
+      "detail": ""
+    },
+    {
+      "id": "PERSIST-01",
+      "status": "PASS",
+      "desc": "Reload after save: valid v2, 3 printers, migrated=false",
+      "detail": ""
+    },
+    {
+      "id": "PERSIST-02",
+      "status": "PASS",
+      "desc": "Round-trip: printer IDs identical before and after save+reload",
+      "detail": ""
+    },
+    {
+      "id": "N-02",
+      "status": "MANUAL",
+      "desc": "Paso 2 — ingresar restaurant_id norte-demo",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-03",
+      "status": "MANUAL",
+      "desc": "Paso 2 — restaurant_id vacío bloqueado",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-04",
+      "status": "MANUAL",
+      "desc": "Paso 3 — IP distinta de AMALAY",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-07",
+      "status": "MANUAL",
+      "desc": "Auto-slug del ID lógico",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-12",
+      "status": "MANUAL",
+      "desc": "Routing overlap permitted",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-14",
+      "status": "MANUAL",
+      "desc": "Editar star-barra → cambio de puerto",
+      "detail": "Electron wizard UI"
+    },
+    {
+      "id": "N-26",
+      "status": "MANUAL",
+      "desc": "Doble apertura del wizard — singleton check",
+      "detail": "Requires running Electron process"
+    },
+    {
+      "id": "N-31",
+      "status": "MANUAL",
+      "desc": "Legacy v1 parcialmente válido",
+      "detail": "Requires Windows with C:\\fullsite\\printers.json"
+    },
+    {
+      "id": "N-11",
+      "status": "PASS",
+      "desc": "TCP to unreachable IP returns error code: TIMEOUT",
+      "detail": ""
+    }
+  ]
+}

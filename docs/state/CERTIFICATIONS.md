@@ -90,6 +90,31 @@ Una feature es CERTIFIED cuando:
 
 ---
 
+---
+
+## OCS — Operational Certification Suite (v1, iniciada 2026-07-31)
+
+La OCS es la suite de certificación por módulo para POS V2. Cada módulo se certifica de forma independiente antes de avanzar al siguiente. El cierre de todos los módulos OCS equivale a la certificación de POS V2.
+
+**Criterio de cierre por módulo:**
+1. Código implementado
+2. Tests E2 automatizados pasan (0 regresiones en suite completa)
+3. Documentación consolidada en `docs/`
+4. Design Review disponible
+
+### P2.5.4 — Caja (Turno, Movimientos, Arqueo)
+
+**Estado:** ✅ CERTIFIED — 2026-07-31  
+**Tests:** 27 nuevos E2 + 1 759 suite completa · 0 regresiones  
+**Gaps resueltos:** CAJ-GAP-01 PASS · CAJ-GAP-02 PASS · CAJ-GAP-03 PASS · CAJ-GAP-04 P3 DOC  
+**Referencia:** `docs/certifications/OCS-P2.5.4-CAJA.md`
+
+### P2.5.5 — KDS / Cocina
+
+**Estado:** 🔴 PENDIENTE — próximo módulo
+
+---
+
 ## Milestone: POS V2 Operational Certification
 
 **Estado:** 🔴 BLOQUEADO — todos los P0s deben estar CERTIFIED primero

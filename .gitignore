@@ -46,5 +46,12 @@ electron-app/dist/
 electron-kds/dist/
 electron-dashboard/dist/
 
+# Fingerprint service binaries (compiled from print-bridge/fingerprint-service.cs;
+# contain the DigitalPersona SDK DLL which must not be tracked in git)
+electron-app/resources/fingerprint/*.exe
+electron-app/resources/fingerprint/*.dll
+print-bridge/*.exe
+print-bridge/*.dll
+
 # Graphify regenerable cache
 graphify-out/cache/ast/

@@ -1,0 +1,44 @@
+
+--- Monitor started at 2026-07-20T13:47:22.280029 ---
+[13:47:22] +   0min  VALID  page=True  api=True
+[13:52:33] +   5min  EXPIRED  page=False  api=False
+⚠ EXPIRED after 5 minutes
+
+--- Monitor v2 started at 2026-07-20T13:55:04.088371 ---
+--- Cookies from: 2026-07-20T19:51:22.913868+00:00 ---
+[13:55:04] +   0min  VALID  sales=$1,431,782
+[14:00:04] +   5min  VALID  sales=$1,434,864
+[14:05:05] +  10min  VALID  sales=$1,434,864
+[14:10:06] +  15min  VALID  sales=$1,434,864
+Monitor started at 14:14:28
+Cookies stored at: 2026-07-20T19:51:22.913868+00:00
+Checking every 300s. Log: /Users/danielrg/fullsite/docs/technical/wansoft_session_log.txt
+
+[14:14:28] +   0min  VALID  sales=$1,434,864
+
+--- Monitor v2 started at 2026-07-20T14:14:28.171049 ---
+--- Cookies from: 2026-07-20T19:51:22.913868+00:00 ---
+[14:14:28] +   0min  VALID  sales=$1,434,864
+[14:19:28] +   5min  VALID  sales=$1,434,864
+[14:19:28] +   5min  VALID  sales=$1,434,864
+[14:24:28] +  10min  VALID  sales=$1,434,864
+[14:24:28] +  10min  VALID  sales=$1,434,864
+[14:29:28] +  15min  VALID  sales=$1,434,864
+[14:29:28] +  15min  VALID  sales=$1,434,864
+[14:40:03] +  25min  VALID  sales=$1,437,310
+[14:40:03] +  25min  VALID  sales=$1,437,310
+[14:45:10] +  30min  VALID  sales=$1,437,310
+[14:45:10] +  30min  VALID  sales=$1,437,310
+[14:50:11] +  35min  VALID  sales=$1,437,310
+[14:50:11] +  35min  VALID  sales=$1,437,310
+[14:55:11] +  40min  VALID  sales=$1,437,310
+[14:55:11] +  40min  VALID  sales=$1,437,310
+[15:00:11] +  45min  VALID  sales=$1,437,310
+[15:00:11] +  45min  VALID  sales=$1,437,310
+[15:05:12] +  50min  VALID  sales=$1,437,310
+[15:05:12] +  50min  VALID  sales=$1,437,310
+[15:10:12] +  55min  EXPIRED  sales=$0
+[15:10:12] +  55min  EXPIRED  sales=$0
+
+⚠ SESSION EXPIRED after 55 minutes
+⚠ EXPIRED after 55 minutes

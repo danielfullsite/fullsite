@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>Fullsite — Pre-Seed Pitch Deck</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { font-family: 'Inter', -apple-system, sans-serif; background: #000; color: #fff; }
+
+.slide {
+  width: 1280px; height: 720px;
+  background: #0a0a0a;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+  margin: 0 auto;
+}
+
+.slide-num {
+  position: absolute; bottom: 24px; right: 36px;
+  font-size: 11px; color: #555; font-weight: 500;
+}
+
+.accent { color: #10b981; }
+.gray { color: #888; }
+.lgray { color: #bbb; }
+.white { color: #fff; }
+.bold { font-weight: 700; }
+.semi { font-weight: 600; }
+
+.tag {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px;
+  color: #10b981; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.tag::after {
+  content: ''; display: block; width: 40px; height: 2px;
+  background: #10b981; margin-top: 6px;
+}
+
+h1 { font-size: 36px; font-weight: 800; line-height: 1.15; margin-bottom: 16px; }
+h2 { font-size: 26px; font-weight: 700; line-height: 1.25; margin-bottom: 12px; }
+h3 { font-size: 18px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+p { font-size: 14px; line-height: 1.6; color: #bbb; }
+
+.card {
+  background: #161616; border-radius: 10px; padding: 24px;
+}
+.card-sm {
+  background: #161616; border-radius: 8px; padding: 16px 20px;
+}
+
+.metric-val { font-size: 28px; font-weight: 800; color: #10b981; }
+.metric-label { font-size: 12px; color: #777; margin-top: 4px; }
+
+.bullet { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.bullet::before {
+  content: ''; min-width: 6px; min-height: 6px; width: 6px; height: 6px;
+  background: #10b981; border-radius: 50%; margin-top: 7px;
+}
+.bullet p { margin: 0; font-size: 14px; color: #ccc; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; color: #10b981; font-weight: 600; letter-spacing: 0.5px;
+     padding: 10px 12px; background: #1a1a1a; text-transform: uppercase; }
+td { padding: 10px 12px; font-size: 12px; color: #ccc; border-bottom: 1px solid #1a1a1a; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.four-col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+
+.pad { padding: 60px 72px; }
+.pad-center { padding: 60px 72px; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+
+.pipeline-row {
+  background: #161616; border-radius: 6px; padding: 12px 16px;
+  display: flex; gap: 16px; align-items: center; margin-bottom: 8px;
+}
+.pipeline-stage { font-size: 11px; font-weight: 700; color: #10b981; min-width: 140px; }
+.pipeline-detail { font-size: 12px; color: #bbb; }
+
+.milestone-row {
+  display: flex; align-items: center; gap: 0; margin-bottom: 10px;
+}
+.milestone-badge {
+  background: #10b981; color: #0a0a0a; font-size: 12px; font-weight: 700;
+  padding: 10px 16px; border-radius: 6px 0 0 6px; min-width: 100px; text-align: center;
+}
+.milestone-text {
+  background: #161616; color: #ccc; font-size: 13px; padding: 10px 20px;
+  border-radius: 0 6px 6px 0; flex: 1;
+}
+
+.fund-card {
+  background: #161616; border-radius: 10px; padding: 20px; text-align: center;
+}
+.fund-amount { font-size: 26px; font-weight: 800; color: #10b981; }
+.fund-label { font-size: 13px; font-weight: 600; color: #fff; margin-top: 6px; }
+.fund-desc { font-size: 11px; color: #777; margin-top: 4px; }
+
+.divider { width: 60px; height: 2px; background: #10b981; margin: 16px auto; }
+
+@media print {
+  .slide { page-break-after: always; margin: 0; }
+  body { background: #000; }
+}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: COVER -->
+<div class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+  <div style="width:60px;height:2px;background:#10b981;margin-bottom:20px;"></div>
+  <h1 style="font-size:56px;font-weight:900;letter-spacing:-1px;">fullsite</h1>
+  <p style="font-size:20px;color:#888;margin-top:8px;">"The restaurant that runs itself."</p>
+  <div style="position:absolute;bottom:60px;text-align:center;">
+    <p style="font-size:13px;color:#555;">Pre-Seed &nbsp;|&nbsp; Julio 2026</p>
+  </div>
+</div>
+
+<!-- SLIDE 2: AGENDA -->
+<div class="slide pad">
+  <div class="two-col" style="height:100%;">
+    <div style="display:flex;flex-direction:column;justify-content:center;">
+      <h1 style="font-size:48px;font-weight:900;line-height:1.1;">Today's<br>Agenda</h1>
+    </div>
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:14px;">
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">01</span><span style="font-size:15px;color:#ccc;">The Problem</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">02</span><span style="font-size:15px;color:#ccc;">Current Software</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">03</span><span style="font-size:15px;color:#ccc;">Our Thesis</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">04</span><span style="font-size:15px;color:#ccc;">Fullsite Platform</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">05</span><span style="font-size:15px;color:#ccc;">Operational Intelligence</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">06</span><span style="font-size:15px;color:#ccc;">AMALAY Validation</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">07</span><span style="font-size:15px;color:#ccc;">Market & Competition</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">08</span><span style="font-size:15px;color:#ccc;">Business Model</span></div>
+      <div style="display:flex;gap:16px;align-items:baseline;"><span class="accent bold" style="font-size:14px;min-width:28px;">09</span><span style="font-size:15px;color:#ccc;">Team & The Ask</span></div>
+    </div>
+  </div>
+  <div class="slide-num">2</div>
+</div>
+
+<!-- SLIDE 3: PROBLEM -->
+<div class="slide pad">
+  <div class="tag">The Problem</div>
+  <h1>Restaurants discover operational<br>problems too late.</h1>
+  <div style="margin:28px 0 32px 0;">
+    <span class="accent bold" style="font-size:52px;">80%</span>
+    <span style="font-size:16px;color:#888;margin-left:12px;">of restaurants fail within 2 years</span>
+  </div>
+  <div class="three-col" style="margin-top:12px;">
+    <div class="card">
+      <h3 class="accent">Invisible Bleeding</h3>
+      <p>Waste, fraud, poor purchasing, labor inefficiency, menu mispricing — all happening daily, silently.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">Late Discovery</h3>
+      <p>By the time the owner sees the problem in a manual report, the money is already gone.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">No Correlation</h3>
+      <p>Sales, weather, inventory, labor, suppliers — no system connects these signals automatically.</p>
+    </div>
+  </div>
+  <div class="slide-num">3</div>
+</div>
+
+<!-- SLIDE 4: CURRENT SOFTWARE -->
+<div class="slide pad">
+  <div class="tag">Current Software</div>
+  <h1>POS systems record transactions.<br>Then they wait.</h1>
+  <div class="two-col" style="margin-top:32px;">
+    <div>
+      <div class="bullet"><p>Manual end-of-day reports</p></div>
+      <div class="bullet"><p>Spreadsheet analysis by the owner or an expensive specialist</p></div>
+      <div class="bullet"><p>No cross-system correlation (sales x weather x inventory x labor)</p></div>
+      <div class="bullet"><p>Legacy systems with closed APIs that charge $10K+ per integration</p></div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <p style="font-size:64px;font-weight:900;color:#333;">2007</p>
+      <p style="font-size:14px;color:#666;margin-top:8px;">The dominant POS in Mexico<br>(Wansoft) runs .NET 4.5 from 2007</p>
+    </div>
+  </div>
+  <div class="slide-num">4</div>
+</div>
+
+<!-- SLIDE 5: THESIS -->
+<div class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 120px;">
+  <div class="tag" style="text-align:center;">The Thesis</div>
+  <h1 style="font-size:32px;line-height:1.4;max-width:900px;margin-top:16px;">What if the restaurant's operating system watched continuously and surfaced problems before they became losses?</h1>
+  <div style="margin-top:40px;">
+    <p style="font-size:16px;color:#666;">Not a dashboard that waits to be opened.</p>
+    <p style="font-size:16px;color:#666;">Not a report that waits to be generated.</p>
+    <p style="font-size:18px;color:#fff;font-weight:600;margin-top:16px;">A system that observes, detects, and acts.</p>
+  </div>
+  <div class="slide-num">5</div>
+</div>
+
+<!-- SLIDE 6: FULLSITE PLATFORM -->
+<div class="slide pad">
+  <div class="tag">Fullsite Platform</div>
+  <h2>Operational intelligence built on a production-grade restaurant stack.</h2>
+  <div class="three-col" style="margin-top:28px;">
+    <div class="card" style="border-top:3px solid #10b981;">
+      <h3 style="color:#10b981;font-size:13px;letter-spacing:1px;">CAPTURE</h3>
+      <p style="margin-top:12px;">Full POS, KDS, inventory, cash management, event stream — every operational signal in real time.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #10b981;">
+      <h3 style="color:#10b981;font-size:13px;letter-spacing:1px;">OBSERVE</h3>
+      <p style="margin-top:12px;">36 autonomous analytical agents running against 915 days of operational history.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #10b981;">
+      <h3 style="color:#10b981;font-size:13px;letter-spacing:1px;">ACT</h3>
+      <p style="margin-top:12px;">Actionable insights delivered to the operator: what to buy, what to watch, what to change.</p>
+    </div>
+  </div>
+  <p style="margin-top:28px;font-size:13px;color:#666;">The intelligence layer requires owning the capture layer. That's why we built the full stack.</p>
+  <div class="slide-num">6</div>
+</div>
+
+<!-- SLIDE 7: LIVE IN PRODUCTION -->
+<div class="slide pad">
+  <div class="tag">Live in Production</div>
+  <h2>Running at AMALAY Coffee & Market since July 8, 2026.</h2>
+  <div style="margin-top:20px;">
+    <table>
+      <tr><th>Component</th><th>Status</th></tr>
+      <tr><td>POS (3 terminals)</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>KDS (kitchen display)</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>Print bridge (ticket + kitchen printers)</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>Offline-first / recovery</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>Fingerprint authentication + cash drawer</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>Cash management / cortes de caja</td><td><span class="accent bold">Production</span></td></tr>
+      <tr><td>Canonical inventory reconciliation engine</td><td><span style="color:#888;font-weight:600;">Deployed</span></td></tr>
+      <tr><td>CFDI 4.0 (Facturama)</td><td><span style="color:#888;font-weight:600;">Built</span></td></tr>
+    </table>
+  </div>
+  <p style="margin-top:16px;font-size:12px;color:#555;">Runs on any hardware: Windows, Android, tablet, existing terminal. Zero proprietary dependency.</p>
+  <div class="slide-num">7</div>
+</div>
+
+<!-- SLIDE 8: AGENTS -->
+<div class="slide pad">
+  <div class="tag">Operational Intelligence</div>
+  <h2>36 analytical agents. Not chatbots — autonomous operational workflows.</h2>
+  <div class="three-col" style="margin-top:20px;">
+    <div class="card">
+      <h3 class="accent" style="font-size:14px;">Purchase Predictor</h3>
+      <p style="font-size:12px;margin-top:8px;">Every Monday: analyzes 30-day purchase history, explodes recipes into ingredient demand, projects 7-day need with 15% safety margin. Grouped by department and supplier. Operator reviews and approves.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent" style="font-size:14px;">Anomaly Detector</h3>
+      <p style="font-size:12px;margin-top:8px;">Compares real-time sales against historical day-of-week patterns. Detects when a metric deviates significantly — before the owner notices.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent" style="font-size:14px;">Climate + Events</h3>
+      <p style="font-size:12px;margin-top:8px;">Fetches 3-day weather forecast, cross-references with 90 days of sales history and 40+ local events (holidays, paydays, World Cup). Recommends menu adjustments.</p>
+    </div>
+  </div>
+  <p style="margin-top:20px;font-size:12px;color:#555;">Also: fraud detection, waste analysis, menu engineering, staffing optimization, table rotation, speed of service, upselling, supplier monitoring, cost variance, CRM.</p>
+  <div class="slide-num">8</div>
+</div>
+
+<!-- SLIDE 9: THE QUESTION -->
+<div class="slide pad">
+  <div class="tag">The Question We Are Proving</div>
+  <p style="font-size:16px;color:#999;font-style:italic;margin-bottom:20px;">"Where is the value that restaurants will pay for — not a fixed fee, but a variable tied to measurable outcomes?"</p>
+  <table style="margin-top:8px;">
+    <tr><th>Operational Outcome</th><th>Measurability</th><th>Estimated Impact</th><th>Status</th></tr>
+    <tr><td>Waste / merma reduction</td><td>High</td><td>2-5% of revenue</td><td class="accent">Proving</td></tr>
+    <tr><td>Fraud / theft detection</td><td>High</td><td>1-3% of revenue</td><td class="accent">Proving</td></tr>
+    <tr><td>Purchasing optimization</td><td>Medium</td><td>1-2% of COGS</td><td class="accent">Proving</td></tr>
+    <tr><td>Labor / staffing efficiency</td><td>Medium</td><td>3-8% of labor cost</td><td class="accent">Proving</td></tr>
+    <tr><td>Menu pricing / engineering</td><td>High</td><td>1-3% of revenue</td><td class="accent">Proving</td></tr>
+  </table>
+  <div style="margin-top:28px;">
+    <p style="font-size:15px;color:#fff;font-weight:700;">The honest answer: we don't know yet which one becomes the wedge.</p>
+    <p class="accent" style="font-size:14px;margin-top:4px;">That's exactly what the pre-seed funds will prove.</p>
+  </div>
+  <div class="slide-num">9</div>
+</div>
+
+<!-- SLIDE 10: AMALAY -->
+<div class="slide pad">
+  <div class="tag">AMALAY: Operational Validation</div>
+  <h2>AMALAY Coffee & Market — Monterrey, MX</h2>
+  <div class="four-col" style="margin-top:24px;">
+    <div class="card-sm"><div class="metric-val">$31.1M</div><div class="metric-label">2025 Revenue (MXN)</div></div>
+    <div class="card-sm"><div class="metric-val">+12%</div><div class="metric-label">YoY Growth</div></div>
+    <div class="card-sm"><div class="metric-val">$82K</div><div class="metric-label">Daily Average</div></div>
+    <div class="card-sm"><div class="metric-val">915</div><div class="metric-label">Days of Data</div></div>
+  </div>
+  <div class="four-col" style="margin-top:12px;">
+    <div class="card-sm"><div class="metric-val">522</div><div class="metric-label">Active Menu Items</div></div>
+    <div class="card-sm"><div class="metric-val">178</div><div class="metric-label">Canonical Recipes</div></div>
+    <div class="card-sm"><div class="metric-val">1,050</div><div class="metric-label">Ingredients</div></div>
+    <div class="card-sm"><div class="metric-val">40</div><div class="metric-label">Staff</div></div>
+  </div>
+  <div style="margin-top:24px;padding:16px 20px;background:#1a1a1a;border-radius:8px;border-left:3px solid #f59e0b;">
+    <p style="font-size:13px;color:#fff;font-weight:600;">AMALAY is the founder's family restaurant.</p>
+    <p style="font-size:12px;color:#888;">This is operational validation — not independent commercial validation.</p>
+  </div>
+  <div class="slide-num">10</div>
+</div>
+
+<!-- SLIDE 11: DE-RISKED / OPEN -->
+<div class="slide pad">
+  <div class="tag">What's De-risked / What's Open</div>
+  <div class="two-col" style="margin-top:24px;">
+    <div class="card" style="border-left:3px solid #10b981;">
+      <h3 style="color:#10b981;margin-bottom:16px;">De-risked</h3>
+      <div class="bullet"><p>Full POS + KDS + printing + offline</p></div>
+      <div class="bullet"><p>36 analytical agents built and running</p></div>
+      <div class="bullet"><p>915 days of operational data depth</p></div>
+      <div class="bullet"><p>Canonical inventory reconciliation engine</p></div>
+      <div class="bullet"><p>Server-side mutation authority</p></div>
+      <div class="bullet"><p>Hardware-agnostic architecture</p></div>
+    </div>
+    <div class="card" style="border-left:3px solid #f59e0b;">
+      <h3 style="color:#f59e0b;margin-bottom:16px;">Open</h3>
+      <div class="bullet"><p>External willingness to pay</p></div>
+      <div class="bullet"><p>Which outcome becomes the wedge</p></div>
+      <div class="bullet"><p>Deployment without founder present</p></div>
+      <div class="bullet"><p>Repeatable installation (&lt;30 min)</p></div>
+      <div class="bullet"><p>Second restaurant validation</p></div>
+      <div class="bullet"><p>Team beyond solo founder</p></div>
+    </div>
+  </div>
+  <p style="margin-top:24px;font-size:15px;font-weight:700;">Product risk: substantially retired. &nbsp; Commercial risk: entirely open.</p>
+  <div class="slide-num">11</div>
+</div>
+
+<!-- SLIDE 12: BEACHHEAD + PIPELINE -->
+<div class="slide pad">
+  <div class="tag">Beachhead & Pipeline</div>
+  <h2>Premium casual / brunch + cafe — Monterrey metro</h2>
+  <div class="two-col" style="margin-top:24px;">
+    <div>
+      <div class="bullet"><p>$300K - $1.5M MXN monthly revenue</p></div>
+      <div class="bullet"><p>10-40 employees</p></div>
+      <div class="bullet"><p>Owner-operator or small group</p></div>
+      <div class="bullet"><p>Currently using Wansoft, SoftRestaurant, or manual</p></div>
+      <div class="bullet"><p>Estimated addressable: 600-900 restaurants in Monterrey</p></div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:16px;">Pipeline</h3>
+      <div class="pipeline-row"><span class="pipeline-stage">Production</span><span class="pipeline-detail">AMALAY (founder's restaurant)</span></div>
+      <div class="pipeline-row"><span class="pipeline-stage">LOI (non-binding)</span><span class="pipeline-detail">Grupo Galeria: Dunkin, Carl's Jr, BWW, IHOP</span></div>
+      <div class="pipeline-row"><span class="pipeline-stage">Conversations</span><span class="pipeline-detail">3 independent restaurants</span></div>
+    </div>
+  </div>
+  <div class="slide-num">12</div>
+</div>
+
+<!-- SLIDE 13: BUSINESS MODEL -->
+<div class="slide pad">
+  <div class="tag">Business Model</div>
+  <div class="two-col" style="margin-top:16px;">
+    <div>
+      <h3>Today</h3>
+      <p style="font-size:32px;font-weight:800;color:#10b981;margin:12px 0;">$1,999 MXN/mo</p>
+      <p style="font-size:14px;color:#888;margin-bottom:20px;">per location</p>
+      <div class="bullet"><p>+$499/month per additional terminal</p></div>
+      <div class="bullet"><p>$0 installation (BYOD hardware)</p></div>
+      <div class="bullet"><p>No long-term contract</p></div>
+      <div class="bullet"><p>78% cheaper than Wansoft in year 1</p></div>
+    </div>
+    <div>
+      <h3>Tomorrow: the variable</h3>
+      <p style="margin:12px 0 20px 0;">Toast generates $6.15B in revenue. 81% comes from payments and lending — not software. The SaaS fee is the wedge. The real business model is transactional.</p>
+      <div class="bullet"><p>Embedded payments (basis points)</p></div>
+      <div class="bullet"><p>Performance-based pricing (% of savings)</p></div>
+      <div class="bullet"><p>Supplier marketplace / GPO</p></div>
+      <div class="bullet"><p>Lending / payroll integration</p></div>
+    </div>
+  </div>
+  <div class="slide-num">13</div>
+</div>
+
+<!-- SLIDE 14: COMPETITION -->
+<div class="slide pad">
+  <div class="tag">Competition</div>
+  <h2>Fragmented market. Weak incumbents. No real AI.</h2>
+  <table style="margin-top:20px;">
+    <tr><th>Competitor</th><th>Restaurants</th><th>Price</th><th>AI</th><th>Weakness</th></tr>
+    <tr><td>SoftRestaurant</td><td>42,000+</td><td>$500-$1,500/mo</td><td>No</td><td>Legacy, no intelligence</td></tr>
+    <tr><td>Wansoft (Clip)</td><td>~2,000</td><td>$2,499 + SaaS</td><td>No</td><td>.NET 4.5 from 2007</td></tr>
+    <tr><td>Parrot</td><td>1,500+</td><td>$1,800-$2,800/mo</td><td>No</td><td>Best delivery, no AI</td></tr>
+    <tr><td>Clip POS</td><td>Large</td><td>Free + 3.6% tx</td><td>No</td><td>Payment-first, basic</td></tr>
+    <tr><td>Calisto AI</td><td>~100</td><td>Unknown</td><td>Yes</td><td>AI only, no full POS</td></tr>
+    <tr><td>Fudo</td><td>Growing</td><td>From $360/mo</td><td>Partial</td><td>WhatsApp AI only</td></tr>
+  </table>
+  <p class="accent bold" style="margin-top:20px;font-size:14px;">Fullsite: the only system that owns the complete capture-to-intelligence pipeline.</p>
+  <div class="slide-num">14</div>
+</div>
+
+<!-- SLIDE 15: TEAM -->
+<div class="slide pad">
+  <div class="tag">Team</div>
+  <div class="two-col" style="margin-top:16px;">
+    <div>
+      <h1 style="font-size:32px;">Daniel Ramonfaur</h1>
+      <p class="accent bold" style="font-size:14px;margin-bottom:20px;">Founder & CEO</p>
+      <div class="bullet"><p>Built the entire stack solo: POS, KDS, inventory engine, 36 AI agents, data pipeline</p></div>
+      <div class="bullet"><p>Deep restaurant operations domain from AMALAY</p></div>
+      <div class="bullet"><p>Zero to production in 3 months</p></div>
+    </div>
+    <div>
+      <p style="font-size:12px;color:#666;">Domain Advisor</p>
+      <h3>Eduardo de la Garza</h3>
+      <p style="font-size:13px;color:#888;margin-bottom:28px;">13 years leading Wansoft's commercial operation</p>
+      <h3 class="accent" style="margin-bottom:16px;">Hiring with this round:</h3>
+      <div class="card-sm" style="margin-bottom:10px;">
+        <p style="font-size:14px;font-weight:700;color:#fff;">CTO / Technical Co-founder</p>
+        <p style="font-size:12px;color:#888;">Eliminate founder dependency, own architecture</p>
+      </div>
+      <div class="card-sm">
+        <p style="font-size:14px;font-weight:700;color:#fff;">CCO / Head of Sales</p>
+        <p style="font-size:12px;color:#888;">Prove repeatable sales process, build pipeline</p>
+      </div>
+      <p style="font-size:13px;font-weight:700;margin-top:20px;">Cap table: Daniel Ramonfaur — 100%</p>
+    </div>
+  </div>
+  <div class="slide-num">15</div>
+</div>
+
+<!-- SLIDE 16: THE ASK -->
+<div class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px;">
+  <div class="tag" style="text-align:center;">The Ask</div>
+  <h1 style="font-size:44px;margin-top:12px;">$500K USD Pre-Seed</h1>
+  <p style="font-size:15px;color:#888;">Post-money SAFE &nbsp;—&nbsp; $5M USD cap &nbsp;—&nbsp; YC standard terms</p>
+  <div class="four-col" style="margin-top:36px;width:100%;max-width:1000px;">
+    <div class="fund-card"><div class="fund-amount">$250K</div><div class="fund-label">Team</div><div class="fund-desc">CTO + Sales hire</div></div>
+    <div class="fund-card"><div class="fund-amount">$100K</div><div class="fund-label">Product</div><div class="fund-desc">Deployment automation</div></div>
+    <div class="fund-card"><div class="fund-amount">$100K</div><div class="fund-label">GTM</div><div class="fund-desc">10-15 restaurants</div></div>
+    <div class="fund-card"><div class="fund-amount">$50K</div><div class="fund-label">Ops / Legal</div><div class="fund-desc">Incorporation, IP</div></div>
+  </div>
+  <div style="margin-top:32px;">
+    <p style="font-size:14px;font-weight:700;">Two risks eliminated:</p>
+    <p style="font-size:13px;color:#bbb;margin-top:8px;">1. Commercial validation — prove external willingness to pay</p>
+    <p style="font-size:13px;color:#bbb;margin-top:4px;">2. Founder dependency — build a 3-person core</p>
+  </div>
+  <div class="slide-num">16</div>
+</div>
+
+<!-- SLIDE 17: MILESTONES -->
+<div class="slide pad">
+  <div class="tag">18-Month Milestones</div>
+  <div style="margin-top:28px;">
+    <div class="milestone-row"><div class="milestone-badge">Month 3</div><div class="milestone-text">CTO hired. 3 restaurants deployed. Repeatable install process documented.</div></div>
+    <div class="milestone-row"><div class="milestone-badge">Month 6</div><div class="milestone-text">5 paying restaurants. $10K MXN MRR. First measurable operational outcome published.</div></div>
+    <div class="milestone-row"><div class="milestone-badge">Month 9</div><div class="milestone-text">10 restaurants. Sales hire producing independently. Deployment &lt;30 min without founder.</div></div>
+    <div class="milestone-row"><div class="milestone-badge">Month 12</div><div class="milestone-text">15 restaurants. $30K MXN MRR. Variable pricing wedge identified from real data.</div></div>
+    <div class="milestone-row"><div class="milestone-badge">Month 18</div><div class="milestone-text">Seed-ready. Repeatable unit economics proven. YC W27 application submitted.</div></div>
+  </div>
+  <p style="margin-top:24px;font-size:13px;color:#555;">These are targets, not commitments.</p>
+  <div class="slide-num">17</div>
+</div>
+
+<!-- SLIDE 18: CLOSING -->
+<div class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px;">
+  <div class="divider"></div>
+  <h1 style="font-size:32px;margin-top:20px;">The product is built.</h1>
+  <p style="font-size:20px;color:#888;margin-top:12px;max-width:700px;">The question is whether restaurants will pay for operational intelligence.</p>
+  <p class="accent bold" style="font-size:20px;margin-top:20px;">That's what we're proving next.</p>
+  <div style="position:absolute;bottom:60px;">
+    <p style="font-size:13px;color:#555;">fullsite.mx &nbsp;&nbsp;|&nbsp;&nbsp; daniel@fullsite.mx</p>
+  </div>
+</div>
+
+</body>
+</html>

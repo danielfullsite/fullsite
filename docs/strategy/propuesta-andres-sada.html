@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Propuesta Comercial — Andrés Sada × Fullsite</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #18181b; background: #fff; -webkit-font-smoothing: antialiased; padding: 60px 80px; max-width: 900px; margin: 0 auto; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #10b981; }
+  .header h1 { font-size: 28px; font-weight: 900; letter-spacing: -0.03em; }
+  .header h1 span { color: #10b981; }
+  .header .meta { text-align: right; font-size: 12px; color: #a1a1aa; line-height: 1.8; }
+
+  h2 { font-size: 20px; font-weight: 800; margin-top: 40px; margin-bottom: 16px; color: #09090b; border-left: 4px solid #10b981; padding-left: 12px; }
+  h3 { font-size: 15px; font-weight: 700; margin-top: 24px; margin-bottom: 10px; color: #3f3f46; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; margin-bottom: 20px; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; background: #f4f4f5; font-weight: 700; color: #3f3f46; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e4e4e7; }
+  td { padding: 10px 12px; border-bottom: 1px solid #e4e4e7; color: #52525b; }
+  td:first-child { font-weight: 600; color: #18181b; }
+  tr:hover { background: #fafafa; }
+
+  .highlight-row td { background: #d1fae5; font-weight: 700; color: #065f46; }
+  .money { font-weight: 700; color: #059669; }
+
+  p { font-size: 14px; line-height: 1.7; color: #52525b; margin-bottom: 12px; }
+  .note { font-size: 12px; color: #a1a1aa; font-style: italic; margin-top: 8px; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .stat { border-left: 3px solid #10b981; padding-left: 12px; }
+  .stat .num { font-size: 32px; font-weight: 900; color: #09090b; line-height: 1; }
+  .stat .lbl { font-size: 11px; color: #a1a1aa; margin-top: 4px; font-weight: 500; }
+
+  .phase { background: #f4f4f5; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .phase .title { font-size: 14px; font-weight: 800; color: #09090b; margin-bottom: 8px; }
+  .phase .tag { display: inline-block; font-size: 10px; font-weight: 700; color: #10b981; background: #d1fae5; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .phase ul { list-style: none; padding: 0; }
+  .phase li { font-size: 13px; color: #52525b; padding: 3px 0; padding-left: 16px; position: relative; }
+  .phase li::before { content: ''; position: absolute; left: 0; top: 10px; width: 6px; height: 6px; background: #10b981; border-radius: 50%; }
+
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e4e4e7; font-size: 11px; color: #a1a1aa; text-align: center; line-height: 1.8; }
+
+  @media print { body { padding: 40px; } }
+  @page { size: letter; margin: 0.5in; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>fullsite<span>.</span> × Andrés Sada</h1>
+    <p style="color:#71717a;font-size:13px;margin-top:4px">Propuesta de Co-founder Comercial</p>
+  </div>
+  <div class="meta">
+    Julio 2026<br>
+    Confidencial
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">5-8%</div><div class="lbl">Equity (vesting 4 años, cliff 1 año)</div></div>
+  <div class="stat"><div class="num">$5-10K</div><div class="lbl">Comisión por restaurante cerrado</div></div>
+  <div class="stat"><div class="num">10%</div><div class="lbl">Recurrente sobre mensualidad</div></div>
+</div>
+
+<h2>Comisión por deal cerrado</h2>
+
+<table>
+  <tr><th>Tipo de deal</th><th>Comisión única</th><th>Comisión recurrente</th></tr>
+  <tr><td>Restaurante 1 sucursal (solo software)</td><td class="money">$5,000 MXN</td><td>10% de mensualidad</td></tr>
+  <tr><td>Restaurante 1 sucursal (software + hardware)</td><td class="money">$10,000 MXN</td><td>10% de mensualidad</td></tr>
+  <tr><td>Restaurante multi-sucursal (2-5)</td><td class="money">$8,000 MXN / sucursal</td><td>10% de mensualidad total</td></tr>
+  <tr><td>Cadena (6+ sucursales)</td><td class="money">$15,000 MXN / sucursal</td><td>8% de mensualidad total</td></tr>
+</table>
+
+<h2>Pricing Fullsite (lo que paga el restaurante)</h2>
+
+<table>
+  <tr><th>Concepto</th><th>Precio</th><th>Margen</th></tr>
+  <tr><td>Software mensual (POS + KDS + inventario + IA)</td><td>$2,500 MXN/mes</td><td>~95%</td></tr>
+  <tr><td>Hardware por sucursal (terminal + impresoras + cajón)</td><td>$15,000 - $25,000 MXN (una vez)</td><td>~40%</td></tr>
+  <tr><td>Instalación</td><td><strong>$0 (gratis)</strong></td><td>—</td></tr>
+  <tr><td>Agentes IA premium (opcional)</td><td>$1,000 - $2,000 MXN/mes</td><td>~95%</td></tr>
+</table>
+<p class="note">Wansoft cobra $10,000 solo por instalación. Fullsite: $0. Ese es el diferenciador.</p>
+
+<h2>Proyección de ingresos — Escenario conservador</h2>
+<p>Basado en 2-5 restaurantes cerrados por mes, solo software:</p>
+
+<table>
+  <tr><th>Mes</th><th>Deals cerrados</th><th>Comisión única</th><th>Recurrente acumulada</th><th>Total mensual</th></tr>
+  <tr><td>1</td><td>2</td><td>$10,000</td><td>$500</td><td>$10,500</td></tr>
+  <tr><td>2</td><td>3</td><td>$15,000</td><td>$1,750</td><td>$16,750</td></tr>
+  <tr><td>3</td><td>3</td><td>$15,000</td><td>$3,250</td><td class="money">$18,250</td></tr>
+  <tr><td>4</td><td>4</td><td>$20,000</td><td>$5,250</td><td class="money">$25,250</td></tr>
+  <tr><td>5</td><td>4</td><td>$20,000</td><td>$7,250</td><td class="money">$27,250</td></tr>
+  <tr class="highlight-row"><td>6</td><td>5</td><td>$25,000</td><td>$9,750</td><td>$34,750</td></tr>
+</table>
+
+<h2>Proyección de ingresos — Escenario optimista</h2>
+<p>Basado en 3-8 restaurantes cerrados por mes, incluyendo hardware:</p>
+
+<table>
+  <tr><th>Mes</th><th>Deals cerrados</th><th>Comisión única</th><th>Recurrente acumulada</th><th>Total mensual</th></tr>
+  <tr><td>1</td><td>3</td><td>$15,000</td><td>$750</td><td>$15,750</td></tr>
+  <tr><td>2</td><td>5</td><td>$25,000</td><td>$3,000</td><td>$28,000</td></tr>
+  <tr><td>3</td><td>5</td><td>$25,000</td><td>$5,250</td><td class="money">$30,250</td></tr>
+  <tr><td>4</td><td>6</td><td>$30,000</td><td>$8,250</td><td class="money">$38,250</td></tr>
+  <tr><td>5</td><td>7</td><td>$35,000</td><td>$11,750</td><td class="money">$46,750</td></tr>
+  <tr class="highlight-row"><td>6</td><td>8</td><td>$40,000</td><td>$15,750</td><td>$55,750</td></tr>
+</table>
+
+<h2>Breakeven</h2>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">Mes 3</div><div class="lbl">Iguala ~$20K/mes (conservador)</div></div>
+  <div class="stat"><div class="num">Mes 6</div><div class="lbl">$35-55K/mes con recurrente</div></div>
+  <div class="stat"><div class="num">Año 1</div><div class="lbl">Recurrente cubre ingreso fijo</div></div>
+</div>
+
+<h2>Roadmap comercial — 6 meses</h2>
+
+<div class="phase">
+  <div class="tag">Mes 1-2</div>
+  <div class="title">Playbook — Julio / Agosto 2026</div>
+  <ul>
+    <li>Definir ICP — nicho del nicho (restaurantes nuevos en Monterrey)</li>
+    <li>Visitar 20 restaurantes (discovery, no venta)</li>
+    <li>Documentar pain points reales</li>
+    <li>Crear sales playbook (pitch, objeciones, pricing, demo flow)</li>
+    <li>Cerrar 2-3 restaurantes con red directa</li>
+    <li>Primer caso de éxito documentado (AMALAY)</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="tag">Mes 3-4</div>
+  <div class="title">Ejecución — Septiembre / Octubre 2026</div>
+  <ul>
+    <li>Ejecutar playbook en el nicho definido</li>
+    <li>Meta: 3-4 restaurantes/mes</li>
+    <li>CRM configurado (HubSpot free)</li>
+    <li>Refinar pitch basado en feedback</li>
+    <li>Segundo y tercer caso de éxito</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="tag">Mes 5-6</div>
+  <div class="title">Escala — Noviembre / Diciembre 2026</div>
+  <ul>
+    <li>Meta: 5+ restaurantes/mes</li>
+    <li>Contratar primer SDR junior</li>
+    <li>Programa de referidos activo</li>
+    <li>Pipeline listo para YC W27 (50 restaurantes target)</li>
+    <li>Transición a sueldo fijo + comisión con revenue recurrente</li>
+  </ul>
+</div>
+
+<h2>Estructura del acuerdo</h2>
+
+<table>
+  <tr><th>Concepto</th><th>Detalle</th></tr>
+  <tr><td>Equity</td><td>5-8% con vesting 4 años, cliff 1 año</td></tr>
+  <tr><td>Comisión</td><td>Por deal cerrado (ver tabla arriba)</td></tr>
+  <tr><td>Recurrente</td><td>10% de mensualidad de cada cliente (mientras sea cliente)</td></tr>
+  <tr><td>Sueldo fijo</td><td>$0 al inicio → se activa cuando haya revenue recurrente suficiente</td></tr>
+  <tr><td>Dedicación</td><td>Full-time o acordar part-time inicial</td></tr>
+  <tr><td>Rol</td><td>Co-founder & Head of Sales</td></tr>
+</table>
+
+<div class="footer">
+  fullsite. — The Intelligence Layer for Restaurant Operations.<br>
+  Daniel Ramonfaur · daniel@fullsite.mx · fullsite.mx<br>
+  Confidencial — Julio 2026
+</div>
+
+</body>
+</html>

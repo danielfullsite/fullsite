@@ -1,0 +1,527 @@
+# OFFLINE-TEST-MATRIX — Matriz de Certificación Offline
+
+> Versión 2: 2026-07-27 | OFFLINE-100
+> Columnas: Implementado | Testado | Certificado | Pendiente
+
+---
+
+## Convenciones
+
+| Columna | Significado |
+|---|---|
+| **Implementado** | El código que soporta el escenario existe en el repositorio |
+| **Testado** | Hay un test automatizado que corre este escenario (unit, integration, o e2e) |
+| **Certificado** | El escenario fue ejecutado manualmente en staging con resultado PASS documentado |
+| **Pendiente** | La columna no está marcada |
+
+Un escenario es **CERTIFIED** solo cuando las 3 columnas están marcadas: Impl ✓ + Test ✓ + Cert ✓.
+
+---
+
+## Grupo 1: Caída de Internet
+
+### T-01: Internet cae durante una venta activa
+
+**Preconditions**: POS cargado, turno abierto, mesa abierta con 2 ítems, internet activo.
+
+**Steps**:
+1. Desconectar cable Ethernet o deshabilitar Wi-Fi en el router.
+2. Agregar un ítem a la orden.
+3. Enviar a cocina.
+4. Cobrar la mesa.
+
+**Expected Result**:
+- Mesa se agrega normalmente (IndexedDB).
+- "Enviar a cocina" dispara WS LOCAL → KDS recibe la orden.
+- Cobro se guarda en IDB sync_queue.
+- UI muestra banner "Sin conexión — datos guardados localmente".
+- No hay error visible para el operador.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Ejecutar escenario + crear test Playwright |
+
+---
+
+### T-02: Internet cae a mitad de una transacción de pago
+
+**Preconditions**: Mesa abierta, orden enviada, listo para cobrar.
+
+**Steps**:
+1. Seleccionar método de pago.
+2. Desconectar internet exactamente al presionar "Cobrar".
+
+**Expected Result**:
+- Operación de pago encolada en IDB sync_queue.
+- La mesa queda marcada como "pagando" en estado local.
+- Al volver internet, syncAll() completa la operación.
+- NO se genera cobro duplicado.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Timing exacto difícil de automatizar; ejecutar manualmente |
+
+---
+
+### T-03: Internet cae, operación 2+ horas, vuelve
+
+**Preconditions**: POS activo, internet desconectado.
+
+**Steps**:
+1. Operar el restaurante completo durante 2 horas (10 mesas, 30 órdenes, cobros, caja).
+2. Reconectar internet.
+3. Esperar sync.
+
+**Expected Result**:
+- Todas las órdenes en IDB sync_queue.
+- Al reconectar: `window.online` → `syncAll()`.
+- 0 ítems duplicados en Supabase.
+- getPendingCount() = 0 al final.
+- Items con STALE_WRITE_CONFLICT marcados (no perdidos).
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Test requiere seed de 30 órdenes en IDB; ejecutar manualmente primero |
+
+---
+
+## Grupo 2: Reinicios de Componentes
+
+### T-04: POS reinicia (Electron — Task Manager kill)
+
+**Preconditions**: Mesa abierta con ítems, pendientes en IDB sync_queue.
+
+**Steps**:
+1. Forzar cierre del proceso Electron (End Task).
+2. Reabrir Fullsite POS.
+
+**Expected Result**:
+- Electron arranca. Local Server inicia, replay events.ndjson.
+- POS carga desde Service Worker.
+- drainLocalStorageToIdb() drena buffer.
+- recoverFromIDB() restaura print jobs pendientes.
+- La mesa abierta aparece en el estado local.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Playwright Electron puede hacer esto |
+
+---
+
+### T-05: Local Server reinicia
+
+**Preconditions**: 3 mesas abiertas, KDS conectado vía WS.
+
+**Steps**:
+1. Reiniciar Electron (contiene el Local Server).
+2. Observar reconexión del KDS.
+
+**Expected Result**:
+- events.ndjson se replaya → state reconstruido con 3 mesas.
+- KDS reconecta → SUBSCRIBE → SNAPSHOT con las 3 mesas.
+- Print jobs pendientes: `_retryPendingJobs()` reintenta.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (parcial — event-store.test.js cubre el replay) | ✗ | Falta test e2e de WS reconnect post-restart |
+
+---
+
+### T-06: Windows reinicia
+
+**Preconditions**: Fullsite POS instalado con openAtLogin: true.
+
+**Steps**:
+1. Reiniciar Windows.
+2. Esperar arranque completo.
+
+**Expected Result**:
+- Fullsite POS arranca automáticamente.
+- Local Server en puerto 7717.
+- KDS abre si config.kds = true.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Requiere acceso físico o VM con snapshot |
+
+---
+
+### T-07: KDS reinicia
+
+**Preconditions**: KDS activo con 3 órdenes en pantalla.
+
+**Steps**:
+1. Cerrar ventana KDS o matar `electron-kds`.
+2. Reabrir.
+
+**Expected Result**:
+- KDS carga /pos/cocina.
+- WS SUBSCRIBE + last_sequence → SNAPSHOT → 3 órdenes en pantalla.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Automatizable con Playwright Electron |
+
+---
+
+## Grupo 3: Fallos de Red LAN
+
+### T-08: LAN se cae (cable del servidor desconectado)
+
+**Preconditions**: Tablet secundaria conectada vía WS.
+
+**Steps**:
+1. Desconectar cable de red del servidor.
+2. Operar desde tablet secundaria y desde POS local.
+
+**Expected Result**:
+- Tablet secundaria: WS cierra, UI muestra "Sin conexión al servidor".
+- POS local (mismo Electron): sigue operando (localhost no depende de LAN).
+- Print jobs TCP: ALL_PRINTERS_FAILED → bridge_unavailable.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ (parcial — LAN failure no es un caso específico, pero los mecanismos existen) | ✗ | ✗ | Separar test de POS local vs tablet remota |
+
+---
+
+### T-09: Wi-Fi cambia de IP (DHCP renewal)
+
+**Preconditions**: Servidor en Wi-Fi, tablets conectadas vía WS.
+
+**Steps**:
+1. Forzar renovación DHCP del servidor (nueva IP asignada).
+2. Observar si las tablets reconectan automáticamente.
+
+**Expected Result**:
+- mDNS reanuncia con nueva IP.
+- Tablets reconectan en <60s sin intervención manual.
+
+**Actual Result (auditado 2026-07-27)**:
+
+`BridgeClient.connect()` implementa reconexión automática con backoff (1s → 30s), pero reconecta siempre a la URL baked en construcción (`this._wsUrl` readonly, fijada desde el resultado de discovery).
+
+`useBridgeClient` corre `ServerDiscovery` una sola vez al montar el componente. Si la IP del servidor cambia mid-session y el WS cae, el cliente reintenta a la IP obsoleta indefinidamente (hasta 30s entre intentos) sin re-correr discovery.
+
+El subnet scan existe en `server-discovery.ts` (`_subnetScan`) pero `permitSubnetScan = false` en todos los callers de producción — nunca se activa.
+
+**Resolución actual**: el operador debe recargar la página. Eso remonta `useBridgeClient`, re-corre `ServerDiscovery` desde cero, y si el registry tiene algún candidato reciente, reconecta.
+
+**Gap**: no existe re-discovery automático en el ciclo de vida de la conexión WS.
+
+**Implementación requerida para PASS**:
+- Después de N reconexiones fallidas consecutivas (sugerido: 5 intentos = ~30s con backoff maxed), `BridgeClient` debe emitir un evento `connection_exhausted`
+- `useBridgeClient` escucha ese evento y re-corre `ServerDiscovery`
+- Si discovery encuentra una nueva IP, crea un nuevo `BridgeClient` con la IP actualizada
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✗ | ✗ | ✗ | Implementar re-discovery automático; ver descripción arriba |
+
+---
+
+## Grupo 4: Escenarios de Volumen
+
+### T-10: Cola con 1000 eventos en events.ndjson
+
+**Preconditions**: Local Server activo.
+
+**Steps**:
+1. Enviar 1000 comandos via POST /events.
+2. Medir readAfter(0) y carga en startup.
+
+**Expected Result**:
+- readAfter(0) < 500ms.
+- Startup replay < 2s.
+- Servidor estable, sin OOM.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ (NDJSON soporta; no hay límite hard) | ✗ | ✗ | Script de carga: 1000 POST /events |
+
+---
+
+### T-11: IDB sync_queue con 200 operaciones pendientes
+
+**Preconditions**: POS offline por período largo.
+
+**Steps**:
+1. Poblar IDB sync_queue con 200 ítems.
+2. Reconectar internet.
+3. Medir tiempo hasta getPendingCount() = 0.
+
+**Expected Result**:
+- syncAll() procesa en FIFO.
+- 0 pérdida de datos.
+- Total < 3 minutos (throttle 400ms entre syncs APP_API).
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Test con seed de 200 ítems en IDB |
+
+---
+
+## Grupo 5: Idempotencia y Duplicados
+
+### T-12: Evento duplicado (mismo command_id dos veces vía HTTP)
+
+**Preconditions**: Local Server activo.
+
+**Steps**:
+1. POST /events con command_id: "test-123", command_type: "ORDER_SENT".
+2. POST /events con el mismo payload.
+
+**Expected Result**:
+- Primera: `{ results: [{ event: {...} }] }`.
+- Segunda: `{ results: [{ duplicate: true }] }`.
+- Solo 1 línea en events.ndjson.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (event-store.test.js: "same command_id does not create duplicate events") | ✗ | Ampliar a nivel HTTP; ejecutar manualmente |
+
+---
+
+### T-13: Idempotencia sobrevive restart del servidor
+
+**Preconditions**: Local Server con comando procesado.
+
+**Steps**:
+1. Procesar comando con command_id: "persist-cmd".
+2. Reiniciar el Local Server.
+3. Enviar el mismo comando.
+
+**Expected Result**:
+- Después del restart: processed-commands.ndjson se recarga.
+- El segundo envío devuelve `duplicate: true`.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (event-store.test.js: "duplicate detection survives restart") | ✗ | Ejecutar manualmente a nivel de proceso Electron |
+
+---
+
+### T-14: ACK perdido — cliente reenvía comando
+
+**Preconditions**: POS conectado vía WS.
+
+**Steps**:
+1. Enviar COMMAND via WS.
+2. Interceptar el ACK antes de que llegue al cliente.
+3. El cliente reenvía el mismo COMMAND (mismo command_id).
+
+**Expected Result**:
+- Servidor detecta duplicate → ACK con `duplicate: true`.
+- No se crea un segundo evento.
+- Estado no cambia.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (event-store.test.js cubre la lógica; sin test WS end-to-end) | ✗ | Ampliar a nivel WS con mock |
+
+---
+
+## Grupo 6: Timeout y Retry
+
+### T-15: Timeout WS — cliente desaparece sin cerrar
+
+**Preconditions**: Terminal conectada vía WS.
+
+**Steps**:
+1. Desconectar cable de red de la tablet sin cerrar el WS.
+2. Esperar 25s (15s ping + 10s pong timeout).
+
+**Expected Result**:
+- Local Server: `client.ws.terminate()`.
+- Log: `[ws-hub] Client timed out: [clientId]`.
+- Cliente eliminado del hub.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (ws-hub.test.js cubre ping/pong) | ✗ | Ejecutar con cliente real (tablet o script) |
+
+---
+
+### T-16: Reconexión automática del WS
+
+**Preconditions**: Terminal conectada, luego red interrumpida.
+
+**Steps**:
+1. Interrumpir red.
+2. Restaurar red.
+3. Observar si el cliente reconecta sin intervención manual.
+
+**Expected Result**:
+- Cliente reconecta con backoff.
+- SUBSCRIBE + last_sequence → SNAPSHOT + deltas.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ (servidor soporta; reconexión del cliente no auditada) | ✗ | ✗ | Auditar lógica de reconexión del cliente WS primero |
+
+---
+
+## Grupo 7: Impresora
+
+### T-17: Impresora desconectada durante venta
+
+**Preconditions**: Impresora TCP configurada, bridge activo.
+
+**Steps**:
+1. Apagar la impresora.
+2. Enviar una orden a cocina.
+
+**Expected Result**:
+- TCP connect timeout en 5s.
+- Job: retrying → (5 intentos) → comanda: needs_attention, ticket: failed.
+- UI muestra alerta. Print queue muestra el job.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (printer-queue.test.ts, multi-printer.test.ts) | ✗ | Ejecutar con impresora real desconectada |
+
+---
+
+### T-18: Impresora vuelve después de 3 minutos
+
+**Preconditions**: Jobs en needs_attention por impresora caída.
+
+**Steps**:
+1. Reconectar la impresora.
+2. Esperar ciclo de retry (15s).
+
+**Expected Result**:
+- isBridgeHealthy() detecta bridge UP.
+- Jobs needs_attention → pending → printed.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (printer-queue.test.ts cubre recovery) | ✗ | Ejecutar con impresora real |
+
+---
+
+## Grupo 8: Múltiples Terminales
+
+### T-19: Tres POS — misma mesa simultáneamente
+
+**Preconditions**: 3 tablets conectadas al mismo Local Server.
+
+**Steps**:
+1. Tablet A envía MESA_LOCK para mesa 5.
+2. Tablets B y C envían MESA_LOCK para mesa 5 simultáneamente.
+
+**Expected Result**:
+- A: ACK con lock.
+- B y C: REJECT "Mesa 5 locked by another terminal".
+- Solo 1 evento MESA_LOCK en events.ndjson.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Script con 3 WS clients concurrentes |
+
+---
+
+### T-20: Tres POS — mesas distintas simultáneamente
+
+**Preconditions**: 3 tablets conectadas.
+
+**Steps**:
+1. Cada tablet abre una mesa distinta simultáneamente y envía órdenes.
+
+**Expected Result**:
+- Sin conflictos. Todas las órdenes llegan al KDS. Estado del plano correcto.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Script con 3 WS clients |
+
+---
+
+### T-21: Consistencia de estado entre terminales
+
+**Preconditions**: 2 terminales conectadas.
+
+**Steps**:
+1. Terminal A cambia estado de mesa 3.
+2. Verificar estado en Terminal B inmediatamente.
+
+**Expected Result**:
+- Terminal B recibe DELTA en <200ms.
+- Estado de mesa 3 idéntico en ambas.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✓ (ws-hub.test.js cubre broadcast) | ✗ | Ejecutar con 2 terminales reales |
+
+---
+
+## Grupo 9: Recovery de Datos
+
+### T-22: Internet vuelve — sin duplicados en Supabase
+
+**Preconditions**: 10 órdenes operadas offline, en IDB sync_queue.
+
+**Steps**:
+1. Reconectar internet.
+2. Esperar syncAll().
+3. Contar filas en pos_orders en Supabase.
+
+**Expected Result**:
+- Exactamente 10 nuevas filas (no 20, no 0).
+- syncAll() devuelve `{ synced: 10, failed: 0 }`.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Requiere Supabase staging con rollback |
+
+---
+
+### T-23: Conflicto STALE_WRITE — datos preservados
+
+**Preconditions**: Orden A en IDB sync_queue; Supabase tiene versión más nueva de la misma orden.
+
+**Steps**:
+1. Modificar la orden directamente en Supabase antes del sync.
+2. Ejecutar syncAll().
+
+**Expected Result**:
+- Item marcado `conflict: true`, `error_class: 'STALE_WRITE_CONFLICT'`.
+- Payload local preservado en IDB.
+- Supabase no es sobreescrita con datos obsoletos.
+
+| Impl | Test | Cert | Pendiente |
+|---|---|---|---|
+| ✓ | ✗ | ✗ | Requiere seed de conflicto en Supabase staging |
+
+---
+
+## Resumen de la Matriz
+
+| Grupo | Escenarios | Impl ✓ | Test ✓ | Cert ✓ | Blocker |
+|---|---|---|---|---|---|
+| 1 — Caída de Internet | 3 | 3 | 0 | 0 | Sin tests e2e |
+| 2 — Reinicios | 4 | 4 | 1 | 0 | Sin test de WS reconnect post-restart |
+| 3 — LAN | 2 | 1 | 0 | 0 | T-09: rediscovery de IP no confirmado |
+| 4 — Volumen | 2 | 2 | 0 | 0 | Sin scripts de carga |
+| 5 — Idempotencia | 3 | 3 | 2 | 0 | Falta ampliar a nivel HTTP/WS |
+| 6 — Timeout/Retry | 2 | 2 | 1 | 0 | Reconexión cliente WS auditada: reconecta a IP fija, sin re-discovery |
+| 7 — Impresora | 2 | 2 | 2 | 0 | Sin test con hardware real |
+| 8 — Multi-terminal | 3 | 3 | 1 | 0 | Sin test concurrente real |
+| 9 — Recovery | 2 | 2 | 0 | 0 | Requiere Supabase staging |
+| **Total** | **23** | **22** | **7** | **0** | |
+
+**Escenarios Implementados**: 22/23 (96%)
+**Escenarios con Test Automatizado**: 7/23 (30%)
+**Escenarios Certificados**: 0/23 (0%)
+
+> T-09: auditado 2026-07-27. Re-discovery automático en cambio de IP NO implementado (`BridgeClient` reconecta a URL fija; `useBridgeClient` corre discovery una sola vez al montar; subnet scan existe pero desactivado). Requiere nueva funcionalidad antes de poder ejecutar o certificar.
+
+---
+
+## Ruta Crítica hacia 23/23 Certificados
+
+1. **T-09 requiere implementación nueva**: detectar reconexiones fallidas consecutivas → re-correr `ServerDiscovery` → crear nuevo `BridgeClient` con nueva IP. No es solo un test — es un gap funcional.
+2. **Ejecutar T-12, T-13, T-14** primero: son los más simples, los tests unitarios ya existen, solo falta ejecución a nivel de proceso real.
+3. **Montar entorno staging**: Supabase staging con rollback para T-22, T-23.
+4. **Tests e2e con Playwright Electron**: T-01, T-04, T-07 son automatizables con bajo esfuerzo.
+5. **Tests con hardware real**: T-17, T-18 requieren impresora física.

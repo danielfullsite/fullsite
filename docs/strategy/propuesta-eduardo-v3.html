@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Propuesta Eduardo — Fullsite v3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #18181b; background: #fff; padding: 56px 72px; max-width: 860px; margin: 0 auto; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; padding-bottom: 16px; border-bottom: 3px solid #10b981; }
+  .header h1 { font-size: 24px; font-weight: 900; letter-spacing: -0.03em; }
+  .header h1 span { color: #10b981; }
+  .header .meta { text-align: right; font-size: 11px; color: #a1a1aa; line-height: 1.8; }
+
+  h2 { font-size: 17px; font-weight: 800; margin-top: 32px; margin-bottom: 12px; color: #09090b; border-left: 4px solid #10b981; padding-left: 10px; }
+
+  p { font-size: 13px; line-height: 1.7; color: #52525b; margin-bottom: 10px; }
+  .lead { font-size: 14px; color: #3f3f46; line-height: 1.7; margin-bottom: 20px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; background: #f4f4f5; font-weight: 700; color: #3f3f46; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e4e4e7; }
+  td { padding: 8px 10px; border-bottom: 1px solid #e4e4e7; color: #52525b; }
+  td:first-child { font-weight: 600; color: #18181b; }
+  .money { font-weight: 700; color: #059669; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 16px 0; }
+  .stat { border-left: 3px solid #10b981; padding-left: 10px; }
+  .stat .num { font-size: 28px; font-weight: 900; color: #09090b; line-height: 1; }
+  .stat .lbl { font-size: 10px; color: #a1a1aa; margin-top: 3px; font-weight: 500; }
+
+  .resp { background: #f4f4f5; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .resp .title { font-size: 13px; font-weight: 700; color: #09090b; margin-bottom: 6px; }
+  .resp .desc { font-size: 12px; color: #52525b; line-height: 1.6; }
+  .resp .tag { display: inline-block; font-size: 9px; font-weight: 700; color: #10b981; background: #d1fae5; padding: 2px 6px; border-radius: 3px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .note { font-size: 11px; color: #a1a1aa; font-style: italic; margin-top: 6px; }
+
+  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e4e4e7; font-size: 10px; color: #a1a1aa; text-align: center; line-height: 1.8; }
+
+  .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 32px; }
+  .sig-block { }
+  .sig-line { border-bottom: 1px solid #ccc; height: 40px; margin-bottom: 8px; }
+  .sig-name { font-size: 13px; font-weight: 700; }
+  .sig-role { font-size: 11px; color: #71717a; }
+  .sig-date { margin-top: 12px; font-size: 11px; color: #a1a1aa; }
+
+  @media print { body { padding: 36px; } }
+  @page { size: letter; margin: 0.5in; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>fullsite<span>.</span> × Eduardo Esquivel</h1>
+    <p style="color:#71717a;font-size:12px;margin-top:3px">Acuerdo de Advisor Estratégico — v3</p>
+  </div>
+  <div class="meta">Julio 2026<br>Confidencial</div>
+</div>
+
+<p class="lead">
+Eduardo ha sido clave para el desarrollo de Fullsite. Su experiencia en Wansoft, implementación operativa y conocimiento de restaurantes es un activo invaluable. Este acuerdo busca mantener su participación de forma realista — sin que tenga que dejar su trabajo actual ni depender económicamente de Fullsite.
+</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">2%</div><div class="lbl">Equity (vesting 2 años)</div></div>
+  <div class="stat"><div class="num">$3,000</div><div class="lbl">Bono por cliente implementado</div></div>
+  <div class="stat"><div class="num">~8 hrs</div><div class="lbl">Dedicación semanal estimada</div></div>
+</div>
+
+<h2>Rol: Advisor Estratégico Comercial-Operativo</h2>
+
+<p>Eduardo no es empleado ni socio operativo. Es advisor con equity y bonos por resultados. Mantiene su trabajo actual y participa en Fullsite de forma flexible.</p>
+
+<div class="resp">
+  <div class="tag">Credibilidad</div>
+  <div class="title">1. Respaldo en presentaciones clave</div>
+  <div class="desc">Acompañar a Daniel en demos y reuniones con restauranteros. Su experiencia con Wansoft y Fullsite da credibilidad que Daniel solo no puede generar. No tiene que ir a todas — solo a las importantes.</div>
+</div>
+
+<div class="resp">
+  <div class="tag">Implementación</div>
+  <div class="title">2. Apoyo en implementación de clientes nuevos</div>
+  <div class="desc">Apoyar la configuración inicial: POS, recetas, costos, inventarios, capacitación de staff. Eduardo sabe cómo capacitar al panadero, al chef, al almacenista — eso no se puede reemplazar con un manual.</div>
+</div>
+
+<div class="resp">
+  <div class="tag">Producto</div>
+  <div class="title">3. Feedback continuo de producto</div>
+  <div class="desc">Validar features, flujos y UX desde la perspectiva operativa real. Señalar qué falta, qué sobra, qué confunde. Como lo ha hecho hasta ahora — pero formalizado.</div>
+</div>
+
+<div class="resp">
+  <div class="tag">Comercial</div>
+  <div class="title">4. Identificación de prospectos e intros</div>
+  <div class="desc">Compartir contactos de restauranteros que conozca, hacer intros cuando sea natural, y participar en materiales de pitch (testimoniales, videos). No se espera que haga prospección activa de tiempo completo.</div>
+</div>
+
+<h2>Compensación</h2>
+
+<table>
+  <tr><th>Concepto</th><th>Detalle</th></tr>
+  <tr><td>Equity</td><td>2% con vesting de 2 años, cliff de 6 meses. Vesting mensual después del cliff.</td></tr>
+  <tr><td>Bono por cliente implementado</td><td class="money">$3,000 MXN por restaurante implementado con éxito (operando 30+ días)</td></tr>
+  <tr><td>Bono por cadena (3+ sucursales)</td><td class="money">$5,000 MXN por sucursal implementada</td></tr>
+  <tr><td>Sueldo fijo</td><td>$0 — no aplica en esta etapa</td></tr>
+  <tr><td>Dedicación</td><td>~8 horas/semana (flexible, compatible con su trabajo actual)</td></tr>
+  <tr><td>Exclusividad</td><td>No se requiere. Eduardo mantiene su empleo actual.</td></tr>
+</table>
+
+<h2>Metas (realistas)</h2>
+
+<table>
+  <tr><th>Periodo</th><th>Meta</th><th>Bono potencial</th></tr>
+  <tr><td>Meses 1-3</td><td>Apoyar implementación de 3 clientes</td><td class="money">$9,000 MXN</td></tr>
+  <tr><td>Meses 4-6</td><td>1 cliente implementado/mes + feedback producto</td><td class="money">$3,000 MXN/mes</td></tr>
+  <tr><td>Meses 7-12</td><td>1-2 clientes/mes + intros a prospectos</td><td class="money">$3,000 - $6,000 MXN/mes</td></tr>
+</table>
+
+<p class="note">Las metas no son condición para mantener el equity — son guía. El cliff de 6 meses protege a ambas partes. Si después de 6 meses la relación funciona, el equity sigue vesting. Si no, se termina limpio.</p>
+
+<h2>Lo que NO incluye este acuerdo</h2>
+
+<p>Eduardo NO es responsable de:</p>
+<table>
+  <tr><td>Prospección activa (200 llamadas/día)</td><td>Eso es trabajo del vendedor, no del advisor</td></tr>
+  <tr><td>Cierre de ventas solo</td><td>Eduardo acompaña, Daniel cierra</td></tr>
+  <tr><td>Soporte técnico post-implementación</td><td>Fullsite tiene soporte IA + Daniel</td></tr>
+  <tr><td>Dedicación full-time</td><td>~8 hrs/semana, flexible</td></tr>
+</table>
+
+<h2>Protecciones</h2>
+
+<table>
+  <tr><th>Concepto</th><th>Detalle</th></tr>
+  <tr><td>Control de la empresa</td><td>Daniel retiene 100% de las decisiones. Eduardo es advisor consultivo.</td></tr>
+  <tr><td>No competencia</td><td>12 meses después de terminación. No crear POS con IA competidor directo.</td></tr>
+  <tr><td>Confidencialidad</td><td>3 años post-terminación. Datos de clientes pertenecen a Fullsite.</td></tr>
+  <tr><td>Terminación</td><td>Cualquiera puede terminar con 30 días de aviso. Equity adquirido se conserva.</td></tr>
+</table>
+
+<h2>Reconocimiento</h2>
+
+<p>Fullsite reconoce que Eduardo ha sido fundamental en el desarrollo del producto hasta hoy. Sus 1,000+ tips, sesiones de revisión y acompañamiento en la implementación de AMALAY fueron clave para llegar a Day 0. Este acuerdo formaliza esa relación para que siga aportando valor sin comprometer su estabilidad.</p>
+
+<h2>Firmas</h2>
+
+<div class="sig-grid">
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <div class="sig-name">Eduardo Esquivel</div>
+    <div class="sig-role">Advisor Estratégico, Fullsite</div>
+    <div class="sig-date">Fecha: _______________</div>
+  </div>
+  <div class="sig-block">
+    <div class="sig-line"></div>
+    <div class="sig-name">Daniel Ramonfaur</div>
+    <div class="sig-role">Founder & CEO, Fullsite</div>
+    <div class="sig-date">Fecha: _______________</div>
+  </div>
+</div>
+
+<div class="footer">
+  fullsite. — The Intelligence Layer for Restaurant Operations.<br>
+  Confidencial — Julio 2026
+</div>
+
+</body>
+</html>

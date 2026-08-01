@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LOI — Fullsite × Grupo Galería</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1a1a1a;
+    background: #fff;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 80px 60px;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #e5e5e5;
+  }
+
+  .header-left .logo {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0a0a0a;
+  }
+
+  .header-left .logo span {
+    color: #10b981;
+  }
+
+  .header-right {
+    text-align: right;
+    font-size: 13px;
+    color: #999;
+    line-height: 1.6;
+  }
+
+  .doc-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0a0a0a;
+    margin-bottom: 32px;
+  }
+
+  .doc-subtitle {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 40px;
+    line-height: 1.7;
+    max-width: 600px;
+  }
+
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  .section-body {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #333;
+  }
+
+  .signatures {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid #e5e5e5;
+  }
+
+  .sig-intro {
+    font-size: 15px;
+    color: #333;
+    margin-bottom: 48px;
+    font-weight: 500;
+  }
+
+  .sig-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+  }
+
+  .sig-block {
+    position: relative;
+  }
+
+  .sig-line {
+    border-bottom: 1px solid #ccc;
+    height: 60px;
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .sign-here {
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #ef4444;
+  }
+
+  .sign-here .arrow {
+    font-size: 18px;
+    color: #ef4444;
+    line-height: 1;
+  }
+
+  .sign-here .tab {
+    background: #ef4444;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .sig-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0a0a0a;
+  }
+
+  .sig-role {
+    font-size: 13px;
+    color: #666;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .sig-date {
+    margin-top: 24px;
+  }
+
+  .sig-date-label {
+    font-size: 12px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  .sig-date-line {
+    border-bottom: 1px solid #ccc;
+    height: 32px;
+    margin-top: 4px;
+  }
+
+  .footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e5e5;
+    font-size: 11px;
+    color: #bbb;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  @media print {
+    body { background: white; }
+    .page { padding: 40px; }
+    .sign-here .tab { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">FULL<span>SITE</span></div>
+    </div>
+    <div class="header-right">
+      Letter of Intent<br>
+      Julio 2026<br>
+      Confidencial
+    </div>
+  </div>
+
+  <div class="doc-title">Letter of Intent</div>
+  <div class="doc-subtitle">
+    Fullsite &times; Grupo Galeria
+  </div>
+
+  <div class="section">
+    <div class="section-body">
+      This Letter of Intent ("LOI") confirms the mutual intent of <strong>Monica Garcia Pons</strong>, in her capacity as a Board Member of <strong>Grupo Galeria</strong>, and <strong>Daniel Ramonfaur</strong>, in his capacity as Founder & CEO of <strong>Fullsite</strong>, to explore the deployment of Fullsite's Restaurant Operating System within Grupo Galeria's restaurant brands: <strong>Dunkin Mexico, Carl's Jr, BWW, IHOP</strong>.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">1. Intent</div>
+    <div class="section-body">
+      Grupo Galeria will evaluate Fullsite's platform — including POS, Kitchen Display System, Inventory, Purchasing, Dashboards, and AI Intelligence Layer — through pilots in selected locations, with the possibility of expanding to additional brands and formats if the pilots are successful.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">2. Non-Binding Nature</div>
+    <div class="section-body">
+      This LOI is not a binding agreement. Neither party is obligated to proceed with a commercial relationship unless and until a definitive agreement is signed.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">3. Next Steps</div>
+    <div class="section-body">
+      Both parties will work in good faith to define pilot parameters, including location selection, timeline, and success metrics, within the next 6 months.
+    </div>
+  </div>
+
+  <div class="signatures">
+    <div class="sig-intro">Signed,</div>
+
+    <div class="sig-grid">
+
+      <div class="sig-block">
+        <div class="sig-line">
+          <div class="sign-here">
+            <span class="arrow">&rarr;</span>
+            <span class="tab">SIGN HERE</span>
+          </div>
+        </div>
+        <div class="sig-name">Monica Garcia Pons</div>
+        <div class="sig-role">Board Member<br>Grupo Galeria</div>
+        <div class="sig-date">
+          <div class="sig-date-label">Fecha</div>
+          <div class="sig-date-line"></div>
+        </div>
+      </div>
+
+      <div class="sig-block">
+        <div class="sig-line">
+          <div class="sign-here">
+            <span class="arrow">&rarr;</span>
+            <span class="tab">SIGN HERE</span>
+          </div>
+        </div>
+        <div class="sig-name">Daniel Ramonfaur</div>
+        <div class="sig-role">Founder & CEO<br>Fullsite</div>
+        <div class="sig-date">
+          <div class="sig-date-label">Fecha</div>
+          <div class="sig-date-line"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    This document is confidential and intended solely for the named parties.<br>
+    Fullsite &mdash; The Intelligence Layer for Restaurant Operations.
+  </div>
+
+</div>
+
+</body>
+</html>
