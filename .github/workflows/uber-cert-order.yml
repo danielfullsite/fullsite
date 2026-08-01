@@ -11,32 +11,52 @@ jobs:
       INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
 
     steps:
-      - name: Trigger sandbox order via Fullsite endpoint
+      - name: UBER-009 — Send signed test order webhook
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
             -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
+            -d '{"action":"test_webhook","store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
 
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
-          echo "HTTP: $HTTP_CODE"
-          echo "Body: $BODY"
-          echo "ORDER_HTTP=$HTTP_CODE" >> $GITHUB_ENV
-          echo "ORDER_BODY=$BODY" >> $GITHUB_ENV
+          echo "UBER-009 HTTP: $HTTP_CODE"
+          echo "UBER-009 Body: $BODY"
+          echo "ORDER_ID=$(echo $BODY | python3 -c 'import sys,json; print(json.load(sys.stdin).get("order_id",""))' 2>/dev/null)" >> $GITHUB_ENV
+          echo "UBER009_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER009_BODY=$BODY" >> $GITHUB_ENV
 
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "ORDER_RESULT=PASS" >> $GITHUB_ENV
-          else
-            echo "ORDER_RESULT=FAIL_$HTTP_CODE" >> $GITHUB_ENV
-          fi
+      - name: UBER-011 — Exactly-once (replay same order)
+        run: |
+          ORDER_ID=$(echo "$ORDER_ID" | tr -d '\n')
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"test_webhook\",\"store_id\":\"633b57d4-237a-5a32-b249-7ceb795f1d35\",\"order_id\":\"$ORDER_ID\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-011 HTTP (replay): $HTTP_CODE — $BODY"
+          echo "UBER011_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+
+      - name: UBER-017 — Invalid signature → 401
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"test_invalid_sig","store_id":"633b57d4-237a-5a32-b249-7ceb795f1d35"}')
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-017 Body: $BODY"
+          echo "UBER017_BODY=$BODY" >> $GITHUB_ENV
 
       - name: Notify Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
         run: |
-          MSG="*UBER-009 Simulate Order*%0A%0AResult: $ORDER_RESULT%0AHTTP: $ORDER_HTTP%0ABody: $ORDER_BODY"
+          MSG="*UBER-009/011/017 Webhook Tests*%0A%0AUBER-009: $UBER009_HTTP $UBER009_BODY%0AUBER-011 replay: $UBER011_HTTP%0AUBER-017 bad sig: $UBER017_BODY"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d "chat_id=$TELEGRAM_CHAT_ID&text=$MSG&parse_mode=Markdown" > /dev/null
