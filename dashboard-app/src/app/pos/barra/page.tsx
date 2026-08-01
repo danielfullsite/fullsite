@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, Wine, Printer } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB, type OrderItem } from '@/lib/pos-data'
-import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, getStationByName, type StationName } from '@/lib/pos-constants'
+import { isBebida as isBeverage, POLL_INTERVAL_KITCHEN, KITCHEN_ARCHIVE_HOURS, resolveItemStation, type StationName } from '@/lib/pos-constants'
 import { reprintByStation, type ReprintOrderContext } from '@/lib/printer'
+import { getActiveClientSlug as _cid } from '@/lib/data'
+import { useBridgeClient, setPosServerHost } from '@/lib/bridge-client'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -45,11 +47,53 @@ export default function BarraPage() {
     try {
       if (!navigator.onLine) throw new Error('offline')
       const allOrders = await getKitchenOrders()
-      // Store all orders — filtering happens at render time based on stationFilter
-      const newEnviadas = allOrders.filter(o => o.status === 'enviada').length
+
+      // Auto-archive orders older than 4 hours (matches Cocina behavior — KDS-GAP-03)
+      const now = Date.now()
+      const fourHoursMs = KITCHEN_ARCHIVE_HOURS * 60 * 60 * 1000
+      for (const order of allOrders) {
+        const age = now - new Date(order.created_at).getTime()
+        if (age > fourHoursMs && (order.status === 'enviada' || order.status === 'preparando')) {
+          try { await updateOrderStatus(order.id, 'entregada') } catch { /* non-blocking */ }
+        }
+      }
+      const visibleOrders = allOrders.filter(o => {
+        const age = now - new Date(o.created_at).getTime()
+        return age <= fourHoursMs || o.status === 'lista'
+      })
+
+      // G-02: parity with Cocina — show delivery_orders on Barra too
+      try {
+        const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+        const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        const delRes = await fetch(
+          `${sbUrl}/rest/v1/delivery_orders?select=*&status=in.(nueva,aceptada,preparando)&client_id=eq.${_cid()}&order=created_at.desc`,
+          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+        )
+        if (delRes.ok) {
+          const deliveryOrders = await delRes.json()
+          const platformBadge: Record<string, string> = { ubereats: '🟢 Uber', rappi: '🟠 Rappi' }
+          for (const d of deliveryOrders) {
+            const items = typeof d.items === 'string' ? JSON.parse(d.items) : d.items || []
+            visibleOrders.push({
+              id: d.id,
+              mesa: 0,
+              mesero: platformBadge[d.platform] || d.platform,
+              status: d.status === 'nueva' ? 'enviada' : d.status,
+              items: JSON.stringify(items.map((i: { name: string; qty: number; notes?: string; modifiers?: string }) => ({
+                nombre: i.name, cantidad: i.qty, notas: i.notes || '', modificadores: i.modifiers || '',
+              }))),
+              created_at: d.created_at,
+              notas: d.notes || `${d.customer_name} · $${d.total}`,
+            } as KitchenOrderFromDB)
+          }
+        }
+      } catch { /* delivery table might not exist yet */ }
+
+      const newEnviadas = visibleOrders.filter(o => o.status === 'enviada').length
       if (prevCountRef.current > 0 && newEnviadas > prevCountRef.current) playSound()
       prevCountRef.current = newEnviadas
-      setOrders(allOrders)
+      setOrders(visibleOrders)
     } catch {
       // Offline — merge cached orders from IndexedDB into current state
       // (same pattern as cocina/page.tsx so barra survives reload without internet)
@@ -70,6 +114,46 @@ export default function BarraPage() {
       setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
     }
   }
+
+  // G-06: register ?bridge=IP on first visit (parity with Cocina)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const bridgeHost = params.get('bridge')
+    if (bridgeHost) {
+      setPosServerHost(bridgeHost)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  // G-06: push DELTA events from the POS local server — LAN-first resilience
+  useBridgeClient((event) => {
+    const ORDER_EVENTS = ['ORDER_UPSERTED', 'ORDER_SENT', 'ORDER_CLOSED', 'KDS_ITEM_STATUS']
+    if (ORDER_EVENTS.includes(event.type)) {
+      if ((event.type === 'ORDER_SENT' || event.type === 'ORDER_UPSERTED') && event.payload) {
+        const p = event.payload as Record<string, unknown>
+        if (p.order_id) {
+          import('@/lib/pos-offline-db').then(({ cacheOrder }) => {
+            cacheOrder({
+              id: p.order_id as string,
+              mesa: p.mesa,
+              mesero: p.mesero,
+              status: 'enviada',
+              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []),
+              personas: p.personas || 1,
+              total: p.total || 0,
+              turno_id: p.turno_id || null,
+              notas: p.notas || null,
+              comanda_batches: p.comanda_batches ? JSON.stringify(p.comanda_batches) : null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }).catch(() => {})
+        }
+      }
+      fetchOrders()
+    }
+  }, 'kds')
 
   useEffect(() => {
     setMounted(true)
@@ -106,6 +190,9 @@ export default function BarraPage() {
       return
     }
 
+    // Optimistic update — apply immediately, roll back on error
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o))
+
     try {
       await updateOrderStatus(id, newStatus)
       logAudit({
@@ -114,6 +201,8 @@ export default function BarraPage() {
       })
       fetchOrders()
     } catch (err) {
+      // Roll back to previous status
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: currentStatus } : o))
       console.error('Error advancing status:', err)
       showToast('Error al cambiar estado. Intenta de nuevo.')
     }
@@ -129,9 +218,8 @@ export default function BarraPage() {
   const filteredOrders = orders.filter(order => {
     const items: BarraItem[] = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
     return items.some(item => {
-      const name = item.nombre || item.name || ''
       if (stationFilter === 'todo') return true
-      return getStationByName(name) === stationFilter
+      return resolveItemStation(item) === stationFilter
     })
   })
 
@@ -226,10 +314,8 @@ export default function BarraPage() {
               // Use saved station from POS first, fallback to name-based detection
               const beverageItems = allItems.filter(item => {
                 if ((item as BarraItem & { cancelled?: boolean }).cancelled) return false
-                const name = item.nombre || item.name || ''
                 if (stationFilter === 'todo') return true
-                const station = (item as { station?: string }).station || getStationByName(name)
-                return station === stationFilter
+                return resolveItemStation(item) === stationFilter
               })
 
               return (

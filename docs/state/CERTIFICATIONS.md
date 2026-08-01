@@ -186,9 +186,12 @@ La OCS certifica módulos del POS de forma independiente. El cierre de todos los
 **Gaps resueltos:** KDS-GAP-01 PASS · KDS-GAP-02 PASS · KDS-GAP-03 PASS · KDS-GAP-04 P3 DOC
 **Referencia:** `docs/certifications/OCS-P2.5.5-KDS.md`
 
-### P2.5.6 — Próximo módulo
+### P2.5.6 — Impresión / Print Bridge
 
-**Estado:** PENDIENTE
+**Estado:** CERTIFIED — 2026-07-31
+**Tests:** 23 nuevos E2 + 1,843 suite completa · 0 regresiones
+**Gaps resueltos:** PRN-GAP-01 PASS · PRN-GAP-02 PASS · PRN-GAP-03 P3 DOC
+**Referencia:** `docs/certifications/OCS-P2.5.6-IMPRESION.md`
 
 ---
 

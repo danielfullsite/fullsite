@@ -5,7 +5,7 @@
 
 import { formatMXN, MENU_CATEGORIES } from './pos-data'
 import type { Order, OrderItem } from './pos-data'
-import { getStationForItem, STATION_LABELS, isTiempoItem, type StationName } from './pos-constants'
+import { getStationForItem, STATION_LABELS, isTiempoItem, getIvaRate, type StationName } from './pos-constants'
 import { enqueueFailedPrint } from './print-queue'
 import { getPosConfigSync } from './pos-config'
 import { qrToDataURL } from './qr'
@@ -66,7 +66,7 @@ export async function printTicketCSS(order: Order) {
   <table>
     <tr><td>Subtotal</td><td class="right">${formatMXN(order.subtotal)}</td></tr>
     ${order.descuento > 0 ? `<tr><td>Descuento</td><td class="right" style="color:red">-${formatMXN(order.descuento)}</td></tr>` : ''}
-    <tr><td>IVA (16%)</td><td class="right">${formatMXN(order.iva)}</td></tr>
+    ${getIvaRate() > 0 ? `<tr><td>IVA (${Math.round(getIvaRate() * 100)}%)</td><td class="right">${formatMXN(order.iva)}</td></tr>` : ''}
     <tr class="bold"><td style="font-size:14px">TOTAL</td><td class="right" style="font-size:14px">${formatMXN(order.total)}</td></tr>
     ${order.propina ? `<tr><td>Propina</td><td class="right">${formatMXN(order.propina)}</td></tr>` : ''}
     ${order.propina ? `<tr class="bold"><td>Total + propina</td><td class="right">${formatMXN(order.total + order.propina)}</td></tr>` : ''}
@@ -310,7 +310,7 @@ export function printPreTicketCSS(order: Order) {
   <table>
     <tr><td>Subtotal</td><td style="text-align:right">${formatMXN(order.subtotal)}</td></tr>
     ${order.descuento > 0 ? `<tr><td>Descuento</td><td style="text-align:right;color:red">-${formatMXN(order.descuento)}</td></tr>` : ''}
-    <tr><td>IVA (16%)</td><td style="text-align:right">${formatMXN(order.iva)}</td></tr>
+    ${getIvaRate() > 0 ? `<tr><td>IVA (${Math.round(getIvaRate() * 100)}%)</td><td style="text-align:right">${formatMXN(order.iva)}</td></tr>` : ''}
     <tr class="bold"><td style="font-size:14px">TOTAL</td><td style="text-align:right;font-size:14px">${formatMXN(order.total)}</td></tr>
   </table>
   <div class="line"></div>
@@ -368,7 +368,9 @@ function buildPreTicketBytes(order: Order, cols: TicketCols = COLS_BT): Uint8Arr
   if (order.descuento > 0) {
     cmds.push(...textToBytes(padLine('Descuento', '-' + formatMXN(order.descuento), cols)))
   }
-  cmds.push(...textToBytes(padLine('IVA (16%)', formatMXN(order.iva), cols)))
+  if (getIvaRate() > 0) {
+    cmds.push(...textToBytes(padLine(`IVA (${Math.round(getIvaRate() * 100)}%)`, formatMXN(order.iva), cols)))
+  }
   cmds.push(ESC, 0x45, 0x01)
   cmds.push(GS, 0x21, 0x01)
   cmds.push(...textToBytes(padLine('TOTAL', formatMXN(order.total), cols)))
@@ -466,7 +468,9 @@ function buildESCPOS(order: Order, cols: TicketCols = COLS_BT): Uint8Array {
   if (order.descuento > 0) {
     cmds.push(...textToBytes(padLine('Descuento', '-' + formatMXN(order.descuento), cols)))
   }
-  cmds.push(...textToBytes(padLine('IVA (16%)', formatMXN(order.iva), cols)))
+  if (getIvaRate() > 0) {
+    cmds.push(...textToBytes(padLine(`IVA (${Math.round(getIvaRate() * 100)}%)`, formatMXN(order.iva), cols)))
+  }
 
   // Bold total
   cmds.push(ESC, 0x45, 0x01) // bold on
@@ -1295,7 +1299,10 @@ export async function reprintByStation(
     }
   }
 
-  return { printed: false, error: 'Impresora no disponible' }
+  // Enqueue for retry — reprint failure gets the same treatment as initial comanda failure
+  // (PRN-GAP-01: previously silent drop; now retried via print-queue)
+  enqueueFailedPrint(bridgeBytes, station, 'comanda', { mesa: order.mesa ?? undefined, orderId: order.id })
+  return { printed: false, error: 'Impresora no disponible — reimpresión encolada' }
 }
 
 /**

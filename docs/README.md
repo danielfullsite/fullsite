@@ -29,6 +29,19 @@ El modelo: plataforma SaaS multi-tenant, un solo Supabase, particionamiento por 
 
 ## Mapa completo
 
+### Patterns — implementaciones reutilizables
+```
+patterns/
+  README.md                  Catálogo completo y reglas de contribución.
+  canonical-module.md        Business rule usada por >1 componente → módulo canónico (ADR-004).
+  optimistic-update.md       Aplicar cambio inmediato + rollback en error. Cierre-by-closure.
+  forward-only-state-machine.md  Rank numérico previene transiciones hacia atrás en multi-device.
+  background-poll.md         setInterval + cleanup + fallback offline para superficies en tiempo real.
+  auto-archive.md            Avanzar registros stale a estado terminal en cada ciclo de poll.
+  offline-queue.md           Write-through cache + sync_queue para operación offline.
+  recoverable-operation.md   Side effects externos (cobro, CFDI) antes del write → log durable + retry.
+```
+
 ### Constitution — principios permanentes (no se negocian)
 ```
 constitution/
@@ -123,6 +136,9 @@ certifications/
   FOUNDATION-SKELETON-AUDIT.md  Auditoría del Foundation Skeleton (SKEL-04).
   PUBLIC-CLAIMS-REGISTER.md  Registro de claims públicos con evidencia.
   OCS-P2.5.4-CAJA.md         OCS Caja — CERTIFIED 2026-07-31. 27 tests E2, 0 regresiones.
+  OCS-P2.5.5-KDS.md          OCS KDS/Cocina/Barra — CERTIFIED 2026-07-31. 24 tests E2, 0 regresiones.
+  OCS-P2.5.6-IMPRESION.md    OCS Impresión/Print Bridge — CERTIFIED 2026-07-31. 23 tests E2, 0 regresiones.
+  KDS-WANSOFT-GAP-ANALYSIS.md  Revisión funcional KDS vs Wansoft. 6 gaps (2×P2, 4×P3).
 ```
 
 ### State — estado vivo (se actualiza cada sesión)
