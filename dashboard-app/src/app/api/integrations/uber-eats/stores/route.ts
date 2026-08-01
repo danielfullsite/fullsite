@@ -12,6 +12,7 @@
 // integration_store_mappings (B-5). Also supports dashboard store-selection UI.
 
 import { type NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { uberFetch } from '@/lib/integrations/uber-eats/oauth'
 import { auditLog } from '@/lib/integrations/audit-logger'
 
@@ -20,12 +21,41 @@ interface UberStoreRow {
   name?: string
 }
 
-function checkAuth(request: NextRequest): boolean {
-  const adminSecret = process.env.INTEGRATION_ADMIN_SECRET
-  if (!adminSecret) return false
-  const auth = request.headers.get('authorization') ?? ''
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  return token.length > 0 && token === adminSecret
+// TEMPORARY DIAGNOSTIC — emits SHA-256 partial fingerprints to Vercel logs.
+// Lets us verify whether the configured secret and the provided token hash to
+// the same value without ever logging the raw strings.
+// REMOVE before marking B-3 complete.
+async function sha256Fp(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 16)
+}
+
+async function checkAuth(request: NextRequest): Promise<boolean> {
+  const expected = (process.env.INTEGRATION_ADMIN_SECRET ?? '').trim()
+  if (!expected) return false
+
+  const raw = request.headers.get('authorization') ?? ''
+  // Case-insensitive Bearer prefix; trim removes accidental whitespace/newlines
+  const provided = raw.replace(/^Bearer\s+/i, '').trim()
+  if (!provided) return false
+
+  // TEMPORARY DIAGNOSTIC — fingerprints only, never raw values
+  const [expFp, provFp] = await Promise.all([sha256Fp(expected), sha256Fp(provided)])
+  console.log(
+    `[uber-stores] auth_diagnostic exp_len=${expected.length} got_len=${provided.length}` +
+    ` exp_fp=${expFp} got_fp=${provFp} lengths_match=${expected.length === provided.length}`
+  )
+
+  if (provided.length !== expected.length) return false
+
+  try {
+    return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(provided, 'utf8'))
+  } catch {
+    return false
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -40,7 +70,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Guard 1: admin authentication via dedicated INTEGRATION_ADMIN_SECRET
-  if (!checkAuth(request)) {
+  if (!await checkAuth(request)) {
     return NextResponse.json({ error: 'unauthorized', correlation_id: correlationId }, { status: 401 })
   }
 
@@ -63,7 +93,6 @@ export async function GET(request: NextRequest) {
     })
 
     if (!r.ok) {
-      const errorSnippet = (await r.text()).slice(0, 300)
       await auditLog({
         provider: 'ubereats',
         correlation_id: correlationId,
@@ -90,12 +119,7 @@ export async function GET(request: NextRequest) {
       response: { count: stores.length, env },
     })
 
-    return NextResponse.json({
-      env,
-      count: stores.length,
-      stores,
-      correlation_id: correlationId,
-    })
+    return NextResponse.json({ env, count: stores.length, stores, correlation_id: correlationId })
   } catch (e) {
     await auditLog({
       provider: 'ubereats',
