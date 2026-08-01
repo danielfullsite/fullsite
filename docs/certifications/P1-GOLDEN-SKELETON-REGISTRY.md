@@ -11,18 +11,24 @@
 
 ## Gate de apertura — estado actual
 
-| Requisito | Estado |
-|---|---|
-| P0-1 CERTIFIED | CERTIFIED ✓ |
-| P0-2 CERTIFIED | EN VALIDACIÓN |
-| P0-3 CERTIFIED | OPEN — blocker SAT (agosto 2026) |
-| P0-4 CERTIFIED | OPEN — Fase 5 pendiente |
-| 7 días operación sostenida sin intervención | PENDIENTE |
-| Cero pérdida de órdenes en esos 7 días | PENDIENTE |
-| Cero diferencias de arqueo no explicadas | PENDIENTE |
-| Sin incidentes P0 al cierre de los 7 días | PENDIENTE |
+Todos los requisitos provienen de `docs/feos/EXECUTION-PLAN.md` § "Milestone: POS V2 Operational Certification" (aprobado 2026-07-23). No hay condiciones agregadas fuera de ese documento.
+
+| Requisito | Fuente | Estado |
+|---|---|---|
+| P0-1 CERTIFIED | EXECUTION-PLAN.md | CERTIFIED ✓ |
+| P0-2 CERTIFIED | EXECUTION-PLAN.md | EN VALIDACIÓN |
+| P0-3 CERTIFIED | EXECUTION-PLAN.md | OPEN — blocker SAT |
+| P0-4 CERTIFIED | EXECUTION-PLAN.md | OPEN — Fase 5 pendiente |
+| 7 días consecutivos en AMALAY sin intervención | EXECUTION-PLAN.md | PENDIENTE |
+| Cero pérdida de órdenes en esos 7 días | EXECUTION-PLAN.md | PENDIENTE |
+| Cero diferencias de arqueo no explicadas | EXECUTION-PLAN.md | PENDIENTE |
+| Cero fallas de impresión no recuperables | EXECUTION-PLAN.md | PENDIENTE |
+| Facturación CFDI operando (≥1 CFDI/día) | EXECUTION-PLAN.md | PENDIENTE — blocker P0-3 |
+| Sin incidentes P0 abiertos al cierre de los 7 días | EXECUTION-PLAN.md | PENDIENTE |
 
 **El gate está OPEN. Ninguna certificación P1 puede comenzar.**
+
+> Cualquier modificación a estos gates requiere un ADR explícito que modifique `docs/feos/EXECUTION-PLAN.md`. No se ajustan durante ejecución.
 
 ---
 
