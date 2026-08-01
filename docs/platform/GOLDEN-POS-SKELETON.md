@@ -541,6 +541,34 @@ ALTER TABLE pos_recipes              ALTER COLUMN client_id SET NOT NULL;
 ALTER TABLE pos_sessions             ALTER COLUMN client_id SET NOT NULL;
 ```
 
+### Closure Registry (congelado 2026-08-01)
+
+Criterio de cierre por ítem. Una D-xx se marca CLOSED cuando se cumple **todo** lo siguiente:
+(a) commit identificable con el fix, (b) grep de verificación en cero, (c) evidencia funcional donde se indica.
+
+| ID | Grep de verificación → esperado 0 hits | Evidencia funcional adicional |
+|---|---|---|
+| D-01 | `grep -n "AFO200806JI0\|8115324371\|Omar Aguilera" lib/client-config.ts` | — |
+| D-02 | `grep -n "ramonfaur.daniel@gmail.com" lib/client-config.ts` | Login con email no-AMALAY resuelve client_id desde `client_users` |
+| D-03 | `grep -n "mkt-amalay\|mkt-vitaminas\|mkt-regalos" lib/settings.ts` | POS de cliente nuevo arranca sin routing errors |
+| D-04 | `grep -n "mkt-amalay\|mkt-vitaminas\|mkt-regalos" lib/pos-constants.ts` | — |
+| D-05 | `grep -n "AMALAY real menu\|mkt-" lib/pos-data.ts` | Categorías de menú cargadas desde DB para cliente nuevo |
+| D-06 | `grep -n "BAKERY_CATEGORIES" lib/pos-constants.ts` | Feature flag `pos.bakery_station=false` → panadería oculta |
+| D-07 | `grep -n "panaderia" app/pos/panaderia/page.tsx \| grep -v redirect` | `/pos/panaderia` redirige a `/pos` sin `bakery_station` activo |
+| D-08 | `grep -n "inventario-market" app/pos/inventario-market/page.tsx \| grep -v redirect` | `/pos/inventario-market` redirige a `/pos` sin `posTienda` activo |
+| D-09 | `grep -rn "DEFAULT 'amalay'" scripts/sql/` | `\d+ reservaciones` en Supabase → sin DEFAULT en client_id |
+| D-10 | `grep -rn "client_id: 'amalay'" cloudflare/delivery-worker/` | Webhook con `storeId` desconocido → DLQ, no insertado en tabla |
+| D-11 | `grep -n "Omar Aguilera\|Hector Rodriguez" src/app/api/chat/route.ts src/app/api/voice/route.ts` | Chat de NÓMADA-MINI no menciona meseros de AMALAY |
+| D-12 | `grep -rn "cafeamalay.com" agents/reviews-manager/` | `clients.support_email` poblado en AMALAY; escalación llega al email correcto |
+| D-13 | `grep -n "qjiomlvudfmzuvqvhwpk" electron-kds/main.js` | KDS falla explícitamente si `SUPABASE_URL` no está en env |
+| D-14 | `grep -n "ramonfaur.daniel@gmail.com" src/lib/roles.ts` | `resolveRole(null, 'otro@email.com')` → `'staff'`, no `'dueño'` |
+| D-15 | `grep -n "Plaza Duendes\|Mónica\|horario" cloudflare/orquestador-worker/src/lib/claude-api.ts` | SYSTEM_PROMPT contiene nombre del restaurante desde `clients.display_name` |
+| D-16 | `grep -n "\|\| 'amalay'" .github/scripts/client_config.py` | Script Python sin CLIENT_ID → exit code ≠ 0 con mensaje de error claro |
+| D-17 | `grep -n "\|\| 'amalay'" src/app/api/integrations/uber-eats/` | Estado OAuth inválido → throw 400, sin token guardado |
+| D-18 | `grep -n "\|\| 'amalay'" src/app/api/agents/cron/route.ts` | Cron sin env var → HTTP 400, no ejecuta agentes |
+| D-19 | `grep -n "ramonfaur.daniel@gmail.com\|monica@fullsite.mx" src/app/api/backup/route.ts` | Dueño de VANTARA puede exportar backup; Daniel no puede exportar backup de VANTARA |
+| D-20 | `grep -rn "amalay_reservaciones" scripts/sql/migrations/` | `\dt amalay_reservaciones` en Supabase → tabla no existe |
+
 ---
 
 ## 10. Minute 0 State
