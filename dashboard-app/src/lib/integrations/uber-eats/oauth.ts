@@ -14,7 +14,9 @@ const authorizeUrl = (): string =>
     ? 'https://login.uber.com/oauth/v2/authorize'
     : 'https://sandbox-login.uber.com/oauth/v2/authorize'
 
-const API_BASE = 'https://api.uber.com'
+// Uber docs: Testing → test-api.uber.com  /  Production → api.uber.com
+const apiBase = (): string =>
+  isProduction() ? 'https://api.uber.com' : 'https://test-api.uber.com'
 
 // Scopes required for POS integration.
 // eats.pos_provisioning covers order + store management in one scope (production).
@@ -133,7 +135,7 @@ export async function uberFetch(
   const scope = opts.scope ?? 'eats.order'
   const token = await getUberAccessToken(scope)
   const { scope: _scope, ...rest } = opts
-  return fetch(`${API_BASE}${path}`, {
+  return fetch(`${apiBase()}${path}`, {
     ...rest,
     headers: {
       'Content-Type': 'application/json',
