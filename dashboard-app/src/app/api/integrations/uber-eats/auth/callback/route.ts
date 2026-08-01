@@ -56,6 +56,7 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
       provider_account_id: storeId,
       // NOTE: stored plaintext until encryption layer is implemented
       access_token_enc: tokens.access_token,
+      refresh_token_enc: tokens.refresh_token,
       token_expires_at: expiresAt,
       scopes: tokens.scope.split(' '),
       status: 'active',

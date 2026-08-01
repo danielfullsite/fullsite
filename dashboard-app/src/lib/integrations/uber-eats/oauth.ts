@@ -133,14 +133,67 @@ export async function refreshUberToken(refreshToken: string): Promise<UberTokenR
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Authenticated fetch to Uber API — always uses Bearer token for the given scope. */
+/**
+ * Return the stored access_token for a given Uber store from integration_providers.
+ * Uses the authorization_code token granted during USL — required for all merchant-level
+ * operations (menu, orders, store status). eats.pos_provisioning is NOT a valid
+ * client_credentials scope; only the merchant's own token carries those permissions.
+ * If the token is expired and refresh_token_enc is present, refreshes automatically.
+ */
+export async function getStoredTokenForStore(storeId: string): Promise<string> {
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY
+  if (!serviceKey) throw new Error('[uber-oauth] SUPABASE_SERVICE_KEY not configured')
+
+  const r = await fetch(
+    `${sbUrl}/rest/v1/integration_providers?provider=eq.ubereats&provider_account_id=eq.${encodeURIComponent(storeId)}&select=client_id,access_token_enc,token_expires_at,refresh_token_enc&limit=1`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  )
+  if (!r.ok) throw new Error(`[uber-oauth] DB lookup failed ${r.status}: ${await r.text()}`)
+
+  const rows = (await r.json()) as Array<{
+    client_id: string
+    access_token_enc: string
+    token_expires_at: string
+    refresh_token_enc?: string
+  }>
+  if (!rows.length) throw new Error(`[uber-oauth] no stored token for store ${storeId} — run USL first`)
+
+  const row = rows[0]
+  const expiresAt = new Date(row.token_expires_at).getTime()
+
+  if (expiresAt > Date.now() + 60_000) return row.access_token_enc
+
+  if (!row.refresh_token_enc) throw new Error(`[uber-oauth] token expired and no refresh_token for store ${storeId}`)
+  const tokens = await refreshUberToken(row.refresh_token_enc)
+
+  await fetch(
+    `${sbUrl}/rest/v1/integration_providers?provider=eq.ubereats&provider_account_id=eq.${encodeURIComponent(storeId)}`,
+    {
+      method: 'PATCH',
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        access_token_enc: tokens.access_token,
+        token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  )
+  return tokens.access_token
+}
+
+/** Authenticated fetch to Uber API.
+ *  Pass `storeId` for merchant-level operations (menu, orders, store status) —
+ *  uses the stored authorization_code token from integration_providers.
+ *  Omit `storeId` only for app-level M2M calls that don't require merchant scope. */
 export async function uberFetch(
   path: string,
-  opts: RequestInit & { scope?: string } = {}
+  opts: RequestInit & { scope?: string; storeId?: string } = {}
 ): Promise<Response> {
-  const scope = opts.scope ?? 'eats.pos_provisioning'
-  const token = await getUberAccessToken(scope)
-  const { scope: _scope, ...rest } = opts
+  const { scope: _scope, storeId, ...rest } = opts
+  const token = storeId
+    ? await getStoredTokenForStore(storeId)
+    : await getUberAccessToken(_scope ?? 'eats.pos_provisioning')
   return fetch(`${getApiBase()}${path}`, {
     ...rest,
     headers: {
