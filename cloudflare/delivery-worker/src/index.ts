@@ -1,16 +1,15 @@
 /**
- * DEPRECATED — Replaced by Integration Framework v1.
- * New webhook endpoint: /api/integrations/uber-eats/webhook (Next.js App Router)
- * Reasons for deprecation:
- *   - Hardcodes client_id='amalay' (violates multi-tenant isolation)
- *   - No HMAC verification, no deduplication, no DLQ, no audit log
- *   - No correlation IDs
- * Do not route new Uber Eats webhooks here. Keep for Rappi/Didi until those providers
- * have their own integration framework adapters.
- *
  * Delivery Worker — Receives webhooks from Uber Eats, Rappi, Didi Food
- * Saves orders to Supabase delivery_orders table
- * Sends notification to Telegram
+ * Saves orders to Supabase delivery_orders table.
+ *
+ * Tenant resolution:
+ *   provider + provider_store_id → integration_store_mappings → client_id
+ *   Fail-closed: unknown store → delivery_dlq + Telegram alert, order NOT saved.
+ *   Never falls back to any hardcoded tenant.
+ *
+ * NOTE: Uber Eats webhooks are handled by Integration Framework v1
+ * (/api/integrations/uber-eats/webhook). This worker handles Rappi and Didi
+ * until those providers get their own adapters.
  */
 
 export interface Env {
@@ -21,7 +20,7 @@ export interface Env {
   UBEREATS_CLIENT_SECRET: string
   RAPPI_API_KEY: string
   DIDI_APP_SECRET: string
-  WEBHOOK_SECRET: string  // For verifying our own internal calls
+  WEBHOOK_SECRET: string
 }
 
 interface DeliveryItem {
@@ -50,9 +49,76 @@ interface DeliveryOrder {
   raw_payload: unknown
 }
 
-// ─── UBER EATS ──────────────────────────────────────────────────────────
+// ─── TENANT RESOLUTION ──────────────────────────────────────────────────────
 
-function parseUberEatsOrder(payload: any): DeliveryOrder {
+async function resolveClientId(
+  env: Env,
+  provider: string,
+  providerStoreId: string,
+): Promise<string | null> {
+  if (!providerStoreId) return null
+  try {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/integration_store_mappings?provider=eq.${encodeURIComponent(provider)}&provider_store_id=eq.${encodeURIComponent(providerStoreId)}&select=client_id&limit=1`,
+      { headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}` } }
+    )
+    if (!res.ok) return null
+    const rows: Array<{ client_id: string }> = await res.json()
+    return rows[0]?.client_id ?? null
+  } catch {
+    return null
+  }
+}
+
+async function writeDlq(
+  env: Env,
+  provider: string,
+  providerStoreId: string | undefined,
+  correlationId: string,
+  rawPayload: unknown,
+): Promise<void> {
+  await fetch(`${env.SUPABASE_URL}/rest/v1/delivery_dlq`, {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ provider, provider_store_id: providerStoreId, correlation_id: correlationId, raw_payload: rawPayload }),
+  })
+
+  if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: env.TELEGRAM_CHAT_ID,
+        text: `[DLQ] Webhook ${provider} sin mapping.\nstore_id: ${providerStoreId || '(no detectado)'}\ncorrelation_id: ${correlationId}\nAgrega el mapping en integration_store_mappings para rutear este pedido.`,
+      }),
+    })
+  }
+}
+
+// ─── STORE ID EXTRACTION ─────────────────────────────────────────────────────
+// Best-effort extraction of the platform store identifier from the raw payload.
+// Used for mapping lookup BEFORE full order parsing.
+
+function extractUberStoreId(body: any): string {
+  return body.store?.id || body.store_id || body.restaurant?.id || ''
+}
+
+function extractRappiStoreId(body: any): string {
+  return String(body.restaurant?.id || body.store?.id || body.store_id || '')
+}
+
+function extractDidiStoreId(body: any): string {
+  return String(body.shop_id || body.store_id || body.data?.shop_id || '')
+}
+
+// ─── ORDER PARSERS ───────────────────────────────────────────────────────────
+
+function parseUberEatsOrder(payload: any, clientId: string): DeliveryOrder {
   const order = payload.order || payload
   const items: DeliveryItem[] = (order.items || order.cart?.items || []).map((item: any) => ({
     name: item.title || item.name || 'Item',
@@ -63,10 +129,9 @@ function parseUberEatsOrder(payload: any): DeliveryOrder {
       .flatMap((g: any) => (g.selected_items || []).map((m: any) => m.title))
       .join(', '),
   }))
-
   return {
     id: `ue-${order.id || order.order_id || Date.now()}`,
-    client_id: 'amalay',
+    client_id: clientId,
     platform: 'ubereats',
     platform_order_id: order.id || order.order_id || '',
     status: 'nueva',
@@ -83,9 +148,7 @@ function parseUberEatsOrder(payload: any): DeliveryOrder {
   }
 }
 
-// ─── RAPPI ──────────────────────────────────────────────────────────────
-
-function parseRappiOrder(payload: any): DeliveryOrder {
+function parseRappiOrder(payload: any, clientId: string): DeliveryOrder {
   const order = payload.order || payload
   const items: DeliveryItem[] = (order.items || order.products || []).map((item: any) => ({
     name: item.name || item.product_name || 'Item',
@@ -94,10 +157,9 @@ function parseRappiOrder(payload: any): DeliveryOrder {
     notes: item.comments || item.notes || '',
     modifiers: (item.toppings || item.modifiers || []).map((m: any) => m.name || m).join(', '),
   }))
-
   return {
     id: `rp-${order.id || order.order_id || Date.now()}`,
-    client_id: 'amalay',
+    client_id: clientId,
     platform: 'rappi',
     platform_order_id: String(order.id || order.order_id || ''),
     status: 'nueva',
@@ -114,9 +176,7 @@ function parseRappiOrder(payload: any): DeliveryOrder {
   }
 }
 
-// ─── DIDI FOOD ──────────────────────────────────────────────────────────
-
-function parseDidiOrder(payload: any): DeliveryOrder {
+function parseDidiOrder(payload: any, clientId: string): DeliveryOrder {
   const order = payload.order || payload.data || payload
   const items: DeliveryItem[] = (order.items || order.order_items || []).map((item: any) => ({
     name: item.name || item.item_name || 'Item',
@@ -125,10 +185,9 @@ function parseDidiOrder(payload: any): DeliveryOrder {
     notes: item.remark || item.notes || '',
     modifiers: (item.attributes || item.options || []).map((m: any) => m.name || m.value || m).join(', '),
   }))
-
   return {
     id: `dd-${order.order_id || order.id || Date.now()}`,
-    client_id: 'amalay',
+    client_id: clientId,
     platform: 'didi',
     platform_order_id: String(order.order_id || order.id || ''),
     status: 'nueva',
@@ -145,7 +204,7 @@ function parseDidiOrder(payload: any): DeliveryOrder {
   }
 }
 
-// ─── MAIN HANDLER ───────────────────────────────────────────────────────
+// ─── MAIN HANDLER ───────────────────────────────────────────────────────────
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -155,42 +214,60 @@ export default {
 
     const url = new URL(request.url)
     const path = url.pathname
+    const correlationId = crypto.randomUUID()
 
     try {
       const body = await request.json()
 
-      let order: DeliveryOrder
-
-      // Route based on path
+      // Detect provider
+      let provider: string
       if (path.includes('/ubereats') || path.includes('/uber')) {
-        order = parseUberEatsOrder(body)
+        provider = 'ubereats'
       } else if (path.includes('/rappi')) {
-        order = parseRappiOrder(body)
+        provider = 'rappi'
       } else if (path.includes('/didi')) {
-        order = parseDidiOrder(body)
+        provider = 'didi'
+      } else if (body.eater || body.store_id) {
+        provider = 'ubereats'
+      } else if (body.client || body.store) {
+        provider = 'rappi'
+      } else if (body.order_id && body.shop_id) {
+        provider = 'didi'
       } else {
-        // Try to detect from payload
-        if (body.eater || body.store_id) {
-          order = parseUberEatsOrder(body)
-        } else if (body.client || body.store) {
-          order = parseRappiOrder(body)
-        } else if (body.order_id && body.shop_id) {
-          order = parseDidiOrder(body)
-        } else {
-          return new Response(JSON.stringify({ error: 'Unknown platform. Use /ubereats, /rappi, or /didi path' }), {
-            status: 400, headers: { 'Content-Type': 'application/json' }
-          })
-        }
+        return new Response(JSON.stringify({ error: 'Unknown platform. Use /ubereats, /rappi, or /didi path' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' },
+        })
       }
+
+      // Extract store ID for tenant lookup
+      let providerStoreId: string
+      if (provider === 'ubereats') providerStoreId = extractUberStoreId(body)
+      else if (provider === 'rappi')  providerStoreId = extractRappiStoreId(body)
+      else                             providerStoreId = extractDidiStoreId(body)
+
+      // Resolve tenant — fail-closed if no mapping exists
+      const clientId = await resolveClientId(env, provider, providerStoreId)
+      if (!clientId) {
+        await writeDlq(env, provider, providerStoreId, correlationId, body)
+        return new Response(JSON.stringify({ status: 'dlq', reason: 'no_mapping', correlation_id: correlationId }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Parse full order
+      let order: DeliveryOrder
+      if (provider === 'ubereats')   order = parseUberEatsOrder(body, clientId)
+      else if (provider === 'rappi') order = parseRappiOrder(body, clientId)
+      else                           order = parseDidiOrder(body, clientId)
 
       // Save to Supabase
       const sbRes = await fetch(`${env.SUPABASE_URL}/rest/v1/delivery_orders`, {
         method: 'POST',
         headers: {
-          'apikey': env.SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
           'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
         },
         body: JSON.stringify({
           id: order.id,
@@ -219,24 +296,17 @@ export default {
       // Send Telegram notification
       const platformEmoji: Record<string, string> = { ubereats: '🟢', rappi: '🟠', didi: '🔶' }
       const platformName: Record<string, string> = { ubereats: 'Uber Eats', rappi: 'Rappi', didi: 'Didi Food' }
-      const emoji = platformEmoji[order.platform] || '📦'
-      const pName = platformName[order.platform] || order.platform
-
       const itemsList = order.items.map(i => `  ${i.qty}x ${i.name}${i.modifiers ? ` (${i.modifiers})` : ''}`).join('\n')
-
-      const msg = `${emoji} NUEVO PEDIDO — ${pName}\n\n` +
-        `Cliente: ${order.customer_name}\n` +
-        `Total: $${order.total.toFixed(0)}\n\n` +
-        `${itemsList}\n` +
-        (order.notes ? `\nNota: ${order.notes}\n` : '') +
-        (order.estimated_pickup ? `\nRecoger: ${order.estimated_pickup}` : '')
 
       await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: env.TELEGRAM_CHAT_ID,
-          text: msg,
+          text: `${platformEmoji[provider] || '📦'} NUEVO PEDIDO — ${platformName[provider] || provider}\n\n` +
+            `Cliente: ${order.customer_name}\nTotal: $${order.total.toFixed(0)}\n\n${itemsList}` +
+            (order.notes ? `\nNota: ${order.notes}` : '') +
+            (order.estimated_pickup ? `\nRecoger: ${order.estimated_pickup}` : ''),
         }),
       })
 
@@ -246,15 +316,12 @@ export default {
         platform: order.platform,
         items_count: order.items.length,
         total: order.total,
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
     } catch (error) {
       console.error('Webhook error:', error)
       return new Response(JSON.stringify({ error: 'Internal error', detail: String(error) }), {
-        status: 500, headers: { 'Content-Type': 'application/json' }
+        status: 500, headers: { 'Content-Type': 'application/json' },
       })
     }
   },
