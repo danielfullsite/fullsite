@@ -59,9 +59,9 @@ function makeEatsAdapter(): OrderAdapter {
     channel: 'eats',
     getOrderDetails: (orderId, correlationId, storeId) =>
       eatsGetOrderDetails(orderId, correlationId, storeId),
-    // eatsAcceptOrder takes minutesToReady as 3rd positional arg; default to 20
-    acceptOrder: (orderId, correlationId, storeId) =>
-      eatsAcceptOrder(orderId, correlationId, 20, storeId),
+    // eatsAcceptOrder takes minutesToReady as 3rd positional arg
+    acceptOrder: (orderId, correlationId, storeId, minutesToReady) =>
+      eatsAcceptOrder(orderId, correlationId, minutesToReady ?? 20, storeId),
     denyOrder: (orderId, reason, correlationId, storeId) =>
       eatsDenyOrder(orderId, reason, correlationId, storeId),
     cancelOrder: (orderId, reason, correlationId, storeId) =>

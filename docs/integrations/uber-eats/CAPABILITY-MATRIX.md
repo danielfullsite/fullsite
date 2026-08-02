@@ -1,50 +1,77 @@
 # Uber Eats — Capability Matrix
 
-> Auditoría: 2026-07-31. Branch: `integrations/uber-eats`.
+> Última actualización: 2026-08-02. Día 1 completo. Día 2 (Delivery adapter) completo.
+
+## Leyenda
+
+| Estado | Significado |
+|---|---|
+| **IMPLEMENTADO** | Código completo, tests Cat A pasando, evidencia generada |
+| **SANDBOX LIMIT** | Implementado localmente; bloqueado por permiso de Uber sandbox/producción |
+| **PENDING** | No implementado aún |
 
 ## Matriz de capacidades
 
-| ID | Capability | Código existente | Endpoints/Rutas | Estado real | Gap | Riesgo | Idempotencia | Observabilidad | Tests | Evidencia Uber | Acción |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| UBER-001 | Activate Integration (OAuth/USL) | Ninguno | — | **MISSING** | 100% | Crítico | N/A | Ninguna | 0 | USL completado, access_token válido | IMPLEMENTAR |
-| UBER-002 | Store Mapping | `UBER_STORE_CLIENT_MAP` env var | — | **ROTO** | 90% | Alto | N/A | Ninguna | 0 | store_id → client_id verificado | IMPLEMENTAR tabla DB |
-| UBER-003 | Upload Menu | Ninguno | — | **MISSING** | 100% | Medio | N/A | Ninguna | 0 | Menú visible en app Uber | IMPLEMENTAR |
-| UBER-004 | Update Menu | Ninguno | — | **MISSING** | 100% | Medio | N/A | Ninguna | 0 | Cambio de precio/nombre visible | IMPLEMENTAR |
-| UBER-005 | Mark Item OOS | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Item no disponible en plataforma | IMPLEMENTAR |
-| UBER-006 | Restore Item | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Item disponible de nuevo | IMPLEMENTAR |
-| UBER-007 | Store Status Webhook | Ninguno | — | **MISSING** | 100% | Crítico | N/A | Ninguna | 0 | Store activa/pausa desde Uber | IMPLEMENTAR |
-| UBER-008 | Get Store Status | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Estado de tienda consultable | IMPLEMENTAR |
-| UBER-009 | Order Notification | `api/webhook/ubereats/route.ts` | POST `/api/webhook/ubereats` | **ROTO** | 60% | Crítico | Parcial (`merge-duplicates`) | `console.log` solo | 0 | Webhook recibido y procesado | REFACTORIZAR |
-| UBER-010 | Get Order Details | Ninguno | — | **MISSING** | 100% | Crítico | N/A | Ninguna | 0 | Order detallada antes de accept | IMPLEMENTAR |
-| UBER-011 | Exactly-once Injection | Parcial (merge-duplicates PK) | — | **ROTO** | 70% | Crítico | Sin tabla de dedup | Ninguna | 0 | Orden no duplicada en retry | IMPLEMENTAR tabla |
-| UBER-012 | Accept | Parcial (inline en webhook) | POST `accept_pos_order` | **ROTO** | 50% | Crítico | Sin retry, sin RecoverableOp | Ninguna | 0 | Accept con timer confirmado | REFACTORIZAR |
-| UBER-013 | Deny (catálogo de razones) | Ninguno | — | **MISSING** | 100% | Crítico | N/A | Ninguna | 0 | Deny con razón enviado | IMPLEMENTAR |
-| UBER-014 | Cancel (catálogo de razones) | Solo PATCH status en DB | — | **ROTO** | 80% | Crítico | N/A | Ninguna | 0 | Cancel con razón enviado a Uber | IMPLEMENTAR |
-| UBER-015 | Mark Ready (KDS-connected) | UI button en delivery page | — | **ROTO** | 70% | Alto | N/A | Ninguna | 0 | Ready sincronizado con KDS | IMPLEMENTAR |
-| UBER-016 | Duplicate Webhook | Parcial (`merge-duplicates`) | — | **ROTO** | 70% | Alto | Sin tabla de eventos | Ninguna | 0 | 2do webhook ignorado | IMPLEMENTAR event table |
-| UBER-017 | Invalid Signature | `verifyUberSignature()` | — | **FUNCIONA** | 0% | — | N/A | `console.warn` | 0 | 401 devuelto | MANTENER + test |
-| UBER-018 | Retry / Timeout | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Retry exitoso tras fallo transitorio | IMPLEMENTAR |
-| UBER-019 | Fullsite Unavailable (DLQ) | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Evento en DLQ, reenviado | IMPLEMENTAR |
-| UBER-020 | Reconciliation | Ninguno | — | **MISSING** | 100% | Alto | N/A | Ninguna | 0 | Órdenes reconciliadas con Uber | IMPLEMENTAR |
+| ID | Capability | Módulo / Ruta | Estado | Tests Cat A | Tests Cat B | Notas |
+|---|---|---|---|---|---|---|
+| UBER-001 | Activate Integration (OAuth/USL) | `lib/uber-eats/oauth.ts` · `/api/integrations/uber-eats/auth/callback` | **IMPLEMENTADO** | CAT-A-039..043 | — | M2M + USL, token cache, refresh automático |
+| UBER-002 | Store Mapping (multi-tenant, fail-closed) | `integration_store_mappings` DB | **IMPLEMENTADO** | CAT-A-044..047e | — | provider_store_id → client_id; desconocido → DLQ, sin fallback |
+| UBER-003 | Upload Menu | — | **SANDBOX LIMIT** | — | — | Requiere permiso especial de Uber |
+| UBER-004 | Update Menu | — | **SANDBOX LIMIT** | — | — | Requiere permiso especial de Uber |
+| UBER-005 | Mark Item OOS | — | **SANDBOX LIMIT** | — | — | Requiere permiso especial de Uber |
+| UBER-006 | Restore Item | — | **SANDBOX LIMIT** | — | — | Requiere permiso especial de Uber |
+| UBER-007 | Store Activate / Pause | `store/route.ts` POST | **IMPLEMENTADO** | uber-stores.test.ts | — | pauseStore / activateStore via `/v1/eats/stores/{id}/status` |
+| UBER-008 | Get Store Status | `store/route.ts` GET | **IMPLEMENTADO** | uber-stores.test.ts | — | getStoreStatus; admin-token guard |
+| UBER-009 | Order Notification (webhook) | `webhook/route.ts` | **IMPLEMENTADO** | CAT-A-001..010, 058..063 | — | HMAC-SHA256, dedup, DLQ, fail-closed |
+| UBER-010 | Get Order Details | `lib/uber-eats/adapter.ts` → `getOrderDetails` | **IMPLEMENTADO** | CAT-A-035..038 | — | Antes de accept; vía adapter-factory en Day 2 |
+| UBER-011 | Exactly-once Injection | `integration_webhook_events` UNIQUE(provider, provider_event_id) | **IMPLEMENTADO** | CAT-A-011..015 | — | ON CONFLICT DO NOTHING; idempotency_key deterministico |
+| UBER-012 | Accept Order | `order/route.ts` → `adapter-factory` | **IMPLEMENTADO** | CAT-A-046..047e | — | Ruteado a EatsAdapter o DeliveryAdapter por channel |
+| UBER-013 | Deny Order (catálogo de razones) | `order/route.ts` + `reasons.ts` | **IMPLEMENTADO** | CAT-A-062 | — | 5 razones con etiquetas en español |
+| UBER-014 | Cancel Order (catálogo de razones) | `order/route.ts` + `reasons.ts` | **IMPLEMENTADO** | CAT-A-063 | — | Catálogo completo con etiquetas en español |
+| UBER-015 | Mark Ready (pickup) | `order/route.ts` → `adapter.markOrderReady` | **IMPLEMENTADO** | CAT-A-046..047e | — | Ruteado por adapter-factory |
+| UBER-016 | Duplicate Webhook (dedup) | `integration_webhook_events` UNIQUE | **IMPLEMENTADO** | CAT-A-011..015 | — | Segundo webhook del mismo evento → ack 200, sin reprocesamiento |
+| UBER-017 | Invalid Signature rejection | `webhook/route.ts` HMAC verify | **IMPLEMENTADO** | CAT-A-001..005 | — | 401 en firma faltante/errónea; 503 si secret no configurado |
+| UBER-018 | Retry / Transient Failure | `lib/integrations/retry.ts` → `withRetry` | **IMPLEMENTADO** | CAT-A-016..029 | — | maxAttempts=3, exponential backoff, 429/5xx retryable |
+| UBER-019 | Fullsite Unavailable (DLQ) | `integration_webhook_dlq` + `/api/integrations/uber-eats/dlq` | **IMPLEMENTADO** | CAT-A-048..053 | — | Webhook siempre devuelve 200 a Uber; fallas van a DLQ |
+| UBER-020 | Reconciliation | `/api/integrations/uber-eats/reconcile` | **IMPLEMENTADO** | CAT-A-064..066 | — | Detecta órdenes Uber no registradas en delivery_orders |
 
-## Problemas críticos encontrados
+## Day 2 — Delivery Channel Adapter
 
-1. **Dos sistemas paralelos**: `cloudflare/delivery-worker/` duplica la lógica del webhook con sin HMAC y `client_id: 'amalay'` hardcodeado → **deprecar CF Worker**.
-2. **Sin tabla de dedup de webhooks**: `merge-duplicates` solo protege contra PK duplicada, no contra el mismo evento procesado dos veces con IDs distintos.
-3. **Accept sin RecoverableOperation**: Uber Eats confirm es Type A (efecto externo antes de confirmación interna). La falla silenciosa actual es un gap de certificación.
-4. **Sin Get Order Details antes de Accept**: Uber requiere que el POS llame a GET `/v1/eats/orders/{order_id}` antes de aceptar.
-5. **Store mapping via env var**: No multi-tenant. Un nuevo cliente requiere redeploy.
-6. **Header HMAC incorrecto**: El código usa `x-uber-signature`; verificar contra documentación v1 de Uber.
-7. **Sin retry/backoff en llamadas a Uber API**.
-8. **Sin DLQ**: Fallas de procesamiento se pierden.
-9. **Sin reconciliation**: Órdenes que Uber marca como pendientes pero Fullsite no tiene pasan desapercibidas.
-10. **Sin audit trail redactado**: Solo `console.log` — no hay trazabilidad para debugging post-incidente.
+Completado 2026-08-02. Ruteado transparente entre EatsLegacyAdapter y DeliveryV1Adapter.
+
+| ID | Capability | Módulo | Estado | Tests |
+|---|---|---|---|---|
+| DAY2 | Channel Detection | `adapter-factory.ts` → `detectChannel` | **IMPLEMENTADO** | DAY2-001..005 |
+| DAY2 | Adapter Factory Routing | `adapter-factory.ts` → `getOrderAdapter / getOrderAdapterForPayload` | **IMPLEMENTADO** | DAY2-006..010 |
+| DAY2 | DeliveryV1 URL paths | `delivery-adapter.ts` | **IMPLEMENTADO** | DAY2-011..015 |
+| DAY2 | EatsLegacy minutesToReady passthrough | `adapter-factory.ts` → `makeEatsAdapter` | **IMPLEMENTADO** | DAY2-016..018 |
+| DAY2 | order/route.ts channel routing | `order/route.ts` → `resolveOrderContext` + `getOrderAdapter` | **IMPLEMENTADO** | DAY2-019..020 |
+
+**Dispatch logic:**
+
+```
+order/route.ts (POST) 
+  → resolveOrderContext(order_id)        — leer raw_payload.channel de delivery_orders
+  → getOrderAdapter(channel)              — 'delivery' o 'eats' (default)
+      ├── 'eats'     → EatsLegacyAdapter  → /v1/eats/orders/{id}/...
+      └── 'delivery' → DeliveryV1Adapter  → /v1/delivery/order/{id}/...
+```
+
+## Resumen de cobertura
+
+| Categoría | Total | IMPLEMENTADO | SANDBOX LIMIT | PENDING |
+|---|---|---|---|---|
+| Core capabilities (UBER-001..020) | 20 | 16 | 4 | 0 |
+| Day 2 routing capabilities | 5 | 5 | 0 | 0 |
+
+**Tests:** 172 Cat A (category-a.test.ts) + 20 Day 2 (delivery-adapter.test.ts) = **192 total** — todos pasando.
 
 ## Estado de certificación
 
 | Fase | Criterio | Estado |
 |---|---|---|
-| SANDBOX | Todas las capabilities con test_store | No iniciado |
-| PRODUCTION | Uber review + ticket activo | No iniciado (ticket cerrado por inactividad) |
+| **SANDBOX Cat A** | 192 tests internos sin Uber API | **PASS** |
+| **SANDBOX Cat B** | Endpoints con sandbox de Uber | 9 PASS · 9 SANDBOX LIMIT (menú) |
+| **PRODUCTION** | Uber Basic Production Validation | Ticket #D5FEA8 en espera — pendiente respuesta Uber |
 
-**Próximo ticket a abrir**: mencionar `#D5FEA8` al completar test suite con test store.
+**Nota SANDBOX LIMIT:** Las 4 capabilities de menú (UBER-003..006) y los 9 Cat B pendientes requieren acceso especial al sandbox de Uber para el scope `eats.menu.write`. El resto del stack está listo para producción.

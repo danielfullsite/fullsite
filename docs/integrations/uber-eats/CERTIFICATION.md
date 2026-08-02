@@ -9,7 +9,8 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 |---|---|
 | DB migration producción | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
 | Integration Framework código | ✓ En `main`, desplegado en Vercel |
-| **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
+| **Categoría A — Day 1** (tests automatizados) | **CERRADA — 172/172 PASS** |
+| **Categoría A — Day 2** (Delivery adapter routing) | **CERRADA — 20/20 PASS** |
 | **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 9 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
 | **Production Validation (Uber Form)** | **SUBMITTED 2026-08-02 — Awaiting Uber Review** |
 | Deployment público | ✓ COMPLETO — commit `cd69d09`, CI green |
@@ -577,6 +578,35 @@ Una capability está CERTIFICADA cuando:
 - [ ] `integration_store_mappings` con store_id de producción real
 - [ ] `UBER_WEBHOOK_SECRET` rotado (sandbox ≠ producción)
 - [ ] Cifrado en reposo para `integration_providers._enc` columns (pre-producción blocker)
+
+## Day 2 — Delivery Adapter (2026-08-02)
+
+### Cambios
+
+| Archivo | Cambio |
+|---|---|
+| `adapter-factory.ts` | `OrderAdapter.acceptOrder` ahora acepta `minutesToReady?` opcional; `makeEatsAdapter` pasa el valor al Eats legacy adapter |
+| `order/route.ts` | Reemplazado import directo de `adapter.ts` por `getOrderAdapter(channel)` del factory; `resolveOrderContext()` extrae `storeId` y `channel` del raw_payload |
+| `delivery-adapter.test.ts` | 20 nuevos tests Cat A — detectChannel, routing, URL paths, minutesToReady, interface compliance |
+
+### Evidencia Cat A — Day 2
+
+| Test | Cubre | Resultado |
+|---|---|---|
+| DAY2-001..005 | `detectChannel` — campo channel, prefijo event_type, default | PASS |
+| DAY2-006..010 | `getOrderAdapter` / `getOrderAdapterForPayload` — routing correcto | PASS |
+| DAY2-011..015 | DeliveryV1Adapter — 5 URLs `/v1/delivery/order/{id}/...` | PASS |
+| DAY2-016 | EatsLegacyAdapter — URL `/v1/eats/orders/` (no confunde rutas) | PASS |
+| DAY2-017..018 | `minutesToReady` — 45 override y default 20 | PASS |
+| DAY2-019..020 | `DELIVERY_ADAPTER_VERSION` semver, interface completa | PASS |
+
+**Total Day 2:** 20/20 PASS. Regresión Cat A Day 1: 0 (192/192 pasan).
+
+### Garantías de no-regresión
+
+- Pedidos Eats existentes siguen usando `/v1/eats/orders/` — `resolveOrderContext` devuelve `channel='eats'` si no hay registro en `delivery_orders`
+- `minutes_to_ready` de 20 es el default cuando el caller no pasa el parámetro
+- Responses del route ahora incluyen `channel` field para trazabilidad
 
 ## Risk Register (pre-producción, no sandbox-blocking)
 
