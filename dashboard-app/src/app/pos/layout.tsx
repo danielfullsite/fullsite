@@ -10,6 +10,7 @@ import { getActiveClientSlug as _cid } from '@/lib/data'
 import { getEffectiveSetting } from '@/lib/settings'
 import { initStationRouting } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
+import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
@@ -266,8 +267,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricChecking, setBiometricChecking] = useState(false)
 
-  // Check if fingerprint reader is available (direct to fingerprint service on port 7718)
-  const FINGERPRINT_URL = 'http://127.0.0.1:7718'
+  const FINGERPRINT_URL = getFingerprintUrl()
   useEffect(() => {
     fetch(`${FINGERPRINT_URL}/health`, { signal: AbortSignal.timeout(1000) })
       .then(r => r.ok ? r.json() : null)
@@ -411,7 +411,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
       if (biometricAvailable) {
         let serviceHasTemplates = true
         try {
-          const listRes = await fetch('http://127.0.0.1:7718/list', { signal: AbortSignal.timeout(2000) })
+          const listRes = await fetch(`${getFingerprintUrl()}/list`, { signal: AbortSignal.timeout(2000) })
           const listData = await listRes.json()
           serviceHasTemplates = listData.count > 0 && listData.enrolled?.includes(member.id)
         } catch { serviceHasTemplates = false }
