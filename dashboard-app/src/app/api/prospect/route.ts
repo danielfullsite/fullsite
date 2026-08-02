@@ -48,22 +48,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Notify Daniel on Telegram
-    try {
-      await fetch(
-        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: '7654040494',
-            text: `\ud83d\udd14 NUEVO PROSPECTO\n\n${nombre}\n${restaurante}\n${email}\n${teléfono}\nPOS: ${pos}`,
-          }),
-        }
-      )
-    } catch (telegramError) {
-      // Non-blocking — log but don't fail the request
-      console.error('Telegram notification error:', telegramError)
+    // Notify platform owner on Telegram (optional — silent if TELEGRAM_CHAT_ID_PLATFORM not set)
+    const platformChatId = process.env.TELEGRAM_CHAT_ID_PLATFORM
+    if (platformChatId && process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        await fetch(
+          `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: platformChatId,
+              text: `🔔 NUEVO PROSPECTO\n\n${nombre}\n${restaurante}\n${email}\n${teléfono}\nPOS: ${pos}`,
+            }),
+          }
+        )
+      } catch (telegramError) {
+        console.error('Telegram notification error:', telegramError)
+      }
     }
 
     return NextResponse.json({ success: true })

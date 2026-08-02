@@ -11,6 +11,7 @@ import {
   getCachedOrdersByTurno,
   getCachedCashMovsByTurno,
 } from '@/lib/pos-offline-db'
+import { getPosConfigSync } from '@/lib/pos-config'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
 import {
   filterOpenOrders,
@@ -385,8 +386,8 @@ export default function CierreCajaWizard({
         .total{font-weight:bold;font-size:14px}
         .diff{font-size:16px;font-weight:bold;text-align:center;padding:8px;margin:8px 0;border:2px solid ${diferencia >= 0 ? '#16a34a' : '#dc2626'};color:${diferencia >= 0 ? '#16a34a' : '#dc2626'}}
       </style></head><body>
-      <h2>AMALAY</h2>
-      <p style="text-align:center;margin:0">Coffee & Market</p>
+      <h2>${getPosConfigSync().name || 'Restaurante'}</h2>
+      <p style="text-align:center;margin:0">${getPosConfigSync().subtitle || ''}</p>
       <p style="text-align:center;font-size:11px;margin:2px 0 8px">CIERRE DE CAJA</p>
       <p style="text-align:center">${now.toLocaleDateString('es-MX')} ${now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</p>
       <div class="line"></div>

@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch POS orders for the day
     const cid = encodeURIComponent(clientId)
-    const [ordersRes, movementsRes, marketRes, wansoftDay] = await Promise.all([
+    const [ordersRes, movementsRes, marketRes, wansoftDay, clientRes] = await Promise.all([
       fetch(
         `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
         OPTS
@@ -152,11 +152,13 @@ export async function GET(request: NextRequest) {
         OPTS
       ),
       fetchWansoftDaily(fecha),
+      fetch(`${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc&limit=1`, OPTS),
     ])
 
     const orders: PosOrder[] = ordersRes.ok ? await ordersRes.json() : []
     const movements: InventoryMovement[] = movementsRes.ok ? await movementsRes.json() : []
     const marketMovements: InventoryMovement[] = marketRes.ok ? await marketRes.json() : []
+    const clientRfc: string = clientRes?.ok ? ((await clientRes.json())[0]?.rfc ?? '') : ''
 
     const polizas: Poliza[] = []
     let numPoliza = 1
@@ -425,7 +427,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (formato === 'xml') {
-      return new Response(generateXML(result), {
+      return new Response(generateXML(result, clientRfc), {
         headers: {
           'Content-Type': 'application/xml',
           'Content-Disposition': `attachment; filename="polizas_${fecha}.xml"`,
@@ -545,10 +547,10 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
 
 // ─── XML (CONTPAQi Polizas format) ───────────────
 
-function generateXML(data: { fecha: string; polizas: Poliza[] }): string {
+function generateXML(data: { fecha: string; polizas: Poliza[] }, rfc: string): string {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<Polizas Version="1.3" TipoSolicitud="AF" NumOrden="1" Anio="${data.fecha.slice(0, 4)}" Mes="${data.fecha.slice(5, 7)}" RFC="XXXXXXXXXXXX">`,
+    `<Polizas Version="1.3" TipoSolicitud="AF" NumOrden="1" Anio="${data.fecha.slice(0, 4)}" Mes="${data.fecha.slice(5, 7)}" RFC="${rfc}">`,
   ]
 
   for (const p of data.polizas) {

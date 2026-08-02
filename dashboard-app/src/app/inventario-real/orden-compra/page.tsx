@@ -6,6 +6,7 @@ import {
   Save, Wand2, Send, ChevronDown, ChevronRight, Plus, Trash2, Download,
 } from 'lucide-react'
 import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { fetchClientConfig } from '@/lib/client-config'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import KPICard from '@/components/KPICard'
@@ -109,9 +110,9 @@ function generateId(): string {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function formatWhatsAppMessage(supplierName: string, lines: OrderLine[]): string {
+function formatWhatsAppMessage(supplierName: string, lines: OrderLine[], displayName: string): string {
   const today = new Date().toISOString().split('T')[0]
-  let msg = `*Orden de Compra - AMALAY*\n`
+  let msg = `*Orden de Compra - ${displayName || 'Restaurante'}*\n`
   msg += `Proveedor: ${supplierName}\n`
   msg += `Fecha: ${today}\n\n`
   msg += `*Productos:*\n`
@@ -129,6 +130,7 @@ export default function OrdenCompraPage() {
   const [configs, setConfigs] = useState<ReorderConfig[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [orderLines, setOrderLines] = useState<OrderLine[]>([])
+  const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -138,6 +140,13 @@ export default function OrdenCompraPage() {
   const [addSearch, setAddSearch] = useState('')
 
   // ── Load data ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const clientId = getActiveClientSlug()
+    if (clientId) {
+      fetchClientConfig(clientId).then(cfg => setDisplayName(cfg.display_name)).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -648,7 +657,7 @@ export default function OrdenCompraPage() {
                   <div className="flex gap-2">
                     {phone && (
                       <a
-                        href={`https://wa.me/${phone}?text=${encodeURIComponent(formatWhatsAppMessage(supplierName, lines))}`}
+                        href={`https://wa.me/${phone}?text=${encodeURIComponent(formatWhatsAppMessage(supplierName, lines, displayName))}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-400 font-semibold text-xs hover:bg-emerald-500/25 active:scale-95 transition-all min-h-[36px]"
@@ -659,7 +668,7 @@ export default function OrdenCompraPage() {
                     )}
                     {supplierData?.email && (
                       <a
-                        href={`mailto:${supplierData.email}?subject=${encodeURIComponent(`Orden de Compra - AMALAY ${new Date().toISOString().split('T')[0]}`)}&body=${encodeURIComponent(formatWhatsAppMessage(supplierName, lines).replace(/\*/g, ''))}`}
+                        href={`mailto:${supplierData.email}?subject=${encodeURIComponent(`Orden de Compra - ${displayName || 'Restaurante'} ${new Date().toISOString().split('T')[0]}`)}&body=${encodeURIComponent(formatWhatsAppMessage(supplierName, lines, displayName).replace(/\*/g, ''))}`}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/15 text-blue-400 font-semibold text-xs hover:bg-blue-500/25 active:scale-95 transition-all min-h-[36px]"
                       >
                         <Download size={14} />

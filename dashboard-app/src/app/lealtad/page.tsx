@@ -9,6 +9,8 @@ import {
 import KPICard from '@/components/KPICard'
 import PageHeader from '@/components/PageHeader'
 import { formatCurrency } from '@/lib/format'
+import { getActiveClientSlug } from '@/lib/data'
+import { fetchClientConfig } from '@/lib/client-config'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface LoyaltyConfig {
@@ -80,7 +82,7 @@ const DEFAULT_CONFIG: LoyaltyConfig = {
   welcome_bonus: 50,
   birthday_bonus: 100,
   min_redemption: 100,
-  program_name: 'AMALAY Rewards',
+  program_name: 'Programa de Lealtad',
   active: true,
 }
 
@@ -117,9 +119,21 @@ export default function LealtadPage() {
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000) }
 
-  // Load from localStorage
+  // Load from localStorage; derive program_name from client config on first load
   useEffect(() => {
-    setConfig(load(KEYS.config, DEFAULT_CONFIG))
+    const stored = load<LoyaltyConfig | null>(KEYS.config, null)
+    if (stored) {
+      setConfig(stored)
+    } else {
+      const clientId = getActiveClientSlug()
+      if (clientId) {
+        fetchClientConfig(clientId)
+          .then(cfg => setConfig({ ...DEFAULT_CONFIG, program_name: `${cfg.display_name} Rewards` }))
+          .catch(() => setConfig(DEFAULT_CONFIG))
+      } else {
+        setConfig(DEFAULT_CONFIG)
+      }
+    }
     setRewards(load(KEYS.rewards, []))
     setCustomers(load(KEYS.customers, []))
     setActivity(load(KEYS.activity, []))

@@ -25,7 +25,9 @@ export async function getPosClientConfig(): Promise<PosClientConfig> {
 
   const clientId = typeof window !== 'undefined'
     ? getActiveClientSlug()
-    : 'amalay'
+    : null
+
+  if (!clientId) return getPosConfigSync()
 
   const config = await fetchClientConfig(clientId)
 

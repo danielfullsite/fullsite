@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -100,10 +100,16 @@ async function checkCosteoData(): Promise<HealthCheck> {
   }
 }
 
-export async function GET() {
+const SKIPPED = (name: string): HealthCheck => ({ name, status: 'ok', detail: 'Skipped — data_source=fullsite', ms: 0 })
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const dataSource = searchParams.get('data_source') ?? 'wansoft'
+  const wansoft = dataSource === 'wansoft'
+
   const checks = await Promise.all([
-    checkSupabaseConnection(),
-    checkDataFreshness(),
+    wansoft ? checkSupabaseConnection() : Promise.resolve(SKIPPED('supabase')),
+    wansoft ? checkDataFreshness() : Promise.resolve(SKIPPED('data_freshness')),
     checkAgentsRunning(),
     checkAuth(),
     checkCosteoData(),

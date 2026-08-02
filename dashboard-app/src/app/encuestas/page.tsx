@@ -147,7 +147,7 @@ export default function EncuestasPage() {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [surveyQrDataURL, setSurveyQrDataURL] = useState<string | null>(null)
 
-  const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : 'amalay'
+  const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : ''
   const surveyUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/encuesta/${clientId}`
     : `https://app.fullsite.mx/encuesta/${clientId}`

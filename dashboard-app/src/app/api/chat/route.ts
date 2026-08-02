@@ -382,12 +382,10 @@ export async function POST(request: NextRequest) {
     }
     // Alias map: nombre en POS/Wansoft → nombre de la receta en el Excel de costeo (typos y variantes)
     const RECIPE_ALIASES: Record<string, string> = {
-      'AMALAY SALMON SPECIAL TOAST': 'AMALAY SALMON SPECIAL',
       'EGG AND PANCAKE COMBO': 'EGG & PANCAKE COMBO',
       'SALMON BAGEL': 'BAGEL DE SALMON CURADO',
       'GARDEN OMELET': 'GARDEN OMELLET',
       "MUMMA'S BREAKFAST CROSSAINT": "MUMMA'S BREKFAST CROISSANT",
-      'TAQUITOS AMALAY': 'TACOS DE RIB EYE',
       'RIBEYE SMASH BURGER': 'SMASH BURGUER',
       'MISS BENEDICT KETO-PANELA WALLANDER': 'MISS KETO PANELA WALLANDER',
       'PIZZA PEPERONI': 'PIZZA PEPPERONI',
