@@ -659,8 +659,8 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 |---|---|---|---|
 | D-01 | DONE | 0bf9993 | — |
 | D-02 | DONE | 0bf9993 | — |
-| D-03 | DONE | M2 (p1_d03_amalay_station_routing) + this commit | — |
-| D-04 | DONE | M2 (p1_d03_amalay_station_routing) + this commit | — |
+| D-03 | DONE | M2 (p1_d03_amalay_station_routing) + c705ee2 | — |
+| D-04 | DONE | M2 (p1_d03_amalay_station_routing) + c705ee2 | — |
 | D-05 | DEFERRED | — | Requiere menú desde DB (scope mayor) |
 | D-06 | DONE | 0bf9993 | — |
 | D-07 | DONE | 0bf9993 | — |
