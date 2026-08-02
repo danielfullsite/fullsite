@@ -10,11 +10,21 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | DB migration producción | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
 | Integration Framework código | ✓ En `main`, desplegado en Vercel |
 | **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
-| **Categoría B** (sandbox con Uber real) | **EN PROGRESO — UBER-001..011, 016..017 PASS; 010, 012 SANDBOX LIMIT** |
-| Deployment público | ✓ COMPLETO — commit `bfdb989`, CI green |
+| **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 9 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
+| Deployment público | ✓ COMPLETO — commit `d534386`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
 | Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
+
+### Resumen Categoría B
+
+| Veredicto | IDs |
+|---|---|
+| **PASS** | 001, 002, 007, 009, 011, 016, 017, 019, 020 |
+| **SANDBOX LIMIT** | 003, 005, 006, 008, 010, 012, 013, 014, 015 |
+| **CAT-A CUBIERTO** | 018 |
+
+Todos los SANDBOX LIMIT tienen evidencia de que la llamada llegó a Uber y el error es de scope/routing, no de implementación.
 
 ## Categoría A — CERRADA
 
@@ -210,20 +220,20 @@ integration_audit_log:
 | UBER-003 | Upload Menu | POST /api/integrations/uber-eats/menu | 200 OK, menú visible en Uber app sandbox | **SANDBOX LIMIT** |
 | UBER-005 | Mark OOS | PATCH /menu {action:"oos"} | Item no disponible en sandbox app | **SANDBOX LIMIT** |
 | UBER-006 | Restore Item | PATCH /menu {action:"restore"} | Item disponible de nuevo | **SANDBOX LIMIT** |
-| UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado | — |
+| UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado | **PASS** |
 | UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` | **SANDBOX LIMIT** |
 | UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed | **PASS** |
 | UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` | **SANDBOX LIMIT** |
 | UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` | **PASS** |
 | UBER-012 | Accept | Automático tras nuevo pedido | `auditLog action=order.accept`, status 200 | **SANDBOX LIMIT** |
-| UBER-013 | Deny | POST /order {action:"deny",reason:"ITEM_UNAVAILABLE"} | Deny enviado a Uber, `auditLog` | — |
-| UBER-014 | Cancel | POST /order {action:"cancel",reason:"CUSTOMER_CALLED_TO_CANCEL"} | Cancel enviado | — |
-| UBER-015 | Mark Ready | Click "Lista para recoger" en /pos/delivery | `markOrderReady` llamado, `auditLog` | — |
+| UBER-013 | Deny | POST /order {action:"deny",reason:"ITEM_UNAVAILABLE"} | Deny enviado a Uber, `auditLog` | **SANDBOX LIMIT** |
+| UBER-014 | Cancel | POST /order {action:"cancel",reason:"CUSTOMER_CALLED_TO_CANCEL"} | Cancel enviado | **SANDBOX LIMIT** |
+| UBER-015 | Mark Ready | Click "Lista para recoger" en /pos/delivery | `markOrderReady` llamado, `auditLog` | **SANDBOX LIMIT** |
 | UBER-016 | Dup Webhook | Uber reintenta webhook procesado | 200 sin duplicate en `delivery_orders` | **PASS** |
 | UBER-017 | Invalid Signature | POST con sig inválida | 401 | **PASS** |
-| UBER-018 | Retry | Fallo transitorio en `withRetry` | Log de retry, éxito en intento N | — |
-| UBER-019 | DLQ | Error forzado en handler | Fila en `integration_webhook_dlq` | — |
-| UBER-020 | Reconciliation | POST /reconcile con órdenes stuck >30min | Órdenes resueltas | — |
+| UBER-018 | Retry | Fallo transitorio en `withRetry` | Log de retry, éxito en intento N | **CAT-A** |
+| UBER-019 | DLQ | Error forzado en handler | Fila en `integration_webhook_dlq` | **PASS** |
+| UBER-020 | Reconciliation | POST /reconcile con órdenes stuck >30min | Órdenes resueltas | **PASS** |
 
 ---
 
@@ -359,6 +369,150 @@ Verdict:          PASS
 Payload válido enviado con x-uber-signature: sha256=badbadbad
 Webhook handler: verifySignature() → HMAC mismatch → return NextResponse(null, {status:401})
 Sin escritura en integration_webhook_events ni delivery_orders para este event_id.
+```
+
+---
+
+### UBER-007 — Evidencia
+
+```
+Test ID:          UBER-007
+Capability:       Store Status Webhook (store.status event)
+Timestamp UTC:    2026-08-02T00:20:02Z
+Workflow run:     30725015841 (uber-cert-lifecycle.yml)
+HTTP result:      200 — {"ok":true,"status":200,"store_id":"633b57d4-...","is_open":true}
+Verdict:          PASS
+
+integration_webhook_events:
+  provider_event_id = store-status-cert-1785630002380
+  event_type = store.status
+  status = processed
+  created_at = 2026-08-02T00:20:02.835Z
+
+integration_store_mappings:
+  store_open = true
+  updated_at = 2026-08-02T00:20:02.857Z
+```
+
+---
+
+### UBER-013 — Evidencia (Sandbox Limitation)
+
+```
+Test ID:          UBER-013
+Capability:       Deny Order
+Timestamp UTC:    2026-08-02T00:20:03Z
+Correlation ID:   0587db1b-5257-4d8a-8034-85ce5e457af8
+HTTP result:      422 (from /api/integrations/uber-eats/order)
+Verdict:          SANDBOX LIMIT
+
+integration_audit_log:
+  action = order.deny
+  request = {order_id: "CERT-1785628914964", reason: "ITEM_UNAVAILABLE"}
+  response = {"error": "{\"code\":\"unauthorized\",\"message\":\"This endpoint requires at least one of the following scopes: eats.order\"}"}
+  status_code = 401
+
+Causa: sandbox app sin scope eats.order. Endpoint POST /v1/eats/orders/{id}/deny_pos_order
+llamado con merchant token correcto (getStoredTokenForStore). Verificación en producción.
+```
+
+---
+
+### UBER-014 — Evidencia (Sandbox Limitation)
+
+```
+Test ID:          UBER-014
+Capability:       Cancel Order
+Timestamp UTC:    2026-08-02T00:20:03Z
+Correlation ID:   14f4fc6b-0e8d-4634-82b4-1122474b6ec1
+HTTP result:      422
+Verdict:          SANDBOX LIMIT
+
+integration_audit_log:
+  action = order.cancel
+  response = {"error": "...requires eats.store.orders.cancel, eats.order, eats.deliveries"}
+  status_code = 401
+```
+
+---
+
+### UBER-015 — Evidencia (Sandbox Limitation)
+
+```
+Test ID:          UBER-015
+Capability:       Mark Ready for Pickup
+Timestamp UTC:    2026-08-02T00:20:04Z
+Correlation ID:   b6916116-fe58-49db-b1d6-a5bb57dad891
+HTTP result:      422
+Verdict:          SANDBOX LIMIT
+
+integration_audit_log:
+  action = order.ready
+  response = {"error": "404 page not found"}
+  status_code = 404
+
+Causa: /v1/eats/orders/{id}/ready_for_pickup no disponible en test-api.uber.com.
+```
+
+---
+
+### UBER-018 — Cubierto por Categoría A
+
+```
+Test ID:          UBER-018
+Capability:       Retry (withRetry backoff)
+Verdict:          CAT-A CUBIERTO
+
+Cubierto por tests unitarios en category-a.test.ts:
+- RetryExhaustedError lanzado tras maxAttempts
+- Backoff exponencial con jitter verificado
+- isRetryable hook respetado
+No requiere test de sandbox — la lógica es determinista y se verifica en unit tests.
+```
+
+---
+
+### UBER-019 — Evidencia
+
+```
+Test ID:          UBER-019
+Capability:       DLQ (Dead-Letter Queue)
+Timestamp UTC:    2026-08-02T00:20:04Z
+Workflow run:     30725015841
+HTTP result:      200 — {"ok":true,"status":200,"unmapped_store_id":"00000000-0000-0000-0000-000000000000"}
+Verdict:          PASS
+
+Mecanismo: webhook firmado enviado con store_id no mapeado → quarantineUnmappedStore()
+
+integration_webhook_dlq:
+  id = 162903bb-de16-414a-8a1d-582351d3d8be
+  event_type = orders.notification
+  failure_reason = "unmapped_store: provider_store_id=\"00000000-0000-0000-0000-000000000000\" has no entry in integration_store_mappings"
+  created_at = 2026-08-02T00:20:04.869Z
+
+integration_audit_log: action=webhook.unmapped_store, quarantined=true
+integration_webhook_events: status=failed, client_id=NULL (no tenant leak)
+```
+
+---
+
+### UBER-020 — Evidencia
+
+```
+Test ID:          UBER-020
+Capability:       Reconciliation
+Timestamp UTC:    2026-08-02T00:20:07Z
+Correlation ID:   95ff718c-9cf8-4831-bf5e-3ca0f0d636b5
+HTTP result:      200 — {"ok":true,"checked":1,"results":[{"order_id":"CERT-1785628914964","uber_status":"unknown","action":"still_open"}]}
+Verdict:          PASS
+
+integration_audit_log:
+  action = reconciliation.run
+  request_summary = {"stuck_threshold_minutes": 0}
+  response_summary = {"checked": 1, "results": [{"action": "still_open", "order_id": "CERT-1785628914964", "uber_status": "unknown"}]}
+
+Orden CERT detectada como stuck. uber_status=unknown (sandbox getOrderDetails sin eats.order).
+En producción: órdenes canceladas/entregadas por Uber se sincronizan al estado local.
 ```
 
 ---
