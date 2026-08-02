@@ -23,6 +23,7 @@ const TEST_SB_KEY = 'test-service-key-day2'
 
 /** Fetch mock that returns 200 for token + audit + API calls. Captures raw calls. */
 function makeFetchSpy() {
+  // Keep as vi.fn (with .mock.calls accessible); cast only when passing to mockImplementation
   return vi.fn((input: RequestInfo | URL) => {
     const url = input.toString()
     if (url.includes('sandbox-login.uber.com') || url.includes('auth.uber.com')) {
@@ -34,7 +35,7 @@ function makeFetchSpy() {
     }
     // Uber API calls (test-api.uber.com)
     return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-  }) as unknown as typeof fetch
+  })
 }
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
@@ -109,46 +110,46 @@ describe('DAY2-006..010: getOrderAdapter + getOrderAdapterForPayload', () => {
 describe('DAY2-011..015: DeliveryV1Adapter URL paths', () => {
   it('DAY2-011: acceptDeliveryOrder → POST /v1/delivery/order/{id}/accept', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
     await adapter.acceptOrder('order-d2-011', 'corr-d2-011')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/delivery/order/order-d2-011/accept'))).toBe(true)
   })
 
   it('DAY2-012: denyDeliveryOrder → POST /v1/delivery/order/{id}/deny', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
-    await adapter.denyOrder('order-d2-012', 'ITEM_NO_LONGER_AVAILABLE', 'corr-d2-012')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    await adapter.denyOrder('order-d2-012', 'ITEM_UNAVAILABLE', 'corr-d2-012')
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/delivery/order/order-d2-012/deny'))).toBe(true)
   })
 
   it('DAY2-013: cancelDeliveryOrder → POST /v1/delivery/order/{id}/cancel', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
-    await adapter.cancelOrder('order-d2-013', 'RESTAURANT_CLOSED', 'corr-d2-013')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    await adapter.cancelOrder('order-d2-013', 'RESTAURANT_TOO_BUSY', 'corr-d2-013')
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/delivery/order/order-d2-013/cancel'))).toBe(true)
   })
 
   it('DAY2-014: markDeliveryOrderReady → POST /v1/delivery/order/{id}/ready', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
     await adapter.markOrderReady('order-d2-014', 'corr-d2-014')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/delivery/order/order-d2-014/ready'))).toBe(true)
   })
 
   it('DAY2-015: getDeliveryOrderDetails → GET /v1/delivery/order/{id}', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
     await adapter.getOrderDetails('order-d2-015', 'corr-d2-015')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     // GET /v1/delivery/order/{id} — no trailing action
     expect(apiCalls.some(u => /\/v1\/delivery\/order\/order-d2-015$/.test(u))).toBe(true)
   })
@@ -159,10 +160,10 @@ describe('DAY2-011..015: DeliveryV1Adapter URL paths', () => {
 describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
   it('DAY2-016: eats acceptOrder → /v1/eats/orders/ path (not /v1/delivery/)', async () => {
     const spy = makeFetchSpy()
-    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('eats')
     await adapter.acceptOrder('order-d2-016', 'corr-d2-016')
-    const apiCalls = (spy.mock.calls as [string | URL][]).map(([u]) => u.toString()).filter(u => u.includes('uber.com/v1'))
+    const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/eats/orders/'))).toBe(true)
     expect(apiCalls.every(u => !u.includes('/v1/delivery/'))).toBe(true)
   })
