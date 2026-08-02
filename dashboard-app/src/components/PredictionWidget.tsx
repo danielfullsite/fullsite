@@ -1,24 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-
-// Hourly distribution for a brunch/café (AMALAY pattern)
-const HOURLY_DISTRIBUTION: Record<number, number> = {
-  8:  0.02,
-  9:  0.06,
-  10: 0.12,
-  11: 0.15,
-  12: 0.16,
-  13: 0.14,
-  14: 0.10,
-  15: 0.07,
-  16: 0.06,
-  17: 0.05,
-  18: 0.04,
-  19: 0.02,
-  20: 0.01,
-}
+import { getActiveClientSlug } from '@/lib/data'
 
 interface PredictionWidgetProps {
   currentVentas: number
@@ -29,28 +14,25 @@ interface PredictionWidgetProps {
   dataFecha?: string
 }
 
-function predict(currentVentas: number, dataFecha?: string): { projected: number; pctDone: number; remaining: number } {
+function predict(
+  currentVentas: number,
+  distribution: Record<number, number>,
+  dataFecha?: string,
+): { projected: number; pctDone: number; remaining: number } {
   const now = new Date()
-  // Mexico timezone offset (UTC-6)
   const mxHour = (now.getUTCHours() - 6 + 24) % 24
   const mxMinute = now.getUTCMinutes()
 
-  // Don't predict if data is from a different day (stale data)
   if (dataFecha) {
     const mxNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Monterrey' }))
     const todayStr = mxNow.toISOString().slice(0, 10)
-    if (dataFecha !== todayStr) {
-      return { projected: 0, pctDone: 0, remaining: 0 }
-    }
+    if (dataFecha !== todayStr) return { projected: 0, pctDone: 0, remaining: 0 }
   }
 
-  if (currentVentas <= 0 || mxHour < 8) {
-    return { projected: 0, pctDone: 0, remaining: 0 }
-  }
+  if (currentVentas <= 0 || mxHour < 8) return { projected: 0, pctDone: 0, remaining: 0 }
 
-  // Calculate percentage of day captured so far
   let pctCaptured = 0
-  for (const [hour, pct] of Object.entries(HOURLY_DISTRIBUTION)) {
+  for (const [hour, pct] of Object.entries(distribution)) {
     const h = parseInt(hour)
     if (h < mxHour) {
       pctCaptured += pct
@@ -62,10 +44,7 @@ function predict(currentVentas: number, dataFecha?: string): { projected: number
   if (pctCaptured <= 0) return { projected: 0, pctDone: 0, remaining: 0 }
 
   const projected = currentVentas / pctCaptured
-  const remaining = projected - currentVentas
-  const pctDone = pctCaptured * 100
-
-  return { projected, pctDone, remaining }
+  return { projected, pctDone: pctCaptured * 100, remaining: projected - currentVentas }
 }
 
 export default function PredictionWidget({
@@ -76,8 +55,24 @@ export default function PredictionWidget({
   dowAvgVentas,
   dataFecha,
 }: PredictionWidgetProps) {
-  const { projected, pctDone, remaining } = predict(currentVentas, dataFecha)
+  const [distribution, setDistribution] = useState<Record<number, number> | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
+  useEffect(() => {
+    const clientId = getActiveClientSlug()
+    if (!clientId) { setLoaded(true); return }
+
+    fetch(`/api/dashboard/hourly-distribution?client_id=${encodeURIComponent(clientId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { setDistribution(data?.distribution ?? null) })
+      .catch(() => setDistribution(null))
+      .finally(() => setLoaded(true))
+  }, [])
+
+  // Not ready or no sufficient history (N/A)
+  if (!loaded || !distribution) return null
+
+  const { projected, pctDone, remaining } = predict(currentVentas, distribution, dataFecha)
   if (projected <= 0) return null
 
   const vsYesterday = yesterdayVentas > 0 ? ((projected - yesterdayVentas) / yesterdayVentas) * 100 : 0
@@ -89,9 +84,11 @@ export default function PredictionWidget({
   const mainCompLabel = dowAvgVentas > 0 ? 'vs promedio del día' : 'vs ayer'
   const isUp = mainComparison >= 0
 
+  // suppress unused-var warning — kept in props for backward compatibility
+  void currentTickets
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm mb-6">
-      {/* Gradient accent bar */}
       <div
         className="absolute inset-x-0 top-0 h-1"
         style={{
@@ -102,7 +99,6 @@ export default function PredictionWidget({
       />
 
       <div className="px-4 sm:px-6 py-4 sm:py-5">
-        {/* Header */}
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isAboveAvg ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
@@ -117,7 +113,6 @@ export default function PredictionWidget({
           </div>
         </div>
 
-        {/* Main prediction number */}
         <div className="flex items-end gap-3 sm:gap-4 mb-3 sm:mb-4">
           <p className="text-3xl sm:text-4xl font-black text-[var(--text-1)] tracking-tight">
             {formatCurrency(projected)}
@@ -129,7 +124,6 @@ export default function PredictionWidget({
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="mb-3 sm:mb-4">
           <div className="flex justify-between text-xs text-[var(--text-3)] mb-1.5">
             <span>Progreso del día</span>
@@ -148,7 +142,6 @@ export default function PredictionWidget({
           </div>
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-[var(--line-soft)]">
           <div>
             <p className="text-[10px] sm:text-xs text-[var(--text-3)] mb-0.5">Falta</p>
