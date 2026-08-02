@@ -127,7 +127,16 @@ export async function GET(request: NextRequest) {
   }
 
   // Extract store_id and client_id from state payload: "uuid|store_id|client_id"
-  const [, storeId = '', clientId = 'amalay'] = stateParam.split('|')
+  const parts = stateParam.split('|')
+  const storeId = parts[1] || ''
+  const clientId = parts[2]
+  if (!clientId) {
+    await auditLog({
+      provider: 'ubereats', correlation_id: correlationId,
+      action: 'usl.invalid_state_client', response: { state_len: parts.length },
+    })
+    return NextResponse.redirect(new URL(errorUrl('invalid_state'), request.url))
+  }
 
   try {
     const callbackUri = redirectUri(request)

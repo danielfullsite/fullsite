@@ -7,6 +7,7 @@ export interface ClientFeatures {
   pos: boolean
   posRestaurant: boolean
   posTienda: boolean
+  bakery_station: boolean
   delivery: boolean
   ecommerce: boolean
   inventory: boolean
@@ -56,7 +57,7 @@ export interface ClientConfig {
 
 // Default features for new clients
 const DEFAULT_FEATURES: ClientFeatures = {
-  pos: true, posRestaurant: true, posTienda: false, delivery: false,
+  pos: true, posRestaurant: true, posTienda: false, bakery_station: false, delivery: false,
   ecommerce: false, inventory: true, foodCost: true, facturacion: true,
   nomina: false, agentesIA: true, coach: true, chatIA: true,
   resenas: false, giftCards: false,
@@ -129,17 +130,6 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
 
 function getClientConfigFallback(clientId: string): ClientConfig {
   const FALLBACKS: Record<string, Partial<ClientConfig>> = {
-    amalay: {
-      display_name: 'AMALAY Coffee & Market',
-      city: 'Monterrey, NL',
-      type: 'Coffee & Market',
-      mesas: 16,
-      meseros: ['Omar Aguilera', 'Hector Enrique Rodriguez Lopez', 'Brayan Berlanga Solis', 'Daniela Edith Rico Segura', 'Julio Cesar Hernández Hernández', 'Mauricio Rodriguez Rodriguez', 'Oscar Rios Alvarado', 'Alexis Alejandro Ocampo Vera', 'Aldo Ruiz Ramirez', 'Mariana Carolina Salas Alva', 'Mario García Ramírez'],
-      address: 'San Pedro Garza Garcia, NL',
-      phone: '8115324371',
-      rfc: 'AFO200806JI0',
-      receipt_footer: 'Gracias por tu visita!',
-    },
     demo: {
       display_name: 'Café Central',
       city: 'San Pedro Garza García, NL',
@@ -180,7 +170,6 @@ export function getClientConfig(clientId: string): ClientConfig {
 // Only used when user_metadata.client_id and client_users both miss.
 export function getClientIdFromEmail(email: string): string {
   const EMAIL_MAP: Record<string, string> = {
-    'ramonfaur.daniel@gmail.com': 'amalay',
     'demo@fullsite.mx': 'demo',
   }
   return EMAIL_MAP[email] || ''

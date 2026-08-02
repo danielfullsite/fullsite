@@ -1,13 +1,17 @@
 'use client'
 
 // Inventario Market — stock por unidad de productos retail (categorías mkt-*).
+// Gated by features.posTienda — redirects to /pos if not enabled for this client.
 // A diferencia de cocina/barra (recetas → insumos), aquí 1 venta = -1 unidad.
 // El descuento automático ocurre al cobrar (pos/page.tsx → deductMarketStockForOrder).
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, ArrowLeft, Check, PackagePlus, Trash2, SlidersHorizontal, ScanBarcode } from 'lucide-react'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import Link from 'next/link'
+import { fetchClientConfig } from '@/lib/client-config'
+import { getActiveClientSlug } from '@/lib/data'
 import {
   getMarketMenuItems,
   getMarketStock,
@@ -31,6 +35,16 @@ interface Row extends MarketMenuItemLite {
 type ModalType = 'entrada' | 'merma' | 'ajuste'
 
 export default function InventarioMarketPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : ''
+    if (!clientId) return
+    fetchClientConfig(clientId).then(cfg => {
+      if (!cfg.features.posTienda) router.replace('/pos')
+    })
+  }, [router])
+
   const [rows, setRows] = useState<Row[]>([])
   const [movements, setMovements] = useState<MarketMovement[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Check, Flame, RefreshCw, CakeSlice } from 'lucide-react'
 import { getKitchenOrders, updateOrderStatus, logAudit, type KitchenOrderFromDB } from '@/lib/pos-data'
 import { POLL_INTERVAL_KITCHEN, getStationByName } from '@/lib/pos-constants'
+import { fetchClientConfig } from '@/lib/client-config'
+import { getActiveClientSlug } from '@/lib/data'
 
 function getElapsedMinutes(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -22,8 +25,17 @@ interface PanItem {
 }
 
 export default function PanaderiaPage() {
+  const router = useRouter()
   const [orders, setOrders] = useState<KitchenOrderFromDB[]>([])
   const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const clientId = typeof window !== 'undefined' ? getActiveClientSlug() : ''
+    if (!clientId) return
+    fetchClientConfig(clientId).then(cfg => {
+      if (!cfg.features.bakery_station) router.replace('/pos')
+    })
+  }, [router])
   const [loading, setLoading] = useState(true)
   const [offline, setOffline] = useState(false)
   const prevCountRef = useRef(0)

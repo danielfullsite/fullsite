@@ -25,7 +25,6 @@ export function canAccessPage(role: DashboardRole, path: string): boolean {
 // Fallback por email — solo para usuarios que aún no tienen fila en client_users
 // ni app_metadata.role. La fuente de verdad es la BD.
 export const ROLE_MAP: Record<string, DashboardRole> = {
-  'ramonfaur.daniel@gmail.com': 'dueño',
   'demo@fullsite.mx': 'dueño',
 }
 

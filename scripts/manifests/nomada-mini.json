@@ -1,0 +1,64 @@
+{
+  "client_id": "nomada",
+  "display_name": "Nómada Coffee",
+  "type": "Coffee & Brunch",
+  "city": "Monterrey, NL",
+  "timezone": "America/Mexico_City",
+
+  "plan": "fullsite_software",
+  "features": {
+    "pos": true,
+    "posRestaurant": true,
+    "posTienda": false,
+    "bakery_station": false,
+    "delivery": false,
+    "ecommerce": false,
+    "inventory": true,
+    "foodCost": true,
+    "facturacion": false,
+    "nomina": false,
+    "agentesIA": true,
+    "coach": true,
+    "chatIA": true,
+    "resenas": false,
+    "giftCards": false
+  },
+
+  "accent_color": "emerald",
+  "default_theme": "light",
+
+  "mesas": 12,
+  "iva_rate": 0.16,
+  "receipt_footer": "¡Gracias por tu visita en Nómada Coffee!",
+
+  "support_email": "hola@nomadacoffee.mx",
+  "business_context": "Café de especialidad y brunch en Monterrey. Horario L-V 8am-5pm, Sáb-Dom 9am-3pm.",
+
+  "data_source": "fullsite",
+
+  "staff": [
+    { "name": "María López",   "role": "dueño",   "email": "maria@nomadacoffee.mx" },
+    { "name": "Carlos Ruiz",   "role": "cajero" },
+    { "name": "Ana Martínez",  "role": "mesero" },
+    { "name": "Luis García",   "role": "mesero" }
+  ],
+
+  "station_routing": {
+    "cocina": [
+      "chilaquiles", "eggs", "croissants", "pancakes", "paninis",
+      "bowls", "toast", "postres", "promos", "extras", "signature"
+    ],
+    "barra": [
+      "coffee", "jugos", "fresh", "smoothies", "frappes",
+      "sodas", "tea"
+    ],
+    "caja": [
+      "icecream", "desserts"
+    ]
+  },
+
+  "reviews": {
+    "location_display": "Monterrey, NL",
+    "staff_names": "María, Carlos, Ana, Luis"
+  }
+}

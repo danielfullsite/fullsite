@@ -23,10 +23,13 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const storeId = searchParams.get('store_id') || ''
-  const clientId = searchParams.get('client_id') || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || 'amalay'
+  const clientId = searchParams.get('client_id') || process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID
 
   if (!storeId) {
     return NextResponse.json({ error: 'store_id is required' }, { status: 400 })
+  }
+  if (!clientId) {
+    return NextResponse.json({ error: 'client_id is required' }, { status: 400 })
   }
 
   // Generate CSRF state: uuid + encoded store context

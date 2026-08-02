@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const clientId = process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || 'amalay'
+  const clientId = process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID
   if (!clientId) return NextResponse.json({ error: 'No client configured' }, { status: 400 })
 
   try {

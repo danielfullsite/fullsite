@@ -1,0 +1,67 @@
+{
+  "_note": "Source of truth for AMALAY's tenant config. Values must match the clients table in production.",
+  "client_id": "amalay",
+  "display_name": "AMALAY Coffee & Market",
+  "type": "Brunch and Cafe",
+  "city": "San Pedro Garza García, MX",
+  "timezone": "America/Monterrey",
+
+  "plan": "fullsite_completo",
+  "features": {
+    "pos": true,
+    "posRestaurant": true,
+    "posTienda": true,
+    "bakery_station": true,
+    "delivery": false,
+    "ecommerce": false,
+    "inventory": true,
+    "foodCost": true,
+    "facturacion": true,
+    "nomina": false,
+    "agentesIA": true,
+    "coach": true,
+    "chatIA": true,
+    "resenas": false,
+    "giftCards": true
+  },
+
+  "accent_color": "emerald",
+  "default_theme": "light",
+  "mesas": 16,
+  "iva_rate": 0.16,
+  "receipt_footer": "Gracias por tu visita!",
+
+  "address": "San Pedro Garza Garcia, NL",
+  "phone": "8115324371",
+  "rfc": "AFO200806JI0",
+  "razon_social": "AMALAY FOODS",
+  "support_email": "hola@cafeamalay.com",
+
+  "business_context": "Café-brunch en Plaza Duendes, San Pedro Garza García. Revenue mensual ~$3-4M MXN. Ticket promedio ~$500. ~200-250 personas/día.",
+  "data_source": "supabase",
+
+  "staff": [],
+
+  "station_routing": {
+    "cocina": [
+      "chilaquiles", "eggs", "croissants", "pancakes", "paninis",
+      "pizzas", "bowls", "ceviche", "toast", "bakery", "postres",
+      "promos", "keto", "kids", "soups", "munchies", "extras", "envios",
+      "enchiladas-tacos", "salads-ceviche", "appetizers", "evento", "signature"
+    ],
+    "barra": [
+      "coffee", "jugos", "fresh", "smoothies", "frappes",
+      "sodas", "tea", "alcohol", "activaciones", "vinos", "cerveza", "licores"
+    ],
+    "caja": [
+      "icecream", "desserts", "mkt-cafe",
+      "mkt-healthy", "mkt-vitaminas", "mkt-regalos", "mkt-amalay"
+    ]
+  },
+
+  "reviews": {
+    "location_display": "Plaza Duendes, San Pedro Garza García",
+    "owner_context": "La dueña es Mónica.",
+    "staff_names": "Omar, Mario, Antonio, Brayan, Alexis, Oscar, Mauricio, Julio César"
+  }
+}

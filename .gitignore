@@ -44,6 +44,7 @@ skills-lock.json
 # Electron build outputs
 electron-app/dist/
 electron-kds/dist/
+electron-kds/kds.config.json
 electron-dashboard/dist/
 
 # Fingerprint service binaries (compiled from print-bridge/fingerprint-service.cs;

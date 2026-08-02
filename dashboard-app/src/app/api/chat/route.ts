@@ -762,7 +762,7 @@ NOTA RANGO DE DATOS: los datos diarios abajo cubren EXACTAMENTE del ${(recentDay
     }
 
     // 4a. Fetch active meseros from pos_staff
-    let activeMeserosStr = 'Omar Aguilera, Hector Rodriguez, Brayan Berlanga, Daniela Rico, Julio Cesar Hernandez, Mauricio Rodriguez, Oscar Rios, Alexis Ocampo, Aldo Ruiz, Mariana Salas, Mario Garcia'
+    let activeMeserosStr = ''
     try {
       const staffRes = await fetch(
         `${sbUrl}/rest/v1/pos_staff?client_id=eq.${encodeURIComponent(client_id || '')}&active=eq.true&role=in.(mesero,cajero,barra,supervisor)&select=name&order=name.asc`,

@@ -20,6 +20,12 @@ export interface Env {
   GOOGLE_CLIENT_SECRET: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
+  // Per-client context for review replies — set in Cloudflare Worker env vars
+  RESTAURANT_NAME: string;
+  RESTAURANT_LOCATION: string;
+  SUPPORT_EMAIL: string;
+  STAFF_NAMES?: string;
+  OWNER_CONTEXT?: string;
 }
 
 export default {

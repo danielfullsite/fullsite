@@ -124,11 +124,21 @@ async function processReview(
   review: GoogleReview
 ): Promise<void> {
   // Step 1: Generate draft with Groq
-  const groq = await generateReplyDraft(env.GROQ_API_KEY, {
-    reviewerName: review.reviewer_name,
-    starRating: review.star_rating,
-    comment: review.comment,
-  });
+  const groq = await generateReplyDraft(
+    env.GROQ_API_KEY,
+    {
+      reviewerName: review.reviewer_name,
+      starRating: review.star_rating,
+      comment: review.comment,
+    },
+    {
+      restaurantName: env.RESTAURANT_NAME,
+      location: env.RESTAURANT_LOCATION,
+      supportEmail: env.SUPPORT_EMAIL,
+      staffNames: env.STAFF_NAMES,
+      ownerContext: env.OWNER_CONTEXT,
+    }
+  );
 
   // Strip [URGENT_REVIEW] tag for the actual reply text
   const cleanDraft = groq.draft.replace(/^\[URGENT_REVIEW\]\s*/m, "").trim();

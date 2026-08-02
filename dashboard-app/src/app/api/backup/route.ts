@@ -4,8 +4,11 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Solo dueños reales pueden exportar backups (NO demo)
-const BACKUP_ADMINS = new Set(['ramonfaur.daniel@gmail.com', 'monica@fullsite.mx'])
+// Solo dueños reales pueden exportar backups (NO demo).
+// Configurable vía BACKUP_ADMIN_EMAILS (csv) — fail-closed si no está definida.
+const BACKUP_ADMINS = new Set(
+  (process.env.BACKUP_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+)
 
 /** Valida el Bearer token contra Supabase Auth y exige email de admin */
 async function isAuthorized(request: NextRequest): Promise<boolean> {

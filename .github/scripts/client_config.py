@@ -18,7 +18,9 @@ _cache = {}
 def get_client(client_id: str = None) -> dict:
     """Fetch and cache client config from Supabase."""
     if client_id is None:
-        client_id = os.environ.get("CLIENT_ID", "amalay")
+        client_id = os.environ.get("CLIENT_ID")
+        if not client_id:
+            raise ValueError("CLIENT_ID environment variable is required")
 
     if client_id in _cache:
         return _cache[client_id]

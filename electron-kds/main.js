@@ -1,7 +1,41 @@
-const { app, BrowserWindow, globalShortcut } = require('electron');
+const { app, BrowserWindow, globalShortcut, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
-const KDS_URL = 'https://app.fullsite.mx/pos/cocina';
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+// kds.config.json is created by the bootstrap script during installation.
+// It is never committed to git. The app refuses to start without it.
+
+let kdsConfig = {};
+try {
+  const configPath = path.join(__dirname, 'kds.config.json');
+  kdsConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+} catch {
+  // Show error before app is ready — use synchronous dialog
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      'KDS no configurado',
+      'Falta kds.config.json. Ejecuta el script de instalación o contacta soporte.'
+    );
+    app.quit();
+  });
+}
+
+const KDS_URL = kdsConfig.dashboard_url || 'https://app.fullsite.mx/pos/cocina';
+const SUPABASE_URL = kdsConfig.supabase_url;
+const SUPABASE_ANON_KEY = kdsConfig.supabase_anon_key;
+const KDS_EMAIL = kdsConfig.kds_email;
+const KDS_PASSWORD = kdsConfig.kds_password;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !KDS_EMAIL || !KDS_PASSWORD) {
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      'KDS config incompleto',
+      'kds.config.json requiere: supabase_url, supabase_anon_key, kds_email, kds_password'
+    );
+    app.quit();
+  });
+}
 
 // ─── ROUTE GUARD ──────────────────────────────────────────────────────────
 // KDS must never navigate away from the cocina page.
@@ -54,10 +88,10 @@ function createWindow() {
           // Wait for Supabase auth to be available
           await new Promise(r => setTimeout(r, 2000));
           // Set session directly via Supabase REST
-          const res = await fetch('https://qjiomlvudfmzuvqvhwpk.supabase.co/auth/v1/token?grant_type=password', {
+          const res = await fetch(${JSON.stringify(SUPABASE_URL + '/auth/v1/token?grant_type=password')}, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaW9tbHZ1ZGZtenV2cXZod3BrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODQ5MTUsImV4cCI6MjA5MTM2MDkxNX0.W0nSk9w0dAogfY8rFOI_IzES7IB-S2gSvzJQFMmjFSU' },
-            body: JSON.stringify({ email: 'ramonfaur.daniel@gmail.com', password: 'Fullsite.2026!' })
+            headers: { 'Content-Type': 'application/json', 'apikey': ${JSON.stringify(SUPABASE_ANON_KEY)} },
+            body: JSON.stringify({ email: ${JSON.stringify(KDS_EMAIL)}, password: ${JSON.stringify(KDS_PASSWORD)} })
           });
           if (res.ok) {
             const data = await res.json();
