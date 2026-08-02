@@ -663,15 +663,15 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | D-18 | DONE | 0bf9993 | — |
 | D-19 | DONE | 0bf9993 | Env var `BACKUP_ADMIN_EMAILS` debe configurarse en Vercel |
 | D-20 | MIGRATION PENDING | — | Run P1-D20 migration (DROP TABLE amalay_reservaciones) |
-| D-21 | OPEN | — | Sprint 1, item 1 |
-| D-22 | OPEN | — | Sprint 1, item 2 |
-| D-23 | OPEN | — | Sprint 1, item 3 |
-| D-24 | OPEN | — | Sprint 1, item 4 |
-| D-25 | OPEN | — | Sprint 1, item 5 |
-| D-27 | OPEN | — | Sprint 1, item 6 |
-| D-28 | OPEN | — | Sprint 1, item 7 |
-| D-29 | OPEN | — | Sprint 1, item 8 |
-| D-34 | OPEN | — | Sprint 1, item 8 (30min, same session) |
+| D-21 | DONE | d0836a1 | — |
+| D-22 | DONE | d0836a1 | — |
+| D-23 | DONE | d0836a1 | Pasar `?data_source=fullsite` al llamar desde cliente no-wansoft |
+| D-24 | DONE | d0836a1 | Configurar env var `TELEGRAM_CHAT_ID_PLATFORM` en Vercel |
+| D-25 | DONE | d0836a1 | — |
+| D-27 | DONE | d0836a1 | — |
+| D-28 | DONE | d0836a1 | — |
+| D-29 | DONE | d0836a1 | — |
+| D-34 | DONE | d0836a1 | — |
 | D-30 | OPEN | — | Sprint 2 |
 | D-31 | OPEN — bloqueado por OCM | — | Sprint 2 (requiere OCM v0.1) |
 | D-32 | OPEN | — | Sprint 2 |
