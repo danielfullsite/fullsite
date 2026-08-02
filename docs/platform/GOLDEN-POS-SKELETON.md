@@ -515,6 +515,20 @@ No integration may hardcode a `client_id`. No integration may use a request head
 | D-18 | `dashboard-app/src/app/api/agents/cron/route.ts:22` | Default | `process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID \|\| 'amalay'` — cron de agentes IA corre para AMALAY si env var ausente | Requerir env var. Retornar 400 si ausente — nunca defaultear a un cliente específico. | P1 |
 | D-19 | `dashboard-app/src/app/api/backup/route.ts:8` | Hardcode | `BACKUP_ADMINS = Set(['ramonfaur.daniel@gmail.com', 'monica@fullsite.mx'])` — endpoint de backup solo accesible por 2 personas | Leer admins desde `client_users WHERE role = 'dueño' AND client_id = current_client`. | P1 |
 | D-20 | Schema SQL: tabla `amalay_reservaciones` | Schema debt | Tabla dedicada AMALAY sin `client_id` — existe en migraciones aunque el código ya usa `reservaciones` genérica | Eliminar tabla + triggers + vistas + constraints de `amalay_reservaciones` en nueva migración. | P1 |
+| D-21 | `src/lib/pos-config.ts:28` | Default | SSR fallback `typeof window === 'undefined' ? 'amalay' : clientId` — durante render server-side el POS carga config de AMALAY por ~100ms | Retornar `null` y mostrar loading. Eliminar `'amalay'` como valor literal de fallback. | P0 |
+| D-22 | `src/app/encuestas/page.tsx:150` | Default | `getActiveClientSlug() : 'amalay'` — client_id de encuestas escribe `'amalay'` durante SSR | Cambiar a `\|\| ''`. Validar que clientId no sea vacío antes de persistir la encuesta. | P0 |
+| D-23 | `src/app/api/health/route.ts:16,22` | Assumption | Health check consulta `wansoft_daily` sin verificar si el cliente usa wansoft — reporta `status: 'error'` (falso negativo) para clientes con `data_source='fullsite'` | Verificar `clients.data_source` antes de consultar `wansoft_daily`. Omitir check si no aplica. | P0 |
+| D-24 | `src/app/api/prospect/route.ts:59` | Hardcode | `chat_id: '7654040494'` — leads de cualquier cliente (formularios, demos) notifican al Telegram personal de Daniel sin routing por cliente | Leer `chat_id` desde `clients.telegram_chat_id`. Silencio si el campo está vacío. | P0 |
+| D-25 | `src/components/pos/CierreCajaWizard.tsx:388` | Hardcode | `<h2>AMALAY</h2>` hardcodeado en el bloque de ticket impreso del corte Z | Reemplazar con `config.display_name` leído desde `usePosConfig()` | P0 |
+| D-26 | `src/app/pos/mesas/page.tsx:37-90,736` + `src/lib/pos-data.ts:1265` | Hardcode | FLOOR_TABLES (~70 líneas) + WALLS_MAP con coordenadas AMALAY + `_cid() === 'amalay'` gatea la vista Plano. Cliente nuevo ve el plano del restaurante de AMALAY. | Mover a tabla `pos_floor_plans` + feature flag `pos.floor_plan`. Deferred a FEOS Kitchen Manager. GAP-D de OCS-P2.5.7. | P2 (deferred — requiere DB design) |
+| D-27 | `src/app/lealtad/page.tsx:83` | Hardcode | `program_name: 'AMALAY Rewards'` — cliente nuevo ve "AMALAY Rewards" en su programa de lealtad | Leer desde `config.display_name + ' Rewards'` o campo `clients.loyalty_program_name` | P1 |
+| D-28 | `src/app/inventario-real/orden-compra/page.tsx:114,662` | Hardcode | `*Orden de Compra - AMALAY*` en plantilla WhatsApp/email a proveedores — proveedor recibe mensaje con nombre incorrecto | Reemplazar con `config.display_name` | P1 |
+| D-29 | `src/app/api/chat/route.ts:385,390` | Hardcode | Mapa de normalización de platillos con aliases AMALAY-específicos (`'TAQUITOS AMALAY' → 'TACOS DE RIB EYE'`) — chat IA normaliza incorrectamente para otro cliente | Mover alias map a `pos_menu_aliases` en DB por `client_id`. Leer dinámicamente en route.ts. | P0 |
+| D-30 | `src/components/PredictionWidget.tsx:6` | Assumption | Distribución horaria hardcodeada modelada en patrón brunch/café de AMALAY — predicciones intraday incorrectas para otro tipo de restaurante | Calcular distribución desde historial real de `pos_orders` por cliente, por hora del día, rolling 30d | P1 |
+| D-31 | `api/chat`, `api/voice`, `api/coach`, `api/inventory/predict`, `api/contabilidad/polizas`, `app/contabilidad`, `app/nomina` | Assumption | `wansoft_daily` y `wansoft_kpis` consultadas en 7+ rutas sin filtro `client_slug` consistente. Nota en `agents/finance.ts:9`: "tablas globales sin client_id". Cliente nuevo sin Wansoft ve datos vacíos o de AMALAY. | Implementar OCM v0.1 como capa de abstracción. Rutas leen del OCM, no directo de `wansoft_daily`. OCM decide fuente según `data_source`. | P1 (bloqueada por OCM) |
+| D-32 | `src/app/pos/layout.tsx:270` | Hardcode | `FINGERPRINT_URL = 'http://127.0.0.1:7718'` — servicio de huella digital no configurable (análogo al bridge URL antes de commit `1718bab`) | Implementar `getFingerprintUrl()` + `setFingerprintUrl()` en `src/lib/fingerprint-url.ts`. UI en `pos/configuracion`. | P1 |
+| D-33 | `src/app/reservar/page.tsx` | AMALAY route | Página de reservaciones 100% hardcodeada: espacios (terraza/jardín/salón con capacidades AMALAY), horarios, paquetes de menú AMALAY, teléfono 8115324371, branding. No reutilizable. | Convertir a reservation engine configurable (espacios desde `reservation_spaces` en DB) o guard con `features.reservaciones`. Refactor de feature. | P1 (refactor) |
+| D-34 | `src/app/api/contabilidad/polizas/route.ts:551` | Hardcode | `RFC="XXXXXXXXXXXX"` placeholder en XML de pólizas contables — no se lee RFC fiscal del cliente desde config | Leer `rfc` desde `clients` table o config fiscal del cliente. 30min. | P1 |
 
 **SQL migration:**
 
@@ -568,6 +582,62 @@ Criterio de cierre por ítem. Una D-xx se marca CLOSED cuando se cumple **todo**
 | D-18 | `grep -n "\|\| 'amalay'" src/app/api/agents/cron/route.ts` | Cron sin env var → HTTP 400, no ejecuta agentes |
 | D-19 | `grep -n "ramonfaur.daniel@gmail.com\|monica@fullsite.mx" src/app/api/backup/route.ts` | Dueño de VANTARA puede exportar backup; Daniel no puede exportar backup de VANTARA |
 | D-20 | `grep -rn "amalay_reservaciones" scripts/sql/migrations/` | `\dt amalay_reservaciones` en Supabase → tabla no existe |
+| D-21 | `grep -n "'amalay'" src/lib/pos-config.ts` | POS con sesión de cliente nuevo nunca muestra config de AMALAY |
+| D-22 | `grep -n "\|\| 'amalay'" src/app/encuestas/page.tsx` | Encuesta enviada desde cliente nuevo tiene `client_id` correcto en Supabase |
+| D-23 | `grep -n "wansoft_daily" src/app/api/health/route.ts` (sin `data_source` guard) | `/api/health` devuelve `ok` para cliente con `data_source='fullsite'` y `wansoft_daily` vacía |
+| D-24 | `grep -n "7654040494" src/app/api/prospect/route.ts` | Lead desde formulario de nuevo cliente llega al Telegram del dueño de ese cliente |
+| D-25 | `grep -n "AMALAY" src/components/pos/CierreCajaWizard.tsx` | Ticket de corte Z muestra `display_name` del cliente activo, no "AMALAY" |
+| D-26 | `grep -n "_cid.*===.*amalay\|FLOOR_TABLES" src/app/pos/mesas/page.tsx` | Deferred — evidencia cuando `pos_floor_plans` esté implementado |
+| D-27 | `grep -n "AMALAY Rewards" src/app/lealtad/page.tsx` | Página de lealtad de nuevo cliente muestra su propio nombre |
+| D-28 | `grep -n "Orden de Compra - AMALAY" src/app/inventario-real/orden-compra/page.tsx` | Plantilla WhatsApp de OC muestra `display_name` del cliente activo |
+| D-29 | `grep -n "TAQUITOS AMALAY\|AMALAY SALMON" src/app/api/chat/route.ts` | Chat de NÓMADA-MINI no menciona platillos de AMALAY |
+| D-30 | `grep -n "AMALAY pattern" src/components/PredictionWidget.tsx` | Widget de predicción usa distribución calculada del cliente (o N/A si sin historial) |
+| D-31 | `grep -rn "wansoft_daily\b" src/app/api/ \| grep -v "client_slug\|data_source"` (esperado 0) | Ruta de chat con NÓMADA-MINI (data_source='fullsite') no devuelve datos de AMALAY |
+| D-32 | `grep -n "127.0.0.1:7718" src/app/pos/layout.tsx` | Deferred — evidencia cuando `getFingerprintUrl()` implementado |
+| D-33 | `grep -n "terraza.*jardin.*salon\|8115324371" src/app/reservar/page.tsx` | Página de reservas muestra espacios del cliente activo |
+| D-34 | `grep -n "XXXXXXXXXXXX" src/app/api/contabilidad/polizas/route.ts` | XML de póliza contiene RFC real del cliente emisor |
+
+---
+
+### Audit Provenance — HC-xx → D-xx (Auditoría cloneabilidad 2026-08-01)
+
+Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda absorbido por un D-xx. Auditoría congelada — no seguir buscando por iniciativa propia.
+
+| HC (audit 2026-08-01) | D-xx | Estado del D-xx |
+|---|---|---|
+| HC-04 — client-config.ts fallback map | D-01 | DONE (0bf9993) — extendido con demo config |
+| HC-05 — email hardcodeado a 'amalay' | D-02 | DONE (0bf9993) |
+| HC-06 — pos-config.ts slug fallback | **D-21** | OPEN |
+| HC-07 — cron route `\|\| 'amalay'` | D-18 | DONE (0bf9993) |
+| HC-08 — encuestas SSR fallback | **D-22** | OPEN |
+| HC-09 — Uber Eats OAuth fallback | D-17 | DONE (0bf9993) |
+| HC-10 / HC-14 — health wansoft check | **D-23** | OPEN |
+| HC-11 — prospect Telegram chat_id | **D-24** | OPEN |
+| HC-12 — CierreCaja ticket `<h2>AMALAY</h2>` | **D-25** | OPEN |
+| HC-13 — pos-data.ts `if clientId === 'amalay'` | D-05 | DEFERRED |
+| HC-15 / HC-16 — FLOOR_TABLES + vista Plano gate | **D-26** | OPEN — P2 deferred (GAP-D OCS-P2.5.7) |
+| HC-17 — cocina routing keywords | D-03 | MIGRATION PENDING |
+| HC-18 — pos-constants MODIFIER_STRIP_PATTERNS | D-04 | MIGRATION PENDING |
+| HC-19 — lealtad `'AMALAY Rewards'` | **D-27** | OPEN |
+| HC-20 — OC WhatsApp template | **D-28** | OPEN |
+| HC-21 — food-cost MARKET_KEYWORDS | D-05 | DEFERRED |
+| HC-22 — chat dish normalization map | **D-29** | OPEN |
+| HC-23 — PredictionWidget brunch pattern | **D-30** | OPEN |
+| HC-24 — wansoft tables sin client filter | **D-31** | OPEN (bloqueado por OCM) |
+| HC-25 — fingerprint URL hardcodeado | **D-32** | OPEN |
+| HC-26 — dashboard category alias | D-05 | DEFERRED |
+| HC-27 — reservar page hardcodeada | **D-33** | OPEN |
+| HC-28 — Uber Eats sandbox store name | D-10 | OPEN |
+| HC-29 — email placeholder admin/usuarios | P3 — sin D-xx | No corrompe datos |
+| HC-30 — mission-control workflow name | P3 — sin D-xx | Cosmético de ops |
+| HC-31 — polizas RFC placeholder | **D-34** | OPEN |
+| HC-32 — WhatsApp demo pages | P3 — sin D-xx | Marketing, no del producto |
+| HC-33 — demo config datos AMALAY | D-01 | DONE (0bf9993) |
+| HC-34 — platillos AMALAY en pos-data.ts | D-05 | DEFERRED |
+| HC-35 — GitHub Actions timezone UTC-6 | P3 — sin D-xx | Infra/ops, no bloquea NÓMADA-MINI |
+| HC-36 / HC-37 — Python scripts + agents | D-16 / D-31 | D-16 DONE; D-31 OPEN |
+
+**P3 (no D-xx, no bloquean smoke test):** HC-29, HC-30, HC-32, HC-35.
 
 ### P1 Execution Progress (actualizado 2026-08-01)
 
@@ -593,6 +663,42 @@ Criterio de cierre por ítem. Una D-xx se marca CLOSED cuando se cumple **todo**
 | D-18 | DONE | 0bf9993 | — |
 | D-19 | DONE | 0bf9993 | Env var `BACKUP_ADMIN_EMAILS` debe configurarse en Vercel |
 | D-20 | MIGRATION PENDING | — | Run P1-D20 migration (DROP TABLE amalay_reservaciones) |
+| D-21 | OPEN | — | Sprint 1, item 1 |
+| D-22 | OPEN | — | Sprint 1, item 2 |
+| D-23 | OPEN | — | Sprint 1, item 3 |
+| D-24 | OPEN | — | Sprint 1, item 4 |
+| D-25 | OPEN | — | Sprint 1, item 5 |
+| D-27 | OPEN | — | Sprint 1, item 6 |
+| D-28 | OPEN | — | Sprint 1, item 7 |
+| D-29 | OPEN | — | Sprint 1, item 8 |
+| D-34 | OPEN | — | Sprint 1, item 8 (30min, same session) |
+| D-30 | OPEN | — | Sprint 2 |
+| D-31 | OPEN — bloqueado por OCM | — | Sprint 2 (requiere OCM v0.1) |
+| D-32 | OPEN | — | Sprint 2 |
+| D-33 | OPEN | — | Sprint 2 (refactor feature reservaciones) |
+| D-26 | OPEN — deferred P2 | — | Requiere DB design `pos_floor_plans` |
+
+---
+
+### Sprint 1 — P1 abre: primeros 8 items (sin migraciones, sin refactors grandes)
+
+**Gate:** P0-4 CERTIFIED + milestone POS V2 Operational Certification CLOSED.  
+**Estimado:** ~5h de código + tests. Un bloque de trabajo, un commit.  
+**Criterio de cierre:** `smoke_test_nomada.py` pasa steps 1–6 sin errores.
+
+| # | D-xx | Archivo | Fix | Riesgo | Tests | Criterio PASS |
+|---|---|---|---|---|---|---|
+| 1 | D-25 | `src/components/pos/CierreCajaWizard.tsx:388` | `<h2>AMALAY</h2>` → `<h2>{config.display_name}</h2>`. Leer con `usePosConfig()`. | BAJO — 1 línea | `grep -n "AMALAY" CierreCajaWizard.tsx` → 0 | Ticket de corte Z imprime nombre del cliente activo |
+| 2 | D-21 | `src/lib/pos-config.ts:28` | `: 'amalay'` → `: null`. El POS muestra loading si `clientId` es null en SSR. | BAJO — 1 línea | `grep -n "'amalay'" pos-config.ts` → 0 | POS arranca sin flash de config AMALAY |
+| 3 | D-22 | `src/app/encuestas/page.tsx:150` | `|| 'amalay'` → `|| ''`. Agregar guard: `if (!clientId) return null`. | BAJO — 2 líneas | `grep -n "amalay" encuestas/page.tsx` → 0 | Encuesta de nuevo cliente persiste con `client_id` correcto |
+| 4 | D-23 | `src/app/api/health/route.ts:16,22` | Leer `data_source` del cliente activo. Omitir check de `wansoft_daily` si `data_source !== 'wansoft'`. | BAJO — 10 líneas | `curl /api/health` con cliente fullsite → `{status:'ok'}` | `/api/health` green para cliente sin pipeline Wansoft |
+| 5 | D-24 | `src/app/api/prospect/route.ts:59` | Leer `telegram_chat_id` desde `clients` table. Silencio (no error) si vacío. Agregar columna `telegram_chat_id text` a `clients` si no existe. | MEDIO — requiere column check | `grep -n "7654040494" prospect/route.ts` → 0 | Lead de demo de NÓMADA llega a su Telegram (si configurado), no al de Daniel |
+| 6 | D-27 | `src/app/lealtad/page.tsx:83` | `'AMALAY Rewards'` → `` `${config.display_name} Rewards` ``. | BAJO — 1 línea | `grep -n "AMALAY Rewards" lealtad/page.tsx` → 0 | Página lealtad muestra nombre correcto del cliente |
+| 7 | D-28 | `src/app/inventario-real/orden-compra/page.tsx:114,662` | `*Orden de Compra - AMALAY*` → `` `*Orden de Compra - ${config.display_name}*` ``. Mismo para el enlace de email (línea 662). | BAJO — 2 líneas | `grep -n "Orden de Compra - AMALAY" orden-compra/page.tsx` → 0 | Plantilla WhatsApp de OC tiene nombre del cliente |
+| 8 | D-29 | `src/app/api/chat/route.ts:385,390` | Eliminar las 2 entradas AMALAY del normalization map. El map debe contener solo aliases genéricos o estar vacío. Las búsquedas fuzzy manejan los alias restantes. | BAJO — eliminar 2 líneas | `grep -n "TAQUITOS AMALAY\|AMALAY SALMON" chat/route.ts` → 0 | Chat de NÓMADA no normaliza platillos de AMALAY |
+| +1 | D-34 | `src/app/api/contabilidad/polizas/route.ts:551` | `RFC="XXXXXXXXXXXX"` → `RFC="${clientRfc}"` leyendo desde `clients.rfc`. | BAJO — 5 líneas | `grep -n "XXXXXXXXXXXX" polizas/route.ts` → 0 | XML de póliza contiene RFC real del cliente |
+
+**Sprint 1 no incluye:** D-26 (deferred), D-30/31/32/33 (requieren diseño o OCM). Migraciones D-03/04/09/20 son Sprint 2 (coordinadas con DB).
 
 **New systems shipped (commit 0bf9993):**
 - `lib/restaurant-manifest.ts` — TypeScript schema for tenant onboarding
@@ -737,6 +843,23 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 | 18 | Eliminar tabla amalay_reservaciones (D-20) | Nueva migración SQL | 1h | Schema limpio, sin tablas AMALAY dedicadas |
 | 19 | Gate tests in CI as required checks | `.github/workflows/` | 2h | No skeleton regression merges |
 | 20 | Smoke test con VANTARA + NÓMADA-MINI | `sandbox.app.fullsite.mx` | — | Skeleton acceptance verified |
+
+### Estimación revisada (2026-08-01)
+
+Estado post-commit 0bf9993: D-01/02/06/07/08/11/12/13/14/15/16/17/18/19 = DONE. D-03/04/09/20 = MIGRATION PENDING. D-05 = DEFERRED. D-10 = OPEN. D-21..D-34 = OPEN (audit 2026-08-01).
+
+| Sprint | Items | Estimado | Descripción |
+|---|---|---|---|
+| **Sprint 1** | D-21..D-29, D-34 (8 code fixes) | **~5h** | Un bloque, sin migraciones. Gate: P0-4 CERTIFIED. |
+| **Sprint 2** | D-03/04 (post-migration code) + D-09 migration + D-20 migration + D-12 migration | **~4h** | Requiere correr las 4 migraciones SQL coordinadas con DB. |
+| **Sprint 3** | D-10 (delivery worker) + D-30 (prediction widget) + D-32 (fingerprint URL) + D-27/28 cleanup | **~6h** | Integrations + config items. |
+| **Sprint 4** | D-31 (OCM abstraction, wansoft tables) + D-33 (reservar page refactor) | **~12h** | OCM es prerequisito para D-31. D-33 requiere diseño de `reservation_spaces`. |
+| **D-26** | FLOOR_TABLES → `pos_floor_plans` | **~12h** | Track separado. Requiere DB design + FEOS Kitchen Manager. |
+| **D-05** | Menú desde DB (DEFERRED) | **~16h** | Depende de FEOS. No en roadmap activo. |
+
+**Total hasta smoke test NÓMADA-MINI (sin D-26/D-05):** ~27h  
+**Total completo incluyendo D-26:** ~39h  
+**Vs estimación anterior (~41h para D-01..D-20):** el scope creció con 14 nuevos items, pero 14 de los originales ya están DONE → el costo neto es similar.
 
 ---
 
