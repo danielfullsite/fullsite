@@ -166,6 +166,7 @@ platform/
   GOLDEN-SKELETON.md         El Golden Skeleton: 5 preguntas antes de cualquier PR.
   GOLDEN-POS-SKELETON.md     Skeleton completo del POS: scores, debt registry, roadmap A/B/C.
   PAE.md                     Platform Acceptance Environment — Café Nómada. Gate antes de Cliente #2.
+  PAE-IMPLEMENTATION-PLAN.md Backlog de implementación PAE: 6 componentes, dependencias, riesgos, PASS/FAIL.
   PROVISIONING.md            Cómo aprovisionar un nuevo cliente.
   CLONEABILITY-REPORT-v1.md  Reporte de clonabilidad v1.
   migrations/
