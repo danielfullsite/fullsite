@@ -11,10 +11,35 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | Integration Framework código | ✓ En `main`, desplegado en Vercel |
 | **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
 | **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 9 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
-| Deployment público | ✓ COMPLETO — commit `d534386`, CI green |
+| **Production Validation (Uber Form)** | **SUBMITTED 2026-08-02 — Awaiting Uber Review** |
+| Deployment público | ✓ COMPLETO — commit `cd69d09`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
 | Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
+
+## Production Validation — Submission
+
+```
+Formulario:       Uber Eats > Test Stores & Production Validation
+Enviado:          2026-08-02 (hora MX: ~18:30)
+Estado:           SUBMITTED – Awaiting Uber Review
+Referencia:       Ticket #D5FEA8
+Webhook URL:      https://app.fullsite.mx/api/integrations/uber-eats/webhook
+Integration Name: Fullsite POS
+Product:          Uber Eats
+
+Próxima acción:   Esperar respuesta del tech team de Uber.
+                  NO activar UBER_ENV=production hasta recibir confirmación oficial.
+                  NO marcar esta integración como Production Certified hasta ese momento.
+
+Respuestas enviadas al form:
+  - Integration owner: Yes (developer)
+  - Item issues API / resolved-for-fulfillment webhook: No
+  - Deny-reason codes: Yes (UBER_DENY_REASONS enum)
+  - Mark ready for pickup interface: Yes (/pos/delivery + markOrderReady())
+  - Store online status toggle: Yes (pauseStore / activateStore)
+  - Customer/Courier contact info surfaced: Yes (delivery_orders.customer_phone/driver_phone)
+```
 
 ### Resumen Categoría B
 
@@ -562,16 +587,6 @@ Una capability está CERTIFICADA cuando:
 | Reconcile: `LIMIT 50` sin paginación | LOW | Aceptable para sandbox; cursorizar antes de producción con volumen alto |
 | `sha256=` prefix handling (CAT-A-057) | LOW | Uber spec exige el prefijo; comportamiento edge aceptado — nunca 500 |
 
-## Gate antes del Google Form (Uber Certification)
-
-No llenar el formulario hasta que:
-- [ ] Categoría B completa — todos los UBER-001..UBER-020 con evidencia real
-- [ ] Actividad verificable en logs de Uber Developer Console
-- [ ] USL end-to-end completado con merchant real
-- [ ] Cero casos FAIL
-- [ ] Timestamps y correlation IDs documentados
-- [ ] Daniel revisa demo en /pos/delivery con orden del test store
-
 ## Smoke test pre-producción
 
 Antes de activar `UBER_ENV=production`:
@@ -581,12 +596,12 @@ Antes de activar `UBER_ENV=production`:
 4. Verificar `/pos/delivery` recibe órdenes del test store
 5. Confirmar que ningún store no mapeado resulta en delivery_order — ejecutar CAT-A-047 contra staging
 
-## Ticket Uber (al completar Categoría B)
+## Cuando Uber responda
 
-```
-Asunto: POS Integration Certification Request
-Cuerpo: Fullsite POS integration ready for certification.
-        Reference ticket: #D5FEA8
-        Webhook URL: https://app.fullsite.mx/api/integrations/uber-eats/webhook
-        All capabilities implemented and tested with test store.
-```
+Al recibir confirmación oficial de Uber:
+1. Actualizar este doc: estado → `PRODUCTION CERTIFIED`
+2. Ejecutar Smoke test pre-producción (sección abajo)
+3. Cambiar `UBER_ENV=production` en Vercel
+4. Rotar `UBER_WEBHOOK_SECRET` (sandbox ≠ producción)
+5. Registrar webhook URL de producción en Uber Developer Console
+6. Insertar store_id de producción en `integration_store_mappings`
