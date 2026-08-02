@@ -22,9 +22,12 @@ export async function POST(request: NextRequest) {
   }
 
   const correlationId = crypto.randomUUID()
-  const { client_id } = await request.json().catch(() => ({})) as { client_id?: string }
+  const { client_id, threshold_minutes } = await request.json().catch(() => ({})) as { client_id?: string; threshold_minutes?: number }
 
-  const thresholdTime = new Date(Date.now() - STUCK_THRESHOLD_MINUTES * 60_000).toISOString()
+  const effectiveThreshold = (process.env.UBER_ENV === 'sandbox' && threshold_minutes != null)
+    ? threshold_minutes
+    : STUCK_THRESHOLD_MINUTES
+  const thresholdTime = new Date(Date.now() - effectiveThreshold * 60_000).toISOString()
   const filter = client_id
     ? `client_id=eq.${client_id}&platform=eq.ubereats&status=eq.nueva&created_at=lt.${thresholdTime}`
     : `platform=eq.ubereats&status=eq.nueva&created_at=lt.${thresholdTime}`
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
     client_id: client_id ?? null,
     correlation_id: correlationId,
     action: 'reconciliation.run',
-    request: { stuck_threshold_minutes: STUCK_THRESHOLD_MINUTES },
+    request: { stuck_threshold_minutes: effectiveThreshold },
     response: { checked: stuckOrders.length, results },
   })
 

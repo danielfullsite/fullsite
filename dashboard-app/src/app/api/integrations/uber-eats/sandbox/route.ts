@@ -100,6 +100,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: r.status === 401, status: r.status, order_id: orderId })
   }
 
+  if (action === 'test_store_status') {
+    // UBER-007: send a store.status event → integration_store_mappings.store_open updated
+    const is_open = (body as Record<string, unknown>).is_open !== false
+    const storeStatusPayload = JSON.stringify({
+      event_type: 'store.status',
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: `store-status-cert-${Date.now()}`,
+      store_id: storeId,
+      store_status: is_open ? 'ACTIVE' : 'PAUSED',
+      is_open,
+      meta: { resource: { store: { store_id: storeId } } },
+    })
+    const sig = signPayload(storeStatusPayload, webhookSecret)
+    const r = await selfPost(request, '/api/integrations/uber-eats/webhook', storeStatusPayload, {
+      'x-uber-signature': sig,
+    })
+    return NextResponse.json({ ok: r.ok, status: r.status, store_id: storeId, is_open })
+  }
+
+  if (action === 'test_dlq') {
+    // UBER-019: send signed webhook from unmapped store → quarantineUnmappedStore → DLQ row
+    const unmappedStoreId = '00000000-0000-0000-0000-000000000000'
+    const dlqPayload = JSON.stringify(buildOrderPayload(`DLQ-${Date.now()}`, unmappedStoreId))
+    const sig = signPayload(dlqPayload, webhookSecret)
+    const r = await selfPost(request, '/api/integrations/uber-eats/webhook', dlqPayload, {
+      'x-uber-signature': sig,
+    })
+    return NextResponse.json({ ok: r.ok, status: r.status, unmapped_store_id: unmappedStoreId })
+  }
+
   // Default: test_webhook — sign and send real payload (UBER-009..016)
   const sig = signPayload(payload, webhookSecret)
   const r = await selfPost(request, '/api/integrations/uber-eats/webhook', payload, {

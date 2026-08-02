@@ -1,0 +1,98 @@
+name: UBER-007/013-015/019-020 Cert Suite
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cert-suite:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+      CERT_ORDER_ID: CERT-1785628914964
+      CERT_STORE_ID: 633b57d4-237a-5a32-b249-7ceb795f1d35
+
+    steps:
+      - name: UBER-007 — Store Status Webhook (store.status event)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"test_store_status\",\"store_id\":\"$CERT_STORE_ID\",\"is_open\":true}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-007 HTTP: $HTTP_CODE — $BODY"
+          echo "UBER007_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER007_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: UBER-013 — Deny Order
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"deny\",\"reason\":\"ITEM_UNAVAILABLE\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-013 HTTP: $HTTP_CODE — $BODY"
+          echo "UBER013_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER013_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: UBER-014 — Cancel Order
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"cancel\",\"reason\":\"CUSTOMER_CALLED_TO_CANCEL\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-014 HTTP: $HTTP_CODE — $BODY"
+          echo "UBER014_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER014_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: UBER-015 — Mark Ready
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$CERT_ORDER_ID\",\"action\":\"ready\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-015 HTTP: $HTTP_CODE — $BODY"
+          echo "UBER015_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER015_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: UBER-019 — DLQ (unmapped store triggers quarantine)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"test_dlq\",\"store_id\":\"$CERT_STORE_ID\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-019 HTTP: $HTTP_CODE — $BODY"
+          echo "UBER019_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER019_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: UBER-020 — Reconciliation (threshold_minutes=0 picks up CERT order)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/reconcile" \
+            -H "Content-Type: application/json" \
+            -d '{"client_id":"amalay","threshold_minutes":0}')
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "UBER-020 HTTP: $HTTP_CODE"
+          echo "UBER-020 Body: $BODY"
+          echo "UBER020_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "UBER020_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: Notify Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+        run: |
+          MSG="*UBER Cert Suite 007/013-015/019-020*%0A%0AUBER-007 (store status): $UBER007_HTTP $UBER007_BODY%0AUBER-013 (deny): $UBER013_HTTP $UBER013_BODY%0AUBER-014 (cancel): $UBER014_HTTP $UBER014_BODY%0AUBER-015 (ready): $UBER015_HTTP $UBER015_BODY%0AUBER-019 (dlq): $UBER019_HTTP $UBER019_BODY%0AUBER-020 (reconcile): $UBER020_HTTP $UBER020_BODY"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID&text=$MSG&parse_mode=Markdown" > /dev/null
