@@ -1,10 +1,12 @@
 # Platform Acceptance Environment (PAE)
 
-> **Status:** Design — pendiente de implementación hasta que P1 Golden Skeleton esté completo.  
+> **DISEÑO BASE — CONGELADO v1.0 · 2026-08-01**  
+> Este documento solo evoluciona cuando una ejecución física revela un gap real. No por hipótesis.  
+> Cualquier cambio requiere incrementar la versión y aprobación explícita.
+
 > **Category:** A — Camino crítico. Gate obligatorio antes de Cliente #2.  
 > **Owner:** Platform Engineering  
-> **Created:** 2026-08-01  
-> **Regla de evolución:** Este documento solo cambia cuando la ejecución física revela un gap real. No por hipótesis.
+> **Created:** 2026-08-01
 
 ---
 
@@ -15,7 +17,67 @@ Es el gate entre desarrollo y deployment a un cliente real.
 
 **Un feature que no pasa el PAE no llega a un cliente pagador.**
 
-El PAE no es un entorno de pruebas ad hoc. Es una instalación certificada, con datos canónicos, que puede destruirse y re-provisionarse desde cero en menos de 30 minutos. Cada vez que se destruye y vuelve a levantar, el proceso de bootstrap es la prueba misma.
+El PAE no es un entorno de pruebas ad hoc. Es una instalación certificada, con datos canónicos, que puede destruirse y re-provisionarse en < 30 minutos. Cada vez que se destruye y vuelve a levantar, el proceso de bootstrap es la prueba misma.
+
+---
+
+## Pipeline de activación
+
+El PAE tiene cuatro etapas en secuencia estricta. No se puede saltar ninguna.
+
+```
+BOOTSTRAP  →  [GATE P0: Tenant Isolation]
+    ↓
+SMOKE TESTS  →  [GATE P1: PAE Ready]
+    ↓
+PAE READY (entorno operativo certificado)
+    ↓
+ACCEPTANCE SUITE  →  [GATE P3: PAE CERTIFIED]
+```
+
+### Gate P0 — Tenant Isolation (bloquea smoke tests)
+
+El entorno no puede usarse si hay contaminación de datos entre tenants.  
+Debe verificarse inmediatamente después del bootstrap y antes de cualquier test.
+
+| Check | Query / acción | Criterio de PASS |
+|---|---|---|
+| TI-01 | `SELECT count(*) FROM pos_orders WHERE client_id = 'amalay'` — ejecutado desde sesión de `nomada` | = 0 filas |
+| TI-02 | `SELECT count(*) FROM pos_menu_categories WHERE client_id != 'nomada'` — ejecutado desde sesión de `nomada` | = 0 filas |
+| TI-03 | `SELECT count(*) FROM pos_staff WHERE client_id != 'nomada'` — ejecutado desde sesión de `nomada` | = 0 filas |
+| TI-04 | Login como `admin@nomada.test` → navegar a `/pos` → confirmar que no hay datos de AMALAY visibles en ninguna pantalla | 0 referencias a AMALAY |
+| TI-05 | Dashboard de Nómada → filtro por fecha de hoy → ventas y órdenes son 0 o corresponden solo a sesiones de test | Sin rows de `amalay` |
+| TI-06 | Chat IA: "¿Quiénes son mis meseros?" → respuesta no incluye ningún nombre del dataset de AMALAY | 0 nombres de AMALAY |
+
+**Si cualquier check TI-XX falla → STOP. Tear down y re-provision. No continuar con smoke tests.**
+
+### Gate P1 — PAE Ready (cierre de P1 Golden Skeleton)
+
+P1 Golden Skeleton queda DONE cuando se cumplen simultáneamente:
+
+| Criterio | Verificación |
+|---|---|
+| Provisioning < 30 min | Bootstrap completo (Fases A + B + C) medido en tiempo real |
+| Tenant Isolation PASS | Los 6 checks TI-01…TI-06 todos PASS |
+| 12/12 Smoke Tests PASS | SM-01…SM-12 todos PASS en una sola ejecución |
+| 0 datos AMALAY visibles | Revisión manual de todas las pantallas del POS y Dashboard |
+| Commit con evidencia | `docs/certifications/PAE-P1-CERT-{fecha}.md` archivado |
+
+**Este gate cierra P1. No es necesario completar la Acceptance Suite para cerrar P1.**
+
+### Gate P3 — PAE CERTIFIED (cierre de P3 / Demo 24/7)
+
+El PAE queda CERTIFIED cuando se completa la Acceptance Suite completa:
+
+| Criterio | Verificación |
+|---|---|
+| 14/14 módulos PASS | Acceptance Suite completa (§5) |
+| ORS ≥ 80 | Calculado al cierre de las 4 horas |
+| Offline Fase 5 PASS | Protocolo v1.0 ejecutado sobre Nómada |
+| Rollback validado | Tear down + re-provision ejecutado y documentado |
+| Commit con evidencia | `docs/certifications/PAE-CERT-{fecha}.md` archivado |
+
+**Este gate es el prerequisito inmediato antes del Shadow Day de Cliente #2.**
 
 ---
 
@@ -385,13 +447,21 @@ Versionar el dataset es obligatorio: si cambia el schema de producción, el data
 
 ## Relación con el roadmap
 
-| Workstream | Relación con PAE |
-|---|---|
-| P1 Golden Skeleton | PAE es el smoke test final de P1. Si el bootstrap falla, P1 no está cerrado. |
-| FEOS Core | PAE es el primer restaurante provisionado desde FEOS. |
-| Cliente #2 | PAE debe estar CERTIFIED antes del Shadow Day del cliente. |
-| Offline Fase 5 | La acceptance suite del PAE incluye el Protocolo Offline v1.0 completo. |
+| Workstream | Gate que cierra | Criterio PAE requerido |
+|---|---|---|
+| P1 Golden Skeleton | Gate P1 — PAE Ready | Bootstrap < 30 min + TI PASS + 12/12 SM PASS |
+| P3 Demo 24/7 / FEOS Core | Gate P3 — PAE CERTIFIED | Acceptance Suite 14/14 + ORS ≥ 80 + Rollback validado |
+| Cliente #2 Shadow Day | Prerequisito | PAE debe tener Gate P3 CERTIFIED antes del Shadow Day |
+| Offline Fase 5 | Incluido en Gate P3 | Protocolo Offline v1.0 ejecutado sobre Nómada |
+
+**Secuencia obligatoria:**
+
+```
+P1 Golden Skeleton → [Gate P1: PAE Ready] → P3 / FEOS Core → [Gate P3: PAE CERTIFIED] → Cliente #2 Shadow Day
+```
+
+No se puede saltar del Gate P1 al Shadow Day. El Gate P3 es obligatorio.
 
 ---
 
-> **Regla permanente:** Si el PAE no puede provisionarse desde cero en < 30 min con el bootstrap, el proceso de instalación de un restaurante nuevo está roto. Eso es una regresión de plataforma, no un bug menor.
+> **Regla permanente:** Si el PAE no puede provisionarse desde cero en < 30 min, el proceso de onboarding de restaurantes está roto — no es un bug menor, es una regresión de plataforma.
