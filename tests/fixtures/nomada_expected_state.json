@@ -1,0 +1,100 @@
+{
+  "_meta": {
+    "version": "v1",
+    "client_id": "nomada",
+    "description": "Estado esperado de Café Nómada post-seed v1. Usado por smoke tests para verificación programática.",
+    "seed_files": [
+      "scripts/seed/nomada/v1_client.sql",
+      "scripts/seed/nomada/v1_staff.sql",
+      "scripts/seed/nomada/v1_payment_methods.sql",
+      "scripts/seed/nomada/v1_menu.sql",
+      "scripts/seed/nomada/v1_ingredients.sql",
+      "scripts/seed/nomada/v1_recipes.sql"
+    ]
+  },
+  "counts": {
+    "clients": 1,
+    "pos_staff": 4,
+    "pos_payment_methods": 4,
+    "pos_menu_categories": 10,
+    "pos_menu_items": 40,
+    "pos_ingredients": 20,
+    "pos_recipe_versions": 10,
+    "pos_recipe_lines": 33
+  },
+  "client": {
+    "id": "nomada",
+    "display_name": "Café Nómada",
+    "city": "Monterrey",
+    "timezone": "America/Mexico_City",
+    "mesas": 15,
+    "data_source": "supabase",
+    "pos_write_authority": "supabase",
+    "type": "cafe",
+    "active": true,
+    "features": {
+      "pos": true,
+      "kds": true,
+      "dashboard": true,
+      "staff": true,
+      "recipes": true,
+      "inventory": true,
+      "agents": true,
+      "reports": true,
+      "customers": false,
+      "cfdi": false,
+      "reservaciones": false,
+      "suppliers": false
+    }
+  },
+  "staff": [
+    { "name": "Ana García",    "pin": "9001", "role": "admin",  "role_display": "Gerente", "active": true },
+    { "name": "Carlos Méndez", "pin": "1001", "role": "mesero", "role_display": "Mesero",  "active": true },
+    { "name": "Diana Torres",  "pin": "1002", "role": "mesero", "role_display": "Mesero",  "active": true },
+    { "name": "Eduardo Reyes", "pin": "1003", "role": "mesero", "role_display": "Mesero",  "active": true }
+  ],
+  "payment_methods": [
+    { "name": "Efectivo",           "type": "cash",     "commission_pct": 0,   "active": true },
+    { "name": "Tarjeta de crédito", "type": "card",     "commission_pct": 3.6, "active": true },
+    { "name": "Tarjeta de débito",  "type": "card",     "commission_pct": 1.8, "active": true },
+    { "name": "Transferencia",      "type": "transfer", "commission_pct": 0,   "active": true }
+  ],
+  "menu_categories": [
+    { "id": "nomada-cat-cafes-calientes",  "name": "Cafés Calientes",    "sort_order": 1  },
+    { "id": "nomada-cat-cafes-frios",      "name": "Cafés Fríos",        "sort_order": 2  },
+    { "id": "nomada-cat-desayunos",        "name": "Desayunos",          "sort_order": 3  },
+    { "id": "nomada-cat-tostadas-bagels",  "name": "Tostadas y Bagels",  "sort_order": 4  },
+    { "id": "nomada-cat-bowls",            "name": "Bowls",              "sort_order": 5  },
+    { "id": "nomada-cat-jugos-smoothies",  "name": "Jugos y Smoothies",  "sort_order": 6  },
+    { "id": "nomada-cat-postres",          "name": "Postres",            "sort_order": 7  },
+    { "id": "nomada-cat-aguas",            "name": "Aguas Frescas",      "sort_order": 8  },
+    { "id": "nomada-cat-especiales",       "name": "Especiales del Día", "sort_order": 9  },
+    { "id": "nomada-cat-extras",           "name": "Extras",             "sort_order": 10 }
+  ],
+  "menu_items_sample": [
+    { "id": "nomada-item-americano",       "category_id": "nomada-cat-cafes-calientes", "name": "Americano",          "price": 45  },
+    { "id": "nomada-item-chilaquiles",     "category_id": "nomada-cat-desayunos",       "name": "Chilaquiles Rojos",  "price": 115 },
+    { "id": "nomada-item-tostada-aguacate","category_id": "nomada-cat-tostadas-bagels", "name": "Tostada con Aguacate","price": 85 },
+    { "id": "nomada-item-bowl-fruta",      "category_id": "nomada-cat-bowls",           "name": "Bowl de Fruta",      "price": 75  }
+  ],
+  "recipes_with_food_cost": [
+    { "menu_item_id": "nomada-item-cappuccino",       "estimated_cost_pct": 24 },
+    { "menu_item_id": "nomada-item-latte",            "estimated_cost_pct": 26 },
+    { "menu_item_id": "nomada-item-cafe-frio",        "estimated_cost_pct": 24 },
+    { "menu_item_id": "nomada-item-jugo-verde",       "estimated_cost_pct": 25 },
+    { "menu_item_id": "nomada-item-huevos-rancheros", "estimated_cost_pct": 27 },
+    { "menu_item_id": "nomada-item-omelette-jamon",   "estimated_cost_pct": 28 },
+    { "menu_item_id": "nomada-item-chilaquiles",      "estimated_cost_pct": 24 },
+    { "menu_item_id": "nomada-item-tostada-aguacate", "estimated_cost_pct": 26 },
+    { "menu_item_id": "nomada-item-sandwich-chef",    "estimated_cost_pct": 26 },
+    { "menu_item_id": "nomada-item-bowl-fruta",       "estimated_cost_pct": 26 }
+  ],
+  "isolation_assertions": {
+    "no_amalay_text_in_ui": true,
+    "no_cross_tenant_orders_visible": true,
+    "no_cross_tenant_staff_visible": true,
+    "ai_chat_meseros_names": ["Ana García", "Carlos Méndez", "Diana Torres", "Eduardo Reyes"],
+    "ai_chat_forbidden_names": ["Omar Aguilera", "Hector Enrique", "Brayan Berlanga", "Daniela Edith", "Julio Cesar"]
+  },
+  "kds_routing_note": "KDS station routing depende de D-03 y D-04 (Debt P0). Barra: cafés/bebidas. Cocina: desayunos/tostadas/bowls/especiales. Confirmar en Gate P1 SM-04 y SM-05 después de resolver D-03/D-04."
+}
