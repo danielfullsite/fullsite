@@ -59,19 +59,27 @@ order/route.ts (POST)
 
 ## Resumen de cobertura
 
-| Categoría | Total | IMPLEMENTADO | SANDBOX LIMIT | PENDING |
-|---|---|---|---|---|
-| Core capabilities (UBER-001..020) | 20 | 16 | 4 | 0 |
-| Day 2 routing capabilities | 5 | 5 | 0 | 0 |
+| Dimensión | Conteo | Detalle |
+|---|---|---|
+| Capabilities totales | 20 | UBER-001..020 |
+| Código implementado | 16 | UBER-001, 002, 007-020 |
+| Código NO implementado (requiere scope Uber) | 4 | UBER-003, 004, 005, 006 (menú) |
+| Cat B PASS (verificado contra sandbox Uber) | 9 | 001, 002, 007, 009, 011, 016, 017, 019, 020 |
+| Cat B SANDBOX LIMIT (código listo, Uber sandbox bloquea) | 6 | 008, 010, 012, 013, 014, 015 |
+| Cat B NO TESTEABLE (menú, scope faltante) | 4 | 003, 004, 005, 006 |
+| Cat A ONLY (comportamiento interno, sin llamada Uber) | 1 | 018 (retry) |
+| **Tests total** | **192** | 172 Cat A Day 1 + 20 Day 2 — todos PASS |
 
-**Tests:** 172 Cat A (category-a.test.ts) + 20 Day 2 (delivery-adapter.test.ts) = **192 total** — todos pasando.
+**Regla de consistencia:** 9 + 6 + 4 + 1 = 20 ✓ · 16 implementados = 9 Cat B PASS + 6 Cat B LIMIT + 1 Cat A only ✓
 
 ## Estado de certificación
 
 | Fase | Criterio | Estado |
 |---|---|---|
-| **SANDBOX Cat A** | 192 tests internos sin Uber API | **PASS** |
-| **SANDBOX Cat B** | Endpoints con sandbox de Uber | 9 PASS · 9 SANDBOX LIMIT (menú) |
-| **PRODUCTION** | Uber Basic Production Validation | Ticket #D5FEA8 en espera — pendiente respuesta Uber |
+| **Cat A interna** | 192 tests sin Uber API | **PASS** |
+| **Cat B sandbox** | 9 verificados end-to-end con Uber | **9 PASS · 10 SANDBOX LIMIT** |
+| **Production Validation** | Basic Production Validation form | Ticket #D5FEA8 — pendiente respuesta Uber |
 
-**Nota SANDBOX LIMIT:** Las 4 capabilities de menú (UBER-003..006) y los 9 Cat B pendientes requieren acceso especial al sandbox de Uber para el scope `eats.menu.write`. El resto del stack está listo para producción.
+**Desglose Cat B SANDBOX LIMIT (10):**
+- UBER-003, 004, 005, 006 — Menú: código no implementado, requiere `eats.menu.write` scope de Uber
+- UBER-008, 010, 012, 013, 014, 015 — código implementado y Cat A verificado; sandbox de Uber devuelve error de scope/routing, no error de implementación

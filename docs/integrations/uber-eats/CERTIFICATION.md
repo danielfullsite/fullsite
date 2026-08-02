@@ -11,7 +11,7 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | Integration Framework código | ✓ En `main`, desplegado en Vercel |
 | **Categoría A — Day 1** (tests automatizados) | **CERRADA — 172/172 PASS** |
 | **Categoría A — Day 2** (Delivery adapter routing) | **CERRADA — 20/20 PASS** |
-| **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 9 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
+| **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 10 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
 | **Production Validation (Uber Form)** | **SUBMITTED 2026-08-02 — Awaiting Uber Review** |
 | Deployment público | ✓ COMPLETO — commit `cd69d09`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
@@ -47,14 +47,14 @@ Respuestas enviadas al form:
 | Veredicto | IDs |
 |---|---|
 | **PASS** | 001, 002, 007, 009, 011, 016, 017, 019, 020 |
-| **SANDBOX LIMIT** | 003, 005, 006, 008, 010, 012, 013, 014, 015 |
+| **SANDBOX LIMIT** | 003, 004, 005, 006, 008, 010, 012, 013, 014, 015 |
 | **CAT-A CUBIERTO** | 018 |
 
 Todos los SANDBOX LIMIT tienen evidencia de que la llamada llegó a Uber y el error es de scope/routing, no de implementación.
 
 ## Categoría A — CERRADA
 
-**Resultado final: 67/67 PASS — suite `category-a.test.ts` — vitest v4.1.7**
+**Resultado final: 172/172 PASS — suite `category-a.test.ts` — vitest v4.1.7** (67 originales + 105 expandidos en remediación Day 1)
 
 Commits que cierran Categoría A:
 - `15f5523` — guards SUPABASE_SERVICE_KEY + suite inicial (63 tests)
