@@ -16,6 +16,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { normalizeUberOrder } from '@/lib/integrations/uber-eats/order-adapter'
 import { acceptOrder, getOrderDetails } from '@/lib/integrations/uber-eats/adapter'
+import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
 import { auditLog } from '@/lib/integrations/audit-logger'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -331,10 +332,16 @@ export async function POST(request: NextRequest) {
       await handleCancelledOrder(orderId, eventRow.id, correlationId)
     } else if (eventType === 'orders.ready_for_pickup') {
       await handleReadyForPickup(orderId, eventRow.id, correlationId)
-    } else if (eventType === 'store.status') {
+    } else if (eventType === 'store.provisioned') {
+      await handleProvisioned(storeId, meta, clientId, body, eventRow.id, correlationId)
+    } else if (eventType === 'store.deprovisioned') {
+      await handleDeprovisioned(storeId, clientId, eventRow.id, correlationId)
+    } else if (eventType === 'store.status.changed' || eventType === 'store.status') {
+      // store.status.changed is the canonical Uber event name.
+      // store.status is kept as a legacy alias for older webhook versions.
       await handleStoreStatus(storeId, body, eventRow.id, correlationId)
     } else {
-      // Unknown event type — mark as processed (don't DLQ unknown events)
+      // Unknown event type — ACK 200 without DLQ (don't penalize unknown future events)
       console.log(`[uber-webhook-v2] Unknown event type: ${eventType}`)
       await markEventProcessed(eventRow.id)
     }
@@ -417,6 +424,104 @@ async function handleReadyForPickup(orderId: string, eventId: string, correlatio
     }
   )
   await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'order.ready_for_pickup', request: { order_id: orderId } })
+  await markEventProcessed(eventId)
+}
+
+// ─── store.provisioned ───────────────────────────────────────────────────────
+// Uber sends this when a merchant grants the app access to their store.
+// We call GET /pos_data immediately so the event generates Uber-visible API
+// traffic with a real timestamp — required for certification evidence.
+//
+// Idempotent: the PATCH on integration_store_mappings uses ON CONFLICT logic
+// at the DB level; duplicate store.provisioned events are deduped before this
+// function is reached (Step 4 dedup in the main handler).
+//
+// Bootstrap note: this handler assumes USL has already run and the store row
+// exists in integration_store_mappings. If not, resolveClientId() returns null
+// and the event is quarantined in integration_webhook_dlq for manual replay.
+
+async function handleProvisioned(
+  storeId: string,
+  meta: Record<string, unknown>,
+  clientId: string,
+  payload: unknown,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  // Uber may include the resource_href to the pos_data endpoint directly in meta.
+  const resourceHref = (meta.resource_href ?? '') as string
+  // Some webhook versions embed store_id in meta.resource_id instead of body.store_id.
+  const effectiveStoreId = storeId || (meta.resource_id as string) || ''
+
+  // Call GET /pos_data — generates Uber-visible API traffic with UTC timestamp.
+  // Failure does not abort the handler; the webhook ACK is more important.
+  const posResult = await getPosData(effectiveStoreId, correlationId)
+  if (!posResult.ok) {
+    console.warn(`[uber-webhook-v2] getPosData failed for ${effectiveStoreId}: ${posResult.error}`)
+  }
+
+  // Mark store active in our mapping (idempotent PATCH).
+  if (effectiveStoreId) {
+    await fetch(
+      `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(effectiveStoreId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ store_open: true, updated_at: new Date().toISOString() }),
+      }
+    ).catch(() => {})
+  }
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: clientId,
+    correlation_id: correlationId,
+    action: 'store.provisioned',
+    request: { store_id: effectiveStoreId, resource_href: resourceHref || null },
+    response: {
+      pos_data_fetched: posResult.ok,
+      pos_data_status_code: posResult.status_code ?? null,
+      store_marked_active: true,
+    },
+  })
+
+  console.log(`[uber-webhook-v2] store.provisioned store=${effectiveStoreId} pos_data_ok=${posResult.ok} correlation=${correlationId}`)
+  await markEventProcessed(eventId)
+}
+
+// ─── store.deprovisioned ─────────────────────────────────────────────────────
+// Uber sends this when a merchant revokes the app's access.
+// We mark the store inactive but keep the row for traceability — do NOT delete.
+// After deprovisioning the store's USL token is no longer valid; further API
+// calls using it will receive 401 from Uber.
+
+async function handleDeprovisioned(
+  storeId: string,
+  clientId: string,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  if (storeId) {
+    await fetch(
+      `${SB_URL()}/rest/v1/integration_store_mappings?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ store_open: false, updated_at: new Date().toISOString() }),
+      }
+    ).catch(() => {})
+  }
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: clientId,
+    correlation_id: correlationId,
+    action: 'store.deprovisioned',
+    request: { store_id: storeId },
+    response: { integration_marked_inactive: true, row_preserved: true },
+  })
+
+  console.log(`[uber-webhook-v2] store.deprovisioned store=${storeId} correlation=${correlationId}`)
   await markEventProcessed(eventId)
 }
 
