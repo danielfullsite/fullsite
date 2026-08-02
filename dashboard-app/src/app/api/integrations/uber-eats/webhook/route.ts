@@ -15,8 +15,8 @@
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { normalizeUberOrder } from '@/lib/integrations/uber-eats/order-adapter'
-import { acceptOrder, getOrderDetails } from '@/lib/integrations/uber-eats/adapter'
 import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
+import { getOrderAdapterForPayload } from '@/lib/integrations/uber-eats/adapter-factory'
 import { auditLog } from '@/lib/integrations/audit-logger'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -366,8 +366,11 @@ async function handleNewOrder(
   eventId: string,
   correlationId: string
 ): Promise<void> {
+  // Select adapter (Eats legacy or Delivery V1) based on webhook channel field.
+  const adapter = getOrderAdapterForPayload(rawPayload as Record<string, unknown>)
+
   // Get full order details from Uber (required before accept per certification)
-  const detailsResult = await getOrderDetails(orderId, correlationId, storeId)
+  const detailsResult = await adapter.getOrderDetails(orderId, correlationId, storeId)
   // Fallback: Uber sends the order object inside meta.resource of the webhook envelope.
   // normalizeUberOrder expects a direct order object — extract it when the API call fails.
   const envelope = rawPayload as Record<string, unknown>
@@ -386,13 +389,13 @@ async function handleNewOrder(
   }
 
   if (!persistResult.was_duplicate) {
-    console.log(`[uber-webhook-v2] Order ${orderId} persisted. Accepting...`)
+    console.log(`[uber-webhook-v2] Order ${orderId} persisted (channel=${adapter.channel}). Accepting...`)
     // Accept — Type A operation: Uber confirms externally
-    const acceptResult = await acceptOrder(orderId, correlationId, 20, storeId)
+    const acceptResult = await adapter.acceptOrder(orderId, correlationId, storeId)
     if (!acceptResult.ok) {
       // Log accept failure but don't throw — order is in DB, accept can be retried from delivery page
       console.warn(`[uber-webhook-v2] Accept failed for ${orderId}: ${acceptResult.error}`)
-      await auditLog({ provider: 'ubereats', client_id: clientId, correlation_id: correlationId, action: 'order.accept_failed', response: { error: acceptResult.error } })
+      await auditLog({ provider: 'ubereats', client_id: clientId, correlation_id: correlationId, action: 'order.accept_failed', response: { error: acceptResult.error, channel: adapter.channel } })
     }
   } else {
     console.log(`[uber-webhook-v2] Order ${orderId} already exists — skip persist+accept`)

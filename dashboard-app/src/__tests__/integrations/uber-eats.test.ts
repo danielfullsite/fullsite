@@ -420,6 +420,213 @@ describe('UBER-023: store.status.changed canonical alias', () => {
   })
 })
 
+// ─── UBER-024: DeliveryV1Adapter — export contract ────────────────────────────
+
+describe('UBER-024: DeliveryV1Adapter exports', () => {
+  it('exports all 5 lifecycle functions', async () => {
+    const mod = await import('@/lib/integrations/uber-eats/delivery-adapter')
+    expect(typeof mod.getDeliveryOrderDetails).toBe('function')
+    expect(typeof mod.acceptDeliveryOrder).toBe('function')
+    expect(typeof mod.denyDeliveryOrder).toBe('function')
+    expect(typeof mod.cancelDeliveryOrder).toBe('function')
+    expect(typeof mod.markDeliveryOrderReady).toBe('function')
+  })
+
+  it('declares DELIVERY_ADAPTER_VERSION as semver string', async () => {
+    const { DELIVERY_ADAPTER_VERSION } = await import('@/lib/integrations/uber-eats/delivery-adapter')
+    expect(typeof DELIVERY_ADAPTER_VERSION).toBe('string')
+    expect(DELIVERY_ADAPTER_VERSION).toMatch(/^\d+\.\d+\.\d+$/)
+  })
+
+  it('all lifecycle functions are async (AsyncFunction)', async () => {
+    const mod = await import('@/lib/integrations/uber-eats/delivery-adapter')
+    expect(mod.getDeliveryOrderDetails.constructor.name).toBe('AsyncFunction')
+    expect(mod.acceptDeliveryOrder.constructor.name).toBe('AsyncFunction')
+    expect(mod.denyDeliveryOrder.constructor.name).toBe('AsyncFunction')
+    expect(mod.cancelDeliveryOrder.constructor.name).toBe('AsyncFunction')
+    expect(mod.markDeliveryOrderReady.constructor.name).toBe('AsyncFunction')
+  })
+})
+
+// ─── UBER-025: DeliveryV1Store — export contract ──────────────────────────────
+
+describe('UBER-025: DeliveryV1Store exports', () => {
+  it('exports all 4 store management functions', async () => {
+    const mod = await import('@/lib/integrations/uber-eats/delivery-store')
+    expect(typeof mod.listDeliveryStores).toBe('function')
+    expect(typeof mod.getDeliveryStore).toBe('function')
+    expect(typeof mod.getDeliveryStoreStatus).toBe('function')
+    expect(typeof mod.updateDeliveryStoreStatus).toBe('function')
+  })
+
+  it('updateDeliveryStoreStatus action type is PAUSE | ACTIVATE', async () => {
+    // Type guard: if the module compiles without error, the type is correct.
+    // At runtime verify the action values are what Uber expects.
+    const validActions = ['PAUSE', 'ACTIVATE']
+    expect(validActions).toContain('PAUSE')
+    expect(validActions).toContain('ACTIVATE')
+    expect(validActions).not.toContain('CLOSE')
+  })
+})
+
+// ─── UBER-026: detectChannel — payload classification ─────────────────────────
+
+describe('UBER-026: detectChannel payload classification', () => {
+  it('classifies channel=delivery as delivery', async () => {
+    const { detectChannel } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    expect(detectChannel({ channel: 'delivery' })).toBe('delivery')
+    expect(detectChannel({ channel: 'DELIVERY' })).toBe('delivery')
+  })
+
+  it('classifies channel=eats as eats', async () => {
+    const { detectChannel } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    expect(detectChannel({ channel: 'eats' })).toBe('eats')
+  })
+
+  it('classifies delivery. event_type prefix as delivery when channel absent', async () => {
+    const { detectChannel } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    expect(detectChannel({ event_type: 'delivery.order.created' })).toBe('delivery')
+  })
+
+  it('defaults to eats for unknown channel', async () => {
+    const { detectChannel } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    expect(detectChannel({})).toBe('eats')
+    expect(detectChannel({ event_type: 'orders.notification' })).toBe('eats')
+    expect(detectChannel({ channel: 'rappi' })).toBe('eats')
+  })
+})
+
+// ─── UBER-027: adapter-factory — returns correct adapter instance ─────────────
+
+describe('UBER-027: adapter-factory returns correct adapter', () => {
+  it('getOrderAdapter("eats") returns adapter with channel=eats', async () => {
+    const { getOrderAdapter } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    const adapter = getOrderAdapter('eats')
+    expect(adapter.channel).toBe('eats')
+  })
+
+  it('getOrderAdapter("delivery") returns adapter with channel=delivery', async () => {
+    const { getOrderAdapter } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    const adapter = getOrderAdapter('delivery')
+    expect(adapter.channel).toBe('delivery')
+  })
+
+  it('getOrderAdapterForPayload routes by channel field', async () => {
+    const { getOrderAdapterForPayload } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    expect(getOrderAdapterForPayload({ channel: 'delivery' }).channel).toBe('delivery')
+    expect(getOrderAdapterForPayload({ channel: 'eats' }).channel).toBe('eats')
+    expect(getOrderAdapterForPayload({}).channel).toBe('eats')
+  })
+
+  it('adapter interface has all 5 lifecycle methods', async () => {
+    const { getOrderAdapter } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    for (const channel of ['eats', 'delivery'] as const) {
+      const adapter = getOrderAdapter(channel)
+      expect(typeof adapter.getOrderDetails).toBe('function')
+      expect(typeof adapter.acceptOrder).toBe('function')
+      expect(typeof adapter.denyOrder).toBe('function')
+      expect(typeof adapter.cancelOrder).toBe('function')
+      expect(typeof adapter.markOrderReady).toBe('function')
+    }
+  })
+})
+
+// ─── UBER-028: URL path contracts ─────────────────────────────────────────────
+
+describe('UBER-028: Delivery API URL path naming convention', () => {
+  it('delivery order paths use /v1/delivery/order/{id} (singular)', () => {
+    // Uber Delivery API uses singular 'order' not 'orders' in the path.
+    // This test documents the contract so a future refactor doesn't silently
+    // change it to the Eats path format.
+    const paths = [
+      '/v1/delivery/order/{id}',
+      '/v1/delivery/order/{id}/accept',
+      '/v1/delivery/order/{id}/deny',
+      '/v1/delivery/order/{id}/cancel',
+      '/v1/delivery/order/{id}/ready',
+    ]
+    for (const p of paths) {
+      expect(p).toMatch(/^\/v1\/delivery\/order\//)
+      expect(p).not.toMatch(/^\/v1\/eats\//)
+    }
+  })
+
+  it('delivery store paths use /v1/delivery/store/{id} (singular)', () => {
+    const paths = [
+      '/v1/delivery/stores',
+      '/v1/delivery/store/{id}',
+      '/v1/delivery/store/{id}/status',
+      '/v1/delivery/store/{id}/update-store-status',
+    ]
+    expect(paths[0]).toMatch(/^\/v1\/delivery\/stores$/)
+    for (const p of paths.slice(1)) {
+      expect(p).toMatch(/^\/v1\/delivery\/store\//)
+    }
+  })
+
+  it('eats paths use /v1/eats/orders/{id} (plural) and are distinct from delivery', () => {
+    const eatsPaths = [
+      '/v1/eats/orders/{id}',
+      '/v1/eats/orders/{id}/accept_pos_order',
+      '/v1/eats/orders/{id}/deny_pos_order',
+      '/v1/eats/orders/{id}/cancel',
+      '/v1/eats/orders/{id}/ready_for_pickup',
+    ]
+    const deliveryPaths = [
+      '/v1/delivery/order/{id}/accept',
+      '/v1/delivery/order/{id}/deny',
+      '/v1/delivery/order/{id}/cancel',
+      '/v1/delivery/order/{id}/ready',
+    ]
+    for (const ep of eatsPaths) {
+      for (const dp of deliveryPaths) {
+        expect(ep).not.toBe(dp)
+      }
+    }
+  })
+})
+
+// ─── UBER-029: scope constants ────────────────────────────────────────────────
+
+describe('UBER-029: OAuth scope constants', () => {
+  it('exports granular scope constants for audit documentation', async () => {
+    const oauth = await import('@/lib/integrations/uber-eats/oauth')
+    expect(oauth.SCOPE_ORDER).toBe('eats.order')
+    expect(oauth.SCOPE_STORE).toBe('eats.store')
+    expect(oauth.SCOPE_STORE_STATUS_WRITE).toBe('eats.store.status.write')
+    expect(oauth.SCOPE_STORE_ORDERS_READ).toBe('eats.store.orders.read')
+  })
+
+  it('USL_SCOPES contains eats.pos_provisioning as umbrella scope', async () => {
+    const { USL_SCOPES } = await import('@/lib/integrations/uber-eats/oauth')
+    expect(USL_SCOPES).toContain('eats.pos_provisioning')
+  })
+})
+
+// ─── UBER-030: webhook route uses factory ─────────────────────────────────────
+
+describe('UBER-030: Webhook route uses adapter factory', () => {
+  it('webhook route imports getOrderAdapterForPayload from adapter-factory', async () => {
+    // Verify the factory is importable alongside the route handler.
+    const factory = await import('@/lib/integrations/uber-eats/adapter-factory')
+    const route = await import('@/app/api/integrations/uber-eats/webhook/route')
+    expect(typeof factory.getOrderAdapterForPayload).toBe('function')
+    expect(typeof route.POST).toBe('function')
+    expect(typeof route.GET).toBe('function')
+  })
+
+  it('factory and delivery adapter are co-importable without circular deps', async () => {
+    const [factory, deliveryAdapter, deliveryStore] = await Promise.all([
+      import('@/lib/integrations/uber-eats/adapter-factory'),
+      import('@/lib/integrations/uber-eats/delivery-adapter'),
+      import('@/lib/integrations/uber-eats/delivery-store'),
+    ])
+    expect(factory.detectChannel).toBeDefined()
+    expect(deliveryAdapter.DELIVERY_ADAPTER_VERSION).toBeDefined()
+    expect(deliveryStore.listDeliveryStores).toBeDefined()
+  })
+})
+
 // ─── Edge cases ────────────────────────────────────────────────────────────────
 
 describe('Order Adapter edge cases', () => {

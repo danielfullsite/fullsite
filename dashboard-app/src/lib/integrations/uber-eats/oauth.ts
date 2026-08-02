@@ -25,9 +25,21 @@ export const getApiBase = (): string =>
     ? 'https://api.uber.com'
     : 'https://test-api.uber.com'
 
-// eats.pos_provisioning is the single approved scope for Eats Marketplace POS apps.
-// It covers order management, store management, and menu operations.
+// eats.pos_provisioning is the approved umbrella scope for Eats Marketplace POS apps.
+// It covers order management, store management, menu, and Delivery API operations.
+//
+// Granular scopes (for reference — granted as part of eats.pos_provisioning):
+//   eats.order                — read/write order lifecycle
+//   eats.store                — read store details
+//   eats.store.status.write   — update store open/closed status
+//   eats.store.orders.read    — read orders for a store
 export const USL_SCOPES = ['eats.pos_provisioning']
+
+// Explicit scope constants used for audit documentation and future scope negotiation.
+export const SCOPE_ORDER = 'eats.order'
+export const SCOPE_STORE = 'eats.store'
+export const SCOPE_STORE_STATUS_WRITE = 'eats.store.status.write'
+export const SCOPE_STORE_ORDERS_READ = 'eats.store.orders.read'
 
 interface CachedToken {
   token: string
