@@ -142,8 +142,8 @@ describe('getStationForItem', () => {
     expect(getStationForItem('postres', 'Cheesecake')).toBe('cocina')
   })
 
-  it('routes mkt-cafe to caja', () => {
-    expect(getStationForItem('mkt-cafe', 'Café en grano')).toBe('caja')
+  it('routes unknown slug with beverage name to barra (mkt-* slugs require client DB override)', () => {
+    expect(getStationForItem('mkt-cafe', 'Café en grano')).toBe('barra')
   })
 
   it('falls back to barra for unknown category with beverage name', () => {

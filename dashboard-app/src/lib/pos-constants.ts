@@ -103,9 +103,7 @@ export const STATION_CATEGORIES: Record<StationName, string[]> = {
     'vinos', 'cerveza', 'licores',
   ],
   caja: [
-    'icecream', 'desserts', 'mkt-cafe',
-    // Market consolidado Wansoft (junio 2026)
-    'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay',
+    'icecream', 'desserts',
   ],
 }
 

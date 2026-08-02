@@ -75,8 +75,7 @@ const REGISTRY: { [K in SettingKey]: SettingDefinition<SettingValue<K>> } = {
         'sodas', 'tea', 'alcohol', 'activaciones', 'vinos', 'cerveza', 'licores',
       ],
       caja: [
-        'icecream', 'desserts', 'mkt-cafe',
-        'mkt-healthy', 'mkt-vitaminas', 'mkt-regalos', 'mkt-amalay',
+        'icecream', 'desserts',
       ],
     } as Record<string, string[]>,
   },

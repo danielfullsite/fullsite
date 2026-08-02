@@ -4,8 +4,8 @@ import { getClientIdFromEmail, getClientConfig } from '@/lib/client-config'
 // ─── getClientIdFromEmail ────────────────────────────────────────────────
 
 describe('getClientIdFromEmail', () => {
-  it('maps ramonfaur.daniel@gmail.com to amalay', () => {
-    expect(getClientIdFromEmail('ramonfaur.daniel@gmail.com')).toBe('amalay')
+  it('returns empty string for ramonfaur.daniel@gmail.com (owner email not hardcoded)', () => {
+    expect(getClientIdFromEmail('ramonfaur.daniel@gmail.com')).toBe('')
   })
 
   it('maps demo@fullsite.mx to demo', () => {
@@ -47,20 +47,20 @@ describe('getClientConfig', () => {
       expect(config.id).toBe('amalay')
     })
 
-    it('has display_name', () => {
-      expect(config.display_name).toBe('AMALAY Coffee & Market')
+    it('has display_name falling back to id when no DB', () => {
+      expect(config.display_name).toBe('amalay')
     })
 
-    it('has city', () => {
-      expect(config.city).toBe('Monterrey, NL')
+    it('has empty city when no DB (no hardcoded fallback)', () => {
+      expect(config.city).toBe('')
     })
 
     it('has timezone', () => {
       expect(config.timezone).toBe('America/Mexico_City')
     })
 
-    it('has type', () => {
-      expect(config.type).toBe('Coffee & Market')
+    it('has empty type when no DB (no hardcoded fallback)', () => {
+      expect(config.type).toBe('')
     })
 
     it('has default_theme light', () => {
@@ -75,13 +75,13 @@ describe('getClientConfig', () => {
       expect(config.mesas).toBe(16)
     })
 
-    it('has meseros array', () => {
+    it('has empty meseros array when no DB (staff not hardcoded)', () => {
       expect(Array.isArray(config.meseros)).toBe(true)
-      expect(config.meseros.length).toBeGreaterThan(0)
+      expect(config.meseros.length).toBe(0)
     })
 
-    it('meseros includes Omar Aguilera', () => {
-      expect(config.meseros).toContain('Omar Aguilera')
+    it('meseros does not contain AMALAY-specific staff', () => {
+      expect(config.meseros).not.toContain('Omar Aguilera')
     })
 
     it('has IVA rate 0.16', () => {

@@ -35,7 +35,8 @@ export type UberChannel = 'eats' | 'delivery' | 'unknown'
 export interface OrderAdapter {
   readonly channel: UberChannel
   getOrderDetails(orderId: string, correlationId: string, storeId?: string): Promise<{ ok: boolean; order?: unknown; error?: string }>
-  acceptOrder(orderId: string, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
+  // minutesToReady only applies to the Eats channel; Delivery adapter ignores it
+  acceptOrder(orderId: string, correlationId: string, storeId?: string, minutesToReady?: number): Promise<{ ok: boolean; error?: string }>
   denyOrder(orderId: string, reason: UberDenyReason, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
   cancelOrder(orderId: string, reason: UberCancelReason, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
   markOrderReady(orderId: string, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>

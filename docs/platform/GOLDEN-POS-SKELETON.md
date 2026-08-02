@@ -621,21 +621,21 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 |---|---|---|
 | HC-04 — client-config.ts fallback map | D-01 | DONE (0bf9993) — extendido con demo config |
 | HC-05 — email hardcodeado a 'amalay' | D-02 | DONE (0bf9993) |
-| HC-06 — pos-config.ts slug fallback | **D-21** | OPEN |
+| HC-06 — pos-config.ts slug fallback | D-21 | DONE (d0836a1) |
 | HC-07 — cron route `\|\| 'amalay'` | D-18 | DONE (0bf9993) |
-| HC-08 — encuestas SSR fallback | **D-22** | OPEN |
+| HC-08 — encuestas SSR fallback | D-22 | DONE (d0836a1) |
 | HC-09 — Uber Eats OAuth fallback | D-17 | DONE (0bf9993) |
-| HC-10 / HC-14 — health wansoft check | **D-23** | OPEN |
-| HC-11 — prospect Telegram chat_id | **D-24** | OPEN |
-| HC-12 — CierreCaja ticket `<h2>AMALAY</h2>` | **D-25** | OPEN |
+| HC-10 / HC-14 — health wansoft check | D-23 | DONE (d0836a1) |
+| HC-11 — prospect Telegram chat_id | D-24 | DONE (d0836a1) |
+| HC-12 — CierreCaja ticket `<h2>AMALAY</h2>` | D-25 | DONE (d0836a1) |
 | HC-13 — pos-data.ts `if clientId === 'amalay'` | D-05 | DEFERRED |
-| HC-15 / HC-16 — FLOOR_TABLES + vista Plano gate | **D-26** | OPEN — P2 deferred (GAP-D OCS-P2.5.7) |
-| HC-17 — cocina routing keywords | D-03 | MIGRATION PENDING |
-| HC-18 — pos-constants MODIFIER_STRIP_PATTERNS | D-04 | MIGRATION PENDING |
-| HC-19 — lealtad `'AMALAY Rewards'` | **D-27** | OPEN |
-| HC-20 — OC WhatsApp template | **D-28** | OPEN |
+| HC-15 / HC-16 — FLOOR_TABLES + vista Plano gate | D-26 | OPEN — P2 deferred (GAP-D OCS-P2.5.7) |
+| HC-17 — cocina routing keywords | D-03 | DONE (M2 applied + mkt-* removed) |
+| HC-18 — pos-constants MODIFIER_STRIP_PATTERNS | D-04 | DONE (M2 applied + mkt-* removed) |
+| HC-19 — lealtad `'AMALAY Rewards'` | D-27 | DONE (d0836a1) |
+| HC-20 — OC WhatsApp template | D-28 | DONE (d0836a1) |
 | HC-21 — food-cost MARKET_KEYWORDS | D-05 | DEFERRED |
-| HC-22 — chat dish normalization map | **D-29** | OPEN |
+| HC-22 — chat dish normalization map | D-29 | DONE (d0836a1) |
 | HC-23 — PredictionWidget brunch pattern | **D-30** | OPEN |
 | HC-24 — wansoft tables sin client filter | **D-31** | OPEN (bloqueado por OCM) |
 | HC-25 — fingerprint URL hardcodeado | **D-32** | OPEN |
@@ -644,7 +644,7 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | HC-28 — Uber Eats sandbox store name | D-10 | OPEN |
 | HC-29 — email placeholder admin/usuarios | P3 — sin D-xx | No corrompe datos |
 | HC-30 — mission-control workflow name | P3 — sin D-xx | Cosmético de ops |
-| HC-31 — polizas RFC placeholder | **D-34** | OPEN |
+| HC-31 — polizas RFC placeholder | D-34 | DONE (d0836a1) |
 | HC-32 — WhatsApp demo pages | P3 — sin D-xx | Marketing, no del producto |
 | HC-33 — demo config datos AMALAY | D-01 | DONE (0bf9993) |
 | HC-34 — platillos AMALAY en pos-data.ts | D-05 | DEFERRED |
@@ -653,22 +653,22 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 
 **P3 (no D-xx, no bloquean smoke test):** HC-29, HC-30, HC-32, HC-35.
 
-### P1 Execution Progress (actualizado 2026-08-01)
+### P1 Execution Progress (actualizado 2026-08-02)
 
 | ID | Status | Commit | Pendiente |
 |---|---|---|---|
 | D-01 | DONE | 0bf9993 | — |
 | D-02 | DONE | 0bf9993 | — |
-| D-03 | MIGRATION PENDING | — | Run P1-D03 migration → then remove mkt-* from settings.ts |
-| D-04 | MIGRATION PENDING | — | Run P1-D03 migration → then remove mkt-* from pos-constants.ts |
+| D-03 | DONE | M2 (p1_d03_amalay_station_routing) + this commit | — |
+| D-04 | DONE | M2 (p1_d03_amalay_station_routing) + this commit | — |
 | D-05 | DEFERRED | — | Requiere menú desde DB (scope mayor) |
 | D-06 | DONE | 0bf9993 | — |
 | D-07 | DONE | 0bf9993 | — |
 | D-08 | DONE | 0bf9993 | — |
-| D-09 | MIGRATION PENDING | — | Run P1-D09 migration (69 tablas) |
+| D-09 | DONE | M3 (p1_d09_remove_client_id_defaults) — 72 tablas | — |
 | D-10 | OPEN | — | Requiere `integration_store_mappings` table + lookup logic |
 | D-11 | DONE | 0bf9993 | — |
-| D-12 | DONE | 0bf9993 + P1-D12 migration | Run P1-D12 migration para agregar `support_email` column |
+| D-12 | DONE | 0bf9993 + M1 (p1_d12_clients_support_email_plan) | — |
 | D-13 | DONE | 0bf9993 | — |
 | D-14 | DONE | 0bf9993 | — |
 | D-15 | DONE | b21dace | Agregar env vars a Cloudflare Worker deployment |
@@ -676,7 +676,7 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | D-17 | DONE | 0bf9993 | — |
 | D-18 | DONE | 0bf9993 | — |
 | D-19 | DONE | 0bf9993 | Env var `BACKUP_ADMIN_EMAILS` debe configurarse en Vercel |
-| D-20 | MIGRATION PENDING | — | Run P1-D20 migration (DROP TABLE amalay_reservaciones) |
+| D-20 | BLOCKED — out of critical path | — | Proyecto de migración de datos: migrar 23 filas → reservaciones, actualizar views/scripts, validar, luego DROP |
 | D-21 | DONE | d0836a1 | — |
 | D-22 | DONE | d0836a1 | — |
 | D-23 | DONE | d0836a1 | Pasar `?data_source=fullsite` al llamar desde cliente no-wansoft |
@@ -860,7 +860,7 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 
 ### Estimación revisada (2026-08-01)
 
-Estado post-commit 0bf9993: D-01/02/06/07/08/11/12/13/14/15/16/17/18/19 = DONE. D-03/04/09/20 = MIGRATION PENDING. D-05 = DEFERRED. D-10 = OPEN. D-21..D-34 = OPEN (audit 2026-08-01).
+Estado 2026-08-02: D-01/02/03/04/06/07/08/09/11/12/13/14/15/16/17/18/19/21/22/23/24/25/27/28/29/34 = DONE. D-20 = BLOCKED (datos vivos, proyecto de migración separado). D-05 = DEFERRED. D-10/26/30/31/32/33 = OPEN.
 
 | Sprint | Items | Estimado | Descripción |
 |---|---|---|---|
