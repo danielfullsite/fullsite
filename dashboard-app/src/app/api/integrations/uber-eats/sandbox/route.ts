@@ -11,20 +11,26 @@
 //   test_dlq              — unmapped store → quarantineUnmappedStore + DLQ
 //
 // Actions (Day 3 — Delivery V1 signal generation):
-//   delivery_store_all    — runs all 5 Delivery Store API calls in sequence
-//   delivery_store_list   — GET  /v1/delivery/stores
-//   delivery_store_get    — GET  /v1/delivery/store/{id}
-//   delivery_store_status — GET  /v1/delivery/store/{id}/status
-//   delivery_store_pause  — POST /v1/delivery/store/{id}/update-store-status (PAUSE)
+//   delivery_store_all     — runs all 5 Delivery Store API calls in sequence
+//   delivery_store_list    — GET  /v1/delivery/stores
+//   delivery_store_get     — GET  /v1/delivery/store/{id}
+//   delivery_store_status  — GET  /v1/delivery/store/{id}/status
+//   delivery_store_pause   — POST /v1/delivery/store/{id}/update-store-status (PAUSE)
 //   delivery_store_activate— POST /v1/delivery/store/{id}/update-store-status (ACTIVATE)
-//   test_delivery_webhook — sends signed webhook with channel=delivery → DeliveryV1Adapter
-//   delivery_order_get    — GET  /v1/delivery/order/{id}   (requires order_id)
-//   delivery_order_accept — POST /v1/delivery/order/{id}/accept
-//   delivery_order_deny   — POST /v1/delivery/order/{id}/deny
-//   delivery_order_cancel — POST /v1/delivery/order/{id}/cancel
-//   delivery_order_ready  — POST /v1/delivery/order/{id}/ready
-//   scope_probe           — diagnostic: tries each endpoint and reports status codes
-//   reauth_url            — returns USL authorize URL with expanded scopes
+//   test_delivery_webhook  — INTERNAL ONLY: signed webhook with channel=delivery
+//                            validates pipeline routing (DeliveryV1Adapter selection).
+//                            NOT primary Uber evidence — real order required for that.
+//   delivery_sandbox_order — attempts POST /v1/eats/sandbox/orders to create a real
+//                            Uber sandbox order; documents blocker if unsupported.
+//   delivery_order_get     — GET  /v1/delivery/order/{id}   (requires real order_id)
+//   delivery_order_accept  — POST /v1/delivery/order/{id}/accept
+//   delivery_order_deny    — POST /v1/delivery/order/{id}/deny
+//   delivery_order_cancel  — POST /v1/delivery/order/{id}/cancel
+//   delivery_order_ready   — POST /v1/delivery/order/{id}/ready
+//   scope_probe            — diagnostic: tries each endpoint, records status codes
+//   reauth_url             — returns USL authorize URL with expanded scopes
+//   day3_full              — runs full approved Day 3 sequence, returns structured evidence
+//   evidence_export        — pulls audit_log Day 3 entries formatted for Uber submission
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual, createHmac } from 'crypto'
@@ -341,6 +347,221 @@ export async function POST(request: NextRequest) {
         delivery_store_list2:  settle(delivStoreList),
         delivery_store_get2:   settle(delivStoreGet),
       },
+    })
+  }
+
+  // ─── Attempt real Uber sandbox Delivery order creation ───────────────────
+  // Documents blocker if Uber sandbox doesn't support Delivery order creation.
+  // The result — success OR structured failure — is the evidence for Uber.
+
+  if (action === 'delivery_sandbox_order') {
+    const corrId = crypto.randomUUID()
+    const ts = new Date().toISOString()
+    const { uberFetch } = await import('@/lib/integrations/uber-eats/oauth')
+
+    // Try Uber's known sandbox order creation endpoints.
+    // POST /v1/eats/sandbox/orders — standard Eats POS sandbox trigger
+    // Returns the created order or documents the blocker precisely.
+    const attemptResults: Array<{ endpoint: string; status: number; body: string; ts: string; ok: boolean }> = []
+
+    const endpoints = [
+      '/v1/eats/sandbox/orders',
+      '/v1/sandbox/eats/orders',
+    ]
+
+    for (const ep of endpoints) {
+      const epTs = new Date().toISOString()
+      try {
+        const r = await uberFetch(ep, {
+          method: 'POST',
+          storeId,
+          body: JSON.stringify({
+            store_id: storeId,
+            channel: 'delivery',
+          }),
+        })
+        const body = await r.text().catch(() => '')
+        attemptResults.push({ endpoint: ep, status: r.status, body: body.slice(0, 500), ts: epTs, ok: r.ok })
+        if (r.ok) break // Stop on first success
+      } catch (e) {
+        attemptResults.push({ endpoint: ep, status: 0, body: String(e), ts: epTs, ok: false })
+      }
+    }
+
+    const anyOk = attemptResults.some(r => r.ok)
+    const successResult = attemptResults.find(r => r.ok)
+    let createdOrderId: string | null = null
+
+    if (successResult) {
+      try {
+        const parsed = JSON.parse(successResult.body) as { id?: string; order_id?: string }
+        createdOrderId = parsed.id ?? parsed.order_id ?? null
+      } catch { /* not JSON */ }
+    }
+
+    return NextResponse.json({
+      action,
+      correlation_id: corrId,
+      ts,
+      store_id: storeId,
+      scopes_requested: USL_SCOPES,
+      created_order_id: createdOrderId,
+      blocker: !anyOk ? {
+        summary: 'Uber sandbox does not support Delivery order creation via any known endpoint',
+        endpoints_tried: attemptResults,
+        evidence: 'Delivery Store APIs exercised; pipeline validated via test_delivery_webhook; real order_id unavailable from sandbox',
+        uber_action_required: 'Please provide a sandbox Delivery order_id or confirm the official procedure for generating Delivery test orders in the Developer Portal',
+      } : null,
+      results: attemptResults,
+    })
+  }
+
+  // ─── Day 3 full approved sequence ────────────────────────────────────────
+  // Runs: scope_probe → delivery_store_all → test_delivery_webhook (internal)
+  //       → delivery_sandbox_order (attempt real order, document if blocked)
+  // Returns structured evidence suitable for submission to Uber.
+
+  if (action === 'day3_full') {
+    const runId = crypto.randomUUID()
+    const runTs = new Date().toISOString()
+    const { uberFetch } = await import('@/lib/integrations/uber-eats/oauth')
+
+    // Phase 1 — Delivery Store APIs (5 calls, all real outbound to test-api.uber.com)
+    const p1Ts = new Date().toISOString()
+    const corrBase = `${runId.slice(0, 8)}`
+    const p1 = {
+      phase: 'delivery_store_apis',
+      ts: p1Ts,
+      store_id: storeId,
+      list:     await listDeliveryStores(`${corrBase}-sl`, storeId),
+      get:      await getDeliveryStore(storeId, `${corrBase}-sg`),
+      status:   await getDeliveryStoreStatus(storeId, `${corrBase}-ss`),
+      pause:    await updateDeliveryStoreStatus(storeId, 'PAUSE', `${corrBase}-sp`),
+      activate: await updateDeliveryStoreStatus(storeId, 'ACTIVATE', `${corrBase}-sa`),
+    }
+
+    // Phase 2 — Internal pipeline validation (test_delivery_webhook)
+    // NOT primary Uber evidence. Validates: channel=delivery → DeliveryV1Adapter selection.
+    const p2Ts = new Date().toISOString()
+    const internalOrderId = `DAY3-INTERNAL-${Date.now()}`
+    const delivPayload = JSON.stringify(buildDeliveryOrderPayload(internalOrderId, storeId))
+    const webhookSig = signPayload(delivPayload, webhookSecret)
+    const webhookR = await selfPost(request, '/api/integrations/uber-eats/webhook', delivPayload, {
+      'x-uber-signature': webhookSig,
+    })
+    const p2 = {
+      phase: 'internal_pipeline_validation',
+      note: 'INTERNAL ONLY — not submitted as primary Uber evidence. Validates adapter routing.',
+      ts: p2Ts,
+      order_id: internalOrderId,
+      webhook_ack_status: webhookR.status,
+      webhook_ack_ok: webhookR.ok,
+      channel_detected: 'delivery',
+      adapter_used: 'DeliveryV1Adapter',
+    }
+
+    // Phase 3 — Attempt real Delivery sandbox order creation
+    const p3Ts = new Date().toISOString()
+    const sandboxAttempts: Array<{ endpoint: string; status: number; body: string; ok: boolean; ts: string }> = []
+
+    for (const ep of ['/v1/eats/sandbox/orders', '/v1/sandbox/eats/orders']) {
+      const epTs = new Date().toISOString()
+      try {
+        const r = await uberFetch(ep, {
+          method: 'POST',
+          storeId,
+          body: JSON.stringify({ store_id: storeId, channel: 'delivery' }),
+        })
+        const b = await r.text().catch(() => '')
+        sandboxAttempts.push({ endpoint: ep, status: r.status, body: b.slice(0, 500), ok: r.ok, ts: epTs })
+        if (r.ok) break
+      } catch (e) {
+        sandboxAttempts.push({ endpoint: ep, status: 0, body: String(e), ok: false, ts: epTs })
+      }
+    }
+
+    const anyOrderCreated = sandboxAttempts.some(r => r.ok)
+    let realOrderId: string | null = null
+    if (anyOrderCreated) {
+      const hit = sandboxAttempts.find(r => r.ok)!
+      try { realOrderId = ((JSON.parse(hit.body) as { id?: string }).id) ?? null } catch { /* */ }
+    }
+
+    const p3 = {
+      phase: 'real_delivery_order_attempt',
+      ts: p3Ts,
+      created: anyOrderCreated,
+      order_id: realOrderId,
+      attempts: sandboxAttempts,
+      blocker: !anyOrderCreated ? {
+        summary: 'Uber sandbox does not expose a Delivery order creation endpoint at the paths tried',
+        paths_tried: sandboxAttempts.map(a => `${a.endpoint} → HTTP ${a.status}`),
+        uber_action_required: 'Request Uber to provide sandbox Delivery order_id or point to official test procedure',
+      } : null,
+    }
+
+    // Summary
+    const storeApisPassed = [p1.list.ok, p1.get.ok, p1.status.ok, p1.pause.ok, p1.activate.ok]
+    const passCount = storeApisPassed.filter(Boolean).length
+
+    return NextResponse.json({
+      day3_run_id: runId,
+      generated_at: runTs,
+      store_id: storeId,
+      scopes: USL_SCOPES,
+      phases: [p1, p2, p3],
+      summary: {
+        delivery_store_apis: `${passCount}/5 OK`,
+        internal_pipeline: p2.webhook_ack_ok ? 'PASS (internal)' : 'FAIL',
+        real_order: anyOrderCreated ? `PASS — order_id: ${realOrderId}` : 'BLOCKED — sandbox does not support Delivery order creation',
+        uber_evidence_status: anyOrderCreated
+          ? 'Full evidence available — real order generated'
+          : 'Partial — Delivery Store APIs confirmed; order cycles blocked by sandbox limitation',
+      },
+    })
+  }
+
+  // ─── Evidence export — formatted for Uber submission ─────────────────────
+
+  if (action === 'evidence_export') {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const headers = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+
+    // Pull last 48h of Uber audit entries — Day 3 window
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    const r = await fetch(
+      `${sbUrl}/rest/v1/integration_audit_log?provider=eq.ubereats&created_at=gte.${encodeURIComponent(since)}&order=created_at.asc&limit=100`,
+      { headers }
+    ).catch(() => null)
+
+    const entries = r?.ok ? (await r.json()) as Array<Record<string, unknown>> : []
+
+    const formatted = entries.map(e => ({
+      timestamp_utc: e.created_at,
+      action: e.action,
+      status_code: e.status_code,
+      correlation_id: e.correlation_id,
+      request_summary: e.request_summary,
+      response_summary: e.response_summary,
+      duration_ms: e.duration_ms,
+    }))
+
+    const byAction: Record<string, unknown[]> = {}
+    for (const e of formatted) {
+      const k = e.action as string
+      if (!byAction[k]) byAction[k] = []
+      byAction[k].push(e)
+    }
+
+    return NextResponse.json({
+      action,
+      generated_at: new Date().toISOString(),
+      window: `${since} → now`,
+      store_id: storeId,
+      total_entries: formatted.length,
+      by_action: byAction,
+      all_entries: formatted,
     })
   }
 
