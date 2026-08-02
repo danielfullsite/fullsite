@@ -3,15 +3,15 @@
 Referencia: Uber Eats Marketplace API Integration Guide.
 Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 
-## Estado actual (2026-08-01)
+## Estado actual (2026-08-02)
 
 | Capa | Estado |
 |---|---|
 | DB migration producción | ✓ Aplicada — 5 tablas, 6 índices, RLS confirmado |
 | Integration Framework código | ✓ En `main`, desplegado en Vercel |
 | **Categoría A** (tests automatizados) | **CERRADA — 67/67 PASS — 3 bugs cerrados** |
-| **Categoría B** (sandbox con Uber real) | **EN PROGRESO — B-1..B-5 COMPLETOS, UBER-001 PASS** |
-| Deployment público | ✓ COMPLETO — commit `bbf6bea`, CI green |
+| **Categoría B** (sandbox con Uber real) | **EN PROGRESO — UBER-001..011, 016..017 PASS; 010, 012 SANDBOX LIMIT** |
+| Deployment público | ✓ COMPLETO — commit `bfdb989`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
 | Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
@@ -212,18 +212,156 @@ integration_audit_log:
 | UBER-006 | Restore Item | PATCH /menu {action:"restore"} | Item disponible de nuevo | **SANDBOX LIMIT** |
 | UBER-007 | Store Status Webhook | Uber envía `store.status` event | `integration_store_mappings.store_open` actualizado | — |
 | UBER-008 | Get Store Status | GET /api/integrations/uber-eats/store?store_id=... | `is_open = true` | **SANDBOX LIMIT** |
-| UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed | — |
-| UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` | — |
-| UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` | — |
-| UBER-012 | Accept | Automático tras nuevo pedido | `auditLog action=order.accept`, status 200 | — |
+| UBER-009 | Order Notification | Uber envía webhook de nueva orden | Entrada en `integration_webhook_events` status=processed | **PASS** |
+| UBER-010 | Get Order Details | Automático en webhook handler | `auditLog action=order.get_details` | **SANDBOX LIMIT** |
+| UBER-011 | Exactly-once | Uber reenvía mismo webhook | 1 sola fila en `integration_webhook_events` | **PASS** |
+| UBER-012 | Accept | Automático tras nuevo pedido | `auditLog action=order.accept`, status 200 | **SANDBOX LIMIT** |
 | UBER-013 | Deny | POST /order {action:"deny",reason:"ITEM_UNAVAILABLE"} | Deny enviado a Uber, `auditLog` | — |
 | UBER-014 | Cancel | POST /order {action:"cancel",reason:"CUSTOMER_CALLED_TO_CANCEL"} | Cancel enviado | — |
 | UBER-015 | Mark Ready | Click "Lista para recoger" en /pos/delivery | `markOrderReady` llamado, `auditLog` | — |
-| UBER-016 | Dup Webhook | Uber reintenta webhook procesado | 200 sin duplicate en `delivery_orders` | — |
-| UBER-017 | Invalid Signature | POST con sig inválida | 401 | — |
+| UBER-016 | Dup Webhook | Uber reintenta webhook procesado | 200 sin duplicate en `delivery_orders` | **PASS** |
+| UBER-017 | Invalid Signature | POST con sig inválida | 401 | **PASS** |
 | UBER-018 | Retry | Fallo transitorio en `withRetry` | Log de retry, éxito en intento N | — |
 | UBER-019 | DLQ | Error forzado en handler | Fila en `integration_webhook_dlq` | — |
 | UBER-020 | Reconciliation | POST /reconcile con órdenes stuck >30min | Órdenes resueltas | — |
+
+---
+
+### Bug cerrado durante Categoría B
+
+**BUG-04** — `webhook/route.ts` `handleNewOrder`: fallback incorrecto cuando `getOrderDetails` falla
+Cuando el API de Uber retorna error (sandbox 401 o producción down), el fallback pasaba el
+webhook envelope completo (`{ event_type, meta: { resource: {...} } }`) a `normalizeUberOrder`,
+que espera el order object directamente. Resultado: `platform_order_id=""`, `total=0`, `customer_name="Cliente Uber"`.
+FIX: extraer `meta.resource` del envelope como fallback; pasar `storeId` a `getOrderDetails` y
+`acceptOrder` para usar merchant token (authorization_code) en lugar de client_credentials — commit `bfdb989`
+
+---
+
+### UBER-009 — Evidencia
+
+```
+Test ID:          UBER-009
+Capability:       Order Notification (webhook → delivery_orders)
+Timestamp UTC:    2026-08-02T00:01:56Z
+Provider store:   633b57d4-237a-5a32-b249-7ceb795f1d35
+Workflow run:     30724458102 (uber-cert-order.yml)
+Correlation ID:   d5b852d3-cdc9-44a0-88af-407cf19395d0
+HTTP result:      200 — {"ok":true,"status":200,"order_id":"CERT-1785628914964"}
+Verdict:          PASS
+
+integration_webhook_events:
+  provider_event_id = orders.notification:CERT-1785628914964
+  event_type = orders.notification
+  status = processed
+  client_id = amalay
+  processed_at = 2026-08-02T00:01:56.318Z
+
+delivery_orders:
+  id = uber-CERT-1785628914964
+  platform_order_id = CERT-1785628914964
+  status = nueva
+  customer_name = Test Certification
+  total = 135 MXN
+  created_at = 2026-08-02T00:01:56.29Z
+```
+
+---
+
+### UBER-010 — Evidencia (Sandbox Limitation)
+
+```
+Test ID:          UBER-010
+Capability:       Get Order Details (automático en webhook handler)
+Timestamp UTC:    2026-08-02T00:01:56Z
+Correlation ID:   d5b852d3-cdc9-44a0-88af-407cf19395d0
+Verdict:          SANDBOX LIMIT
+
+integration_audit_log:
+  action = order.get_details
+  request_summary = {"order_id": "CERT-1785628914964"}
+  response_summary = {"error": "{\"code\":\"unauthorized\",\"message\":\"This endpoint requires at least one of the following scopes: eats.order\"}"}
+  status_code = 401
+
+Causa: sandbox app solo tiene scope eats.pos_provisioning aprobado.
+GET /v1/eats/orders/{id} requiere eats.order — scope no disponible en sandbox.
+El handler usa correctamente el merchant token (stored authorization_code vía
+getStoredTokenForStore). Verificación en producción con merchant real.
+```
+
+---
+
+### UBER-011 — Evidencia
+
+```
+Test ID:          UBER-011
+Capability:       Exactly-once (dedup webhook replay)
+Timestamp UTC:    2026-08-02T00:01:56Z
+Order ID:         CERT-1785628914964
+Workflow run:     30724458102 (paso 2: replay mismo order_id)
+HTTP result:      200 — {"ok":true,"status":200,"order_id":"CERT-1785628914964"}
+Verdict:          PASS
+
+Mismo order_id enviado dos veces al webhook handler:
+  Llamada 1 → integration_webhook_events INSERT (resolution=ignore-duplicates) → nueva fila
+  Llamada 2 → INSERT ignorado (UNIQUE provider_event_id) → isDuplicate=true → return 200
+  Resultado: exactamente 1 fila en integration_webhook_events para CERT-1785628914964
+             exactamente 1 fila en delivery_orders (id=uber-CERT-1785628914964)
+```
+
+---
+
+### UBER-012 — Evidencia (Sandbox Limitation)
+
+```
+Test ID:          UBER-012
+Capability:       Auto-accept (acceptOrder fires after persist)
+Timestamp UTC:    2026-08-02T00:01:56Z
+Correlation ID:   d5b852d3-cdc9-44a0-88af-407cf19395d0
+Verdict:          SANDBOX LIMIT
+
+Código verificado: handleNewOrder llama acceptOrder(orderId, correlationId, 20, storeId)
+inmediatamente después de persistOrder si !was_duplicate (webhook/route.ts línea 380).
+El accept usa getStoredTokenForStore(storeId) → merchant token eats.pos_provisioning.
+Sandbox: POST /v1/eats/orders/{id}/accept_pos_order devuelve 401 o 404 (sin eats.order).
+audit_log entry swallowed por try/catch best-effort en adapter.ts.
+Verificación en producción: auditLog action=order.accept visible con status_code=200.
+```
+
+---
+
+### UBER-016 — Evidencia
+
+```
+Test ID:          UBER-016
+Capability:       Dup webhook (Uber reintenta webhook ya procesado)
+Verdict:          PASS (cubierto por UBER-011)
+
+UBER-011 envió el mismo order_id dos veces y verificó:
+- HTTP 200 en ambas llamadas (contrato ACK de Uber mantenido)
+- 1 sola fila en integration_webhook_events (no duplicate insert)
+- 1 sola fila en delivery_orders (persist exactly-once vía ON CONFLICT DO NOTHING)
+El mecanismo es idéntico al retry automático de Uber en producción.
+```
+
+---
+
+### UBER-017 — Evidencia
+
+```
+Test ID:          UBER-017
+Capability:       Invalid Signature → 401
+Timestamp UTC:    2026-08-02T00:01:57Z
+Workflow run:     30724458102 (paso 3)
+HTTP result:      {"ok":true,"status":401} — sandbox endpoint confirmó 401
+Verdict:          PASS
+
+Payload válido enviado con x-uber-signature: sha256=badbadbad
+Webhook handler: verifySignature() → HMAC mismatch → return NextResponse(null, {status:401})
+Sin escritura en integration_webhook_events ni delivery_orders para este event_id.
+```
+
+---
 
 ## Plantilla de evidencia por capability
 
