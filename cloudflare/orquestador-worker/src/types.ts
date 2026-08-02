@@ -7,6 +7,12 @@ export interface Env {
   CHAT_ID_DANIEL: string;
   CHAT_ID_MONICA: string;
   CHAT_ID_RAUL: string;
+  // Per-client restaurant context — set in Cloudflare Worker env vars
+  RESTAURANT_NAME: string;
+  RESTAURANT_LOCATION: string;
+  BUSINESS_CONTEXT: string;
+  STAFF_CONTEXT?: string;
+  EXCLUDE_FROM_RANKING?: string;
   // Legacy — no se usa pero no rompe nada
   GITHUB_TOKEN?: string;
 }
