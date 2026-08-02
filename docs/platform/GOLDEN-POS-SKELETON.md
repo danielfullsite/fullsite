@@ -636,12 +636,12 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | HC-20 — OC WhatsApp template | D-28 | DONE (d0836a1) |
 | HC-21 — food-cost MARKET_KEYWORDS | D-05 | DEFERRED |
 | HC-22 — chat dish normalization map | D-29 | DONE (d0836a1) |
-| HC-23 — PredictionWidget brunch pattern | **D-30** | OPEN |
+| HC-23 — PredictionWidget brunch pattern | D-30 | DONE (0fe81a8) |
 | HC-24 — wansoft tables sin client filter | **D-31** | OPEN (bloqueado por OCM) |
-| HC-25 — fingerprint URL hardcodeado | **D-32** | OPEN |
+| HC-25 — fingerprint URL hardcodeado | D-32 | DONE (e2b36d8) |
 | HC-26 — dashboard category alias | D-05 | DEFERRED |
-| HC-27 — reservar page hardcodeada | **D-33** | OPEN |
-| HC-28 — Uber Eats sandbox store name | D-10 | OPEN |
+| HC-27 — reservar page hardcodeada | **D-33** | OPEN — Sprint 4 (reservación_spaces no existe) |
+| HC-28 — Uber Eats sandbox store name | D-10 | DONE — D-10A (c28971b); D-10B pendiente onboarding |
 | HC-29 — email placeholder admin/usuarios | P3 — sin D-xx | No corrompe datos |
 | HC-30 — mission-control workflow name | P3 — sin D-xx | Cosmético de ops |
 | HC-31 — polizas RFC placeholder | D-34 | DONE (d0836a1) |
@@ -666,7 +666,7 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | D-07 | DONE | 0bf9993 | — |
 | D-08 | DONE | 0bf9993 | — |
 | D-09 | DONE | M3 (p1_d09_remove_client_id_defaults) — 72 tablas | — |
-| D-10 | OPEN | — | Requiere `integration_store_mappings` table + lookup logic |
+| D-10A | DONE | M4 (p1_d10a_integration_store_mappings) + c28971b | D-10B: seed por proveedor al recibir IDs oficiales |
 | D-11 | DONE | 0bf9993 | — |
 | D-12 | DONE | 0bf9993 + M1 (p1_d12_clients_support_email_plan) | — |
 | D-13 | DONE | 0bf9993 | — |
@@ -686,10 +686,10 @@ Mapeo completo de hallazgos del audit contra el Debt Registry. Cada HC queda abs
 | D-28 | DONE | d0836a1 | — |
 | D-29 | DONE | d0836a1 | — |
 | D-34 | DONE | d0836a1 | — |
-| D-30 | OPEN | — | Sprint 2 |
-| D-31 | OPEN — bloqueado por OCM | — | Sprint 2 (requiere OCM v0.1) |
-| D-32 | OPEN | — | Sprint 2 |
-| D-33 | OPEN | — | Sprint 2 (refactor feature reservaciones) |
+| D-30 | DONE | 0fe81a8 | — |
+| D-31 | OPEN — bloqueado por OCM | — | Sprint 4 (requiere OCM v0.1) |
+| D-32 | DONE | e2b36d8 | — |
+| D-33 | OPEN — Sprint 4 | — | Requiere DDL `reservation_spaces` (no existe en repo) |
 | D-26 | OPEN — deferred P2 | — | Requiere DB design `pos_floor_plans` |
 
 ---
@@ -860,7 +860,7 @@ Ordered by impact/effort ratio. Steps 1–4 unlock the second client. Steps 5–
 
 ### Estimación revisada (2026-08-01)
 
-Estado 2026-08-02: D-01/02/03/04/06/07/08/09/11/12/13/14/15/16/17/18/19/21/22/23/24/25/27/28/29/34 = DONE. D-20 = BLOCKED (datos vivos, proyecto de migración separado). D-05 = DEFERRED. D-10/26/30/31/32/33 = OPEN.
+Estado 2026-08-02: D-01/02/03/04/06/07/08/09/10A/11/12/13/14/15/16/17/18/19/21/22/23/24/25/27/28/29/30/32/34 = DONE. D-20 = BLOCKED (datos vivos). D-05 = DEFERRED. D-10B/26/31/33 = OPEN (Sprint 4 o pending onboarding).
 
 | Sprint | Items | Estimado | Descripción |
 |---|---|---|---|
