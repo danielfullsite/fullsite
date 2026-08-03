@@ -27,6 +27,7 @@
 | v0.1 | 2026-08-01 | Diseño inicial con polling como mecanismo primario |
 | v0.2 | 2026-08-02 | **Arquitectura invertida:** webhooks push como primario, polling solo como reconciliación. Firma Rappi-Signature descubierta. Host México corregido. TTL corregido. Reutilización recalculada: 62% → ~68%. |
 | v0.2.1 | 2026-08-02 | Estado actualizado a `WAITING_EXTERNAL`. Correo de onboarding enviado. Workstream congelado. |
+| v0.2.2 | 2026-08-03 | **Partners dashboard + doc pública:** storeId confirmado `MX1930030014`, brandId `MX491066`. Auth header corregido: `x-authorization: bearer` (NO `Authorization: Bearer`). Secreto webhook: Rappi lo devuelve en `POST webhook` response. Token TTL: 86400s (24h, no 1 semana). Precios en centavos confirmado por muestras de payload. ECRs reducidos de 5 a 2. |
 
 ---
 

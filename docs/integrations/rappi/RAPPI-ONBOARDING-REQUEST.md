@@ -166,14 +166,14 @@ Marcar cuando se reciba confirmación escrita:
 
 - [ ] `RAPPI_CLIENT_ID` recibido
 - [ ] `RAPPI_CLIENT_SECRET` recibido
-- [ ] `storeId` de AMALAY confirmado
-- [ ] Formato de `Rappi-Signature` documentado oficialmente
-- [ ] String firmado para HMAC confirmado
-- [ ] Secreto HMAC recibido
-- [ ] URL/método del PING confirmado
-- [ ] Payload de ejemplo de orden recibido
-- [ ] Unidad monetaria (MXN o centavos) confirmada
-- [ ] Semántica del polling (destructivo o no) confirmada
-- [ ] Sandbox disponible (sí/no)
+- [x] `storeId` de AMALAY confirmado — `MX1930030014` (brandId: `MX491066`) — extraído de URL partners.rappi.com 2026-08-03
+- [ ] Formato de `Rappi-Signature` documentado oficialmente — **ECR ABIERTO** (no en doc pública)
+- [x] String firmado para HMAC: pendiente, pero secreto lo da Rappi en respuesta `POST webhook` — confirmado por doc pública
+- [x] Secreto HMAC: Rappi lo devuelve en `POST /webhook` response campo `secret` — confirmado
+- [ ] URL/método del PING confirmado — **ECR ABIERTO** (no en doc pública)
+- [x] Payload de ejemplo de orden recibido — disponible en doc pública `GET /orders`
+- [x] Unidad monetaria: **centavos** — confirmado por muestras de payload (28900 = $289 MXN)
+- [x] Semántica del polling: `GET /orders` devuelve órdenes "nuevas" (persisten hasta ser tomadas/rechazadas) — confirmado por doc pública
+- [ ] Sandbox disponible: dev domain `microservices.dev.rappi.com` + `rests-integrations-dev.auth0.com` — credenciales dev separadas, pendiente confirmar
 
 **Cuando todos estén marcados → abrir RAPPI-001.**
