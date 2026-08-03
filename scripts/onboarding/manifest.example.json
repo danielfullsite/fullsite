@@ -1,0 +1,22 @@
+{
+  "_comment": "Manifest de onboarding — copiar y renombrar a manifest-<cliente>.json",
+
+  "client_id":    "grupo-galeria-dunkin",
+  "name":         "Dunkin' Donuts Galería",
+  "owner_email":  "gerente@dunkin-galeria.com",
+  "confirm_ref":  "<supabase-project-ref>",
+  "template":     "cafe",
+
+  "city":         "Monterrey",
+  "timezone":     "America/Monterrey",
+
+  "menu_csv":     "menus/dunkin-menu.csv",
+  "staff_csv":    "staff/dunkin-staff.csv",
+
+  "vercel_project": "fullsite-dunkin",
+  "github_repo":    "ramonfaurdaniel-png/fullsite",
+
+  "subdomain":    "dunkin",
+  "cf_zone_id":   "<cloudflare-zone-id>",
+  "dns_verify":   true
+}
