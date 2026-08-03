@@ -35,7 +35,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 14 * * 1'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
@@ -45,7 +45,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 15 * * 1'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
@@ -55,7 +55,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 3'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
@@ -65,7 +65,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 4'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
@@ -75,7 +75,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * 5'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
@@ -85,7 +85,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 23 * * 5'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: { python-version: '3.11' }
       - run: pip install requests
