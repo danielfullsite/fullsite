@@ -28,13 +28,14 @@ export const getApiBase = (): string =>
 // USL_SCOPES — all scopes required for POS + Delivery API certification.
 //
 // eats.pos_provisioning — store provisioning, menu, accept_pos_order, ready_for_pickup
+// eats.store            — GET /v1/delivery/store/{id}, GET /v1/delivery/store/{id}/status
+//                         (REQUIRED — scope_probe returned 401 "requires eats.store" on 2026-08-02)
 // eats.order            — order GET, deny_pos_order, cancel (REQUIRED, not in pos_provisioning)
 // eats.deliveries       — Delivery API order operations (/v1/delivery/order/...)
 //
-// Evidence: sandbox returned 401 "requires eats.order" on deny/cancel/get_details
-// with the previous pos_provisioning-only token (2026-08-02 audit log).
-// Re-running USL flow after this change grants the merchant the expanded scopes.
-export const USL_SCOPES = ['eats.pos_provisioning', 'eats.order', 'eats.deliveries']
+// Evidence: scope_probe 2026-08-02 (corr 175692b0) — eats.store missing caused
+// delivery_store_get + delivery_store_status to 401 even after first re-auth.
+export const USL_SCOPES = ['eats.pos_provisioning', 'eats.store', 'eats.order', 'eats.deliveries']
 
 // Explicit scope constants used for audit documentation.
 export const SCOPE_ORDER = 'eats.order'

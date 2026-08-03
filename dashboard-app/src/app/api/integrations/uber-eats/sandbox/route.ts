@@ -318,34 +318,69 @@ export async function POST(request: NextRequest) {
   }
 
   // ─── Diagnostic: scope probe ──────────────────────────────────────────────
+  // Reports: scopes_requested (USL_SCOPES constant), scopes_granted (from DB —
+  // what Uber actually returned during OAuth), delta (requested but NOT granted).
+  // If delta is non-empty, Uber filtered those scopes — requires Developer Dashboard
+  // approval before re-auth will include them.
 
   if (action === 'scope_probe') {
-    // Probes each scope-gated endpoint with the current USL token.
-    // Reports status codes so we know exactly what's covered by eats.pos_provisioning.
     const corrId = crypto.randomUUID()
+    const ts = new Date().toISOString()
+
+    // Fetch what Uber actually granted during the last OAuth flow
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    let scopesGranted: string[] = []
+    let tokenExpiresAt: string | null = null
+    let scopeSource = 'db'
+    try {
+      const dbR = await fetch(
+        `${sbUrl}/rest/v1/integration_providers?provider=eq.ubereats&provider_account_id=eq.${encodeURIComponent(storeId)}&select=scopes,token_expires_at&limit=1`,
+        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+      )
+      if (dbR.ok) {
+        const rows = (await dbR.json()) as Array<{ scopes: string[]; token_expires_at: string }>
+        if (rows.length) {
+          scopesGranted = rows[0].scopes ?? []
+          tokenExpiresAt = rows[0].token_expires_at ?? null
+        }
+      }
+    } catch { scopeSource = 'db_error' }
+
+    const scopesDelta = USL_SCOPES.filter(s => !scopesGranted.includes(s))
+
+    // Probe each scope-gated endpoint with the current USL token
     const probeOrderId = 'SCOPE-PROBE-NOOP'
-    const [storeList, storeGet, storeStatus, orderGet, delivStoreList, delivStoreGet] = await Promise.allSettled([
+    const [storeList, storeGet, storeStatus, orderGet] = await Promise.allSettled([
       listDeliveryStores(`${corrId}-ds-list`, storeId),
       getDeliveryStore(storeId, `${corrId}-ds-get`),
       getDeliveryStoreStatus(storeId, `${corrId}-ds-status`),
       getDeliveryOrderDetails(probeOrderId, `${corrId}-do-get`, storeId),
-      listDeliveryStores(`${corrId}-dl-list`, storeId),
-      getDeliveryStore(storeId, `${corrId}-dl-get`),
     ])
     const settle = (r: PromiseSettledResult<unknown>) =>
       r.status === 'fulfilled' ? r.value : { ok: false, error: String(r.reason) }
+
+    const scopeBlocker = scopesDelta.length > 0 ? {
+      summary: 'Uber granted fewer scopes than requested — Developer Dashboard approval required',
+      missing_scopes: scopesDelta,
+      uber_action_required: `Enable these scopes for the application in Uber Developer Dashboard (developer.uber.com): ${scopesDelta.join(', ')}. Then re-run re-auth.`,
+    } : null
+
     return NextResponse.json({
       action,
       correlation_id: corrId,
-      ts: new Date().toISOString(),
+      ts,
       scopes_requested: USL_SCOPES,
+      scopes_granted: scopesGranted,
+      scopes_delta: scopesDelta,
+      scope_source: scopeSource,
+      token_expires_at: tokenExpiresAt,
+      scope_blocker: scopeBlocker,
       probe: {
         delivery_store_list:   settle(storeList),
         delivery_store_get:    settle(storeGet),
         delivery_store_status: settle(storeStatus),
         delivery_order_get:    settle(orderGet),
-        delivery_store_list2:  settle(delivStoreList),
-        delivery_store_get2:   settle(delivStoreGet),
       },
     })
   }
