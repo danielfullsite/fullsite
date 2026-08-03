@@ -1,4 +1,4 @@
-name: UBER Day 3 — Scope Probe + Delivery APIs + Fresh Evidence
+name: UBER Day 3 - Scope Probe + Delivery APIs + Fresh Evidence
 
 on:
   workflow_dispatch:
@@ -12,16 +12,16 @@ jobs:
       CERT_STORE_ID: 633b57d4-237a-5a32-b249-7ceb795f1d35
 
     steps:
-      - name: D3-001 — Health check (deploy Ready)
+      - name: D3-001 - Health check (deploy Ready)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" "$APP_URL/api/integrations/uber-eats/webhook")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
-          echo "D3-001 health: HTTP $HTTP_CODE — $BODY"
+          echo "D3-001 health: HTTP $HTTP_CODE - $BODY"
           echo "D3001_HTTP=$HTTP_CODE" >> $GITHUB_ENV
           echo "D3001_BODY=$BODY" >> $GITHUB_ENV
 
-      - name: D3-002 — Scope probe (granted vs requested delta)
+      - name: D3-002 - Scope probe (granted vs requested delta)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
@@ -31,21 +31,18 @@ jobs:
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "D3-002 scope_probe: HTTP $HTTP_CODE"
-          echo "$BODY" | python3 -c "
-import sys,json
-try:
-  d=json.load(sys.stdin)
-  print('scopes_granted:', d.get('scopes_granted'))
-  print('scopes_delta:', d.get('scopes_delta'))
-  b=d.get('scope_blocker')
-  if b: print('BLOCKER:', b.get('summary'))
-  print('corr_id:', d.get('correlation_id'))
-except: print('parse error:', sys.stdin.read())
-" 2>/dev/null || true
+          GRANTED=$(echo "$BODY" | jq -r '.scopes_granted // [] | join(", ")' 2>/dev/null || echo "?")
+          DELTA=$(echo "$BODY" | jq -r '.scopes_delta // [] | join(", ")' 2>/dev/null || echo "?")
+          CORR=$(echo "$BODY" | jq -r '.correlation_id // "?"' 2>/dev/null || echo "?")
+          echo "  scopes_granted: $GRANTED"
+          echo "  scopes_delta:   $DELTA"
+          echo "  correlation_id: $CORR"
           echo "D3002_HTTP=$HTTP_CODE" >> $GITHUB_ENV
-          echo "D3002_BODY=$BODY" >> $GITHUB_ENV
+          echo "D3002_GRANTED=$GRANTED" >> $GITHUB_ENV
+          echo "D3002_DELTA=$DELTA" >> $GITHUB_ENV
+          echo "D3002_CORR=$CORR" >> $GITHUB_ENV
 
-      - name: D3-003 — Re-auth URL (USL with expanded scopes)
+      - name: D3-003 - Re-auth URL (USL with expanded scopes)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
@@ -53,10 +50,10 @@ except: print('parse error:', sys.stdin.read())
             -H "Content-Type: application/json" \
             -d "{\"action\":\"reauth_url\",\"store_id\":\"$CERT_STORE_ID\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
-          echo "D3-003 reauth_url: HTTP $HTTP_CODE (URL not logged — contains secrets)"
+          echo "D3-003 reauth_url: HTTP $HTTP_CODE (URL omitted - contains secrets)"
           echo "D3003_HTTP=$HTTP_CODE" >> $GITHUB_ENV
 
-      - name: D3-004 — Delivery Store APIs (day3_full — phases 1+2)
+      - name: D3-004 - Delivery Store APIs + real order attempt (day3_full)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
@@ -66,22 +63,22 @@ except: print('parse error:', sys.stdin.read())
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "D3-004 day3_full: HTTP $HTTP_CODE"
-          echo "$BODY" | python3 -c "
-import sys,json
-try:
-  d=json.load(sys.stdin)
-  s=d.get('summary',{})
-  print('delivery_store_apis:', s.get('delivery_store_apis'))
-  print('internal_pipeline:', s.get('internal_pipeline'))
-  print('real_order:', s.get('real_order'))
-  print('uber_evidence_status:', s.get('uber_evidence_status'))
-  print('day3_run_id:', d.get('day3_run_id'))
-except: print(sys.stdin.read()[:500])
-" 2>/dev/null || true
+          STORE_APIS=$(echo "$BODY" | jq -r '.summary.delivery_store_apis // "?"' 2>/dev/null || echo "?")
+          PIPELINE=$(echo "$BODY" | jq -r '.summary.internal_pipeline // "?"' 2>/dev/null || echo "?")
+          REAL_ORDER=$(echo "$BODY" | jq -r '.summary.real_order // "?"' 2>/dev/null || echo "?")
+          EVIDENCE=$(echo "$BODY" | jq -r '.summary.uber_evidence_status // "?"' 2>/dev/null || echo "?")
+          RUN_ID=$(echo "$BODY" | jq -r '.day3_run_id // "?"' 2>/dev/null || echo "?")
+          echo "  delivery_store_apis: $STORE_APIS"
+          echo "  internal_pipeline:   $PIPELINE"
+          echo "  real_order:          $REAL_ORDER"
+          echo "  uber_evidence_status: $EVIDENCE"
+          echo "  day3_run_id: $RUN_ID"
           echo "D3004_HTTP=$HTTP_CODE" >> $GITHUB_ENV
-          echo "D3004_BODY=$BODY" >> $GITHUB_ENV
+          echo "D3004_STORE_APIS=$STORE_APIS" >> $GITHUB_ENV
+          echo "D3004_REAL_ORDER=$REAL_ORDER" >> $GITHUB_ENV
+          echo "D3004_RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-      - name: D3-005 — Evidence export (last 48h audit log)
+      - name: D3-005 - Evidence export (last 48h audit log)
         run: |
           RESP=$(curl -s -w "\n%{http_code}" -X POST \
             "$APP_URL/api/integrations/uber-eats/sandbox" \
@@ -90,19 +87,15 @@ except: print(sys.stdin.read()[:500])
             -d "{\"action\":\"evidence_export\",\"store_id\":\"$CERT_STORE_ID\"}")
           HTTP_CODE=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
+          ENTRIES=$(echo "$BODY" | jq -r '.total_entries // 0' 2>/dev/null || echo "?")
+          WINDOW=$(echo "$BODY" | jq -r '.window // "?"' 2>/dev/null || echo "?")
+          ACTIONS=$(echo "$BODY" | jq -r '.by_action | keys | join(", ")' 2>/dev/null || echo "?")
           echo "D3-005 evidence_export: HTTP $HTTP_CODE"
-          echo "$BODY" | python3 -c "
-import sys,json
-try:
-  d=json.load(sys.stdin)
-  print('total_entries:', d.get('total_entries'))
-  print('window:', d.get('window'))
-  print('actions_found:', list(d.get('by_action',{}).keys()))
-except: print(sys.stdin.read()[:300])
-" 2>/dev/null || true
+          echo "  total_entries: $ENTRIES"
+          echo "  window: $WINDOW"
+          echo "  actions: $ACTIONS"
           echo "D3005_HTTP=$HTTP_CODE" >> $GITHUB_ENV
-          ENTRY_COUNT=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_entries',0))" 2>/dev/null || echo "?")
-          echo "D3005_ENTRY_COUNT=$ENTRY_COUNT" >> $GITHUB_ENV
+          echo "D3005_ENTRIES=$ENTRIES" >> $GITHUB_ENV
 
       - name: Notify Telegram
         if: always()
@@ -110,12 +103,18 @@ except: print(sys.stdin.read()[:300])
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
         run: |
-          MSG="*UBER Day 3 — Scope Probe %2B Delivery APIs %2B Evidence*%0A%0A"
+          MSG="*UBER Day 3 - Scope Probe %2B Delivery APIs*%0A%0A"
           MSG="${MSG}D3-001 health: $D3001_HTTP $D3001_BODY%0A"
           MSG="${MSG}D3-002 scope_probe: $D3002_HTTP%0A"
+          MSG="${MSG}  granted: $D3002_GRANTED%0A"
+          MSG="${MSG}  delta: $D3002_DELTA%0A"
+          MSG="${MSG}  corr: $D3002_CORR%0A"
           MSG="${MSG}D3-003 reauth_url: $D3003_HTTP%0A"
           MSG="${MSG}D3-004 day3_full: $D3004_HTTP%0A"
-          MSG="${MSG}D3-005 evidence_export: $D3005_HTTP ($D3005_ENTRY_COUNT entries)%0A%0A"
-          MSG="${MSG}Ticket: %23D5FEA8 — NO certified hasta respuesta Uber"
+          MSG="${MSG}  store_apis: $D3004_STORE_APIS%0A"
+          MSG="${MSG}  real_order: $D3004_REAL_ORDER%0A"
+          MSG="${MSG}  run_id: $D3004_RUN_ID%0A"
+          MSG="${MSG}D3-005 evidence: $D3005_HTTP ($D3005_ENTRIES entries)%0A%0A"
+          MSG="${MSG}Ticket: %23D5FEA8 - NO certified hasta respuesta Uber"
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d "chat_id=$TELEGRAM_CHAT_ID&text=$MSG&parse_mode=Markdown" > /dev/null
