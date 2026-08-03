@@ -127,6 +127,19 @@ def anon_get(table: str, params: dict = None) -> tuple[int, list]:
     return r.status_code, (r.json() if r.status_code < 500 else [])
 
 
+def denied(code: int, data) -> bool:
+    """True when access is correctly denied.
+
+    Accepts either:
+    - 401/403 (table-level REVOKE, no SELECT grant)
+    - 200 + empty result set (RLS silently filters all rows)
+    Both are valid outcomes depending on whether REVOKE or RLS-only was applied.
+    """
+    if code in (401, 403):
+        return True
+    return code == 200 and isinstance(data, list) and len(data) == 0
+
+
 def create_admin_user(email: str, password: str, client_id: str) -> str:
     """Create user via service_role + insert into client_users. Returns user_id."""
     r = requests.post(
@@ -150,14 +163,22 @@ def create_admin_user(email: str, password: str, client_id: str) -> str:
     return user_id
 
 
-def delete_admin_user(user_id: str):
+def delete_admin_user(user_id: str) -> bool:
+    # Remove client_users rows first (FK: client_users.client_id → clients, not user_id,
+    # but belt-and-suspenders to avoid leftover rows)
+    try:
+        sro_delete("client_users", {"user_id": f"eq.{user_id}"})
+    except Exception:
+        pass
     r = requests.delete(
         f"{AUTH}/admin/users/{user_id}",
         headers=SRO_HEADERS,
     )
     # 404 is fine (already deleted)
     if r.status_code not in (200, 204, 404):
-        print(f"  WARNING: could not delete user {user_id}: {r.status_code}")
+        print(f"  WARNING: auth delete returned {r.status_code} for {user_id}")
+        return False
+    return True
 
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
@@ -188,7 +209,7 @@ def setup() -> tuple[str, str, list[str]]:
                 requests.post(
                     f"{REST}/clients",
                     headers={**SRO_HEADERS, "Prefer": "return=minimal"},
-                    json={"id": cid, "name": f"Test {cid}"},
+                    json={"id": cid, "display_name": f"Test {cid}"},
                 ).raise_for_status()
 
         uid_a = create_admin_user(email_a, pwd, TENANT_A_CLIENT_ID)
@@ -223,8 +244,8 @@ def teardown(ephemeral_ids: list[str]):
         return
     print("\n[teardown] Removing ephemeral test users...")
     for uid in ephemeral_ids:
-        delete_admin_user(uid)
-        print(f"  deleted {uid}")
+        ok = delete_admin_user(uid)
+        print(f"  {'deleted' if ok else 'partial cleanup'} {uid}")
 
 
 # ── Test Cases ────────────────────────────────────────────────────────────────
@@ -236,7 +257,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("clients")
     record(
         "anon cannot read clients",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -244,7 +265,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("credentials_vault")
     record(
         "anon cannot read credentials_vault",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -252,7 +273,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("chat_logs")
     record(
         "anon cannot read chat_logs",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -260,7 +281,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("agent_runs")
     record(
         "anon cannot read agent_runs",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -268,7 +289,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("delivery_orders")
     record(
         "anon cannot read delivery_orders",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -276,7 +297,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = anon_get("pos_bridge_logs")
     record(
         "anon cannot read pos_bridge_logs",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -324,7 +345,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = authed_get(token_a, "credentials_vault")
     record(
         "authenticated (A) cannot read credentials_vault",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -332,7 +353,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = authed_get(token_a, "agent_runs")
     record(
         "authenticated (A) cannot read agent_runs",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -340,7 +361,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = authed_get(token_a, "delivery_orders")
     record(
         "authenticated (A) cannot read delivery_orders",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -348,7 +369,7 @@ def run_tests(token_a: str, token_b: str):
     code, data = authed_get(token_b, "credentials_vault")
     record(
         "authenticated (B) cannot read credentials_vault",
-        code == 200 and len(data) == 0,
+        denied(code, data),
         f"status={code} rows={len(data) if isinstance(data, list) else data}",
     )
 
@@ -387,13 +408,13 @@ def run_tests(token_a: str, token_b: str):
             f"{REST}/chat_logs",
             headers={**SRO_HEADERS, "Prefer": "return=minimal"},
             json={
-                "id":        test_row_id,
-                "client_id": TENANT_A_CLIENT_ID,
-                "user_id":   _get_user_id_from_token(token_a),
-                "role":      "user",
-                "content":   "isolation-test-sentinel",
+                "id":           test_row_id,
+                "client_id":    TENANT_A_CLIENT_ID,
+                "user_id":      _get_user_id_from_token(token_a),
+                "user_message": "isolation-test-sentinel",
+                "ai_response":  "isolation-test-response",
             },
-        )
+        ).raise_for_status()
 
         # tenant A should see the row
         code_a, data_a = authed_get(token_a, "chat_logs", {"id": f"eq.{test_row_id}"})
