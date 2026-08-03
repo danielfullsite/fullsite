@@ -771,17 +771,48 @@ ORDER BY created_at DESC
 LIMIT 50;
 ```
 
-### Resultados Day 3
+### Hallazgo previo — Scope probe (commit `04ee6b2`, 2026-08-02T23:17 MX)
 
 ```
-D3-001 (health check):      [PENDIENTE]
-D3-002 (USL re-auth URL):   [PENDIENTE — MANUAL]
-D3-003 (scope probe):       [PENDIENTE]
-D3-004 (store API):         [PENDIENTE]
-D3-005 (fresh order ID):    [PENDIENTE]
-D3-006 (mark ready):        [PENDIENTE]
-D3-007 (audit log):         [PENDIENTE]
+Correlation ID:   175692b0 (referenciado en commit message)
+Scopes solicitados (USL_SCOPES):
+  eats.pos_provisioning, offline_access, eats.store, eats.order, eats.deliveries
 
-Workflow run ID:             [PENDIENTE]
-Timestamp inicio:            [PENDIENTE]
+Scopes otorgados por Uber (de integration_providers.scopes en DB):
+  ["eats.pos_provisioning", "offline_access"]
+
+Scopes delta (solicitados pero NO otorgados):
+  eats.store, eats.order, eats.deliveries
+
+Veredicto: UBER-SIDE BLOCKER
+  Los scopes no se otorgaron silenciosamente porque no están aprobados
+  en el Developer Dashboard de Uber para esta aplicación.
+  Uber action required: aprobar eats.store + eats.order + eats.deliveries
+  en developer.uber.com antes de que el re-auth los incluya.
+
+Fix aplicado:  USL_SCOPES += 'eats.store' (estaba faltando en la solicitud).
+               Con el fix, la PRÓXIMA re-auth los solicitará correctamente.
+               Una vez Uber los apruebe en Dashboard → re-auth → nuevos tokens.
+
+Resultado Delivery Store APIs (con token actual sin eats.store):
+  delivery_store_get:    HTTP 401 "requires eats.store"
+  delivery_store_status: HTTP 401 "requires eats.store"
+```
+
+> Este hallazgo es evidencia real para incluir en la respuesta a Uber: confirma que
+> nuestro código solicita los scopes correctos y que el blocker es de configuración
+> en el Developer Dashboard, no de implementación.
+
+### Resultados Day 3 — Ejecución post-Submission #2
+
+```
+D3-001 (health check):           [PENDIENTE — ejecutar uber-cert-day3.yml]
+D3-002 (scope probe fresco):     [PENDIENTE]
+D3-003 (reauth_url):             [PENDIENTE]
+D3-004 (day3_full):              [PENDIENTE]
+D3-005 (evidence_export):        [PENDIENTE]
+
+Workflow: .github/workflows/uber-cert-day3.yml
+Trigger:  gh workflow run uber-cert-day3.yml --repo danielfullsite/fullsite
+Resultados Telegram:  [se recibirán post-ejecución]
 ```
