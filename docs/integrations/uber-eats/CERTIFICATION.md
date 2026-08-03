@@ -806,13 +806,15 @@ Resultado Delivery Store APIs (con token actual sin eats.store):
 ### Resultados Day 3 — Ejecución post-Submission #2
 
 ```
-D3-001 (health check):           [PENDIENTE — ejecutar uber-cert-day3.yml]
+D3-001 (health check):           [PENDIENTE]
 D3-002 (scope probe fresco):     [PENDIENTE]
 D3-003 (reauth_url):             [PENDIENTE]
 D3-004 (day3_full):              [PENDIENTE]
 D3-005 (evidence_export):        [PENDIENTE]
 
-Workflow: .github/workflows/uber-cert-day3.yml
-Trigger:  gh workflow run uber-cert-day3.yml --repo danielfullsite/fullsite
-Resultados Telegram:  [se recibirán post-ejecución]
+Workflow:         .github/workflows/uber-cert-day3.yml (commit c8136ef)
+Trigger manual:   github.com/danielfullsite/fullsite/actions/workflows/uber-cert-day3.yml
+                  → Run workflow → branch: main → Run workflow
+                  (GitHub CLI retorna 422 en workflows recién registrados — trigger web una vez)
+Resultados:       Telegram notificará automáticamente al completar
 ```
