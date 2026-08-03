@@ -17,6 +17,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { normalizeUberOrder } from '@/lib/integrations/uber-eats/order-adapter'
 import { getPosData } from '@/lib/integrations/uber-eats/provisioning'
 import { getOrderAdapterForPayload } from '@/lib/integrations/uber-eats/adapter-factory'
+import { uploadMenu, type UberMenuUpload } from '@/lib/integrations/uber-eats/menu'
 import { auditLog } from '@/lib/integrations/audit-logger'
 
 const SB_URL = () => process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -340,6 +341,11 @@ export async function POST(request: NextRequest) {
       // store.status.changed is the canonical Uber event name.
       // store.status is kept as a legacy alias for older webhook versions.
       await handleStoreStatus(storeId, body, eventRow.id, correlationId)
+    } else if (eventType === 'store.menu_refresh_request') {
+      // store.menu_refresh_request is the canonical Uber event name per Eats Basic
+      // Production Validation spec. 'menu.refresh' is NOT an official Uber event name —
+      // no alias is added; unknown events (including menu.refresh) already ACK 200.
+      await handleMenuRefreshRequest(storeId, clientId, body, eventRow.id, correlationId)
     } else {
       // Unknown event type — ACK 200 without DLQ (don't penalize unknown future events)
       console.log(`[uber-webhook-v2] Unknown event type: ${eventType}`)
@@ -547,6 +553,88 @@ async function handleStoreStatus(
     ).catch(() => {})
   }
   await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'store.status_update', request: { store_id: storeId, is_open: isOpen } })
+  await markEventProcessed(eventId)
+}
+
+// ─── store.menu_refresh_request ─────────────────────────────────────────────
+// Uber sends this when it requires the POS to re-sync its menu (e.g. after a
+// catalog issue or during certification validation). We fetch the latest cached
+// menu payload from integration_menu_cache and call uploadMenu().
+//
+// Failure contract (matches External Side Effects Rule, Taxonomy A):
+//   - If no cached menu is available → DLQ + audit log, still ACK 200.
+//   - If uploadMenu() fails → DLQ + audit log, still ACK 200.
+//   - The webhook ACK is always sent; upload failures are not visible to Uber's
+//     webhook delivery system and must be resolved via DLQ replay.
+
+async function fetchCurrentMenuForStore(
+  storeId: string,
+  clientId: string
+): Promise<UberMenuUpload | null> {
+  const r = await fetch(
+    `${SB_URL()}/rest/v1/integration_menu_cache?provider=eq.ubereats&provider_store_id=eq.${encodeURIComponent(storeId)}&client_id=eq.${encodeURIComponent(clientId)}&order=updated_at.desc&limit=1`,
+    { headers: sbHeaders() }
+  ).catch(() => null)
+  if (!r?.ok) return null
+  const rows = (await r.json()) as Array<{ menu_payload: UberMenuUpload }>
+  return rows[0]?.menu_payload ?? null
+}
+
+async function handleMenuRefreshRequest(
+  storeId: string,
+  clientId: string,
+  payload: unknown,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  const t0 = Date.now()
+  const timestampUtc = new Date().toISOString()
+
+  const menu = await fetchCurrentMenuForStore(storeId, clientId)
+  if (!menu) {
+    const reason = `no_cached_menu: store=${storeId} has no row in integration_menu_cache`
+    await sendToDLQ(eventId, 'store.menu_refresh_request', clientId, payload, reason)
+    await auditLog({
+      provider: 'ubereats',
+      client_id: clientId,
+      correlation_id: correlationId,
+      action: 'menu.refresh_request',
+      request: { store_id: storeId, event_id: eventId, timestamp_utc: timestampUtc },
+      response: { ok: false, error: 'no_cached_menu', queued_for_retry: true },
+      duration_ms: Date.now() - t0,
+    })
+    await markEventProcessed(eventId, reason)
+    console.warn(`[uber-webhook-v2] menu.refresh_request no_menu store=${storeId} correlation=${correlationId}`)
+    return
+  }
+
+  const result = await uploadMenu(storeId, menu, correlationId)
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: clientId,
+    correlation_id: correlationId,
+    action: 'menu.refresh_request',
+    request: {
+      store_id: storeId,
+      event_id: eventId,
+      items_count: menu.items.length,
+      timestamp_utc: timestampUtc,
+    },
+    response: result.ok
+      ? { ok: true, status: 'uploaded' }
+      : { ok: false, error: result.error, queued_for_retry: true },
+    duration_ms: Date.now() - t0,
+  })
+
+  if (!result.ok) {
+    await sendToDLQ(eventId, 'store.menu_refresh_request', clientId, payload, result.error ?? 'upload_failed')
+    await markEventProcessed(eventId, result.error)
+    console.warn(`[uber-webhook-v2] menu.refresh_request upload_failed store=${storeId} error=${result.error} correlation=${correlationId}`)
+    return
+  }
+
+  console.log(`[uber-webhook-v2] menu.refresh_request ok store=${storeId} items=${menu.items.length} correlation=${correlationId}`)
   await markEventProcessed(eventId)
 }
 
