@@ -14,13 +14,42 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 10 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
 | **Production Validation — Submission #1** | **SUBMITTED 2026-08-02 ~18:30 MX — Awaiting Uber Review** |
 | **Production Validation — Submission #2** | **SUBMITTED 2026-08-02 — AWAITING UBER REVIEW (re-send tras Day 2 + Delivery adapter)** |
-| **Day 3** (scope probe + Delivery APIs + evidencia fresca) | **PENDIENTE EJECUCIÓN** |
+| **Day 3** (scope probe + Delivery APIs + evidencia fresca) | **COMPLETO 2026-08-03 — 21 audit entries, 12 action types, UBER-SIDE BLOCKER confirmado** |
 | Deployment público | ✓ COMPLETO — commit `cd69d09`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
 | Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
 
 > **REGLA:** NO marcar Production Certified hasta recibir confirmación explícita de Uber. NO cambiar `UBER_ENV=production`. NO hacer cambios al código de la integración salvo que Uber solicite evidencia adicional.
+
+---
+
+## Day 3 — Scope Probe + Delivery APIs + Evidencia Fresca (2026-08-03)
+
+Run ID: `30847395120` | Duración: 11s | Todos los pasos: PASS
+
+| Step | HTTP | Resultado |
+|---|---|---|
+| D3-001 health | 200 | `fullsite-ubereats-webhook-v2 v2.0.0` — deploy Ready |
+| D3-002 scope_probe | 200 | `scopes_granted: []` — UBER-SIDE BLOCKER confirmado (corr `83095544-7b65-4a4b-93d7-7ffdd052158a`) |
+| D3-003 reauth_url | 200 | URL generada con scopes expandidos |
+| D3-004 day3_full | 200 | `delivery_store_apis: 1/5 OK` (limitado por scopes pendientes de Uber) |
+| D3-004 real_order | — | `BLOCKED — sandbox does not support Delivery order creation` (limitación Uber, no nuestro código) |
+| D3-005 evidence_export | 200 | **21 entradas, 12 action types** en las últimas 48h |
+
+### Audit log — 12 action types (evidencia real para Uber)
+
+```
+menu.upload, order.cancel, order.deny, order.get_details, order.ready,
+reconciliation.run, store.status_update, usl.connected, usl.denied,
+usl.error, usl.initiate, webhook.unmapped_store
+```
+
+### Hallazgo confirmado — UBER-SIDE BLOCKER
+
+Uber Developer Dashboard solo aprobó `eats.pos_provisioning` + `offline_access`.
+Scopes faltantes: `eats.store`, `eats.order`, `eats.deliveries`.
+**Acción requerida: Uber debe aprobar scopes en su panel antes de que re-auth otorgue acceso completo.**
 
 ---
 
