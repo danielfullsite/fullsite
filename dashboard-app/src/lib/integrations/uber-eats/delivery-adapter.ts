@@ -7,9 +7,9 @@
 //   POST /v1/delivery/order/{id}/cancel  — cancel order
 //   POST /v1/delivery/order/{id}/ready   — mark ready for pickup
 //
-// All operations use the stored USL token (storeId param routes to
-// getStoredTokenForStore in uberFetch). eats.pos_provisioning is the approved
-// scope for Delivery API order operations during Basic Production Validation.
+// Token: client_credentials / delivery (eats.deliveries).
+// NOT the USL authorization_code token — eats.deliveries is an M2M scope
+// for the Delivery/Direct API product, separate from the Eats Marketplace product.
 
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
@@ -26,7 +26,7 @@ export async function getDeliveryOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', storeId }),
+      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'delivery' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -53,7 +53,7 @@ export async function acceptDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/accept`, {
         method: 'POST',
         body: JSON.stringify({}),
-        storeId,
+        tokenType: 'delivery',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -77,7 +77,7 @@ export async function denyDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/deny`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        storeId,
+        tokenType: 'delivery',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -101,7 +101,7 @@ export async function cancelDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        storeId,
+        tokenType: 'delivery',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -124,7 +124,7 @@ export async function markDeliveryOrderReady(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/ready`, {
         method: 'POST',
         body: JSON.stringify({}),
-        storeId,
+        tokenType: 'delivery',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )

@@ -47,7 +47,7 @@ import {
   cancelDeliveryOrder,
   markDeliveryOrderReady,
 } from '@/lib/integrations/uber-eats/delivery-adapter'
-import { buildUberAuthUrl, USL_SCOPES } from '@/lib/integrations/uber-eats/oauth'
+import { buildUberAuthUrl, USL_SCOPES, MARKETPLACE_M2M_SCOPES, DELIVERY_M2M_SCOPES, probeM2MToken } from '@/lib/integrations/uber-eats/oauth'
 
 function checkAuth(request: NextRequest): boolean {
   const expected = (process.env.INTEGRATION_ADMIN_SECRET ?? '').trim()
@@ -317,22 +317,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ action, correlation_id: corrId, order_id: orderId, ts: new Date().toISOString(), result })
   }
 
-  // ─── Diagnostic: scope probe ──────────────────────────────────────────────
-  // Reports: scopes_requested (USL_SCOPES constant), scopes_granted (from DB —
-  // what Uber actually returned during OAuth), delta (requested but NOT granted).
-  // If delta is non-empty, Uber filtered those scopes — requires Developer Dashboard
-  // approval before re-auth will include them.
+  // ─── Diagnostic: scope probe (3 phases, by grant type) ───────────────────
+  // Tests each token type independently to surface exactly where Uber's whitelist
+  // stands. Do NOT compare scopes across grant types (USL vs M2M).
+  //
+  // Phase 1 — USL (authorization_code, eats.pos_provisioning)
+  //   Reads what Uber granted in DB. Attempts accept_pos_order on a NOOP order.
+  //   404 = scope OK (order not found). 401 = scope not granted.
+  //
+  // Phase 2 — Marketplace M2M (client_credentials: eats.store + eats.order)
+  //   Requests M2M token and records granted_scope from Uber's response.
+  //   If token request fails with invalid_scope → app not whitelisted.
+  //   On success, probes GET /v1/delivery/store/{id}.
+  //
+  // Phase 3 — Delivery M2M (client_credentials: eats.deliveries)
+  //   Requests M2M token. On success, probes GET /v1/delivery/order/PROBE.
 
   if (action === 'scope_probe') {
     const corrId = crypto.randomUUID()
     const ts = new Date().toISOString()
-
-    // Fetch what Uber actually granted during the last OAuth flow
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    let scopesGranted: string[] = []
-    let tokenExpiresAt: string | null = null
-    let scopeSource = 'db'
+
+    // ── Phase 1: USL / Provisioning ──────────────────────────────────────────
+    let uslGrantedScopes: string[] = []
+    let uslTokenExpiresAt: string | null = null
+    let uslDbStatus = 'ok'
     try {
       const dbR = await fetch(
         `${sbUrl}/rest/v1/integration_providers?provider=eq.ubereats&provider_account_id=eq.${encodeURIComponent(storeId)}&select=scopes,token_expires_at&limit=1`,
@@ -340,48 +350,79 @@ export async function POST(request: NextRequest) {
       )
       if (dbR.ok) {
         const rows = (await dbR.json()) as Array<{ scopes: string[]; token_expires_at: string }>
-        if (rows.length) {
-          scopesGranted = rows[0].scopes ?? []
-          tokenExpiresAt = rows[0].token_expires_at ?? null
-        }
+        if (rows.length) { uslGrantedScopes = rows[0].scopes ?? []; uslTokenExpiresAt = rows[0].token_expires_at ?? null }
+        else uslDbStatus = 'no_row_found'
+      } else uslDbStatus = 'db_error'
+    } catch { uslDbStatus = 'db_exception' }
+
+    // Probe accept_pos_order — 404 = scope ok, 401 = scope missing
+    let uslProbe: { ok: boolean; status?: number; interpretation?: string; error?: string } = { ok: false }
+    try {
+      const { uberFetch } = await import('@/lib/integrations/uber-eats/oauth')
+      const r = await uberFetch('/v1/eats/orders/SCOPE-PROBE-USL/accept_pos_order', {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'scope_probe', minutes_to_ready: 20 }),
+        tokenType: 'provisioning',
+        storeId,
+      })
+      uslProbe = {
+        ok: r.status === 404, // 404 = order not found (scope is OK); 401 = scope denied
+        status: r.status,
+        interpretation: r.status === 404 ? 'eats.pos_provisioning GRANTED (404=order not found is expected)' : r.status === 401 ? 'eats.pos_provisioning DENIED or token expired' : `unexpected HTTP ${r.status}`,
       }
-    } catch { scopeSource = 'db_error' }
+    } catch (e) { uslProbe = { ok: false, error: String(e) } }
 
-    const scopesDelta = USL_SCOPES.filter(s => !scopesGranted.includes(s))
+    const phase1 = {
+      grant_type: 'authorization_code',
+      scope_requested: USL_SCOPES,
+      scopes_granted_by_uber: uslGrantedScopes,
+      token_expires_at: uslTokenExpiresAt,
+      db_status: uslDbStatus,
+      probe_accept_pos_order: uslProbe,
+      blocker: !uslGrantedScopes.includes('eats.pos_provisioning') ? 'eats.pos_provisioning not in granted scopes — re-auth required' : null,
+    }
 
-    // Probe each scope-gated endpoint with the current USL token
-    const probeOrderId = 'SCOPE-PROBE-NOOP'
-    const [storeList, storeGet, storeStatus, orderGet] = await Promise.allSettled([
-      listDeliveryStores(`${corrId}-ds-list`, storeId),
-      getDeliveryStore(storeId, `${corrId}-ds-get`),
-      getDeliveryStoreStatus(storeId, `${corrId}-ds-status`),
-      getDeliveryOrderDetails(probeOrderId, `${corrId}-do-get`, storeId),
-    ])
-    const settle = (r: PromiseSettledResult<unknown>) =>
-      r.status === 'fulfilled' ? r.value : { ok: false, error: String(r.reason) }
+    // ── Phase 2: Marketplace M2M ──────────────────────────────────────────────
+    const marketplaceTokenProbe = await probeM2MToken(MARKETPLACE_M2M_SCOPES.join(' '))
+    let marketplaceEndpointProbe: { ok: boolean; status?: number; error?: string } | null = null
+    if (marketplaceTokenProbe.ok) {
+      const storeGetResult = await getDeliveryStore(storeId, `${corrId}-m2m-sg`)
+      marketplaceEndpointProbe = { ok: storeGetResult.ok, error: storeGetResult.error }
+    }
+    const phase2 = {
+      grant_type: 'client_credentials',
+      scopes_requested: MARKETPLACE_M2M_SCOPES,
+      token_probe: marketplaceTokenProbe,
+      endpoint_probe: marketplaceEndpointProbe,
+      blocker: !marketplaceTokenProbe.ok
+        ? `Marketplace M2M token request failed: ${marketplaceTokenProbe.error} — enable ${MARKETPLACE_M2M_SCOPES.join(', ')} in Uber Developer Dashboard`
+        : null,
+    }
 
-    const scopeBlocker = scopesDelta.length > 0 ? {
-      summary: 'Uber granted fewer scopes than requested — Developer Dashboard approval required',
-      missing_scopes: scopesDelta,
-      uber_action_required: `Enable these scopes for the application in Uber Developer Dashboard (developer.uber.com): ${scopesDelta.join(', ')}. Then re-run re-auth.`,
-    } : null
+    // ── Phase 3: Delivery M2M ─────────────────────────────────────────────────
+    const deliveryTokenProbe = await probeM2MToken(DELIVERY_M2M_SCOPES.join(' '))
+    let deliveryEndpointProbe: { ok: boolean; status?: number; error?: string } | null = null
+    if (deliveryTokenProbe.ok) {
+      const orderGetResult = await getDeliveryOrderDetails('SCOPE-PROBE-DELIVERY', `${corrId}-del-og`, storeId)
+      deliveryEndpointProbe = { ok: orderGetResult.ok, error: orderGetResult.error }
+    }
+    const phase3 = {
+      grant_type: 'client_credentials',
+      scopes_requested: DELIVERY_M2M_SCOPES,
+      token_probe: deliveryTokenProbe,
+      endpoint_probe: deliveryEndpointProbe,
+      blocker: !deliveryTokenProbe.ok
+        ? `Delivery M2M token request failed: ${deliveryTokenProbe.error} — enable eats.deliveries in Uber Developer Dashboard`
+        : null,
+    }
 
     return NextResponse.json({
       action,
       correlation_id: corrId,
       ts,
-      scopes_requested: USL_SCOPES,
-      scopes_granted: scopesGranted,
-      scopes_delta: scopesDelta,
-      scope_source: scopeSource,
-      token_expires_at: tokenExpiresAt,
-      scope_blocker: scopeBlocker,
-      probe: {
-        delivery_store_list:   settle(storeList),
-        delivery_store_get:    settle(storeGet),
-        delivery_store_status: settle(storeStatus),
-        delivery_order_get:    settle(orderGet),
-      },
+      store_id: storeId,
+      phases: { phase1_usl: phase1, phase2_marketplace: phase2, phase3_delivery: phase3 },
+      blockers: [phase1.blocker, phase2.blocker, phase3.blocker].filter(Boolean),
     })
   }
 
@@ -409,7 +450,7 @@ export async function POST(request: NextRequest) {
       try {
         const r = await uberFetch(ep, {
           method: 'POST',
-          storeId,
+          tokenType: 'marketplace',
           body: JSON.stringify({
             store_id: storeId,
             channel: 'delivery',

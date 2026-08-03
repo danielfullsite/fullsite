@@ -4,6 +4,7 @@
 // │                                                                             │
 // │  Cubre: detectChannel, getOrderAdapter routing, DeliveryV1 URL paths,      │
 // │  minutesToReady passthrough, interface compliance, DELIVERY_ADAPTER_VERSION │
+// │  DAY2-021..024: grant type validation — provisioning vs M2M token routing  │
 // │                                                                             │
 // │  Todos los tests pasan sin credenciales de Uber ni DB real.                │
 // └─────────────────────────────────────────────────────────────────────────────┘
@@ -15,27 +16,83 @@ import {
   getOrderAdapterForPayload,
 } from '@/lib/integrations/uber-eats/adapter-factory'
 import { DELIVERY_ADAPTER_VERSION } from '@/lib/integrations/uber-eats/delivery-adapter'
+import { listDeliveryStores } from '@/lib/integrations/uber-eats/delivery-store'
+import { clearTokenCache } from '@/lib/integrations/uber-eats/oauth'
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 const TEST_SB_URL = 'https://test.supabase.co'
 const TEST_SB_KEY = 'test-service-key-day2'
 
-/** Fetch mock that returns 200 for token + audit + API calls. Captures raw calls. */
+/**
+ * Fetch mock that handles all three token paths:
+ *   sandbox-login.uber.com → M2M token (marketplace or delivery)
+ *   supabase.co/integration_providers → USL provisioning token row
+ *   supabase.co (other) → audit log, etc.
+ *   test-api.uber.com → Uber API calls (returns {})
+ */
 function makeFetchSpy() {
-  // Keep as vi.fn (with .mock.calls accessible); cast only when passing to mockImplementation
   return vi.fn((input: RequestInfo | URL) => {
     const url = input.toString()
     if (url.includes('sandbox-login.uber.com') || url.includes('auth.uber.com')) {
-      return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok-day2', expires_in: 3600 }), { status: 200 }))
+      return Promise.resolve(new Response(
+        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: 'eats.store eats.store.status.write eats.order eats.store.orders.read eats.deliveries' }),
+        { status: 200 }
+      ))
     }
-    // Supabase audit log, DB calls
+    // Provisioning token lookup (getStoredTokenForStore)
+    if (url.includes('supabase.co') && url.includes('integration_providers')) {
+      return Promise.resolve(new Response(
+        JSON.stringify([{
+          client_id: 'test-client',
+          access_token_enc: 'tok-day2-usl',
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+          refresh_token_enc: null,
+        }]),
+        { status: 200 }
+      ))
+    }
+    // Other Supabase calls (audit log etc.)
     if (url.includes('supabase.co')) {
       return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
     }
     // Uber API calls (test-api.uber.com)
     return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
   })
+}
+
+/**
+ * Fetch spy that also captures RequestInit so tests can inspect token request bodies.
+ * Returns { spy, calls } — calls accumulates { url, init } for every fetch invocation.
+ */
+function makeFetchSpyWithInit() {
+  const calls: Array<{ url: string; init?: RequestInit }> = []
+  const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input.toString()
+    calls.push({ url, init })
+    if (url.includes('sandbox-login.uber.com') || url.includes('auth.uber.com')) {
+      return Promise.resolve(new Response(
+        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: 'eats.store eats.store.status.write eats.order eats.deliveries' }),
+        { status: 200 }
+      ))
+    }
+    if (url.includes('supabase.co') && url.includes('integration_providers')) {
+      return Promise.resolve(new Response(
+        JSON.stringify([{
+          client_id: 'test-client',
+          access_token_enc: 'tok-day2-usl',
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+          refresh_token_enc: null,
+        }]),
+        { status: 200 }
+      ))
+    }
+    if (url.includes('supabase.co')) {
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+    }
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+  })
+  return { spy, calls }
 }
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
@@ -50,6 +107,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  clearTokenCache() // prevent cached M2M tokens from leaking between tests
   delete process.env.NEXT_PUBLIC_SUPABASE_URL
   delete process.env.SUPABASE_SERVICE_KEY
   delete process.env.UBER_CLIENT_ID
@@ -156,13 +214,14 @@ describe('DAY2-011..015: DeliveryV1Adapter URL paths', () => {
 })
 
 // ─── DAY2-016..018: EatsAdapter — URL path + minutesToReady ──────────────────
+// acceptOrder uses tokenType:'provisioning' — requires storeId for USL token lookup.
 
 describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
   it('DAY2-016: eats acceptOrder → /v1/eats/orders/ path (not /v1/delivery/)', async () => {
     const spy = makeFetchSpy()
     vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('eats')
-    await adapter.acceptOrder('order-d2-016', 'corr-d2-016')
+    await adapter.acceptOrder('order-d2-016', 'corr-d2-016', 'store-d2-016')
     const apiCalls = spy.mock.calls.map(([u]) => (u as string | URL).toString()).filter(u => u.includes('uber.com/v1'))
     expect(apiCalls.some(u => u.includes('/v1/eats/orders/'))).toBe(true)
     expect(apiCalls.every(u => !u.includes('/v1/delivery/'))).toBe(true)
@@ -171,14 +230,21 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
   it('DAY2-017: minutesToReady=45 override → body includes minutes_to_ready:45', async () => {
     const calls: Array<{ url: string; body: string }> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
-      calls.push({ url: input.toString(), body: (init?.body as string) ?? '' })
-      if (input.toString().includes('login.uber.com')) {
+      const url = input.toString()
+      calls.push({ url, body: (init?.body as string) ?? '' })
+      if (url.includes('login.uber.com')) {
         return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }))
+      }
+      if (url.includes('supabase.co') && url.includes('integration_providers')) {
+        return Promise.resolve(new Response(JSON.stringify([{
+          client_id: 'test-client', access_token_enc: 'tok-usl',
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(), refresh_token_enc: null,
+        }]), { status: 200 }))
       }
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     })
     const adapter = getOrderAdapter('eats')
-    await adapter.acceptOrder('order-d2-017', 'corr-d2-017', undefined, 45)
+    await adapter.acceptOrder('order-d2-017', 'corr-d2-017', 'store-d2-017', 45)
     const apiCall = calls.find(c => c.url.includes('/v1/eats/orders/'))
     expect(apiCall).toBeDefined()
     const parsed = JSON.parse(apiCall!.body)
@@ -188,14 +254,21 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
   it('DAY2-018: minutesToReady not set → body defaults to 20', async () => {
     const calls: Array<{ url: string; body: string }> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
-      calls.push({ url: input.toString(), body: (init?.body as string) ?? '' })
-      if (input.toString().includes('login.uber.com')) {
+      const url = input.toString()
+      calls.push({ url, body: (init?.body as string) ?? '' })
+      if (url.includes('login.uber.com')) {
         return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }))
+      }
+      if (url.includes('supabase.co') && url.includes('integration_providers')) {
+        return Promise.resolve(new Response(JSON.stringify([{
+          client_id: 'test-client', access_token_enc: 'tok-usl',
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(), refresh_token_enc: null,
+        }]), { status: 200 }))
       }
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     })
     const adapter = getOrderAdapter('eats')
-    await adapter.acceptOrder('order-d2-018', 'corr-d2-018')
+    await adapter.acceptOrder('order-d2-018', 'corr-d2-018', 'store-d2-018')
     const apiCall = calls.find(c => c.url.includes('/v1/eats/orders/'))
     expect(apiCall).toBeDefined()
     const parsed = JSON.parse(apiCall!.body)
@@ -219,5 +292,66 @@ describe('DAY2-019..020: Delivery adapter contract', () => {
     expect(typeof adapter.cancelOrder).toBe('function')
     expect(typeof adapter.markOrderReady).toBe('function')
     expect(adapter.channel).toBe('delivery')
+  })
+})
+
+// ─── DAY2-021..024: Grant type validation ────────────────────────────────────
+// Verifies that each operation uses the correct token grant type.
+// provisioning (USL) → supabase integration_providers lookup (not sandbox-login)
+// marketplace  (M2M) → sandbox-login token req with eats.store/eats.order scopes
+// delivery     (M2M) → sandbox-login token req with eats.deliveries scope
+
+describe('DAY2-021..024: Token grant type routing', () => {
+  it('DAY2-021: listDeliveryStores uses marketplace M2M — no integration_providers lookup', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    await listDeliveryStores('corr-d2-021')
+    const hasProvisioningLookup = calls.some(c => c.url.includes('integration_providers'))
+    const hasM2MTokenCall = calls.some(c => c.url.includes('sandbox-login.uber.com'))
+    expect(hasProvisioningLookup).toBe(false)
+    expect(hasM2MTokenCall).toBe(true)
+    // Scope should be marketplace (eats.store), not delivery
+    const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
+    const body = new URLSearchParams(tokenCall!.init?.body as string)
+    expect(body.get('scope')).toContain('eats.store')
+    expect(body.get('scope')).not.toContain('eats.deliveries')
+  })
+
+  it('DAY2-022: delivery acceptOrder uses delivery M2M — eats.deliveries scope in token request', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    const adapter = getOrderAdapter('delivery')
+    await adapter.acceptOrder('order-d2-022', 'corr-d2-022')
+    const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
+    expect(tokenCall).toBeDefined()
+    const body = new URLSearchParams(tokenCall!.init?.body as string)
+    expect(body.get('scope')).toContain('eats.deliveries')
+    // No provisioning lookup — delivery is M2M only
+    expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)
+  })
+
+  it('DAY2-023: eats acceptOrder uses provisioning token — supabase integration_providers lookup, no M2M token request', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    const adapter = getOrderAdapter('eats')
+    await adapter.acceptOrder('order-d2-023', 'corr-d2-023', 'store-d2-023')
+    const hasProvisioningLookup = calls.some(c =>
+      c.url.includes('supabase.co') && c.url.includes('integration_providers')
+    )
+    const hasM2MTokenCall = calls.some(c => c.url.includes('sandbox-login.uber.com'))
+    expect(hasProvisioningLookup).toBe(true)
+    expect(hasM2MTokenCall).toBe(false)
+  })
+
+  it('DAY2-024: eats denyOrder uses marketplace M2M — sandbox-login with eats.order, no integration_providers', async () => {
+    const { spy, calls } = makeFetchSpyWithInit()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
+    const adapter = getOrderAdapter('eats')
+    await adapter.denyOrder('order-d2-024', 'ITEM_UNAVAILABLE', 'corr-d2-024')
+    const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
+    expect(tokenCall).toBeDefined()
+    const body = new URLSearchParams(tokenCall!.init?.body as string)
+    expect(body.get('scope')).toContain('eats.order')
+    expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)
   })
 })

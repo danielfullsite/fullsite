@@ -1,6 +1,10 @@
 // UberEatsAdapter v1.0.0 — canonical entry point for all order lifecycle operations.
 // Every function: retries with backoff, logs to integration_audit_log (redacted).
 // Type A operations (affect Uber state externally) → callers must use RecoverableOperation.
+//
+// Token strategy (per Uber's grant type model):
+//   provisioning (authorization_code / USL) — accept_pos_order, ready_for_pickup
+//   marketplace  (client_credentials, eats.order) — getOrderDetails, deny, cancel
 
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
@@ -17,7 +21,7 @@ export async function getOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET', storeId }),
+      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -45,6 +49,7 @@ export async function acceptOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/accept_pos_order`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Accepted by Fullsite POS', minutes_to_ready: minutesToReady }),
+        tokenType: 'provisioning',
         storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
@@ -69,7 +74,7 @@ export async function denyOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/deny_pos_order`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        storeId,
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -93,7 +98,7 @@ export async function cancelOrder(
       () => uberFetch(`/v1/eats/orders/${orderId}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        storeId,
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -116,6 +121,7 @@ export async function markOrderReady(
       () => uberFetch(`/v1/eats/orders/${orderId}/ready_for_pickup`, {
         method: 'POST',
         body: JSON.stringify({}),
+        tokenType: 'provisioning',
         storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }

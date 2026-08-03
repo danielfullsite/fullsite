@@ -6,7 +6,8 @@
 //   GET  /v1/delivery/store/{id}/status                — get store open/closed status
 //   POST /v1/delivery/store/{id}/update-store-status   — pause or activate store
 //
-// All operations use the stored USL token (storeId routes to getStoredTokenForStore).
+// Token: client_credentials / marketplace (eats.store, eats.store.status.write).
+// NOT the USL authorization_code token — eats.store is an M2M scope.
 
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
@@ -19,7 +20,7 @@ export async function listDeliveryStores(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch('/v1/delivery/stores', { method: 'GET', storeId }),
+      () => uberFetch('/v1/delivery/stores', { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -43,7 +44,7 @@ export async function getDeliveryStore(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}`, { method: 'GET', storeId }),
+      () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -66,7 +67,7 @@ export async function getDeliveryStoreStatus(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/status`, { method: 'GET', storeId }),
+      () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/status`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 2, baseDelayMs: 300 }
     )
     if (!r.ok) {
@@ -97,7 +98,7 @@ export async function updateDeliveryStoreStatus(
       () => uberFetch(`/v1/delivery/store/${encodeURIComponent(storeId)}/update-store-status`, {
         method: 'POST',
         body: JSON.stringify({ action }),
-        storeId,
+        tokenType: 'marketplace',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )

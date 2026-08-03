@@ -25,30 +25,51 @@ export const getApiBase = (): string =>
     ? 'https://api.uber.com'
     : 'https://test-api.uber.com'
 
-// USL_SCOPES — all scopes required for POS + Delivery API certification.
+// ─── Token grant types ────────────────────────────────────────────────────────
 //
-// eats.pos_provisioning — store provisioning, menu, accept_pos_order, ready_for_pickup
-// eats.store            — GET /v1/delivery/store/{id}, GET /v1/delivery/store/{id}/status
-//                         (REQUIRED — scope_probe returned 401 "requires eats.store" on 2026-08-02)
-// eats.order            — order GET, deny_pos_order, cancel (REQUIRED, not in pos_provisioning)
-// eats.deliveries       — Delivery API order operations (/v1/delivery/order/...)
+// Uber defines two distinct grant types with different scope sets.
+// Mixing them causes Uber to silently drop scopes during OAuth.
 //
-// Evidence: scope_probe 2026-08-02 (corr 175692b0) — eats.store missing caused
-// delivery_store_get + delivery_store_status to 401 even after first re-auth.
-export const USL_SCOPES = ['eats.pos_provisioning', 'eats.store', 'eats.order', 'eats.deliveries']
+// authorization_code (USL) — merchant must consent in browser
+//   Scope: eats.pos_provisioning only.
+//   Used for: accept_pos_order, ready_for_pickup, provisioning, menu sync.
+//   Evidence: DB showed only ["eats.pos_provisioning","offline_access"] after
+//   re-auth that included eats.order/eats.deliveries — Uber silently dropped
+//   scopes that belong to client_credentials (2026-08-02, corr 175692b0).
+//
+// client_credentials (M2M) — app-level, cached in memory per scope set
+//   Marketplace scopes: eats.store, eats.store.status.write, eats.order, eats.store.orders.read
+//     Used for: store GET/status, order GET, deny, cancel.
+//   Delivery scopes: eats.deliveries
+//     Used for: all /v1/delivery/order/{id}/... endpoints.
+//   If M2M token request returns invalid_scope, the Uber Developer Dashboard
+//   has not whitelisted that scope for this application.
 
-// Explicit scope constants used for audit documentation.
+export const USL_SCOPES = ['eats.pos_provisioning']
+export const MARKETPLACE_M2M_SCOPES = ['eats.store', 'eats.store.status.write', 'eats.order', 'eats.store.orders.read']
+export const DELIVERY_M2M_SCOPES = ['eats.deliveries']
+
+// Explicit scope constants (kept for audit documentation)
 export const SCOPE_ORDER = 'eats.order'
 export const SCOPE_STORE = 'eats.store'
 export const SCOPE_STORE_STATUS_WRITE = 'eats.store.status.write'
 export const SCOPE_STORE_ORDERS_READ = 'eats.store.orders.read'
 export const SCOPE_DELIVERIES = 'eats.deliveries'
 
+// Token type for explicit grant type selection in uberFetch.
+//   provisioning → authorization_code (USL, stored per-store in integration_providers)
+//   marketplace  → client_credentials with MARKETPLACE_M2M_SCOPES
+//   delivery     → client_credentials with DELIVERY_M2M_SCOPES
+export type UberTokenType = 'provisioning' | 'marketplace' | 'delivery'
+
 interface CachedToken {
   token: string
   expiresAt: number
 }
 const tokenCache = new Map<string, CachedToken>()
+
+// Clears the in-memory M2M token cache. Test isolation only.
+export function clearTokenCache(): void { tokenCache.clear() }
 
 export async function getUberAccessToken(scope = 'eats.pos_provisioning'): Promise<string> {
   const cached = tokenCache.get(scope)
@@ -197,18 +218,46 @@ export async function getStoredTokenForStore(storeId: string): Promise<string> {
   return tokens.access_token
 }
 
+/** Probe whether the Uber app has a given M2M scope approved.
+ *  Returns the scope Uber actually granted (may be narrower than requested). */
+export async function probeM2MToken(scope: string): Promise<{ ok: boolean; granted_scope?: string; error?: string }> {
+  const clientId = process.env.UBER_CLIENT_ID || process.env.UBER_SANDBOX_CLIENT_ID || ''
+  const clientSecret = process.env.UBER_CLIENT_SECRET || process.env.UBER_SANDBOX_CLIENT_SECRET || ''
+  if (!clientId || !clientSecret) return { ok: false, error: 'credentials not configured' }
+  try {
+    const r = await fetch(getLoginUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials', scope }),
+    })
+    const data = (await r.json()) as { access_token?: string; scope?: string; error?: string; error_description?: string }
+    if (!r.ok) return { ok: false, error: data.error_description ?? data.error ?? `HTTP ${r.status}` }
+    return { ok: true, granted_scope: data.scope }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
 /** Authenticated fetch to Uber API.
- *  Pass `storeId` for merchant-level operations (menu, orders, store status) —
- *  uses the stored authorization_code token from integration_providers.
- *  Omit `storeId` only for app-level M2M calls that don't require merchant scope. */
+ *  tokenType drives which token is used — do NOT mix grant types:
+ *    provisioning → USL authorization_code (requires storeId for DB lookup)
+ *    marketplace  → client_credentials, MARKETPLACE_M2M_SCOPES
+ *    delivery     → client_credentials, DELIVERY_M2M_SCOPES
+ *  Default: marketplace (covers most operational endpoints). */
 export async function uberFetch(
   path: string,
-  opts: RequestInit & { scope?: string; storeId?: string } = {}
+  opts: RequestInit & { tokenType?: UberTokenType; storeId?: string; scope?: string } = {}
 ): Promise<Response> {
-  const { scope: _scope, storeId, ...rest } = opts
-  const token = storeId
-    ? await getStoredTokenForStore(storeId)
-    : await getUberAccessToken(_scope ?? 'eats.pos_provisioning')
+  const { tokenType = 'marketplace', storeId, scope: _scope, ...rest } = opts
+  let token: string
+  if (tokenType === 'provisioning') {
+    if (!storeId) throw new Error('[uber-fetch] storeId required for provisioning token (USL)')
+    token = await getStoredTokenForStore(storeId)
+  } else if (tokenType === 'delivery') {
+    token = await getUberAccessToken(DELIVERY_M2M_SCOPES.join(' '))
+  } else {
+    token = await getUberAccessToken(MARKETPLACE_M2M_SCOPES.join(' '))
+  }
   return fetch(`${getApiBase()}${path}`, {
     ...rest,
     headers: {
