@@ -12,13 +12,103 @@ Ticket siguiente: abrir nuevo ticket mencionando `#D5FEA8`.
 | **Categoría A — Day 1** (tests automatizados) | **CERRADA — 172/172 PASS** |
 | **Categoría A — Day 2** (Delivery adapter routing) | **CERRADA — 20/20 PASS** |
 | **Categoría B** (sandbox con Uber real) | **CERRADA — 9 PASS, 10 SANDBOX LIMIT, 1 CAT-A — todos documentados** |
-| **Production Validation (Uber Form)** | **SUBMITTED 2026-08-02 — Awaiting Uber Review** |
+| **Production Validation — Submission #1** | **SUBMITTED 2026-08-02 ~18:30 MX — Awaiting Uber Review** |
+| **Production Validation — Submission #2** | **SUBMITTED 2026-08-02 — AWAITING UBER REVIEW (re-send tras Day 2 + Delivery adapter)** |
+| **Day 3** (scope probe + Delivery APIs + evidencia fresca) | **PENDIENTE EJECUCIÓN** |
 | Deployment público | ✓ COMPLETO — commit `cd69d09`, CI green |
 | Env vars Vercel (UBER_*) | ✓ COMPLETO — B-2 |
 | Webhook registrado en Uber | ✓ COMPLETO — B-4, BASIC_HMAC |
 | Store mapping test store | ✓ COMPLETO — B-5, `633b57d4-...` → `amalay` |
 
-## Production Validation — Submission
+> **REGLA:** NO marcar Production Certified hasta recibir confirmación explícita de Uber. NO cambiar `UBER_ENV=production`. NO hacer cambios al código de la integración salvo que Uber solicite evidencia adicional.
+
+---
+
+## Production Validation — Submission #2 (RE-SEND)
+
+```
+Formulario:       Uber Eats > Test Stores & Production Validation
+Enviado:          2026-08-02 (hora exacta: ver screenshot de confirmación)
+Estado:           SUBMITTED — AWAITING UBER REVIEW
+Referencia:       Ticket #D5FEA8
+Webhook URL:      https://app.fullsite.mx/api/integrations/uber-eats/webhook
+Integration Name: Fullsite POS
+Product:          Uber Eats
+
+Screenshot:       [PENDIENTE ADJUNTAR — captura de la página de confirmación del form]
+
+Motivo del re-envío:
+  - Day 2 completo: Delivery Adapter routing (20/20 PASS) agregado tras Submission #1
+  - Evidence refresh: correlación IDs de Day 2 post-submission
+  - Ticket #D5FEA8 referenciado explícitamente en el asunto del email adjunto
+```
+
+### Respuestas exactas enviadas (Submission #2)
+
+Fuente completa: `docs/integrations/uber-eats/TICKET-D5FEA8-RESPONSE.md`
+
+```
+Subject: Re: Basic Production Validation — Fullsite POS [#D5FEA8]
+
+ACTIVATE INTEGRATION
+  → Implemented + verified in sandbox.
+     OAuth M2M (client_credentials) + USL (authorization_code) operativos.
+     Token caching + auto-refresh en lugar. Token activo contra test store.
+
+STORE PROVISIONING
+  → Implemented + verified in sandbox.
+     integration_store_mappings: provider_store_id → client_id.
+     Fail-closed: store no mapeado → quarantine DLQ + audit trail.
+     NUNCA fallback a ningún tenant.
+
+MENU MANAGEMENT
+  → Sandbox limitation.
+     Upload/Update/OOS/Restore implementados. Scope eats.menu.write no disponible
+     en sandbox app. Listos para implementar en cuanto se otorgue el scope.
+
+STORE STATUS
+  → Implemented. Parcialmente verificado en sandbox.
+     pauseStore / activateStore → POST /v1/eats/stores/{id}/status → PASS.
+     Get Store Status implementado; scope error en sandbox para ese endpoint.
+
+ORDER MANAGEMENT
+  → Implemented. Sandbox limitation en lifecycle endpoints.
+     Accept (minutesToReady configurable), Deny (catálogo completo deny_reason),
+     Cancel (catálogo completo), Mark Ready for Pickup, Get Order Details.
+     Routing automático Eats Marketplace (/v1/eats/) vs Delivery (/v1/delivery/)
+     via campo channel en el webhook payload — Day 2 adapter.
+     Exactly-once vía UNIQUE(provider, provider_event_id).
+     Scope errors en sandbox para endpoints directos — 192 tests internos pasan.
+
+WEBHOOKS
+  → Implemented + verified in sandbox.
+     Order notification: receiving + processing. PASS.
+     Duplicate detection: acknowledged sin reprocesar. PASS.
+     Dead-letter queue: failures capturados; siempre 200 a Uber. PASS.
+     Reconciliation: operacional. PASS.
+
+SECURITY
+  → Implemented + verified in sandbox.
+     HMAC-SHA256 en cada webhook (sha256= prefix). PASS.
+     Fail-closed tenant isolation (sin cross-tenant fallback). PASS.
+     Audit log con redacción en campos sensibles en cada llamada. PASS.
+     Retry con exponential backoff en 429/5xx. CAT-A cubierto.
+     Correlation IDs en cada request. PASS.
+
+PREGUNTAS EN EL MENSAJE:
+  1. ¿Pueden iniciar un nuevo Basic Production Validation review?
+  2. Si observan una capability faltante en sus logs, ¿pueden indicar
+     exactamente qué endpoint o webhook event no se está detectando?
+  3. Si algún endpoint sigue limitado por el sandbox, ¿cuál es el
+     procedimiento recomendado para generar la evidencia requerida?
+
+Integración: Fullsite POS
+Webhook URL: https://app.fullsite.mx/api/integrations/uber-eats/webhook
+Referencia: Ticket #D5FEA8
+Firmado: Daniel Ramonfaur — daniel@fullsite.mx
+```
+
+## Production Validation — Submission #1 (original)
 
 ```
 Formulario:       Uber Eats > Test Stores & Production Validation
@@ -635,3 +725,63 @@ Al recibir confirmación oficial de Uber:
 4. Rotar `UBER_WEBHOOK_SECRET` (sandbox ≠ producción)
 5. Registrar webhook URL de producción en Uber Developer Console
 6. Insertar store_id de producción en `integration_store_mappings`
+
+---
+
+## Day 3 — Scope Probe + Delivery APIs + Evidencia Fresca (post Submission #2)
+
+**Objetivo:** generar evidencia con timestamps posteriores a Submission #2.  
+**Workflow:** `.github/workflows/uber-cert-day3.yml`  
+**Trigger:** `gh workflow run uber-cert-day3.yml --repo ramonfaurdaniel-png/fullsite`
+
+### Plan de ejecución
+
+| ID | Step | Mecanismo | Objetivo | Estado |
+|---|---|---|---|---|
+| D3-001 | Deploy health check | `GET /api/integrations/uber-eats/webhook` | Confirmar endpoint vivo post-submission | PENDIENTE |
+| D3-002 | Re-auth USL | `GET /api/integrations/uber-eats/auth/initiate?store_id=633b57d4-...` | URL OAuth fresca — confirmar flujo vivo | MANUAL (browser) |
+| D3-003 | Scope probe — `eats.order` | `GET /api/integrations/uber-eats/order?order_id=CERT-...` | Si Uber otorgó scope → primera evidencia real de get_details | PENDIENTE |
+| D3-004 | Delivery Store API | `GET /api/integrations/uber-eats/store?store_id=633b57d4-...` | Retry UBER-008 — puede PASS si scope cambió | PENDIENTE |
+| D3-005 | Fresh order webhook | `/sandbox` con nuevo `order_id` | Timestamps post-Submission #2 en `delivery_orders` | PENDIENTE |
+| D3-006 | Mark Ready (UBER-015 retry) | `POST /order {action:"ready"}` | Si `eats.order` disponible → PASS real | PENDIENTE |
+| D3-007 | Audit log export | Supabase query `integration_audit_log` | Exportar todos los correlation IDs de Day 3 | PENDIENTE |
+
+### Notas
+
+- **D3-002 (USL re-auth)**: requiere browser — el workflow genera la URL; Daniel completa el redirect manualmente en Uber.
+- **D3-003/D3-004/D3-006**: resultado depende de si Uber amplió los scopes tras Submission #2. Si siguen en SANDBOX LIMIT → documentar con timestamp nuevo (evidencia de consistencia).
+- **D3-005**: usar `order_id` con timestamp embebido (`CERT-DAY3-<epoch>`) para distinguir de evidencia Day 2.
+- **NO usar evidencia D3-005 como suficiente por sí sola**: Uber necesita ver flujo real de su plataforma. D3-005 es evidencia de implementación, no de integración end-to-end.
+
+### Evidencia esperada — Audit log export (D3-007)
+
+```sql
+-- Ejecutar en Supabase SQL Editor post Day 3
+SELECT
+  action,
+  correlation_id,
+  status_code,
+  duration_ms,
+  created_at,
+  request_summary,
+  response_summary
+FROM integration_audit_log
+WHERE created_at > '2026-08-02T00:30:00Z'   -- después de Submission #2
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+### Resultados Day 3
+
+```
+D3-001 (health check):      [PENDIENTE]
+D3-002 (USL re-auth URL):   [PENDIENTE — MANUAL]
+D3-003 (scope probe):       [PENDIENTE]
+D3-004 (store API):         [PENDIENTE]
+D3-005 (fresh order ID):    [PENDIENTE]
+D3-006 (mark ready):        [PENDIENTE]
+D3-007 (audit log):         [PENDIENTE]
+
+Workflow run ID:             [PENDIENTE]
+Timestamp inicio:            [PENDIENTE]
+```

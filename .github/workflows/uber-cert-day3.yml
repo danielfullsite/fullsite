@@ -1,0 +1,137 @@
+name: UBER Day 3 — Scope Probe + Delivery APIs + Fresh Evidence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  day3:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://app.fullsite.mx
+      INTEGRATION_ADMIN_SECRET: ${{ secrets.INTEGRATION_ADMIN_SECRET }}
+      CERT_STORE_ID: 633b57d4-237a-5a32-b249-7ceb795f1d35
+
+    steps:
+      - name: D3-001 — Deploy health check
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" "$APP_URL/api/integrations/uber-eats/webhook")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-001 HTTP: $HTTP_CODE — $BODY"
+          echo "D3001_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3001_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: D3-002 — USL re-auth initiate (generate fresh OAuth URL)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" \
+            "$APP_URL/api/integrations/uber-eats/auth/initiate?store_id=$CERT_STORE_ID")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-002 HTTP: $HTTP_CODE"
+          # URL contiene secrets — solo loguear el status code
+          echo "D3-002 USL initiate: HTTP $HTTP_CODE — URL generada (requiere completar en browser)"
+          echo "D3002_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+
+      - name: D3-003 — Scope probe (eats.order — retry get_details)
+        run: |
+          CERT_ORDER=CERT-1785628914964
+          RESP=$(curl -s -w "\n%{http_code}" \
+            "$APP_URL/api/integrations/uber-eats/order?order_id=$CERT_ORDER&store_id=$CERT_STORE_ID")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-003 HTTP: $HTTP_CODE — $BODY"
+          echo "D3003_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3003_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: D3-004 — Delivery Store API (retry UBER-008 — get store status)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" \
+            "$APP_URL/api/integrations/uber-eats/store?store_id=$CERT_STORE_ID")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-004 HTTP: $HTTP_CODE — $BODY"
+          echo "D3004_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3004_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: D3-005 — Fresh order webhook (new order ID, post-submission timestamp)
+        run: |
+          EPOCH=$(date +%s)
+          FRESH_ORDER_ID="CERT-DAY3-$EPOCH"
+          echo "D3-005 order_id: $FRESH_ORDER_ID"
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/sandbox" \
+            -H "Authorization: Bearer $INTEGRATION_ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"test_webhook\",\"store_id\":\"$CERT_STORE_ID\",\"order_id\":\"$FRESH_ORDER_ID\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-005 HTTP: $HTTP_CODE — $BODY"
+          echo "D3005_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3005_BODY=$BODY" >> $GITHUB_ENV
+          echo "D3005_ORDER_ID=$FRESH_ORDER_ID" >> $GITHUB_ENV
+
+      - name: D3-006 — Mark Ready probe (UBER-015 retry — check if scope granted)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$D3005_ORDER_ID\",\"action\":\"ready\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-006 HTTP: $HTTP_CODE — $BODY"
+          echo "D3006_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3006_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: D3-007 — Accept probe (UBER-012 retry — check if scope granted)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$D3005_ORDER_ID\",\"action\":\"accept\",\"minutes_to_ready\":20}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-007 (accept) HTTP: $HTTP_CODE — $BODY"
+          echo "D3007_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3007_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: D3-008 — Deny probe (UBER-013 retry)
+        run: |
+          RESP=$(curl -s -w "\n%{http_code}" -X POST \
+            "$APP_URL/api/integrations/uber-eats/order" \
+            -H "Content-Type: application/json" \
+            -d "{\"order_id\":\"$D3005_ORDER_ID\",\"action\":\"deny\",\"reason\":\"ITEM_UNAVAILABLE\"}")
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "D3-008 (deny) HTTP: $HTTP_CODE — $BODY"
+          echo "D3008_HTTP=$HTTP_CODE" >> $GITHUB_ENV
+          echo "D3008_BODY=$BODY" >> $GITHUB_ENV
+
+      - name: Summary
+        run: |
+          echo "==== DAY 3 SUMMARY ===="
+          echo "D3-001 health:        HTTP $D3001_HTTP — $D3001_BODY"
+          echo "D3-002 USL initiate:  HTTP $D3002_HTTP"
+          echo "D3-003 scope probe:   HTTP $D3003_HTTP — $D3003_BODY"
+          echo "D3-004 store API:     HTTP $D3004_HTTP — $D3004_BODY"
+          echo "D3-005 fresh order:   HTTP $D3005_HTTP — order=$D3005_ORDER_ID"
+          echo "D3-006 mark ready:    HTTP $D3006_HTTP — $D3006_BODY"
+          echo "D3-007 accept:        HTTP $D3007_HTTP — $D3007_BODY"
+          echo "D3-008 deny:          HTTP $D3008_HTTP — $D3008_BODY"
+
+      - name: Notify Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+        run: |
+          MSG="*UBER Day 3 — Scope Probe + Fresh Evidence*%0A%0A"
+          MSG="${MSG}D3-001 health: $D3001_HTTP%0A"
+          MSG="${MSG}D3-002 USL: $D3002_HTTP%0A"
+          MSG="${MSG}D3-003 scope probe: $D3003_HTTP $D3003_BODY%0A"
+          MSG="${MSG}D3-004 store API: $D3004_HTTP $D3004_BODY%0A"
+          MSG="${MSG}D3-005 fresh order ($D3005_ORDER_ID): $D3005_HTTP%0A"
+          MSG="${MSG}D3-006 mark ready: $D3006_HTTP $D3006_BODY%0A"
+          MSG="${MSG}D3-007 accept: $D3007_HTTP%0A"
+          MSG="${MSG}D3-008 deny: $D3008_HTTP%0A%0A"
+          MSG="${MSG}Ticket: %23D5FEA8 — NO marcar certified hasta respuesta Uber"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID&text=$MSG&parse_mode=Markdown" > /dev/null
