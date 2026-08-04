@@ -14,11 +14,13 @@ Allowed events (all others silently suppressed):
 
 NOT sent: heartbeats, cycle starts, claims, retries, progress logs.
 Deduplication: same event+task_id won't repeat within dedup_ttl_s (default 1h).
+Dedup file lives in docs/agent-os/ (persistent across reboots — not /tmp).
 Failures: fully swallowed — never raises, never blocks supervisor loop.
 """
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import time
@@ -26,7 +28,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-_DEDUP_FILE = pathlib.Path('/tmp/agent-os-notified.json')
+_REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
+# Persistent dedup — survives supervisor restarts and machine reboots.
+# Previously used /tmp/ which was cleared between restarts, bypassing dedup.
+_DEDUP_FILE = _REPO_ROOT / 'docs' / 'agent-os' / '.notified.json'
 _SECRETS_FILE = pathlib.Path.home() / '.agent-os.env'
 
 ALLOWED_EVENTS = frozenset({
@@ -179,6 +184,35 @@ def notify(event_type: str, details: dict = None, dedup_ttl_s: int = 3600) -> bo
     return ok
 
 
+# ── Git commit validation ─────────────────────────────────────────────────────
+
+def _is_real_git_commit(commit: str) -> bool:
+    """Return True only if commit is a hex string resolvable in the repo via git cat-file -e."""
+    if not commit or not isinstance(commit, str):
+        return False
+    # Basic hex format: 7–40 lowercase hex chars
+    if not re.fullmatch(r'[0-9a-f]{7,40}', commit.strip().lower()):
+        return False
+    try:
+        r = subprocess.run(
+            ['git', 'cat-file', '-e', commit.strip()],
+            cwd=str(_REPO_ROOT), capture_output=True, timeout=5,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _safe_commit_display(commit) -> str:
+    """Return first 12 chars if commit is a real git object, else a warning token."""
+    if not commit:
+        return '?'
+    s = str(commit).strip()
+    if _is_real_git_commit(s):
+        return s[:12]
+    return '⚠️unverified'
+
+
 # ── Message templates ─────────────────────────────────────────────────────────
 
 def _format_message(event_type: str, d: dict) -> str:
@@ -186,11 +220,27 @@ def _format_message(event_type: str, d: dict) -> str:
     title = d.get('title', '')
 
     if event_type == 'TASK_CLOSED':
-        commit = d.get('commit', '?')[:12]
+        merge_commit = d.get('commit')
+        eng_commit = d.get('engineer_commit')
+
+        merge_disp = _safe_commit_display(merge_commit)
+        eng_disp = _safe_commit_display(eng_commit)
+
+        # Show both hashes when they differ (engineer branch commit vs merge commit)
+        if eng_commit and merge_commit and eng_commit != merge_commit:
+            commit_line = (
+                f"Engineer: <code>{eng_disp}</code> · "
+                f"Merge: <code>{merge_disp}</code>"
+            )
+        else:
+            # Fall back to whichever is available
+            disp = merge_disp if merge_commit else eng_disp
+            commit_line = f"Commit: <code>{disp}</code>"
+
         return (
             f"✅ <b>Tarea completada</b>\n"
             f"<code>{tid}</code> {title}\n"
-            f"Commit: <code>{commit}</code>"
+            f"{commit_line}"
         )
 
     if event_type == 'TASK_BLOCKED':

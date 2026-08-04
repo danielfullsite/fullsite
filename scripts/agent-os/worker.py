@@ -246,6 +246,32 @@ def _invoke_claude(prompt: str, task_id: str, phase: str, cwd: str = None) -> di
             pass
 
 
+def _validate_commit_field(raw: str | None) -> str | None:
+    """Return the commit hash if it resolves in the repo, else None.
+
+    Catches placeholder values like 'git-hash-here' or 'abc123def456' that
+    pass hex-format checks but are not real git objects.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    s = raw.strip().lower()
+    if not re.fullmatch(r'[0-9a-f]{7,40}', s):
+        print(f'[worker] commit field "{raw}" is not hex — discarding', flush=True)
+        return None
+    try:
+        r = subprocess.run(
+            ['git', 'cat-file', '-e', s],
+            cwd=REPO_ROOT, capture_output=True, timeout=5,
+        )
+        if r.returncode != 0:
+            print(f'[worker] commit "{raw}" not found in repo — discarding', flush=True)
+            return None
+        return s
+    except Exception as exc:
+        print(f'[worker] git cat-file failed: {exc}', flush=True)
+        return None
+
+
 def _parse_result(output: str) -> dict:
     """Extract AGENT_OS_RESULT JSON block from claude output."""
     match = re.search(
@@ -254,7 +280,10 @@ def _parse_result(output: str) -> dict:
     )
     if match:
         try:
-            return json.loads(match.group(1))
+            parsed = json.loads(match.group(1))
+            # Validate the commit field — reject placeholders and unresolvable hashes
+            parsed['commit'] = _validate_commit_field(parsed.get('commit'))
+            return parsed
         except json.JSONDecodeError as e:
             print(f'[worker] JSON parse error: {e}')
 

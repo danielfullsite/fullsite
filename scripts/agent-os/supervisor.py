@@ -451,22 +451,29 @@ def _handle_verified_tasks():
             else:
                 result = load_result(task_id)
                 evidence = result.get('evidence', 'Verified') if result else 'Verified'
+                engineer_commit = result.get('commit') if result else None
                 _log(f'Closing R3 task {task_id} — merge + CLOSED + gate update')
                 commit = merge_and_close_task(task_id, evidence)
                 _last_completed = task_id
-                _log(f'Task {task_id} CLOSED. Merge commit: {commit}')
+                _log(f'Task {task_id} CLOSED. Engineer: {engineer_commit} Merge: {commit}')
                 audit('PIPELINE_COMPLETE', {
                     'task_id': task_id,
                     'commit': commit,
+                    'engineer_commit': engineer_commit,
                     'gates': tags,
                 })
                 try:
                     task = load_task(task_id)
-                    _tg('TASK_CLOSED', {
-                        'task_id': task_id,
-                        'title': task.get('title', ''),
-                        'commit': commit,
-                    })
+                    # Guard: only notify if task is actually in terminal status
+                    if task.get('status') not in ('CLOSED', 'MERGED'):
+                        _log(f'WARN: {task_id} not CLOSED after merge — skipping notification')
+                    else:
+                        _tg('TASK_CLOSED', {
+                            'task_id': task_id,
+                            'title': task.get('title', ''),
+                            'commit': commit,
+                            'engineer_commit': engineer_commit,
+                        })
                 except Exception:
                     pass
         except Exception as e:
