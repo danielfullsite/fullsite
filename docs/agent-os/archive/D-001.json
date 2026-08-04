@@ -16,5 +16,7 @@
   "action_requested": "APROBAR VISITA DE CERTIFICACIÓN",
   "response": "CHANGES_REQUESTED",
   "response_at": "2026-08-04T15:40:27Z",
-  "response_notes": "D-001 omite AUTH-OFFLINE-02 (GAP-A abierto en RUNTIME-GAP-REGISTER al momento de TSK-001). Verification cruzó AUDIT-FINDINGS.md pero no RUNTIME-GAP-REGISTER. OC-09 era CODE PARTIAL cuando se emitió D-001. Fix llegó en commits 72625e7+c2e4770 post-decisión. Requiere D-002 con evidencia completa de ambos commits."
+  "response_notes": "D-001 omite AUTH-OFFLINE-02 (GAP-A abierto en RUNTIME-GAP-REGISTER al momento de TSK-001). Verification cruzó AUDIT-FINDINGS.md pero no RUNTIME-GAP-REGISTER. OC-09 era CODE PARTIAL cuando se emitió D-001. Fix llegó en commits 72625e7+c2e4770 post-decisión. Requiere D-002 con evidencia completa de ambos commits.",
+  "archived_at": "2026-08-04T16:04:10Z",
+  "archive_reason": "Superseded by D-002 after CHANGES_REQUESTED"
 }

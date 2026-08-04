@@ -22,6 +22,7 @@ sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from shared import (
     load_state, is_killed, load_tasks_index, load_pending_decisions,
     create_task, transition_task, update_state, audit, ensure_dirs,
+    is_gate_completed,
     ACTIVE_DIR, INBOX_DIR, now_iso,
 )
 
@@ -133,6 +134,9 @@ def _count_active(role=None):
     return count
 
 def _task_exists_for_gate(gate_tag):
+    # Gate permanently completed (task MERGED) — don't recreate
+    if is_gate_completed(gate_tag):
+        return True
     index = load_tasks_index()
     terminal = {'MERGED', 'CANCELLED', 'REJECTED', 'APPROVED'}
     for tid, meta in index.items():

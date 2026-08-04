@@ -4,7 +4,7 @@
   "objective": "Crear contract tests que validen el protocolo Bridge WS y los endpoints REST del local server",
   "role": "RUNTIME_ENGINEER",
   "priority": "P1",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "tags": [
     "http-contracts",
     "r3",
@@ -28,7 +28,7 @@
   "submitted_at": null,
   "verified_at": null,
   "created_at": "2026-08-04T15:26:38Z",
-  "updated_at": "2026-08-04T15:26:38Z",
+  "updated_at": "2026-08-04T16:11:20Z",
   "history": [
     {
       "from": null,
@@ -36,6 +36,20 @@
       "by": "ORCHESTRATOR",
       "at": "2026-08-04T15:26:38Z",
       "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T16:11:20Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T16:11:20Z",
+      "note": "Engineering started"
     }
   ]
 }

@@ -23,3 +23,23 @@
 {"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "AUTH-OFFLINE-02 incorporated. All gaps checked including RUNTIME-GAP-REGISTER."}
 {"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "RUNTIME_VERIFICATION", "note": "D-002 created — complete Field Batch #2 evidence"}
 {"ts": "2026-08-04T15:42:33Z", "type": "DECISION_CREATED", "decision_id": "D-002", "task_id": "TSK-001"}
+{"ts": "2026-08-04T15:45:41Z", "type": "DECISION_RESPONSE", "decision_id": "D-002", "response": "APPROVED", "by": "FOUNDER"}
+{"ts": "2026-08-04T16:04:10Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "AWAITING_FOUNDER", "to": "APPROVED", "by": "SUPERVISOR", "note": "Decision D-002 approved by Founder"}
+{"ts": "2026-08-04T16:04:10Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "APPROVED", "to": "MERGED", "by": "SUPERVISOR", "note": "Auto-merged after Founder approval"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "field-batch-2"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "r1"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "offline-sync"}
+{"ts": "2026-08-04T16:04:10Z", "type": "DECISION_PROPAGATED", "decision_id": "D-002", "task_id": "TSK-001", "task_final": "MERGED", "response": "APPROVED"}
+{"ts": "2026-08-04T16:11:20Z", "type": "SUPERVISOR_STARTED", "pid": 45257}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-002", "phase": "engineer", "pid": 45258}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-003", "phase": "engineer", "pid": 45259}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_STARTED", "task_id": "TSK-003", "phase": "engineer", "pid": 45259}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "engineer", "pid": 45258}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T16:11:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "engineer", "budget_usd": 3.0}
+{"ts": "2026-08-04T16:11:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0}
+{"ts": "2026-08-04T16:13:56Z", "type": "SUPERVISOR_STARTED", "pid": 46612}
+{"ts": "2026-08-04T16:14:07Z", "type": "SUPERVISOR_STARTED", "pid": 46625}

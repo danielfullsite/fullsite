@@ -1,7 +1,7 @@
 {
   "TSK-001": {
     "title": "Field Batch #2 — Code Readiness for OCS-P2.5.9",
-    "status": "AWAITING_FOUNDER",
+    "status": "MERGED",
     "role": "RUNTIME_VERIFICATION",
     "priority": "P0",
     "tags": [
@@ -9,11 +9,11 @@
       "r1",
       "offline-sync"
     ],
-    "updated_at": "2026-08-04T15:42:33Z"
+    "updated_at": "2026-08-04T16:04:10Z"
   },
   "TSK-002": {
     "title": "HTTP Contract Tests — Bridge WS + REST API",
-    "status": "READY",
+    "status": "IN_PROGRESS",
     "role": "RUNTIME_ENGINEER",
     "priority": "P1",
     "tags": [
@@ -21,11 +21,11 @@
       "r3",
       "testing"
     ],
-    "updated_at": "2026-08-04T15:26:38Z"
+    "updated_at": "2026-08-04T16:11:20Z"
   },
   "TSK-003": {
     "title": "Logging Persistente — Electron logs survive restarts",
-    "status": "READY",
+    "status": "IN_PROGRESS",
     "role": "RUNTIME_ENGINEER",
     "priority": "P1",
     "tags": [
@@ -33,6 +33,6 @@
       "r3",
       "observability"
     ],
-    "updated_at": "2026-08-04T15:26:38Z"
+    "updated_at": "2026-08-04T16:11:20Z"
   }
 }

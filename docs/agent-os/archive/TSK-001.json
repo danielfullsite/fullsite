@@ -4,7 +4,7 @@
   "objective": "Preparar todo el trabajo de código ejecutable antes de la visita física a AMALAY para que la visita sea exclusivamente de certificación",
   "role": "RUNTIME_VERIFICATION",
   "priority": "P0",
-  "status": "AWAITING_FOUNDER",
+  "status": "MERGED",
   "tags": [
     "field-batch-2",
     "r1",
@@ -32,7 +32,7 @@
   "submitted_at": "2026-08-04T15:29:53Z",
   "verified_at": "2026-08-04T15:30:03Z",
   "created_at": "2026-08-04T15:26:38Z",
-  "updated_at": "2026-08-04T15:42:33Z",
+  "updated_at": "2026-08-04T16:04:10Z",
   "history": [
     {
       "from": null,
@@ -124,6 +124,20 @@
       "by": "RUNTIME_VERIFICATION",
       "at": "2026-08-04T15:42:33Z",
       "note": "D-002 created — complete Field Batch #2 evidence"
+    },
+    {
+      "from": "AWAITING_FOUNDER",
+      "to": "APPROVED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T16:04:10Z",
+      "note": "Decision D-002 approved by Founder"
+    },
+    {
+      "from": "APPROVED",
+      "to": "MERGED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T16:04:10Z",
+      "note": "Auto-merged after Founder approval"
     }
   ]
 }

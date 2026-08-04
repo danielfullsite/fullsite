@@ -439,12 +439,107 @@ def load_pending_decisions():
     decisions = []
     if os.path.isdir(DECISIONS_DIR):
         for fn in sorted(os.listdir(DECISIONS_DIR)):
-            # Decision files are named D-NNN.json; task files are TSK-NNN.json
             if fn.startswith('D-') and fn.endswith('.json') and not fn.endswith('.tmp'):
                 d = read_json(os.path.join(DECISIONS_DIR, fn), {})
                 if d.get('status') == 'AWAITING_FOUNDER':
                     decisions.append(d)
     return decisions
+
+# ── Gate completion tracking ──────────────────────────────────────────────────
+
+def mark_gate_completed(gate_tag: str):
+    """Record that a gate is done so the Orchestrator won't recreate its task."""
+    with FileLock(STATE_FILE):
+        state = _load_state_raw()
+        gates = state.get('completed_gates', [])
+        if gate_tag not in gates:
+            gates.append(gate_tag)
+        state['completed_gates'] = gates
+        _save_state_raw(state)
+    audit('GATE_COMPLETED', {'gate_tag': gate_tag})
+
+def is_gate_completed(gate_tag: str) -> bool:
+    return gate_tag in _load_state_raw().get('completed_gates', [])
+
+# ── Decision propagation ──────────────────────────────────────────────────────
+
+def _archive_decision_file(decision_id: str):
+    """Move decision file from decisions/ to archive/."""
+    src = _decision_path(decision_id)
+    if not os.path.exists(src):
+        return
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    dst = os.path.join(ARCHIVE_DIR, f'{decision_id}.json')
+    d = read_json(src)
+    d['archived_at'] = now_iso()
+    write_json(dst, d)
+    os.unlink(src)
+    _refresh_founder_inbox()
+
+def propagate_decision_to_task(decision_id: str):
+    """
+    Propagate a Founder Decision result to the linked task.
+
+    Root cause of original bug (D-001/D-002 desync): approve_decision.py called
+    respond_to_decision() which only updated D-XXX.json. It did NOT transition the
+    linked task from AWAITING_FOUNDER → APPROVED → MERGED, and did NOT update the
+    heartbeat. This function fixes that gap.
+
+    Called by: approve_decision.py, reject_decision.py, supervisor.py reconcile loop.
+    """
+    path = _decision_path(decision_id)
+    if not os.path.exists(path):
+        # May already be archived
+        arch = os.path.join(ARCHIVE_DIR, f'{decision_id}.json')
+        if not os.path.exists(arch):
+            return
+        return  # Already propagated
+    d = read_json(path)
+    response = d.get('response')
+    task_id  = d.get('task_id')
+
+    if not response or response == 'CHANGES_REQUESTED':
+        return  # Nothing to propagate for changes-requested
+
+    if not task_id:
+        _archive_decision_file(decision_id)
+        return
+
+    # Find task regardless of current directory
+    task_path = find_task_file(task_id)
+    if not task_path:
+        audit('PROPAGATION_SKIP', {'decision_id': decision_id, 'reason': f'{task_id} not found'})
+        _archive_decision_file(decision_id)
+        return
+
+    task = read_json(task_path)
+    current_status = task.get('status', '')
+
+    if response == 'APPROVED':
+        if current_status == 'AWAITING_FOUNDER':
+            transition_task(task_id, 'APPROVED', by='SUPERVISOR',
+                           note=f'Decision {decision_id} approved by Founder')
+            transition_task(task_id, 'MERGED', by='SUPERVISOR',
+                           note='Auto-merged after Founder approval')
+        for tag in task.get('tags', []):
+            mark_gate_completed(tag)
+        audit('DECISION_PROPAGATED', {
+            'decision_id': decision_id, 'task_id': task_id,
+            'task_final': 'MERGED', 'response': 'APPROVED',
+        })
+
+    elif response == 'REJECTED':
+        if current_status == 'AWAITING_FOUNDER':
+            transition_task(task_id, 'REJECTED', by='SUPERVISOR',
+                           note=f'Decision {decision_id} rejected by Founder')
+            transition_task(task_id, 'CANCELLED', by='SUPERVISOR',
+                           note='Cancelled after rejection')
+        audit('DECISION_PROPAGATED', {
+            'decision_id': decision_id, 'task_id': task_id,
+            'task_final': 'CANCELLED', 'response': 'REJECTED',
+        })
+
+    _archive_decision_file(decision_id)
 
 # ── Result/Review CRUD ────────────────────────────────────────────────────────
 
