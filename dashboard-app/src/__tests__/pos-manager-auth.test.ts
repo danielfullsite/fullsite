@@ -81,15 +81,21 @@ describe('provisionManagerCredential + verifyPinOffline', () => {
 
 describe('TTL expiration', () => {
   it('expired credential is rejected', async () => {
+    // Provision as if 25 hours ago (past the 24h TTL)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.now() - 25 * 60 * 60 * 1000))
     await provisionManagerCredential('1234', 'staff-exp', 'Old Manager', 'gerente')
-    // Manually expire the credential
-    const raw = localStorage.getItem('pos_manager_credentials_v2')!
-    const creds = JSON.parse(raw)
-    creds[0].synced_at = Date.now() - 9 * 60 * 60 * 1000  // 9 hours ago > 8h TTL
-    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
+    vi.useRealTimers()
 
     const result = await verifyPinOffline('1234')
     expect(result).toBeNull()
+  })
+
+  it('fresh credential within TTL is accepted', async () => {
+    await provisionManagerCredential('4321', 'staff-fresh', 'Fresh Manager', 'gerente')
+    const result = await verifyPinOffline('4321')
+    expect(result).not.toBeNull()
+    expect(result?.name).toBe('Fresh Manager')
   })
 })
 
@@ -110,13 +116,100 @@ describe('pruneStaleCredentials', () => {
     const raw = localStorage.getItem('pos_manager_credentials_v2')!
     const creds = JSON.parse(raw)
     const staleIdx = creds.findIndex((c: { staff_id: string }) => c.staff_id === 'staff-stale')
-    creds[staleIdx].synced_at = Date.now() - 9 * 60 * 60 * 1000
+    creds[staleIdx].synced_at = Date.now() - 25 * 60 * 60 * 1000  // 25h > 24h TTL
     localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
 
     pruneStaleCredentials()
     const managers = listCachedManagers()
     expect(managers.map(m => m.staff_id)).not.toContain('staff-stale')
     expect(managers.map(m => m.staff_id)).toContain('staff-fresh')
+  })
+})
+
+describe('TTL — 24h boundary', () => {
+  it('credential at 23h 59m 59s is still accepted', async () => {
+    await provisionManagerCredential('5555', 'staff-ttl', 'Fresh Manager', 'gerente')
+    const raw = localStorage.getItem('pos_manager_credentials_v2')!
+    const creds = JSON.parse(raw)
+    creds[0].synced_at = Date.now() - (24 * 60 * 60 * 1000 - 1000) // 1s before expiry
+    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
+    const result = await verifyPinOffline('5555')
+    expect(result).not.toBeNull()
+  })
+
+  it('credential at exactly 24h+1ms is rejected', async () => {
+    await provisionManagerCredential('6666', 'staff-exp2', 'Expired Manager', 'gerente')
+    const raw = localStorage.getItem('pos_manager_credentials_v2')!
+    const creds = JSON.parse(raw)
+    creds[0].synced_at = Date.now() - (24 * 60 * 60 * 1000 + 1)
+    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify(creds))
+    const result = await verifyPinOffline('6666')
+    expect(result).toBeNull()
+  })
+})
+
+describe('corrupt credential store', () => {
+  it('returns null and does not throw when store contains invalid JSON', async () => {
+    localStorage.setItem('pos_manager_credentials_v2', 'NOT_VALID_JSON{{{')
+    const result = await verifyPinOffline('1234')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when store has valid JSON but wrong-shaped objects', async () => {
+    localStorage.setItem('pos_manager_credentials_v2', JSON.stringify([{ bad: 'data' }, { also: 'bad' }]))
+    const result = await verifyPinOffline('1234')
+    expect(result).toBeNull()
+  })
+})
+
+describe('re-provisioning after revocation', () => {
+  it('re-provisioning a revoked credential re-enables access', async () => {
+    await provisionManagerCredential('4444', 'staff-rev2', 'Manager Rev', 'gerente')
+    revokeManagerCredential('staff-rev2')
+    expect(await verifyPinOffline('4444')).toBeNull()
+    // Online auth succeeds → re-provision
+    await provisionManagerCredential('4444', 'staff-rev2', 'Manager Rev', 'gerente')
+    expect(await verifyPinOffline('4444')).not.toBeNull()
+  })
+
+  it('revoking one does not affect others', async () => {
+    await provisionManagerCredential('1111', 'staff-a', 'Manager A', 'gerente')
+    await provisionManagerCredential('2222', 'staff-b', 'Manager B', 'admin')
+    revokeManagerCredential('staff-a')
+    expect(await verifyPinOffline('1111')).toBeNull()
+    expect(await verifyPinOffline('2222')).not.toBeNull()
+  })
+})
+
+describe('migration from legacy btoa cache', () => {
+  it('PBKDF2 store is independent — does not read btoa cache', async () => {
+    // Simulate a legacy btoa cache entry (as written by old pos-data.ts)
+    const legacyCache = { [btoa('1234')]: { name: 'Legacy Manager', role: 'gerente', cached_at: Date.now() } }
+    localStorage.setItem('pos_manager_pin_cache', JSON.stringify(legacyCache))
+
+    // verifyPinOffline reads only the PBKDF2 store — should NOT find the btoa entry
+    const result = await verifyPinOffline('1234')
+    expect(result).toBeNull()
+  })
+
+  it('PBKDF2 provisioning does not wipe the legacy btoa cache', async () => {
+    const legacyCache = { [btoa('1234')]: { name: 'Legacy Manager', role: 'gerente', cached_at: Date.now() } }
+    localStorage.setItem('pos_manager_pin_cache', JSON.stringify(legacyCache))
+
+    // Provision a DIFFERENT pin with PBKDF2
+    await provisionManagerCredential('5678', 'staff-new', 'New Manager', 'admin')
+
+    // Legacy cache must be untouched
+    const still = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+    expect(still[btoa('1234')]?.name).toBe('Legacy Manager')
+  })
+
+  it('after online auth + PBKDF2 provision, PIN verifies via PBKDF2', async () => {
+    // Simulates what pos-data.ts does on successful online auth
+    await provisionManagerCredential('1234', 'staff-m', 'Migrated Manager', 'gerente')
+    const result = await verifyPinOffline('1234')
+    expect(result?.name).toBe('Migrated Manager')
+    expect(result?.role).toBe('gerente')
   })
 })
 

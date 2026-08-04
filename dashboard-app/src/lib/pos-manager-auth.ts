@@ -30,7 +30,7 @@
  */
 
 const PBKDF2_ITERATIONS = 10_000
-const CREDENTIAL_TTL_MS = 8 * 60 * 60 * 1000  // 8 hours
+const CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1000  // 24h — full overnight shift (AUTH-01)
 const CREDENTIALS_KEY = 'pos_manager_credentials_v2'
 const DEVICE_SALT_KEY = 'pos_pin_device_salt'
 const OFFLINE_LOG_KEY = 'pos_offline_auth_log'

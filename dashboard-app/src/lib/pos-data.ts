@@ -269,6 +269,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
 import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
+import { provisionManagerCredential, verifyPinOffline } from '@/lib/pos-manager-auth'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
@@ -1217,14 +1218,15 @@ export async function fetchMeseros(clientId?: string): Promise<string[]> {
       const rows: { name: string }[] = await res.json()
       if (rows.length > 0) {
         MESEROS = rows.map(r => r.name)
-        try { localStorage.setItem('pos_staff_cache', JSON.stringify(MESEROS)) } catch {}
+        // pos_meseros_cache — distinct from pos_staff_cache (reserved for offline staff auth)
+        try { localStorage.setItem('pos_meseros_cache', JSON.stringify(MESEROS)) } catch {}
         return MESEROS
       }
     }
   } catch {
     // Network error — try localStorage cache
     try {
-      const cached = localStorage.getItem('pos_staff_cache')
+      const cached = localStorage.getItem('pos_meseros_cache')
       if (cached) {
         const parsed: string[] = JSON.parse(cached)
         if (parsed.length > 0) { MESEROS = parsed; return MESEROS }
@@ -1670,18 +1672,40 @@ export async function getAuditLogForOrder(orderId: string): Promise<AuditLogEntr
   return res.json()
 }
 
-// Simple hash for PIN cache keys — keeps plaintext out of localStorage.
-// Uses btoa(pin) as a deterministic, non-reversible-enough obfuscation for cache keying.
-// (Not cryptographic — purpose is to avoid storing raw PINs, not to resist an attacker
-//  with full localStorage access; that threat is out of scope for an in-person POS.)
+// ─── DEPRECATED: btoa legacy manager PIN cache ────────────────────────────────
+// Written by pre-2026-08-04 sessions. New sessions use PBKDF2 (pos-manager-auth.ts).
+// Remove after field recertification confirms pos_btoa_fallback_count = 0 across all terminals.
 function _pinCacheKey(pin: string): string {
   return btoa(pin)
 }
+const _LEGACY_PIN_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+// Telemetry: incremented every time btoa fallback is used instead of PBKDF2.
+// Goal is 0 hits per terminal before retiring the legacy cache.
+// Read with: parseInt(localStorage.getItem('pos_btoa_fallback_count') || '0', 10)
+function _recordBtoaFallback(): void {
+  try {
+    const n = parseInt(localStorage.getItem('pos_btoa_fallback_count') || '0', 10)
+    localStorage.setItem('pos_btoa_fallback_count', String(Number.isNaN(n) ? 1 : n + 1))
+  } catch {}
+}
+
+async function _legacyBtoaFallback(pin: string): Promise<{ name: string; role: string } | null> {
+  try {
+    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
+    const entry = cached[_pinCacheKey(pin)]
+    if (entry?.name && Date.now() - (entry.cached_at || 0) < _LEGACY_PIN_CACHE_TTL_MS) {
+      _recordBtoaFallback()
+      return { name: entry.name as string, role: (entry.role as string) || 'gerente' }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Validación server-side de PIN de gerente (cancelaciones, descuentos, cortes).
-// Antes venía de NEXT_PUBLIC_MANAGER_PINS (expuesto en el bundle) — ahora valida
-// contra /api/pos/pin con manager=true (pos_staff admin/gerente + env server-only).
-// Cachea éxitos en localStorage para fallback offline.
+// Online: valida contra /api/pos/pin y provisiona credencial PBKDF2 para uso offline.
+// Offline: verifica contra credencial PBKDF2 (pos-manager-auth); fallback a btoa legacy.
 export async function verifyManagerPin(pin: string): Promise<string | null> {
   if (!pin) return null
   try {
@@ -1694,26 +1718,20 @@ export async function verifyManagerPin(pin: string): Promise<string | null> {
     if (res.ok) {
       const { staff } = await res.json()
       if (staff?.name) {
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role: staff.role || 'gerente', cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
+        const staffId = (staff.id as string | undefined) ?? (staff.name as string)
+        await provisionManagerCredential(pin, staffId, staff.name as string, (staff.role as string) || 'gerente').catch(() => {})
         return staff.name as string
       }
       return null
     }
     if (res.status === 401 || res.status === 400) return null
-  } catch { /* offline → fallback al cache */ }
-  // Fallback offline: PINs validados previamente (máx 8 horas — un turno)
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
-      return entry.name as string
-    }
-  } catch { /* ignore */ }
-  return null
+  } catch { /* offline → fallback */ }
+  // Fallback 1: PBKDF2 offline cache (canonical path)
+  const pbkdf2 = await verifyPinOffline(pin, 'manager_auth').catch(() => null)
+  if (pbkdf2) return pbkdf2.name
+  // Fallback 2: legacy btoa cache (migration — active until PBKDF2 provisioned)
+  const legacy = await _legacyBtoaFallback(pin)
+  return legacy?.name ?? null
 }
 
 /** Like verifyManagerPin but also returns the role — used for permission checks */
@@ -1729,27 +1747,20 @@ export async function verifyManagerPinWithRole(pin: string): Promise<{ name: str
     if (res.ok) {
       const { staff } = await res.json()
       if (staff?.name) {
-        const role = staff.role || 'gerente'
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
-        return { name: staff.name, role }
+        const role = (staff.role as string) || 'gerente'
+        const staffId = (staff.id as string | undefined) ?? (staff.name as string)
+        await provisionManagerCredential(pin, staffId, staff.name as string, role).catch(() => {})
+        return { name: staff.name as string, role }
       }
       return null
     }
     if (res.status === 401 || res.status === 400) return null
-  } catch { /* offline → fallback al cache */ }
-  // Fallback offline (máx 8 horas — un turno)
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) { // 15 min TTL
-      return { name: entry.name, role: entry.role || 'gerente' }
-    }
-  } catch { /* ignore */ }
-  return null
+  } catch { /* offline → fallback */ }
+  // Fallback 1: PBKDF2 offline cache
+  const pbkdf2 = await verifyPinOffline(pin, 'manager_auth_with_role').catch(() => null)
+  if (pbkdf2) return pbkdf2
+  // Fallback 2: legacy btoa cache (migration)
+  return _legacyBtoaFallback(pin)
 }
 
 /**
@@ -1773,25 +1784,21 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
     if (res.ok) {
       const { staff } = await res.json()
       if (staff?.name) {
-        const role = staff.role || minRole
-        try {
-          const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-          cached[_pinCacheKey(pin)] = { name: staff.name, role, cached_at: Date.now() }
-          localStorage.setItem('pos_manager_pin_cache', JSON.stringify(cached))
-        } catch { /* ignore */ }
-        return { name: staff.name, role }
+        const role = (staff.role as string) || minRole
+        const staffId = (staff.id as string | undefined) ?? (staff.name as string)
+        await provisionManagerCredential(pin, staffId, staff.name as string, role).catch(() => {})
+        return { name: staff.name as string, role }
       }
       return null
     }
     if (res.status === 401 || res.status === 400) return null
   } catch { /* offline → fallback */ }
-  try {
-    const cached = JSON.parse(localStorage.getItem('pos_manager_pin_cache') || '{}')
-    const entry = cached[_pinCacheKey(pin)]
-    if (entry?.name && Date.now() - (entry.cached_at || 0) < 8 * 60 * 60 * 1000) {
-      return { name: entry.name, role: entry.role || minRole }
-    }
-  } catch { /* ignore */ }
+  // Fallback 1: PBKDF2 offline cache
+  const pbkdf2 = await verifyPinOffline(pin, `min_role:${minRole}`).catch(() => null)
+  if (pbkdf2) return pbkdf2
+  // Fallback 2: legacy btoa cache (migration)
+  const legacy = await _legacyBtoaFallback(pin)
+  if (legacy) return { name: legacy.name, role: legacy.role || minRole }
   return null
 }
 
