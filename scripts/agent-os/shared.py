@@ -330,10 +330,64 @@ def update_task_fields(task_id, updates):
 def _decision_path(decision_id):
     return os.path.join(DECISIONS_DIR, f'{decision_id}.json')
 
+def assert_no_open_gaps(gap_register_path=None, fail_hard=True):
+    """
+    GAP-GATE — Block readiness decisions if open P0/P1 gaps exist in RUNTIME-GAP-REGISTER.md.
+
+    Why: D-001 was issued with AUTH-OFFLINE-02 (GAP-A) still open because RUNTIME_VERIFICATION
+    crossed AUDIT-FINDINGS.md but not RUNTIME-GAP-REGISTER.md. This gate prevents recurrence.
+
+    Returns list of open gap IDs (empty = clean). If fail_hard=True and gaps exist, raises.
+    """
+    if gap_register_path is None:
+        gap_register_path = os.path.join(REPO_ROOT, 'docs', 'runtime', 'RUNTIME-GAP-REGISTER.md')
+    if not os.path.exists(gap_register_path):
+        return []  # register not present → can't block (log a warning)
+    open_gaps = []
+    try:
+        with open(gap_register_path) as f:
+            content = f.read()
+        # Scan for open gap headers: "## GAP-xxx" followed by a Status line that is NOT CLOSED
+        import re
+        blocks = re.split(r'\n## (GAP-[A-Za-z0-9-]+)', content)
+        # blocks: [preamble, gap_id, gap_body, gap_id, gap_body, ...]
+        for i in range(1, len(blocks), 2):
+            gap_id = blocks[i]
+            gap_body = blocks[i+1] if i+1 < len(blocks) else ''
+            # Find status line: "| Status | CLOSED |" or "**Status:** CLOSED"
+            status_match = re.search(r'\|\s*[Ss]tatus\s*\|\s*(\w+)', gap_body)
+            if not status_match:
+                status_match = re.search(r'\*\*[Ss]tatus[:\*]+\s*(\w+)', gap_body)
+            status = status_match.group(1).upper() if status_match else 'UNKNOWN'
+            if status not in ('CLOSED', 'RESOLVED', 'MERGED'):
+                # Check severity — only block on P0/P1
+                sev_match = re.search(r'\|\s*[Ss]everity\s*\|\s*(P\d)', gap_body)
+                if not sev_match:
+                    sev_match = re.search(r'\*\*[Ss]everity[:\*]+\s*(P\d)', gap_body)
+                sev = sev_match.group(1) if sev_match else 'P1'  # conservative default
+                if sev in ('P0', 'P1'):
+                    open_gaps.append(f'{gap_id} [{sev}] status={status}')
+    except Exception as e:
+        audit('GAP_GATE_ERROR', {'error': str(e)})
+        return []
+    if open_gaps and fail_hard:
+        raise RuntimeError(
+            f'GAP-GATE: {len(open_gaps)} open P0/P1 gap(s) in RUNTIME-GAP-REGISTER — '
+            f'cannot create readiness decision until resolved: {open_gaps}. '
+            'Fix gaps or get explicit Founder waiver before proceeding.'
+        )
+    return open_gaps
+
 def create_decision(task_id, objective, what_changed, why_it_matters,
                     commit=None, tests_summary='', verification='VERIFIED',
                     risk='BAJO', rollback='No aplica',
-                    runtime_health_delta='Sin cambio', action_requested='APROBAR MERGE'):
+                    runtime_health_delta='Sin cambio', action_requested='APROBAR MERGE',
+                    skip_gap_gate=False):
+    # GAP-GATE: readiness decisions cannot be issued while P0/P1 gaps are open.
+    # skip_gap_gate=True only when Founder has explicitly waived (put reason in what_changed).
+    if not skip_gap_gate:
+        assert_no_open_gaps(fail_hard=True)  # raises if open gaps found
+
     decision_id = new_decision_id()
     ts = now_iso()
     decision = {

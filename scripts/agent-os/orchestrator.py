@@ -42,17 +42,31 @@ R1_WORKQUEUE = [
         'priority': 'P0',
         'tags': ['field-batch-2', 'r1', 'offline-sync'],
         'dod': [
+            # Audit findings (AUDIT-FINDINGS.md)
             'AF-001 verificado y documentado en AUDIT-FINDINGS o RESOLVED',
             'AF-002 verificado y documentado',
             'AF-003 verificado y documentado',
             'AF-004 verificado y documentado',
-            'GAP-A documentado con prioridad correcta en RUNTIME-HEALTH',
-            'Runtime Health actualizado con resultados',
+            'AF-005 (re-auditoría módulos no cubiertos) revisado o diferido con justificación',
+            # Runtime gaps (RUNTIME-GAP-REGISTER.md) — mandatory cross-check
+            'RUNTIME-GAP-REGISTER.md leído completo — listar todos los gaps abiertos',
+            'Todo gap abierto P0/P1 en RUNTIME-GAP-REGISTER: corregido o diferido con aprobación explícita del Founder',
+            'AUTH-OFFLINE-02 (GAP-A): verificar meetsMinRole enforcement en PBKDF2 + btoa offline paths en pos-data.ts',
+            # OC-09 specific
+            'OC-09 Auth offline: cada path (online→PBKDF2→btoa) verificado con tests; resultado CODE VERIFIED o CODE PARTIAL con evidencia',
+            # Docs & runtime health
+            'Runtime Health ORS recalculado con evidencia del día',
+            'RUNTIME-HEALTH.md actualizado (módulo Manager PIN offline)',
             'Preflight checklist PRE-01..PRE-12 revisado — ítems ajustables marcados',
-            'FIELD BATCH #2 decision card creada en FOUNDER-INBOX',
+            # Decision gate
+            'FIELD BATCH #2 decision card creada en FOUNDER-INBOX solo si: 0 gaps P0, OC-09 CODE VERIFIED, ORS ≥ 80',
         ],
         'budget_tokens': 150_000,
-        'notes': 'No declara ninguna prueba física como completada. Solo prepara el trabajo de código.',
+        'notes': (
+            'No declara ninguna prueba física como completada. Solo prepara el trabajo de código. '
+            'OBLIGATORIO: cruzar RUNTIME-GAP-REGISTER.md además de AUDIT-FINDINGS.md. '
+            'Una decisión de readiness que omite gaps abiertos en el register es inválida — ver POLICIES.md §GAP-GATE.'
+        ),
     },
 ]
 

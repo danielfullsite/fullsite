@@ -1,0 +1,20 @@
+{
+  "id": "D-002",
+  "task_id": "TSK-001",
+  "status": "AWAITING_FOUNDER",
+  "created_at": "2026-08-04T15:42:33Z",
+  "updated_at": "2026-08-04T15:42:33Z",
+  "objective": "APROBAR VISITA DE CERTIFICACIÓN — Field Batch #2 Code Readiness (v2 — AUTH-OFFLINE-02 incorporado)",
+  "what_changed": "D-001 fue CHANGES_REQUESTED porque omitía AUTH-OFFLINE-02 (GAP-A). GAP-A corregido en commits 72625e7+c2e4770:\n  • pos-data.ts:1797-1803 — PBKDF2 path: meetsMinRole(pbkdf2.role, minRole) antes de return\n  • pos-data.ts:1805-1810 — btoa path: meetsMinRole(legacy.role, minRole) antes de return\n  • Fail-closed: role vacío/desconocido → false\n  • 54 tests: 30 pos-manager-auth + 24 pos-data-auth\n  • OC-09 Auth offline = CODE VERIFIED\n  • RUNTIME-GAP-REGISTER: 0 gaps abiertos\nProtección añadida:\n  • GAP-GATE en shared.py bloquea create_decision si hay P0/P1 abiertos\n  • Orchestrator DoD actualizado con cross-check explícito de RUNTIME-GAP-REGISTER.md",
+  "why_it_matters": "handleTransferItem (pos/page.tsx:2533) es la única operación que requiere minRole: capitan. Sin el fix, cualquier gerente/cajero/mesero con PIN cacheado podía transferir items sin restricción de rol. Con el fix: role hierarchy enforced offline. La visita puede ser exclusivamente de certificación.",
+  "commit": "c2e4770",
+  "tests_summary": "54 PASS (pos-manager-auth: 30 | pos-data-auth: 24) — incluyendo capitan PASS + cajero REJECT regression cases para AUTH-OFFLINE-02",
+  "verification": "VERIFIED",
+  "risk": "BAJO",
+  "rollback": "No aplica — corrección solo añade checks; no elimina auth path existente",
+  "runtime_health_delta": "ORS 94/100 PASS (sin cambio numérico — GAP-A ya cerrado en PR 2026-08-04)",
+  "action_requested": "APROBAR VISITA DE CERTIFICACIÓN OCS-P2.5.9",
+  "response": null,
+  "response_at": null,
+  "response_notes": null
+}

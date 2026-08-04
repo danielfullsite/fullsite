@@ -13,3 +13,13 @@
 {"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "VERIFIED"}
 {"ts": "2026-08-04T15:30:03Z", "type": "DECISION_CREATED", "decision_id": "D-001", "task_id": "TSK-001"}
 {"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "ORCHESTRATOR", "note": "Decision D-001 created"}
+{"ts": "2026-08-04T15:40:27Z", "type": "DECISION_RESPONSE", "decision_id": "D-001", "response": "CHANGES_REQUESTED", "by": "FOUNDER"}
+{"ts": "2026-08-04T15:40:32Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "AWAITING_FOUNDER", "to": "CHANGES_REQUESTED", "by": "FOUNDER", "note": "D-001 CHANGES_REQUESTED: AUTH-OFFLINE-02 missing from verification scope"}
+{"ts": "2026-08-04T15:40:32Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "CHANGES_REQUESTED", "to": "IN_PROGRESS", "by": "RUNTIME_VERIFICATION", "note": "Incorporating AUTH-OFFLINE-02 evidence from commits 72625e7+c2e4770"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_VERIFICATION", "note": "AUTH-OFFLINE-02 fixed in 72625e7+c2e4770. Resubmitting with complete evidence."}
+{"ts": "2026-08-04T15:42:33Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "RUNTIME_VERIFICATION", "note": "Complete evidence submitted — AUTH-OFFLINE-02 fixed, OC-09 CODE VERIFIED"}
+{"ts": "2026-08-04T15:42:33Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "AUTH-OFFLINE-02 incorporated. All gaps checked including RUNTIME-GAP-REGISTER."}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "RUNTIME_VERIFICATION", "note": "D-002 created — complete Field Batch #2 evidence"}
+{"ts": "2026-08-04T15:42:33Z", "type": "DECISION_CREATED", "decision_id": "D-002", "task_id": "TSK-001"}

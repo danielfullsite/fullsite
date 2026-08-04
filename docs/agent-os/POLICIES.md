@@ -70,6 +70,34 @@ Si una tarea falla `MAX_RETRIES_PER_TASK` ciclos Engineering ↔ Verification:
 2. Se genera una Founder Decision con diagnóstico completo
 3. El Orchestrator **no intenta un cuarto ciclo automático**
 
+## GAP-GATE — Protección de decisiones de readiness
+
+**Origen: Post-mortem D-001 / 2026-08-04**
+
+Ninguna decisión de readiness (`create_decision`) puede ser emitida si existen gaps P0/P1 abiertos en `docs/runtime/RUNTIME-GAP-REGISTER.md`. Implementado en `shared.py:assert_no_open_gaps()`.
+
+### Por qué existe
+
+D-001 fue emitida con AUTH-OFFLINE-02 (GAP-A) abierto porque RUNTIME_VERIFICATION cruzó `AUDIT-FINDINGS.md` pero no `RUNTIME-GAP-REGISTER.md`. El gap fue corregido en commits posteriores (`72625e7`+`c2e4770`), pero el Founder recibió una decisión incompleta.
+
+### Fallo del Orchestrator
+
+El DoD de TSK-001 decía "GAP-A documentado con prioridad correcta en RUNTIME-HEALTH" — documentar, no verificar/corregir. El scope explícito solo listaba AF-001..AF-005. El RUNTIME-GAP-REGISTER no estaba en scope.
+
+### Regla para toda verificación de readiness (RUNTIME_VERIFICATION)
+
+Antes de someter cualquier resultado a AWAITING_FOUNDER:
+
+1. Leer `docs/runtime/RUNTIME-GAP-REGISTER.md` completo
+2. Leer `docs/runtime/AUDIT-FINDINGS.md` completo
+3. Listar todos los items abiertos de ambos
+4. Para cada item abierto: clasificar como (a) corregido, (b) diferido con justificación, o (c) bloqueante
+5. Si cualquier P0/P1 está abierto sin fix o waiver del Founder → BLOCKED, no VERIFIED
+
+### Skip waiver
+
+`create_decision(skip_gap_gate=True)` solo si el Founder ha dado waiver explícito por escrito. Registrar el waiver en `what_changed`.
+
 ## Protección contra loops
 
 - El Orchestrator verifica si ya existe una tarea para cada gate antes de crear una nueva

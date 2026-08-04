@@ -9,7 +9,7 @@
       "r1",
       "offline-sync"
     ],
-    "updated_at": "2026-08-04T15:30:03Z"
+    "updated_at": "2026-08-04T15:42:33Z"
   },
   "TSK-002": {
     "title": "HTTP Contract Tests — Bridge WS + REST API",
