@@ -160,11 +160,12 @@ def main():
 
     _log(f'Supervisor started — PID {os.getpid()}')
     audit('SUPERVISOR_STARTED', {'pid': os.getpid()})
-    _write_heartbeat('STARTING', 'Initializing')
 
-    # Crash-recovery detection: if clean-shutdown marker is absent, previous run
-    # was killed abnormally (SIGKILL or crash). Notify once, then clear marker.
+    # Crash-recovery detection MUST run before _write_heartbeat overwrites the
+    # previous PID — otherwise the check always sees its own PID and never fires.
     _notify_if_crash_recovery()
+
+    _write_heartbeat('STARTING', 'Initializing')
 
     backoff = LOOP_ACTIVE_S
     while not _shutdown:

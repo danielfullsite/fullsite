@@ -19,6 +19,7 @@ Failures: fully swallowed — never raises, never blocks supervisor loop.
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import time
 import urllib.error
@@ -93,12 +94,23 @@ def _send_raw(token: str, chat_id: str, text: str) -> bool:
         return False
 
 
+def _gh_path() -> str:
+    """Resolve gh CLI path — handles launchd's restricted PATH."""
+    gh = shutil.which('gh')
+    if gh:
+        return gh
+    for candidate in ('/opt/homebrew/bin/gh', '/usr/local/bin/gh'):
+        if os.path.isfile(candidate):
+            return candidate
+    return 'gh'
+
+
 def _send_via_gha(event_type: str, text: str) -> bool:
     """Fallback: dispatch agent-os-notify.yml via gh CLI (async, ~30-60s delivery)."""
     try:
         result = subprocess.run(
             [
-                'gh', 'workflow', 'run', _NOTIFY_WORKFLOW,
+                _gh_path(), 'workflow', 'run', _NOTIFY_WORKFLOW,
                 '--repo', _REPO,
                 '--field', f'event_type={event_type}',
                 '--field', f'text={text}',
