@@ -25,6 +25,7 @@ const LEGACY_CONFIG_PATH  = path.join('C:\\fullsite', 'config.json');
 // blocking the Local Server, POS, and KDS from starting.
 const configSchema        = require('./local-server/config-schema');
 const printerConfigSchema = require('./local-server/adapters/printer-config-schema');
+const logger              = require('./local-server/logger');
 
 /**
  * Return the primary config path: userData first (writable by Electron),
@@ -805,6 +806,13 @@ app.commandLine.appendSwitch('enable-features', 'WebAuthenticationWin10');
 app.commandLine.appendSwitch('enable-web-authentication');
 
 app.whenReady().then(async () => {
+  // Initialize file logger and redirect all console.* calls to rotating log files.
+  // Must happen before any other startup code so every log line is captured.
+  try {
+    logger.init(path.join(app.getPath('userData'), 'logs'));
+    logger.patchConsole();
+  } catch {}
+
   // Grant WebAuthn/HID permissions automatically (no popup)
   const defaultSession = require('electron').session.defaultSession;
   defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
