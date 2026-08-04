@@ -6,6 +6,7 @@ import uuid
 import datetime
 import fcntl
 import shutil
+import subprocess
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
@@ -33,27 +34,28 @@ VALID_STATUSES = [
     'DRAFT', 'READY', 'CLAIMED', 'IN_PROGRESS', 'SUBMITTED',
     'IN_REVIEW', 'CHANGES_REQUESTED', 'VERIFIED',
     'AWAITING_FOUNDER', 'APPROVED', 'REJECTED', 'MERGED',
-    'BLOCKED', 'CANCELLED',
+    'BLOCKED', 'CANCELLED', 'CLOSED',
 ]
 
 VALID_TRANSITIONS = {
     'DRAFT':              ['READY', 'CANCELLED'],
     'READY':              ['CLAIMED', 'CANCELLED'],
     'CLAIMED':            ['IN_PROGRESS', 'READY'],
-    'IN_PROGRESS':        ['SUBMITTED', 'BLOCKED', 'CANCELLED'],
+    'IN_PROGRESS':        ['SUBMITTED', 'BLOCKED', 'CANCELLED', 'READY'],
     'SUBMITTED':          ['IN_REVIEW'],
-    'IN_REVIEW':          ['VERIFIED', 'CHANGES_REQUESTED', 'BLOCKED'],
-    'CHANGES_REQUESTED':  ['IN_PROGRESS'],
-    'VERIFIED':           ['AWAITING_FOUNDER', 'MERGED'],
+    'IN_REVIEW':          ['VERIFIED', 'CHANGES_REQUESTED', 'BLOCKED', 'READY'],
+    'CHANGES_REQUESTED':  ['IN_PROGRESS', 'CANCELLED'],
+    'VERIFIED':           ['AWAITING_FOUNDER', 'MERGED', 'CLOSED'],
     'AWAITING_FOUNDER':   ['APPROVED', 'REJECTED', 'CHANGES_REQUESTED'],
     'APPROVED':           ['MERGED'],
     'REJECTED':           ['CANCELLED'],
     'MERGED':             [],
+    'CLOSED':             [],
     'BLOCKED':            ['READY', 'CANCELLED'],
     'CANCELLED':          [],
 }
 
-TERMINAL_STATUSES = {'MERGED', 'CANCELLED', 'REJECTED'}
+TERMINAL_STATUSES = {'MERGED', 'CANCELLED', 'REJECTED', 'CLOSED'}
 
 VALID_ROLES = ['ORCHESTRATOR', 'RUNTIME_ENGINEER', 'RUNTIME_VERIFICATION',
                'KNOWLEDGE_ENGINEER', 'FIELD_CERTIFICATION', 'FOUNDER']
@@ -204,9 +206,12 @@ STATUS_DIR = {
     'APPROVED':          ARCHIVE_DIR,
     'REJECTED':          ARCHIVE_DIR,
     'MERGED':            ARCHIVE_DIR,
+    'CLOSED':            ARCHIVE_DIR,
     'BLOCKED':           ACTIVE_DIR,
     'CANCELLED':         ARCHIVE_DIR,
 }
+
+GATE_STATUS_FILE = os.path.join(AOS_ROOT, 'GATE-STATUS.json')
 
 def _task_path(task_id, status):
     directory = STATUS_DIR.get(status, ACTIVE_DIR)
@@ -679,6 +684,126 @@ def ensure_dirs():
         write_json(TASKS_FILE, {})
     if not os.path.exists(INBOX_MD):
         _refresh_founder_inbox()
+
+# ── Worktree management ───────────────────────────────────────────────────────
+
+def create_task_worktree(task_id: str) -> tuple:
+    """Create isolated git branch + worktree for a task. Returns (branch, worktree_path)."""
+    branch = f'agent-os/{task_id}'
+    worktree_path = f'/tmp/fullsite-worker-{task_id}'
+
+    # Create branch from current HEAD if it doesn't exist
+    r = subprocess.run(['git', 'show-ref', '--verify', '--quiet', f'refs/heads/{branch}'],
+                      cwd=REPO_ROOT, capture_output=True)
+    if r.returncode != 0:
+        subprocess.run(['git', 'branch', branch, 'HEAD'],
+                      cwd=REPO_ROOT, capture_output=True, check=True)
+
+    # Remove stale worktree if present
+    if os.path.exists(worktree_path):
+        subprocess.run(['git', 'worktree', 'remove', '--force', worktree_path],
+                      cwd=REPO_ROOT, capture_output=True)
+    # Also prune stale refs
+    subprocess.run(['git', 'worktree', 'prune'], cwd=REPO_ROOT, capture_output=True)
+
+    r = subprocess.run(['git', 'worktree', 'add', worktree_path, branch],
+                      cwd=REPO_ROOT, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f'git worktree add failed: {r.stderr.strip()}')
+
+    update_task_fields(task_id, {'branch': branch, 'worktree_path': worktree_path})
+    audit('WORKTREE_CREATED', {'task_id': task_id, 'branch': branch, 'path': worktree_path})
+    return branch, worktree_path
+
+
+def cleanup_task_worktree(task_id: str):
+    """Remove worktree (branch preserved for audit trail)."""
+    try:
+        task = load_task(task_id)
+        path = task.get('worktree_path', f'/tmp/fullsite-worker-{task_id}')
+    except Exception:
+        path = f'/tmp/fullsite-worker-{task_id}'
+    if os.path.exists(path):
+        subprocess.run(['git', 'worktree', 'remove', '--force', path],
+                      cwd=REPO_ROOT, capture_output=True)
+    subprocess.run(['git', 'worktree', 'prune'], cwd=REPO_ROOT, capture_output=True)
+    audit('WORKTREE_REMOVED', {'task_id': task_id, 'path': path})
+
+
+def get_task_diff(task_id: str) -> tuple:
+    """Return (diff_stat, diff_patch) for task branch vs main."""
+    try:
+        task = load_task(task_id)
+        branch = task.get('branch', f'agent-os/{task_id}')
+    except Exception:
+        branch = f'agent-os/{task_id}'
+
+    stat = subprocess.run(
+        ['git', 'diff', f'main..{branch}', '--stat'],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    ).stdout
+    patch = subprocess.run(
+        ['git', 'diff', f'main..{branch}', '--unified=3'],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    ).stdout
+    return stat[:3000], patch[:10000]
+
+
+def merge_and_close_task(task_id: str, evidence: str) -> str:
+    """
+    Merge task branch into main, transition to CLOSED, update gates.
+    Returns merge commit hash.
+    Only for R3 (non-gate) tasks. R1 gate tasks go through Founder Decision.
+    """
+    task = load_task(task_id)
+    branch = task.get('branch', f'agent-os/{task_id}')
+    title = task.get('title', task_id)[:60]
+    tags = task.get('tags', [])
+
+    r = subprocess.run(
+        ['git', 'merge', '--no-ff', branch, '-m', f'merge({task_id}): {title}'],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f'Merge failed for {task_id}/{branch}: {r.stderr.strip()}')
+
+    commit = subprocess.run(
+        ['git', 'rev-parse', 'HEAD'],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    ).stdout.strip()
+
+    transition_task(task_id, 'CLOSED', by='SUPERVISOR',
+                   note=f'Pipeline complete. Merge commit: {commit}')
+    update_task_fields(task_id, {
+        'closed_at': now_iso(),
+        'merge_commit': commit,
+        'close_evidence': evidence[:500],
+        'gate_updated': tags,
+    })
+
+    for tag in tags:
+        mark_gate_completed(tag)
+    _write_gate_status_entries(tags, task_id, commit, evidence)
+    cleanup_task_worktree(task_id)
+
+    audit('TASK_CLOSED', {'task_id': task_id, 'commit': commit, 'gates': tags,
+                          'evidence': evidence[:200]})
+    return commit
+
+
+def _write_gate_status_entries(gates: list, task_id: str, commit: str, evidence: str):
+    with FileLock(GATE_STATUS_FILE):
+        data = read_json(GATE_STATUS_FILE, {})
+        for gate in gates:
+            data[gate] = {
+                'status': 'CLOSED',
+                'task_id': task_id,
+                'commit': commit,
+                'evidence': evidence[:300],
+                'closed_at': now_iso(),
+            }
+        write_json(GATE_STATUS_FILE, data)
+
 
 if __name__ == '__main__':
     ensure_dirs()

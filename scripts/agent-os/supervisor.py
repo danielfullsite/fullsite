@@ -18,7 +18,8 @@ from shared import (
     propagate_decision_to_task, transition_task, mark_gate_completed,
     is_gate_completed, audit, ensure_dirs, now_iso, read_json, write_json,
     DECISIONS_DIR, ARCHIVE_DIR, RESULTS_DIR, REPO_ROOT, AOS_ROOT,
-    update_task_fields,
+    update_task_fields, load_result,
+    create_task_worktree, cleanup_task_worktree, merge_and_close_task,
 )
 import orchestrator as _orchestrator
 
@@ -173,8 +174,14 @@ def _loop_once() -> bool:
     global _last_completed
 
     if is_killed():
-        _log('Kill switch ON — exiting')
-        _write_heartbeat('KILLED', 'Kill switch activated')
+        if _workers:
+            _log(f'Kill switch ON — waiting for {len(_workers)} workers to finish cleanly')
+            _reap_workers()
+            _write_heartbeat('KILL_PENDING',
+                             f'Draining {len(_workers)} workers before exit')
+            return False
+        _log('Kill switch ON, no active workers — exiting cleanly')
+        _write_heartbeat('KILLED', 'Kill switch activated, state preserved')
         sys.exit(0)
 
     # 1. Reap finished workers
@@ -231,13 +238,13 @@ def _reconcile_decisions():
 
 def _recover_stuck_tasks():
     index = load_tasks_index()
-    stuck_statuses = {'CLAIMED', 'IN_PROGRESS'}
+    # IN_REVIEW can also get stuck if verifier worker dies
+    stuck_statuses = {'CLAIMED', 'IN_PROGRESS', 'IN_REVIEW', 'SUBMITTED'}
     now_dt = datetime.datetime.now(datetime.timezone.utc)
 
     for task_id, meta in index.items():
         if meta['status'] not in stuck_statuses:
             continue
-        # If an active worker is handling it, not stuck
         if task_id in _workers or f'{task_id}_verify' in _workers:
             continue
         try:
@@ -247,21 +254,29 @@ def _recover_stuck_tasks():
             age_min = (now_dt - updated_dt).total_seconds() / 60
             if age_min > STUCK_MIN:
                 _log(f'Recovering stuck task {task_id} (age {age_min:.0f}m, status {meta["status"]})')
-                transition_task(task_id, 'READY', by='SUPERVISOR',
-                               note=f'Recovered: stuck for {age_min:.0f}m with no active worker')
-                audit('TASK_RECOVERED', {'task_id': task_id, 'age_min': age_min})
+                # IN_REVIEW/SUBMITTED stuck → back to READY for full retry
+                target = 'READY'
+                transition_task(task_id, target, by='SUPERVISOR',
+                               note=f'Recovered: stuck {meta["status"]} for {age_min:.0f}m, no active worker')
+                # Clean up any stale worktree so next dispatch creates fresh one
+                try:
+                    cleanup_task_worktree(task_id)
+                except Exception:
+                    pass
+                audit('TASK_RECOVERED', {'task_id': task_id, 'from': meta['status'], 'age_min': age_min})
         except Exception as e:
             _log(f'Recovery check error {task_id}: {e}')
 
 # ── Worker dispatch ───────────────────────────────────────────────────────────
 
 def _dispatch_workers() -> int:
-    index = load_tasks_index()
+    if is_killed():
+        return 0  # kill switch: no new claims
 
+    index = load_tasks_index()
     eng_count = sum(1 for w in _workers.values() if w['phase'] == 'engineer')
     dispatched = 0
 
-    # Sort by priority (P0 first, then P1, etc.)
     priority_order = {'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3}
     sorted_tasks = sorted(
         [(tid, m) for tid, m in index.items() if m['status'] == 'READY'],
@@ -275,6 +290,15 @@ def _dispatch_workers() -> int:
         if role == 'RUNTIME_ENGINEER' and eng_count >= MAX_ENGINEERS:
             continue
         if role == 'RUNTIME_VERIFICATION' and eng_count >= MAX_VERIFIERS:
+            continue
+
+        # Create isolated branch + worktree before dispatching engineer
+        try:
+            branch, worktree_path = create_task_worktree(task_id)
+            _log(f'Worktree ready: {worktree_path} (branch={branch})')
+        except Exception as e:
+            _log(f'Worktree creation failed for {task_id}: {e} — skipping this cycle')
+            _errors.append({'ts': now_iso(), 'error': f'worktree:{task_id}:{str(e)[:200]}'})
             continue
 
         _launch_worker(task_id, 'engineer')
@@ -307,26 +331,37 @@ def _handle_submitted_tasks():
 
 def _handle_verified_tasks():
     """
-    VERIFIED tasks that are not R1 gate tasks → MERGED automatically.
-    R1 gate tasks → create Founder Decision (these touch production readiness).
+    VERIFIED tasks:
+    - R1 gate tasks → Founder Decision (touch production readiness).
+    - R3 and other tasks → merge branch + CLOSED + gate update (fully autonomous).
     """
+    global _last_completed
     index = load_tasks_index()
     for task_id, meta in index.items():
         if meta['status'] != 'VERIFIED':
             continue
+        if task_id in _workers or f'{task_id}_verify' in _workers:
+            continue  # still has an active worker
         tags = meta.get('tags', [])
-        is_gate = any(t.startswith('r1') or 'field-batch' in t for t in tags)
+        is_r1_gate = any(t.startswith('r1') or 'field-batch' in t for t in tags)
         try:
-            if is_gate:
+            if is_r1_gate:
                 _maybe_create_founder_decision(task_id)
             else:
-                _log(f'Auto-merging non-gate task {task_id}')
-                transition_task(task_id, 'MERGED', by='SUPERVISOR',
-                               note='Auto-merged: non-gate implementation task')
-                for tag in tags:
-                    mark_gate_completed(tag)
+                result = load_result(task_id)
+                evidence = result.get('evidence', 'Verified') if result else 'Verified'
+                _log(f'Closing R3 task {task_id} — merge + CLOSED + gate update')
+                commit = merge_and_close_task(task_id, evidence)
+                _last_completed = task_id
+                _log(f'Task {task_id} CLOSED. Merge commit: {commit}')
+                audit('PIPELINE_COMPLETE', {
+                    'task_id': task_id,
+                    'commit': commit,
+                    'gates': tags,
+                })
         except Exception as e:
-            _log(f'Error handling verified task {task_id}: {e}')
+            _log(f'Error closing verified task {task_id}: {e}')
+            _errors.append({'ts': now_iso(), 'error': f'close:{task_id}:{str(e)[:200]}'})
 
 def _maybe_create_founder_decision(task_id: str):
     from shared import create_decision, load_result

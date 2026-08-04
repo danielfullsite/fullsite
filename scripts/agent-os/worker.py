@@ -19,7 +19,7 @@ sys.path.insert(0, SCRIPTS_ROOT)
 
 from shared import (
     load_task, load_result, transition_task, submit_result, submit_review,
-    update_task_fields, audit, now_iso, REPO_ROOT,
+    update_task_fields, audit, now_iso, REPO_ROOT, get_task_diff,
 )
 
 CLAUDE_BIN       = '/usr/local/bin/claude'
@@ -70,19 +70,38 @@ def main():
 def run_engineer(task: dict):
     task_id = task['id']
 
-    # Claim: READY → CLAIMED → IN_PROGRESS  (or resume CHANGES_REQUESTED → IN_PROGRESS)
     s = task['status']
     if s == 'READY':
-        transition_task(task_id, 'CLAIMED',      by='RUNTIME_ENGINEER', note='Worker claimed task')
-        transition_task(task_id, 'IN_PROGRESS',  by='RUNTIME_ENGINEER', note='Engineering started')
+        transition_task(task_id, 'CLAIMED',     by='RUNTIME_ENGINEER', note='Worker claimed task')
+        transition_task(task_id, 'IN_PROGRESS', by='RUNTIME_ENGINEER', note='Engineering started')
     elif s == 'CHANGES_REQUESTED':
-        transition_task(task_id, 'IN_PROGRESS',  by='RUNTIME_ENGINEER', note='Resuming after changes requested')
+        transition_task(task_id, 'IN_PROGRESS', by='RUNTIME_ENGINEER', note='Repair attempt after verification failure')
     elif s not in ('CLAIMED', 'IN_PROGRESS'):
         print(f'[worker] Cannot engineer task in status {s}')
         sys.exit(1)
 
-    prompt = _build_engineer_prompt(task)
-    result = _invoke_claude(prompt, task_id, 'engineer')
+    # Re-load task to get worktree_path (set by supervisor before dispatch)
+    task = load_task(task_id)
+    worktree_path = task.get('worktree_path')
+    work_dir = worktree_path if worktree_path and os.path.isdir(worktree_path) else REPO_ROOT
+    print(f'[worker] Engineering in: {work_dir}', flush=True)
+
+    # Load previous review findings if this is a repair attempt
+    repair_context = ''
+    if s == 'CHANGES_REQUESTED':
+        try:
+            import sys as _sys
+            _sys.path.insert(0, os.path.dirname(__file__))
+            from shared import load_review
+            review = load_review(task_id)
+            if review and review.get('findings'):
+                repair_context = '\n\nPREVIOUS VERIFICATION FAILURES (fix these specifically):\n' + \
+                    '\n'.join(f'  - {f}' for f in review['findings'])
+        except Exception:
+            pass
+
+    prompt = _build_engineer_prompt(task, work_dir, repair_context)
+    result = _invoke_claude(prompt, task_id, 'engineer', cwd=work_dir)
 
     submit_result(
         task_id      = task_id,
@@ -110,8 +129,13 @@ def run_verify(task: dict):
         sys.exit(1)
 
     engineer_result = load_result(task_id)
-    prompt = _build_verify_prompt(task, engineer_result)
-    result = _invoke_claude(prompt, task_id, 'verify')
+
+    # Get real diff from task branch for independent inspection
+    diff_stat, diff_patch = get_task_diff(task_id)
+    print(f'[worker] Diff stat ({len(diff_stat)} chars): {diff_stat[:200]}', flush=True)
+
+    prompt = _build_verify_prompt(task, engineer_result, diff_stat, diff_patch)
+    result = _invoke_claude(prompt, task_id, 'verify', cwd=REPO_ROOT)
 
     verdict = result.get('verdict', 'FAILED')
     is_verified = (verdict == 'VERIFIED')
@@ -146,12 +170,14 @@ def run_verify(task: dict):
 
 # ── Claude invocation ─────────────────────────────────────────────────────────
 
-def _invoke_claude(prompt: str, task_id: str, phase: str) -> dict:
+def _invoke_claude(prompt: str, task_id: str, phase: str, cwd: str = None) -> dict:
     """
     Invoke claude --print non-interactively.
+    cwd: working directory for Claude (worktree for engineer, REPO_ROOT for verify).
     Returns parsed AGENT_OS_RESULT dict, or a FAILED dict on error.
     """
-    # Write prompt to temp file (avoids shell-escaping issues with long prompts)
+    work_dir = cwd if cwd and os.path.isdir(cwd) else REPO_ROOT
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
         f.write(prompt)
         prompt_file = f.name
@@ -165,8 +191,10 @@ def _invoke_claude(prompt: str, task_id: str, phase: str) -> dict:
             '--max-budget-usd', str(MAX_BUDGET_USD),
         ]
 
-        audit('CLAUDE_INVOKE', {'task_id': task_id, 'phase': phase, 'budget_usd': MAX_BUDGET_USD})
-        print(f'[worker] Invoking claude for {task_id}/{phase} (timeout={WORKER_TIMEOUT_S}s)', flush=True)
+        audit('CLAUDE_INVOKE', {'task_id': task_id, 'phase': phase,
+                                'budget_usd': MAX_BUDGET_USD, 'cwd': work_dir})
+        print(f'[worker] Invoking claude for {task_id}/{phase} cwd={work_dir} '
+              f'(timeout={WORKER_TIMEOUT_S}s)', flush=True)
 
         with open(prompt_file) as pf:
             proc = subprocess.run(
@@ -175,7 +203,7 @@ def _invoke_claude(prompt: str, task_id: str, phase: str) -> dict:
                 capture_output=True,
                 text=True,
                 timeout=WORKER_TIMEOUT_S,
-                cwd=REPO_ROOT,
+                cwd=work_dir,
                 env={**os.environ, 'HOME': os.environ.get('HOME', '/Users/danielrg')},
             )
 
@@ -234,12 +262,18 @@ def _parse_result(output: str) -> dict:
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
-def _build_engineer_prompt(task: dict) -> str:
+def _build_engineer_prompt(task: dict, work_dir: str = None, repair_context: str = '') -> str:
     dod = '\n'.join(f'  {i+1}. {item}' for i, item in enumerate(task.get('dod', [])))
+    branch = task.get('branch', f'agent-os/{task["id"]}')
+    cwd_note = f'Working directory: {work_dir}' if work_dir else f'Working directory: {REPO_ROOT}'
     return f"""{SAFETY_CONSTRAINTS}
 
 You are the RUNTIME_ENGINEER of the Fullsite Agent OS — an autonomous engineering agent.
-Your job: implement the task below completely and produce verifiable results.
+{cwd_note}
+Branch: {branch}  (do NOT push to remote, do NOT merge to main)
+
+Your job: implement the task below completely and produce verifiable, committed results.
+{repair_context}
 
 TASK:
   ID:       {task['id']}
@@ -259,14 +293,18 @@ INSTRUCTIONS:
 1. Read existing code to understand context before writing anything
 2. Implement what the objective requires — no more, no less
 3. Run tests to verify your work (fail fast if tests don't pass)
-4. Create a git commit if work is complete and tests pass
-5. At the very end of your response, output EXACTLY this block with no text after it:
+4. Commit your changes when tests pass:
+   git add -A
+   git commit -m "feat({task['id']}): <description>"
+   git rev-parse HEAD   (include this hash in evidence)
+5. Do NOT push. Do NOT merge. Commit only to current branch ({branch}).
+6. At the very end of your response, output EXACTLY this block with no text after it:
 
 AGENT_OS_RESULT:
 {{
   "verdict": "VERIFIED",
-  "evidence": "one paragraph: what you did, key files changed, test results",
-  "commit": "git-hash-or-null",
+  "evidence": "one paragraph: what you did, key files changed, test results, commit hash",
+  "commit": "git-hash-here",
   "tests_passed": 0,
   "tests_total": 0,
   "gaps_found": [],
@@ -275,21 +313,27 @@ AGENT_OS_RESULT:
 AGENT_OS_RESULT_END
 
 Use verdict=FAILED if you cannot complete the task. Use verdict=PARTIAL if partially done.
+List specific unmet DoD items in gaps_found.
 """
 
 
-def _build_verify_prompt(task: dict, engineer_result) -> str:
+def _build_verify_prompt(task: dict, engineer_result,
+                         diff_stat: str = '', diff_patch: str = '') -> str:
     result_str = json.dumps(engineer_result, indent=2) if engineer_result else 'No result available'
     dod = '\n'.join(f'  {i+1}. {item}' for i, item in enumerate(task.get('dod', [])))
+    branch = task.get('branch', f'agent-os/{task["id"]}')
     return f"""{SAFETY_CONSTRAINTS}
 
 You are RUNTIME_VERIFICATION of the Fullsite Agent OS.
-Your job: INDEPENDENTLY verify that the engineering work on task {task['id']} is correct.
+Your job: INDEPENDENTLY verify the engineering work on task {task['id']} is correct.
 
-CRITICAL: Do NOT re-do the work. READ the code, RUN the tests yourself, and issue your own verdict.
-Be skeptical. A VERIFIED verdict requires all DoD items to be genuinely satisfied.
+CRITICAL: Do NOT re-do the work. Inspect the actual diff, run tests yourself, issue your own verdict.
+Be skeptical — a VERIFIED verdict requires every DoD item to be genuinely satisfied in the real code.
 
-TASK BEING VERIFIED:
+Branch under review: {branch}
+Repo: {REPO_ROOT}
+
+TASK:
   ID:    {task['id']}
   Title: {task['title']}
   Obj:   {task['objective']}
@@ -297,22 +341,28 @@ TASK BEING VERIFIED:
 DEFINITION OF DONE:
 {dod}
 
-ENGINEER'S SELF-REPORTED RESULT:
+ACTUAL DIFF (what the engineer committed):
+--- stat ---
+{diff_stat or '(no diff — branch may not exist or has no commits ahead of main)'}
+--- patch (first 10k chars) ---
+{diff_patch[:8000] if diff_patch else '(no patch)'}
+
+ENGINEER RESULT:
 {result_str}
 
 VERIFICATION STEPS:
-1. Read the files the engineer created/modified
-2. Run the tests independently (don't trust engineer's report alone)
-3. Check each DoD item is genuinely satisfied — not just claimed
-4. Look for regressions, security issues, TODOs, or unmet criteria
-5. Issue your independent verdict
+1. Inspect the diff above. Does it match what the DoD requires?
+2. Read the specific files changed (use Read tool with absolute paths in {REPO_ROOT})
+3. Run tests independently: cd {REPO_ROOT} && run the relevant test suite (npm test / bun test / jest)
+4. Check each DoD item is satisfied in the actual code, not just claimed
+5. Look for regressions, security issues, incomplete implementations, or TODO stubs
 
 At the very end, output EXACTLY:
 
 AGENT_OS_RESULT:
 {{
   "verdict": "VERIFIED",
-  "evidence": "what you verified, test results you ran, gaps you found or didn't find",
+  "evidence": "what you read, tests you ran, exact results, gaps found or none",
   "commit": null,
   "tests_passed": 0,
   "tests_total": 0,
@@ -321,7 +371,9 @@ AGENT_OS_RESULT:
 }}
 AGENT_OS_RESULT_END
 
-VERIFIED = all DoD items satisfied. PARTIAL = most items done, minor gaps. FAILED = critical items missing.
+VERIFIED = every DoD item satisfied in real code + tests pass.
+PARTIAL = most done, minor gaps (list them in gaps_found).
+FAILED = critical DoD items missing (list them in gaps_found).
 """
 
 

@@ -1,12 +1,23 @@
 {
-  "supervisor_status": "IDLE",
-  "pid": 46625,
-  "last_heartbeat": "2026-08-04T16:14:37Z",
-  "current_task": null,
-  "current_role": null,
-  "next_action": "Idle \u2014 waiting for new work or field execution",
+  "supervisor_status": "RUNNING",
+  "pid": 49962,
+  "last_heartbeat": "2026-08-04T18:49:43Z",
+  "current_task": "TSK-002",
+  "current_role": "engineer",
+  "next_action": "Workers running: ['TSK-002', 'TSK-003']",
   "last_completed_task": null,
-  "active_workers": {},
+  "active_workers": {
+    "TSK-002": {
+      "pid": 49969,
+      "phase": "engineer",
+      "started": "2026-08-04T18:49:02Z"
+    },
+    "TSK-003": {
+      "pid": 49976,
+      "phase": "engineer",
+      "started": "2026-08-04T18:49:02Z"
+    }
+  },
   "pending_decisions": 0,
   "errors": [],
   "kill_switch": false

@@ -43,3 +43,22 @@
 {"ts": "2026-08-04T16:11:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0}
 {"ts": "2026-08-04T16:13:56Z", "type": "SUPERVISOR_STARTED", "pid": 46612}
 {"ts": "2026-08-04T16:14:07Z", "type": "SUPERVISOR_STARTED", "pid": 46625}
+{"ts": "2026-08-04T18:48:58Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-002", "path": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "IN_PROGRESS", "to": "READY", "by": "SUPERVISOR", "note": "Worker PID confirmed dead post-supervisor-restart. Recovered for full pipeline cycle."}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_RECOVERED_MANUAL", "task_id": "TSK-002", "reason": "Worker PIDs 45258/45259 confirmed dead via kill -0"}
+{"ts": "2026-08-04T18:48:58Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-003", "path": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "IN_PROGRESS", "to": "READY", "by": "SUPERVISOR", "note": "Worker PID confirmed dead post-supervisor-restart. Recovered for full pipeline cycle."}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_RECOVERED_MANUAL", "task_id": "TSK-003", "reason": "Worker PIDs 45258/45259 confirmed dead via kill -0"}
+{"ts": "2026-08-04T18:49:01Z", "type": "SUPERVISOR_STARTED", "pid": 49962}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKTREE_CREATED", "task_id": "TSK-002", "branch": "agent-os/TSK-002", "path": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-002", "phase": "engineer", "pid": 49969}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "engineer", "pid": 49969}
+{"ts": "2026-08-04T18:49:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T18:49:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T18:49:02Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKTREE_CREATED", "task_id": "TSK-003", "branch": "agent-os/TSK-003", "path": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-003", "phase": "engineer", "pid": 49976}
+{"ts": "2026-08-04T18:49:03Z", "type": "WORKER_STARTED", "task_id": "TSK-003", "phase": "engineer", "pid": 49976}
+{"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T18:49:03Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-003"}
