@@ -1,0 +1,22 @@
+name: Test Telegram (one-time)
+on:
+  workflow_dispatch:
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test message
+        run: |
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID_DANIEL}\",\"parse_mode\":\"HTML\",\"text\":\"🤖 <b>Agent OS — Telegram verification</b>\n\nNotificaciones activas:\n• ✅ TASK_CLOSED\n• 🚫 TASK_BLOCKED\n• ⚠️ DECISION_REQUIRED\n• 🔄 SUPERVISOR_CRASH\n• 🏁 WAITING_FIELD\n\n<code>REMOTE-NOTIFICATIONS-01 = VERIFIED</code>\"}")
+          echo "Response: $RESPONSE"
+          if echo "$RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Telegram message sent successfully"
+          else
+            echo "❌ Telegram message failed"
+            exit 1
+          fi
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
