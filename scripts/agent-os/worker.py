@@ -150,8 +150,23 @@ def run_verify(task: dict):
         notes             = result.get('evidence', ''),
     )
 
-    retry_count = task.get('retry_count', 0)
-    max_retries = task.get('max_retries', 3)
+    # Reload task to get current status — state may have changed while Claude ran
+    # (e.g., supervisor recovery moved task, or stash pop reverted state).
+    current_task = load_task(task_id)
+    retry_count = current_task.get('retry_count', 0)
+    max_retries = current_task.get('max_retries', 3)
+
+    # If status regressed (e.g., IN_PROGRESS due to stash pop), recover it first
+    if current_task['status'] not in ('IN_REVIEW', 'VERIFIED', 'SUBMITTED'):
+        print(f'[worker] State regression detected: {current_task["status"]}. Recovering to IN_REVIEW.')
+        if current_task['status'] == 'IN_PROGRESS':
+            transition_task(task_id, 'SUBMITTED', by='RUNTIME_VERIFICATION',
+                           note='Auto-recovered from regression during verification')
+        transition_task(task_id, 'IN_REVIEW', by='RUNTIME_VERIFICATION',
+                       note='Recovered to IN_REVIEW after state regression')
+    elif current_task['status'] == 'SUBMITTED':
+        transition_task(task_id, 'IN_REVIEW', by='RUNTIME_VERIFICATION',
+                       note='Recovered SUBMITTED → IN_REVIEW before verdict')
 
     if is_verified:
         transition_task(task_id, 'VERIFIED', by='RUNTIME_VERIFICATION',

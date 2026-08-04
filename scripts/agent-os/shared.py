@@ -731,22 +731,74 @@ def cleanup_task_worktree(task_id: str):
 
 
 def get_task_diff(task_id: str) -> tuple:
-    """Return (diff_stat, diff_patch) for task branch vs main."""
+    """Return (diff_stat, diff_patch) for task branch vs main, excluding agent-os state files."""
     try:
         task = load_task(task_id)
         branch = task.get('branch', f'agent-os/{task_id}')
     except Exception:
         branch = f'agent-os/{task_id}'
 
+    # Exclude agent-os state/script dirs so verifier sees only task-relevant changes
+    exclude = [':(exclude)docs/agent-os/', ':(exclude)scripts/agent-os/']
     stat = subprocess.run(
-        ['git', 'diff', f'main..{branch}', '--stat'],
+        ['git', 'diff', f'main..{branch}', '--stat', '--'] + exclude,
         cwd=REPO_ROOT, capture_output=True, text=True,
     ).stdout
     patch = subprocess.run(
-        ['git', 'diff', f'main..{branch}', '--unified=3'],
+        ['git', 'diff', f'main..{branch}', '--unified=3', '--'] + exclude,
         cwd=REPO_ROOT, capture_output=True, text=True,
     ).stdout
     return stat[:3000], patch[:10000]
+
+
+def _clear_branch_conflicts(branch: str):
+    """
+    Clear staged/working-tree conflicts for files the branch will introduce.
+
+    Avoids git-stash (stash pops revert agent-os task JSON files, corrupting state).
+    Instead: unstage + discard tracked changes, delete new untracked staged files.
+    """
+    r = subprocess.run(
+        ['git', 'diff', '--name-only', f'HEAD...{branch}'],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return
+
+    branch_files = [
+        f.strip() for f in r.stdout.splitlines()
+        if f.strip()
+        and not f.startswith('docs/agent-os/')
+        and not f.startswith('scripts/agent-os/')
+    ]
+    if not branch_files:
+        return
+
+    status_r = subprocess.run(
+        ['git', 'status', '--porcelain'] + branch_files,
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    staged, new_staged, modified = [], [], []
+    for line in status_r.stdout.splitlines():
+        if len(line) < 3:
+            continue
+        xy, path = line[:2], line[3:].strip()
+        if xy[0] in ('A', 'M', 'D'):
+            staged.append(path)
+            if xy[0] == 'A':
+                new_staged.append(path)
+            else:
+                modified.append(path)
+
+    if staged:
+        subprocess.run(['git', 'restore', '--staged', '--'] + staged,
+                       cwd=REPO_ROOT, capture_output=True)
+    for f in modified:
+        subprocess.run(['git', 'restore', '--', f], cwd=REPO_ROOT, capture_output=True)
+    for f in new_staged:
+        full = os.path.join(REPO_ROOT, f)
+        if os.path.exists(full):
+            os.remove(full)
 
 
 def merge_and_close_task(task_id: str, evidence: str) -> str:
@@ -760,8 +812,13 @@ def merge_and_close_task(task_id: str, evidence: str) -> str:
     title = task.get('title', task_id)[:60]
     tags = task.get('tags', [])
 
+    # Clear staging conflicts from old pre-worktree workers before merging.
+    # Do NOT stash: stash pops corrupt agent-os task JSON files (state regression).
+    _clear_branch_conflicts(branch)
+
     r = subprocess.run(
-        ['git', 'merge', '--no-ff', branch, '-m', f'merge({task_id}): {title}'],
+        ['git', 'merge', '--no-ff', '-X', 'ours', branch,
+         '-m', f'merge({task_id}): {title}'],
         cwd=REPO_ROOT, capture_output=True, text=True,
     )
     if r.returncode != 0:
