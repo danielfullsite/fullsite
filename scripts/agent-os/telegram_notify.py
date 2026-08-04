@@ -23,6 +23,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -137,8 +138,22 @@ def _load_dedup() -> dict:
 
 
 def _save_dedup(data: dict):
+    # Atomic write: write to sibling tempfile then rename, so a crash mid-write
+    # never leaves a partially-written JSON that would corrupt the dedup state.
     try:
-        _DEDUP_FILE.write_text(json.dumps(data))
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(_DEDUP_FILE.parent), suffix='.tmp'
+        )
+        try:
+            with os.fdopen(tmp_fd, 'w') as f:
+                f.write(json.dumps(data))
+            os.replace(tmp_path, str(_DEDUP_FILE))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            raise
     except Exception:
         pass
 
