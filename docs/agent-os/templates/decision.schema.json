@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentOS Founder Decision",
+  "type": "object",
+  "required": ["id","task_id","status","objective","verification","risk","action_requested","created_at"],
+  "properties": {
+    "id":                    {"type": "string", "pattern": "^D-\\d{3,}$"},
+    "task_id":               {"type": "string", "pattern": "^TSK-\\d+$"},
+    "status":                {"type": "string", "enum": ["AWAITING_FOUNDER","APPROVED","REJECTED","CHANGES_REQUESTED"]},
+    "created_at":            {"type": "string"},
+    "updated_at":            {"type": "string"},
+    "objective":             {"type": "string"},
+    "what_changed":          {"type": "string"},
+    "why_it_matters":        {"type": "string"},
+    "commit":                {"type": ["string","null"]},
+    "tests_summary":         {"type": "string"},
+    "verification":          {"type": "string", "enum": ["VERIFIED","PARTIAL","FAILED","UNVERIFIED"]},
+    "risk":                  {"type": "string", "enum": ["BAJO","MEDIO","ALTO"]},
+    "rollback":              {"type": "string"},
+    "runtime_health_delta":  {"type": "string"},
+    "action_requested":      {"type": "string"},
+    "response":              {"type": ["string","null"]},
+    "response_at":           {"type": ["string","null"]},
+    "response_notes":        {"type": ["string","null"]}
+  }
+}

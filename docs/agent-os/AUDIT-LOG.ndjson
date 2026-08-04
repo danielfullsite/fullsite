@@ -1,0 +1,15 @@
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-001", "title": "Field Batch #2 — Code Readiness for OCS-P2.5.9", "role": "RUNTIME_VERIFICATION", "priority": "P0"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-001", "gate": "R1-G02", "reason": "R1 blocker"}
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-002", "title": "HTTP Contract Tests — Bridge WS + REST API", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-002", "gate": "R3-G01", "reason": "R3 parallel work"}
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-003", "title": "Logging Persistente — Electron logs survive restarts", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-003", "gate": "R3-G02", "reason": "R3 parallel work"}
+{"ts": "2026-08-04T15:27:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_VERIFICATION", "note": "Claimed by runner"}
+{"ts": "2026-08-04T15:27:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_VERIFICATION", "note": "Work started"}
+{"ts": "2026-08-04T15:29:53Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:29:53Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_VERIFICATION", "note": "Result: VERIFIED"}
+{"ts": "2026-08-04T15:30:03Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "RUNTIME_VERIFICATION", "note": "Review started"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "VERIFIED"}
+{"ts": "2026-08-04T15:30:03Z", "type": "DECISION_CREATED", "decision_id": "D-001", "task_id": "TSK-001"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "ORCHESTRATOR", "note": "Decision D-001 created"}

@@ -18,7 +18,7 @@
 | Offline queue (`queueOperation`, `APP_API`) | CODE ONLY | `pos-offline-db.ts` |
 | Registro auto-sync al reconectar | CODE ONLY | `registerAutoSync()` |
 | Print queue con retry loop | CODE ONLY | `startRetryLoop()` |
-| Auth offline — Manager PIN | ✅ CODE READY | PBKDF2 activo: `provisionManagerCredential` en online auth, `verifyPinOffline` como primer path offline, btoa legacy DEPRECATED como fallback transitorio (telemetría: `pos_btoa_fallback_count`). TTL 24h. 18+13 tests PASS. Pendiente: ejecución física OC-09. |
+| Auth offline — Manager PIN | ✅ CODE VERIFIED | PBKDF2 activo (commit fc5ffb1): `provisionManagerCredential` en online auth, `verifyPinOffline` como primer path offline, btoa legacy DEPRECATED como fallback transitorio (telemetría: `pos_btoa_fallback_count`). TTL 24h. 18+13=31 tests PASS. Pendiente: ejecución física OC-09 (FIELD VERIFIED). |
 | Auth offline — Staff Login (lockscreen) | ⚠️ DEUDA SEPARADA | `layout.tsx` usa `SHA-256(pin:staffId)` + `pos_staff_cache`. TTL 8h. No usa PBKDF2. **Fuera de scope de OC-09 en este PR.** Fix programado como workstream independiente. |
 | Menú offline (IDB cache) | PASS (código) | `pos-offline-db.ts` |
 | KDS broadcast LAN (127.0.0.1:7717) | CODE ONLY | `page.tsx:2973` |

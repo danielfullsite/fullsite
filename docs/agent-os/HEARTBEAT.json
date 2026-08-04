@@ -1,0 +1,51 @@
+{
+  "ts": "2026-08-04T15:31:27Z",
+  "status": "AWAITING_FOUNDER",
+  "current_task": null,
+  "next_action": "Daniel debe responder a D-001 (APROBAR VISITA) para desbloquear el siguiente ciclo. TSK-002 y TSK-003 listos para Engineering en paralelo.",
+  "active_tasks": {
+    "TSK-001": {
+      "status": "AWAITING_FOUNDER",
+      "role": "RUNTIME_VERIFICATION",
+      "priority": "P0"
+    },
+    "TSK-002": {
+      "status": "READY",
+      "role": "RUNTIME_ENGINEER",
+      "priority": "P1"
+    },
+    "TSK-003": {
+      "status": "READY",
+      "role": "RUNTIME_ENGINEER",
+      "priority": "P1"
+    }
+  },
+  "readiness": {
+    "R1": {
+      "score": 33,
+      "gates_done": 3,
+      "gates_total": 9,
+      "blocker": "P0-4 FIELD EXECUTION pending"
+    },
+    "R2": {
+      "score": 10,
+      "gates_done": 1,
+      "gates_total": 10,
+      "blocker": "R1 gates open"
+    },
+    "R3": {
+      "score": 0,
+      "gates_done": 0,
+      "gates_total": 11,
+      "blocker": "R2 gates open"
+    },
+    "R4": {
+      "score": 29,
+      "gates_done": 2,
+      "gates_total": 7,
+      "blocker": "Data quality gaps"
+    }
+  },
+  "errors": [],
+  "kill_switch": false
+}

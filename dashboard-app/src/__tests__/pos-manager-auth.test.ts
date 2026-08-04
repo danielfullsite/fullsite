@@ -22,6 +22,8 @@ import {
   listCachedManagers,
   getPendingOfflineAuthLog,
   markOfflineAuthLogSynced,
+  meetsMinRole,
+  ROLE_HIERARCHY,
 } from '@/lib/pos-manager-auth'
 
 beforeEach(() => {
@@ -210,6 +212,48 @@ describe('migration from legacy btoa cache', () => {
     const result = await verifyPinOffline('1234')
     expect(result?.name).toBe('Migrated Manager')
     expect(result?.role).toBe('gerente')
+  })
+})
+
+describe('meetsMinRole — role hierarchy enforcement', () => {
+  it('exact match: role === minRole is accepted', () => {
+    expect(meetsMinRole('capitan', 'capitan')).toBe(true)
+    expect(meetsMinRole('gerente', 'gerente')).toBe(true)
+    expect(meetsMinRole('admin',   'admin')).toBe(true)
+  })
+
+  it('superior role is accepted', () => {
+    expect(meetsMinRole('gerente', 'capitan')).toBe(true)
+    expect(meetsMinRole('admin',   'capitan')).toBe(true)
+    expect(meetsMinRole('admin',   'gerente')).toBe(true)
+  })
+
+  it('inferior role is rejected', () => {
+    expect(meetsMinRole('mesero',  'capitan')).toBe(false)
+    expect(meetsMinRole('cajero',  'capitan')).toBe(false)
+    expect(meetsMinRole('capitan', 'gerente')).toBe(false)
+    expect(meetsMinRole('gerente', 'admin')).toBe(false)
+  })
+
+  it('undefined role is rejected — fail safe', () => {
+    expect(meetsMinRole(undefined, 'capitan')).toBe(false)
+    expect(meetsMinRole(null,      'gerente')).toBe(false)
+    expect(meetsMinRole('',        'mesero')).toBe(false)
+  })
+
+  it('unknown role is rejected — fail safe', () => {
+    expect(meetsMinRole('supervisor', 'capitan')).toBe(false)
+    expect(meetsMinRole('owner',      'gerente')).toBe(false)
+  })
+
+  it('unknown minRole rejects everything — fail safe', () => {
+    expect(meetsMinRole('admin',   'superadmin')).toBe(false)
+    expect(meetsMinRole('gerente', 'director')).toBe(false)
+  })
+
+  it('ROLE_HIERARCHY covers exactly the expected roles', () => {
+    const roles = Object.keys(ROLE_HIERARCHY).sort()
+    expect(roles).toEqual(['admin', 'cajero', 'capitan', 'gerente', 'mesero'])
   })
 })
 

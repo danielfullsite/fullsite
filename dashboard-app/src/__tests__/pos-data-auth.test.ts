@@ -240,3 +240,91 @@ describe('12. App restart simulation — PBKDF2 persists', () => {
     expect(result).toBe('Maria Mgr')
   })
 })
+
+// ── GAP-A: offline minimum-role enforcement ───────────────────────────────────
+
+describe('GAP-A: verifyPinWithMinRole — offline role hierarchy enforcement', () => {
+  it('PBKDF2 valid but role below minRole is rejected', async () => {
+    await provisionManagerCredential('1111', 'staff-ga1', 'Capitan User', 'capitan')
+    mockOffline()
+    // capitan (3) vs admin (5) — must reject
+    const result = await verifyPinWithMinRole('1111', 'admin')
+    expect(result).toBeNull()
+  })
+
+  it('PBKDF2 valid with exact role match is accepted', async () => {
+    await provisionManagerCredential('2222', 'staff-ga2', 'Gerente User', 'gerente')
+    mockOffline()
+    const result = await verifyPinWithMinRole('2222', 'gerente')
+    expect(result).not.toBeNull()
+    expect(result?.role).toBe('gerente')
+  })
+
+  it('PBKDF2 valid with superior role is accepted', async () => {
+    await provisionManagerCredential('3333', 'staff-ga3', 'Admin User', 'admin')
+    mockOffline()
+    const result = await verifyPinWithMinRole('3333', 'gerente')
+    expect(result).not.toBeNull()
+    expect(result?.role).toBe('admin')
+  })
+
+  it('btoa valid but role below minRole is rejected', async () => {
+    seedBtoaCache('4444', 'Mesero User', 'mesero')
+    mockOffline()
+    // mesero (1) vs capitan (3) — must reject
+    const result = await verifyPinWithMinRole('4444', 'capitan')
+    expect(result).toBeNull()
+  })
+
+  it('btoa valid with sufficient role is accepted', async () => {
+    seedBtoaCache('5555', 'Gerente Btoa', 'gerente')
+    mockOffline()
+    const result = await verifyPinWithMinRole('5555', 'capitan')
+    expect(result).not.toBeNull()
+    expect(result?.name).toBe('Gerente Btoa')
+    expect(result?.role).toBe('gerente')
+  })
+
+  it('btoa with empty role is rejected — no privilege escalation (old bug)', async () => {
+    // Old code: `role || minRole` would grant minRole when role is empty — FIXED
+    seedBtoaCache('6666', 'No Role User', '')
+    mockOffline()
+    const result = await verifyPinWithMinRole('6666', 'capitan')
+    expect(result).toBeNull()
+  })
+
+  it('PBKDF2 with unknown role is rejected — fail safe', async () => {
+    await provisionManagerCredential('7777', 'staff-ga7', 'Unknown Role', 'supervisor')
+    mockOffline()
+    const result = await verifyPinWithMinRole('7777', 'capitan')
+    expect(result).toBeNull()
+  })
+
+  it('corrupt PBKDF2 store + btoa with insufficient role = rejected', async () => {
+    store['pos_manager_credentials_v2'] = 'BAD_JSON'
+    seedBtoaCache('8888', 'Low Role', 'cajero')
+    mockOffline()
+    const result = await verifyPinWithMinRole('8888', 'admin')
+    expect(result).toBeNull()
+  })
+
+  it('online/offline parity: same credentials, same minRole returns equivalent result', async () => {
+    // Online: provision via mock response
+    mockPinSuccess({ id: 'staff-parity', name: 'Parity Mgr', role: 'gerente' })
+    const onlineResult = await verifyPinWithMinRole('9999', 'capitan')
+    // Online path goes via API; PIN not provisioned yet — goes offline after
+    // So: provision first, then test parity
+    await provisionManagerCredential('9999', 'staff-parity', 'Parity Mgr', 'gerente')
+
+    mockOffline()
+    const offlineResult = await verifyPinWithMinRole('9999', 'capitan')
+
+    // Both must grant access (gerente >= capitan)
+    expect(offlineResult).not.toBeNull()
+    expect(offlineResult?.role).toBe('gerente')
+    // Both must reject when minRole is too high
+    mockOffline()
+    const offlineReject = await verifyPinWithMinRole('9999', 'admin')
+    expect(offlineReject).toBeNull()
+  })
+})

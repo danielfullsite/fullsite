@@ -59,6 +59,30 @@ export interface OfflineAuthLogEntry {
   synced?: boolean
 }
 
+// ── Role hierarchy — single source of truth for offline permission checks ────
+// Must mirror the server-side definition in /api/pos/pin/route.ts.
+// Unknown roles are treated as level 0 (fail-safe: always rejected).
+
+export const ROLE_HIERARCHY: Record<string, number> = {
+  mesero: 1,
+  cajero:  2,
+  capitan: 3,
+  gerente: 4,
+  admin:   5,
+}
+
+/**
+ * Returns true iff `role` meets or exceeds `minRole` in the hierarchy.
+ * Fails safe: undefined, empty, or unknown roles always return false.
+ */
+export function meetsMinRole(role: string | undefined | null, minRole: string): boolean {
+  if (!role) return false
+  const level = ROLE_HIERARCHY[role]
+  const minLevel = ROLE_HIERARCHY[minRole]
+  if (!level || !minLevel) return false
+  return level >= minLevel
+}
+
 // ── Device salt (singleton per install) ──────────────────────────────────────
 
 function getDeviceSalt(): string {

@@ -269,7 +269,7 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
 import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
-import { provisionManagerCredential, verifyPinOffline } from '@/lib/pos-manager-auth'
+import { provisionManagerCredential, verifyPinOffline, meetsMinRole } from '@/lib/pos-manager-auth'
 
 export function getModifiersForCategory(categoryId: string): {
   quitarOptions: string[]
@@ -1696,7 +1696,7 @@ async function _legacyBtoaFallback(pin: string): Promise<{ name: string; role: s
     const entry = cached[_pinCacheKey(pin)]
     if (entry?.name && Date.now() - (entry.cached_at || 0) < _LEGACY_PIN_CACHE_TTL_MS) {
       _recordBtoaFallback()
-      return { name: entry.name as string, role: (entry.role as string) || 'gerente' }
+      return { name: entry.name as string, role: (entry.role as string) || '' }
     }
   } catch { /* ignore */ }
   return null
@@ -1795,10 +1795,19 @@ export async function verifyPinWithMinRole(pin: string, minRole: string): Promis
   } catch { /* offline → fallback */ }
   // Fallback 1: PBKDF2 offline cache
   const pbkdf2 = await verifyPinOffline(pin, `min_role:${minRole}`).catch(() => null)
-  if (pbkdf2) return pbkdf2
-  // Fallback 2: legacy btoa cache (migration)
+  if (pbkdf2) {
+    // Apply role hierarchy — reject if stored role is below minRole.
+    // Fail safe: absent or unknown role → null (never grant access).
+    if (!meetsMinRole(pbkdf2.role, minRole)) return null
+    return pbkdf2
+  }
+  // Fallback 2: legacy btoa cache (migration — read-only)
   const legacy = await _legacyBtoaFallback(pin)
-  if (legacy) return { name: legacy.name, role: legacy.role || minRole }
+  if (legacy) {
+    // Apply role hierarchy — never use minRole as a substitute for a missing role.
+    if (!meetsMinRole(legacy.role, minRole)) return null
+    return { name: legacy.name, role: legacy.role }
+  }
   return null
 }
 

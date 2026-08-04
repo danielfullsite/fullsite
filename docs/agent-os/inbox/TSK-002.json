@@ -1,0 +1,41 @@
+{
+  "id": "TSK-002",
+  "title": "HTTP Contract Tests — Bridge WS + REST API",
+  "objective": "Crear contract tests que validen el protocolo Bridge WS y los endpoints REST del local server",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "READY",
+  "tags": [
+    "http-contracts",
+    "r3",
+    "testing"
+  ],
+  "dod": [
+    "Tests para SUBSCRIBE, COMMAND, ACK, REJECT, DELTA protocol messages",
+    "Tests para /health, /state REST endpoints",
+    "Tests pasan en CI (npm test o bun test)",
+    "Coverage de happy path + error cases"
+  ],
+  "dependencies": [],
+  "budget_tokens": 120000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-04T15:26:38Z",
+  "updated_at": "2026-08-04T15:26:38Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-04T15:26:38Z",
+      "note": "Task created"
+    }
+  ]
+}
