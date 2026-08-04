@@ -1,0 +1,29 @@
+name: Agent OS — Send Notification
+on:
+  workflow_dispatch:
+    inputs:
+      event_type:
+        description: Event type (TASK_CLOSED|TASK_BLOCKED|DECISION_REQUIRED|SUPERVISOR_CRASH|WAITING_FIELD)
+        required: true
+      text:
+        description: Pre-formatted HTML message text
+        required: true
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram notification
+        run: |
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID_DANIEL}\",\"parse_mode\":\"HTML\",\"text\":$(echo "$TEXT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}")
+          if echo "$RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Sent: ${{ inputs.event_type }}"
+          else
+            echo "❌ Failed: $RESPONSE"
+            exit 1
+          fi
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID_DANIEL: ${{ secrets.TELEGRAM_CHAT_ID_DANIEL }}
+          TEXT: ${{ inputs.text }}

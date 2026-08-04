@@ -22,6 +22,7 @@ from shared import (
     create_task_worktree, cleanup_task_worktree, merge_and_close_task,
 )
 import orchestrator as _orchestrator
+from telegram_notify import notify as _tg
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -39,11 +40,15 @@ MAX_ENGINEERS    = 2
 MAX_VERIFIERS    = 1
 STUCK_MIN        = 60     # minutes before a task is considered stuck
 
+# Marker written on clean shutdown; absence at next startup indicates crash/SIGKILL
+_CLEAN_SHUTDOWN_MARKER = '/tmp/agent-os-clean-shutdown'
+
 # active workers: key → {'proc': Popen, 'phase': str, 'started': str, 'pid': int, 'log': str}
 _workers: dict = {}
 _shutdown       = False
 _last_completed = None
 _errors: list   = []
+_notified_waiting_field = False  # dedup: only notify once per WAITING_FIELD transition
 
 # ── PID management ────────────────────────────────────────────────────────────
 
@@ -71,6 +76,11 @@ def _release_pid_lock():
 def _handle_sigterm(sig, frame):
     global _shutdown
     _log('SIGTERM/SIGINT received — shutting down cleanly')
+    # Write clean-shutdown marker so next startup knows this was intentional
+    try:
+        open(_CLEAN_SHUTDOWN_MARKER, 'w').close()
+    except Exception:
+        pass
     _shutdown = True
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -152,6 +162,10 @@ def main():
     audit('SUPERVISOR_STARTED', {'pid': os.getpid()})
     _write_heartbeat('STARTING', 'Initializing')
 
+    # Crash-recovery detection: if clean-shutdown marker is absent, previous run
+    # was killed abnormally (SIGKILL or crash). Notify once, then clear marker.
+    _notify_if_crash_recovery()
+
     backoff = LOOP_ACTIVE_S
     while not _shutdown:
         try:
@@ -170,8 +184,82 @@ def main():
     _log('Supervisor exiting')
     audit('SUPERVISOR_STOPPED', {'pid': os.getpid()})
 
+# ── Telegram notification helpers ─────────────────────────────────────────────
+
+def _notify_if_crash_recovery():
+    """Send SUPERVISOR_CRASH if previous run ended without clean-shutdown marker."""
+    marker = _CLEAN_SHUTDOWN_MARKER
+    prev_hb = {}
+    try:
+        if os.path.exists(HEARTBEAT_FILE):
+            prev_hb = read_json(HEARTBEAT_FILE)
+    except Exception:
+        pass
+
+    was_crash = (
+        not os.path.exists(marker)
+        and prev_hb.get('pid') is not None
+        and prev_hb.get('pid') != os.getpid()
+    )
+    # Always remove marker (clean slate for next shutdown detection)
+    try:
+        os.unlink(marker)
+    except FileNotFoundError:
+        pass
+
+    if was_crash:
+        # Count runs via launchctl (best-effort)
+        try:
+            r = subprocess.run(
+                ['launchctl', 'print', f'gui/{os.getuid()}/com.fullsite.agent-os'],
+                capture_output=True, text=True, timeout=5,
+            )
+            runs_line = next((l for l in r.stdout.splitlines() if 'runs =' in l), '')
+            runs = int(runs_line.split('=')[1].strip()) if runs_line else '?'
+        except Exception:
+            runs = '?'
+        _tg('SUPERVISOR_CRASH', {'pid': os.getpid(), 'runs': runs})
+        _log(f'Crash-recovery detected — Telegram notified (prev PID={prev_hb.get("pid")})')
+
+
+def _notify_blocked_tasks(index: dict):
+    """Notify about tasks that just entered BLOCKED status."""
+    for task_id, meta in index.items():
+        if meta['status'] != 'BLOCKED':
+            continue
+        try:
+            task = load_task(task_id)
+            history = task.get('history', [])
+            # Only notify if blocked recently (last transition)
+            if history and history[-1].get('to') == 'BLOCKED':
+                _tg('TASK_BLOCKED', {
+                    'task_id': task_id,
+                    'title': task.get('title', ''),
+                    'reason': history[-1].get('note', 'max retries agotados'),
+                })
+        except Exception:
+            pass
+
+
+def _maybe_notify_waiting_field(index: dict):
+    """Notify once when system reaches WAITING_FIELD after completing tasks."""
+    global _notified_waiting_field
+    if _notified_waiting_field:
+        return
+    if not _all_remaining_work_is_field_or_external(index):
+        return
+    if _last_completed is None:
+        return  # Never actually completed anything this session
+
+    closed = [tid for tid, m in index.items() if m['status'] in ('CLOSED', 'MERGED')]
+    _tg('WAITING_FIELD', {'completed': closed}, dedup_ttl_s=300)
+    _notified_waiting_field = True
+
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
 def _loop_once() -> bool:
-    global _last_completed
+    global _last_completed, _notified_waiting_field
 
     if is_killed():
         if _workers:
@@ -209,6 +297,18 @@ def _loop_once() -> bool:
 
     # 7. Auto-close VERIFIED tasks that don't need Founder gate
     _handle_verified_tasks()
+
+    # 8. Telegram notifications (non-blocking, deduplicated)
+    try:
+        index = load_tasks_index()
+        _notify_blocked_tasks(index)
+        _maybe_notify_waiting_field(index)
+        # Reset WAITING_FIELD dedup when new active work appears
+        if any(m['status'] in ('READY', 'CLAIMED', 'IN_PROGRESS', 'SUBMITTED', 'IN_REVIEW')
+               for m in index.values()):
+            _notified_waiting_field = False
+    except Exception:
+        pass
 
     return dispatched > 0
 
@@ -359,6 +459,15 @@ def _handle_verified_tasks():
                     'commit': commit,
                     'gates': tags,
                 })
+                try:
+                    task = load_task(task_id)
+                    _tg('TASK_CLOSED', {
+                        'task_id': task_id,
+                        'title': task.get('title', ''),
+                        'commit': commit,
+                    })
+                except Exception:
+                    pass
         except Exception as e:
             _log(f'Error closing verified task {task_id}: {e}')
             _errors.append({'ts': now_iso(), 'error': f'close:{task_id}:{str(e)[:200]}'})
@@ -377,6 +486,12 @@ def _maybe_create_founder_decision(task_id: str):
                 if d.get('task_id') == task_id and d.get('status') == 'AWAITING_FOUNDER':
                     return  # decision already pending
     _log(f'Creating Founder Decision for VERIFIED gate task {task_id}')
+    task_for_notify = load_task(task_id)
+    _tg('DECISION_REQUIRED', {
+        'task_id': task_id,
+        'title': task_for_notify.get('title', ''),
+        'decision_id': '(pending)',
+    })
     create_decision(
         task_id=task_id,
         objective=f'APROBAR MERGE — {task["title"]}',
