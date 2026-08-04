@@ -70,4 +70,8 @@ function getDiskFreeMb() {
   }
 }
 
-module.exports = { init, getDataDir, getEventLogPath, getProcessedCommandsPath, getConfigPath, getPlatform, getVersion, getHostname, getDiskFreeMb }
+function getLogDir() {
+  return path.join(getDataDir(), 'logs')
+}
+
+module.exports = { init, getDataDir, getEventLogPath, getProcessedCommandsPath, getConfigPath, getLogDir, getPlatform, getVersion, getHostname, getDiskFreeMb }
