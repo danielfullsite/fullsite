@@ -4,6 +4,8 @@
 > Patrones: CB-001 a CB-020  
 > Fuente principal: `docs/certifications/KDS-WANSOFT-GAP-ANALYSIS.md` (2026-07-31)  
 > Referencias cruzadas: → PR-001 (bridge), → DL-001 (delivery), → EC-005 (cancelaciones en KDS)
+>
+> **Nota de evidencia (corrección Lote 3):** Todos los patrones CB-001 a CB-020 derivados de KDS-WANSOFT-GAP-ANALYSIS.md tienen nivel de evidencia DOCUMENTED — el gap analysis es un documento de análisis, no código fuente directamente. Solo serían CODE VERIFIED si la fuente citara file:line del código. Los patrones que mencionan nombres de función específicos (resolveItemStation, useBridgeClient, reprintByStation) lo hacen a través del gap analysis, no de lectura directa del código.
 
 ---
 
@@ -15,7 +17,7 @@ Nombre:            KDS polling 2s + push events del bridge
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Operación-continua (2026-07-31)
 ```
 
@@ -59,7 +61,7 @@ Nombre:            Routing por estación: resolveItemStation()
 Categoría:         Cocina y Barra
 Clasificación:     MATCH
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Routing (2026-07-31)
 ```
 
@@ -142,7 +144,7 @@ Nombre:            Estados KDS: enviada → preparando → lista → entregada
 Categoría:         Cocina y Barra
 Clasificación:     MATCH
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estados (2026-07-31)
 ```
 
@@ -188,7 +190,7 @@ Nombre:            Forward-only: no retrocede estado en KDS
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estados — "Fullsite supera (más explícito)" (2026-07-31)
 ```
 
@@ -231,7 +233,7 @@ Nombre:            Tracking por ítem en Cocina: click individual por ítem
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estados (2026-07-31)
 ```
 
@@ -274,7 +276,7 @@ Nombre:            Barra: tracking solo a nivel de orden — sin tracking por í
 Categoría:         Cocina y Barra
 Clasificación:     UNKNOWN
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estados — GAP G-03 (P3) (2026-07-31)
 ```
 
@@ -317,7 +319,7 @@ Nombre:            Auto-archive de órdenes > 4h en ambas superficies
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Recuperación — "Fullsite supera" (2026-07-31)
 ```
 
@@ -358,7 +360,7 @@ Nombre:            Alerta de audio en Cocina: 880+1100Hz al recibir órdenes nue
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Alertas — "Fullsite supera" (2026-07-31)
 ```
 
@@ -399,7 +401,7 @@ Nombre:            Alerta de audio en Barra: 660Hz
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Alertas — "Fullsite supera" (2026-07-31)
 ```
 
@@ -440,7 +442,7 @@ Nombre:            Umbral urgencia Cocina: configurable desde Settings modal (lo
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Alertas (2026-07-31)
 ```
 
@@ -481,7 +483,7 @@ Nombre:            Umbral urgencia Barra: hardcoded 10 min — gap G-05
 Categoría:         Cocina y Barra
 Clasificación:     UNKNOWN
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Alertas — GAP G-05 / KDS-GAP-04 (2026-07-31)
 ```
 
@@ -521,7 +523,7 @@ Nombre:            Delivery orders en Cocina KDS: delivery_orders inyectadas en 
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estaciones (2026-07-31)
 ```
 
@@ -562,7 +564,7 @@ Nombre:            Delivery orders en Barra KDS — implementado 2026-07-31
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estaciones — CLOSED G-02 (2026-07-31)
 ```
 
@@ -602,7 +604,7 @@ Nombre:            Reimpresión desde KDS: botón "Reimprimir" con reprintByStat
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Impresión — "Fullsite supera" (2026-07-31)
 ```
 
@@ -643,7 +645,7 @@ Nombre:            reprintByStation sin retry queue — fallo es silencioso
 Categoría:         Cocina y Barra
 Clasificación:     UNKNOWN
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Impresión — GAP G-04 (P3) (2026-07-31)
 ```
 
@@ -687,7 +689,7 @@ Nombre:            Tab panadería en Cocina: filtro de sub-categoría
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Estaciones — "Fullsite supera" (2026-07-31)
 ```
 
@@ -770,7 +772,7 @@ Nombre:            Sidebar de conteo por platillo en Cocina: ordenado por demand
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Alertas — "Fullsite supera" (2026-07-31)
 ```
 
@@ -811,7 +813,7 @@ Nombre:            Barra: push events via useBridgeClient — CLOSED G-06
 Categoría:         Cocina y Barra
 Clasificación:     SURPASS
 Estado ficha:      DOCUMENTED
-Evidencia:         CODE VERIFIED
+Evidencia:         DOCUMENTED
 Fuente:            KDS-WANSOFT-GAP-ANALYSIS.md §Recuperación y §Operación-continua (2026-07-31)
 ```
 

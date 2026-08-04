@@ -13,7 +13,24 @@
 > - `agents/wansoft/wansoft_variacion_costos.json` — variación de costos  
 > - `docs/archive/bibles/FULLSITE-OPERATIONS-BIBLE.md` — reglas de inventario Fullsite  
 >
-> **Nota sobre fuentes JSON:** Los archivos `agents/wansoft/wansoft_*.json` contienen datos exportados directamente del sistema Wansoft de AMALAY via scraper. Son datos reales de producción — los patrones derivados de ellos tienen evidencia DOCUMENTED (datos observados, no inferidos).  
+> **Sobre las fuentes JSON de este archivo:**
+>
+> | Archivo | Tipo de dato | Scope | Contexto de extracción |
+> |---|---|---|---|
+> | `wansoft_recetas.json` | Catálogo de recetas | AMALAY-específico | Exportación via scraper, fecha exacta no registrada |
+> | `wansoft_existencias.json` | Snapshot de existencias | AMALAY-específico, punto en el tiempo | No representa estado continuo |
+> | `wansoft_existencias_detalle.json` | Detalle de existencias por almacén | AMALAY-específico, snapshot | — |
+> | `wansoft_compras_sugeridas.json` | Reporte generado por el sistema | AMALAY-específico | Calculado a partir del ROP configurado |
+> | `wansoft_reorder_points.json` | Configuración de puntos de reorden | AMALAY-específico | Configuración, no transacciones |
+> | `wansoft_cardex_summary.json` | Resumen de movimientos | AMALAY-específico | Agregado, no el detalle transaccional completo |
+> | `wansoft_transferencias.json` | Registro de transferencias | AMALAY-específico | Transaccional |
+> | `wansoft_subproductos.json` | Catálogo de subproductos | AMALAY-específico | Configuración/catálogo |
+> | `wansoft_produccion_plantillas.json` | Plantillas de producción | AMALAY-específico | Configuración |
+> | `wansoft_variacion_costos.json` | Reporte de variación | AMALAY-específico | Reporte generado, punto en el tiempo |
+> | `wansoft_costo_vs_venta.json` | Relación costo-venta por platillo | AMALAY-específico | Calculado |
+> | `wansoft_costos.json` | Costos por ingrediente/receta | AMALAY-específico | Puede estar stale — ver CONTRA-002 |
+>
+> **Advertencia:** Ningún dato de estos JSON debe generalizarse como comportamiento universal de Wansoft o de cualquier restaurante. Son datos de AMALAY en un momento específico. Los recuentos (ej. cantidad de recetas, de almacenes) son atribuidos a la exportación y deben verificarse independientemente antes de citarse como hechos.
 >
 > Referencias cruzadas: → CJ-001 (IVA en costos), → MS-001 (PIN staff), → EC-004 (sync silencioso)
 
@@ -149,21 +166,29 @@ No hay datos de cuántos de los 574 ingredientes en Wansoft tienen yield configu
 
 ---
 
-## IN-004 — 574 recetas en AMALAY, 6 almacenes en Wansoft
+## IN-004 — Recetas y almacenes en AMALAY (Wansoft)
 
 ```
 ID:                IN-004
-Nombre:            574 recetas en AMALAY; 6 almacenes en Wansoft
+Nombre:            Recetas y almacenes en AMALAY (Wansoft): conteo atribuido a exportación
 Categoría:         Inventario y Compras
 Clasificación:     UNKNOWN
 Estado ficha:      DOCUMENTED
-Evidencia:         DOCUMENTED
-Fuente:            agents/wansoft/wansoft_recetas.json (recuento); agents/wansoft/wansoft_existencias.json (almacenes)
+Evidencia:         DOCUMENTED / UNVERIFIED COUNT
+Fuente:            agents/wansoft/wansoft_recetas.json (recuento sin verificación independiente);
+                   agents/wansoft/wansoft_existencias_detalle.json (múltiples almacenes observados)
+Método de verificación pendiente: contar filas en wansoft_recetas.json + wansoft_existencias_detalle.json;
+                   contrastar con el sistema Wansoft en AMALAY via TeamViewer o acceso directo → UNK-031
 ```
 
-**Evidencia:**  
-- `agents/wansoft/wansoft_recetas.json`: contiene las recetas exportadas de Wansoft-AMALAY. El número de registros en el archivo indica 574 recetas activas.
-- `agents/wansoft/wansoft_existencias.json`: contiene existencias por almacén. Los datos muestran múltiples almacenes (documentado como 6 en AMALAY).
+**Evidencia atribuida (no verificada independientemente):**  
+- `wansoft_recetas.json`: exportación de recetas de Wansoft-AMALAY. La cifra de 574 recetas proviene de la memoria del proyecto y documentación interna — no ha sido reproducida contando filas del archivo en este KB. No usar como cifra exacta sin verificación.
+- `wansoft_existencias_detalle.json`: contiene existencias desglosadas. Se observan múltiples almacenes; el número 6 es atribuido a documentación interna y memoria del proyecto. Puede incluir almacenes inactivos o de prueba.
+
+**Aclaración sobre el tipo de dato:**  
+- Las recetas pueden incluir sub-preparaciones, bases y salsas — no es 1:1 con platillos del menú
+- Los almacenes pueden incluir almacenes históricos o inactivos que aparecen en el sistema
+- Ambos números son de AMALAY en Wansoft, en el momento de la extracción — no representan un estándar de la industria
 
 **Nota importante:**  
 El número 574 es el recuento de recetas en la exportación del sistema Wansoft — no necesariamente equivale a 574 platillos únicos del menú. Wansoft puede tener recetas para sub-preparaciones, bases, salsas, y presentaciones distintas del mismo platillo.

@@ -44,6 +44,21 @@
 | UNK-035 | ¿Fullsite tiene módulo de producción/subproductos equivalente? ¿Cuántas plantillas activas tiene AMALAY? | Revisión de código + revisión wansoft_produccion_plantillas.json | IN-008 |
 | UNK-036 | ¿Con qué frecuencia hace AMALAY conteo físico de inventario? ¿Qué ingredientes muestran mayor variación? | Entrevista AMALAY + revisión wansoft_variacion_costos.json | IN-009 |
 | UNK-037 | ¿Cuándo fue la última actualización de precios de ingredientes en pos_recipes? ¿Se ha validado el 27.6% con auditoría física? | Entrevista AMALAY + revisión BD | IN-010 |
+| UNK-038 | ¿Existe log de auditoría por mesero en Fullsite? ¿Se registra qué acción realizó cada PIN y cuándo? | Revisión de código | MS-001 |
+| UNK-039 | ¿Puede el gerente resetear el PIN de un mesero desde la terminal o requiere acceso al panel admin (deploy/Supabase)? | Revisión de código + entrevista AMALAY | MS-001, MS-003 |
+| UNK-040 | ¿El cache de PIN en Fullsite sobrevive un refresh de página (localStorage) o vive solo en memoria de sesión? | Revisión de código | MS-002 |
+| UNK-041 | ¿Cuántos de los 50 staff de AMALAY tienen turno activo en promedio por semana? ¿Cuántos son registros históricos no dados de baja? | Entrevista AMALAY | MS-003 |
+| UNK-042 | ¿Usa AMALAY lectores de huella dactilar en alguna terminal? ¿El hardware existe físicamente en las instalaciones? | Observación de campo | MS-004 |
+| UNK-043 | ¿Puede el cajero corregir una propina después de cerrar el cobro en Fullsite? ¿Qué sucede con la diferencia en efectivo? | Revisión de código + prueba de campo | MS-005 |
+| UNK-044 | ¿Cómo se gestiona el PIN de MESERO EVENTO en AMALAY? ¿Es un PIN compartido entre el personal de evento o tiene un solo responsable? | Entrevista AMALAY | MS-007 |
+| UNK-045 | ¿El ranking de meseros mostrado en Fullsite POS está basado en datos en tiempo real o solo en wansoft_daily (scraper)? | Revisión de código | MS-008 |
+| UNK-046 | ¿Usa AMALAY el permiso "¿Se preparó?" en Wansoft? Si existe, ¿Fullsite necesita un equivalente? | Entrevista AMALAY + observación de campo | MS-009 |
+| UNK-047 | ¿Fullsite soporta autorización remota de gerente (el gerente aprueba desde su propia terminal sin estar en la del mesero)? | Revisión de código | MS-010 |
+| UNK-048 | ¿Cuántas órdenes de UberEats/Rappi recibe AMALAY al día en promedio? ¿Cuánto tarda el capturista en ingresar una orden manualmente en Wansoft? | Entrevista AMALAY + observación de campo | DL-001 |
+| UNK-049 | ¿Cuántas plataformas de delivery están configuradas en el webhook de Fullsite en AMALAY? ¿Hay fallback si el webhook falla? | Revisión de código + entrevista AMALAY | DL-002 |
+| UNK-050 | ¿Fullsite recibe confirmación de entrega desde la plataforma? ¿Cierra automáticamente el ciclo de la orden o queda en "lista" indefinidamente? | Revisión de código | DL-003 |
+| UNK-051 | ¿Existe roadmap en Fullsite para recibir estados post-restaurante (en_ruta, entregada) desde las plataformas de delivery? | Revisión de roadmap + entrevista | DL-004 |
+| UNK-052 | ¿Cuál es el endpoint exacto del webhook de delivery en Fullsite? ¿Tiene validación de firma HMAC? | Revisión de código | DL-005 |
 
 ---
 
@@ -51,15 +66,17 @@
 
 - UNK-002, UNK-007, UNK-014, UNK-016, UNK-018, UNK-020, UNK-021, UNK-022, UNK-024
 - UNK-026, UNK-027, UNK-028, UNK-036, UNK-037
+- UNK-041, UNK-042, UNK-043, UNK-044, UNK-046, UNK-048, UNK-049
 
 ## Unknowns de código (requieren leer source o comparar archivos)
 
 - UNK-001, UNK-003, UNK-004, UNK-005, UNK-006, UNK-008, UNK-009, UNK-010, UNK-011, UNK-012, UNK-013, UNK-015, UNK-017, UNK-019, UNK-025
 - UNK-029, UNK-030, UNK-031, UNK-032, UNK-033, UNK-034, UNK-035
+- UNK-038, UNK-039, UNK-040, UNK-045, UNK-047, UNK-050, UNK-052
 
 ## Unknowns de roadmap/entrevista
 
-- UNK-023
+- UNK-023, UNK-051
 
 ---
 
