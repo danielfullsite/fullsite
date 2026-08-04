@@ -32,16 +32,30 @@
 | UNK-023 | ¿Cuándo se implementa la integración directa MP Point API? ¿Está en el roadmap activo? | Revisión de roadmap | CJ-018 |
 | UNK-024 | ¿La báscula COM1 de AMALAY tiene algún caso de uso activo? ¿Qué se pesa? | Entrevista AMALAY | AM-003 |
 | UNK-025 | ¿El agente close_predictor.py usa datos de hora_pico o solo histórico de ventas? | Revisión de código del agente | OP-009 |
+| UNK-026 | ¿Cuál es el tiempo promedio de preparación de una orden de Barra en AMALAY? ¿El umbral de 10 min es correcto? | Observación de campo | CB-012 |
+| UNK-027 | ¿Tiene Wansoft notificación al mesero cuando cocina cancela un ítem? ¿Cómo se entera el mesero actualmente en AMALAY? | Entrevista AMALAY + revisión Wansoft | CB-018 |
+| UNK-028 | ¿Cuándo fue la última vez que AMALAY tuvo stock negativo en Wansoft? ¿Qué ingrediente y cuál fue la causa? | Revisión wansoft_existencias.json + entrevista | IN-001 |
+| UNK-029 | ¿Están sincronizadas las recetas de wansoft_recetas.json con pos_recipes en Fullsite? ¿Cuántas difieren? | Comparación directa de archivos | IN-002 |
+| UNK-030 | ¿Cuántos ingredientes de AMALAY tienen yield < 100% en Wansoft? ¿Fullsite implementa el campo yield en pos_recipes? | Revisión wansoft_recetas.json + código pos_recipes | IN-003 |
+| UNK-031 | ¿Fullsite implementa múltiples almacenes equivalentes a los 6 de Wansoft-AMALAY? | Revisión de código | IN-004 |
+| UNK-032 | ¿Fullsite tiene un equivalente al cardex de Wansoft integrado en el dashboard? | Revisión de código | IN-005 |
+| UNK-033 | ¿Fullsite usa datos de ventas históricas para sugerir puntos de reorden dinámicos? | Revisión de código | IN-006 |
+| UNK-034 | ¿Fullsite tiene módulo de transferencias entre almacenes? ¿Con qué frecuencia ocurren en AMALAY? | Revisión de código + entrevista AMALAY | IN-007 |
+| UNK-035 | ¿Fullsite tiene módulo de producción/subproductos equivalente? ¿Cuántas plantillas activas tiene AMALAY? | Revisión de código + revisión wansoft_produccion_plantillas.json | IN-008 |
+| UNK-036 | ¿Con qué frecuencia hace AMALAY conteo físico de inventario? ¿Qué ingredientes muestran mayor variación? | Entrevista AMALAY + revisión wansoft_variacion_costos.json | IN-009 |
+| UNK-037 | ¿Cuándo fue la última actualización de precios de ingredientes en pos_recipes? ¿Se ha validado el 27.6% con auditoría física? | Entrevista AMALAY + revisión BD | IN-010 |
 
 ---
 
 ## Unknowns de campo (requieren visita física a AMALAY)
 
 - UNK-002, UNK-007, UNK-014, UNK-016, UNK-018, UNK-020, UNK-021, UNK-022, UNK-024
+- UNK-026, UNK-027, UNK-028, UNK-036, UNK-037
 
-## Unknowns de código (requieren leer source)
+## Unknowns de código (requieren leer source o comparar archivos)
 
 - UNK-001, UNK-003, UNK-004, UNK-005, UNK-006, UNK-008, UNK-009, UNK-010, UNK-011, UNK-012, UNK-013, UNK-015, UNK-017, UNK-019, UNK-025
+- UNK-029, UNK-030, UNK-031, UNK-032, UNK-033, UNK-034, UNK-035
 
 ## Unknowns de roadmap/entrevista
 
@@ -49,8 +63,9 @@
 
 ---
 
-## Contradicciones detectadas en esta versión
+## Contradicciones detectadas
 
-| ID | Descripción | Fuente A | Fuente B |
-|---|---|---|---|
-| CONTRA-001 | Cobro clasificado como "INFERIOR" en FULLSITE-POS-OPERATIONAL-BIBLE.md pero sin detalle de por qué — puede referirse solo al cobro mixto o a otros aspectos | FULLSITE-POS-OPERATIONAL-BIBLE.md (veredicto tabla) | FULLSITE-POS-BIBLE.md (no lista limitaciones de cobro) |
+| ID | Descripción | Fuente A | Fuente B | Resuelve con |
+|---|---|---|---|---|
+| CONTRA-001 | Cobro clasificado como "INFERIOR" en FULLSITE-POS-OPERATIONAL-BIBLE.md §veredicto pero sin detalle de qué aspecto específico falla. Puede referirse al cobro mixto, al flujo de pago, o a ambos. | FULLSITE-POS-OPERATIONAL-BIBLE.md §tabla-veredicto | FULLSITE-POS-BIBLE.md (no lista limitaciones de cobro) | Leer §veredicto completo + prueba de campo cobro mixto → CJ-004 |
+| CONTRA-002 | pos_recipes (Fullsite) y wansoft_food_cost coexisten como fuentes de costo para AMALAY. FULLSITE-OPERATIONS-BIBLE.md establece que wansoft_food_cost está stale pero no cuantifica la diferencia. El 27.6% debe tratarse como aproximación hasta auditoría. | FULLSITE-OPERATIONS-BIBLE.md §food-cost | agents/wansoft/wansoft_costos.json | Comparación directa por platillo + auditoría física → IN-002, IN-010 |
