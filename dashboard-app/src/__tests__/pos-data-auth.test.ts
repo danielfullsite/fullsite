@@ -327,4 +327,23 @@ describe('GAP-A: verifyPinWithMinRole — offline role hierarchy enforcement', (
     const offlineReject = await verifyPinWithMinRole('9999', 'admin')
     expect(offlineReject).toBeNull()
   })
+
+  // Regression: exact handleTransferItem scenario (minRole: 'capitan')
+  it('capitan PBKDF2 offline puede transferir (capitan >= capitan)', async () => {
+    await provisionManagerCredential('1212', 'staff-cap', 'Capitan Mgr', 'capitan')
+    mockOffline()
+    const result = await verifyPinWithMinRole('1212', 'capitan')
+    expect(result).not.toBeNull()
+    expect(result?.role).toBe('capitan')
+  })
+
+  it('cajero PBKDF2 offline no puede transferir — regression bug AUTH-OFFLINE-02', async () => {
+    // Before fix: verifyPinOffline returned { name, role:'cajero' } and the
+    // caller returned it directly without checking role >= minRole.
+    // After fix: meetsMinRole('cajero', 'capitan') === false → null.
+    await provisionManagerCredential('1313', 'staff-caj', 'Cajero User', 'cajero')
+    mockOffline()
+    const result = await verifyPinWithMinRole('1313', 'capitan')
+    expect(result).toBeNull()
+  })
 })
