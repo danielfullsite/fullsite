@@ -42,18 +42,18 @@
 |---|---|---|---|---|
 | **Lote 1** | **156** | 33 | 123 | El resumen del Lote 1 mostraba 106 — error: sumó tipos de clasificación, no filas. |
 | **Lote 2** | **155** | 63 | 92 | El resumen del Lote 2 mostraba 145/82 — error aritmético: 63+92=155, no 145. |
-| **Lote 3** | **TBD** | TBD | TBD | — |
+| **Lote 3** | **155** | 78 | 77 | MS+DL pasan de INDEXED a DOCUMENTED. MS-002 degradado de CODE VERIFIED a DOCUMENTED por discrepancia con código. |
 
 **Cambios reales Lote 1 → Lote 2 (sin contar fichas escritas):**
 
-| Cambio | Detalle |
-|---|---|
-| DL-006 eliminado | "Delivery orders inyectadas en Cocina" absorbido en CB-013 / CB-014. DL: 6 → 5 filas. |
-| CB-002 renombrado | "Wansoft KDS poll 15s" (Lote 1) → absorbido en documentación de CB-001. CB-002 pasó a ser "resolveItemStation()". |
-| CB-020 reemplazado | "Sidebar conteo platillos" (Lote 1) pasó a CB-019. CB-020 nuevo = "Barra push events via useBridgeClient". |
-| Total neto | -1 fila (DL-006 eliminada). 156 → 155. |
+- Entrega DL eliminada: "Delivery orders inyectadas en Cocina" absorbido en CB-013 / CB-014. DL: 6 → 5 filas.
+- Cocina-002 renombrado: "Wansoft KDS poll 15s" (Lote 1) absorbido en documentación de CB-001. CB-002 pasó a ser "resolveItemStation()".
+- Cocina-020 reemplazado: "Sidebar conteo platillos" (Lote 1) pasó a CB-019. CB-020 nuevo = "Barra push events via useBridgeClient".
+- Total neto: -1 fila (entrega DL eliminada). 156 → 155.
 
-**No hay patrones silenciosamente añadidos.** La diferencia entre los resúmenes (106 vs 145) fue enteramente por errores aritméticos en ambas tablas de resumen.
+**Diferencia 145 vs 155:** El footer del resumen de Lote 2 sumaba OP..WN (135 rows) y omitía AM (10 rows), dando 145. Los 10 IDs ausentes del footer son AM-001..AM-010. Error de omisión, no IDs ocultos.
+
+**CB: fichas corregidas Lote 1→2:** En el archivo 03-cocina-barra.md, 18 fichas tenían CODE VERIFIED que se cambió a DOCUMENTED. CB-003 y CB-018 ya tenían DOCUMENTED (dos excepciones, no una como decía el commit message).
 
 ---
 
@@ -157,7 +157,7 @@
 | ID | Nombre | Clasificación | Estado ficha | Evidencia | Fuente / Sección |
 |---|---|---|---|---|---|
 | MS-001 | PIN como autenticación primaria en POS | MATCH | DOCUMENTED | DOCUMENTED | BREAK-THE-RESTAURANT.md §BLOCKER-1; FULLSITE-OPERATIONS-BIBLE.md |
-| MS-002 | PIN_CACHE_TTL = 900s — re-auth silenciosa | UNKNOWN | DOCUMENTED | CODE VERIFIED | FULLSITE-POS-BIBLE.md §constante-PIN_CACHE_TTL=900000 |
+| MS-002 | Cache de PIN para re-auth silenciosa | UNKNOWN | DOCUMENTED | DOCUMENTED | FULLSITE-POS-BIBLE.md §constante — DISCREPANCIA: 900s/pos/layout.tsx no existe en código; ver ficha |
 | MS-003 | 50 registros de staff activos en AMALAY | UNKNOWN | DOCUMENTED | DOCUMENTED | FULLSITE DOCS/15-AMALAY/FULLSITE-OPERATIONS.md §staff |
 | MS-004 | Wansoft: huella dactilar como autenticación alternativa | WANSOFT-ONLY | DOCUMENTED | DOCUMENTED | WANSOFT-BIBLE.md §seguridad |
 | MS-005 | Propina como campo de entrada en el cobro | MATCH | DOCUMENTED | DOCUMENTED | FULLSITE-OPERATIONS-BIBLE.md §cobro; CLAUDE.md §propinas_total |

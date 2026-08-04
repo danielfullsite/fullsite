@@ -59,6 +59,7 @@
 | UNK-050 | ¿Fullsite recibe confirmación de entrega desde la plataforma? ¿Cierra automáticamente el ciclo de la orden o queda en "lista" indefinidamente? | Revisión de código | DL-003 |
 | UNK-051 | ¿Existe roadmap en Fullsite para recibir estados post-restaurante (en_ruta, entregada) desde las plataformas de delivery? | Revisión de roadmap + entrevista | DL-004 |
 | UNK-052 | ¿Cuál es el endpoint exacto del webhook de delivery en Fullsite? ¿Tiene validación de firma HMAC? | Revisión de código | DL-005 |
+| UNK-053 | ¿La bible FULLSITE-POS-BIBLE.md §PIN_CACHE_TTL=900000/pos/layout.tsx refleja un valor planeado, un estado anterior del código, o es un error de documentación? El código actual tiene `_LEGACY_PIN_CACHE_TTL_MS=86400000ms` en pos-data.ts:1681 siendo retirado. | Revisión de código + git log | MS-002 |
 
 ---
 
@@ -72,7 +73,7 @@
 
 - UNK-001, UNK-003, UNK-004, UNK-005, UNK-006, UNK-008, UNK-009, UNK-010, UNK-011, UNK-012, UNK-013, UNK-015, UNK-017, UNK-019, UNK-025
 - UNK-029, UNK-030, UNK-031, UNK-032, UNK-033, UNK-034, UNK-035
-- UNK-038, UNK-039, UNK-040, UNK-045, UNK-047, UNK-050, UNK-052
+- UNK-038, UNK-039, UNK-040, UNK-045, UNK-047, UNK-050, UNK-052, UNK-053
 
 ## Unknowns de roadmap/entrevista
 

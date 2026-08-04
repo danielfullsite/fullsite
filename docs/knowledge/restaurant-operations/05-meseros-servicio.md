@@ -40,36 +40,40 @@ Fuente:         BREAK-THE-RESTAURANT.md §BLOCKER-1 (listado como primer vector 
 
 ---
 
-## MS-002 — PIN_CACHE_TTL = 900s — re-autenticación silenciosa
+## MS-002 — Cache de PIN para re-autenticación silenciosa
 
 ```
 ID:             MS-002
-Nombre:         PIN_CACHE_TTL = 900s — re-autenticación silenciosa
+Nombre:         Cache de PIN para re-autenticación silenciosa
 Categoría:      Meseros / Autenticación
 Clasificación:  UNKNOWN
 Estado ficha:   DOCUMENTED
-Evidencia:      CODE VERIFIED
+Evidencia:      DOCUMENTED
 Fuente:         FULLSITE-POS-BIBLE.md §constante-PIN_CACHE_TTL=900000
-                (referencia a archivo con constante)
+                DISCREPANCIA: ver Comportamiento observado
 ```
 
 **Problema operacional:** El mesero no debe reingresar el PIN en cada acción, pero la sesión no puede mantenerse indefinidamente por razones de seguridad.
 
-**Por qué existe:** Balance entre fricción operativa (PIN en cada orden) y seguridad (expiración por inactividad). 15 minutos es el estándar en muchos POS de restaurante.
+**Por qué existe:** Balance entre fricción operativa (PIN en cada orden) y seguridad (expiración por inactividad).
 
-**Cuándo aplica:** Después de cada autenticación exitosa, la identidad del mesero queda en caché por 900 segundos (15 minutos). Transcurrido ese tiempo, el sistema solicita PIN nuevamente.
+**Cuándo aplica:** Después de cada autenticación exitosa, la identidad del mesero queda en caché. El TTL exacto es objeto de discrepancia (ver abajo).
 
 **Comportamiento observado:**
-- Constante `PIN_CACHE_TTL = 900000` (ms) confirmada en código vía FULLSITE-POS-BIBLE.md.
+- FULLSITE-POS-BIBLE.md line 1234 cita: `PIN_CACHE_TTL | 900000 (15 min) | pos/layout.tsx`
+- Auditoría de código (2026-08-04): `pos/layout.tsx` NO contiene `PIN_CACHE_TTL`. La constante no existe en el archivo citado.
+- Lo que existe en producción: `_LEGACY_PIN_CACHE_TTL_MS = 24 * 60 * 60 * 1000` (86400000ms = 24h) en `pos-data.ts:1681`, marcado como btoa fallback siendo retirado ("Goal is 0 hits per terminal before retiring the legacy cache").
+- El valor 900000ms (15 min) no está presente en el código de producción.
 - La re-autenticación es silenciosa — el mesero ve un prompt de PIN sin mensaje de error.
-- Distinto del `IDLE_TIMEOUT_MS = 1800000` (OP-011): idle timeout cierra la sesión completa; el PIN cache solo requiere re-ingreso sin cerrar la sesión.
+- Distinto del `IDLE_TIMEOUT_MS = 1800000` (OP-011): idle timeout cierra la sesión completa.
 
-**Impacto operativo:** Una terminal inactiva por > 15 min puede ser usada por otro mesero sin dejar rastro en logs si ingresan el PIN del titular.
+**Impacto operativo:** El TTL real del cache de PIN determina la ventana de riesgo de uso no autorizado de una terminal. Hasta que se resuelva la discrepancia, el valor no puede ser afirmado.
 
 **Limitaciones conocidas:**
-- El cache vive en memoria: si el browser se recarga, el PIN se solicita de inmediato independientemente del TTL restante.
+- El valor 900s (15 min) de la bible no coincide con el código de producción.
+- `_LEGACY_PIN_CACHE_TTL_MS` está en proceso de retiro — el mecanismo actual de cache puede diferir.
 
-**Preguntas abiertas:** UNK-040 (¿El cache de PIN sobrevive un refresh de página o está solo en memoria de sesión?).
+**Preguntas abiertas:** UNK-040 (¿Cuál es el TTL de cache de PIN activo en producción? ¿Qué reemplaza al legacy btoa cache?), UNK-053 (¿La bible FULLSITE-POS-BIBLE.md §PIN_CACHE_TTL reflejaba un valor planeado o un estado anterior del código?).
 
 ---
 
