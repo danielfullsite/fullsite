@@ -41,7 +41,7 @@ Actualizar en cada PR que toque capacidades offline, Bridge, auth, sync o printi
 | KDS → Bridge | ✅ PASS | useBridgeClient('kds') en /pos/cocina — RAF-002 | 2026-08-03 |
 | Print Queue | ✅ PASS | atomic write JSON, 24h TTL — RAF-003 | 2026-08-03 |
 | command_id | ✅ PASS | crypto.randomUUID() — GAP-002 cerrado | 2026-08-03 |
-| Manager PIN offline (PBKDF2) | ✅ PASS | PBKDF2 activo — provisionManagerCredential + verifyPinOffline. btoa fallback DEPRECATED con telemetría | 2026-08-04 |
+| Manager PIN offline (PBKDF2) | ✅ PASS | PBKDF2 activo + `meetsMinRole` enforcement (GAP-A cerrado) — autenticación ✅ · jerarquía roles offline ✅ · fail-closed ✅. 54 tests PASS | 2026-08-04 |
 | Staff Login offline (SHA-256) | ⚠️ DEUDA | SHA-256(pin:staffId) en layout.tsx — deuda de seguridad separada, fuera de scope OC-09 | 2026-08-04 |
 | Mesa state (Bridge) | ✅ PASS | Lock reconciliation en STATE_SYNC — GAP-003 cerrado | 2026-08-03 |
 | Print recovery | ✅ PASS | retryRecoverableJobs: setInterval 60s activo + startup retry — AF-004 REFUTADO (RAF-008) | 2026-08-04 |
