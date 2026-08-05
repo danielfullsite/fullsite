@@ -34,6 +34,34 @@ interface SyncQueueItem {
   error_class?: SyncErrorClass   // classified error state
   error_detail?: string          // human-readable error detail for operator recovery
   server_revision?: number       // server revision at time of conflict (evidence)
+  last_attempt_at?: number       // epoch ms of last sync attempt — drives slow-retry backoff
+}
+
+// ─── Transient Retry Policy (PRR-02) ────────────────────────────────────────
+// Transient items are never abandoned: after MAX_FAST_RETRIES consecutive
+// failures they degrade to slow retries with exponential backoff (60s doubling
+// up to 5 min) instead of being skipped forever. A flaky reconnection window
+// can burn through 5 fast attempts in seconds; without backoff those items
+// were stranded in IDB with no retry, no UI signal — silent data loss.
+const MAX_FAST_RETRIES = 5
+const SLOW_RETRY_BASE_MS = 60_000
+const SLOW_RETRY_MAX_MS = 300_000
+
+export function syncBackoffMs(retries: number): number {
+  if (retries < MAX_FAST_RETRIES) return 0
+  return Math.min(SLOW_RETRY_BASE_MS * 2 ** (retries - MAX_FAST_RETRIES), SLOW_RETRY_MAX_MS)
+}
+
+export function shouldAttemptSync(
+  item: Pick<SyncQueueItem, 'retries' | 'error_class' | 'last_attempt_at'>,
+  now: number,
+): boolean {
+  if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
+    return false
+  }
+  const backoff = syncBackoffMs(item.retries)
+  if (backoff === 0) return true
+  return now - (item.last_attempt_at ?? 0) >= backoff
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -241,8 +269,21 @@ export async function incrementRetry(id: string): Promise<void> {
     const item = request.result
     if (item) {
       item.retries += 1
+      item.last_attempt_at = Date.now()
       store.put(item)
     }
+  }
+}
+
+// Increments retry count and, the moment an item crosses into slow-retry mode,
+// notifies the active POS page so the operator knows sync is degraded (PRR-02:
+// previously these items went dark with no signal).
+async function noteTransientFailure(item: SyncQueueItem): Promise<void> {
+  await incrementRetry(item.id)
+  if (item.retries + 1 === MAX_FAST_RETRIES && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pos-sync-degraded', {
+      detail: { queueId: item.id, endpoint: item.endpoint ?? item.table },
+    }))
   }
 }
 
@@ -272,7 +313,7 @@ export interface SyncQueueSummary {
   pending: number     // items in queue, not yet synced, no terminal error
   terminal: number    // items with STALE_WRITE_CONFLICT or TERMINAL_NON_RETRYABLE
   conflicts: number   // items with conflict: true (subset of terminal, for display)
-  exhausted: number   // items with retries >= 5 but no error_class (transient failures that ran out)
+  exhausted: number   // items past MAX_FAST_RETRIES with no error_class — now on slow-retry backoff, not abandoned
 }
 
 export async function getSyncQueueSummary(): Promise<SyncQueueSummary> {
@@ -464,11 +505,9 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   let failed = 0
 
   for (const item of queue) {
-    // Skip items in terminal error state — they require operator intervention
-    if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
-      continue
-    }
-    if (item.retries >= 5) continue
+    // Terminal items are skipped (operator intervention); transient items past
+    // the fast-retry cap are attempted only when their backoff window elapses.
+    if (!shouldAttemptSync(item, Date.now())) continue
 
     const transport = resolveTransport(item)
 
@@ -515,7 +554,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         } else {
           // TRANSIENT_RETRYABLE
           console.warn(`[offline-sync] Transient failure for ${item.endpoint}: ${result.detail}`)
-          await incrementRetry(item.id)
+          await noteTransientFailure(item)
           failed++
         }
       } else {
@@ -543,7 +582,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           await markSynced(item.id)
           synced++
         } else {
-          await incrementRetry(item.id)
+          await noteTransientFailure(item)
           failed++
         }
       }

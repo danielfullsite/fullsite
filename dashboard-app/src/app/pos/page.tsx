@@ -2200,6 +2200,16 @@ function POSContent() {
     return () => window.removeEventListener('pos-order-conflict', conflictHandler)
   }, [orderId, mesa])
 
+  // PRR-02: warn operator when a queued operation enters slow-retry mode —
+  // sync is degraded but the item keeps retrying with backoff, nothing is lost
+  useEffect(() => {
+    const degradedHandler = () => {
+      showToast('Sincronización lenta — una operación pendiente sigue reintentando en segundo plano')
+    }
+    window.addEventListener('pos-sync-degraded', degradedHandler)
+    return () => window.removeEventListener('pos-sync-degraded', degradedHandler)
+  }, [])
+
   // Flash animation state
   const [flashItemId, setFlashItemId] = useState<string | null>(null)
 
