@@ -7,9 +7,17 @@ Maquinas   : PDV3 (terminal punto de venta) y SERVER1 (Bridge)
 
 CONTENIDO
 ---------
-  CERT-CAPTURE.ps1     -- Script de captura de evidencia (solo lectura)
-  RUN-CERT-CAPTURE.cmd -- Lanzador con doble clic (pide permisos de admin)
-  README.txt           -- Este archivo
+  CERT-CAPTURE.ps1       -- Script de captura de evidencia (solo lectura)
+  RUN-CERT-CAPTURE.cmd   -- Lanzador con doble clic (pide permisos de admin)
+  PRE-INSTALL-BACKUP.ps1 -- Respaldo restaurable ANTES de instalar
+  INSTALL.cmd            -- Instalacion con respaldo, firewall y log
+  FIREWALL-SETUP.ps1     -- Reglas de firewall del Bridge (7717 / 5353)
+  ROLLBACK.ps1           -- Regresar la maquina al estado del respaldo
+  README.txt             -- Este archivo
+
+  OJO: CERT-CAPTURE nunca cambia nada. INSTALL.cmd, FIREWALL-SETUP.ps1 y
+  ROLLBACK.ps1 SI cambian el sistema — usarlos solo cuando el runbook
+  (seccion "Instalacion controlada") lo indique.
 
 QUE HACE
 --------
@@ -28,7 +36,7 @@ guarda en una carpeta nueva con fecha y hora. NO cambia nada:
   - Lineas de ERROR en los logs del servidor
   - SUMMARY.txt con resultado PASS / WARN / FAIL de cada punto
 
-ESTE PAQUETE NO:
+LA CAPTURA (CERT-CAPTURE / RUN-CERT-CAPTURE) NO:
   X Imprime tickets ni abre el cajon
   X Detiene o modifica ningun proceso
   X Escribe en el registro de Windows
@@ -79,6 +87,41 @@ INTERPRETACION DEL SUMMARY
   FAIL  -> Detente. FAIL en PORT_7717_LISTENING, HEALTH_OK o
            ZERO_DUPLICATES es un P0: usa la plantilla P0 del runbook
            THURSDAY-RUNBOOK.md y no avances al siguiente paso.
+
+INSTALACION Y ROLLBACK (SOLO CUANDO EL RUNBOOK LO PIDA)
+-------------------------------------------------------
+  Estos pasos SI cambian la maquina. Seguir el orden del runbook,
+  seccion "Instalacion controlada".
+
+  1. INSTALAR / ACTUALIZAR la app:
+       a. Cierra la app si esta abierta (Ctrl+Shift+Q).
+       b. En cmd, desde la carpeta del kit:
+
+            INSTALL.cmd "D:\usb\Fullsite POS Setup 1.3.3.exe"
+
+          (la ruta es la del instalador en tu USB)
+       c. El script hace TODO solo: respaldo verificado, instalacion
+          silenciosa, firewall y primer arranque de la app.
+       d. Si el respaldo falla, la instalacion se cancela sola. Avisa
+          al responsable tecnico.
+       e. Al terminar: RUN-CERT-CAPTURE.cmd install
+       f. Guarda: la carpeta backups\ y el archivo de install-logs\.
+
+  2. RESPALDO SUELTO (sin instalar): doble clic no aplica; en cmd:
+       powershell -NoProfile -ExecutionPolicy Bypass -File .\PRE-INSTALL-BACKUP.ps1
+     El resultado queda en backups\MAQUINA-FECHA\ con BACKUP-INFO.txt
+     (debe decir RESULT : VERIFIED).
+
+  3. FIREWALL solo (si la otra maquina no alcanza el puerto 7717):
+       powershell -NoProfile -ExecutionPolicy Bypass -File .\FIREWALL-SETUP.ps1
+     Para quitar las reglas:  ...\FIREWALL-SETUP.ps1 -Remove
+
+  4. ROLLBACK (regresar todo como estaba) -- SOLO con autorizacion
+     del responsable tecnico:
+       powershell -NoProfile -ExecutionPolicy Bypass -File .\ROLLBACK.ps1 -BackupDir ".\backups\MAQUINA-FECHA"
+     Te pide escribir SI antes de borrar nada. Al final revisa que
+     diga ROLLBACK VERIFIED, reinicia la maquina y corre:
+       RUN-CERT-CAPTURE.cmd rollback
 
 SOLUCION DE PROBLEMAS
 ---------------------

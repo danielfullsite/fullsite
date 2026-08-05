@@ -68,6 +68,38 @@ Fotografiar el bloque final de cada máquina y copiar el ZIP al USB. El bloque m
 
 ---
 
+## Instalación controlada (solo si se va a instalar/actualizar la app)
+
+Cierra los gaps FAIL de `INSTALLER-VERIFICATION.md` (backup restaurable, firewall, log de instalación, rollback). Todo vive en `FULLSITE-FIELD-KIT\`. Orden exacto, en cada máquina que se instale (SERVER1 primero, PDV3 después):
+
+1. Cerrar la app si está abierta (`Ctrl+Shift+Q`) — mejora la fidelidad del backup (archivos de IndexedDB sin candados).
+2. Instalación con log (hace backup verificado → estado previo → NSIS `/S` → estado posterior → firewall 7717 TCP + 5353 UDP → primer arranque que registra el auto-inicio):
+
+   ```bat
+   INSTALL.cmd "D:\usb\Fullsite POS Setup 1.3.3.exe"
+   ```
+
+   - Si el backup no se verifica, la instalación se **aborta sola** (exit 2).
+   - Log completo en `install-logs\install-<timestamp>.log`; backup restaurable en `backups\<máquina>-<timestamp>\`.
+3. Verificación: la app abre en kiosco, `/health` responde `ok:true` con la versión esperada; desde la otra máquina `Invoke-RestMethod http://IP:7717/health` responde (regla de firewall activa).
+4. Evidencia obligatoria:
+
+   ```bat
+   RUN-CERT-CAPTURE.cmd install
+   ```
+
+5. **Rollback** (si la instalación o la verificación fallan): usar el backup del paso 2 —
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\ROLLBACK.ps1 -BackupDir ".\backups\<máquina>-<timestamp>" [-PreviousInstaller "D:\usb\Fullsite POS Setup 1.3.2.exe"]
+   ```
+
+   Pide confirmación (`SI`) antes de tocar nada; detiene la app, desinstala NSIS en silencio, restaura `C:\fullsite` y `%APPDATA%\Fullsite POS/KDS` como espejo exacto del backup, y verifica hash por hash contra `MANIFEST.csv`. Después: reboot + `RUN-CERT-CAPTURE.cmd rollback`. Las reglas de firewall se deshacen con `FIREWALL-SETUP.ps1 -Remove`.
+
+Solo después de instalación verificada (o si no hubo instalación) se ejecutan los 29 pasos.
+
+---
+
 ## Plantilla P0 (usar ante cualquier FAIL)
 
 Copiar y llenar. Un P0 detiene la certificación del paso; los pasos independientes pueden continuar solo si el responsable técnico lo autoriza.
