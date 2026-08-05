@@ -22,9 +22,9 @@ Los 27 hallazgos están clasificados en 3 niveles: P0 (bloquea deployment en Cli
 | ID | Hallazgo | Estado |
 |---|---|---|
 | PRR-01 | Turno offline sin certificación de campo | OPEN |
-| PRR-02 | sync_queue no tiene retry con backoff — pérdida silenciosa posible | OPEN |
+| PRR-02 | sync_queue no tiene retry con backoff — pérdida silenciosa posible | FIXED `dacf364` — slow-retry backoff (60s→5min) + evento `pos-sync-degraded` al operador; 8 tests incl. soak 4h simulado. Pendiente retest físico |
 | PRR-03 | Conflictos de sincronización multi-terminal sin resolución documentada | OPEN |
-| PRR-04 | Recovery de impresora falla si el bridge se reinicia durante operación | OPEN |
+| PRR-04 | Recovery de impresora falla si el bridge se reinicia durante operación | FIXED `80a8d7d` — jobs en `printing` al crash se reviven a `retrying`/`recoverable` en init(); 6 tests. Pendiente retest físico |
 
 ### Aprovisionamiento (P0 — bloquea Cliente #2)
 
