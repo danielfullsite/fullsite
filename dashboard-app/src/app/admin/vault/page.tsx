@@ -198,7 +198,7 @@ export default function VaultPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-[var(--text-3)] block mb-1">Nombre (ej. "Rappi AMALAY", "WiFi restaurante")</label>
+              <label className="text-xs text-[var(--text-3)] block mb-1">Nombre (ej. "Cuenta Rappi", "WiFi restaurante")</label>
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                 className="w-full bg-[var(--line)] border border-slate-600 rounded-lg px-3 py-2 text-sm" placeholder="Nombre descriptivo" />
             </div>
