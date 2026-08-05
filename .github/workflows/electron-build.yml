@@ -87,8 +87,11 @@ jobs:
         run: |
           $uninstall = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
             Where-Object { $_.DisplayName -like 'Fullsite POS*' }
-          $cmd = $uninstall.UninstallString.Trim('"')
-          Start-Process -FilePath $cmd -ArgumentList '/S' -Wait
+          # electron-builder NSIS format: "C:\...\Uninstall Fullsite POS.exe" /allusers
+          $raw = if ($uninstall.QuietUninstallString) { $uninstall.QuietUninstallString } else { $uninstall.UninstallString }
+          if ($raw -match '^"([^"]+)"\s*(.*)$') { $exe = $Matches[1]; $extraArgs = $Matches[2] }
+          else { $exe = $raw; $extraArgs = '' }
+          Start-Process -FilePath $exe -ArgumentList "/S $extraArgs".Trim() -Wait
           Start-Sleep -Seconds 5
           if (Test-Path "$env:ProgramFiles\Fullsite POS\Fullsite POS.exe") {
             Write-Error 'FAIL: exe still present after uninstall'; exit 1
