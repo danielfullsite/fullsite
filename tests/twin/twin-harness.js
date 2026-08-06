@@ -1751,6 +1751,10 @@ async function readEventsForVerification() {
 async function verifyRun(drainMs) {
   const invariants = []
   const STOP_CLASS = new Set()
+  // accum phases compress 7/30 restaurant-days into minutes: print THROUGHPUT
+  // is a pacing artifact there, so the print paper-trail is informational (data
+  // safety stays a hard gate). Hoisted so every print/scenario block sees it.
+  const isAccum = ARGS.phase === 'accum7' || ARGS.phase === 'accum30'
   const inv = (name, pass, detail, opts = {}) => {
     invariants.push({ name, pass: !!pass, detail, founder_gate: opts.gate || null, stop_class: opts.stopClass || null })
     if (!pass && opts.stopClass) STOP_CLASS.add(JSON.stringify({ kind: opts.stopClass, name, detail }))
@@ -1926,9 +1930,8 @@ async function verifyRun(drainMs) {
     // Informational in accum phases (see every_acked_print_job_reached_paper):
     // extreme print-rate compression leaves a transient backlog that the drain
     // window can't clear — data safety is unaffected and enforced separately.
-    const isAccumFV = ARGS.phase === 'accum7' || ARGS.phase === 'accum30'
-    inv('zero_stuck_print_jobs_file_view', stuck === 0, { ...pq, informational_in_accum: isAccumFV },
-      isAccumFV ? { gate: 6 } : { gate: 6, stopClass: 'stuck-print' })
+    inv('zero_stuck_print_jobs_file_view', stuck === 0, { ...pq, informational_in_accum: isAccum },
+      isAccum ? { gate: 6 } : { gate: 6, stopClass: 'stuck-print' })
   }
   // Print byte-capture is a SPAWN-mode capability: the harness's twin-server-
   // runner boots the Bridge with printers.json wired to THIS host's fake ESC/POS
@@ -1962,7 +1965,6 @@ async function verifyRun(drainMs) {
     // realistic-RATE signal, enforced hard in smoke/shift/full (and the 4h
     // soak: 478/478). In accum phases it is informational — data-safety
     // invariants (loss/dup/outbox/tenant/sequence) remain hard gates.
-    const isAccum = ARGS.phase === 'accum7' || ARGS.phase === 'accum30'
     inv('every_acked_print_job_reached_paper', unmatchedNonces.length === 0,
       unmatchedNonces.length
         ? { count: unmatchedNonces.length, total_print_jobs: printNonces.size, informational_in_accum: isAccum,
