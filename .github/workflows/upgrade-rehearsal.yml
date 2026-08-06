@@ -1,0 +1,431 @@
+name: Canonical V2 Upgrade + Rollback Rehearsal (Windows Lab)
+
+# Rehearses the EXACT Monday field cycle on a throwaway windows-latest runner:
+#   1.3.0 (run 30539193853) with LIVE Bridge data
+#     -> PRE-INSTALL-BACKUP -> INSTALL.cmd with the canonical v2 EXE
+#        (run 31066570237, SHA pinned) -> restart -> preservation checks
+#     -> mid-activity hard-kill + recovery -> print-queue drain
+#     -> ROLLBACK.ps1 -> byte-identical restore -> 1.3.0 reinstall
+#     -> semantic-identity + live runtime probe.
+# Live data is created by the REAL local-server extracted from the INSTALLED
+# app.asar of each version (no fixtures where the real Bridge can run).
+# Replaces any reliance on the superseded installer from run 31033026398.
+# Triggers: push to release/** only (workflow_dispatch does not register for
+# workflows absent from the default branch). Never runs on main.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/**']
+    paths:
+      - '.github/workflows/upgrade-rehearsal.yml'
+      - 'tests/upgrade-rehearsal/**'
+
+permissions:
+  contents: read
+  actions: read   # gh run download of the pinned installer artifacts
+
+concurrency:
+  group: upgrade-rehearsal
+  cancel-in-progress: false
+
+env:
+  KIT: ${{ github.workspace }}\docs\agent-os\field\FULLSITE-FIELD-KIT
+  UR: ${{ github.workspace }}\tests\upgrade-rehearsal
+  EVIDENCE: ${{ github.workspace }}\rehearsal-artifacts
+  MATRIX_FILE: ${{ github.workspace }}\rehearsal-artifacts\matrix.txt
+  V130_RUN_ID: "30539193853"
+  V130_ARTIFACT: fullsite-pos-win-23d7eaf6a340111e25c0b1697a582c716b88295e
+  V130_SHA: 193b4d87513e8454e5cc2a9c5a50e4fdf16e483f307bd4e50c45be088e87fd7c
+  V2_RUN_ID: "31066570237"
+  V2_ARTIFACT: fullsite-pos-win-21f6b87ad405c7068d518175833a8c414c8fc691
+  V2_SHA: 80f0a819bae51dcad7a0deaaeda93c821d0cf738bfe1271e0fb52f30dc15c03a
+  APP_EXE: C:\Program Files\Fullsite POS\Fullsite POS.exe
+  # DATA_DIR (= %APPDATA%\Fullsite POS) is exported via GITHUB_ENV in the init
+  # step - %APPDATA% is only resolvable on the runner.
+  HOSTS_FILE: C:\Windows\System32\drivers\etc\hosts
+
+jobs:
+  rehearsal:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: powershell   # Windows PowerShell 5.1 - same engine the field kit targets
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Init evidence dir + matrix file
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:EVIDENCE | Out-Null
+          New-Item -ItemType File -Force -Path $env:MATRIX_FILE | Out-Null
+          "DATA_DIR=$env:APPDATA\Fullsite POS" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      # ════════════════════════════════════════════════════════════════════
+      # 1. WAN isolation FIRST - null-route fullsite.mx for the whole run.
+      #    Any accidental production dependency becomes a hard failure.
+      # ════════════════════════════════════════════════════════════════════
+      - name: 1. WAN isolation - null-route fullsite.mx in hosts
+        run: |
+          $lines = @(
+            '# upgrade-rehearsal WAN isolation (added by upgrade-rehearsal.yml)',
+            '127.0.0.1 app.fullsite.mx',
+            '127.0.0.1 fullsite.mx',
+            '127.0.0.1 www.fullsite.mx',
+            '::1 app.fullsite.mx',
+            '::1 fullsite.mx',
+            '::1 www.fullsite.mx'
+          )
+          Add-Content -Path $env:HOSTS_FILE -Value $lines -Encoding ASCII
+          ipconfig /flushdns | Out-Null
+          $addrs = [System.Net.Dns]::GetHostAddresses('app.fullsite.mx') | ForEach-Object { $_.ToString() }
+          $nonLoop = @($addrs | Where-Object { $_ -ne '127.0.0.1' -and $_ -ne '::1' })
+          if ($nonLoop.Count -gt 0) { Write-Error "app.fullsite.mx still resolves to non-loopback: $($nonLoop -join ', ')"; exit 1 }
+          $reached = $false
+          try { Invoke-WebRequest 'https://app.fullsite.mx' -UseBasicParsing -TimeoutSec 8 | Out-Null; $reached = $true } catch {
+            Write-Host "Verified: https://app.fullsite.mx unreachable ($($_.Exception.Message))"
+          }
+          if ($reached) { Write-Error 'https://app.fullsite.mx is still reachable after null-route'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'WAN-ISOLATION=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 2. Download the REAL 1.3.0 installer (rollback release) + SHA pin
+      # ════════════════════════════════════════════════════════════════════
+      - name: 2. Download 1.3.0 installer (run 30539193853) + verify SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          gh run download $env:V130_RUN_ID -n $env:V130_ARTIFACT -R $env:GITHUB_REPOSITORY -D "$env:RUNNER_TEMP\v130-dl"
+          if ($LASTEXITCODE -ne 0) { Write-Error "gh run download (1.3.0) failed ($LASTEXITCODE)"; exit 1 }
+          $exe = Get-ChildItem "$env:RUNNER_TEMP\v130-dl" -Recurse -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem "$env:RUNNER_TEMP\v130-dl" -Recurse -Filter '*.exe' | Select-Object -First 1 }
+          if (-not $exe) { Write-Error 'No .exe inside the 1.3.0 artifact'; exit 1 }
+          Copy-Item $exe.FullName "$env:RUNNER_TEMP\fullsite-130.exe" -Force
+          $h = (Get-FileHash "$env:RUNNER_TEMP\fullsite-130.exe" -Algorithm SHA256).Hash.ToLower()
+          "1.3.0 installer: $($exe.Name)`nsha256: $h`nexpected: $env:V130_SHA`nrun: $env:V130_RUN_ID" | Tee-Object "$env:EVIDENCE\v130-provenance.txt"
+          if ($h -ne $env:V130_SHA) { Write-Error "STOP: 1.3.0 EXE SHA mismatch. got=$h expected=$env:V130_SHA"; exit 1 }
+          "V130_EXE=$env:RUNNER_TEMP\fullsite-130.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'DL-130-SHA=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 3. Install 1.3.0 silently (field machines already run 1.3.0)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 3. Silent install 1.3.0 + registry assert
+        run: |
+          Start-Process "$env:V130_EXE" -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error "Installed exe not found: $env:APP_EXE"; exit 1 }
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) {
+            foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break }
+            }
+            if ($entry) { break }
+          }
+          if (-not $entry) { Write-Error 'No Fullsite POS uninstall registry entry after 1.3.0 install'; exit 1 }
+          Write-Host "Installed: $($entry.DisplayName) v$($entry.DisplayVersion)"
+          if ($entry.DisplayVersion -ne '1.3.0') { Write-Error "Expected DisplayVersion 1.3.0, got $($entry.DisplayVersion)"; exit 1 }
+          "V130_VERSION=$($entry.DisplayVersion)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          # A silent NSIS oneClick install can auto-launch the app - kill it,
+          # the rehearsal drives the Bridge from the installed asar instead.
+          Start-Sleep -Seconds 10
+          Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Add-Content $env:MATRIX_FILE 'INSTALL-130=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 4. Extract the INSTALLED 1.3.0 asar + npm ci (ws for the driver)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 4. Extract installed 1.3.0 asar + npm ci
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+          if (-not (Test-Path $asar)) { Write-Error "Installed app.asar not found at $asar"; exit 1 }
+          npx --yes @electron/asar extract $asar "$env:RUNNER_TEMP\app-130"
+          if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract (1.3.0) failed'; exit 1 }
+          if (-not (Test-Path "$env:RUNNER_TEMP\app-130\local-server\index.js")) { Write-Error '1.3.0 asar has no local-server/index.js'; exit 1 }
+          (Get-FileHash $asar -Algorithm SHA256).Hash.ToLower() | Set-Content "$env:EVIDENCE\asar-130-sha.txt"
+          Push-Location "$env:GITHUB_WORKSPACE\electron-app"
+          npm ci --omit=dev --no-audit --no-fund
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { Write-Error "npm ci failed ($code)"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ASAR-130=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 5. PHASE A - live data on the real 1.3.0 Bridge (installed bytes)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 5. PHASE A - 1.3.0 live data (turno, orders, cancel, splits, prints, dedup, outbox)
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $env:UR_BRIDGE_INDEX = "$env:RUNNER_TEMP\app-130\local-server\index.js"
+          $env:UR_DATA_DIR     = $env:DATA_DIR
+          $env:UR_EVIDENCE     = $env:EVIDENCE
+          $env:UR_WS_MODULE    = "$env:GITHUB_WORKSPACE\electron-app\node_modules\ws"
+          node "$env:UR\driver.js" a 2>&1 | Tee-Object "$env:EVIDENCE\phase-a-console.log"
+          if ($LASTEXITCODE -ne 0) { Write-Error "PHASE A failed ($LASTEXITCODE) - see phase-a-verdict.json"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'PHASE-A=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 6. BASELINE - hash every byte of the live data dir
+      # ════════════════════════════════════════════════════════════════════
+      - name: 6. Baseline snapshot (hashes + copies)
+        run: |
+          Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          $rows = Get-ChildItem "$env:DATA_DIR" -Recurse -File | ForEach-Object {
+            [pscustomobject]@{
+              Rel    = $_.FullName.Substring($env:DATA_DIR.Length + 1)
+              SHA256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              Bytes  = $_.Length
+            }
+          }
+          if (@($rows).Count -lt 3) { Write-Error "Baseline suspiciously small: $(@($rows).Count) files"; exit 1 }
+          $rows | Export-Csv "$env:EVIDENCE\baseline-hashes.csv" -NoTypeInformation
+          $rows | Format-Table -AutoSize | Out-String | Write-Host
+          New-Item -ItemType Directory -Force -Path "$env:EVIDENCE\baseline" | Out-Null
+          foreach ($f in 'events.ndjson','config.json','print-queue.json','printers.json','server-id') {
+            if (Test-Path "$env:DATA_DIR\$f") { Copy-Item "$env:DATA_DIR\$f" "$env:EVIDENCE\baseline\$f" -Force }
+          }
+          Add-Content $env:MATRIX_FILE 'BASELINE=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 7. PRE-INSTALL-BACKUP.ps1 against the REAL live data
+      # ════════════════════════════════════════════════════════════════════
+      - name: 7. PRE-INSTALL-BACKUP.ps1 - backup of live data + manifest cross-check
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\PRE-INSTALL-BACKUP.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "PRE-INSTALL-BACKUP.ps1 exited $LASTEXITCODE"; exit 1 }
+          $bk = Get-ChildItem "$env:KIT\backups" -Directory | Sort-Object CreationTime | Select-Object -Last 1
+          if (-not $bk) { Write-Error 'No backup folder created'; exit 1 }
+          $info = Get-Content (Join-Path $bk.FullName 'BACKUP-INFO.txt') -Raw
+          if ($info -notmatch 'RESULT\s*:\s*VERIFIED') { Write-Error "Backup not VERIFIED:`n$info"; exit 1 }
+          $manifest = Import-Csv (Join-Path $bk.FullName 'MANIFEST.csv')
+          foreach ($f in 'events.ndjson','config.json','print-queue.json') {
+            $row = $manifest | Where-Object { $_.OriginalPath -eq "$env:DATA_DIR\$f" } | Select-Object -First 1
+            if (-not $row) { Write-Error "MANIFEST.csv has no row for $f"; exit 1 }
+            $live = (Get-FileHash "$env:DATA_DIR\$f" -Algorithm SHA256).Hash.ToLower()
+            if ($row.SHA256 -ne $live) { Write-Error "Manifest hash for $f does not match live file"; exit 1 }
+          }
+          Write-Host "Backup verified with live-data manifest rows: $($bk.FullName)"
+          "BACKUP_A_DIR=$($bk.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'BACKUP=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 8. Download the CANONICAL v2 EXE + exact SHA gate (stop condition)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 8. Download canonical v2 installer (run 31066570237) + verify exact SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          gh run download $env:V2_RUN_ID -n $env:V2_ARTIFACT -R $env:GITHUB_REPOSITORY -D "$env:RUNNER_TEMP\v2-dl"
+          if ($LASTEXITCODE -ne 0) { Write-Error "gh run download (v2) failed ($LASTEXITCODE)"; exit 1 }
+          $exe = Get-ChildItem "$env:RUNNER_TEMP\v2-dl" -Recurse -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $exe) { Write-Error 'No Setup exe inside the v2 artifact'; exit 1 }
+          Copy-Item $exe.FullName "$env:RUNNER_TEMP\fullsite-v2.exe" -Force
+          $h = (Get-FileHash "$env:RUNNER_TEMP\fullsite-v2.exe" -Algorithm SHA256).Hash.ToLower()
+          $len = (Get-Item "$env:RUNNER_TEMP\fullsite-v2.exe").Length
+          "canonical v2: $($exe.Name)`nsha256: $h`nexpected: $env:V2_SHA`nbytes: $len`nrun: $env:V2_RUN_ID" | Tee-Object "$env:EVIDENCE\v2-provenance.txt"
+          if ($h -ne $env:V2_SHA) { Write-Error "STOP CONDITION: canonical v2 SHA mismatch. got=$h expected=$env:V2_SHA"; exit 1 }
+          "INSTALLER_EXE=$env:RUNNER_TEMP\fullsite-v2.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'DL-V2-SHA=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 9. UPGRADE - INSTALL.cmd with the canonical v2 EXE over live 1.3.0
+      # ════════════════════════════════════════════════════════════════════
+      - name: 9. INSTALL.cmd upgrade 1.3.0 -> canonical v2 (live data in place)
+        run: |
+          $ErrorActionPreference = 'Continue'
+          '' | & cmd.exe /c "$env:KIT\INSTALL.cmd" "$env:INSTALLER_EXE" 2>&1 | Tee-Object "$env:EVIDENCE\upgrade-console.log"
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Write-Error "INSTALL.cmd exited $code (expected 0)"; exit 1 }
+          $log = Get-ChildItem "$env:KIT\install-logs" -Filter 'install-*.log' | Sort-Object CreationTime | Select-Object -Last 1
+          if ((Get-Content $log.FullName -Raw) -notmatch 'INSTALACION COMPLETA') { Write-Error 'Install log missing INSTALACION COMPLETA'; exit 1 }
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error 'App exe missing after upgrade'; exit 1 }
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) {
+            foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break }
+            }
+            if ($entry) { break }
+          }
+          if (-not $entry) { Write-Error 'No uninstall registry entry after upgrade'; exit 1 }
+          Write-Host "Upgraded to: $($entry.DisplayName) v$($entry.DisplayVersion)"
+          if ($entry.DisplayVersion -eq $env:V130_VERSION) { Write-Error "DisplayVersion still $($entry.DisplayVersion) after upgrade"; exit 1 }
+          "V133_VERSION=$($entry.DisplayVersion)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          # INSTALL.cmd created its own backup (same data state as step 7) and
+          # launched the app once. Record that backup for ROLLBACK, kill the app.
+          $bk2 = Get-ChildItem "$env:KIT\backups" -Directory | Sort-Object CreationTime | Select-Object -Last 1
+          "BACKUP_B_DIR=$($bk2.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Start-Sleep -Seconds 20
+          Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+          Add-Content $env:MATRIX_FILE 'UPGRADE-INSTALL=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 10. Installer must NOT have touched the live data files
+      # ════════════════════════════════════════════════════════════════════
+      - name: 10. Data untouched by installer (hash compare vs baseline)
+        run: |
+          $baseline = Import-Csv "$env:EVIDENCE\baseline-hashes.csv"
+          foreach ($f in 'events.ndjson','config.json','print-queue.json','printers.json','server-id') {
+            $row = $baseline | Where-Object { $_.Rel -eq $f } | Select-Object -First 1
+            if (-not $row) { continue }
+            if (-not (Test-Path "$env:DATA_DIR\$f")) { Write-Error "STOP: $f missing after upgrade install"; exit 1 }
+            $h = (Get-FileHash "$env:DATA_DIR\$f" -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne $row.SHA256) { Write-Error "STOP: installer modified $f"; exit 1 }
+          }
+          Write-Host 'Live data files untouched by the NSIS upgrade.'
+          Add-Content $env:MATRIX_FILE 'DATA-UNTOUCHED=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 11. Extract the INSTALLED canonical v2 asar
+      # ════════════════════════════════════════════════════════════════════
+      - name: 11. Extract installed v2 asar
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+          npx --yes @electron/asar extract $asar "$env:RUNNER_TEMP\app-133"
+          if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract (v2) failed'; exit 1 }
+          if (-not (Test-Path "$env:RUNNER_TEMP\app-133\local-server\index.js")) { Write-Error 'v2 asar has no local-server/index.js'; exit 1 }
+          $h130 = Get-Content "$env:EVIDENCE\asar-130-sha.txt" -Raw
+          $h133 = (Get-FileHash $asar -Algorithm SHA256).Hash.ToLower()
+          $h133 | Set-Content "$env:EVIDENCE\asar-133-sha.txt"
+          if ($h133.Trim() -eq $h130.Trim()) { Write-Error 'Installed asar did not change across the upgrade'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ASAR-133=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 12. PHASE B - replay, preservation, dedup, outbox, crash, drain
+      # ════════════════════════════════════════════════════════════════════
+      - name: 12. PHASE B - canonical v2 verify + crash injection + drain
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $env:UR_BRIDGE_INDEX = "$env:RUNNER_TEMP\app-133\local-server\index.js"
+          $env:UR_DATA_DIR     = $env:DATA_DIR
+          $env:UR_EVIDENCE     = $env:EVIDENCE
+          $env:UR_WS_MODULE    = "$env:GITHUB_WORKSPACE\electron-app\node_modules\ws"
+          $env:UR_EXPECT_VERSION = $env:V133_VERSION
+          node "$env:UR\driver.js" b 2>&1 | Tee-Object "$env:EVIDENCE\phase-b-console.log"
+          if ($LASTEXITCODE -ne 0) { Write-Error "PHASE B failed ($LASTEXITCODE) - see phase-b-verdict.json"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'PHASE-B=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 13. ROLLBACK.ps1 - restore the pre-upgrade world
+      # ════════════════════════════════════════════════════════════════════
+      - name: 13. ROLLBACK.ps1 -Force (backup from INSTALL.cmd)
+        run: |
+          Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          if (-not $env:BACKUP_B_DIR -or -not (Test-Path $env:BACKUP_B_DIR)) { Write-Error 'INSTALL.cmd backup dir unavailable'; exit 1 }
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\ROLLBACK.ps1" -BackupDir "$env:BACKUP_B_DIR" -Force
+          $code = $LASTEXITCODE
+          Get-Content (Join-Path $env:BACKUP_B_DIR 'rollback-verification.txt') -ErrorAction SilentlyContinue | Write-Host
+          if ($code -ne 0) { Write-Error "ROLLBACK.ps1 exited $code (expected 0)"; exit 1 }
+          if (Test-Path $env:APP_EXE) { Write-Error 'App exe still present after rollback'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ROLLBACK=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 14. BYTE-IDENTICAL restoration vs the phase-A baseline
+      # ════════════════════════════════════════════════════════════════════
+      - name: 14. Byte-identical restore vs baseline (hashes + file set)
+        run: |
+          $baseline = Import-Csv "$env:EVIDENCE\baseline-hashes.csv"
+          $problems = 0
+          foreach ($row in $baseline) {
+            $p = Join-Path $env:DATA_DIR $row.Rel
+            if (-not (Test-Path $p)) { Write-Host "[FAIL] missing after restore: $($row.Rel)"; $problems++; continue }
+            $h = (Get-FileHash $p -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne $row.SHA256) { Write-Host "[FAIL] not byte-identical: $($row.Rel)"; $problems++ }
+          }
+          # /MIR must also have removed everything created after the backup
+          $now = Get-ChildItem "$env:DATA_DIR" -Recurse -File | ForEach-Object { $_.FullName.Substring($env:DATA_DIR.Length + 1) }
+          $extra = @($now | Where-Object { $_ -notin @($baseline | ForEach-Object { $_.Rel }) })
+          if ($extra.Count -gt 0) { Write-Host "[FAIL] files not in baseline survived restore: $($extra -join ', ')"; $problems++ }
+          if ($problems -gt 0) { Write-Error "STOP: restoration not byte-identical ($problems problems)"; exit 1 }
+          Write-Host "All $(@($baseline).Count) baseline files byte-identical; no extra files survived."
+          Add-Content $env:MATRIX_FILE 'BYTE-IDENTICAL=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 15. Reinstall 1.3.0 (field: from the USB) + PHASE C runtime probe
+      # ════════════════════════════════════════════════════════════════════
+      - name: 15. Reinstall 1.3.0 + extract asar
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Start-Process "$env:V130_EXE" -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error 'App exe missing after 1.3.0 reinstall'; exit 1 }
+          Start-Sleep -Seconds 10
+          Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+          npx --yes @electron/asar extract $asar "$env:RUNNER_TEMP\app-130-post"
+          if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract (1.3.0 reinstall) failed'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'REINSTALL-130=PASS'
+
+      - name: 16. PHASE C - restored 1.3.0 semantic identity + live probe
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $env:UR_BRIDGE_INDEX = "$env:RUNNER_TEMP\app-130-post\local-server\index.js"
+          $env:UR_DATA_DIR     = $env:DATA_DIR
+          $env:UR_EVIDENCE     = $env:EVIDENCE
+          $env:UR_WS_MODULE    = "$env:GITHUB_WORKSPACE\electron-app\node_modules\ws"
+          node "$env:UR\driver.js" c 2>&1 | Tee-Object "$env:EVIDENCE\phase-c-console.log"
+          if ($LASTEXITCODE -ne 0) { Write-Error "PHASE C failed ($LASTEXITCODE) - see phase-c-verdict.json"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'PHASE-C=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 17. Null-route held for the whole run + matrix + evidence
+      # ════════════════════════════════════════════════════════════════════
+      - name: 17. Hosts integrity re-check
+        if: always()
+        run: |
+          $addrs = [System.Net.Dns]::GetHostAddresses('app.fullsite.mx') | ForEach-Object { $_.ToString() }
+          $nonLoop = @($addrs | Where-Object { $_ -ne '127.0.0.1' -and $_ -ne '::1' })
+          if ($nonLoop.Count -gt 0) { Write-Error "app.fullsite.mx resolves to non-loopback at end of run: $($nonLoop -join ', ')"; exit 1 }
+          Write-Host 'Null-route held for the entire run - zero production reachability.'
+          Add-Content $env:MATRIX_FILE 'WAN-HELD=PASS'
+
+      - name: MATRIX summary
+        if: always()
+        run: |
+          $expected = @('WAN-ISOLATION','DL-130-SHA','INSTALL-130','ASAR-130','PHASE-A','BASELINE','BACKUP',
+                        'DL-V2-SHA','UPGRADE-INSTALL','DATA-UNTOUCHED','ASAR-133','PHASE-B','ROLLBACK',
+                        'BYTE-IDENTICAL','REINSTALL-130','PHASE-C','WAN-HELD')
+          $done = @()
+          if (Test-Path $env:MATRIX_FILE) { $done = @(Get-Content $env:MATRIX_FILE | Where-Object { $_ }) }
+          $lines = @('## Canonical V2 Upgrade + Rollback Rehearsal - MATRIX', '', '| Step | Result |', '|---|---|')
+          $allPass = $true
+          foreach ($e in $expected) {
+            $r = if ($done -contains "$e=PASS") { 'PASS' } else { $allPass = $false; 'FAIL' }
+            $lines += "| $e | $r |"
+            Write-Host ("{0,-20} {1}" -f $e, $r)
+          }
+          $lines += ''
+          if ($allPass) { $lines += '**ALL STEPS PASS - canonical v2 upgrade + rollback cycle is WINDOWS LAB VERIFIED on this run.**' }
+          else          { $lines += '**One or more steps FAILED - see the failing step logs above.**' }
+          $lines | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-rehearsal-evidence
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            rehearsal-artifacts/
+            docs/agent-os/field/FULLSITE-FIELD-KIT/backups/
+            docs/agent-os/field/FULLSITE-FIELD-KIT/install-logs/
