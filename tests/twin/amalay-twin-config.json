@@ -1,0 +1,339 @@
+{
+  "_meta": {
+    "fixture": "amalay-twin",
+    "purpose": "Digital-twin rehearsal fixture for the 2026-08 AMALAY field certification. NOT production config.",
+    "tenant_isolation": "restaurantId is 'amalay-twin' on purpose. NEVER 'amalay'. Twin harness must refuse to start if restaurantId === 'amalay'.",
+    "provenance": "Every field is classified KNOWN / INFERRED / UNKNOWN in tests/twin/AMALAY-CONFIG-PROVENANCE.md. Sanitized: staff surnames reduced to initials, PINs are synthetic test values, no phone numbers, no biometric data.",
+    "generated": "2026-08-06",
+    "sources": [
+      "scripts/manifests/amalay.json",
+      "docs/customers/amalay/FIELD-NOTES-PREFLIGHT-JUL12.md",
+      "docs/customers/amalay/MANUAL-OPERATIVO.md",
+      "docs/customers/amalay/DEPLOYMENT-STATE.md",
+      "dashboard-app/src/lib/pos-data.ts",
+      "dashboard-app/src/lib/pos-constants.ts",
+      "dashboard-app/src/lib/pos-manager-auth.ts",
+      "electron-app/local-server/config-schema.js",
+      "electron-app/local-server/adapters/printer-config-schema.js",
+      "CLAUDE.md (project root)"
+    ]
+  },
+
+  "restaurantId": "amalay-twin",
+  "display_name": "AMALAY Coffee & Market (TWIN)",
+  "branch": {
+    "name": "Plaza Duendes",
+    "city": "San Pedro Garza García, NL, MX",
+    "timezone": "America/Monterrey",
+    "single_location": true
+  },
+  "iva_rate": 0.16,
+  "prices_include_iva": true,
+  "receipt_footer": "Gracias por tu visita!",
+  "accent_color": "emerald",
+
+  "terminals": [
+    {
+      "config_version": 1,
+      "restaurant_id": "amalay-twin",
+      "terminal_id": "twin-pdv3-0000-0000-000000000001",
+      "terminal_role": "pos",
+      "terminal_name": "ENTRADA (PDV3)",
+      "local_server_host": "127.0.0.1",
+      "local_server_port": 7717,
+      "protocol_version": "1.0",
+      "provisioned_at": "2026-08-06T00:00:00.000Z",
+      "channel": "development",
+      "instance_name": "twin-pdv3"
+    },
+    {
+      "config_version": 1,
+      "restaurant_id": "amalay-twin",
+      "terminal_id": "twin-server1-0000-0000-000000000002",
+      "terminal_role": "server_pos",
+      "terminal_name": "CAJA (SERVER1)",
+      "local_server_host": "127.0.0.1",
+      "local_server_port": 7717,
+      "protocol_version": "1.0",
+      "provisioned_at": "2026-08-06T00:00:00.000Z",
+      "channel": "development",
+      "instance_name": "twin-server1",
+      "kds": true
+    }
+  ],
+
+  "stations": [
+    { "id": "cocina", "label": "COCINA", "type": "kitchen" },
+    { "id": "barra", "label": "BARRA", "type": "bar" },
+    { "id": "caja", "label": "MARKET", "type": "cashier" },
+    { "id": "tickets", "label": "TICKETS", "type": "receipt" }
+  ],
+
+  "printers_config": {
+    "_format": "electron-app/local-server/adapters/printer-config-schema.js v2 — passes validate() as-is",
+    "_twin_note": "Hosts/ports are twin-local mock listeners (127.0.0.1:19100/19101), NOT the real AMALAY printer IPs. Real topology documented in provenance KNOWN block.",
+    "schema_version": 2,
+    "printers": [
+      {
+        "printer_id": "twin-cocina",
+        "name": "Cocina (TWIN)",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19100 },
+        "station_ids": ["cocina"],
+        "document_types": ["kitchen_ticket", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      },
+      {
+        "printer_id": "twin-barra",
+        "name": "Barra (TWIN)",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19101 },
+        "station_ids": ["barra", "tickets", "caja"],
+        "document_types": ["bar_ticket", "receipt", "pre_ticket", "invoice", "corte", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      }
+    ],
+    "routing": { "default_station": "tickets" }
+  },
+
+  "users": [
+    { "staff_id": "tw-01", "name": "Eduardo E.", "role": "gerente", "role_display": "Gerente", "pin": "9001", "active": true },
+    { "staff_id": "tw-02", "name": "Omar A.", "role": "mesero", "role_display": "Mesero", "pin": "1001", "active": true },
+    { "staff_id": "tw-03", "name": "Hector E. R.", "role": "mesero", "role_display": "Mesero", "pin": "1002", "active": true },
+    { "staff_id": "tw-04", "name": "Brayan B.", "role": "mesero", "role_display": "Mesero", "pin": "1003", "active": true },
+    { "staff_id": "tw-05", "name": "Daniela E. R.", "role": "mesero", "role_display": "Mesero", "pin": "1004", "active": true },
+    { "staff_id": "tw-06", "name": "Julio Cesar H.", "role": "mesero", "role_display": "Mesero", "pin": "1005", "active": true },
+    { "staff_id": "tw-07", "name": "Mauricio R.", "role": "mesero", "role_display": "Mesero", "pin": "1006", "active": true },
+    { "staff_id": "tw-08", "name": "Oscar R.", "role": "mesero", "role_display": "Mesero", "pin": "1007", "active": true },
+    { "staff_id": "tw-09", "name": "Alexis A. O.", "role": "mesero", "role_display": "Mesero", "pin": "1008", "active": true },
+    { "staff_id": "tw-10", "name": "Aldo R.", "role": "mesero", "role_display": "Mesero", "pin": "1009", "active": true },
+    { "staff_id": "tw-11", "name": "Mariana C. S.", "role": "mesero", "role_display": "Mesero", "pin": "1010", "active": true },
+    { "staff_id": "tw-12", "name": "Mario G.", "role": "mesero", "role_display": "Mesero", "pin": "1011", "active": true },
+    { "staff_id": "tw-13", "name": "MESERO EVENTO", "role": "mesero", "role_display": "Mesero Evento", "pin": "1012", "active": true },
+    { "staff_id": "tw-14", "name": "Cajero Twin", "role": "cajero", "role_display": "Cajero", "pin": "2001", "active": true },
+    { "staff_id": "tw-15", "name": "Admin Twin", "role": "admin", "role_display": "Admin", "pin": "9999", "active": true }
+  ],
+
+  "role_hierarchy": { "mesero": 1, "cajero": 2, "capitan": 3, "gerente": 4, "admin": 5 },
+  "permission_model": {
+    "source": "dashboard-app/src/lib/pos-permissions.ts PERMISSION_PROFILES — 50+ granular permissions per role",
+    "offline_pin_auth": "PIN verified offline via pos-manager-auth.ts cached credentials; unknown roles fail-safe to level 0",
+    "manager_pin_required_for": ["descuento/cortesia", "cierre de caja (paso 4)", "reabrir orden", "override cierre con mesas abiertas"]
+  },
+
+  "mesas": {
+    "count": 16,
+    "naming": "numeric 1-16",
+    "features": ["merge", "cuentas por nombre", "filtro mis-mesas", "alerta +90min", "mesa_transferred audit"]
+  },
+
+  "menu": {
+    "_note": "Category ids/names and item names/prices are the REAL static AMALAY menu from pos-data.ts MENU_CATEGORIES (certified 'Precios 509/509 match Wansoft' 2026-06-27 for the full DB catalog; this static subset is verbatim repo data). Market items priced 0 in repo are excluded. Full 509-item catalog lives only in production Supabase (pos_menu_items).",
+    "categories": [
+      { "id": "chilaquiles", "name": "Chilaquiles", "station": "cocina", "items": [
+        { "id": "c1a", "name": "Chilaquiles Verdes", "price": 292 },
+        { "id": "c1b", "name": "Chilaquiles Rojos", "price": 292 },
+        { "id": "c2", "name": "Chilaquiles Light", "price": 304 },
+        { "id": "c3", "name": "Enchiladas Suizas", "price": 261 },
+        { "id": "c4", "name": "Taquitos Amalay", "price": 279 }
+      ]},
+      { "id": "eggs", "name": "Huevos", "station": "cocina", "items": [
+        { "id": "e1", "name": "Machacado con Huevo", "price": 274 },
+        { "id": "e2", "name": "Half & Half Combo", "price": 287 },
+        { "id": "e3", "name": "Garden Omelet", "price": 264 },
+        { "id": "e4", "name": "Combo Fit", "price": 264 },
+        { "id": "e5", "name": "Egg and Pancake Combo", "price": 277 },
+        { "id": "e6", "name": "Miss Benedict", "price": 310 },
+        { "id": "e7", "name": "Miss Benedict Keto-Panela Wallander", "price": 389 },
+        { "id": "e8", "name": "Mr. Benedict", "price": 351 },
+        { "id": "e9", "name": "Benedict Omelet", "price": 283 }
+      ]},
+      { "id": "coffee", "name": "Café", "station": "barra", "items": [
+        { "id": "cf1", "name": "Cafe Americano", "price": 48 },
+        { "id": "cf2", "name": "Capuchino Caliente", "price": 89 },
+        { "id": "cf3", "name": "Cafe Latte Caliente", "price": 94 },
+        { "id": "cf4", "name": "Latte Frio", "price": 102 },
+        { "id": "cf5", "name": "Matcha Latte Frio", "price": 127 },
+        { "id": "cf6", "name": "Chai Latte Frio", "price": 122 },
+        { "id": "cf7", "name": "Mocca Latte Caliente", "price": 100 },
+        { "id": "cf8", "name": "Chai Latte Caliente", "price": 122 },
+        { "id": "cf9", "name": "Mocca Latte Frio", "price": 108 }
+      ]},
+      { "id": "toast", "name": "Pan & Toast", "station": "cocina", "items": [
+        { "id": "t1", "name": "Avocado Toast", "price": 252 },
+        { "id": "t2", "name": "Amalay Salmon Special Toast", "price": 402 },
+        { "id": "t3", "name": "El Mexicano Toast", "price": 183 },
+        { "id": "t4", "name": "Salmon Bagel", "price": 350 }
+      ]},
+      { "id": "signature", "name": "Signature", "station": "cocina", "items": [
+        { "id": "sg1", "name": "Mimosa Clasica", "price": 160 },
+        { "id": "sg2", "name": "Chamoyada de Mango", "price": 120 }
+      ]},
+      { "id": "croissants", "name": "Croissants", "station": "cocina", "items": [
+        { "id": "cr1", "name": "Croque Madame Amalay", "price": 308 },
+        { "id": "cr2", "name": "Croissant Nutella", "price": 99 },
+        { "id": "cr3", "name": "Turkey & Swiss Croissant", "price": 285 },
+        { "id": "cr4", "name": "Croissant Almendra", "price": 99 },
+        { "id": "cr5", "name": "Mumma's Breakfast Croissant", "price": 268 }
+      ]},
+      { "id": "jugos", "name": "Jugos", "station": "barra", "items": [
+        { "id": "j1", "name": "Jugo de Naranja Natural", "price": 78 },
+        { "id": "j2", "name": "Jugo Verde de la Casa", "price": 98 },
+        { "id": "j3", "name": "Jugo Be Inmune", "price": 115 },
+        { "id": "j4", "name": "Jugo Dr Detox", "price": 115 },
+        { "id": "j5", "name": "Jugo U Glow", "price": 115 }
+      ]},
+      { "id": "fresh", "name": "Frescos", "station": "barra", "items": [
+        { "id": "f1", "name": "Limonada Natural", "price": 63 },
+        { "id": "f2", "name": "Limonada de Frutos Rojos", "price": 62 },
+        { "id": "f3", "name": "Limonada de Pepino", "price": 62 },
+        { "id": "f4", "name": "Jamaica Natural", "price": 49 },
+        { "id": "f5", "name": "Horchata Natural", "price": 49 }
+      ]},
+      { "id": "smoothies", "name": "Smoothies", "station": "barra", "items": [
+        { "id": "sm1", "name": "Smoothie Mango-Matcha", "price": 221 },
+        { "id": "sm2", "name": "Smoothie Pink Flamingo", "price": 152 },
+        { "id": "sm3", "name": "Smoothie Tropical Coconut", "price": 139 },
+        { "id": "sm4", "name": "Smoothie Morning Blast", "price": 207 },
+        { "id": "sm5", "name": "Smoothie Choco-Peanut Butter", "price": 175 }
+      ]},
+      { "id": "frappes", "name": "Frappes", "station": "barra", "items": [
+        { "id": "fr1", "name": "Frappe Matcha", "price": 124 },
+        { "id": "fr2", "name": "Frappe Mango-Maracuya", "price": 120 },
+        { "id": "fr3", "name": "Frapuccino", "price": 135 },
+        { "id": "fr4", "name": "Frappe Oreo", "price": 132 }
+      ]},
+      { "id": "pancakes", "name": "Pancakes", "station": "cocina", "items": [
+        { "id": "pw1", "name": "Classic Pancakes", "price": 215 },
+        { "id": "pw2", "name": "Paradise Buttermilk Blueberry Pancakes", "price": 265 },
+        { "id": "pw3", "name": "Red Velvet Pancakes", "price": 250 }
+      ]},
+      { "id": "paninis", "name": "Paninis", "station": "cocina", "items": [
+        { "id": "pn1", "name": "Chicken Panini", "price": 296 },
+        { "id": "pn2", "name": "Caprese Panini", "price": 275 }
+      ]},
+      { "id": "pizzas", "name": "Pizzas & Pastas", "station": "cocina", "items": [
+        { "id": "pz1", "name": "Pasta Mamarosa", "price": 287 },
+        { "id": "pz2", "name": "Pizza Pepperoni", "price": 245 },
+        { "id": "pz3", "name": "Pizza Margarita", "price": 220 },
+        { "id": "pz4", "name": "Pasta Bolognese", "price": 232 },
+        { "id": "pz5", "name": "Ribeye Smash Burger", "price": 252 }
+      ]},
+      { "id": "bowls", "name": "Bowls", "station": "cocina", "items": [
+        { "id": "bw1", "name": "Acai Love Bowl", "price": 232 },
+        { "id": "bw2", "name": "Fruit Bowl", "price": 150 }
+      ]},
+      { "id": "postres", "name": "Postres", "station": "cocina", "items": [
+        { "id": "ds1", "name": "New York Cheesecake", "price": 130 },
+        { "id": "ds2", "name": "Carrot Cake", "price": 135 },
+        { "id": "ds3", "name": "Dark Chocolate Brownie", "price": 130 },
+        { "id": "ds4", "name": "Tiramisú", "price": 145 },
+        { "id": "ds5", "name": "Pastel de Chocolate", "price": 130 }
+      ]},
+      { "id": "ceviche", "name": "Ceviche", "station": "cocina", "items": [
+        { "id": "cv1", "name": "Ceviche de Salmon", "price": 395 },
+        { "id": "cv2", "name": "Ceviche Clasico", "price": 320 }
+      ]},
+      { "id": "bakery", "name": "Panadería", "station": "cocina", "items": [
+        { "id": "bk1", "name": "Concha de Mantequilla", "price": 37 },
+        { "id": "bk2", "name": "Healthy Crunchy Mix", "price": 170 }
+      ]},
+      { "id": "sodas", "name": "Sodas", "station": "barra", "items": [
+        { "id": "sd1", "name": "Coca Cola Regular 355ml", "price": 34 },
+        { "id": "sd2", "name": "Coca Cola Sin Azucar 355ml", "price": 60 },
+        { "id": "sd3", "name": "Coca Cola Light 355ml", "price": 60 },
+        { "id": "sd4", "name": "Agua Amalay 500ml", "price": 44 },
+        { "id": "sd5", "name": "Agua de Piedra Mineral", "price": 57 },
+        { "id": "sd6", "name": "Agua de Piedra Natural", "price": 57 }
+      ]},
+      { "id": "tea", "name": "Té", "station": "barra", "items": [
+        { "id": "te1", "name": "Te Chai", "price": 75 },
+        { "id": "te2", "name": "Te Verde", "price": 65 }
+      ]},
+      { "id": "alcohol", "name": "Bebidas OH", "station": "barra", "items": [
+        { "id": "al1", "name": "Cerveza Artesanal", "price": 95 },
+        { "id": "al2", "name": "Vino Copa Tinto", "price": 150 }
+      ]}
+    ],
+    "item_count": 84,
+    "wansoft_group_names": [
+      "CHILAQUILES & ENCHILADAS", "EGGS & KETO", "COFFEE HOT/ICE", "TOAST & BAGELS", "PANINIS",
+      "BOWLS", "EVERYDAY SPECIALS", "FRESH DRINKS", "SIGNATURE", "JUGOS", "CROISSANTS BREAKFAST",
+      "SMOOTHIES", "PANCAKES & WAFFLES", "FRAPPES", "BAKERY", "HEALTHY SNACKS & MARKET", "DESSERTS",
+      "SODAS", "TEA & TISANAS", "EXTRAS", "CEVICHE", "BEBIDAS OH", "PIZZAS & PASTAS",
+      "SEMILLAS Y DULCES AMALAY", "MUNCHIES", "LA NONNA Gorditas Keto", "VARIOS", "HEALTHY SNACKS", "ICE CREAM"
+    ]
+  },
+
+  "modifier_groups": {
+    "_schema": "pos_modifier_groups: {id, name, level, min_selections, max_selections, required, sort_order} + pos_modifiers {group_id, name, price} — multinivel via level asc (pos-data.ts:545,631)",
+    "_note": "Group structuring is INFERRED; modifier names/prices are the repo static defaults (pos-data.ts:200-228), whose category mapping was validated against AMALAY June 2026.",
+    "groups": [
+      { "id": "g-quitar", "name": "Quitar", "level": 1, "min_selections": 0, "max_selections": null, "required": false, "modifiers": [
+        { "name": "Sin cebolla", "price": 0 }, { "name": "Sin chile", "price": 0 }, { "name": "Sin crema", "price": 0 },
+        { "name": "Sin queso", "price": 0 }, { "name": "Sin pan", "price": 0 }, { "name": "Sin salsa", "price": 0 },
+        { "name": "Sin jitomate", "price": 0 }, { "name": "Sin aguacate", "price": 0 }
+      ]},
+      { "id": "g-extras-food", "name": "Extras Comida", "level": 2, "min_selections": 0, "max_selections": null, "required": false, "applies_to_modifier_type": "food", "modifiers": [
+        { "name": "Extra queso", "price": 25 }, { "name": "Extra aguacate", "price": 35 },
+        { "name": "Extra proteina", "price": 45 }, { "name": "Extra huevo", "price": 20 }, { "name": "Extra salsa", "price": 0 }
+      ]},
+      { "id": "g-extras-coffee", "name": "Extras Café", "level": 2, "min_selections": 0, "max_selections": null, "required": false, "applies_to_modifier_type": "coffee", "modifiers": [
+        { "name": "Shot extra", "price": 20 }, { "name": "Leche de almendra", "price": 15 }, { "name": "Leche de avena", "price": 15 },
+        { "name": "Leche deslactosada", "price": 10 }, { "name": "Jarabe de vainilla", "price": 15 }, { "name": "Crema batida", "price": 10 }
+      ]},
+      { "id": "g-extras-drinks", "name": "Extras Bebidas", "level": 2, "min_selections": 0, "max_selections": null, "required": false, "applies_to_modifier_type": "beverage", "modifiers": [
+        { "name": "Leche de almendra", "price": 15 }, { "name": "Leche de avena", "price": 15 },
+        { "name": "Extra fruta", "price": 20 }, { "name": "Proteina whey", "price": 25 }
+      ]}
+    ],
+    "no_modifier_categories": ["sodas", "cerveza", "vinos", "licores", "bakery", "toast", "postres"]
+  },
+
+  "routing_rules": {
+    "_source": "scripts/manifests/amalay.json station_routing (matches pos-constants.ts STATION_CATEGORIES + AMALAY overrides)",
+    "cocina": ["chilaquiles", "eggs", "croissants", "pancakes", "paninis", "pizzas", "bowls", "ceviche", "toast", "bakery", "postres", "promos", "keto", "kids", "soups", "munchies", "extras", "envios", "enchiladas-tacos", "salads-ceviche", "appetizers", "evento", "signature"],
+    "barra": ["coffee", "jugos", "fresh", "smoothies", "frappes", "sodas", "tea", "alcohol", "activaciones", "vinos", "cerveza", "licores"],
+    "caja": ["icecream", "desserts", "mkt-cafe", "mkt-healthy", "mkt-vitaminas", "mkt-regalos", "mkt-amalay"],
+    "fallbacks": "resolveItemStation (pos-constants.ts:211): item.station wins ('bar' normalized to 'barra'); else category map; else DB category-name keywords; else BEBIDA_KEYWORDS name match -> barra; else CAJA_KEYWORDS -> caja; else cocina",
+    "twin_note": "Twin collapses caja-station print jobs onto the barra printer (see printers_config); routing categories preserved verbatim."
+  },
+
+  "payment_methods": [
+    { "name": "Efectivo", "type": "cash", "opens_drawer": true },
+    { "name": "Tarjeta de crédito", "type": "card", "terminal": "standalone (not integrated to cobro)" },
+    { "name": "Tarjeta de débito", "type": "card", "terminal": "standalone (not integrated to cobro)" },
+    { "name": "Transferencia electrónica", "type": "transfer" },
+    { "name": "Ubereats", "type": "delivery_platform" }
+  ],
+  "pos_ui_payment_buttons": ["efectivo", "tarjeta", "transferencia", "mixto"],
+
+  "caja": {
+    "turno": {
+      "open": "openTurno(fondoInicial, openedBy) -> pos_turnos {id, client_id, opened_by, fondo_inicial}",
+      "fondo_inicial_twin_default": 2000.00,
+      "close": "CierreCajaWizard: 1) contar billetes 2) contar monedas 3) resumen + diferencia 4) PIN gerente + cerrar -> pos_cierres, imprime ticket de cierre"
+    },
+    "cortes": {
+      "corte_x": "snapshot parcial sin cerrar turno (pos/corte)",
+      "corte_turno": "por turno_id",
+      "corte_dia": "por fecha",
+      "corte_z": "NO EXISTE formalmente (deuda DT-17: 'Sin Corte Z formal') — twin must NOT simulate a blocking Z close"
+    },
+    "cash_movements": {
+      "types": ["cash_retiro", "cash_deposito"],
+      "audit_actions": "pos-data.ts AuditAction 'cash_retiro' | 'cash_deposito'; stored in cash_movements IDB store (v3) + pos_cash"
+    },
+    "drawer": "cajón conectado a impresora de tickets, abre automático en cobro efectivo (no con tarjeta)"
+  },
+
+  "local_server": {
+    "port": 7717,
+    "secondary_port_checked_by_diagnostic": 7718,
+    "health_endpoint": "/health (includes lan_ip, clients_connected, clients)",
+    "state_endpoint": "/state (sequence)",
+    "mdns_service": "_fullsite-pos._tcp"
+  }
+}
