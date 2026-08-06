@@ -1,7 +1,9 @@
 # FULLSITE MASTER EXECUTION PIPELINE
 
-**v1.0-reconciled — 2026-08-05 | release head: faf546d (prev: 7cc59ec — preserved in release history)**
-**PIPELINE STATUS: CANONICAL V1.0-RECONCILED — PRE-FIELD HARDENING COMPLETE — WAITING FOR MONDAY PHYSICAL DIAGNOSTIC**
+**v1.1-frozen — 2026-08-06 | code head / canonical installer: 21f6b87 · evidence head: cfcfe69**
+**PIPELINE STATUS: PRE-FIELD HARDENING COMPLETE — RELEASE FROZEN — WAITING FOR MONDAY PHYSICAL DIAGNOSTIC**
+
+> **FREEZE (2026-08-06):** Este documento queda congelado hasta el resultado físico del lunes 2026-08-10. `cfcfe69` solo agrega la evidencia JSON del soak (SOAK-REPORT-2026-08-06.json); **electron-app no cambió después de `21f6b87`** (`git log 21f6b87..cfcfe69 -- electron-app/` = 0 commits), por lo que el instalador construido de `21f6b87` sigue siendo el canónico exacto. NO declarado: FIELD VERIFIED · OFFLINE CERTIFIED · PRODUCTION READY.
 **Clasificación:** Interno — Fundador / Equipo Técnico / Inversionista
 
 > Este documento es la única fuente de verdad sobre en qué fase está Fullsite, qué la bloquea, y en qué orden se ejecuta el roadmap. No duplica ningún otro documento — los referencia.
@@ -44,17 +46,17 @@ Nunca se declara algo como "verificado en campo" sin evidencia de ejecución fí
 |---|---|---|---|---|
 | ORS (Offline Reliability Score) | 94 / 100 | HISTORICAL — pre-7cc59ec | RUNTIME-HEALTH.md · TSK-001 · 2026-08-04 | FACT — recompute post-field |
 | PRR (Production Readiness Review) | 4.7 / 10 | HISTORICAL — pre-release | PRR-v1.md | FACT — recompute post-field |
-| Tests passing — 5 suites | 2,506 | PASS · TSC CLEAN | AUTH 54 · LocalSrv 170 · Dash 2095 · Bridge+Sec 142 · Demo 45 | FACT |
+| Tests passing — 5 suites | 2,517 | PASS · TSC CLEAN | AUTH 54 · LocalSrv 172 · Dash 2104 · Bridge+Sec 142 · Demo 45 | FACT |
 | Agentes certificados | 0 | NO CERTIFICADO | AGENT-CERTIFICATION-REGISTRY.md | FACT |
 | Agent count | RECONCILE FROM REGISTRY | — | AGENT-CERTIFICATION-REGISTRY.md | PENDING |
-| Release head | faf546d | PRE-FIELD HARDENING COMPLETE · CI 31066343422 13/13 PASS | docs(field): INSTALLER-VERIFICATION.md delta · prev build 31033026398 | FACT |
-| EXE canónico | Fullsite POS Setup 1.3.3.exe | 81,757,095 bytes · SHA-256 verified | release/offline-field-2026-08-06 · build 31033026398 | FACT |
+| Code head / canonical installer | 21f6b87 | PRE-FIELD HARDENING COMPLETE · RELEASE FROZEN · Windows Lab CI 31066343422 PASS · Soak 4h PASS (23/23 invariantes, 12,293 órdenes, 0 loss, 0 dup) | evidence head cfcfe69 = solo JSON soak, Electron sin cambios post-21f6b87 | FACT |
+| EXE canónico | Fullsite POS Setup 1.3.3.exe | 81,757,545 bytes · SHA-256 80F0A819…C03A (publicado = calculado) | release/offline-field-2026-08-06 · build 31066570237 desde 21f6b87 exacto | FACT |
 | Clientes de pago | 0 | — | — | FACT |
 | LOI Grupo Galería | FOUNDER-REPORTED | SIGNED ARTIFACT NOT LOCATED IN REPO · SIGNATURE VERIFICATION PENDING | GRUPO-GALERIA-NEXT-STEPS.md | FACT (reporte) · PENDING (verificación) |
 | Fase actual del pipeline | F1 — Offline Field Preparation | CODE/LAB READY — FIELD VERIFICATION PENDING | release/offline-field-2026-08-06 | FACT |
 | D-002 | APPROVED | Gate actual: T-01 Diagnostic Session | FOUNDER-INBOX | FACT |
 | Gate actual | T-01 DIAGNOSTIC SESSION AMALAY | PDV3 → SERVER1 · 30-45 min · SIN instalación | — | FACT |
-| OC-09 / OC-10 | CODE VERIFIED | Física pendiente post T-01 | OCS-P2.5.9 | FACT |
+| OC-09 / OC-10 | CODE VERIFIED | Física pendiente post T-01 · OCS-P2.5.9: 12 criterios PENDING PHYSICAL EXECUTION | OCS-P2.5.9 | FACT |
 | Installer | 7/7 scripted · 4 PASS (LAB) | req 1,4,5 PASS · req 2,3,6,7 PASS (LAB) · CI 31066343422 · NOT FIELD VERIFIED | INSTALLER-VERIFICATION.md | FACT |
 | Precio mensual | UNKNOWN | PAST HYPOTHESES: $1,999 y $4,999 — ninguna aprobada ni validada | PRICING.md | FACT |
 | Producción | NOT DEPLOYED | Main UNCHANGED (e104e19) · DB NOT CHANGED | — | FACT |
@@ -68,9 +70,20 @@ Nunca se declara algo como "verificado en campo" sin evidencia de ejecución fí
 ```
 ═══════════════════════════════════════════════════════════════
  FULLSITE está en:   F1 — OFFLINE FIELD PREPARATION
- Tarea técnica:      PRE-FIELD HARDENING COMPLETE
- Release head:       faf546d (prev: 7cc59ec — preserved in release history)
- EXE:                Fullsite POS Setup 1.3.3.exe (81,757,095 bytes)
+ Tarea técnica:      PRE-FIELD HARDENING COMPLETE · RELEASE FROZEN
+ Code head:          21f6b87 (canonical installer, build 31066570237)
+ Evidence head:      cfcfe69 (solo JSON del soak — Electron sin cambios post-21f6b87)
+ EXE:                Fullsite POS Setup 1.3.3.exe (81,757,545 bytes)
+ SHA-256:            80F0A819BAE51DCAD7A0DEAAEDA93C821D0CF738BFE1271E0FB52F30DC15C03A
+ Windows Lab:        PASS — CI 31066343422 (scripts WINDOWS LAB VERIFIED)
+ Soak:               PASS — 237 min tráfico+drain · 23/23 invariantes ·
+                     12,293 órdenes · 101,372/101,372 cmds ACKed exactly-once ·
+                     data loss 0 · duplicates 0 · print stuck 0 · outbox final 0
+ P0 sprint:          2 found / 2 fixed
+ Pendiente físico:   10 escenarios matriz + OCS-P2.5.9 12 criterios
+ Lab risks:          Bridge RSS 29→364MB por generación · sync_queue_size
+                     telemetría engañosa · demo_seed.py drift (usar
+                     second_tenant_config.sql)
  D-002:              APPROVED
  Visita AMALAY:      LUNES 2026-08-10
  Gate de campo:      T-01 DIAGNOSTIC SESSION
