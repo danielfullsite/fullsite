@@ -132,7 +132,22 @@ function appPids() {
   } catch { return [] }
 }
 
+// asar-node mode: when the Electron GUI can't init headlessly, the workflow
+// boots the Bridge from the installed app.asar via node and passes the boot
+// script here. Restart hooks then respawn THAT, not the GUI.
+const BRIDGE_BOOT = process.env.TWIN_BRIDGE_BOOT || ''
+let installedBridgeChild = null
+
 function launchApp() {
+  if (BRIDGE_BOOT) {
+    installedBridgeChild = spawn('node', [BRIDGE_BOOT], {
+      detached: true, stdio: 'ignore',
+      env: { ...process.env },
+    })
+    installedBridgeChild.unref()
+    log('installed-bridge-launched', { boot: BRIDGE_BOOT, pid: installedBridgeChild.pid })
+    return
+  }
   // TWIN_APP_ARGS: runtime flags the workflow discovered the app needs on
   // this runner (e.g. --disable-gpu --no-sandbox). Space-separated.
   const args = (process.env.TWIN_APP_ARGS || '').split(/\s+/).filter(Boolean)
@@ -166,6 +181,15 @@ async function waitAppGone(timeoutMs) {
 }
 
 function killApp(force) {
+  if (BRIDGE_BOOT) {
+    // asar-node mode: kill the node Bridge child by PID (graceful/force map
+    // to SIGTERM/SIGKILL — the crash-recovery gate exercises both).
+    if (installedBridgeChild && installedBridgeChild.pid) {
+      try { process.kill(installedBridgeChild.pid, force ? 'SIGKILL' : 'SIGTERM') }
+      catch (e) { log('bridge-kill-nonzero', { force: !!force, msg: String(e.message).slice(0, 200) }) }
+    }
+    return
+  }
   try {
     const args = force ? ['/F', '/T', '/IM', APP_IMAGE] : ['/IM', APP_IMAGE]
     execFileSync('taskkill', args, { encoding: 'utf8', timeout: 15000, windowsHide: true })

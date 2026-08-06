@@ -242,10 +242,59 @@ jobs:
             Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 3
           }
+          # ENVIRONMENT CEILING (runs 31081334740 / 31081857885): the installed
+          # Electron GUI spawns its 4 processes but whenReady never completes on
+          # a headless GHA runner (no logs/ dir, port never binds, 0-byte
+          # chromium logs, process not crashed) -- Electron needs an interactive
+          # desktop that GHA windows-latest does not provide. This is a
+          # rehearsal-ENVIRONMENT limit, NOT a product defect, and it is exactly
+          # what Monday's physical PDV3/SERVER1 resolves.
+          #
+          # FALLBACK that still exercises the CANONICAL SHIPPED BYTES headlessly:
+          # boot the Bridge straight from the installed app.asar via node. This
+          # is the same local-server code the exe ships, extracted from the
+          # actual installed artifact (not the repo source).
+          $bridgeMode = 'electron-gui'
           if (-not $health) {
+            $bridgeMode = 'installed-asar-node'
             Get-ChildItem "$env:APPDATA\Fullsite POS" -Recurse -ErrorAction SilentlyContinue |
               Select-Object FullName,Length | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
-            Write-Error 'Installed app did not answer /health on 7717 (both launch attempts) -- see launch-diagnostics.txt + electron-*.log'
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+
+            $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+            if (-not (Test-Path $asar)) { Write-Error "Electron GUI never bound 7717 AND installed app.asar not found at $asar"; exit 1 }
+            $extract = Join-Path $env:RUNNER_TEMP 'installed-app'
+            Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+            npx --yes @electron/asar extract $asar $extract
+            if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract of the installed artifact failed'; exit 1 }
+            if (-not (Test-Path "$extract\local-server\index.js")) { Write-Error 'installed app.asar has no local-server/index.js'; exit 1 }
+            "installed-bridge-source: $extract\local-server (extracted from $asar)" | Add-Content "$env:EVIDENCE\bridge-identity.txt"
+
+            $boot = Join-Path $env:RUNNER_TEMP 'installed-bridge-boot.js'
+            $bootLines = @(
+              "const { startLocalServer } = require(process.env.INSTALLED_BRIDGE_INDEX)",
+              "startLocalServer({ dataDir: process.env.BRIDGE_DATA_DIR, config: { restaurantId: 'amalay-twin', instanceName: 'AMALAY Twin (installed asar)', channel: 'development' } })",
+              "  .then(() => console.log('INSTALLED_BRIDGE_READY'))",
+              "  .catch(e => { console.error('INSTALLED_BRIDGE_FAILED', (e && e.stack) || e); process.exit(1) })"
+            )
+            Set-Content -Path $boot -Value $bootLines -Encoding ASCII
+            $env:INSTALLED_BRIDGE_INDEX = "$extract\local-server\index.js"
+            $env:BRIDGE_DATA_DIR = Join-Path $env:APPDATA 'Fullsite POS'
+            $bp = Start-Process node -ArgumentList "`"$boot`"" -PassThru -NoNewWindow `
+                    -RedirectStandardOutput "$env:EVIDENCE\installed-bridge-stdout.log" `
+                    -RedirectStandardError  "$env:EVIDENCE\installed-bridge-stderr.log"
+            $script:installedBridgePid = $bp.Id
+            for ($i = 0; $i -lt 30; $i++) {
+              try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
+              Start-Sleep -Seconds 1
+            }
+          }
+          "bridge_mode: $bridgeMode" | Add-Content "$env:EVIDENCE\bridge-identity.txt"
+          Add-Content $env:MATRIX_FILE "BRIDGE-MODE=$bridgeMode"
+          if (-not $health) {
+            Get-Content "$env:EVIDENCE\installed-bridge-stdout.log","$env:EVIDENCE\installed-bridge-stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Error 'Neither Electron GUI nor installed-asar node Bridge answered /health -- see launch-diagnostics.txt'
             exit 1
           }
           if ($health.restaurant_id -ne 'amalay-twin') { Write-Error "Bridge tenant is '$($health.restaurant_id)' (expected amalay-twin) -- refusing to rehearse against the wrong install"; exit 1 }
@@ -277,6 +326,12 @@ jobs:
           $env:TWIN_APP_EXE    = $env:APP_EXE
           # Relaunches must use the same runtime flags that made the launch work
           $env:TWIN_APP_ARGS   = if ($attempt.label -eq 'ci-flags') { '--disable-gpu --no-sandbox --disable-gpu-sandbox' } else { '' }
+          # asar-node fallback: restart hooks respawn the installed-asar node Bridge, not the GUI
+          if ($bridgeMode -eq 'installed-asar-node') {
+            $env:TWIN_BRIDGE_BOOT       = $boot
+            $env:INSTALLED_BRIDGE_INDEX = "$extract\local-server\index.js"
+            $env:BRIDGE_DATA_DIR        = Join-Path $env:APPDATA 'Fullsite POS'
+          }
           $env:TWIN_HOOKS_DIR  = "$env:TWIN\twin-evidence\orchestrator-hooks"
           $env:TWIN_OUT_DIR    = "$env:TWIN\twin-evidence\orchestrator"
           $env:TWIN_STOP_FILE  = "$env:EVIDENCE\orchestrator.stop"
@@ -300,6 +355,7 @@ jobs:
           if ($orch -and -not $orch.HasExited) { Wait-Process -Id $orch.Id -Timeout 25 -ErrorAction SilentlyContinue }
           if ($orch -and -not $orch.HasExited) { Stop-Process -Id $orch.Id -Force -ErrorAction SilentlyContinue }
           taskkill /F /T /IM 'Fullsite POS.exe' 2>&1 | Out-Null
+          if ($script:installedBridgePid) { Stop-Process -Id $script:installedBridgePid -Force -ErrorAction SilentlyContinue }
           Start-Sleep -Seconds 3
 
           # -- Hook-servicing verdict from the orchestrator summary --
