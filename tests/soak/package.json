@@ -1,0 +1,6 @@
+{
+  "name": "fullsite-soak-tests",
+  "private": true,
+  "type": "commonjs",
+  "description": "Scopes tests/soak back to CommonJS (repo root is type:module) so the harness matches the CJS local-server."
+}
