@@ -1,0 +1,4 @@
+# Runtime artifacts — never commit evidence/logs/reports
+twin-evidence/
+*.log
+node_modules/

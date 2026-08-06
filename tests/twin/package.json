@@ -1,0 +1,6 @@
+{
+  "name": "fullsite-twin-tests",
+  "private": true,
+  "type": "commonjs",
+  "description": "Scopes tests/twin back to CommonJS (repo root is type:module) so the twin harness matches the CJS local-server."
+}
