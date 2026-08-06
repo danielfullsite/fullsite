@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0"
+  },
+  "hostname": "SERVER1",
+  "alias": "CAJA",
+  "rol": "server_pos",
+  "ip": {
+    "last_known": null,
+    "volatile": true,
+    "autodetect": "GET http://127.0.0.1:7717/health → lan_ip; candidatos SERVER1: 192.168.1.71/192.168.0.71/192.168.1.1"
+  },
+  "windows_user": {
+    "last_known": "SOPORTE",
+    "volatile": true
+  },
+  "deployment_type": {
+    "last_known": "LEGACY (manual, 2026-07-12)",
+    "volatile": true,
+    "autodetect": "PREFLIGHT.ps1 → NSIS/LEGACY/MIXED/UNKNOWN"
+  },
+  "autostart": {
+    "expected": "Electron login item (HKCU Run)",
+    "forbidden": "start-bridge.bat en Startup (root cause PIN-only Jul-12 — si reaparece: eliminar)",
+    "volatile": true
+  },
+  "services_expected": "NINGUNO (bridge embebido en Electron; NSSM nunca confirmado)",
+  "data_paths": {
+    "legacy": "C:\\fullsite\\",
+    "nsis_install": "C:\\Program Files\\Fullsite POS\\",
+    "userdata": "%APPDATA%\\Fullsite POS\\"
+  },
+  "kds_flag": {
+    "value": true,
+    "confidence": "INFERRED — FIELD-CERTIFICATION-SHEET asigna FC-07/08/10 aquí"
+  },
+  "bridge": {
+    "port": 7717,
+    "bind": "0.0.0.0",
+    "endpoints": [
+      "/health",
+      "/state",
+      "/identity",
+      "/events",
+      "/print",
+      "/drawer",
+      "/config",
+      "/fp/*"
+    ]
+  },
+  "fingerprint": {
+    "port": 7718,
+    "service": "fingerprint-service.exe (C:\\fullsite\\, DPUruNet.dll)",
+    "reader": "DigitalPersona 4500",
+    "enrolamiento": "PENDIENTE desde Jul-12",
+    "volatile": true
+  },
+  "last_known_build": {
+    "commit": "2932000",
+    "exe_sha256": "c6ccd31c…d3d2b579",
+    "fecha": "2026-07-12 19:34",
+    "electron": "33.4.11"
+  },
+  "printers_windows_last_known": [
+    "PANADERIA (shared)",
+    "EC01",
+    "EC TICKET (modelo EC-PM-80250; atasco histórico → workaround EC01)",
+    "COCINA FRIA",
+    "COCINA CALIENTE",
+    "BARRA"
+  ],
+  "estaciones_permitidas": [
+    "cocina",
+    "barra",
+    "caja",
+    "tickets"
+  ],
+  "cajon": "RJ-11 a impresora tickets; abre solo con efectivo"
+}

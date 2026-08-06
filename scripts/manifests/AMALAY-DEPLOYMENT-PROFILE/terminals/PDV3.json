@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0"
+  },
+  "hostname": "PDV3",
+  "alias": "ENTRADA",
+  "rol": "pos",
+  "ip": {
+    "last_known": null,
+    "volatile": true,
+    "autodetect": "GET http://127.0.0.1:7717/health → lan_ip; candidatos SERVER1: 192.168.1.71/192.168.0.71/192.168.1.1"
+  },
+  "windows_user": {
+    "last_known": "SOPORTE",
+    "volatile": true
+  },
+  "deployment_type": {
+    "last_known": "LEGACY (manual, 2026-07-12)",
+    "volatile": true,
+    "autodetect": "PREFLIGHT.ps1 → NSIS/LEGACY/MIXED/UNKNOWN"
+  },
+  "autostart": {
+    "expected": "Electron login item (HKCU Run)",
+    "forbidden": "start-bridge.bat en Startup (root cause PIN-only Jul-12 — si reaparece: eliminar)",
+    "volatile": true
+  },
+  "services_expected": "NINGUNO (bridge embebido en Electron; NSSM nunca confirmado)",
+  "data_paths": {
+    "legacy": "C:\\fullsite\\",
+    "nsis_install": "C:\\Program Files\\Fullsite POS\\",
+    "userdata": "%APPDATA%\\Fullsite POS\\"
+  },
+  "orden_instalacion": 1,
+  "riesgo": "menor — terminal de arranque",
+  "last_known_build": {
+    "nota": "build viejo Jul-8 con STATIONS hardcoded — DEBE actualizarse a 1.3.3",
+    "confidence": "ALTA a Jul-12"
+  },
+  "printers_windows_last_known": [
+    "TICKET (shared)",
+    "PANADERIA",
+    "COCINA FRIA",
+    "COCINA CALIENTE",
+    "BARRA"
+  ],
+  "estaciones_permitidas": [
+    "cocina",
+    "barra",
+    "caja",
+    "tickets"
+  ],
+  "pendiente_fisico": "ticket de caja local NUNCA probado explícitamente (Jul-12)"
+}

@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0",
+    "generated": "2026-08-06",
+    "source": "Reconciliación de campo 2026-08-06 (FIELD-NOTES-PREFLIGHT-JUL12 + DEBRIEF-JUL12 + DEPLOYMENT-STATE + THURSDAY-RUNBOOK + AMALAY-CONFIG-PROVENANCE)",
+    "rule": "Config-only. Nunca editar código para aplicar este perfil. Valores volatile:true DEBEN autodetectarse en sitio (PREFLIGHT.ps1) y aceptar override explícito — nunca asumirse en silencio."
+  },
+  "subred": {
+    "last_known": "192.168.1.0/24",
+    "volatile": true,
+    "nota": "algunas fuentes sugieren 192.168.0.x — confirmar con ipconfig"
+  },
+  "puertos": {
+    "bridge": 7717,
+    "fingerprint": "7718 loopback",
+    "mdns": "UDP 5353 _fullsite-pos._tcp",
+    "impresoras": 9100
+  },
+  "firewall": "FIREWALL-SETUP.ps1 del Field Package: TCP 7717 in + UDP 5353 in, LocalSubnet",
+  "wan": {
+    "dependencias": [
+      "Supabase qjiomlvudfmzuvqvhwpk",
+      "app.fullsite.mx"
+    ],
+    "regla": "flujos críticos del turno NO dependen de WAN"
+  },
+  "riesgos": [
+    "WiFi KDS junto a extractor",
+    "IP impresoras asumidas estáticas sin confirmación"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0",
+    "generated": "2026-08-06",
+    "source": "Reconciliación de campo 2026-08-06 (FIELD-NOTES-PREFLIGHT-JUL12 + DEBRIEF-JUL12 + DEPLOYMENT-STATE + THURSDAY-RUNBOOK + AMALAY-CONFIG-PROVENANCE)",
+    "rule": "Config-only. Nunca editar código para aplicar este perfil. Valores volatile:true DEBEN autodetectarse en sitio (PREFLIGHT.ps1) y aceptar override explícito — nunca asumirse en silencio."
+  },
+  "windows": {
+    "SOPORTE": "usuario de builds known-good",
+    "Cliente": "sin admin; password '1234' NO válida en SERVER1",
+    "admin_sitio": "NO DOCUMENTADO — obtener en sitio (NG-5)"
+  },
+  "pos_roles": "jerarquía offline: cajero<capitan<gerente (fix fc5ffb1 — escalación con PIN, TTL 24h)",
+  "staff": "roster/PINs reales SOLO desde pos_staff producción (drift confirmado 07-21) — snapshot pre-visita"
+}

@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0",
+    "generated": "2026-08-06",
+    "source": "Reconciliación de campo 2026-08-06 (FIELD-NOTES-PREFLIGHT-JUL12 + DEBRIEF-JUL12 + DEPLOYMENT-STATE + THURSDAY-RUNBOOK + AMALAY-CONFIG-PROVENANCE)",
+    "rule": "Config-only. Nunca editar código para aplicar este perfil. Valores volatile:true DEBEN autodetectarse en sitio (PREFLIGHT.ps1) y aceptar override explícito — nunca asumirse en silencio."
+  },
+  "branch_A_nsis": {
+    "detect": "registry Uninstall 'Fullsite POS' → DisplayVersion, InstallLocation, appId mx.fullsite.pos",
+    "accion": "upgrade in-place /S 1.3.3 (rehearsal 31120621675 PASS lab)"
+  },
+  "branch_B_legacy": {
+    "detect": "C:\\fullsite\\ + proceso Electron + puertos 7717/7718 + Startup/Run/TaskScheduler + NSSM + firewall",
+    "accion": "PRE-INSTALL-BACKUP.ps1 → install 1.3.3 /S → migración automática printers.json v1→v2 + config a userData",
+    "estado_conocido": "LEGACY confirmado Jul-12; actual UNKNOWN"
+  },
+  "branch_mixed": "si NSIS+legacy coexisten: backup, desinstalar NSIS, limpiar autostart legacy, instalar 1.3.3",
+  "rollback": "ROLLBACK.ps1 -BackupDir <backup> -PreviousInstaller 1.3.0 -Force (paquete 04-ROLLBACK)",
+  "preflight_cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\PREFLIGHT.ps1",
+  "tiempo_objetivo": "5-10 min por terminal"
+}

@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0",
+    "generated": "2026-08-06",
+    "source": "Reconciliación de campo 2026-08-06 (FIELD-NOTES-PREFLIGHT-JUL12 + DEBRIEF-JUL12 + DEPLOYMENT-STATE + THURSDAY-RUNBOOK + AMALAY-CONFIG-PROVENANCE)",
+    "rule": "Config-only. Nunca editar código para aplicar este perfil. Valores volatile:true DEBEN autodetectarse en sitio (PREFLIGHT.ps1) y aceptar override explícito — nunca asumirse en silencio."
+  },
+  "esperado": {
+    "windows_services": "NINGUNO",
+    "autostart": "Electron login item (HKCU Run) por terminal",
+    "fingerprint": "fingerprint-service.exe autostart con app (SERVER1)"
+  },
+  "prohibido": {
+    "start-bridge.bat": "eliminado Jul-12 en 3 terminales — si el preflight lo encuentra, removerlo (root cause PIN-only)",
+    "NSSM": "nunca instalado; si aparece, investigar antes de tocar"
+  }
+}

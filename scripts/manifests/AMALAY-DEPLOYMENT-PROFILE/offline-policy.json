@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "profile_version": "1.0.0",
+    "generated": "2026-08-06",
+    "source": "Reconciliación de campo 2026-08-06 (FIELD-NOTES-PREFLIGHT-JUL12 + DEBRIEF-JUL12 + DEPLOYMENT-STATE + THURSDAY-RUNBOOK + AMALAY-CONFIG-PROVENANCE)",
+    "rule": "Config-only. Nunca editar código para aplicar este perfil. Valores volatile:true DEBEN autodetectarse en sitio (PREFLIGHT.ps1) y aceptar override explícito — nunca asumirse en silencio."
+  },
+  "principio": "Wansoft como benchmark; offline NO se rediseña (protocolo v1.0 congelado 6b1aca8)",
+  "flujos_offline_obligatorios": [
+    "cold start sin WAN",
+    "PIN local (PBKDF2, TTL 24h)",
+    "órdenes",
+    "KDS por LAN (WsHub primario)",
+    "impresión por estación",
+    "cobro efectivo",
+    "cortes",
+    "recovery post-crash (print queue _recoverCrashedJobs)"
+  ],
+  "requieren_wan": [
+    "pagos con terminal bancaria",
+    "facturación CFDI",
+    "delivery marketplaces",
+    "dashboard remoto"
+  ],
+  "sync": {
+    "inbound": "poll Supabase 5s (Fase 1)",
+    "outbound": "capa dashboard IDB (evidencia física 07-27: 8 órdenes sync OK); local-server markSynced sin caller = BUG-009 (deuda, no bloqueante)",
+    "invariantes": [
+      "0 pérdidas",
+      "0 duplicados",
+      "outbox=0 post-drain"
+    ]
+  }
+}
