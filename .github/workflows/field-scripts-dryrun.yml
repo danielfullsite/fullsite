@@ -2,11 +2,20 @@ name: Field Scripts Dry-Run (Windows Lab)
 
 # Executes every FULLSITE-FIELD-KIT script against safe fixtures on a throwaway
 # windows-latest runner so the kit can be classified WINDOWS LAB VERIFIED.
-# Manual trigger ONLY — never on push/schedule (installs software, edits
-# firewall rules and registry on the runner).
+# Triggers: manual, plus push to release/* ONLY — GitHub does not register
+# workflow_dispatch for workflows absent from the default branch, and this
+# repo's release flow forbids touching main before field PASS. Never runs on
+# main/schedule (installs software, edits firewall rules and registry on the
+# runner — all throwaway).
 
 on:
   workflow_dispatch:
+  push:
+    branches: ['release/**']
+    paths:
+      - '.github/workflows/field-scripts-dryrun.yml'
+      - 'docs/agent-os/field/FULLSITE-FIELD-KIT/**'
+      - 'electron-app/local-server/**'
 
 permissions:
   contents: read
