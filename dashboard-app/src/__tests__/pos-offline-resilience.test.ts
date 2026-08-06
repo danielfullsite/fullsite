@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { shouldAttemptSync } from '@/lib/pos-offline-db'
 
 // ─── Reproduce core POS logic inline (same pattern as data-integrity.test.ts) ──
 
@@ -562,15 +563,19 @@ describe('Offline sync queue operations', () => {
     expect(item.retries).toBe(2)
   })
 
-  it('items with retries >= 5 should be skipped', () => {
-    const queue: SyncQueueItem[] = [
-      { id: '1', table: 'pos_orders', method: 'POST', data: {}, created_at: '', synced: false, retries: 5 },
-      { id: '2', table: 'pos_orders', method: 'POST', data: {}, created_at: '', synced: false, retries: 0 },
-      { id: '3', table: 'pos_orders', method: 'PATCH', data: {}, created_at: '', synced: false, retries: 10 },
+  it('items with retries >= 5 slow-retry with backoff, never abandoned (PRR-02)', () => {
+    // Real gating logic — not a replica. Fresh items always eligible; items
+    // past the fast cap are eligible once their backoff window elapses.
+    const NOW = 1_700_000_000_000
+    const queue = [
+      { id: '1', retries: 5, last_attempt_at: NOW - 30_000 },   // in backoff window
+      { id: '2', retries: 0 },                                   // fresh
+      { id: '3', retries: 10, last_attempt_at: NOW - 400_000 },  // backoff elapsed
     ]
-    const eligible = queue.filter(i => !i.synced && i.retries < 5)
-    expect(eligible).toHaveLength(1)
-    expect(eligible[0].id).toBe('2')
+    const eligible = queue.filter(i => shouldAttemptSync(i, NOW))
+    expect(eligible.map(i => i.id)).toEqual(['2', '3'])
+    // and NO item is ever permanently ineligible: advance time past the cap
+    expect(queue.filter(i => shouldAttemptSync(i, NOW + 300_000))).toHaveLength(3)
   })
 
   it('getPendingQueue filters out synced items', () => {

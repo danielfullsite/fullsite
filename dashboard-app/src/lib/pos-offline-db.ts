@@ -872,6 +872,17 @@ export async function markTurnoSynced(id: string): Promise<void> {
 // them into IDB so they enter the canonical sync queue and are never silently lost.
 //
 // Idempotent: safe to call multiple times. Clears localStorage only after every
+// Method for a localStorage emergency-queue item. APP_API items without an
+// explicit method default to POST — /api/pos/save-order only exports POST, and
+// items queued before this fix carry no method, so a PATCH default made them
+// replay as 405 → TRANSIENT_RETRYABLE forever (permanently un-syncable).
+// Legacy PostgREST items keep the historical PATCH default.
+export function lsItemMethod(item: Record<string, unknown>): 'POST' | 'PATCH' | 'DELETE' {
+  const m = item.method as string | undefined
+  if (m === 'POST' || m === 'PATCH' || m === 'DELETE') return m
+  return item.transport === 'APP_API' ? 'POST' : 'PATCH'
+}
+
 // item has been successfully written to IDB (all-or-nothing, per item).
 export async function drainLocalStorageToIdb(): Promise<void> {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
@@ -886,7 +897,7 @@ export async function drainLocalStorageToIdb(): Promise<void> {
     let allOk = true
     for (const item of unsynced) {
       try {
-        const method = (item.method as string | undefined) || 'PATCH'
+        const method = lsItemMethod(item)
         await queueOperation(
           (item.table as string) || 'pos_orders',
           method as 'POST' | 'PATCH' | 'DELETE',

@@ -1411,7 +1411,7 @@ export async function saveOrder(order: Order, saveOperationId?: string): Promise
         })
       } catch {
         const queue = JSON.parse(localStorage.getItem('fullsite_offline_queue') || '[]')
-        queue.push({ table: 'pos_orders', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
+        queue.push({ table: 'pos_orders', method: 'POST', data: payload, endpoint: '/api/pos/save-order', transport: 'APP_API', timestamp: Date.now(), synced: false })
         localStorage.setItem('fullsite_offline_queue', JSON.stringify(queue))
       }
       console.log('[offline] Order saved to queue — will sync when online')

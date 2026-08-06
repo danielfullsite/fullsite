@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { syncBackoffMs, shouldAttemptSync } from '@/lib/pos-offline-db'
+import { syncBackoffMs, shouldAttemptSync, lsItemMethod } from '@/lib/pos-offline-db'
 
 // PRR-02: transient sync_queue items must never be stranded. After 5 fast
 // retries they degrade to slow retries with exponential backoff — they are
@@ -58,6 +58,20 @@ describe('shouldAttemptSync — attempt gating', () => {
     // Items queued before this fix have no timestamp — they must recover, not stay stuck
     expect(shouldAttemptSync({ retries: 5 }, NOW)).toBe(true)
     expect(shouldAttemptSync({ retries: 12 }, NOW)).toBe(true)
+  })
+
+  it('emergency save-order items without method replay as POST, not PATCH (405 fix)', () => {
+    // /api/pos/save-order only exports POST. Items queued by the localStorage
+    // emergency fallback before the fix carry no method — a PATCH default made
+    // them 405 forever. APP_API items must default to POST.
+    expect(lsItemMethod({ table: 'pos_orders', transport: 'APP_API', endpoint: '/api/pos/save-order' })).toBe('POST')
+    // explicit methods are always respected
+    expect(lsItemMethod({ method: 'PATCH', transport: 'APP_API' })).toBe('PATCH')
+    expect(lsItemMethod({ method: 'DELETE' })).toBe('DELETE')
+    // legacy PostgREST items keep the historical PATCH default
+    expect(lsItemMethod({ table: 'pos_orders', endpoint: 'pos_orders?id=eq.x' })).toBe('PATCH')
+    // garbage method falls back by transport
+    expect(lsItemMethod({ method: 'PUT', transport: 'APP_API' })).toBe('POST')
   })
 
   it('a 4-hour soak with flaky network never permanently strands an item', () => {
