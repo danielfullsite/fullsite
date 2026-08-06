@@ -235,3 +235,20 @@ describe('resolveLoginRedirect', () => {
     expect(resolveLoginRedirect('mesero', 'nomada-mini')).toBe('/pos')
   })
 })
+
+// RC release gate: rutas incompletas ocultas para TODOS los roles (BUG-001/002/003)
+describe('canAccessPage — RELEASE_HIDDEN_PAGES (RC gate)', () => {
+  const roles: DashboardRole[] = ['dueño', 'gerente', 'capitan', 'cajero', 'mesero', 'staff']
+  const hidden = ['/lealtad', '/lealtad/config', '/encuestas', '/encuesta/abc123', '/admin/usuarios', '/admin/usuarios/nuevo', '/internal/vault']
+  for (const role of roles) {
+    for (const path of hidden) {
+      it(`${role} NO accede a ${path}`, () => expect(canAccessPage(role, path)).toBe(false))
+    }
+  }
+  it('dueño sigue accediendo a /admin/menu (deny-list no sobre-bloquea /admin)', () => {
+    expect(canAccessPage('dueño', '/admin/menu')).toBe(true)
+  })
+  it('capitan sigue accediendo a /admin/promociones', () => {
+    expect(canAccessPage('capitan', '/admin/promociones')).toBe(true)
+  })
+})

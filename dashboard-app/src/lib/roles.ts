@@ -13,7 +13,14 @@ export const POS_PAGES = ['/pos']
 const CAPITAN_PAGES = [...OPERATIONS_PAGES, ...POS_PAGES, '/admin']
 const CAJERO_PAGES = ['/pos', '/cortes', '/propinas', '/ventas']
 
+// Rutas fuera del release: features incompletas que no deben ser accesibles
+// para ningún rol hasta completarse y certificarse (RC bug register:
+// BUG-001 /lealtad rewards mock, BUG-002 /encuestas sin vista de respuestas,
+// BUG-003 /admin/usuarios CRUD parcial; /internal es tooling no-cliente).
+export const RELEASE_HIDDEN_PAGES = ['/lealtad', '/encuestas', '/encuesta', '/admin/usuarios', '/internal']
+
 export function canAccessPage(role: DashboardRole, path: string): boolean {
+  if (RELEASE_HIDDEN_PAGES.some(p => path === p || path.startsWith(p + '/'))) return false
   if (role === 'dueño') return true
   if (role === 'gerente') return !FINANCIAL_PAGES.some(p => path.startsWith(p))
   if (role === 'capitan') return CAPITAN_PAGES.some(p => path === p || path.startsWith(p + '/')) || path === '/'
