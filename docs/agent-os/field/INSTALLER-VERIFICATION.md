@@ -1,10 +1,16 @@
 # INSTALLER-VERIFICATION — Fullsite POS v1.3.3 (NSIS) + Field Tooling
 
-> Verification date: 2026-08-05
+> Verification date: 2026-08-06 (updated from 2026-08-05)
 > Scope: does the CURRENT installer (`electron-app` build config, electron-builder NSIS oneClick)
 > plus field tooling (`docs/agent-os/field/`) satisfy the 7 field-install requirements?
 > Rule applied: a requirement is PASS only if implemented in code/scripts — documentation alone does not count.
 > All paths are repo-relative to `/Users/danielrg/fullsite/`.
+>
+> **2026-08-06 UPDATE — req 2, 3, 6, 7 promoted from FAIL/PARTIAL to PASS.**
+> Scripts `PRE-INSTALL-BACKUP.ps1`, `FIREWALL-SETUP.ps1`, `INSTALL.cmd`, and `ROLLBACK.ps1`
+> were added to `FULLSITE-FIELD-KIT/` and executed end-to-end on a real Windows runner via
+> `.github/workflows/field-scripts-dryrun.yml`. Run 31066343422 — **13/13 steps PASS**.
+> Classification: **WINDOWS LAB VERIFIED** (not yet FIELD VERIFIED — physical execution Monday 2026-08-10).
 
 ## Machine-readable summary
 
@@ -15,28 +21,28 @@
   "installer": "electron-builder NSIS oneClick perMachine (no custom .nsh include)",
   "verified_at": "2026-08-05",
   "requirements": [
-    {"id": 1, "name": "legacy/NSIS/mixed detection", "status": "PASS",    "evidence": "docs/agent-os/field/DIAGNOSTIC-ONLY.ps1:426-432; electron-app/main.js:49-111"},
-    {"id": 2, "name": "pre-install backup",          "status": "FAIL",    "evidence": "docs/agent-os/field/DIAGNOSTIC-ONLY.ps1:253-320 (evidence only, not restorable)"},
-    {"id": 3, "name": "firewall rules",              "status": "FAIL",    "evidence": "no netsh/firewall code anywhere in installer or field scripts"},
-    {"id": 4, "name": "autostart on boot",           "status": "PASS",    "evidence": "electron-app/main.js:822-825"},
-    {"id": 5, "name": "config preserved on upgrade", "status": "PASS",    "evidence": "electron-app/main.js:34-37,116-121; nsis oneClick does not touch appData"},
-    {"id": 6, "name": "install logs",                "status": "FAIL",    "evidence": "no NSIS logging; runtime-only logs at electron-app/main.js:810-814"},
-    {"id": 7, "name": "rollback",                    "status": "PARTIAL", "evidence": "NSIS uninstaller (implicit); .github/workflows/electron-build.yml:33-37; electron-app/main.js:362-378"}
+    {"id": 1, "name": "legacy/NSIS/mixed detection", "status": "PASS",              "evidence": "docs/agent-os/field/DIAGNOSTIC-ONLY.ps1:426-432; electron-app/main.js:49-111"},
+    {"id": 2, "name": "pre-install backup",          "status": "PASS (LAB)",        "evidence": "FULLSITE-FIELD-KIT/PRE-INSTALL-BACKUP.ps1 — robocopy copy, ZIP integrity, SHA-256 manifest, biometric exclusion. CI run 31066343422 steps 2+3 PASS (Windows runner)."},
+    {"id": 3, "name": "firewall rules",              "status": "PASS (LAB)",        "evidence": "FULLSITE-FIELD-KIT/FIREWALL-SETUP.ps1 — TCP 7717 + UDP 5353 LocalSubnet, idempotent, -Remove flag. CI run 31066343422 steps 4+9 PASS."},
+    {"id": 4, "name": "autostart on boot",           "status": "PASS",              "evidence": "electron-app/main.js:822-825"},
+    {"id": 5, "name": "config preserved on upgrade", "status": "PASS",              "evidence": "electron-app/main.js:34-37,116-121; nsis oneClick does not touch appData"},
+    {"id": 6, "name": "install logs",                "status": "PASS (LAB)",        "evidence": "FULLSITE-FIELD-KIT/INSTALL.cmd — writes install-logs/install-<ts>.log, step 5b confirmed 'INSTALACION COMPLETA' marker. CI run 31066343422 step 5b PASS."},
+    {"id": 7, "name": "rollback",                    "status": "PASS (LAB)",        "evidence": "FULLSITE-FIELD-KIT/ROLLBACK.ps1 — silent uninstall, robocopy /MIR, SHA-256 verify of byte-identical restore. CI run 31066343422 step 8 PASS."}
   ]
 }
 ```
 
 ## Summary table
 
-| # | Requirement | Status | Evidence (file:line) | Gap |
+| # | Requirement | Status | Evidence (file:line) | Remaining gap |
 |---|---|---|---|---|
-| 1 | Detects legacy/NSIS/mixed prior installs | **PASS** | `docs/agent-os/field/DIAGNOSTIC-ONLY.ps1:426-432` (deployType = MIXED/NSIS/LEGACY/UNKNOWN); `electron-app/main.js:49-111` (legacy config detection at runtime) | Detection is a *manual pre-install* script; the installer itself takes no action based on the result |
-| 2 | Backup before install (app + data/config) | **FAIL** | `DIAGNOSTIC-ONLY.ps1:253-320` captures inventory + SHA-256 hashes only — no file contents copied | No restorable backup of `C:\fullsite\`, `%APPDATA%\Fullsite POS\` (config.json, printers.json, print-queue.json) is made before install |
-| 3 | Configures Windows Firewall (7717 TCP HTTP+WS, UDP 5353 mDNS) | **FAIL** | No `netsh`/firewall code in `electron-app/package.json:35-41`, `main.js`, or any field script. Diagnostic explicitly does "No firewall changes" (`DIAGNOSTIC-ONLY.ps1:7`) | Local Server listens on `0.0.0.0:7717` (`local-server/index.js:397`) — LAN clients (KDS, other terminals) will be blocked until a rule exists or the user clicks the Windows Defender popup |
-| 4 | Autostart on Windows boot | **PASS** | `electron-app/main.js:822-825` — `app.setLoginItemSettings({ openAtLogin: true, path: process.execPath })` on win32 | Runtime, not installer-level: takes effect only after first launch; per-user (HKCU Run), while install is perMachine — other Windows accounts get no autostart |
-| 5 | Preserves config across upgrade | **PASS** | `electron-app/main.js:34-37` (config.json in userData), `:116-121` (printers.json in userData); `package.json:35-41` (oneClick NSIS — installs to Program Files only, never touches `%APPDATA%`); legacy migration `main.js:68-100, 160-182` | None material. `deleteAppDataOnUninstall` is not set (default false) so even uninstall preserves userData |
-| 6 | Generates install logs | **FAIL** | No custom `.nsh`, no `/LOG`, no `customInstall` macro in `package.json:35-41`. Runtime logging only: `main.js:810-814` → `userData/logs/server.log` via `local-server/logger.js:1-50` | Zero record of what the installer did (files replaced, prior version, errors). Field tech has no artifact if install fails |
-| 7 | Permits rollback (uninstall + restore prior version/data) | **PARTIAL** | NSIS registers uninstaller (implicit in `package.json:28` target nsis, perMachine); prior installers retrievable from CI artifacts for 30 days (`.github/workflows/electron-build.yml:33-37`); config restore via file picker `main.js:362-378` (`provision:import-config`), config auto-backups on save/reset `main.js:341-355, 528-531` | No scripted/documented rollback procedure; no local copy of the previous installer on the terminal; a LEGACY (non-NSIS) install cannot be restored because req #2 never backs it up; `docs/offline/RECOVERY.md` covers data-layer recovery only, zero installer content |
+| 1 | Detects legacy/NSIS/mixed prior installs | **PASS** | `DIAGNOSTIC-ONLY.ps1:426-432` (deployType = MIXED/NSIS/LEGACY/UNKNOWN); `electron-app/main.js:49-111` | Detection is manual pre-install; installer takes no automated action on the result |
+| 2 | Backup before install (app + data/config) | **PASS (LAB)** | `FULLSITE-FIELD-KIT/PRE-INSTALL-BACKUP.ps1` — robocopy file copies, ZIP, SHA-256 manifest, biometric exclusion, SOURCES.csv for ROLLBACK.ps1. CI run 31066343422 steps 2+3 PASS | Not yet FIELD VERIFIED — first physical run Monday 2026-08-10 |
+| 3 | Configures Windows Firewall (7717 TCP HTTP+WS, UDP 5353 mDNS) | **PASS (LAB)** | `FULLSITE-FIELD-KIT/FIREWALL-SETUP.ps1` — TCP 7717 + UDP 5353, LocalSubnet only, idempotent, `-Remove` flag. CI run 31066343422 steps 4+9 PASS | Not yet FIELD VERIFIED |
+| 4 | Autostart on Windows boot | **PASS** | `electron-app/main.js:822-825` — `app.setLoginItemSettings` on win32 | Per-user HKCU vs perMachine install mismatch (see §4 detail) |
+| 5 | Preserves config across upgrade | **PASS** | `electron-app/main.js:34-37,116-121`; oneClick NSIS never touches `%APPDATA%`; `deleteAppDataOnUninstall` unset (default false) | None material |
+| 6 | Generates install logs | **PASS (LAB)** | `FULLSITE-FIELD-KIT/INSTALL.cmd` — writes `install-logs/install-<ts>.log`, 6 steps logged, `INSTALACION COMPLETA` marker. CI run 31066343422 step 5b PASS | Not yet FIELD VERIFIED; cosmetic: `call :log.` (no space) silently skips blank line echo (non-blocking) |
+| 7 | Permits rollback (uninstall + restore prior version/data) | **PASS (LAB)** | `FULLSITE-FIELD-KIT/ROLLBACK.ps1` — silent NSIS uninstall, robocopy /MIR restore, SHA-256 byte-identical verify, `-Force` flag for automation. CI run 31066343422 step 8 PASS | Not yet FIELD VERIFIED; biometric files excluded from backup are also removed by /MIR restore (documented tradeoff) |
 
 ## Facts established during verification
 
