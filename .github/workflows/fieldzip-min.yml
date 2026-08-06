@@ -1,0 +1,12 @@
+name: FieldZip Min Probe
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/**']
+    paths:
+      - '.github/workflows/fieldzip-min.yml'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "probe ok"
