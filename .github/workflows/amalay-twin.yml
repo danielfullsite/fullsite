@@ -356,6 +356,11 @@ jobs:
           if ($orch -and -not $orch.HasExited) { Stop-Process -Id $orch.Id -Force -ErrorAction SilentlyContinue }
           taskkill /F /T /IM 'Fullsite POS.exe' 2>&1 | Out-Null
           if ($script:installedBridgePid) { Stop-Process -Id $script:installedBridgePid -Force -ErrorAction SilentlyContinue }
+          # In asar-node mode there is no 'Fullsite POS.exe', so taskkill exits
+          # 128 and poisons $LASTEXITCODE — GHA then fails the step at its end
+          # even though the harness passed. Reset it; the harness verdict below
+          # gates on $code (captured above), not $LASTEXITCODE.
+          $global:LASTEXITCODE = 0
           Start-Sleep -Seconds 3
 
           # -- Hook-servicing verdict from the orchestrator summary --
@@ -382,6 +387,8 @@ jobs:
           if ($code -ne 0) { Write-Error "Harness exited $code (expected 0) -- see harness-console.log + twin-report.json in the evidence artifact"; exit 1 }
           if (-not $hooksOk) { Write-Error 'Harness passed but orchestrator recorded anomalies / missing summary -- failing the run'; exit 1 }
           Add-Content $env:MATRIX_FILE 'HARNESS=PASS'
+          Write-Host 'Twin external rehearsal PASSED on the canonical shipped bytes.'
+          exit 0   # everything passed — do not inherit any stray native exit code
 
       # ????????????????????????????????????????????????????????????????????
       # 8. Collect the app's %APPDATA% evidence (events.ndjson,

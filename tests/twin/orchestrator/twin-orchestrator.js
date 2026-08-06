@@ -369,11 +369,13 @@ async function serviceHook(file) {
 
 function sampleMemory() {
   try {
-    const out = ps(`Get-Process -Name '${PROC_NAME}' -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id),$($_.WorkingSet64),$($_.PrivateMemorySize64)" }`)
+    // In asar-node mode the Bridge runs as node.exe, not the GUI 'Fullsite POS'.
+    const names = BRIDGE_BOOT ? "'node'" : `'${PROC_NAME}'`
+    const out = ps(`Get-Process -Name ${names} -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id),$($_.WorkingSet64),$($_.PrivateMemorySize64)" }`)
     const ts = new Date().toISOString()
     const lines = out.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
     for (const l of lines) fs.appendFileSync(MEM_CSV, `${ts},${l}\n`)
-    state.mem_samples++
+    if (lines.length) state.mem_samples++
   } catch {}
   if (PROD_IPS.length > 0) {
     try {
