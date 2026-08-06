@@ -388,8 +388,11 @@ jobs:
             if ($ha.last_sequence -ne $hb.last_sequence)     { Write-Error "MUTATION: last_sequence $($hb.last_sequence) -> $($ha.last_sequence)"; exit 1 }
             if ($ha.sync_queue_size -ne $hb.sync_queue_size) { Write-Error "MUTATION: sync_queue_size $($hb.sync_queue_size) -> $($ha.sync_queue_size)"; exit 1 }
 
-            $sb = Get-Content "$env:EVIDENCE\state-before.json" -Raw
-            $sa = (Invoke-WebRequest 'http://127.0.0.1:7717/state' -UseBasicParsing -TimeoutSec 5).Content
+            # PS5.1 Set-Content -Encoding UTF8 writes a BOM; strip it (and CRLF
+            # normalization) before comparing against the fresh HTTP body, or
+            # identical JSON reads as a false MUTATION (run 31065999923).
+            $sb = (Get-Content "$env:EVIDENCE\state-before.json" -Raw).Trim([char]0xFEFF).Trim()
+            $sa = ((Invoke-WebRequest 'http://127.0.0.1:7717/state' -UseBasicParsing -TimeoutSec 5).Content).Trim()
             $sa | Set-Content "$env:EVIDENCE\state-after.json" -Encoding UTF8
             if ($sa -ne $sb) { Write-Error 'MUTATION: /state snapshot changed across read-only audits'; exit 1 }
 
