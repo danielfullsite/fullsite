@@ -1,0 +1,510 @@
+name: Field Scripts Dry-Run (Windows Lab)
+
+# Executes every FULLSITE-FIELD-KIT script against safe fixtures on a throwaway
+# windows-latest runner so the kit can be classified WINDOWS LAB VERIFIED.
+# Manual trigger ONLY — never on push/schedule (installs software, edits
+# firewall rules and registry on the runner).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read   # gh run download of the canonical installer artifact
+
+concurrency:
+  group: field-scripts-dryrun
+  cancel-in-progress: false
+
+env:
+  KIT: ${{ github.workspace }}\docs\agent-os\field\FULLSITE-FIELD-KIT
+  FIELD_DIR: ${{ github.workspace }}\docs\agent-os\field
+  EVIDENCE: ${{ github.workspace }}\dryrun-artifacts
+  MATRIX_FILE: ${{ github.workspace }}\dryrun-artifacts\matrix.txt
+  INSTALLER_RUN_ID: "31033026398"
+  INSTALLER_ARTIFACT: fullsite-pos-win-7cc59ec8b078b2d6ebab756d04d8ddfd0d0ea117
+  APP_EXE: C:\Program Files\Fullsite POS\Fullsite POS.exe
+
+jobs:
+  dryrun:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell   # Windows PowerShell 5.1 — same engine the field kit targets (#Requires -Version 5.1)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Init evidence dir + matrix file
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:EVIDENCE | Out-Null
+          New-Item -ItemType File -Force -Path $env:MATRIX_FILE | Out-Null
+
+      # ════════════════════════════════════════════════════════════════════
+      # 1. FIXTURES — fake legacy install + fake Electron userData
+      #    Paths grounded in PRE-INSTALL-BACKUP.ps1 $sources:
+      #    C:\fullsite and %APPDATA%\Fullsite POS
+      # ════════════════════════════════════════════════════════════════════
+      - name: 1. Create safe fixtures (C:\fullsite + %APPDATA%\Fullsite POS)
+        run: |
+          New-Item -ItemType Directory -Force -Path 'C:\fullsite\bin','C:\fullsite\templates' | Out-Null
+          @'
+          { "clientId": "dryrun-legacy", "printerIp": "192.0.2.55", "note": "fake legacy config fixture for field-scripts dry-run" }
+          '@ | Set-Content 'C:\fullsite\config.json' -Encoding UTF8
+          'Legacy notes fixture - Fullsite field-scripts dry-run' | Set-Content 'C:\fullsite\legacy-notes.txt' -Encoding UTF8
+          [IO.File]::WriteAllBytes('C:\fullsite\bin\fullsite-legacy.exe', [byte[]](77,90 + @(1..64)))
+          # Biometric fixture — must be EXCLUDED from the backup ZIP (privacy rule)
+          'FAKE-BIOMETRIC-TEMPLATE-NOT-REAL' | Set-Content 'C:\fullsite\templates\finger1.dat' -Encoding ASCII
+
+          $fx = Join-Path $env:APPDATA 'Fullsite POS'
+          New-Item -ItemType Directory -Force -Path $fx | Out-Null
+          @'
+          {
+            "restaurant_id": "dryrun-restaurant",
+            "terminal_id": "PDV-DRYRUN",
+            "instance_name": "Fullsite POS DryRun",
+            "channel": "stable"
+          }
+          '@ | Set-Content (Join-Path $fx 'config.json') -Encoding UTF8
+          @'
+          { "version": 2, "printers": [], "stations": {} }
+          '@ | Set-Content (Join-Path $fx 'printers.json') -Encoding UTF8
+          # Valid NDJSON events — shapes grounded in local-server/protocol.js + core/state.js
+          @'
+          {"id":"evt-0001","sequence":1,"type":"ORDER_UPSERTED","restaurant_id":"dryrun-restaurant","ts":"2026-08-05T12:00:00.000Z","payload":{"order_id":"o-dryrun-1","mesa":"5","items":[{"id":"i-1","nombre":"Chilaquiles","qty":1}],"status":"abierta"},"synced":false}
+          {"id":"evt-0002","sequence":2,"type":"KDS_ITEM_STATUS","restaurant_id":"dryrun-restaurant","ts":"2026-08-05T12:01:00.000Z","payload":{"order_id":"o-dryrun-1","item_id":"i-1","status":"preparando"},"synced":false}
+          {"id":"evt-0003","sequence":3,"type":"ORDER_CLOSED","restaurant_id":"dryrun-restaurant","ts":"2026-08-05T12:05:00.000Z","payload":{"order_id":"o-dryrun-1","mesa":"5"},"synced":false}
+          '@ | Set-Content (Join-Path $fx 'events.ndjson') -Encoding UTF8
+
+          # Record fixture SHA-256s — ROLLBACK step later asserts byte-identical restore
+          $targets = @('C:\fullsite\config.json','C:\fullsite\legacy-notes.txt','C:\fullsite\bin\fullsite-legacy.exe',
+                       (Join-Path $fx 'config.json'), (Join-Path $fx 'printers.json'), (Join-Path $fx 'events.ndjson'))
+          $rows = foreach ($t in $targets) {
+            [pscustomobject]@{ Path = $t; SHA256 = (Get-FileHash $t -Algorithm SHA256).Hash.ToLower() }
+          }
+          $rows | Export-Csv "$env:EVIDENCE\fixture-hashes.csv" -NoTypeInformation
+          $rows | Format-Table -AutoSize | Out-String | Write-Host
+          Add-Content $env:MATRIX_FILE 'FIXTURES=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 2. BACKUP — PRE-INSTALL-BACKUP.ps1 (exit 0 = verified)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 2. PRE-INSTALL-BACKUP.ps1 — backup + manifest + ZIP integrity
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\PRE-INSTALL-BACKUP.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "PRE-INSTALL-BACKUP.ps1 exited $LASTEXITCODE (expected 0)"; exit 1 }
+
+          $bk = Get-ChildItem "$env:KIT\backups" -Directory | Sort-Object CreationTime | Select-Object -Last 1
+          if (-not $bk) { Write-Error 'No backup folder created under backups\'; exit 1 }
+          Write-Host "Backup dir: $($bk.FullName)"
+          foreach ($f in 'MANIFEST.csv','SOURCES.csv','backup.zip','BACKUP-INFO.txt') {
+            if (-not (Test-Path (Join-Path $bk.FullName $f))) { Write-Error "Missing $f in backup folder"; exit 1 }
+          }
+          $info = Get-Content (Join-Path $bk.FullName 'BACKUP-INFO.txt') -Raw
+          if ($info -notmatch 'RESULT\s*:\s*VERIFIED') { Write-Error "BACKUP-INFO RESULT is not VERIFIED:`n$info"; exit 1 }
+
+          # ZIP integrity: entry count == staged file count (independent re-check)
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $bk.FullName 'backup.zip'))
+          $entries = @($zip.Entries | Where-Object { $_.Name })
+          $bioInZip = @($entries | Where-Object { $_.FullName -like '*finger1.dat' }).Count
+          $entryCount = $entries.Count
+          $zip.Dispose()
+          $staged = @(Get-ChildItem (Join-Path $bk.FullName 'files') -Recurse -File).Count
+          if ($entryCount -lt 1 -or $entryCount -ne $staged) { Write-Error "ZIP entries ($entryCount) != staged files ($staged)"; exit 1 }
+          if ($bioInZip -ne 0) { Write-Error 'Biometric fixture finger1.dat leaked into backup.zip (privacy rule violated)'; exit 1 }
+          Write-Host "ZIP ok: $entryCount entries == $staged staged files, biometric excluded"
+
+          # SHA-256 of known fixture matches MANIFEST.csv
+          $manifest = Import-Csv (Join-Path $bk.FullName 'MANIFEST.csv')
+          $row = $manifest | Where-Object { $_.OriginalPath -eq 'C:\fullsite\config.json' } | Select-Object -First 1
+          if (-not $row) { Write-Error 'MANIFEST.csv has no row for C:\fullsite\config.json'; exit 1 }
+          $live = (Get-FileHash 'C:\fullsite\config.json' -Algorithm SHA256).Hash.ToLower()
+          if ($row.SHA256 -ne $live) { Write-Error "Manifest hash $($row.SHA256) != live fixture hash $live"; exit 1 }
+          $appRow = $manifest | Where-Object { $_.OriginalPath -eq (Join-Path $env:APPDATA 'Fullsite POS\events.ndjson') } | Select-Object -First 1
+          if (-not $appRow) { Write-Error 'MANIFEST.csv has no row for %APPDATA%\Fullsite POS\events.ndjson'; exit 1 }
+          $bioRow = $manifest | Where-Object { $_.OriginalPath -like '*finger1.dat' } | Select-Object -First 1
+          if (-not $bioRow -or $bioRow.SHA256 -ne 'SKIPPED-BIOMETRIC') { Write-Error 'Biometric file not listed as SKIPPED-BIOMETRIC in manifest'; exit 1 }
+          Write-Host 'Manifest hash checks OK (fixture + appdata + biometric-skip rows)'
+
+          "BACKUP1_DIR=$($bk.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'BACKUP=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 3. BACKUP IDEMPOTENCE — second run, second timestamped folder
+      # ════════════════════════════════════════════════════════════════════
+      - name: 3. PRE-INSTALL-BACKUP.ps1 idempotence (second run)
+        run: |
+          Start-Sleep -Seconds 2   # ensure a distinct yyyyMMdd-HHmmss folder name
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\PRE-INSTALL-BACKUP.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "Second backup run exited $LASTEXITCODE (expected 0)"; exit 1 }
+          $dirs = @(Get-ChildItem "$env:KIT\backups" -Directory)
+          if ($dirs.Count -lt 2) { Write-Error "Expected >= 2 backup folders, found $($dirs.Count)"; exit 1 }
+          $newest = $dirs | Sort-Object CreationTime | Select-Object -Last 1
+          if ($newest.FullName -eq $env:BACKUP1_DIR) { Write-Error 'Second run did not create a new timestamped folder'; exit 1 }
+          $info = Get-Content (Join-Path $newest.FullName 'BACKUP-INFO.txt') -Raw
+          if ($info -notmatch 'RESULT\s*:\s*VERIFIED') { Write-Error 'Second backup not VERIFIED'; exit 1 }
+          Write-Host "Idempotence OK: $($dirs.Count) backups, newest = $($newest.Name)"
+          Add-Content $env:MATRIX_FILE 'BACKUP-IDEMPOTENCE=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 4. FIREWALL — FIREWALL-SETUP.ps1 (create + idempotent re-run)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 4. FIREWALL-SETUP.ps1 — rules created + idempotent
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\FIREWALL-SETUP.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "FIREWALL-SETUP.ps1 exited $LASTEXITCODE"; exit 1 }
+          $bridge = Get-NetFirewallRule -DisplayName 'Fullsite POS Bridge' -ErrorAction SilentlyContinue
+          if (-not $bridge) { Write-Error 'Rule "Fullsite POS Bridge" not found'; exit 1 }
+          $pf = $bridge | Get-NetFirewallPortFilter
+          if ($pf.Protocol -ne 'TCP' -or "$($pf.LocalPort)" -ne '7717') { Write-Error "Bridge rule wrong: $($pf.Protocol)/$($pf.LocalPort) (expected TCP/7717)"; exit 1 }
+          $mdns = Get-NetFirewallRule -DisplayName 'Fullsite mDNS' -ErrorAction SilentlyContinue
+          if (-not $mdns) { Write-Error 'Rule "Fullsite mDNS" not found'; exit 1 }
+          $pf2 = $mdns | Get-NetFirewallPortFilter
+          if ($pf2.Protocol -ne 'UDP' -or "$($pf2.LocalPort)" -ne '5353') { Write-Error "mDNS rule wrong: $($pf2.Protocol)/$($pf2.LocalPort) (expected UDP/5353)"; exit 1 }
+
+          # Idempotence: second run replaces, never duplicates, still exit 0
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\FIREWALL-SETUP.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "Second firewall run exited $LASTEXITCODE"; exit 1 }
+          foreach ($n in 'Fullsite POS Bridge','Fullsite mDNS') {
+            $c = @(Get-NetFirewallRule -DisplayName $n -ErrorAction SilentlyContinue).Count
+            if ($c -ne 1) { Write-Error "Expected exactly 1 rule '$n' after re-run, found $c"; exit 1 }
+          }
+          Write-Host 'Firewall rules verified (TCP 7717 + UDP 5353, idempotent). Left in place for install phase.'
+          Add-Content $env:MATRIX_FILE 'FIREWALL=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 5a. Download the canonical installer artifact
+      # ════════════════════════════════════════════════════════════════════
+      - name: 5a. Download canonical installer (run 31033026398)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'   # gh writes progress to stderr; explicit exit-code asserts below
+          gh run download $env:INSTALLER_RUN_ID -n $env:INSTALLER_ARTIFACT -R $env:GITHUB_REPOSITORY -D "$env:RUNNER_TEMP\installer-dl"
+          if ($LASTEXITCODE -ne 0) { Write-Error "gh run download failed ($LASTEXITCODE)"; exit 1 }
+          $exe = Get-ChildItem "$env:RUNNER_TEMP\installer-dl" -Recurse -Filter '*Setup*.exe' | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem "$env:RUNNER_TEMP\installer-dl" -Recurse -Filter '*.exe' | Select-Object -First 1 }
+          if (-not $exe) { Write-Error 'No .exe found inside the downloaded artifact'; exit 1 }
+          # Copy to a space-free path so INSTALL.cmd argument quoting is a non-issue
+          Copy-Item $exe.FullName "$env:RUNNER_TEMP\fullsite-setup.exe" -Force
+          $h = (Get-FileHash "$env:RUNNER_TEMP\fullsite-setup.exe" -Algorithm SHA256).Hash.ToLower()
+          "installer: $($exe.Name)`nsha256: $h" | Tee-Object "$env:EVIDENCE\installer-provenance.txt"
+          "INSTALLER_EXE=$env:RUNNER_TEMP\fullsite-setup.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'INSTALLER-DOWNLOAD=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 5b. INSTALL — INSTALL.cmd (backup → NSIS /S → firewall → first launch)
+      #     stdin piped so the batch `pause` statements return immediately.
+      # ════════════════════════════════════════════════════════════════════
+      - name: 5b. INSTALL.cmd — full logged install
+        run: |
+          $ErrorActionPreference = 'Continue'   # 2>&1 on a native command must not terminate on stderr lines (PS5.1)
+          '' | & cmd.exe /c "$env:KIT\INSTALL.cmd" "$env:INSTALLER_EXE" 2>&1 | Tee-Object "$env:EVIDENCE\install-console.log"
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Write-Error "INSTALL.cmd exited $code (expected 0)"; exit 1 }
+
+          $log = Get-ChildItem "$env:KIT\install-logs" -Filter 'install-*.log' | Sort-Object CreationTime | Select-Object -Last 1
+          if (-not $log) { Write-Error 'No install-logs\install-<ts>.log created'; exit 1 }
+          if ((Get-Content $log.FullName -Raw) -notmatch 'INSTALACION COMPLETA') { Write-Error "Install log missing 'INSTALACION COMPLETA'"; exit 1 }
+          Write-Host "Install log OK: $($log.Name)"
+
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error "Installed exe not found: $env:APP_EXE"; exit 1 }
+          Write-Host "Installed exe present: $env:APP_EXE"
+
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) {
+            foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break }
+            }
+            if ($entry) { break }
+          }
+          if (-not $entry) { Write-Error 'No "Fullsite POS" uninstall registry entry after install'; exit 1 }
+          Write-Host "Registry uninstall entry: $($entry.DisplayName) v$($entry.DisplayVersion) @ $($entry.InstallLocation)"
+
+          # INSTALL.cmd launched the app once (autostart registration). Headless
+          # runner cannot interact with the window — kill it after ~20s.
+          Start-Sleep -Seconds 20
+          $apps = Get-Process | Where-Object { $_.Name -like '*Fullsite*' }
+          if ($apps) {
+            Write-Host "Killing launched app process(es): $(($apps | ForEach-Object { $_.Id }) -join ', ')"
+            $apps | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          } else {
+            Write-Host 'App process no longer running (already exited on headless runner) — acceptable.'
+          }
+          Add-Content $env:MATRIX_FILE 'INSTALL=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 6. ERROR PATH — INSTALL.cmd must abort (exit 2) when the backup step
+      #    fails. PRE-INSTALL-BACKUP's internal FAILED branch (ZIP verification
+      #    mismatch) cannot be deterministically induced in CI, so the backup
+      #    script is stub-swapped to exit 1 — this exercises INSTALL.cmd's real
+      #    abort wiring (errorlevel check → log ABORTADA → exit /b 2).
+      # ════════════════════════════════════════════════════════════════════
+      - name: 6. ERROR PATH — INSTALL.cmd aborts with exit 2 on backup failure
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Continue'   # 2>&1 on a native command must not terminate on stderr lines (PS5.1)
+          if (-not $env:INSTALLER_EXE -or -not (Test-Path $env:INSTALLER_EXE)) { Write-Error 'Installer exe unavailable — cannot run error-path test'; exit 1 }
+          $real = "$env:KIT\PRE-INSTALL-BACKUP.ps1"
+          $keep = "$env:KIT\PRE-INSTALL-BACKUP.real.ps1"
+          Copy-Item $real $keep -Force
+          Set-Content $real "Write-Host '[dryrun-stub] simulated backup verification failure'`nexit 1"
+          try {
+            '' | & cmd.exe /c "$env:KIT\INSTALL.cmd" "$env:INSTALLER_EXE" 2>&1 | Tee-Object "$env:EVIDENCE\install-errorpath-console.log"
+            $code = $LASTEXITCODE
+          } finally {
+            Move-Item $keep $real -Force
+          }
+          if ($code -ne 2) { Write-Error "INSTALL.cmd exited $code on backup failure (expected 2)"; exit 1 }
+          $log = Get-ChildItem "$env:KIT\install-logs" -Filter 'install-*.log' | Sort-Object CreationTime | Select-Object -Last 1
+          if ((Get-Content $log.FullName -Raw) -notmatch 'ABORTADA') { Write-Error "Abort log missing 'ABORTADA' marker"; exit 1 }
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error 'Error-path run must not touch the existing install, but the app exe is gone'; exit 1 }
+          Write-Host 'ERROR PATH OK: exit 2, ABORTADA logged, installer never executed.'
+          Add-Content $env:MATRIX_FILE 'ERROR-PATH=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 7a. Bridge standalone — index.js exports startLocalServer (no
+      #     require.main block), so a tiny bootstrap calls it directly with
+      #     dataDir = %APPDATA%\Fullsite POS and config.restaurantId (CFG-02
+      #     refuses to start without one). Only prod deps needed (ws +
+      #     bonjour-service); no Supabase creds → poll/heartbeat disabled.
+      # ════════════════════════════════════════════════════════════════════
+      - name: 7a. Boot Bridge standalone (node local-server)
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Continue'   # npm writes notices to stderr; explicit exit-code asserts below
+          Push-Location "$env:GITHUB_WORKSPACE\electron-app"
+          npm ci --omit=dev --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Error "npm ci failed ($LASTEXITCODE)"; exit 1 }
+          Pop-Location
+
+          $boot = Join-Path $env:RUNNER_TEMP 'bridge-boot.js'
+          @'
+          const { startLocalServer } = require(process.env.BRIDGE_INDEX)
+          startLocalServer({
+            dataDir: process.env.BRIDGE_DATA_DIR,
+            config: { restaurantId: 'dryrun-restaurant', instanceName: 'Fullsite POS DryRun', channel: 'stable' },
+          }).then(() => console.log('BRIDGE_READY'))
+            .catch(err => { console.error('BRIDGE_BOOT_FAILED', (err && err.stack) || err); process.exit(1) })
+          '@ | Set-Content $boot -Encoding ASCII
+
+          $env:BRIDGE_INDEX    = "$env:GITHUB_WORKSPACE\electron-app\local-server\index.js"
+          $env:BRIDGE_DATA_DIR = Join-Path $env:APPDATA 'Fullsite POS'
+          $p = Start-Process node -ArgumentList "`"$boot`"" -PassThru -NoNewWindow `
+                 -RedirectStandardOutput "$env:EVIDENCE\bridge-stdout.log" `
+                 -RedirectStandardError  "$env:EVIDENCE\bridge-stderr.log"
+          "BRIDGE_PID=$($p.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $ok = $true; break } } catch {}
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ok) {
+            Get-Content "$env:EVIDENCE\bridge-stdout.log","$env:EVIDENCE\bridge-stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Error 'Bridge did not answer /health within 30s'; exit 1
+          }
+          Write-Host "Bridge up: v$($h.version) seq=$($h.last_sequence) sync_queue=$($h.sync_queue_size)"
+          if ($h.last_sequence -ne 3) { Write-Error "Bridge did not replay the 3 fixture events (last_sequence=$($h.last_sequence))"; exit 1 }
+
+          # /identity regression check (was a ReferenceError crash pre-fix)
+          $id = Invoke-RestMethod 'http://127.0.0.1:7717/identity' -TimeoutSec 5
+          if (-not $id.ok -or $id.restaurant_id -ne 'dryrun-restaurant') { Write-Error '/identity did not answer correctly'; exit 1 }
+
+          # Pre-audit snapshots for the no-mutation gate
+          (Invoke-WebRequest 'http://127.0.0.1:7717/health' -UseBasicParsing -TimeoutSec 5).Content | Set-Content "$env:EVIDENCE\health-before.json" -Encoding UTF8
+          (Invoke-WebRequest 'http://127.0.0.1:7717/state'  -UseBasicParsing -TimeoutSec 5).Content | Set-Content "$env:EVIDENCE\state-before.json"  -Encoding UTF8
+          Add-Content $env:MATRIX_FILE 'BRIDGE-BOOT=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 7b. DIAGNOSTIC-ONLY.ps1 (read-only audit → Desktop\fullsite-diag-*)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 7b. DIAGNOSTIC-ONLY.ps1 — read-only audit
+        if: always()
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:FIELD_DIR\DIAGNOSTIC-ONLY.ps1"
+          if ($LASTEXITCODE -ne 0) { Write-Error "DIAGNOSTIC-ONLY.ps1 exited $LASTEXITCODE"; exit 1 }
+          $diag = Get-ChildItem "$env:USERPROFILE\Desktop" -Directory -Filter 'fullsite-diag-*' -ErrorAction SilentlyContinue |
+                    Sort-Object CreationTime | Select-Object -Last 1
+          if (-not $diag) { Write-Error 'No Desktop\fullsite-diag-<ts> evidence folder produced'; exit 1 }
+          if (-not (Test-Path "$($diag.FullName).zip")) { Write-Error 'Diagnostic ZIP not produced'; exit 1 }
+          foreach ($f in '1-processes.csv','2-uninstall-registry.csv','3-ports.csv','7-folder-inventory.csv') {
+            if (-not (Test-Path (Join-Path $diag.FullName $f))) { Write-Error "Diagnostic evidence missing $f"; exit 1 }
+          }
+          # Copy off the Desktop so the artifact upload only needs workspace paths
+          Copy-Item $diag.FullName (Join-Path $env:EVIDENCE 'diagnostic') -Recurse -Force
+          Copy-Item "$($diag.FullName).zip" $env:EVIDENCE -Force
+          Write-Host "Diagnostic evidence OK: $($diag.Name)"
+          Add-Content $env:MATRIX_FILE 'DIAGNOSTIC=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 7c. CERT-CAPTURE.ps1 -Label dryrun (read-only evidence capture)
+      # ════════════════════════════════════════════════════════════════════
+      - name: 7c. CERT-CAPTURE.ps1 -Label dryrun
+        if: always()
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\CERT-CAPTURE.ps1" -Label dryrun
+          if ($LASTEXITCODE -ne 0) { Write-Error "CERT-CAPTURE.ps1 exited $LASTEXITCODE"; exit 1 }
+          $ev = Get-ChildItem "$env:KIT\evidence" -Directory -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -like '*-dryrun' } | Sort-Object CreationTime | Select-Object -Last 1
+          if (-not $ev) { Write-Error 'No evidence\<machine>-<ts>-dryrun folder produced'; exit 1 }
+          $sumPath = Join-Path $ev.FullName 'SUMMARY.txt'
+          if (-not (Test-Path $sumPath)) { Write-Error 'SUMMARY.txt not produced'; exit 1 }
+          $sum = Get-Content $sumPath -Raw
+          Write-Host $sum
+          # APP_PROCESS_RUNNING is expected FAIL here: the Bridge runs as bare
+          # node.exe, not as the installed "Fullsite POS" app. Assert the checks
+          # that certify the Bridge + event store instead.
+          foreach ($check in 'HEALTH_OK','STATE_OK','PORT_7717_LISTENING','DATA_DIR_FOUND','EVENT_STORE_PRESENT','ZERO_DUPLICATES') {
+            if ($sum -notmatch "\[PASS\s*\]\s*$check") { Write-Error "SUMMARY.txt: expected PASS for $check"; exit 1 }
+          }
+          foreach ($f in '00-metadata.txt','01-ports.csv','03-health.json','04-state.json','07-events.ndjson','15-duplicates.txt') {
+            if (-not (Test-Path (Join-Path $ev.FullName $f))) { Write-Error "Cert evidence missing $f"; exit 1 }
+          }
+          Write-Host "Cert evidence OK: $($ev.Name)"
+          Add-Content $env:MATRIX_FILE 'CERT-CAPTURE=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 7d. NO-MUTATION gate — health/state identical after both audits,
+      #     events.ndjson byte-identical to the fixture. Then stop the Bridge
+      #     (must not hold locks on %APPDATA% during ROLLBACK's robocopy /MIR).
+      # ════════════════════════════════════════════════════════════════════
+      - name: 7d. No-mutation gate + stop Bridge
+        if: always()
+        run: |
+          try {
+            if (-not (Test-Path "$env:EVIDENCE\health-before.json")) { Write-Error 'Pre-audit snapshots missing (bridge boot failed?)'; exit 1 }
+            $hb = Get-Content "$env:EVIDENCE\health-before.json" -Raw | ConvertFrom-Json
+            $haRaw = (Invoke-WebRequest 'http://127.0.0.1:7717/health' -UseBasicParsing -TimeoutSec 5).Content
+            $haRaw | Set-Content "$env:EVIDENCE\health-after.json" -Encoding UTF8
+            $ha = $haRaw | ConvertFrom-Json
+            if ($ha.last_sequence -ne $hb.last_sequence)     { Write-Error "MUTATION: last_sequence $($hb.last_sequence) -> $($ha.last_sequence)"; exit 1 }
+            if ($ha.sync_queue_size -ne $hb.sync_queue_size) { Write-Error "MUTATION: sync_queue_size $($hb.sync_queue_size) -> $($ha.sync_queue_size)"; exit 1 }
+
+            $sb = Get-Content "$env:EVIDENCE\state-before.json" -Raw
+            $sa = (Invoke-WebRequest 'http://127.0.0.1:7717/state' -UseBasicParsing -TimeoutSec 5).Content
+            $sa | Set-Content "$env:EVIDENCE\state-after.json" -Encoding UTF8
+            if ($sa -ne $sb) { Write-Error 'MUTATION: /state snapshot changed across read-only audits'; exit 1 }
+
+            $fx = Import-Csv "$env:EVIDENCE\fixture-hashes.csv" | Where-Object { $_.Path -like '*events.ndjson' }
+            $now = (Get-FileHash $fx.Path -Algorithm SHA256).Hash.ToLower()
+            if ($now -ne $fx.SHA256) { Write-Error 'MUTATION: events.ndjson hash changed during audits'; exit 1 }
+            Write-Host 'No-mutation gate OK: health, state and events.ndjson untouched by DIAGNOSTIC + CERT-CAPTURE.'
+            Add-Content $env:MATRIX_FILE 'NO-MUTATION=PASS'
+          } finally {
+            if ($env:BRIDGE_PID) {
+              Stop-Process -Id $env:BRIDGE_PID -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 2
+              Write-Host "Bridge (pid $env:BRIDGE_PID) stopped."
+            }
+          }
+
+      # ════════════════════════════════════════════════════════════════════
+      # 8. ROLLBACK — restore from the phase-2 backup, verify byte-identical
+      # ════════════════════════════════════════════════════════════════════
+      - name: 8. ROLLBACK.ps1 -Force — uninstall + byte-identical restore
+        if: always()
+        run: |
+          if (-not $env:BACKUP1_DIR -or -not (Test-Path $env:BACKUP1_DIR)) { Write-Error 'Phase-2 backup dir unavailable — cannot test rollback'; exit 1 }
+          # Safety: nothing may hold locks on the restore targets
+          if ($env:BRIDGE_PID) { Stop-Process -Id $env:BRIDGE_PID -Force -ErrorAction SilentlyContinue }
+          Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\ROLLBACK.ps1" -BackupDir "$env:BACKUP1_DIR" -Force
+          $code = $LASTEXITCODE
+          Get-Content (Join-Path $env:BACKUP1_DIR 'rollback-verification.txt') -ErrorAction SilentlyContinue | Write-Host
+          if ($code -ne 0) { Write-Error "ROLLBACK.ps1 exited $code (expected 0 = ROLLBACK VERIFIED)"; exit 1 }
+
+          if (Test-Path $env:APP_EXE) { Write-Error "App exe still present after rollback: $env:APP_EXE"; exit 1 }
+          Write-Host 'Installed exe removed.'
+
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          foreach ($b in $bases) {
+            foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { Write-Error "Uninstall registry entry survived rollback: $($p.DisplayName)"; exit 1 }
+            }
+          }
+          Write-Host 'Registry uninstall entry removed.'
+
+          # Byte-identical restore: every fixture file matches its phase-1 hash
+          foreach ($row in (Import-Csv "$env:EVIDENCE\fixture-hashes.csv")) {
+            if (-not (Test-Path $row.Path)) { Write-Error "Fixture missing after restore: $($row.Path)"; exit 1 }
+            $h = (Get-FileHash $row.Path -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne $row.SHA256) { Write-Error "Fixture NOT byte-identical after restore: $($row.Path)"; exit 1 }
+          }
+          Write-Host 'All fixture files byte-identical to pre-install hashes.'
+
+          # /MIR must have removed files created after the backup (bridge server-id)
+          $sid = Join-Path $env:APPDATA 'Fullsite POS\server-id'
+          if ((Test-Path "$env:EVIDENCE\health-before.json") -and (Test-Path $sid)) {
+            Write-Error 'Post-backup file (server-id) survived robocopy /MIR restore'; exit 1
+          }
+          # Documented tradeoff (not asserted): without -IncludeBiometric, /MIR
+          # also removes biometric files that were excluded from the backup.
+          if (-not (Test-Path 'C:\fullsite\templates\finger1.dat')) {
+            Write-Host 'NOTE: biometric fixture removed by /MIR restore — documented consequence of the default -IncludeBiometric:$false backup.'
+          }
+          Add-Content $env:MATRIX_FILE 'ROLLBACK=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 9. FIREWALL CLEANUP — FIREWALL-SETUP.ps1 -Remove
+      # ════════════════════════════════════════════════════════════════════
+      - name: 9. FIREWALL-SETUP.ps1 -Remove — rules gone
+        if: always()
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\FIREWALL-SETUP.ps1" -Remove
+          if ($LASTEXITCODE -ne 0) { Write-Error "FIREWALL-SETUP.ps1 -Remove exited $LASTEXITCODE"; exit 1 }
+          foreach ($n in 'Fullsite POS Bridge','Fullsite mDNS') {
+            if (Get-NetFirewallRule -DisplayName $n -ErrorAction SilentlyContinue) { Write-Error "Rule '$n' still present after -Remove"; exit 1 }
+          }
+          Write-Host 'Both firewall rules removed.'
+          Add-Content $env:MATRIX_FILE 'FIREWALL-CLEANUP=PASS'
+
+      # ════════════════════════════════════════════════════════════════════
+      # 10. MATRIX + evidence upload
+      # ════════════════════════════════════════════════════════════════════
+      - name: MATRIX summary
+        if: always()
+        run: |
+          $expected = @('FIXTURES','BACKUP','BACKUP-IDEMPOTENCE','FIREWALL','INSTALLER-DOWNLOAD','INSTALL',
+                        'ERROR-PATH','BRIDGE-BOOT','DIAGNOSTIC','CERT-CAPTURE','NO-MUTATION','ROLLBACK','FIREWALL-CLEANUP')
+          $done = @()
+          if (Test-Path $env:MATRIX_FILE) { $done = @(Get-Content $env:MATRIX_FILE | Where-Object { $_ }) }
+          $lines = @('## Field Scripts Dry-Run — MATRIX', '', '| Step | Result |', '|---|---|')
+          $allPass = $true
+          foreach ($e in $expected) {
+            $r = if ($done -contains "$e=PASS") { 'PASS' } else { $allPass = $false; 'FAIL' }
+            $lines += "| $e | $r |"
+            Write-Host ("{0,-20} {1}" -f $e, $r)
+          }
+          $lines += ''
+          if ($allPass) { $lines += '**ALL STEPS PASS — field kit is WINDOWS LAB VERIFIED on this run.**' }
+          else          { $lines += '**One or more steps FAILED — see the failing step logs above.**' }
+          $lines | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-scripts-dryrun-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            dryrun-artifacts/
+            docs/agent-os/field/FULLSITE-FIELD-KIT/backups/
+            docs/agent-os/field/FULLSITE-FIELD-KIT/install-logs/
+            docs/agent-os/field/FULLSITE-FIELD-KIT/evidence/
