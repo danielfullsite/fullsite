@@ -123,7 +123,7 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId }) {
+function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, version, serverId, restaurantId, config = {}, instanceName = '' }) {
   return async function router(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -384,7 +384,7 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
   wsHub.onCommand((msg, clientId) => cmdHandler.handle(msg, clientId))
 
   // ── HTTP server ──────────────────────────────────────────────────────────
-  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId })
+  const router = buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer: printerAdapter, version, serverId, restaurantId, config, instanceName })
   const httpServer = http.createServer(router)
 
   wsHub.attach(httpServer)
