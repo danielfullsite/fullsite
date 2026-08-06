@@ -215,13 +215,39 @@ jobs:
           if (-not (Select-String -Path $env:HOSTS_FILE -Pattern 'app\.fullsite\.mx' -Quiet)) { Write-Error 'hosts null-route missing right before app launch'; exit 1 }
 
           # -- Launch the CANONICAL INSTALLED app --
-          Start-Process -FilePath $env:APP_EXE
+          # Run 31081334740: no logs/ dir appeared in appdata => the process
+          # never reached whenReady (logger.init is its first line). Capture
+          # chromium logging + crash evidence, and retry with GPU/sandbox
+          # disabled (CI-session-only runtime flags; canonical exe untouched).
+          $launchAttempts = @(
+            @{ label = 'default';  args = @('--enable-logging=file', "--log-file=$env:EVIDENCE\electron-1.log") },
+            @{ label = 'ci-flags'; args = @('--disable-gpu', '--no-sandbox', '--disable-gpu-sandbox', '--enable-logging=file', "--log-file=$env:EVIDENCE\electron-2.log") }
+          )
           $health = $null
-          for ($i = 0; $i -lt 60; $i++) {
-            try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
-            Start-Sleep -Seconds 2
+          foreach ($attempt in $launchAttempts) {
+            Write-Host "Launch attempt [$($attempt.label)]"
+            $proc = Start-Process -FilePath $env:APP_EXE -ArgumentList $attempt.args -PassThru
+            for ($i = 0; $i -lt 45; $i++) {
+              try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
+              if ($proc.HasExited) { Write-Host "Process exited early (code $($proc.ExitCode)) on attempt [$($attempt.label)]"; break }
+              Start-Sleep -Seconds 2
+            }
+            if ($health) { break }
+            "attempt=$($attempt.label) exited=$($proc.HasExited) exitcode=$($proc.ExitCode)" | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } |
+              Format-Table Id,Name,StartTime,WS -AutoSize | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -MaxEvents 40 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'Fullsite|electron' -or $_.Id -in 1000,1001,1002 } |
+              Format-List TimeCreated,Id,ProviderName,Message | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
           }
-          if (-not $health) { Write-Error 'Installed app did not answer /health on 7717 within 120s'; exit 1 }
+          if (-not $health) {
+            Get-ChildItem "$env:APPDATA\Fullsite POS" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName,Length | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Write-Error 'Installed app did not answer /health on 7717 (both launch attempts) -- see launch-diagnostics.txt + electron-*.log'
+            exit 1
+          }
           if ($health.restaurant_id -ne 'amalay-twin') { Write-Error "Bridge tenant is '$($health.restaurant_id)' (expected amalay-twin) -- refusing to rehearse against the wrong install"; exit 1 }
           $id = Invoke-RestMethod 'http://127.0.0.1:7717/identity' -TimeoutSec 5
           if (-not $id.ok -or $id.restaurant_id -ne 'amalay-twin') { Write-Error "/identity restaurant_id is '$($id.restaurant_id)' (expected amalay-twin)"; exit 1 }
@@ -249,6 +275,8 @@ jobs:
 
           # -- Orchestrator (background, same step) --
           $env:TWIN_APP_EXE    = $env:APP_EXE
+          # Relaunches must use the same runtime flags that made the launch work
+          $env:TWIN_APP_ARGS   = if ($attempt.label -eq 'ci-flags') { '--disable-gpu --no-sandbox --disable-gpu-sandbox' } else { '' }
           $env:TWIN_HOOKS_DIR  = "$env:TWIN\twin-evidence\orchestrator-hooks"
           $env:TWIN_OUT_DIR    = "$env:TWIN\twin-evidence\orchestrator"
           $env:TWIN_STOP_FILE  = "$env:EVIDENCE\orchestrator.stop"

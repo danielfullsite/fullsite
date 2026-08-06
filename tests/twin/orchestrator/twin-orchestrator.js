@@ -133,9 +133,12 @@ function appPids() {
 }
 
 function launchApp() {
-  const child = spawn(APP_EXE, [], { detached: true, stdio: 'ignore' })
+  // TWIN_APP_ARGS: runtime flags the workflow discovered the app needs on
+  // this runner (e.g. --disable-gpu --no-sandbox). Space-separated.
+  const args = (process.env.TWIN_APP_ARGS || '').split(/\s+/).filter(Boolean)
+  const child = spawn(APP_EXE, args, { detached: true, stdio: 'ignore' })
   child.unref()
-  log('app-launched', { exe: APP_EXE })
+  log('app-launched', { exe: APP_EXE, args })
 }
 
 async function waitHealth(timeoutMs) {
