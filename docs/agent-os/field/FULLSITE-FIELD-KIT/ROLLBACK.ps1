@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     ROLLBACK.ps1 — Restore a machine to its pre-install state from a

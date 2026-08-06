@@ -1,0 +1,12 @@
+Fullsite POS — Field Diagnostic Package
+SHA-256 Checksums
+Generated: 2026-08-04
+
+d482156d246982965667c3042489ff0eb397168a4ba021b75aeb8b931a9a0f5e  DIAGNOSTIC-ONLY.ps1
+a984bf1c2c8e35e3932ed7d445f7853aae799737516de4765f668e94a749e2e2  RUN-DIAGNOSTIC.cmd
+9ad42309e6b1f4df0e58eb3f4c0c31b0a7f2c9fdbe1981031cdb7a755657d318  README.txt
+
+Verification (PowerShell):
+  Get-FileHash .\DIAGNOSTIC-ONLY.ps1 -Algorithm SHA256
+  Get-FileHash .\RUN-DIAGNOSTIC.cmd  -Algorithm SHA256
+  Get-FileHash .\README.txt          -Algorithm SHA256

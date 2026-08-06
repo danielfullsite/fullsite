@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     FIREWALL-SETUP.ps1 — Idempotent Windows Firewall rules for the Fullsite Bridge.

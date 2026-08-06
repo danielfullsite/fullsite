@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     PRE-INSTALL-BACKUP.ps1 — Restorable, timestamped backup before installing/upgrading Fullsite POS.

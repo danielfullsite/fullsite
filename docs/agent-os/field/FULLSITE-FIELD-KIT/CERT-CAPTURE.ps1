@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     CERT-CAPTURE.ps1 — Read-only certification evidence capture for PDV3 / SERVER1.
