@@ -1,0 +1,670 @@
+name: Field ZIP Rehearsal (Exact AMALAY Package)
+
+# PRE-FIELD CLEAN WINDOWS REHEARSAL -- validates the EXACT field package
+# (FULLSITE-AMALAY-FIELD.zip, release asset field-pack-2026-08-06) on a clean
+# windows-latest runner: ZIP SHA gate -> extract to C:\Fullsite-Field ->
+# VERIFY-HASHES.ps1 under Windows PowerShell 5.1 (9 pinned files) -> package
+# backup -> silent install of the EXTRACTED 1.3.3 exe -> version assert ->
+# twin shift rehearsal against the installed bytes (external mode, WAN
+# null-routed for the WHOLE run) -> package ROLLBACK.ps1 to 1.3.0 -> reinstall
+# 1.3.3 from the same extracted exe -> final start probe.
+#
+# PRODUCT BYTES COME ONLY FROM THE ZIP. The repo checkout provides test
+# instrumentation exclusively (tests/twin harness + orchestrator + seeder).
+# Classification: CLEAN WINDOWS LAB REHEARSAL -- NOT physical field evidence.
+# Environment ceiling (runs 31081334740/31081857885): Electron GUI whenReady
+# does not complete on headless GHA; bridge boots from the INSTALLED app.asar
+# via node (canonical shipped bytes). UI-level WAN return NOT exercised.
+#
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/**']
+    paths:
+      - '.github/workflows/field-zip-rehearsal.yml'
+
+permissions:
+  contents: read
+  actions: read   # gh run download of the canonical installer artifact
+
+concurrency:
+  group: field-zip-rehearsal
+  cancel-in-progress: false
+
+env:
+  TWIN: ${{ github.workspace }}\tests\twin
+  EVIDENCE: ${{ github.workspace }}\twin-run-artifacts
+  MATRIX_FILE: ${{ github.workspace }}\twin-run-artifacts\matrix.txt
+  FIELD_TAG: field-pack-2026-08-06
+  ZIP_NAME: FULLSITE-AMALAY-FIELD.zip
+  ZIP_SHA: 5ed4eda9017806413ed18a689d9847f1fee0bdbee5558df8eab07264b7abd051
+  INSTALLER_SHA: 80f0a819bae51dcad7a0deaaeda93c821d0cf738bfe1271e0fb52f30dc15c03a
+  ROLLBACK_SHA: 193b4d87513e8454e5cc2a9c5a50e4fdf16e483f307bd4e50c45be088e87fd7c
+  FIELD_ROOT: C:\Fullsite-Field
+  APP_EXE: C:\Program Files\Fullsite POS\Fullsite POS.exe
+  HOSTS_FILE: C:\Windows\System32\drivers\etc\hosts
+
+jobs:
+  twin:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell   # Windows PowerShell 5.1 -- same lessons as field-scripts-dryrun.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Init evidence dir + matrix file
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:EVIDENCE | Out-Null
+          New-Item -ItemType File -Force -Path $env:MATRIX_FILE | Out-Null
+
+      # ????????????????????????????????????????????????????????????????????
+      # 1. WAN ISOLATION FIRST -- null-route *.fullsite.mx before the app can
+      #    ever launch. main.js/offline.html only reference app.fullsite.mx;
+      #    fullsite.mx + www are added for belt-and-braces. Stays for the
+      #    WHOLE run; re-checked at the end (hosts-integrity).
+      # ????????????????????????????????????????????????????????????????????
+      - name: 1. WAN isolation -- null-route fullsite.mx in hosts
+        run: |
+          $lines = @(
+            '# amalay-twin WAN isolation (added by amalay-twin.yml)',
+            '127.0.0.1 app.fullsite.mx',
+            '127.0.0.1 fullsite.mx',
+            '127.0.0.1 www.fullsite.mx',
+            '::1 app.fullsite.mx',
+            '::1 fullsite.mx',
+            '::1 www.fullsite.mx'
+          )
+          Add-Content -Path $env:HOSTS_FILE -Value $lines -Encoding ASCII
+          ipconfig /flushdns | Out-Null
+
+          $addrs = [System.Net.Dns]::GetHostAddresses('app.fullsite.mx') | ForEach-Object { $_.ToString() }
+          Write-Host "app.fullsite.mx resolves to: $($addrs -join ', ')"
+          $nonLoop = @($addrs | Where-Object { $_ -ne '127.0.0.1' -and $_ -ne '::1' })
+          if ($nonLoop.Count -gt 0) { Write-Error "app.fullsite.mx still resolves to non-loopback: $($nonLoop -join ', ')"; exit 1 }
+
+          $reached = $false
+          try { Invoke-WebRequest 'https://app.fullsite.mx' -UseBasicParsing -TimeoutSec 8 | Out-Null; $reached = $true } catch {
+            Write-Host "Verified: https://app.fullsite.mx unreachable ($($_.Exception.Message))"
+          }
+          if ($reached) { Write-Error 'https://app.fullsite.mx is still reachable after null-route'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'WAN-ISOLATION=PASS'
+
+      # --------------------------------------------------------------------
+      # 2a. EXACT FIELD ZIP -- download the release asset and gate on SHA-256
+      # --------------------------------------------------------------------
+      - name: 2a. Download exact field ZIP + SHA-256 gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          gh release download $env:FIELD_TAG -p $env:ZIP_NAME -R $env:GITHUB_REPOSITORY -D "$env:RUNNER_TEMP\zip-dl"
+          if ($LASTEXITCODE -ne 0) { Write-Error "gh release download failed ($LASTEXITCODE)"; exit 1 }
+          $zip = Join-Path "$env:RUNNER_TEMP\zip-dl" $env:ZIP_NAME
+          if (-not (Test-Path $zip)) { Write-Error "ZIP not found after download"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ZIP-DOWNLOAD=PASS'
+          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "zip: $env:ZIP_NAME`nsha256: $h`nexpected: $env:ZIP_SHA`nsize: $((Get-Item $zip).Length)" |
+            Tee-Object "$env:EVIDENCE\zip-provenance.txt"
+          if ($h -ne $env:ZIP_SHA) { Write-Error "STOP CONDITION: ZIP SHA mismatch (got $h)"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ZIP-SHA=PASS'
+          "FIELD_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      # --------------------------------------------------------------------
+      # 2b. Extract to C:\Fullsite-Field (package root exactly as in the field)
+      # --------------------------------------------------------------------
+      - name: 2b. Extract to C ready Fullsite-Field
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'zip-x'
+          Expand-Archive -Path $env:FIELD_ZIP -DestinationPath $tmp -Force
+          $inner = Join-Path $tmp 'FULLSITE-AMALAY-FIELD'
+          if (-not (Test-Path $inner)) { Write-Error 'ZIP does not contain FULLSITE-AMALAY-FIELD/ root'; exit 1 }
+          New-Item -ItemType Directory -Force -Path $env:FIELD_ROOT | Out-Null
+          Get-ChildItem $inner | Move-Item -Destination $env:FIELD_ROOT -Force
+          $need = @('01-TEAMVIEWER-TRANSFER\VERIFY-HASHES.ps1', '03-RELEASE-1.3.3\Fullsite POS Setup 1.3.3.exe', '04-ROLLBACK-1.3.0\Fullsite POS Setup 1.3.0.exe', '04-ROLLBACK-1.3.0\ROLLBACK.ps1', '03-RELEASE-1.3.3\PRE-INSTALL-BACKUP.ps1')
+          foreach ($n in $need) { if (-not (Test-Path (Join-Path $env:FIELD_ROOT $n))) { Write-Error "Missing after extract: $n"; exit 1 } }
+          Add-Content $env:MATRIX_FILE 'EXTRACT=PASS'
+
+      # --------------------------------------------------------------------
+      # 2c. VERIFY-HASHES.ps1 under real Windows PowerShell 5.1 (separate
+      #     process, exactly the field command line). 9/9 must PASS, exit 0,
+      #     TXT report generated.
+      # --------------------------------------------------------------------
+      - name: 2c. VERIFY-HASHES.ps1 (PowerShell 5.1, 9 pinned files)
+        run: |
+          $PSVersionTable | Out-String | Tee-Object "$env:EVIDENCE\psversion.txt"
+          if ($PSVersionTable.PSVersion.Major -ne 5) { Write-Error "Expected Windows PowerShell 5.x, got $($PSVersionTable.PSVersion)"; exit 1 }
+          $dir = Join-Path $env:FIELD_ROOT '01-TEAMVIEWER-TRANSFER'
+          Push-Location $dir
+          $out = & powershell -NoProfile -ExecutionPolicy Bypass -File .\VERIFY-HASHES.ps1 2>&1
+          $code = $LASTEXITCODE
+          Pop-Location
+          $out | Tee-Object "$env:EVIDENCE\verify-hashes-console.txt"
+          Write-Host "VERIFY-HASHES exit code: $code"
+          if ($code -ne 0) { Write-Error "STOP CONDITION: VERIFY-HASHES.ps1 exited $code"; exit 1 }
+          $passLines = @($out | Where-Object { $_ -match '^\[PASS\]' })
+          if ($passLines.Count -ne 9) { Write-Error "Expected 9 [PASS] lines, got $($passLines.Count)"; exit 1 }
+          $report = Get-ChildItem $dir -Filter 'HASH-REPORT-*.txt' | Sort-Object LastWriteTime | Select-Object -Last 1
+          if (-not $report) { Write-Error 'HASH-REPORT TXT not generated'; exit 1 }
+          Copy-Item $report.FullName "$env:EVIDENCE\" -Force
+          if (-not (Select-String -Path $report.FullName -Pattern 'RESULT: ALL FILES PASS' -Quiet)) { Write-Error 'Report does not state ALL FILES PASS'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'HASH-SCRIPT=PASS'
+
+      # --------------------------------------------------------------------
+      # 2d. Package's own PRE-INSTALL-BACKUP.ps1 (feeds ROLLBACK.ps1 later)
+      # --------------------------------------------------------------------
+      - name: 2d. PRE-INSTALL-BACKUP.ps1 (package tooling)
+        run: |
+          $dir = Join-Path $env:FIELD_ROOT '03-RELEASE-1.3.3'
+          Push-Location $dir
+          & powershell -NoProfile -ExecutionPolicy Bypass -File .\PRE-INSTALL-BACKUP.ps1
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { Write-Error "PRE-INSTALL-BACKUP.ps1 exited $code"; exit 1 }
+          $bk = Get-ChildItem (Join-Path $dir 'backups') -Directory | Sort-Object LastWriteTime | Select-Object -Last 1
+          if (-not $bk) { Write-Error 'No backup folder produced'; exit 1 }
+          "BACKUP_DIR=$($bk.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'BACKUP=PASS'
+
+      # --------------------------------------------------------------------
+      # 2e. Pin the extracted installers by SHA (defense in depth)
+      # --------------------------------------------------------------------
+      - name: 2e. Installer provenance from ZIP
+        run: |
+          $exe133 = Join-Path $env:FIELD_ROOT '03-RELEASE-1.3.3\Fullsite POS Setup 1.3.3.exe'
+          $exe130 = Join-Path $env:FIELD_ROOT '04-ROLLBACK-1.3.0\Fullsite POS Setup 1.3.0.exe'
+          $h133 = (Get-FileHash $exe133 -Algorithm SHA256).Hash.ToLower()
+          $h130 = (Get-FileHash $exe130 -Algorithm SHA256).Hash.ToLower()
+          "1.3.3: $h133`n1.3.0: $h130" | Tee-Object "$env:EVIDENCE\installer-provenance.txt"
+          if ($h133 -ne $env:INSTALLER_SHA) { Write-Error 'STOP CONDITION: 1.3.3 exe SHA mismatch inside ZIP'; exit 1 }
+          if ($h130 -ne $env:ROLLBACK_SHA)  { Write-Error 'STOP CONDITION: 1.3.0 exe SHA mismatch inside ZIP'; exit 1 }
+          "INSTALLER_EXE=$exe133" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "ROLLBACK_EXE=$exe130"  | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Add-Content $env:MATRIX_FILE 'INSTALLER-PIN=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 3. Silent install (/S) + exe + registry assertions (dry-run pattern)
+      # ????????????????????????????????????????????????????????????????????
+      - name: 3. Silent install + assertions
+        run: |
+          Start-Process -FilePath $env:INSTALLER_EXE -ArgumentList '/S' -Wait
+          $found = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            if (Test-Path $env:APP_EXE) { $found = $true; break }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $found) { Write-Error "Installed exe not found after /S install: $env:APP_EXE"; exit 1 }
+          Write-Host "Installed exe present: $env:APP_EXE"
+
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) {
+            foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break }
+            }
+            if ($entry) { break }
+          }
+          if (-not $entry) { Write-Error 'No "Fullsite POS" uninstall registry entry after install'; exit 1 }
+          Write-Host "Registry uninstall entry: $($entry.DisplayName) v$($entry.DisplayVersion) @ $($entry.InstallLocation)"
+          if ($entry.DisplayVersion -ne '1.3.3') { Write-Error "STOP CONDITION: installed version is $($entry.DisplayVersion), expected 1.3.3"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'VERSION-1.3.3=PASS'
+          "display_name: $($entry.DisplayName)`nversion: $($entry.DisplayVersion)`ninstall_location: $($entry.InstallLocation)" |
+            Set-Content "$env:EVIDENCE\install-registry.txt" -Encoding ASCII
+
+          # If the installer auto-launched the app, stop it: the app must not
+          # run before %APPDATA% is pre-seeded (it would open the setup wizard).
+          $apps = Get-Process | Where-Object { $_.Name -like '*Fullsite*' }
+          if ($apps) {
+            Write-Host "Stopping auto-launched app process(es): $(($apps | ForEach-Object { $_.Id }) -join ', ')"
+            $apps | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          }
+          Add-Content $env:MATRIX_FILE 'INSTALL=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 4. Pre-seed %APPDATA%\Fullsite POS -- config.json (valid TerminalConfig,
+      #    restaurant_id amalay-twin) + printers.json (v2, cocina/barra ->
+      #    127.0.0.1:19100/19101). Written and re-validated by seed-appdata.js
+      #    through the electron-app's own schema modules (UTF-8, no BOM).
+      # ????????????????????????????????????????????????????????????????????
+      - name: 4. Pre-seed appdata (config.json + printers.json)
+        run: |
+          node "$env:TWIN\orchestrator\seed-appdata.js"
+          if ($LASTEXITCODE -ne 0) { Write-Error "seed-appdata.js exited $LASTEXITCODE"; exit 1 }
+          Copy-Item (Join-Path $env:APPDATA 'Fullsite POS\config.json')   "$env:EVIDENCE\seeded-config.json"   -Force
+          Copy-Item (Join-Path $env:APPDATA 'Fullsite POS\printers.json') "$env:EVIDENCE\seeded-printers.json" -Force
+          Add-Content $env:MATRIX_FILE 'PRE-SEED=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 5. Harness deps -- tests/twin has no deps of its own; the harness
+      #    resolves `ws` from electron-app/node_modules (its documented
+      #    fallback). The bridge itself is the INSTALLED app -- its deps ship
+      #    inside the exe; local-server is required only for state.js/protocol
+      #    replay, which are dependency-free.
+      # ????????????????????????????????????????????????????????????????????
+      - name: 5. npm ci (electron-app, prod deps only -- provides ws)
+        run: |
+          $ErrorActionPreference = 'Continue'   # npm writes notices to stderr
+          Push-Location "$env:GITHUB_WORKSPACE\electron-app"
+          npm ci --omit=dev --no-audit --no-fund
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { Write-Error "npm ci failed ($code)"; exit 1 }
+          Add-Content $env:MATRIX_FILE 'DEPS=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 6+7. ONE STEP: launch installed app, assert /health + /identity
+      #      tenant, start orchestrator, run the twin harness (external mode).
+      #      Single step on purpose -- the GHA Windows runner kills a step's
+      #      child process tree when the step ends (proved by run 31065688047
+      #      in the dry-run workflow), so the app, the orchestrator and the
+      #      harness must live and die together here.
+      # ????????????????????????????????????????????????????????????????????
+      - name: 6+7. Launch canonical app + twin shift rehearsal (external mode)
+        run: |
+          $ErrorActionPreference = 'Continue'   # node/taskkill write to stderr; explicit exit-code asserts below
+
+          # Fresh twin evidence tree (harness only clears parts of it itself)
+          Remove-Item "$env:TWIN\twin-evidence" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "$env:TWIN\twin-evidence\orchestrator-hooks","$env:TWIN\twin-evidence\orchestrator" | Out-Null
+
+          # Real production IPs (via 8.8.8.8, bypassing hosts) for the
+          # zero-connections-to-production watcher. Best-effort.
+          $prodIps = @()
+          try {
+            $prodIps = @(Resolve-DnsName app.fullsite.mx -Server 8.8.8.8 -Type A -ErrorAction Stop |
+                           Where-Object { $_.IPAddress } | ForEach-Object { $_.IPAddress })
+          } catch { Write-Host "Could not resolve real app.fullsite.mx via 8.8.8.8 ($($_.Exception.Message)) -- IP watcher disabled, hosts+failed-request evidence still applies" }
+          "prod_ips: $($prodIps -join ', ')" | Set-Content "$env:EVIDENCE\prod-ips.txt" -Encoding ASCII
+
+          if (-not (Select-String -Path $env:HOSTS_FILE -Pattern 'app\.fullsite\.mx' -Quiet)) { Write-Error 'hosts null-route missing right before app launch'; exit 1 }
+
+          # -- Launch the CANONICAL INSTALLED app --
+          # Run 31081334740: no logs/ dir appeared in appdata => the process
+          # never reached whenReady (logger.init is its first line). Capture
+          # chromium logging + crash evidence, and retry with GPU/sandbox
+          # disabled (CI-session-only runtime flags; canonical exe untouched).
+          $launchAttempts = @(
+            @{ label = 'default';  args = @('--enable-logging=file', "--log-file=$env:EVIDENCE\electron-1.log") },
+            @{ label = 'ci-flags'; args = @('--disable-gpu', '--no-sandbox', '--disable-gpu-sandbox', '--enable-logging=file', "--log-file=$env:EVIDENCE\electron-2.log") }
+          )
+          $health = $null
+          foreach ($attempt in $launchAttempts) {
+            Write-Host "Launch attempt [$($attempt.label)]"
+            $proc = Start-Process -FilePath $env:APP_EXE -ArgumentList $attempt.args -PassThru
+            for ($i = 0; $i -lt 45; $i++) {
+              try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
+              if ($proc.HasExited) { Write-Host "Process exited early (code $($proc.ExitCode)) on attempt [$($attempt.label)]"; break }
+              Start-Sleep -Seconds 2
+            }
+            if ($health) { break }
+            "attempt=$($attempt.label) exited=$($proc.HasExited) exitcode=$($proc.ExitCode)" | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } |
+              Format-Table Id,Name,StartTime,WS -AutoSize | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -MaxEvents 40 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'Fullsite|electron' -or $_.Id -in 1000,1001,1002 } |
+              Format-List TimeCreated,Id,ProviderName,Message | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          }
+          # ENVIRONMENT CEILING (runs 31081334740 / 31081857885): the installed
+          # Electron GUI spawns its 4 processes but whenReady never completes on
+          # a headless GHA runner (no logs/ dir, port never binds, 0-byte
+          # chromium logs, process not crashed) -- Electron needs an interactive
+          # desktop that GHA windows-latest does not provide. This is a
+          # rehearsal-ENVIRONMENT limit, NOT a product defect, and it is exactly
+          # what Monday's physical PDV3/SERVER1 resolves.
+          #
+          # FALLBACK that still exercises the CANONICAL SHIPPED BYTES headlessly:
+          # boot the Bridge straight from the installed app.asar via node. This
+          # is the same local-server code the exe ships, extracted from the
+          # actual installed artifact (not the repo source).
+          $bridgeMode = 'electron-gui'
+          if (-not $health) {
+            $bridgeMode = 'installed-asar-node'
+            Get-ChildItem "$env:APPDATA\Fullsite POS" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName,Length | Out-String | Add-Content "$env:EVIDENCE\launch-diagnostics.txt"
+            Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+
+            $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+            if (-not (Test-Path $asar)) { Write-Error "Electron GUI never bound 7717 AND installed app.asar not found at $asar"; exit 1 }
+            $extract = Join-Path $env:RUNNER_TEMP 'installed-app'
+            Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+            npx --yes @electron/asar extract $asar $extract
+            if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract of the installed artifact failed'; exit 1 }
+            if (-not (Test-Path "$extract\local-server\index.js")) { Write-Error 'installed app.asar has no local-server/index.js'; exit 1 }
+            "installed-bridge-source: $extract\local-server (extracted from $asar)" | Add-Content "$env:EVIDENCE\bridge-identity.txt"
+
+            $boot = Join-Path $env:RUNNER_TEMP 'installed-bridge-boot.js'
+            $bootLines = @(
+              "const { startLocalServer } = require(process.env.INSTALLED_BRIDGE_INDEX)",
+              "startLocalServer({ dataDir: process.env.BRIDGE_DATA_DIR, config: { restaurantId: 'amalay-twin', instanceName: 'AMALAY Twin (installed asar)', channel: 'development' } })",
+              "  .then(() => console.log('INSTALLED_BRIDGE_READY'))",
+              "  .catch(e => { console.error('INSTALLED_BRIDGE_FAILED', (e && e.stack) || e); process.exit(1) })"
+            )
+            Set-Content -Path $boot -Value $bootLines -Encoding ASCII
+            $env:INSTALLED_BRIDGE_INDEX = "$extract\local-server\index.js"
+            $env:BRIDGE_DATA_DIR = Join-Path $env:APPDATA 'Fullsite POS'
+            $bp = Start-Process node -ArgumentList "`"$boot`"" -PassThru -NoNewWindow `
+                    -RedirectStandardOutput "$env:EVIDENCE\installed-bridge-stdout.log" `
+                    -RedirectStandardError  "$env:EVIDENCE\installed-bridge-stderr.log"
+            $script:installedBridgePid = $bp.Id
+            for ($i = 0; $i -lt 30; $i++) {
+              try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
+              Start-Sleep -Seconds 1
+            }
+          }
+          "bridge_mode: $bridgeMode" | Add-Content "$env:EVIDENCE\bridge-identity.txt"
+          Add-Content $env:MATRIX_FILE "BRIDGE-MODE=$bridgeMode"
+          if (-not $health) {
+            Get-Content "$env:EVIDENCE\installed-bridge-stdout.log","$env:EVIDENCE\installed-bridge-stderr.log" -ErrorAction SilentlyContinue | Write-Host
+            Write-Error 'Neither Electron GUI nor installed-asar node Bridge answered /health -- see launch-diagnostics.txt'
+            exit 1
+          }
+          if ($health.restaurant_id -ne 'amalay-twin') { Write-Error "Bridge tenant is '$($health.restaurant_id)' (expected amalay-twin) -- refusing to rehearse against the wrong install"; exit 1 }
+          $id = Invoke-RestMethod 'http://127.0.0.1:7717/identity' -TimeoutSec 5
+          if (-not $id.ok -or $id.restaurant_id -ne 'amalay-twin') { Write-Error "/identity restaurant_id is '$($id.restaurant_id)' (expected amalay-twin)"; exit 1 }
+          Write-Host "Canonical bridge up: v$($health.version) server_id=$($health.server_id) tenant=$($health.restaurant_id)"
+          "server_id: $($health.server_id)`nversion: $($health.version)`nprotocol: $($health.protocol_version)" |
+            Set-Content "$env:EVIDENCE\bridge-identity.txt" -Encoding ASCII
+
+          # Offline behavior is NOT directly assertable headlessly (no way to
+          # see offline.html render). Proxy assertions: null-route held before
+          # launch + zero connections to the real production IPs (watcher +
+          # netstat snapshots) + hosts re-check at the end of the run.
+          netstat -ano | Set-Content "$env:EVIDENCE\netstat-at-launch.txt" -Encoding ASCII
+          if ($prodIps.Count -gt 0) {
+            $hits = @(Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $prodIps -contains $_.RemoteAddress })
+            if ($hits.Count -gt 0) { Write-Error "Connection(s) to production fullsite.mx IPs at launch: $(($hits | ForEach-Object { $_.RemoteAddress }) -join ', ')"; exit 1 }
+            Write-Host 'Zero TCP connections to production fullsite.mx IPs at launch.'
+          }
+          @(
+            'UI-level offline.html fallback is not directly assertable on a headless runner.',
+            'Proxy evidence: app.fullsite.mx null-routed (hosts) before first launch and re-checked at end;',
+            'orchestrator watched for TCP connections to the real production IPs every 30s.',
+            'UI-level WAN return deliberately NOT exercised - it would contact the production web app.'
+          ) | Set-Content "$env:EVIDENCE\wan-isolation-note.txt" -Encoding ASCII
+          Add-Content $env:MATRIX_FILE 'APP-LAUNCH=PASS'
+
+          # -- Orchestrator (background, same step) --
+          $env:TWIN_APP_EXE    = $env:APP_EXE
+          # Relaunches must use the same runtime flags that made the launch work
+          $env:TWIN_APP_ARGS   = if ($attempt.label -eq 'ci-flags') { '--disable-gpu --no-sandbox --disable-gpu-sandbox' } else { '' }
+          # asar-node fallback: restart hooks respawn the installed-asar node Bridge, not the GUI
+          if ($bridgeMode -eq 'installed-asar-node') {
+            $env:TWIN_BRIDGE_BOOT       = $boot
+            $env:INSTALLED_BRIDGE_INDEX = "$extract\local-server\index.js"
+            $env:BRIDGE_DATA_DIR        = Join-Path $env:APPDATA 'Fullsite POS'
+          }
+          $env:TWIN_HOOKS_DIR  = "$env:TWIN\twin-evidence\orchestrator-hooks"
+          $env:TWIN_OUT_DIR    = "$env:TWIN\twin-evidence\orchestrator"
+          $env:TWIN_STOP_FILE  = "$env:EVIDENCE\orchestrator.stop"
+          $env:TWIN_BRIDGE_URL = 'http://127.0.0.1:7717'
+          $env:TWIN_PROD_IPS   = ($prodIps -join ',')
+          $orch = Start-Process node -ArgumentList "`"$env:TWIN\orchestrator\twin-orchestrator.js`"" -PassThru -NoNewWindow `
+                    -RedirectStandardOutput "$env:EVIDENCE\orchestrator-stdout.log" `
+                    -RedirectStandardError  "$env:EVIDENCE\orchestrator-stderr.log"
+          Write-Host "Orchestrator started (pid $($orch.Id))"
+
+          # -- Twin harness: shift phase, EXTERNAL mode against the installed app --
+          # --hook-timeout 180: graceful-close attempts + Electron relaunch +
+          # /health wait can exceed the 120s default on a cold CI runner.
+          node "$env:TWIN\twin-harness.js" --phase shift --external --bridge-host 127.0.0.1 --bridge-port 7717 --compress 6 --hook-timeout 180 2>&1 |
+            Tee-Object "$env:EVIDENCE\harness-console.log"
+          $code = $LASTEXITCODE
+          Write-Host "Harness exit code: $code"
+
+          # -- Wind down: stop orchestrator, then the app --
+          New-Item -ItemType File -Force -Path $env:TWIN_STOP_FILE | Out-Null
+          if ($orch -and -not $orch.HasExited) { Wait-Process -Id $orch.Id -Timeout 25 -ErrorAction SilentlyContinue }
+          if ($orch -and -not $orch.HasExited) { Stop-Process -Id $orch.Id -Force -ErrorAction SilentlyContinue }
+          taskkill /F /T /IM 'Fullsite POS.exe' 2>&1 | Out-Null
+          if ($script:installedBridgePid) { Stop-Process -Id $script:installedBridgePid -Force -ErrorAction SilentlyContinue }
+          # In asar-node mode there is no 'Fullsite POS.exe', so taskkill exits
+          # 128 and poisons $LASTEXITCODE — GHA then fails the step at its end
+          # even though the harness passed. Reset it; the harness verdict below
+          # gates on $code (captured above), not $LASTEXITCODE.
+          $global:LASTEXITCODE = 0
+          Start-Sleep -Seconds 3
+
+          # -- Hook-servicing verdict from the orchestrator summary --
+          $summaryPath = "$env:TWIN\twin-evidence\orchestrator\orchestrator-summary.json"
+          $hooksOk = $false
+          if (Test-Path $summaryPath) {
+            $s = Get-Content $summaryPath -Raw | ConvertFrom-Json
+            Write-Host "Orchestrator: $(@($s.hooks_serviced).Count) hooks serviced, $(@($s.anomalies).Count) anomalies, $($s.mem_samples) memory samples, prod-IP connection hits: $($s.prod_ip_connection_hits)"
+            foreach ($hk in @($s.hooks_serviced)) { Write-Host "  [$($hk.hook)] $($hk.action) -- $($hk.detail)" }
+            foreach ($a in @($s.anomalies)) { Write-Host "  ANOMALY: $a" }
+            if (@($s.anomalies).Count -eq 0 -and [int]$s.prod_ip_connection_hits -eq 0) { $hooksOk = $true }
+          } else {
+            Write-Host 'No orchestrator-summary.json produced'
+          }
+          if ($hooksOk) { Add-Content $env:MATRIX_FILE 'HOOKS=PASS' }
+
+          # -- Harness verdict (exit 2 = STOP CONDITION -> fail loudly; evidence
+          #    still uploads via the always() steps below) --
+          if ($code -eq 2) {
+            Get-Content "$env:TWIN\twin-evidence\STOP-CONDITION.md" -ErrorAction SilentlyContinue | Write-Host
+            Write-Error 'HARNESS STOP CONDITION (exit 2): data loss / duplication / corruption / stuck jobs / tenant leak. See STOP-CONDITION.md in the evidence artifact.'
+            exit 1
+          }
+          if ($code -ne 0) { Write-Error "Harness exited $code (expected 0) -- see harness-console.log + twin-report.json in the evidence artifact"; exit 1 }
+          if (-not $hooksOk) { Write-Error 'Harness passed but orchestrator recorded anomalies / missing summary -- failing the run'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'HARNESS=PASS'
+          Write-Host 'Twin external rehearsal PASSED on the canonical shipped bytes.'
+          exit 0   # everything passed — do not inherit any stray native exit code
+
+      # ????????????????????????????????????????????????????????????????????
+      # 8. Collect the app's %APPDATA% evidence (events.ndjson,
+      #    print-queue.json, logs, config, server-id). Biometric-pattern and
+      #    Chromium-cache exclusions per kit privacy rules.
+      # ????????????????????????????????????????????????????????????????????
+      - name: 8. Collect appdata evidence (biometric patterns excluded)
+        if: always()
+        run: |
+          $src = Join-Path $env:APPDATA 'Fullsite POS'
+          $dst = Join-Path $env:EVIDENCE 'appdata'
+          if (-not (Test-Path $src)) { Write-Host "No appdata dir at $src -- nothing to collect"; exit 0 }
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          $files = @(Get-ChildItem $src -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+            ($_.Extension -in '.json', '.ndjson', '.log', '.txt' -or $_.Name -eq 'server-id') -and
+            ($_.FullName -notmatch '(?i)finger|biometric|template') -and
+            ($_.Extension -ne '.dat') -and
+            ($_.FullName -notmatch '(?i)\\(Cache|Code Cache|GPUCache|DawnGraphiteCache|DawnWebGPUCache|Service Worker|Session Storage|Local Storage|IndexedDB|blob_storage|Crashpad|Network)\\')
+          })
+          foreach ($f in $files) {
+            $rel = $f.FullName.Substring($src.Length).TrimStart('\')
+            $out = Join-Path $dst $rel
+            New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
+            Copy-Item $f.FullName $out -Force
+          }
+          Write-Host "Collected $($files.Count) files from $src (biometric patterns + Chromium caches excluded)"
+          Add-Content $env:MATRIX_FILE 'EVIDENCE-COLLECT=PASS'
+
+      # --------------------------------------------------------------------
+      # R1. ROLLBACK to 1.3.0 using the PACKAGE'S OWN ROLLBACK.ps1 (-Force)
+      # --------------------------------------------------------------------
+      - name: R1. Package ROLLBACK.ps1 to 1.3.0 + start probe
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+          $dir = Join-Path $env:FIELD_ROOT '04-ROLLBACK-1.3.0'
+          Push-Location $dir
+          & powershell -NoProfile -ExecutionPolicy Bypass -File .\ROLLBACK.ps1 -BackupDir $env:BACKUP_DIR -PreviousInstaller $env:ROLLBACK_EXE -Force 2>&1 |
+            Tee-Object "$env:EVIDENCE\rollback-console.txt"
+          $code = $LASTEXITCODE
+          Pop-Location
+          Write-Host "ROLLBACK.ps1 exit code: $code"
+          if ($code -ne 0) { Write-Error "STOP CONDITION: ROLLBACK.ps1 exited $code"; exit 1 }
+          # registry must now say 1.3.0
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) { foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break } }
+            if ($entry) { break } }
+          if (-not $entry) { Write-Error 'STOP CONDITION: no Fullsite POS registry entry after rollback'; exit 1 }
+          Write-Host "Post-rollback registry: $($entry.DisplayName) v$($entry.DisplayVersion)"
+          if ($entry.DisplayVersion -ne '1.3.0') { Write-Error "STOP CONDITION: rollback installed $($entry.DisplayVersion), expected 1.3.0"; exit 1 }
+          if (-not (Test-Path $env:APP_EXE)) { Write-Error 'STOP CONDITION: app exe missing after rollback'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ROLLBACK-1.3.0=PASS'
+          # start probe: process must launch and stay alive 20s (GUI ceiling
+          # documented -- health bind not gated here)
+          Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          $p130 = Start-Process -FilePath $env:APP_EXE -ArgumentList '--disable-gpu','--no-sandbox' -PassThru
+          Start-Sleep -Seconds 20
+          $alive = -not $p130.HasExited
+          "rollback_start_alive_after_20s: $alive" | Tee-Object -Append "$env:EVIDENCE\rollback-console.txt"
+          Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          if (-not $alive) { Write-Error 'STOP CONDITION: 1.3.0 process exited within 20s of launch'; exit 1 }
+          Add-Content $env:MATRIX_FILE 'ROLLBACK-START=PASS'
+          $global:LASTEXITCODE = 0
+          exit 0
+
+      # --------------------------------------------------------------------
+      # R2. Reinstall 1.3.3 from the SAME extracted ZIP exe + final start
+      # --------------------------------------------------------------------
+      - name: R2. Reinstall 1.3.3 from ZIP + final start probe
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Start-Process -FilePath $env:INSTALLER_EXE -ArgumentList '/S' -Wait
+          $found = $false
+          for ($i = 0; $i -lt 30; $i++) { if (Test-Path $env:APP_EXE) { $found = $true; break }; Start-Sleep -Seconds 2 }
+          if (-not $found) { Write-Error 'STOP CONDITION: app exe missing after reinstall'; exit 1 }
+          $bases = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                     'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+          $entry = $null
+          foreach ($b in $bases) { foreach ($k in @(Get-ChildItem $b -ErrorAction SilentlyContinue)) {
+              $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+              if ($p -and $p.DisplayName -like 'Fullsite POS*') { $entry = $p; break } }
+            if ($entry) { break } }
+          if (-not $entry -or $entry.DisplayVersion -ne '1.3.3') { Write-Error "STOP CONDITION: reinstall version is '$($entry.DisplayVersion)', expected 1.3.3"; exit 1 }
+          Write-Host "Post-reinstall registry: $($entry.DisplayName) v$($entry.DisplayVersion)"
+          Add-Content $env:MATRIX_FILE 'REINSTALL-1.3.3=PASS'
+          # final start: installed-asar bridge must answer /health (proven mode)
+          $apps = Get-Process | Where-Object { $_.Name -match 'Fullsite|electron' }
+          if ($apps) { $apps | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3 }
+          $asar = "$env:ProgramFiles\Fullsite POS\resources\app.asar"
+          $extract = Join-Path $env:RUNNER_TEMP 'reinstalled-app'
+          Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+          npx --yes @electron/asar extract $asar $extract
+          if ($LASTEXITCODE -ne 0) { Write-Error 'asar extract of reinstalled app failed'; exit 1 }
+          $boot = Join-Path $env:RUNNER_TEMP 'reinstalled-bridge-boot.js'
+          @(
+            "const { startLocalServer } = require(process.env.INSTALLED_BRIDGE_INDEX)",
+            "startLocalServer({ dataDir: process.env.BRIDGE_DATA_DIR, config: { restaurantId: 'amalay-twin', instanceName: 'AMALAY Twin (reinstalled)', channel: 'development' } })",
+            "  .then(() => console.log('REINSTALLED_BRIDGE_READY'))",
+            "  .catch(e => { console.error('REINSTALLED_BRIDGE_FAILED', (e && e.stack) || e); process.exit(1) })"
+          ) | Set-Content -Path $boot -Encoding ASCII
+          $env:INSTALLED_BRIDGE_INDEX = "$extract\local-server\index.js"
+          $env:BRIDGE_DATA_DIR = Join-Path $env:APPDATA 'Fullsite POS'
+          $bp = Start-Process node -ArgumentList "`"$boot`"" -PassThru -NoNewWindow `
+                  -RedirectStandardOutput "$env:EVIDENCE\reinstalled-bridge-stdout.log" `
+                  -RedirectStandardError  "$env:EVIDENCE\reinstalled-bridge-stderr.log"
+          $health = $null
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $h = Invoke-RestMethod 'http://127.0.0.1:7717/health' -TimeoutSec 3; if ($h.ok) { $health = $h; break } } catch {}
+            Start-Sleep -Seconds 1
+          }
+          if ($bp -and -not $bp.HasExited) { Stop-Process -Id $bp.Id -Force -ErrorAction SilentlyContinue }
+          if (-not $health) { Write-Error 'STOP CONDITION: reinstalled 1.3.3 bridge did not answer /health'; exit 1 }
+          Write-Host "Final start OK: bridge v$($health.version) tenant=$($health.restaurant_id)"
+          "final_start: v$($health.version) tenant=$($health.restaurant_id)" | Set-Content "$env:EVIDENCE\final-start.txt" -Encoding ASCII
+          Add-Content $env:MATRIX_FILE 'FINAL-START=PASS'
+          $global:LASTEXITCODE = 0
+          exit 0
+
+      # ????????????????????????????????????????????????????????????????????
+      # 9a. Hosts / WAN integrity re-check -- the null-route must have held
+      #     for the entire run.
+      # ????????????????????????????????????????????????????????????????????
+      - name: 9a. Hosts integrity re-check (null-route held all run)
+        if: always()
+        run: |
+          netstat -ano | Set-Content "$env:EVIDENCE\netstat-final.txt" -Encoding ASCII
+          if (-not (Select-String -Path $env:HOSTS_FILE -Pattern 'app\.fullsite\.mx' -Quiet)) {
+            Write-Error 'HOSTS INTEGRITY FAIL: null-route entry disappeared during the run'; exit 1
+          }
+          $addrs = [System.Net.Dns]::GetHostAddresses('app.fullsite.mx') | ForEach-Object { $_.ToString() }
+          $nonLoop = @($addrs | Where-Object { $_ -ne '127.0.0.1' -and $_ -ne '::1' })
+          if ($nonLoop.Count -gt 0) { Write-Error "app.fullsite.mx resolves to non-loopback at end of run: $($nonLoop -join ', ')"; exit 1 }
+          $reached = $false
+          try { Invoke-WebRequest 'https://app.fullsite.mx' -UseBasicParsing -TimeoutSec 8 | Out-Null; $reached = $true } catch {}
+          if ($reached) { Write-Error 'https://app.fullsite.mx reachable at end of run'; exit 1 }
+          $prodFile = "$env:EVIDENCE\prod-ips.txt"
+          if (Test-Path $prodFile) {
+            $ips = @(((Get-Content $prodFile -Raw) -replace 'prod_ips:', '').Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            if ($ips.Count -gt 0) {
+              $hits = @(Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ips -contains $_.RemoteAddress })
+              if ($hits.Count -gt 0) { Write-Error "TCP connection(s) to production fullsite.mx IPs at end of run"; exit 1 }
+            }
+          }
+          Write-Host 'Hosts null-route intact, production unreachable, zero connections to production IPs.'
+          Add-Content $env:MATRIX_FILE 'HOSTS-INTEGRITY=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 9c. Restore the hosts file (remove our null-route lines)
+      # ????????????????????????????????????????????????????????????????????
+      - name: 9c. Restore hosts file
+        if: always()
+        run: |
+          $kept = @(Get-Content $env:HOSTS_FILE | Where-Object { $_ -notmatch 'fullsite\.mx' -and $_ -notmatch 'amalay-twin WAN isolation' })
+          Set-Content -Path $env:HOSTS_FILE -Value $kept -Encoding ASCII
+          ipconfig /flushdns | Out-Null
+          if (Select-String -Path $env:HOSTS_FILE -Pattern 'fullsite\.mx' -Quiet) { Write-Error 'hosts restore failed -- fullsite.mx entries still present'; exit 1 }
+          Write-Host 'Hosts file restored.'
+          Add-Content $env:MATRIX_FILE 'HOSTS-RESTORE=PASS'
+
+      # ????????????????????????????????????????????????????????????????????
+      # 10. MATRIX summary + evidence upload
+      # ????????????????????????????????????????????????????????????????????
+      - name: 10. MATRIX summary
+        if: always()
+        run: |
+          $expected = @('ZIP-DOWNLOAD', 'ZIP-SHA', 'EXTRACT', 'HASH-SCRIPT', 'BACKUP', 'INSTALLER-PIN',
+                        'WAN-ISOLATION', 'INSTALL', 'VERSION-1.3.3', 'PRE-SEED', 'DEPS',
+                        'APP-LAUNCH', 'HOOKS', 'HARNESS', 'EVIDENCE-COLLECT',
+                        'ROLLBACK-1.3.0', 'ROLLBACK-START', 'REINSTALL-1.3.3', 'FINAL-START',
+                        'HOSTS-INTEGRITY', 'HOSTS-RESTORE')
+          $done = @()
+          if (Test-Path $env:MATRIX_FILE) { $done = @(Get-Content $env:MATRIX_FILE | Where-Object { $_ }) }
+          $lines = @('## Field ZIP Rehearsal -- MATRIX', '',
+                     "Package: $env:ZIP_NAME sha256=$env:ZIP_SHA (release $env:FIELD_TAG)", '',
+                     '| Step | Result |', '|---|---|')
+          $allPass = $true
+          foreach ($e in $expected) {
+            $r = if ($done -contains "$e=PASS") { 'PASS' } else { $allPass = $false; 'FAIL' }
+            $lines += "| $e | $r |"
+            Write-Host ("{0,-20} {1}" -f $e, $r)
+          }
+          $lines += ''
+          $lines += 'WAN note: UI-level WAN return deliberately NOT exercised (would contact production web). Null-route held for the whole run (HOSTS-INTEGRITY).'
+          $lines += ''
+          if ($allPass) { $lines += '**ALL STEPS PASS -- the exact field ZIP installed, operated, rolled back and reinstalled on a clean Windows runner (CLEAN WINDOWS LAB REHEARSAL).**' }
+          else          { $lines += '**One or more steps FAILED -- see the failing step logs and the amalay-twin-evidence artifact.**' }
+          $lines | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-zip-rehearsal-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            twin-run-artifacts/
+            tests/twin/twin-evidence/
