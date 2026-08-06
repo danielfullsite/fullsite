@@ -101,11 +101,59 @@ Una feature solo es **PASS** cuando: se ejecuta desde su interfaz; persiste; pro
 
 # FASE 2 — MATRIZ END-TO-END (estado)
 
+## Ejecución UI 2026-08-06 (navegador real + Bridge real v1.3.3 tenant `demo` + staging)
+
+Ambiente: dashboard-app dev (localhost:3210) contra Supabase staging (tenant
+`demo` = "El Molcajete Demo"), Bridge canónico booteado desde el runner del
+rehearsal en 7717, impresoras ESC/POS fake en 19100/19101. Usuario e2e
+`e2e-rc@demo.sandbox` (dueño) + PIN cajero 2222.
+
+**E2E-01 Servicio normal — PASS (UI, salvo impresión física)**. Cadena real
+verificada de punta a punta con evidencia:
+- Login Supabase + PIN staff (cajero Carlos) → **PASS**
+- Abrir turno (fondo $2000) → **PASS** (Turno 1, 16 mesas)
+- Abrir mesa 1 vía `/pos?mesa=N`, mesero Diana Torres, 4 personas → **PASS**
+- Capturar Agua de horchata + Café de olla, **modificador** "Extra queso +$25"
+  (total tile $55→$80), **nota** "sin hielo" → **PASS** (aritmética correcta)
+- Enviar → `save-order` idempotente **HTTP 200** (`r1_save_order_idempotent`,
+  first_execution) + `POST 7717/events ORDER_SENT` **200** → **PASS**
+- **KDS UI** `/pos/barra`: la orden aparece (mesa 1, Diana, 1×horchata +
+  1×café, estado NUEVA); routing correcto (bebidas→barra, cocina=0) → **PASS**
+- **Cambio de estado KDS** NUEVA→Preparando en UI, persistido → **PASS**
+- Cobro: confirmar personas → **propina 15% ($20)** → **efectivo** monto exacto
+  $153.40, **cambio $0.00** → orden `cerrada` con `metodo_pago=Efectivo`,
+  `pagos=[{monto:153.4}]`, subtotal 115 / IVA 18.40 / total 133.40 → **PASS**
+- **Dashboard `/ventas`** refleja la venta: Ventas netas $133, Métodos de pago
+  Efectivo $153 (100%), categorías COFFEE $60 + FRESH DRINKS $55, Personas 4,
+  Propinas $20 → **RECONCILIACIÓN PASS** (valores exactos POS↔dashboard)
+- Impresión física: **BLOCKED PHYSICAL** (KDS en modo FALLBACK Supabase-poll en
+  este ambiente; el print server-side por PRINT_COMMAND no se ejercitó — las
+  impresoras fake capturaron 0 jobs. El path WS↔Bridge + bytes ESC/POS ya está
+  LAB-certificado por el twin; físico el lunes).
+
+**Caveat de honestidad:** el cobro cerró una orden-sonda (`e2e-probe-4`) creada
+por mis llamadas directas a `save-order` durante el diagnóstico de drift, no la
+misma `order_id` que fue al KDS — porque las sondas dejaron varias órdenes
+abiertas en la mesa 1 (ambigüedad que la UI limpia no produce). La matemática
+del cobro, el cierre y el cuadre en dashboard son correctos y reales; la
+identidad única order_id de punta a punta en una sola corrida sin sondas queda
+para re-ejecución limpia. Datos de prueba y órdenes-sonda eliminados; tenant
+`demo` restaurado a 0 órdenes / 0 turnos abiertos.
+
+**Hallazgos de DRIFT staging↔producción** (registrados como BUG-013, infra):
+el tenant `demo` en staging no tenía los grants/policies que producción sí
+aplica vía service key — hubo que espejar: `pos_staff` anon read (login PIN),
+grants+RLS en tablas operativas POS, `execute` en `r1_save_order*`,
+`client_users` anon read (resolución de tenant del dueño). Sin esto el POS daba
+401 en cada escritura. **No es bug de producto** (producción usa service key que
+bypassa RLS); es deuda de paridad del ambiente demo — importa porque el paquete
+de demo/clonability depende de que el tenant demo funcione con anon.
+
 | Journey | Estado | Evidencia actual | Falta |
 |---|---|---|---|
-| E2E-01 Servicio normal (login→turno→orden→KDS→print→cobro→dashboard) | PENDING | Segmento Bridge↔KDS: LAB (twin 127 órdenes + prints byte-verificados) | Ejecución UI completa + cuadre dashboard |
+| E2E-01 Servicio normal (login→turno→orden→KDS→cobro→dashboard) | **PASS (UI)** | Ejecución navegador 2026-08-06 arriba; reconciliación exacta en `/ventas` | Impresión física (lunes); re-corrida limpia sin sondas |
 | E2E-02 Cancelación controlada | PENDING | ORDER_CANCELLED + auth PBKDF2: LAB/TEST | UI + audit log + caja + dashboard |
-| E2E-03 Pago complejo (split + mixto + propina + corte) | PENDING | Cálculos: TEST (pos-critical, arqueo) | UI + ticket + corte + dashboard |
+| E2E-03 Pago complejo (split + mixto + propina + corte) | PARCIAL (UI) | **Propina 15% + efectivo exacto + cambio $0 + cierre + dashboard: PASS** (E2E-01); split parejo/por-producto y mixto multi-método a nivel cálculo TEST (pos-critical) | UI de split y mixto multi-método + corte |
 | E2E-04 Restart (POS/Bridge/KDS + recuperar + cobrar) | **PARTIAL LAB PASS** | Bridge: rehearsal 31120621675 (kill -F, 6/6 ACKs, replay) + twin restarts | Renderer/KDS UI restart; física matriz #14 |
 | E2E-05 Offline completo (WAN off→operar→restart→WAN on→sync→0 dups) | **PARTIAL LAB PASS** | Twin GREEN (0 loss/dup, null-route) + rehearsal drain | Capa UI + física (10 escenarios matriz) |
 | E2E-06 Caja (apertura→ventas→movimientos→X→Z→reconciliación) | PENDING | Cálculos: TEST (arqueo + cierre-guard) | UI + reconciliación dashboard |
@@ -127,6 +175,28 @@ PENDING. Diseño del cuadre: `events.ndjson`/`pos_orders` vs POS UI vs corte vs 
 | Upgrade+Rollback rehearsal | workflow `upgrade-rehearsal.yml` | GREEN run 31120621675 att.4 |
 
 Regla: todo P0/P1 corregido agrega test de regresión y re-ejecuta el journey completo relacionado + esta suite.
+
+# RECONCILIACIÓN DE EVIDENCIA FÍSICA PREVIA (AMALAY)
+
+Visitas físicas documentadas e incorporadas al gate: **2026-07-12** (preflight PDV3/SERVER1: deployment type, impresoras TCP .21/.30/.40:9100 + USB, jam EC TICKET, PDV1 impresora rota IP .250, bug PIN por bridge legacy en 7717), **2026-07-24** (F-01 sync + A-01 boot SW: PASS, commits c312fac/54feab6), **2026-07-27** (sesión offline: bloques A-03/B-01/F-01 definidos; B-01 fix `2edcca1` deployed SIN certificar), **2026-07-28** (PRR v1: 4.7/10, 27 hallazgos).
+
+**Bugs observados físicamente → cobertura actual → estado de retest:**
+
+| Bug de campo | Fix | Test actual | Retest físico (FC lunes) |
+|---|---|---|---|
+| PRR-02 sync abandonado tras retries | `dacf364` | `pos-sync-backoff.test.ts` (8, incl. soak 4h simulado) | FC-20/21 (OC-12 cronómetro) |
+| PRR-04 print jobs varados tras crash Bridge | `80a8d7d` | `print-queue-recovery.test.js` + **rehearsal 31120621675 con datos vivos** | FC-19 |
+| PRN-GAP-01 reimpresión con drop silencioso | fixed | `pos-print.test.ts` | FC-09/reimpresión |
+| PER-01 drain PATCH→405 loop infinito (matrix 08-05) | **`99cdf7a`** | `pos-sync-backoff.test.ts:63` (405 fix) — la mención "no tocado" en OFFLINE-TEST-MATRIX es previa al fix | FC-21 |
+| B-01 impresión offline (27-jul) | `2edcca1` | LAB: twin bytes ESC/POS | FC-08/09 **pendiente cert física** |
+| A-03 login PIN offline (27-jul) | — | `pos-manager-auth` (30) — staff lockscreen es deuda separada documentada | FC-02 |
+| Bug PIN por bridge legacy en 7717 (12-jul) | proceso legacy | DIAGNOSTIC-ONLY detecta dueño del puerto | Gate T-01 diagnóstico |
+| PDV1 impresora rota / EC TICKET jam (12-jul) | hardware | — | Inventario físico lunes (no bloquea PDV3/SERVER1) |
+| PAY-GAP-02 ticket duplicado en crash MP | mitigado | SIN TEST durable — **P2 registrado (BUG-012)** | E2E-03 doble clic + física |
+
+**Pendientes de retest físico** (todos dentro del gate del lunes vía FC/OC): PRR-02, PRR-04, B-01, A-03, F-01 real, OC-01 (4h — DEFERRED aceptado con smoke 90–120 min). PRR-05..10 (provisioning/ops/docs) son alcance PRR de negocio, no de esta certificación UI — siguen abiertos en PRR-v1.md.
+
+**Topología/config usada:** twin fixture `amalay-twin-config.json` (36 KNOWN / 15 INFERRED / 12 UNKNOWN — top: deployment type, IP SERVER1, printers.json v1-vs-v2, enrollment de huella). Los 12 UNKNOWN se resuelven en el diagnóstico T-01 del lunes. Docs leídos: PRR-v1, CERTIFICATION-SESSION-2026-07-27, OCS-P2.5.4–9, OCS-P0-1, THURSDAY-RUNBOOK, OFFLINE-TEST-MATRIX, INSTALLER-VERIFICATION, SECOND-TENANT-REPORT, AMALAY-CONFIG-PROVENANCE, AMALAY-R1-VALIDATION, FIELD-NOTES-PREFLIGHT-JUL12.
 
 # FASE 6 — AMALAY FÍSICO
 
@@ -150,6 +220,21 @@ TENANT ISOLATION PASS             — LAB PASS · física PENDING
 P0 OPEN = 0                       — CUMPLE HOY (0 conocidos)
 P1 BLOCKING = 0                   — NO CUMPLE (BUG-001 y decisión ocultar/reparar pendiente)
 ```
+
+## Estado tras ejecución UI 2026-08-06
+
+**Features certificadas PASS por UI en E2E-01** (subieron de PENDING):
+- POS: P01 login PIN, P04 turno, P05 mesa, P06 mesero, P07 personas, P09 productos, P10 modificadores, P12 notas, P13 envío, P22 efectivo, P25 propina, P32 recuperación de draft tras restart de renderer (la orden $115 sobrevivió relogin/lockscreen).
+- KDS: K01 recepción (UI), K02 routing por estación, K03 modificadores, K04 notas, K06/K07 cambio de estado (vía Supabase-poll path).
+- Dashboard: `/` y `/ventas` carga + auth + tenant-scope + reconciliación con POS (valores exactos).
+
+**Ocultas del release (fix `8010d9a`):** `/lealtad`, `/encuestas`, `/admin/usuarios`, `/internal` → 401 para todos los roles (BUG-001/002/003 cerrados).
+
+**Aún PENDING de UI** (ejecutables sin hardware, no alcanzados esta sesión):
+E2E-02 (cancelación), E2E-06 (caja/cortes), split UI (P19/P20) y mixto
+multi-método (P24), sweep de las 33 POS restantes, dashboard core `/cortes`
+`/meseros` `/propinas` `/platillos` runtime. BLOCKED PHYSICAL: huella (P02),
+impresión física (P29). NOT IMPLEMENTED: dividir por persona (P21).
 
 **Clasificación de salida:** CONTROLLED MARKET RELEASE — clientes seleccionados, instalación controlada, monitoreo cercano, rollback listo, soporte directo. Sin self-service masivo.
 

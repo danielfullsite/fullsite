@@ -74,7 +74,33 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Observado:** `npx vitest run tests/` desde raíz barre también specs de Playwright y tests node:test de otros paquetes → "14 files failed" falsos; los tests reales del scope (142) pasan
 - **Estado:** OPEN — ajustar include del vitest.config raíz o documentar comando exacto de release
 
+### BUG-012 · POS pagos (MP crash window) · P2 · OPEN
+- **Origen:** PAY-GAP-02 (OCS-P2.5.8, campo/lab jul-31): crash de Mercado Pago entre save y clearMpRecovery puede duplicar ticket impreso (no el cobro)
+- **Cobertura:** comportamiento documentado inline; **sin test durable** — pendiente agregar regresión de crash simulado
+- **Retest:** E2E-03 (doble clic / reintento) + física lunes
+- **Estado:** OPEN
+
+### BUG-013 · Staging tenant `demo` sin paridad de grants vs producción · P2 (infra) · OPEN
+- **Origen:** ejecución UI RC 2026-08-06 — el POS daba 401 en login PIN y en cada escritura contra el tenant `demo` de staging
+- **Causa:** staging no tenía los grants/policies que producción aplica: anon read en `pos_staff` y `client_users`, grants+RLS en tablas POS operativas, `execute` en `r1_save_order`/`r1_save_order_idempotent`. Producción los cubre porque las rutas usan `SUPABASE_SERVICE_KEY` (bypassa RLS)
+- **Acción tomada:** espejados en staging vía migraciones (`pos_staff_anon_read_mirror_prod`, `pos_operational_anon_grants_mirror_prod`, `grant_pos_save_rpcs_e2e`, `client_users_anon_read_e2e`, `events_anon_rw_e2e`) para poder ejecutar E2E. NO es cambio de producto ni de producción
+- **Impacto real:** el paquete demo/clonability depende de que el tenant demo opere; esta deuda debe cerrarse en el provisioning del tenant demo, no en la app
+- **Estado:** OPEN — mitigado en staging; documentar en el runbook de alta de tenant demo
+
+### BUG-014 · shadow-mode `events` insert falla (sequence NOT NULL) · P2 · OPEN
+- **Observado:** al cobrar, `POST /rest/v1/events` → 400 `null value in column "sequence"`. Es una escritura **shadow** secundaria (no bloquea la operación: el cobro cerró 200)
+- **Evidencia:** consola navegador 2026-08-06
+- **Estado:** OPEN — verificar si el shadow-write debe omitir `sequence` o tomarlo del Bridge; no afecta el path operativo
+
 ## CERRADOS
+
+### BUG-001 · `/lealtad` rewards mock visible · P1 · **CERRADO** (fix `8010d9a`)
+- **Fix:** `RELEASE_HIDDEN_PAGES` en `roles.ts` bloquea `/lealtad` (+ `/encuestas`, `/admin/usuarios`, `/internal`) para todos los roles vía `canAccessPage`, aplicado en el middleware `proxy.ts` (edge) y heredado por el Sidebar
+- **Test:** 44 regresiones nuevas en `auth-roles.test.ts` (todos los roles × rutas ocultas → deny; admin/menu y promociones siguen accesibles). Suite dashboard-app 2148/2148 PASS
+- **Retest journey:** enforcement de rutas/permisos re-ejecutado (213 tests auth) PASS
+
+### BUG-002 · `/encuestas` sin vista de respuestas · P2 · **CERRADO** (fix `8010d9a`) — oculta del release
+### BUG-003 · `/admin/usuarios` CRUD parcial · P2 · **CERRADO** (fix `8010d9a`) — oculta del release
 
 (ninguno aún en este registro; los P0 pre-RC — PRR-02, PRR-04, save-order 99cdf7a, /identity 29c4b0d — están cerrados en el registro PRR con sus tests de regresión y el ciclo upgrade-rehearsal como retest)
 
