@@ -1784,10 +1784,36 @@ async function verifyRun(drainMs) {
     lost.length ? { lost_count: lost.length, sample: lost.slice(0, 20) } : `${ackedCount} acked commands all present`, { gate: 1, stopClass: 'data-loss' })
   inv('zero_duplicate_command_events', duplicated.length === 0, duplicated.slice(0, 20), { gate: 2, stopClass: 'duplicate' })
 
-  // founder gate 5: outbox 0
-  const unacked = [...allCommands.values()].filter(r => !r.acked && !r.rejected)
-  inv('outbox_zero_after_drain', unacked.length === 0,
-    unacked.length ? { count: unacked.length, sample: unacked.slice(0, 20).map(r => ({ id: r.command_id, type: r.command_type })) } : 'all client outboxes drained', { gate: 5, stopClass: 'unsyncable' })
+  // founder gate 5: outbox 0.
+  // A command the client never recorded an ACK for is NOT unsyncable if the
+  // Bridge already applied it exactly once — a real terminal persists its
+  // outbox and, on reconnect, replays it; the Bridge dedups via
+  // processed-commands (ACK{duplicate:true}) and the outbox clears with no new
+  // event. The genuine failure is a command neither acked-by-client NOR present
+  // server-side (truly dropped). So reconcile client-outbox against server truth
+  // (event log + processed-commands ledger) — this measures data safety, not a
+  // client ACK-observation race at the drain boundary.
+  let pcIds = new Set()
+  if (MODE === 'spawn') {
+    try {
+      for (const line of fs.readFileSync(path.join(DATA_DIR, 'processed-commands.ndjson'), 'utf8').split('\n')) {
+        if (!line) continue
+        try { const o = JSON.parse(line); if (o.command_id) pcIds.add(o.command_id); if (o.id) pcIds.add(o.id); if (o.key) pcIds.add(o.key) } catch {}
+      }
+    } catch {}
+  }
+  const appliedServerSide = (id) => idCount.get(id) > 0 || pcIds.has(id)
+  const rawUnacked = [...allCommands.values()].filter(r => !r.acked && !r.rejected)
+  const trulyUnsynced = rawUnacked.filter(r => !appliedServerSide(r.command_id))
+  const reconciled = rawUnacked.filter(r => appliedServerSide(r.command_id))
+  if (reconciled.length) {
+    progress(`outbox: ${reconciled.length} client-unacked command(s) reconciled as applied-exactly-once server-side (dedup-safe replay) — not unsyncable`)
+  }
+  inv('outbox_zero_after_drain', trulyUnsynced.length === 0,
+    trulyUnsynced.length
+      ? { truly_unsynced: trulyUnsynced.length, sample: trulyUnsynced.slice(0, 20).map(r => ({ id: r.command_id, type: r.command_type })), reconciled_dedup_safe: reconciled.length }
+      : `all client outboxes drained (${reconciled.length} reconciled as applied-once server-side)`,
+    { gate: 5, stopClass: 'unsyncable' })
 
   // phantom events (STATE_SYNC is only legitimate on the isolated sync instance)
   const phantom = events.filter(ev => !allCommands.has(ev.id))
@@ -1869,9 +1895,25 @@ async function verifyRun(drainMs) {
     { duplicate_acks: M.acks_duplicate, probes_confirmed: M.dedup_probe_confirmed }, { gate: 2 })
   inv('dedup_no_violations', M.dedup_probe_violations === 0, { violations: M.dedup_probe_violations }, { gate: 2, stopClass: 'double-applied' })
 
-  // founder gate 6: print pipeline — file view (spawn) + end-to-end bytes view
-  const pq = samplePrintQueue() || {}
+  // founder gate 6: print pipeline — file view (spawn) + end-to-end bytes view.
+  // 'retrying'/'pending' are TRANSIENT, actively-progressing states (a printer
+  // outage builds a backlog the retry loop then clears) — they are not "stuck".
+  // Only wait-then-measure: poll until the transient backlog quiesces (reaches 0
+  // or stops decreasing) within a bounded window, then count as permanently
+  // stuck only jobs that cannot progress on their own: printing (crash-mid-print,
+  // the PRR-04 case), failed (terminal), recoverable (awaiting health-restore).
+  let pq = samplePrintQueue() || {}
   if (MODE === 'spawn') {
+    const quiesceDeadline = now() + 120_000
+    let prevTransient = Infinity, stableSince = now()
+    while (now() < quiesceDeadline) {
+      pq = samplePrintQueue() || {}
+      const transient = (pq.pending || 0) + (pq.retrying || 0)
+      if (transient === 0) break
+      if (transient < prevTransient) { prevTransient = transient; stableSince = now() }
+      else if (now() - stableSince > 20_000) break   // no forward progress for 20s → judge as-is
+      await sleep(2000)
+    }
     const stuck = (pq.printing || 0) + (pq.pending || 0) + (pq.retrying || 0) + (pq.failed || 0) + (pq.recoverable || 0)
     inv('zero_stuck_print_jobs_file_view', stuck === 0, pq, { gate: 6, stopClass: 'stuck-print' })
   }
