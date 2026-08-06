@@ -280,6 +280,7 @@ jobs:
           if (-not (Test-Path $env:APP_EXE)) { Write-Error 'Error-path run must not touch the existing install, but the app exe is gone'; exit 1 }
           Write-Host 'ERROR PATH OK: exit 2, ABORTADA logged, installer never executed.'
           Add-Content $env:MATRIX_FILE 'ERROR-PATH=PASS'
+          exit 0   # step exit code otherwise inherits INSTALL.cmd's expected exit 2
 
       # ════════════════════════════════════════════════════════════════════
       # 7a. Bridge standalone — index.js exports startLocalServer (no
@@ -288,7 +289,10 @@ jobs:
       #     refuses to start without one). Only prod deps needed (ws +
       #     bonjour-service); no Supabase creds → poll/heartbeat disabled.
       # ════════════════════════════════════════════════════════════════════
-      - name: 7a. Boot Bridge standalone (node local-server)
+      # 7a–7d run as ONE step: the GHA Windows runner kills the step's child
+      # process tree when the step ends, so a Bridge booted in its own step is
+      # dead before the audits run (proved by run 31065688047).
+      - name: 7. Bridge boot + DIAGNOSTIC + CERT-CAPTURE + no-mutation gate
         if: always()
         run: |
           $ErrorActionPreference = 'Continue'   # npm writes notices to stderr; explicit exit-code asserts below
@@ -312,7 +316,7 @@ jobs:
           $p = Start-Process node -ArgumentList "`"$boot`"" -PassThru -NoNewWindow `
                  -RedirectStandardOutput "$env:EVIDENCE\bridge-stdout.log" `
                  -RedirectStandardError  "$env:EVIDENCE\bridge-stderr.log"
-          "BRIDGE_PID=$($p.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $bridgePid = $p.Id
 
           $ok = $false
           for ($i = 0; $i -lt 30; $i++) {
@@ -335,12 +339,7 @@ jobs:
           (Invoke-WebRequest 'http://127.0.0.1:7717/state'  -UseBasicParsing -TimeoutSec 5).Content | Set-Content "$env:EVIDENCE\state-before.json"  -Encoding UTF8
           Add-Content $env:MATRIX_FILE 'BRIDGE-BOOT=PASS'
 
-      # ════════════════════════════════════════════════════════════════════
-      # 7b. DIAGNOSTIC-ONLY.ps1 (read-only audit → Desktop\fullsite-diag-*)
-      # ════════════════════════════════════════════════════════════════════
-      - name: 7b. DIAGNOSTIC-ONLY.ps1 — read-only audit
-        if: always()
-        run: |
+          # ── 7b. DIAGNOSTIC-ONLY.ps1 (read-only audit → Desktop\fullsite-diag-*)
           & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:FIELD_DIR\DIAGNOSTIC-ONLY.ps1"
           if ($LASTEXITCODE -ne 0) { Write-Error "DIAGNOSTIC-ONLY.ps1 exited $LASTEXITCODE"; exit 1 }
           $diag = Get-ChildItem "$env:USERPROFILE\Desktop" -Directory -Filter 'fullsite-diag-*' -ErrorAction SilentlyContinue |
@@ -356,12 +355,7 @@ jobs:
           Write-Host "Diagnostic evidence OK: $($diag.Name)"
           Add-Content $env:MATRIX_FILE 'DIAGNOSTIC=PASS'
 
-      # ════════════════════════════════════════════════════════════════════
-      # 7c. CERT-CAPTURE.ps1 -Label dryrun (read-only evidence capture)
-      # ════════════════════════════════════════════════════════════════════
-      - name: 7c. CERT-CAPTURE.ps1 -Label dryrun
-        if: always()
-        run: |
+          # ── 7c. CERT-CAPTURE.ps1 -Label dryrun (read-only evidence capture)
           & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\CERT-CAPTURE.ps1" -Label dryrun
           if ($LASTEXITCODE -ne 0) { Write-Error "CERT-CAPTURE.ps1 exited $LASTEXITCODE"; exit 1 }
           $ev = Get-ChildItem "$env:KIT\evidence" -Directory -ErrorAction SilentlyContinue |
@@ -383,14 +377,8 @@ jobs:
           Write-Host "Cert evidence OK: $($ev.Name)"
           Add-Content $env:MATRIX_FILE 'CERT-CAPTURE=PASS'
 
-      # ════════════════════════════════════════════════════════════════════
-      # 7d. NO-MUTATION gate — health/state identical after both audits,
-      #     events.ndjson byte-identical to the fixture. Then stop the Bridge
-      #     (must not hold locks on %APPDATA% during ROLLBACK's robocopy /MIR).
-      # ════════════════════════════════════════════════════════════════════
-      - name: 7d. No-mutation gate + stop Bridge
-        if: always()
-        run: |
+          # ── 7d. NO-MUTATION gate — health/state identical after both audits,
+          #    events.ndjson byte-identical to fixture. Then stop the Bridge.
           try {
             if (-not (Test-Path "$env:EVIDENCE\health-before.json")) { Write-Error 'Pre-audit snapshots missing (bridge boot failed?)'; exit 1 }
             $hb = Get-Content "$env:EVIDENCE\health-before.json" -Raw | ConvertFrom-Json
@@ -411,10 +399,10 @@ jobs:
             Write-Host 'No-mutation gate OK: health, state and events.ndjson untouched by DIAGNOSTIC + CERT-CAPTURE.'
             Add-Content $env:MATRIX_FILE 'NO-MUTATION=PASS'
           } finally {
-            if ($env:BRIDGE_PID) {
-              Stop-Process -Id $env:BRIDGE_PID -Force -ErrorAction SilentlyContinue
+            if ($bridgePid) {
+              Stop-Process -Id $bridgePid -Force -ErrorAction SilentlyContinue
               Start-Sleep -Seconds 2
-              Write-Host "Bridge (pid $env:BRIDGE_PID) stopped."
+              Write-Host "Bridge (pid $bridgePid) stopped."
             }
           }
 
@@ -428,6 +416,9 @@ jobs:
           # Safety: nothing may hold locks on the restore targets
           if ($env:BRIDGE_PID) { Stop-Process -Id $env:BRIDGE_PID -Force -ErrorAction SilentlyContinue }
           Get-Process | Where-Object { $_.Name -like '*Fullsite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+          # Safety: if step 7 early-exited before its finally, a stray node.exe
+          # Bridge would hold %APPDATA% locks against robocopy /MIR
+          Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
 
           & powershell -NoProfile -ExecutionPolicy Bypass -File "$env:KIT\ROLLBACK.ps1" -BackupDir "$env:BACKUP1_DIR" -Force
