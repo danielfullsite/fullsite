@@ -81,6 +81,34 @@ describe('Cancel after fire', () => {
     expect(totals.subtotal).toBe(292 + 252) // 544, no 96
   })
 
+  it('BUG-016: item with persisted cancelled flag (reloaded from DB/cache) is NOT billable even when the in-session Set is empty', () => {
+    // Repro of the overcharge: order sent with 2 items ($55 + $60), the $55 item
+    // cancelled, then the mesa reopened. On reload the in-session cancelledIds Set
+    // is empty, but the reloaded item still carries cancelled:true. Before the fix
+    // it resurrected as active → subtotal $115 → customer overcharged.
+    const items = [
+      { ...makeItemFull('horchata', 55, 1, { courseId: 1, courseStatus: 'fired' }), cancelled: true },
+      makeItemFull('cafe', 60, 1, { courseId: 1, courseStatus: 'fired' }),
+    ]
+    const emptySet = new Set<string>() // fresh reload — nothing in the session Set yet
+    const active = getActiveItems(items, emptySet)
+    const totals = calcOrderTotals(active)
+
+    expect(active).toHaveLength(1)
+    expect(active[0].id).toBe('cafe')
+    expect(totals.subtotal).toBe(60) // NOT 115 — the cancelled item is excluded
+  })
+
+  it('BUG-016: item with persisted voided flag is not billable on reload', () => {
+    const items = [
+      { ...makeItemFull('x', 100, 1, { courseId: 1, courseStatus: 'fired' }), voided: true },
+      makeItemFull('y', 40, 1, { courseId: 1, courseStatus: 'fired' }),
+    ]
+    const active = getActiveItems(items, new Set<string>())
+    expect(active).toHaveLength(1)
+    expect(calcOrderTotals(active).subtotal).toBe(40)
+  })
+
   it('voided items do not affect subtotal', () => {
     const items = [
       makeItemFull('a', 200, 1, { courseId: 1, courseStatus: 'fired' }),

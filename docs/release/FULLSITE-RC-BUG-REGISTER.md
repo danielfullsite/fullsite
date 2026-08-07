@@ -108,6 +108,31 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Fix propuesto (post-freeze, NO aplicado — electron-app congelado):** que el intervalo de recovery ejecute `_retryPendingJobs()` siempre (no solo cuando revive recoverables), o clasificar errores de infraestructura (ECONNREFUSED et al.) directo a `recoverable` en el primer fallo. + test de regresión: impresora TCP caída→PRINT_COMMAND→recuperada, sin restart.
 - **Estado:** OPEN — P1
 
+### BUG-016 · POS: ítem cancelado RESUCITA como activo y cobrable al reabrir la orden · **P1** · OPEN
+- **Clasificación:** FAIL real de PRODUCTO con impacto financiero (sobrecobro al cliente). Visible/recuperable (no pérdida silenciosa) → P1, no P0. Verificado deterministamente desde la fuente de verdad, no solo UI.
+- **Origen:** E2E-02/03 ejecución UI 2026-08-06 (navegador real + Bridge real + staging tenant demo).
+- **Repro (100%, determinista):**
+  1. POS: abrir mesa, capturar 2 ítems (horchata $55 + café $60), Enviar → orden `enviada`, subtotal $115.
+  2. Cancelar la horchata (admin Ana, motivo, PIN gerente, "Cancelar — No se preparó"). `cancel-item` → 200; DB persiste `items[horchata].cancelled=true`; audit log correcto (actor mesero, approved_by gerente, reason). UI muestra Sub $60. **Hasta aquí correcto.**
+  3. Navegar fuera (a `/pos/mesas`) y regresar a la mesa (o recargar) → **la orden reabre mostrando AMBOS ítems como activos, Sub $115**. La horchata cancelada reaparece sin marca de cancelada.
+  4. Cobrar → el total a cobrar es **$133.40** (acepta efectivo exacto $133.40 → Cambio $0.00), en vez de $69.60. **El cliente paga $63.80 de más por un producto cancelado.**
+- **Evidencia (fuente de verdad, no UI):** orden `06dec11a` cerrada en `pos_orders` con `subtotal=115, total=133.4, pagos=[{Efectivo 40},{Tarjeta 93.40}]` tras cancelar la horchata; orden `7d987c2e` (mesa 3) reabierta desde BD reproduce el Sub $115 con ambos ítems y acepta pago exacto de $133.40.
+- **Causa raíz (código, dashboard-app — NO es el electron-app congelado):** `src/app/pos/page.tsx:2000-2010`. El load hace `loadedItems2 = items.filter(i => !i.cancelled)` (correcto), pero el merge re-agrega ítems cancelados: `const localUnsent = prev.filter(i => !dbIds.has(i.id) && !sentItemIds.has(i.id)); return [...loadedItems2, ...localUnsent]`. `prev` viene del cache stale (`pos_order_${mesa}`) que incluye la horchata cancelada; `dbIds` sólo tiene los NO-cancelados; y `sentItemIds` aún no está poblado en ese punto async → la horchata cancelada cae en `localUnsent` y se RE-AGREGA como activa. `activeItems` (2736) la incluye, y el pago (3264) la cobra. El cache `pos_order_${mesa}` tampoco se actualiza al cancelar (queda con el ítem activo).
+- **Impacto:** cobro incorrecto (de más) cada vez que una orden con ítem cancelado se reabre/recarga antes de cobrar — escenario común (cancelar, bloquear pantalla o cambiar de mesa, volver a cobrar). Multi-terminal lo agrava.
+- **Fix propuesto (dashboard-app, NO aplicado aún — pendiente decisión de secuencia):** en el merge, excluir de `localUnsent` los ids que existen en el pedido de BD pero fueron filtrados por `cancelled` (trackear `cancelledDbIds` del array sin filtrar y restarlos), y/o poblar `cancelledItems`/`voidedItems` Set desde los flags de BD al cargar, y/o invalidar el cache `pos_order_${mesa}` al cancelar. + test de regresión: enviar 2 ítems → cancelar 1 → recargar → subtotal excluye el cancelado → pago cobra sólo el activo.
+- **Repro/estado:** 100% · OPEN · P1 (bloquea gate `P1 BLOCKING = 0`).
+
+### BUG-017 · POS: cancel-item escribe DOBLE entrada en audit log (formato legacy + nuevo) · P2 · OPEN
+- **Observado:** una sola cancelación genera 2 filas en `pos_audit_log` para el mismo `operation_id`: una con `details` como JSON-string legacy (mesa+reason+approved_by poblados) y otra con `details` JSON nuevo (mesa null). Ambas veraces; no es pérdida.
+- **Causa:** cliente (write directo legacy) + ruta API `cancel-item` (línea 92) escriben cada uno su audit.
+- **Impacto:** conteo inflado de cancelaciones en reportes de auditoría/anti-fraude si cuentan filas.
+- **Estado:** OPEN — dedup por operation_id o eliminar uno de los dos writes.
+
+### BUG-018 · POS: header `subtotal`/`total` de la orden no se recalcula al cancelar un ítem · P2 · OPEN
+- **Observado:** `cancel-item` sólo marca `items[i].cancelled=true` (route línea 60-61); no actualiza las columnas `subtotal`/`total` de `pos_orders`. Quedan stale (p.ej. 115/133.40 con un ítem de $55 cancelado) hasta el próximo save.
+- **Relación:** contribuye a BUG-016. Aislado es P2 (el cierre normal recalcula desde ítems activos, salvo el path de reopen roto de BUG-016).
+- **Estado:** OPEN.
+
 ### BUG-014 · shadow-mode `events` insert falla (sequence NOT NULL) · P2 · OPEN
 - **Observado:** al cobrar, `POST /rest/v1/events` → 400 `null value in column "sequence"`. Es una escritura **shadow** secundaria (no bloquea la operación: el cobro cerró 200)
 - **Evidencia:** consola navegador 2026-08-06

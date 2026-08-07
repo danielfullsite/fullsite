@@ -1998,10 +1998,13 @@ function POSContent() {
             const order = rows[0]
             const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
             const loadedItems2 = items.filter((i: OrderItem & { cancelled?: boolean }) => !i.cancelled)
-            // Merge: keep any local unsent items that aren't in the DB yet
+            // BUG-016: ids of EVERY item the DB knows about, cancelled included. The
+            // merge below must treat a DB-cancelled item as "already in the DB" so it
+            // is NOT re-added from the stale cache as an active/billable item.
+            const dbKnownIds = new Set(items.map((i: OrderItem) => i.id))
+            // Merge: keep any local unsent items that aren't in the DB yet (in any state)
             setOrderItems(prev => {
-              const dbIds = new Set(loadedItems2.map((i: OrderItem) => i.id))
-              const localUnsent = prev.filter((i: OrderItem) => !dbIds.has(i.id) && !sentItemIds.has(i.id))
+              const localUnsent = prev.filter((i: OrderItem) => !dbKnownIds.has(i.id) && !sentItemIds.has(i.id))
               if (localUnsent.length > 0) {
                 // User has new items not yet saved — keep them
                 return [...loadedItems2, ...localUnsent]
@@ -2481,6 +2484,10 @@ function POSContent() {
       i.id === cancellingItem.id ? { ...i, cancelled: true } : i
     ))
     setCancellingItem(null)
+    // BUG-016: the pos_order_${mesa} cache was written at send time with this item
+    // active. Drop it so a mesa reopen can't serve the cancelled item as billable
+    // before the DB revalidate lands.
+    try { localStorage.removeItem(`pos_order_${mesa}`) } catch { /* ignore */ }
     if (voided) {
       showToast(`${cancellingItem.nombre} ANULADO — aprobado por ${managerName}`)
     } else if (prepared) {
@@ -2733,7 +2740,14 @@ function POSContent() {
     })
   }, [])
 
-  const activeItems = (orderItems || []).filter(i => !cancelledItems.has(i.id) && !voidedItems.has(i.id))
+  // BUG-016: also honor the item's own persisted `cancelled`/`voided` flag, not just
+  // the in-session Sets. A cancelled item reloaded from the DB or a stale mesa cache
+  // must never count toward the subtotal or be billed, regardless of which load path
+  // put it into orderItems.
+  const activeItems = (orderItems || []).filter(i =>
+    !cancelledItems.has(i.id) && !voidedItems.has(i.id) &&
+    !(i as OrderItem & { cancelled?: boolean; voided?: boolean }).cancelled &&
+    !(i as OrderItem & { cancelled?: boolean; voided?: boolean }).voided)
   const subtotal = activeItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
 
   // Re-evaluate promos when items/subtotal change

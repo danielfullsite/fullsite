@@ -182,11 +182,14 @@ export function splitPersonas(personas: number): number {
 // ─── Active items filter ───────────────────────────────────────────────────
 
 /** Filter out cancelled items from the order. */
-export function getActiveItems<T extends { id: string }>(
+export function getActiveItems<T extends { id: string; cancelled?: boolean; voided?: boolean }>(
   items: T[],
   cancelledIds: Set<string>,
 ): T[] {
-  return items.filter(i => !cancelledIds.has(i.id))
+  // BUG-016: an item is inactive if it is in the in-session cancelled Set OR carries
+  // a persisted cancelled/voided flag (reloaded from the DB or a stale mesa cache).
+  // Honoring only the Set let a reloaded cancelled item resurrect as billable.
+  return items.filter(i => !cancelledIds.has(i.id) && !i.cancelled && !i.voided)
 }
 
 // ─── Format ────────────────────────────────────────────────────────────────
