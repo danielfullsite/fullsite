@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// BUG-019: este route lee pos_orders (tabla tenant con RLS). DEBE usar la
+// service-role key canónica (SUPABASE_SERVICE_KEY) — NUNCA anon (anon queda
+// denegado por RLS post-migración y antes silenciosamente devolvía datos).
+// Fail-closed: si la credencial no está configurada, 503 explícito (sin anon).
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 const MIN_DAYS = 7
 
 export async function GET(request: NextRequest) {
+  if (!SB_KEY) return NextResponse.json({ error: 'server misconfigured: SUPABASE_SERVICE_KEY required' }, { status: 503 })
   const clientId = request.nextUrl.searchParams.get('client_id')
   if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 

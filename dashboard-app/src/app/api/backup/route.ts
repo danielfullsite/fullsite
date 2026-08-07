@@ -1,7 +1,11 @@
 import { NextRequest } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// BUG-019: el backup lee tablas tenant con RLS (pos_orders, pos_staff, pos_audit_log…).
+// DEBE usar la service-role key canónica (SUPABASE_SERVICE_KEY); NUNCA anon (anon
+// queda denegado por RLS y antes hacía fallback silencioso). Fail-closed abajo.
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || ''
+// anon key SOLO para validar el Bearer del usuario contra /auth/v1/user (apikey no privilegiado).
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Solo dueños reales pueden exportar backups (NO demo).
@@ -55,6 +59,10 @@ async function fetchTable(table: string): Promise<unknown[]> {
 export async function GET(request: NextRequest) {
   if (!(await isAuthorized(request))) {
     return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
+  // Fail-closed: sin service key no se hace backup (jamás con anon).
+  if (!SUPABASE_SERVICE_KEY) {
+    return Response.json({ error: 'Backup no disponible: SUPABASE_SERVICE_KEY no configurada' }, { status: 503 })
   }
 
   const { searchParams } = new URL(request.url)

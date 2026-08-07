@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// BUG-019: lee wansoft_data (tabla tenant con RLS) además de fuentes sin client_id.
+// Usa la service-role key canónica (SUPABASE_SERVICE_KEY); NUNCA anon como fallback
+// privilegiado (anon queda denegado por RLS post-migración). Fail-closed en el handler.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 
 interface HealthCheck {
   name: string
@@ -103,6 +106,15 @@ async function checkCosteoData(): Promise<HealthCheck> {
 const SKIPPED = (name: string): HealthCheck => ({ name, status: 'ok', detail: 'Skipped — data_source=fullsite', ms: 0 })
 
 export async function GET(request: NextRequest) {
+  // Fail-closed: sin service key el health NO cae a anon; reporta degraded explícito.
+  if (!SUPABASE_KEY) {
+    return NextResponse.json({
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      total_ms: 0,
+      checks: [{ name: 'config', status: 'error', detail: 'SUPABASE_SERVICE_KEY no configurada', ms: 0 }],
+    }, { status: 503 })
+  }
   const { searchParams } = new URL(request.url)
   const dataSource = searchParams.get('data_source') ?? 'wansoft'
   const wansoft = dataSource === 'wansoft'
