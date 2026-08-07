@@ -233,7 +233,7 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
       const url = input.toString()
       calls.push({ url, body: (init?.body as string) ?? '' })
       if (url.includes('login.uber.com')) {
-        return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }))
+        return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600, scope: 'eats.order' }), { status: 200 }))
       }
       if (url.includes('supabase.co') && url.includes('integration_providers')) {
         return Promise.resolve(new Response(JSON.stringify([{
@@ -257,7 +257,7 @@ describe('DAY2-016..018: EatsLegacyAdapter URL + minutesToReady', () => {
       const url = input.toString()
       calls.push({ url, body: (init?.body as string) ?? '' })
       if (url.includes('login.uber.com')) {
-        return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }))
+        return Promise.resolve(new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600, scope: 'eats.order' }), { status: 200 }))
       }
       if (url.includes('supabase.co') && url.includes('integration_providers')) {
         return Promise.resolve(new Response(JSON.stringify([{
@@ -330,7 +330,7 @@ describe('DAY2-021..024: Token grant type routing', () => {
     expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)
   })
 
-  it('DAY2-023: eats acceptOrder uses provisioning token — supabase integration_providers lookup, no M2M token request', async () => {
+  it('DAY2-023: eats acceptOrder uses M2M eats.order — no integration_providers lookup (accept is client_credentials per current Uber docs)', async () => {
     const { spy, calls } = makeFetchSpyWithInit()
     vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('eats')
@@ -338,9 +338,11 @@ describe('DAY2-021..024: Token grant type routing', () => {
     const hasProvisioningLookup = calls.some(c =>
       c.url.includes('supabase.co') && c.url.includes('integration_providers')
     )
-    const hasM2MTokenCall = calls.some(c => c.url.includes('sandbox-login.uber.com'))
-    expect(hasProvisioningLookup).toBe(true)
-    expect(hasM2MTokenCall).toBe(false)
+    const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
+    expect(hasProvisioningLookup).toBe(false)
+    expect(tokenCall).toBeDefined()
+    const body = new URLSearchParams(tokenCall!.init?.body as string)
+    expect(body.get('scope')).toBe('eats.order')
   })
 
   it('DAY2-024: eats denyOrder uses marketplace M2M — sandbox-login with eats.order, no integration_providers', async () => {

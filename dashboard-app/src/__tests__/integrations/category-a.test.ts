@@ -500,12 +500,14 @@ describe('CAT-A-039..043: USL / OAuth Flow', () => {
     expect(parts[2]).toBe('amalay')
   })
 
-  it('CAT-A-043: exchangeUberCode throws descriptively when credentials missing', async () => {
+  it('CAT-A-043: exchangeUberCode throws descriptively when credentials missing (fail closed)', async () => {
     delete process.env.UBER_CLIENT_ID
     delete process.env.UBER_CLIENT_SECRET
+    delete process.env.UBER_TEST_CLIENT_ID
+    delete process.env.UBER_TEST_CLIENT_SECRET
     const { exchangeUberCode } = await import('@/lib/integrations/uber-eats/oauth')
     await expect(exchangeUberCode('test-code', 'https://app.fullsite.mx/callback'))
-      .rejects.toThrow('UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
+      .rejects.toThrow('UBER_TEST_CLIENT_ID')
   })
 })
 

@@ -51,15 +51,25 @@ describe('UBER-001: OAuth / USL', () => {
     expect(ADAPTER_VERSION).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
-  it('throws descriptively when credentials are missing', async () => {
-    const saved = { id: process.env.UBER_CLIENT_ID, secret: process.env.UBER_CLIENT_SECRET }
+  it('throws descriptively when credentials are missing (fail closed)', async () => {
+    const saved = {
+      env: process.env.UBER_ENV,
+      id: process.env.UBER_CLIENT_ID, secret: process.env.UBER_CLIENT_SECRET,
+      tid: process.env.UBER_TEST_CLIENT_ID, tsecret: process.env.UBER_TEST_CLIENT_SECRET,
+    }
+    process.env.UBER_ENV = 'sandbox'
     delete process.env.UBER_CLIENT_ID
     delete process.env.UBER_CLIENT_SECRET
+    delete process.env.UBER_TEST_CLIENT_ID
+    delete process.env.UBER_TEST_CLIENT_SECRET
     const { getUberAccessToken } = await import('@/lib/integrations/uber-eats/oauth')
-    // Clear module cache to pick up env change
-    await expect(getUberAccessToken()).rejects.toThrow('UBER_CLIENT_ID/UBER_CLIENT_SECRET not configured')
+    await expect(getUberAccessToken('eats.order')).rejects.toThrow('UBER_TEST_CLIENT_ID')
+    if (saved.env) process.env.UBER_ENV = saved.env
+    else delete process.env.UBER_ENV
     if (saved.id) process.env.UBER_CLIENT_ID = saved.id
     if (saved.secret) process.env.UBER_CLIENT_SECRET = saved.secret
+    if (saved.tid) process.env.UBER_TEST_CLIENT_ID = saved.tid
+    if (saved.tsecret) process.env.UBER_TEST_CLIENT_SECRET = saved.tsecret
   })
 })
 
