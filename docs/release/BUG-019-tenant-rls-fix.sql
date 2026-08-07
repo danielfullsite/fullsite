@@ -84,6 +84,8 @@ end $$;
 alter table public.pos_audit_log enable row level security;
 select private._drop_all_policies('pos_audit_log');
 revoke all on public.pos_audit_log from anon;
+-- audit inmutable: authenticated solo select+insert; update/delete revocados a nivel grant (403 duro)
+revoke update, delete on public.pos_audit_log from authenticated;
 grant select, insert on public.pos_audit_log to authenticated;
 create policy pos_audit_log_sel on public.pos_audit_log for select to authenticated
   using (private.user_has_client_access(client_id));
