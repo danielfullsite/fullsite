@@ -33,6 +33,7 @@ let _config       = null   // v2 printers config object
 let _configPath   = null   // path to persist config changes
 let _printJobsFailed = 0
 let _recoveryInterval = null
+let _retryInFlight     = false
 
 // Errors that mean "printer unreachable" — infrastructure, not content.
 // These jobs park as `recoverable` and are re-queued when the printer comes back.
@@ -63,12 +64,14 @@ function init({ printersConfig, configPath, queueFilePath }) {
     printQueue.init({ filePath: queueFilePath })
     // On startup, retry any pending or recoverable jobs from previous run
     _retryPendingJobs().catch(e => console.warn('[printer] Pending job retry error:', e.message))
-    // Periodic recovery: re-queue recoverable jobs every 60s (Wansoft polls every 15s indefinitely).
-    // This ensures printer-unavailable jobs are retried without manual intervention.
+    // Periodic recovery: every 60s (Wansoft polls every 15s indefinitely) re-queue
+    // recoverable jobs AND drain any pending/retrying backlog. BUG-015: 'retrying'
+    // jobs were only picked up at startup — a printer that came back mid-shift
+    // never printed its parked jobs until the Bridge restarted.
     if (_recoveryInterval) clearInterval(_recoveryInterval)
     _recoveryInterval = setInterval(() => {
       const revived = printQueue.retryRecoverableJobs()
-      if (revived.length > 0) {
+      if (revived.length > 0 || printQueue.getPendingJobs().length > 0) {
         _retryPendingJobs().catch(e => console.warn('[printer] Recovery retry error:', e.message))
       }
     }, 60_000)
@@ -262,17 +265,36 @@ function _printUsb(printerName, data) {
 // ── Pending job retry on startup ──────────────────────────────────────────────
 
 async function _retryPendingJobs() {
-  // On startup, also revive recoverable jobs from previous run — printer may be back.
+  // Overlap guard: the 60s recovery interval must never run two drains at once
+  // (a slow printer timeout could exceed the interval and double-print a job).
+  if (_retryInFlight) return
+  _retryInFlight = true
+  try {
+    await _drainPendingJobs()
+  } finally {
+    _retryInFlight = false
+  }
+}
+
+async function _drainPendingJobs() {
+  // Also revive recoverable jobs — printer may be back.
   printQueue.retryRecoverableJobs()
 
   const pending = printQueue.getPendingJobs()
   if (pending.length === 0) return
 
-  console.log(`[printer] Retrying ${pending.length} pending jobs from previous run...`)
+  console.log(`[printer] Retrying ${pending.length} pending job(s)...`)
 
   for (const job of pending) {
     if (!printQueue.canRetry(job.job_id)) {
-      printQueue.markFailed(job.job_id, 'Max retry attempts exceeded on startup')
+      // Out of attempts: infrastructure errors park as 'recoverable' so the
+      // 60s cycle keeps retrying indefinitely (attempts reset on re-queue,
+      // Wansoft-equivalent). Only content errors are terminal.
+      if (_isRecoverableError(job.last_error || '')) {
+        printQueue.markRecoverable(job.job_id, 'Max attempts reached — parked for recovery cycle')
+      } else {
+        printQueue.markFailed(job.job_id, 'Max retry attempts exceeded')
+      }
       continue
     }
 
@@ -309,4 +331,6 @@ module.exports = {
   getQueue: printQueue.getAllJobs,
   getPendingJobs: printQueue.getPendingJobs,
   getRecoverableJobs: printQueue.getRecoverableJobs,
+  // Test-only hooks (BUG-015 regression): drive the recovery drain without the 60s timer
+  _forTesting: { retryPendingJobs: _retryPendingJobs, stopRecoveryInterval: () => { if (_recoveryInterval) clearInterval(_recoveryInterval) } },
 }
