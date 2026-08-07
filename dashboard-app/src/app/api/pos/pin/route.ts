@@ -51,8 +51,12 @@ export async function POST(request: NextRequest) {
     }
     const clientId = client_id
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    // pos_staff has anon_read policy → anon key is sufficient for PIN lookup
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // BUG-019: pos_staff is now tenant-scoped RLS with NO anon access, so the PIN
+    // lookup must run server-side with the service_role key (bypasses RLS). The
+    // clientId is still enforced explicitly in the query filter below, and the
+    // issued shift token binds the operator to this tenant. Never expose this key
+    // to the client.
+    const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
     // Fingerprint (WebAuthn) login — look up by staff ID, validate active status + tenant
     if (fingerprint_id && typeof fingerprint_id === 'string') {
