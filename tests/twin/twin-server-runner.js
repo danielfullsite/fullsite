@@ -2,9 +2,12 @@
 // ─── Twin — Bridge Runner (child process entrypoint, --spawn mode) ────────────
 // Boots the real local-server (electron-app/local-server/index.js) headless with
 // an isolated data dir. Evolution of tests/soak/server-runner.js with:
-//   • TWO printers: cocina (TCP) + barra (TCP). The barra device also carries the
-//     'caja' station so receipts/cortes have a physical route (twin runs exactly
-//     two printers, per the AMALAY rehearsal spec).
+//   • Printers config comes from the FIXTURE via TWIN_PRINTERS_CONFIG (JSON,
+//     printer-config-schema v2). The AMALAY twin runs FIVE named printers
+//     (COCINA-1 + COCINA-2 both on station 'cocina' — real printers.json has an
+//     array of 2 — BARRA, plus the per-terminal ticket printers ENTRADA/CAJA).
+//     Fallback (env unset): legacy two-printer layout (cocina TCP + barra TCP
+//     carrying 'caja') for backwards compatibility.
 //   • Optional Supabase mock target (TWIN_SUPABASE_URL/KEY) → enables the real
 //     startSupabasePoll() against the harness's staging mock. Only ever set for
 //     the DEDICATED sync-scenario instance (STATE_SYNC clobbers local state).
@@ -13,8 +16,9 @@
 //   TWIN_DATA_DIR            — isolated data dir (events.ndjson etc.)
 //   TWIN_PORT                — HTTP/WS port
 //   TWIN_RESTAURANT_ID       — tenant id shared with simulated clients
-//   TWIN_PRINTER_COCINA_PORT — TCP port of harness fake cocina printer
-//   TWIN_PRINTER_BARRA_PORT  — TCP port of harness fake barra printer
+//   TWIN_PRINTERS_CONFIG     — JSON v2 printers config (fixture-driven, 5 printers)
+//   TWIN_PRINTER_COCINA_PORT — (legacy fallback) TCP port of fake cocina printer
+//   TWIN_PRINTER_BARRA_PORT  — (legacy fallback) TCP port of fake barra printer
 //   TWIN_INSTANCE_NAME       — mDNS/instance label
 //   TWIN_SUPABASE_URL        — (optional) staging mock base URL
 //   TWIN_SUPABASE_KEY        — (optional) fake key for the mock
@@ -41,10 +45,21 @@ if (!dataDir) {
 
 const { startLocalServer } = require(path.join(__dirname, '..', '..', 'electron-app', 'local-server', 'index.js'))
 
-// Valid v2 printers config: two physical devices.
+// Fixture-driven v2 printers config (5-printer AMALAY topology) if provided.
+let printersConfig = null
+if (process.env.TWIN_PRINTERS_CONFIG) {
+  try {
+    printersConfig = JSON.parse(process.env.TWIN_PRINTERS_CONFIG)
+  } catch (e) {
+    console.error('[twin-runner] TWIN_PRINTERS_CONFIG is not valid JSON:', e.message)
+    process.exit(1)
+  }
+}
+
+// Legacy fallback: two physical devices.
 //   cocina device ← station 'cocina' (kitchen_ticket)
 //   barra device  ← stations 'barra' + 'caja' (bar_ticket, receipt, corte…)
-const printersConfig = {
+if (!printersConfig) printersConfig = {
   schema_version: 2,
   printers: [
     {

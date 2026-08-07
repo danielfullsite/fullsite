@@ -39,6 +39,8 @@
       "terminal_id": "twin-pdv3-0000-0000-000000000001",
       "terminal_role": "pos",
       "terminal_name": "ENTRADA (PDV3)",
+      "alias": "ENTRADA",
+      "ticket_station": "tickets-entrada",
       "local_server_host": "127.0.0.1",
       "local_server_port": 7717,
       "protocol_version": "1.0",
@@ -49,16 +51,49 @@
     {
       "config_version": 1,
       "restaurant_id": "amalay-twin",
-      "terminal_id": "twin-server1-0000-0000-000000000002",
-      "terminal_role": "server_pos",
-      "terminal_name": "CAJA (SERVER1)",
+      "terminal_id": "twin-pdv1-0000-0000-000000000003",
+      "terminal_role": "pos",
+      "terminal_name": "ESCONDITE (PDV1)",
+      "alias": "ESCONDITE",
+      "ticket_station": "tickets-caja",
+      "local_ticket_printer": false,
+      "_ticket_note": "KNOWN physical FAIL (FIELD-NOTES Jul-12): PDV1 has NO working local ticket printer (192.168.1.250 unreachable, EC TICKET jam). Twin represents the operational workaround: ESCONDITE ticket jobs route to SERVER1's caja ticket station, with per-print origin evidence.",
       "local_server_host": "127.0.0.1",
       "local_server_port": 7717,
       "protocol_version": "1.0",
       "provisioned_at": "2026-08-06T00:00:00.000Z",
       "channel": "development",
-      "instance_name": "twin-server1",
-      "kds": true
+      "instance_name": "twin-pdv1"
+    },
+    {
+      "config_version": 1,
+      "restaurant_id": "amalay-twin",
+      "terminal_id": "twin-server1-0000-0000-000000000002",
+      "terminal_role": "server_pos",
+      "terminal_name": "CAJA (SERVER1)",
+      "alias": "CAJA",
+      "ticket_station": "tickets-caja",
+      "local_server_host": "127.0.0.1",
+      "local_server_port": 7717,
+      "protocol_version": "1.0",
+      "provisioned_at": "2026-08-06T00:00:00.000Z",
+      "channel": "development",
+      "instance_name": "twin-server1"
+    },
+    {
+      "config_version": 1,
+      "restaurant_id": "amalay-twin",
+      "terminal_id": "twin-kds-cocina-0000-000000000004",
+      "terminal_role": "kds",
+      "terminal_name": "KDS COCINA",
+      "alias": "KDS-COCINA",
+      "_note": "The only KDS at AMALAY is COCINA — there is NO barra KDS; barra works from printed comandas (PRINTER-BARRA).",
+      "local_server_host": "127.0.0.1",
+      "local_server_port": 7717,
+      "protocol_version": "1.0",
+      "provisioned_at": "2026-08-06T00:00:00.000Z",
+      "channel": "development",
+      "instance_name": "twin-kds-cocina"
     }
   ],
 
@@ -66,17 +101,19 @@
     { "id": "cocina", "label": "COCINA", "type": "kitchen" },
     { "id": "barra", "label": "BARRA", "type": "bar" },
     { "id": "caja", "label": "MARKET", "type": "cashier" },
-    { "id": "tickets", "label": "TICKETS", "type": "receipt" }
+    { "id": "tickets", "label": "TICKETS", "type": "receipt" },
+    { "id": "tickets-entrada", "label": "TICKETS ENTRADA (local PDV3)", "type": "receipt" },
+    { "id": "tickets-caja", "label": "TICKETS CAJA (local SERVER1)", "type": "receipt" }
   ],
 
   "printers_config": {
     "_format": "electron-app/local-server/adapters/printer-config-schema.js v2 — passes validate() as-is",
-    "_twin_note": "Hosts/ports are twin-local mock listeners (127.0.0.1:19100/19101), NOT the real AMALAY printer IPs. Real topology documented in provenance KNOWN block.",
+    "_twin_note": "Hosts/ports are twin-local mock listeners (127.0.0.1:19100-19104), NOT the real AMALAY printer IPs/USB names. Physical evidence Jul-12 (printers.json captured): station 'cocina' → ARRAY of 2 printers (fría 192.168.1.21:9100 + caliente 192.168.1.40:9100); 'barra' → 192.168.1.30:9100; ticket printers are LOCAL to each terminal (PDV3 usb TICKET, SERVER1 usb PANADERIA/EC01 — TCP in the twin); PDV1/ESCONDITE has no working ticket printer (known FAIL).",
     "schema_version": 2,
     "printers": [
       {
-        "printer_id": "twin-cocina",
-        "name": "Cocina (TWIN)",
+        "printer_id": "twin-cocina-1",
+        "name": "PRINTER-COCINA-1 (fría, real 192.168.1.21)",
         "enabled": true,
         "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19100 },
         "station_ids": ["cocina"],
@@ -85,12 +122,42 @@
         "encoding": "cp850"
       },
       {
-        "printer_id": "twin-barra",
-        "name": "Barra (TWIN)",
+        "printer_id": "twin-cocina-2",
+        "name": "PRINTER-COCINA-2 (caliente, real 192.168.1.40)",
         "enabled": true,
         "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19101 },
-        "station_ids": ["barra", "tickets", "caja"],
-        "document_types": ["bar_ticket", "receipt", "pre_ticket", "invoice", "corte", "reprint"],
+        "station_ids": ["cocina"],
+        "document_types": ["kitchen_ticket", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      },
+      {
+        "printer_id": "twin-barra",
+        "name": "PRINTER-BARRA (real 192.168.1.30)",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19102 },
+        "station_ids": ["barra"],
+        "document_types": ["bar_ticket", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      },
+      {
+        "printer_id": "twin-entrada",
+        "name": "PRINTER-ENTRADA (tickets PDV3, real usb TICKET)",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19103 },
+        "station_ids": ["tickets-entrada"],
+        "document_types": ["receipt", "pre_ticket", "invoice", "corte", "reprint"],
+        "copies": 1,
+        "encoding": "cp850"
+      },
+      {
+        "printer_id": "twin-caja",
+        "name": "PRINTER-CAJA (tickets/caja SERVER1, real usb PANADERIA/EC01)",
+        "enabled": true,
+        "connection": { "type": "tcp", "host": "127.0.0.1", "port": 19104 },
+        "station_ids": ["tickets-caja", "caja", "tickets"],
+        "document_types": ["receipt", "pre_ticket", "invoice", "corte", "reprint"],
         "copies": 1,
         "encoding": "cp850"
       }
@@ -113,7 +180,8 @@
     { "staff_id": "tw-12", "name": "Mario G.", "role": "mesero", "role_display": "Mesero", "pin": "1011", "active": true },
     { "staff_id": "tw-13", "name": "MESERO EVENTO", "role": "mesero", "role_display": "Mesero Evento", "pin": "1012", "active": true },
     { "staff_id": "tw-14", "name": "Cajero Twin", "role": "cajero", "role_display": "Cajero", "pin": "2001", "active": true },
-    { "staff_id": "tw-15", "name": "Admin Twin", "role": "admin", "role_display": "Admin", "pin": "9999", "active": true }
+    { "staff_id": "tw-15", "name": "Admin Twin", "role": "admin", "role_display": "Admin", "pin": "9999", "active": true },
+    { "staff_id": "tw-16", "name": "Revocado Twin", "role": "mesero", "role_display": "Mesero (REVOCADO)", "pin": "1099", "active": false, "_note": "Synthetic revoked staff for the revoked-staff-offline probe. Never used by traffic. Revocation enforcement lives in the web app UI (pos-manager-auth cached credentials) + Supabase pos_staff — NOT in the Bridge protocol." }
   ],
 
   "role_hierarchy": { "mesero": 1, "cajero": 2, "capitan": 3, "gerente": 4, "admin": 5 },
@@ -298,7 +366,7 @@
     "barra": ["coffee", "jugos", "fresh", "smoothies", "frappes", "sodas", "tea", "alcohol", "activaciones", "vinos", "cerveza", "licores"],
     "caja": ["icecream", "desserts", "mkt-cafe", "mkt-healthy", "mkt-vitaminas", "mkt-regalos", "mkt-amalay"],
     "fallbacks": "resolveItemStation (pos-constants.ts:211): item.station wins ('bar' normalized to 'barra'); else category map; else DB category-name keywords; else BEBIDA_KEYWORDS name match -> barra; else CAJA_KEYWORDS -> caja; else cocina",
-    "twin_note": "Twin collapses caja-station print jobs onto the barra printer (see printers_config); routing categories preserved verbatim."
+    "twin_note": "Twin runs the full 5-printer topology (see printers_config): cocina → COCINA-1 AND COCINA-2, barra → BARRA, ticket/caja docs → the LOCAL printer of the printing terminal (ENTRADA → twin-entrada, CAJA → twin-caja, ESCONDITE → twin-caja fallback per known physical FAIL). Routing categories preserved verbatim."
   },
 
   "payment_methods": [

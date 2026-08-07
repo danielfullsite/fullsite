@@ -87,6 +87,27 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Impacto real:** el paquete demo/clonability depende de que el tenant demo opere; esta deuda debe cerrarse en el provisioning del tenant demo, no en la app
 - **Estado:** OPEN — mitigado en staging; documentar en el runbook de alta de tenant demo
 
+### BUG-015 · Bridge print-queue: jobs `retrying` no se reintentan hasta el próximo restart del Bridge · **P1** · OPEN
+- **Clasificación (verificada antes de asignar severidad):** FAIL **real de PRODUCTO** en el pipeline de impresión del Bridge, NO límite de capa/harness. `PRINT_COMMAND` es comando de protocolo soportado (`protocol.js:36` → `command-handler.js:79` → `printer.printToStation`); la sonda ejercita exactamente ese path con un documento tipo corte. (Lo que sí es capa web-UI es el CÓMPUTO del corte — cubierto aparte como `corte-x` NOT-EXERCISABLE.) **No** es pérdida silenciosa: el job queda persistido y visible en `print-queue.json`/`/print-queue` con status `retrying` — por eso P1 y no P0.
+- **Origen:** AMALAY Digital Twin (5 printers / 3 POS), sonda `corte-print-outage`, 2026-08-06
+- **Pasos (repro exacto, spawn mode) con estado de `print-queue.json` en cada paso:**
+  1. Bridge arriba con printers v2 (twin: `node tests/twin/twin-harness.js --phase smoke --spawn`)
+  2. Apagar la impresora de una estación (twin: close del listener TCP → ECONNREFUSED real a nivel socket) — queue: sin el job aún
+  3. Enviar `PRINT_COMMAND` a esa estación (corte a `tickets-caja`) — ACK correcto; queue: job `pending` → `printing` (attempts=1) → intento falla ECONNREFUSED → **`retrying` (attempts=1)**
+  4. Encender la impresora — queue: job sigue **`retrying` (attempts=1)**, sin cambio
+  5. Esperar >75s (cubre el intervalo de recovery de 60s) — queue: job sigue **`retrying`**; 0 bytes en la impresora
+  6. Restart graceful del Bridge — boot: `_retryPendingJobs()` recoge pending+retrying → attempts=2 → imprime; queue: `printed`; bytes `pn=` capturados en la impresora fake
+- **Esperado:** el job sale a papel al recuperar la impresora sin intervención (benchmark Wansoft: reintenta cada 15s indefinidamente — comentario en `printer.js:66`; intención inline del propio código: "ensures printer-unavailable jobs are retried without manual intervention", `printer.js:67`)
+- **Observado (twin):** `self-drain=false` tras 75s con la impresora ya arriba; `printed on startup replay after graceful restart=true`
+- **¿`_recoverCrashedJobs` lo revive?** NO aplica: esa rutina (`print-queue.js:55-71`) solo toca jobs en status `printing` (crash mid-print, caso PRR-04). Este job está en `retrying`; en boot lo recoge `_retryPendingJobs` (`printer.js:264-296`, vía `getPendingJobs()` = pending+retrying). Mientras el Bridge siga vivo, NADIE bombea `retrying`.
+- **Causa (código, sin tocar — release frozen):** `electron-app/local-server/adapters/printer.js:69-74` — el intervalo de 60s solo llama `retryRecoverableJobs()` (revive `recoverable`) y únicamente si revivió alguno ejecuta `_retryPendingJobs()`. Un job que falla su primer intento va a `retrying` porque `canRetry` (attempts<3) gana sobre la clasificación recoverable (`printer.js:167-179`); con un solo intento por PRINT_COMMAND, nunca llega a `recoverable` sin restarts, y ningún loop periódico bombea `pending`/`retrying` — solo el boot.
+- **Impacto:** en campo, una impresora que se apaga/desconecta durante servicio deja comandas/tickets/cortes sin imprimir (visibles solo en `/print-queue`) hasta reiniciar el Bridge, incluso ya recuperada la impresora. Sin pérdida de datos (job persistido, imprime en boot) — gap de self-healing vs el benchmark offline (Wansoft).
+- **Gate que bloquea:** founder gate 6 (0 print jobs varados) en su lectura de recuperación sin intervención; el twin marca `corte-print-outage` FAIL (y por tanto `no_failed_scenarios`) hasta fix + retest.
+- **Evidencia:** `tests/twin/twin-evidence/twin-report.json` escenario `corte-print-outage` (runs smoke/shift 2026-08-06); log del run: `job status=retrying attempts=1` durante toda la ventana
+- **Repro:** 100% (determinista)
+- **Fix propuesto (post-freeze, NO aplicado — electron-app congelado):** que el intervalo de recovery ejecute `_retryPendingJobs()` siempre (no solo cuando revive recoverables), o clasificar errores de infraestructura (ECONNREFUSED et al.) directo a `recoverable` en el primer fallo. + test de regresión: impresora TCP caída→PRINT_COMMAND→recuperada, sin restart.
+- **Estado:** OPEN — P1
+
 ### BUG-014 · shadow-mode `events` insert falla (sequence NOT NULL) · P2 · OPEN
 - **Observado:** al cobrar, `POST /rest/v1/events` → 400 `null value in column "sequence"`. Es una escritura **shadow** secundaria (no bloquea la operación: el cobro cerró 200)
 - **Evidencia:** consola navegador 2026-08-06

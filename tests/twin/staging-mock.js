@@ -15,6 +15,13 @@
 //
 // Injectable behaviors: latencyMs (slow staging), failStatus (HTTP error),
 // holdMs (hang past the poll's 6 s abort).
+//
+// WAN-offline windows: dropWan() CLOSES the TCP listener (all future connects
+// get ECONNREFUSED at socket level — a REAL refused connection, not an API
+// error injection) while keeping orders/hit counters intact; restoreWan()
+// reopens the same port for the drain. This models "the WAN is gone" for the
+// only WAN consumer in Phase 1 (the bridge's Supabase poll) without touching
+// the LAN WS side at all.
 
 const http = require('http')
 
@@ -51,6 +58,14 @@ class StagingMock {
       srv.close(() => resolve())
     })
   }
+
+  /** WAN loss: tear down the TCP listener. In-flight sockets are destroyed and
+   *  every subsequent connect is refused by the OS (ECONNREFUSED) — the bridge
+   *  poll experiences a real socket-level connection failure. */
+  dropWan() { this.wanDown = true; return this.stop() }
+
+  /** WAN return: reopen the listener on the same port (for the drain). */
+  restoreWan() { this.wanDown = false; return this.start() }
 
   _handle(req, res) {
     const url = req.url || '/'

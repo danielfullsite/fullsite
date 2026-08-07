@@ -241,3 +241,27 @@ impresión física (P29). NOT IMPLEMENTED: dividir por persona (P21).
 ## Registro de cambios de este documento
 
 - 2026-08-06: creación; FASE 1 completa; evidencia LAB consolidada; bug register inicial.
+
+# AMALAY DIGITAL TWIN — 5 PRINTERS / 3 POS RUN (2026-08-06)
+
+Harness extendido a topología física completa (fixture reconciliado Jul-12):
+3 POS con identidad (ENTRADA/ESCONDITE/CAJA) + KDS COCINA + 5 impresoras TCP
+nombradas con captura de bytes ESC/POS por destino + WAN cortada a nivel
+socket (listener staging cerrado, LAN WS viva).
+
+**Shift 4h-equivalente (compress 12, spawn):** 129 órdenes (119 cerradas, 10
+canceladas) · 1,413 comandos / 1,411 ACKed · 55 acks duplicados absorbidos ·
+0 violaciones dedup · 3 restarts con recovery · 0 errores · outbox drenado.
+
+**Prints por impresora (bytes reales verificados):** COCINA-1=150 ·
+COCINA-2=151 (estación cocina → ambas, fiel a printers.json) · BARRA=121 ·
+ENTRADA=42 · CAJA=74.
+
+**Sondas nuevas:** escondite-ticket-fallback PASS (FAIL físico PDV1
+representado: RECIBO enruta a tickets-caja) · dedup-after-restart PASS ·
+concurrent-drains PASS · corte-print-outage **FAIL → BUG-015 (P1)**.
+
+**VEREDICTO shift: FAIL — 1 escenario (corte-print-outage / BUG-015).**
+Todo lo demás PASS. Nota técnica: printer-outage-recover PASS porque su ciclo
+incluye restart del Bridge (init revive jobs); BUG-015 demuestra que SIN
+restart, un job `retrying` nunca se auto-reintenta tras recuperar la impresora.

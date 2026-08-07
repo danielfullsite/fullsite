@@ -2,12 +2,18 @@
 // ─── AMALAY DIGITAL TWIN — Rehearsal Harness ─────────────────────────────────
 // Evolution of tests/soak/soak-harness.js for the AMALAY digital-twin rehearsal.
 // Drives the real Bridge (electron-app/local-server) over the real WS protocol
-// with AMALAY-shaped traffic (fixture menu/mesas/users), two capturing fake
-// ESC/POS printers (cocina + barra), a fingerprint-service mock, a slow-staging
-// Supabase REST mock, a named scenario engine covering the founder's 35-step
+// with AMALAY-shaped traffic (fixture menu/mesas/users), FIVE named capturing
+// fake ESC/POS printers matching the physical Jul-12 topology (COCINA-1 fría +
+// COCINA-2 caliente both on station 'cocina', BARRA, and per-terminal ticket
+// printers ENTRADA + CAJA; ESCONDITE has NO local ticket printer — known
+// physical FAIL — its tickets route to SERVER1's caja station per fixture), a
+// fingerprint-service mock, a slow-staging Supabase REST mock with socket-level
+// WAN-drop windows, a named scenario engine covering the founder's 35-step
 // flow (where the protocol supports it), fault injection, and hard invariant
 // gates verified from the on-disk/REST event log replayed through the REAL
-// RestaurantState.
+// RestaurantState. The three POS carry AMALAY terminal identities
+// (ENTRADA/ESCONDITE/CAJA) — every command payload and every printed ticket
+// records its originating terminal.
 //
 // Modes:
 //   --spawn      spawn the bridge as a child process (Mac smoke / CI)
@@ -111,8 +117,34 @@ const FIXTURE_LOAD = loadFixture(ARGS.config)
 const FIX = FIXTURE_LOAD.fixture
 const RESTAURANT_ID = FIX.restaurantId
 
-const COCINA_PORT = ARGS.cocinaPort || (FIX.printers.find(p => p.station === 'cocina') || {}).tcp_port || 19100
-const BARRA_PORT  = ARGS.barraPort  || (FIX.printers.find(p => p.station === 'barra')  || {}).tcp_port || 19101
+// Legacy CLI overrides re-point the FIRST printer carrying that station.
+if (ARGS.cocinaPort) { const p = FIX.printers.find(p => p.station_ids.includes('cocina')); if (p) p.tcp_port = ARGS.cocinaPort }
+if (ARGS.barraPort)  { const p = FIX.printers.find(p => p.station_ids.includes('barra'));  if (p) p.tcp_port = ARGS.barraPort }
+
+// Named printers come from the FIXTURE (5 for the AMALAY topology). Routing is
+// config-driven: a station maps to EVERY printer whose station_ids carries it
+// (cocina → COCINA-1 AND COCINA-2), and ticket printing maps per-terminal via
+// terminals[].ticket_station. Nothing below hardcodes a device.
+const PRINTERS = FIX.printers.map(p => ({ ...p, dev: null }))   // dev = CapturingPrinter, set in main()
+const PRINTERS_BY_ID = new Map(PRINTERS.map(p => [p.printer_id, p]))
+const printersForStation = (station) => PRINTERS.filter(p => p.station_ids.includes(station))
+
+function buildPrintersConfigJson() {
+  return JSON.stringify({
+    schema_version: 2,
+    printers: PRINTERS.map(p => ({
+      printer_id:     p.printer_id,
+      name:           p.name,
+      enabled:        true,
+      connection:     { type: 'tcp', host: '127.0.0.1', port: p.tcp_port },
+      station_ids:    p.station_ids,
+      document_types: p.document_types || [],
+      copies:         1,
+      encoding:       'cp850',
+    })),
+    routing: { default_station: 'tickets' },
+  })
+}
 
 const BRIDGE_HOST = MODE === 'external' ? ARGS.bridgeHost : '127.0.0.1'
 const BRIDGE_PORT = MODE === 'external' ? ARGS.bridgePort : ARGS.port
@@ -191,10 +223,10 @@ const M = {
   orders_created: 0, orders_sent_kitchen: 0, orders_closed: 0, orders_cancelled: 0, orders_split: 0,
   kds_ready_events: 0, kds_partial_status_events: 0,
   barra_deltas_observed: 0,
-  print_commands: 0, print_commands_cocina: 0, print_commands_barra: 0, print_commands_caja: 0,
+  print_commands: 0, print_commands_by_station: {},
   deltas_received: 0, snapshots_received: 0,
   ws_connects: 0, ws_disconnects: 0, network_flaps: 0,
-  printer_outages_cocina: 0, printer_outages_barra: 0,
+  printer_outages: {},               // printer_id → outage count
   client_kills: 0, tenant_probes: 0, tenant_probe_rejected: 0, tenant_subscribe_blocked: 0,
   fp_probes: 0,
   errors: [],
@@ -209,7 +241,7 @@ function recordError(kind, detail) {
 const allCommands = new Map()
 // order_id → { mesa, client, opened_at, sent, terminal, split, forced, expected_total, cancel }
 const orders = new Map()
-// print nonce → { rec (command rec), station, device }
+// print nonce → { rec (command rec), station, expected: [printer_id...], terminal }
 const printNonces = new Map()
 
 const restarts = []     // { kind, down_at, spawn_at, ready_at, first_ack_at, recovery_ms, server_id }
@@ -285,8 +317,7 @@ function spawnBridge() {
   delete env.SUPABASE_ANON_KEY
   env.TWIN_DATA_DIR            = DATA_DIR
   env.TWIN_PORT                = String(ARGS.port)
-  env.TWIN_PRINTER_COCINA_PORT = String(COCINA_PORT)
-  env.TWIN_PRINTER_BARRA_PORT  = String(BARRA_PORT)
+  env.TWIN_PRINTERS_CONFIG     = buildPrintersConfigJson()
   env.TWIN_RESTAURANT_ID       = RESTAURANT_ID
   env.TWIN_INSTANCE_NAME       = 'AMALAY Twin Bridge'
 
@@ -416,9 +447,15 @@ async function requestExternalRestart(kindLabel) {
 // ─── Simulated terminal over the real WS protocol ────────────────────────────
 
 class Terminal {
-  constructor(clientId, clientType) {
+  /** @param {{ terminal_id?: string, terminal_alias?: string }} [identity]
+   *  Terminal identity (fixture-driven: ENTRADA/ESCONDITE/CAJA). Injected into
+   *  EVERY command payload so the persisted event log records which terminal
+   *  originated each comanda/impresión — origin evidence, opaque to the server. */
+  constructor(clientId, clientType, identity) {
     this.clientId = clientId
     this.clientType = clientType
+    this.identity = identity || null
+    this.onAck = null                  // (command_id, duplicate) => void — probe hook
     this.ws = null
     this.snapshotReady = false
     this.maxSeq = -1
@@ -498,6 +535,7 @@ class Terminal {
       M.acks_total++
       const id = msg.payload && msg.payload.command_id
       if (msg.payload && msg.payload.duplicate) M.acks_duplicate++
+      if (this.onAck) { try { this.onAck(id, !!(msg.payload && msg.payload.duplicate)) } catch {} }
       if (awaitingFirstAck && !awaitingFirstAck.first_ack_at) {
         awaitingFirstAck.first_ack_at = now()
         awaitingFirstAck.recovery_ms = awaitingFirstAck.first_ack_at - awaitingFirstAck.spawn_at
@@ -571,7 +609,11 @@ class Terminal {
       type: 'COMMAND',
       restaurant_id: RESTAURANT_ID,
       client_id: this.clientId,
-      payload: { command_id, command_type: commandType, client_id: this.clientId, ...fields },
+      payload: {
+        command_id, command_type: commandType, client_id: this.clientId,
+        ...(this.identity || {}),      // terminal_id + terminal_alias — origin evidence in the event log
+        ...fields,
+      },
     }
     const rec = {
       command_id, command_type: commandType, order_id: orderId || null, msg,
@@ -623,7 +665,7 @@ class Terminal {
    *  outbox on disk); maxSeq resets to -1 → full SNAPSHOT on reconnect. */
   reincarnate() {
     this.stop()
-    const fresh = new Terminal(this.clientId, this.clientType)
+    const fresh = new Terminal(this.clientId, this.clientType, this.identity)
     fresh.pending = this.pending          // carry the outbox
     fresh.onDelta = this.onDelta
     fresh.onSnapshot = this.onSnapshot
@@ -702,27 +744,34 @@ const CASH_METHOD = FIX.paymentMethods.find(isCash) || 'efectivo'
 const CARD_METHOD = FIX.paymentMethods.find(m => /tarjeta|card/i.test(m)) || FIX.paymentMethods[0]
 const TRANSFER_METHOD = FIX.paymentMethods.find(m => /transfer/i.test(m)) || FIX.paymentMethods[0]
 
-function ticketBytes(kind, orderId, mesa, items, nonce) {
+function ticketBytes(kind, orderId, mesa, items, nonce, terminalAlias) {
   const lines = items.map(i => `${i.cantidad}x ${i.name}${(i.modificadores || []).map(mo => ` +${mo.opcion}${mo.sub_opcion ? '/' + mo.sub_opcion.opcion : ''}`).join('')}`)
   return Buffer.from(
     `\x1b\x40\x1b\x61\x01AMALAY TWIN\n` +
-    `TWIN ${kind} pn=${nonce} order=${orderId} mesa=${mesa}\n` +
+    `TWIN ${kind} pn=${nonce} term=${terminalAlias || 'unknown'} order=${orderId} mesa=${mesa}\n` +
     `\x1b\x61\x00${lines.join('\n')}\n\n\x1d\x56\x41\x03`,
     'binary'
   )
 }
 
-/** Enqueue a PRINT_COMMAND, tracking its nonce for end-to-end byte verification. */
-function sendPrint(pos, station, kind, orderId, mesa, items) {
+/** The ticket/receipt station of a POS holder — from the FIXTURE terminal
+ *  entry (per-terminal local printer: ENTRADA → tickets-entrada, CAJA →
+ *  tickets-caja; ESCONDITE has no local ticket printer and falls back to
+ *  SERVER1's tickets-caja per the fixture — known physical FAIL represented). */
+const ticketStationFor = (holder) => holder.ticket_station || 'caja'
+
+/** Enqueue a PRINT_COMMAND from a POS holder, tracking its nonce for
+ *  end-to-end byte verification on EVERY printer the fixture maps to the
+ *  station (cocina fans out to COCINA-1 AND COCINA-2). */
+function sendPrint(holder, station, kind, orderId, mesa, items) {
   const nonce = crypto.randomBytes(6).toString('hex')
-  const bytes = ticketBytes(kind, orderId, mesa, items, nonce)
-  const rec = pos.command('PRINT_COMMAND', { station, data_b64: bytes.toString('base64') }, orderId)
-  const device = station === 'cocina' ? 'cocina' : 'barra'   // 'caja' routes to the barra device
-  printNonces.set(nonce, { rec, station, device })
+  const bytes = ticketBytes(kind, orderId, mesa, items, nonce, holder.alias)
+  const rec = holder.t.command('PRINT_COMMAND', { station, data_b64: bytes.toString('base64') }, orderId)
+  const expected = printersForStation(station).map(p => p.printer_id)
+  if (expected.length === 0) recordError('print-station-unroutable', `station=${station} has no fixture printer`)
+  printNonces.set(nonce, { rec, station, expected, terminal: holder.alias })
   M.print_commands++
-  if (station === 'cocina') M.print_commands_cocina++
-  else if (station === 'barra') M.print_commands_barra++
-  else M.print_commands_caja++
+  M.print_commands_by_station[station] = (M.print_commands_by_station[station] || 0) + 1
   return rec
 }
 
@@ -769,7 +818,7 @@ async function runOrderLifecycle(holder, mesa, timing) {
     comanda_batches: [{ batch: 1, items: round1Items.map(i => i.id) }],
   }, orderId)
   o.sent = true; M.orders_sent_kitchen++
-  for (const st of stationsOf(round1Items)) sendPrint(pos(), st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, round1Items.filter(i => i.station === st))
+  for (const st of stationsOf(round1Items)) sendPrint(holder, st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, round1Items.filter(i => i.station === st))
   await s(600, 1500); if (aborted()) return
 
   // Round 2: rest of a partial send, or add-after-send
@@ -786,7 +835,7 @@ async function runOrderLifecycle(holder, mesa, timing) {
         { batch: 2, items: newOnes.map(i => i.id) },
       ],
     }, orderId)
-    for (const st of stationsOf(newOnes)) sendPrint(pos(), st, `COMANDA-${st.toUpperCase()}-B2`, orderId, mesa, newOnes.filter(i => i.station === st))
+    for (const st of stationsOf(newOnes)) sendPrint(holder, st, `COMANDA-${st.toUpperCase()}-B2`, orderId, mesa, newOnes.filter(i => i.station === st))
     await s(400, 1000); if (aborted()) return
   }
 
@@ -820,7 +869,7 @@ async function runOrderLifecycle(holder, mesa, timing) {
       if (!isCash(p.method) && Math.random() < 0.6) p.propina = Math.round(p.amount * rand(0.08, 0.16))
     }
     pos().command('ORDER_CLOSED', { order_id: orderId, mesa, total, payments, split, personas }, orderId)
-    sendPrint(pos(), 'caja', 'RECIBO', orderId, mesa, items)
+    sendPrint(holder, ticketStationFor(holder), 'RECIBO', orderId, mesa, items)
     o.terminal = 'closed'
     o.split = split
     o.payments = payments
@@ -923,15 +972,18 @@ async function doGracefulRestart() {
   } finally { restartInProgress = false }
 }
 
-async function doPrinterOutage(which, durMs) {
-  const printer = which === 'cocina' ? PRINTER_COCINA : PRINTER_BARRA
-  if (which === 'cocina') M.printer_outages_cocina++
-  else M.printer_outages_barra++
-  progress(`FAULT: printer outage ${which} (${Math.round(durMs / 1000)}s)`)
-  await printer.stop()
+/** Individual printer outage/recovery by printer_id (5 named devices). */
+async function doPrinterOutage(printerId, durMs) {
+  const printer = PRINTERS_BY_ID.get(printerId)
+  if (!printer || !printer.dev) { recordError('printer-outage', `unknown printer ${printerId}`); return }
+  M.printer_outages[printerId] = (M.printer_outages[printerId] || 0) + 1
+  progress(`FAULT: printer outage ${printerId} [${printer.name}] (${Math.round(durMs / 1000)}s)`)
+  await printer.dev.stop()
   await sleep(durMs)
-  if (!shuttingDown) { await printer.start(); progress(`printer ${which} back up`) }
+  if (!shuttingDown) { await printer.dev.start(); progress(`printer ${printerId} back up`) }
 }
+
+const totalPrinterOutages = () => Object.values(M.printer_outages).reduce((a, b) => a + b, 0)
 
 async function doClientKill() {
   const holder = pick(POS_HOLDERS)
@@ -1030,12 +1082,19 @@ function schedulePhaseFaults(profile, startAt, endAt) {
     if (t > 0 && startAt + span * frac < endAt - 5_000) timers.push(setTimeout(() => enqueueFault(fn), t))
   }
 
+  // Outage rotation: config-driven printer ids (first cocina device, the barra
+  // device, then the rest of the 5-printer roster).
+  const cocinaIds = printersForStation('cocina').map(p => p.printer_id)
+  const barraIds  = printersForStation('barra').map(p => p.printer_id)
+  const rotation  = [...new Set([...cocinaIds, ...barraIds, ...PRINTERS.map(p => p.printer_id)])]
+
   if (profile.faults === 'compressed') {
     at(0.30, doKillRestart)
     at(0.72, doKillRestart)
     at(0.50, doGracefulRestart)
-    at(0.25, () => doPrinterOutage('cocina', 15_000))
-    at(0.55, () => doPrinterOutage('barra', 15_000))
+    at(0.25, () => doPrinterOutage(cocinaIds[0], 15_000))
+    at(0.40, () => doPrinterOutage(cocinaIds[1] || cocinaIds[0], 15_000))   // second cocina device (fan-out resilience)
+    at(0.55, () => doPrinterOutage(barraIds[0], 15_000))
     at(0.62, doClientKill)
     at(0.15, runTenantProbe)
   } else if (profile.faults === 'periodic') {
@@ -1044,7 +1103,7 @@ function schedulePhaseFaults(profile, startAt, endAt) {
     for (let t = startAt + graceEvery * 1.5; t < endAt - 60_000; t += graceEvery) timers.push(setTimeout(() => enqueueFault(doGracefulRestart), t - now()))
     let alt = 0
     for (let t = startAt + outageEvery; t < endAt - 90_000; t += outageEvery) {
-      const which = (alt++ % 2 === 0) ? 'cocina' : 'barra'
+      const which = rotation[alt++ % rotation.length]
       timers.push(setTimeout(() => enqueueFault(() => doPrinterOutage(which, 20_000)), t - now()))
     }
     at(0.5, doClientKill)
@@ -1052,8 +1111,8 @@ function schedulePhaseFaults(profile, startAt, endAt) {
     at(0.7, runTenantProbe)
   } else if (profile.faults === 'light') {
     at(0.5, doKillRestart)
-    at(0.35, () => doPrinterOutage('cocina', 15_000))
-    at(0.65, () => doPrinterOutage('barra', 15_000))
+    at(0.35, () => doPrinterOutage(cocinaIds[0], 15_000))
+    at(0.65, () => doPrinterOutage(barraIds[0], 15_000))
     at(0.4, runTenantProbe)
   }
 
@@ -1197,8 +1256,7 @@ async function runSyncScenario() {
     delete env.SUPABASE_URL; delete env.SUPABASE_ANON_KEY
     env.TWIN_DATA_DIR = syncDataDir
     env.TWIN_PORT = String(ARGS.syncPort)
-    env.TWIN_PRINTER_COCINA_PORT = String(COCINA_PORT)
-    env.TWIN_PRINTER_BARRA_PORT = String(BARRA_PORT)
+    env.TWIN_PRINTERS_CONFIG = buildPrintersConfigJson()
     env.TWIN_RESTAURANT_ID = RESTAURANT_ID
     env.TWIN_INSTANCE_NAME = 'AMALAY Twin Sync Instance'
     env.TWIN_SUPABASE_URL = `http://127.0.0.1:${ARGS.stagingPort}`
@@ -1248,7 +1306,30 @@ async function runSyncScenario() {
     detail.push(`hang 8s (> 6s abort): bridge healthy=${hangOk}`)
     if (!hangOk) pass = false
 
-    // Recovery
+    // WAN-offline window: CLOSE the staging TCP listener entirely — every poll
+    // connect is refused at socket level (ECONNREFUSED; not an injected API
+    // error). The LAN WS side must stay alive: prove it with real commands on
+    // the main bridge DURING the window. Then reopen the listener for the drain.
+    staging.setBehavior({})
+    await staging.dropWan()
+    const hitsAtDrop = staging.hits
+    const lanRecs = []
+    if (POS_HOLDERS.length) {
+      lanRecs.push(POS_HOLDERS[0].t.command('MESA_LOCK', { mesa: 'wan-window-probe', expires_ms: now() + 10_000 }))
+      lanRecs.push(POS_HOLDERS[0].t.command('MESA_UNLOCK', { mesa: 'wan-window-probe' }))
+    }
+    await sleep(12_000)   // ≥2 poll cycles against a dead listener
+    const wanHealthOk = (await fetchJson(`${syncBase}/health`, 2000)).ok
+    const wanHits = staging.hits - hitsAtDrop
+    const lanAlive = lanRecs.length === 0 || lanRecs.every(r => r.acked)
+    await staging.restoreWan()
+    const wanWindowOk = wanHits === 0 && wanHealthOk && lanAlive
+    detail.push(`WAN-drop window 12s: listener closed → completed polls=${wanHits} (socket refused), bridge healthy=${wanHealthOk}, LAN WS commands ACKed during window=${lanAlive}`)
+    if (!wanWindowOk) pass = false
+    scenario('wan-offline-socket-window', wanWindowOk ? 'PASS' : 'FAIL',
+      `staging TCP listener CLOSED for 12s (connection refused at socket level, no API-error simulation): 0 polls completed=${wanHits === 0}, sync-instance /health ok=${wanHealthOk}, main-bridge LAN WS stayed alive (probe commands ACKed=${lanAlive}); listener reopened for drain — STATE_SYNC resumption verified below`)
+
+    // Recovery / drain after WAN return
     staging.setBehavior({})
     const syncsBefore = syncs.length
     await sleep(8_000)
@@ -1301,7 +1382,7 @@ async function scenarioOrder({ pos, mesa, items, personas, close }) {
     total: itemsTotal(items), comanda_batches: [{ batch: 1, items: items.map(i => i.id) }],
   }, orderId))
   o.sent = true; M.orders_sent_kitchen++
-  for (const st of stationsOf(items)) recs.push(sendPrint(pos.t, st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, items.filter(i => i.station === st)))
+  for (const st of stationsOf(items)) recs.push(sendPrint(pos, st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, items.filter(i => i.station === st)))
   const total = itemsTotal(items)
   o.expected_total = total
   if (close) {
@@ -1310,6 +1391,179 @@ async function scenarioOrder({ pos, mesa, items, personas, close }) {
   }
   const ok = await ackWait(recs, 12_000)
   return { orderId, total, ok, recs, ledger: o }
+}
+
+// ─── Probe scenarios (dedup-after-restart, concurrent-drains, corte-print-outage,
+//     revoked-staff-offline) ────────────────────────────────────────────────────
+
+/** (a) dedup-after-restart: re-send command_ids that were ACKed BEFORE a
+ *  SIGKILL+restart of the bridge, AFTER it comes back. The processed-commands
+ *  ledger must survive the crash: every re-send must ACK duplicate:true and the
+ *  event log must contain each command exactly once (0 re-applications). */
+async function runDedupAfterRestartProbe() {
+  if (MODE !== 'spawn') {
+    scenario('dedup-after-restart', 'SIMULATED-PARTIAL',
+      'external mode: restarts are orchestrator-owned; the harness auto-fires dedup probes whenever it observes an external restart via /health', 'outer orchestrator')
+    return
+  }
+  const samples = POS_HOLDERS
+    .map(h => ({ h, recs: h.t.recentAcked.slice(-2) }))
+    .filter(x => x.recs.length > 0)
+  if (samples.length === 0) { scenario('dedup-after-restart', 'SKIPPED', 'no acked commands available before restart'); return }
+  const idSet = new Set(samples.flatMap(x => x.recs.map(r => r.command_id)))
+  const ackSeen = new Map()   // command_id → last duplicate flag
+  for (const { h } of samples) h.t.onAck = (id, dup) => { if (idSet.has(id)) ackSeen.set(id, dup) }
+  const violBefore = M.dedup_probe_violations
+
+  await doKillRestart()
+  let dl = now() + 20_000
+  while (now() < dl && !POS_HOLDERS.every(h => h.t.snapshotReady)) await sleep(300)
+
+  // Explicit re-send of the pre-crash ACKed command_ids (bit-identical messages)
+  for (const { h, recs } of samples) {
+    for (const rec of recs) {
+      h.t.expectedDup.add(rec.command_id)
+      try { h.t.ws.send(JSON.stringify(rec.msg)); M.dedup_probe_sent++ } catch {}
+    }
+  }
+  dl = now() + 10_000
+  while (now() < dl && ackSeen.size < idSet.size) await sleep(200)
+  for (const { h } of samples) h.t.onAck = null
+
+  const ev = await fetchJson(`${BASE_URL}/events?since=0`, 20_000)
+  const counts = new Map()
+  for (const e of (ev.ok ? ev.body.events : [])) if (idSet.has(e.id)) counts.set(e.id, (counts.get(e.id) || 0) + 1)
+  const reapplied = [...counts].filter(([, c]) => c > 1)
+  const nonDupAcks = [...ackSeen].filter(([, dup]) => !dup)
+  const ok = ackSeen.size === idSet.size && nonDupAcks.length === 0 && reapplied.length === 0 &&
+    M.dedup_probe_violations === violBefore && counts.size === idSet.size
+  scenario('dedup-after-restart', ok ? 'PASS' : 'FAIL',
+    `${idSet.size} pre-crash-ACKed command_ids re-sent AFTER SIGKILL+restart → duplicate:true ACKs=${[...ackSeen.values()].filter(Boolean).length}, non-duplicate ACKs=${nonDupAcks.length}, re-applications in event log=${reapplied.length} (processed-commands ledger survived the crash)`)
+}
+
+/** (b) concurrent-drains: fire TWO simultaneous drain cycles replaying the same
+ *  already-ACKed outbox and verify the bridge does not double-apply — every ACK
+ *  must carry duplicate:true and the event log must hold each command once. */
+async function runConcurrentDrainsProbe() {
+  const holder = POS_HOLDERS[0]
+  const sample = holder.t.recentAcked.slice(-4)
+  if (sample.length === 0) { scenario('concurrent-drains', 'SKIPPED', 'no acked commands available'); return }
+  const idSet = new Set(sample.map(r => r.command_id))
+  const acks = new Map()   // command_id → [duplicate flags]
+  holder.t.onAck = (id, dup) => { if (idSet.has(id)) { const a = acks.get(id) || []; a.push(dup); acks.set(id, a) } }
+  const drain = () => { for (const rec of sample) { holder.t.expectedDup.add(rec.command_id); try { holder.t.ws.send(JSON.stringify(rec.msg)); M.dedup_probe_sent++ } catch {} } }
+  drain(); drain()   // two interleaved drain cycles, same tick
+  const dl = now() + 8_000
+  while (now() < dl && [...acks.values()].reduce((s, a) => s + a.length, 0) < sample.length * 2) await sleep(200)
+  holder.t.onAck = null
+  const totalAcks = [...acks.values()].reduce((s, a) => s + a.length, 0)
+  const nonDup = [...acks.entries()].filter(([, flags]) => flags.some(f => !f))
+  const ev = await fetchJson(`${BASE_URL}/events?since=0`, 20_000)
+  const counts = new Map()
+  for (const e of (ev.ok ? ev.body.events : [])) if (idSet.has(e.id)) counts.set(e.id, (counts.get(e.id) || 0) + 1)
+  const multi = [...counts].filter(([, c]) => c > 1)
+  const ok = totalAcks === sample.length * 2 && nonDup.length === 0 && multi.length === 0 && counts.size === idSet.size
+  scenario('concurrent-drains', ok ? 'PASS' : 'FAIL',
+    `${sample.length} acked commands × 2 simultaneous drain cycles → ${totalAcks} ACKs all duplicate:true=${nonDup.length === 0}, event-log applications per command=1 (double-drain does not duplicate ACK-applications)`)
+}
+
+/** (c) corte-print-outage: a corte-style print job whose printer is DOWN must
+ *  park visibly in the print queue (retrying/recoverable — never lost, never
+ *  silently dropped) and must reach paper once the printer recovers. */
+async function runCortePrintOutageProbe() {
+  if (MODE !== 'spawn') {
+    scenario('corte-print-outage', 'NOT-EXERCISABLE-AT-PROTOCOL-LEVEL',
+      'external asar-node not wired to the harness printers (see print_bytes_capture_spawn_only)', 'outer orchestrator')
+    return
+  }
+  const holder = POS_HOLDERS.find(h => /caja/i.test(h.alias || '')) || POS_HOLDERS[0]
+  const station = ticketStationFor(holder)
+  const devs = printersForStation(station)
+  if (devs.length === 0) { scenario('corte-print-outage', 'SKIPPED', `no printer serves station ${station}`); return }
+  const detail = []
+  progress(`corte-print-outage: stopping [${devs.map(p => p.printer_id).join(',')}] and printing a CORTE from ${holder.alias}`)
+  for (const p of devs) await p.dev.stop()
+
+  const item = FIX.menu[0]
+  const items = [{ id: `i-${crypto.randomBytes(4).toString('hex')}`, menu_id: item.id, name: `CORTE X ${holder.alias}`, cantidad: 1, precio: 0, station: 'caja', comensal: 1, modificadores: [] }]
+  const rec = sendPrint(holder, station, 'CORTE-X', `corte-${T0}`, 'caja', items)
+  const nonce = [...printNonces.entries()].find(([, info]) => info.rec === rec)[0]
+  await ackWait(rec, 10_000)
+
+  await sleep(4_000)   // let the physical attempt fail (ECONNREFUSED)
+  // File-truth: the job must exist in print-queue.json in a non-terminal,
+  // non-lost state. Match by payload bytes (nonce inside data_b64).
+  const findJob = () => {
+    try {
+      const jobs = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'print-queue.json'), 'utf8'))
+      return jobs.find(j => { try { return Buffer.from(j.data_b64, 'base64').includes(`pn=${nonce}`) } catch { return false } }) || null
+    } catch { return null }
+  }
+  let job = findJob()
+  const parkedOk = !!job && ['retrying', 'recoverable', 'pending'].includes(job.status)
+  detail.push(`while printer down: job ${job ? `status=${job.status} attempts=${job.attempts}` : 'MISSING FROM QUEUE'} (parked-not-lost=${parkedOk})`)
+  if (!job) {
+    for (const p of devs) await p.dev.start()
+    scenario('corte-print-outage', 'FAIL', `${detail.join(' | ')} — print job silently absent from print-queue.json`)
+    return
+  }
+
+  // Printer recovers
+  for (const p of devs) await p.dev.start()
+  progress(`corte-print-outage: printer(s) back up — waiting up to 75s for self-drain (60s recovery interval)`)
+  let selfDrained = false
+  let dl = now() + 75_000
+  while (now() < dl) {
+    if (devs.some(p => p.dev.countMarker(`pn=${nonce}`) > 0)) { selfDrained = true; break }
+    await sleep(2_500)
+  }
+  detail.push(`self-drain after printer recovery (no restart, 75s window): ${selfDrained}`)
+
+  let exitedOnRestart = false
+  if (!selfDrained) {
+    // Observed product behavior: a job parked in 'retrying' is only re-attempted
+    // on bridge startup (or when a 'recoverable' revival fires). Prove the job
+    // is not lost: a graceful restart must replay it to paper.
+    job = findJob()
+    detail.push(`pre-restart queue status: ${job && job.status}`)
+    await doGracefulRestart()
+    dl = now() + 25_000
+    while (now() < dl) {
+      if (devs.some(p => p.dev.countMarker(`pn=${nonce}`) > 0)) { exitedOnRestart = true; break }
+      await sleep(1_000)
+    }
+    detail.push(`printed on startup replay after graceful restart: ${exitedOnRestart}`)
+  }
+
+  const notLost = parkedOk && (selfDrained || exitedOnRestart)
+  // The founder gate for this probe is "parked visibly AND exits when the
+  // printer recovers". Exiting only via restart is a product finding (registered
+  // in the RC bug register), not a harness gap — report it as FAIL of the
+  // self-recovery expectation while still recording that no data was lost.
+  scenario('corte-print-outage', (parkedOk && selfDrained) ? 'PASS' : 'FAIL',
+    `${detail.join(' | ')}${notLost && !selfDrained ? ' — PRODUCT FINDING: retrying jobs are not re-attempted while the bridge stays up (recovery interval only revives recoverable jobs); job exits only on bridge restart. Not lost, but not self-healing.' : ''}`)
+}
+
+/** (d) revoked-staff-offline: the WS protocol has no staff/auth surface — the
+ *  bridge never learns the staff roster, so revocation CANNOT be enforced (or
+ *  probed) at protocol level. Evidence probe: a command carrying the revoked
+ *  staff's identity is ACKed and recorded opaquely by the bridge. */
+async function runRevokedStaffOfflineProbe() {
+  const revoked = (FIX.users_revoked || [])[0]
+  if (!revoked) {
+    scenario('revoked-staff-offline', 'SKIPPED', 'fixture has no revoked staff entry (users[].active=false)')
+    return
+  }
+  const holder = POS_HOLDERS[0]
+  const mesa = `revoked-probe`
+  const recs = [
+    holder.t.command('MESA_LOCK', { mesa, expires_ms: now() + 10_000, authorized_by: revoked.name, auth_method: 'pin', auth_pin_ok: true, staff_revoked_in_fixture: true }),
+    holder.t.command('MESA_UNLOCK', { mesa, authorized_by: revoked.name, auth_method: 'pin' }),
+  ]
+  const acked = await ackWait(recs, 8_000)
+  scenario('revoked-staff-offline', 'NOT-EXERCISABLE-AT-PROTOCOL-LEVEL',
+    `protocol.js has no LOGIN/AUTH/staff-sync command — the Bridge never receives the staff roster and cannot enforce revocation. Evidence: commands carrying revoked staff "${revoked.name}" (fixture active=false) were ACKed=${acked} and recorded opaquely. Offline revocation enforcement owner: web app UI (pos-manager-auth cached credentials + PIN cache refresh) + Supabase pos_staff. The offline window between revocation in Supabase and the POS cache refresh is a documented product property, not exercisable from this harness.`,
+    'web app UI (pos-manager-auth) + Supabase pos_staff sync')
 }
 
 async function runScenarioSuite() {
@@ -1371,7 +1625,7 @@ async function runScenarioSuite() {
       close: (orderId, total, o) => {
         o.terminal = 'closed'; o.payments = [{ method: CASH_METHOD, amount: total }]; M.orders_closed++
         return [pos1.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: false, personas: 4 }, orderId),
-                sendPrint(pos1.t, 'caja', 'RECIBO', orderId, o.mesa, items)]
+                sendPrint(pos1, ticketStationFor(pos1), 'RECIBO', orderId, o.mesa, items)]
       },
     })
     scenario('multi-comensal-order', r.ok ? 'PASS' : 'FAIL', `4 personas, ${r.recs.length} commands, per-item comensal tags (payload-opaque to the server)`)
@@ -1413,7 +1667,7 @@ async function runScenarioSuite() {
       pos1.t.command('ORDER_SENT', { order_id: orderId, mesa, mesero: mesero.name, status: 'enviada', items: batch1, personas: 2, total: itemsTotal(batch1), comanda_batches: [{ batch: 1, items: batch1.map(i => i.id) }] }, orderId),
     ]
     o.sent = true; M.orders_sent_kitchen++
-    for (const st of stationsOf(batch1)) recs.push(sendPrint(pos1.t, st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, batch1.filter(i => i.station === st)))
+    for (const st of stationsOf(batch1)) recs.push(sendPrint(pos1, st, `COMANDA-${st.toUpperCase()}-B1`, orderId, mesa, batch1.filter(i => i.station === st)))
     const partialOk = await ackWait(recs)
     scenario('partial-kitchen-send', partialOk ? 'PASS' : 'FAIL', `round 1: ${batch1.length} items in comanda batch 1`)
 
@@ -1424,7 +1678,7 @@ async function runScenarioSuite() {
       total: itemsTotal(all),
       comanda_batches: [{ batch: 1, items: batch1.map(i => i.id) }, { batch: 2, items: added.map(i => i.id) }],
     }, orderId)]
-    for (const st of stationsOf(added)) recs2.push(sendPrint(pos1.t, st, `COMANDA-${st.toUpperCase()}-B2`, orderId, mesa, added.filter(i => i.station === st)))
+    for (const st of stationsOf(added)) recs2.push(sendPrint(pos1, st, `COMANDA-${st.toUpperCase()}-B2`, orderId, mesa, added.filter(i => i.station === st)))
     o.expected_total = itemsTotal(all)
     o.terminal = 'closed'; o.payments = [{ method: CARD_METHOD, amount: o.expected_total }]; M.orders_closed++
     recs2.push(pos1.t.command('ORDER_CLOSED', { order_id: orderId, mesa, total: o.expected_total, payments: o.payments, split: false }, orderId))
@@ -1432,41 +1686,103 @@ async function runScenarioSuite() {
     scenario('add-after-send', addOk ? 'PASS' : 'FAIL', `round 2: +${added.length} items, full list re-sent with batch map (server contract), batch-2 comanda printed`)
   }
 
-  // 10. cocina/barra routing (station from menu fixture) — verified in bytes
+  // 10. Print routing — 5 DESTINATIONS, verified in raw bytes on the named
+  // printers. A cocina+barra order from ENTRADA must land: comanda cocina on
+  // COCINA-1 AND COCINA-2 (station array of 2, as in the real printers.json),
+  // comanda barra on BARRA, and the closing RECIBO on the printer LOCAL to the
+  // terminal that charges (ENTRADA → PRINTER-ENTRADA). A second order charged
+  // from CAJA must put its RECIBO on PRINTER-CAJA.
   {
     const cocinaItem = FIX.menu.find(m => m.station === 'cocina')
     const barraItem = FIX.menu.find(m => m.station === 'barra')
-    const items = [cocinaItem, barraItem].filter(Boolean).map(m => ({
+    const mkItems = (defs) => defs.filter(Boolean).map(m => ({
       id: `i-${crypto.randomBytes(4).toString('hex')}`, menu_id: m.id, name: m.name,
       cantidad: 1, precio: m.price, station: m.station, comensal: 1, modificadores: [],
     }))
-    const r = await scenarioOrder({
-      pos: pos2, mesa: nextMesa(), items, personas: 1,
+    const entrada = POS_HOLDERS[0]
+    const cajaPos = POS_HOLDERS.find(h => h !== entrada && h.local_ticket_printer !== false &&
+      printersForStation(ticketStationFor(h)).length > 0) || POS_HOLDERS[POS_HOLDERS.length - 1]
+
+    const itemsA = mkItems([cocinaItem, barraItem])
+    const rA = await scenarioOrder({
+      pos: entrada, mesa: nextMesa(), items: itemsA, personas: 1,
       close: (orderId, total, o) => {
         o.terminal = 'closed'; o.payments = [{ method: CASH_METHOD, amount: total }]; M.orders_closed++
-        return pos2.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: false }, orderId)
+        return [entrada.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: false }, orderId),
+                sendPrint(entrada, ticketStationFor(entrada), 'RECIBO', orderId, o.mesa, itemsA)]
       },
     })
-    // wait for physical capture of both comandas
-    const deadline = now() + 12_000
-    let cocinaHit = 0, barraHit = 0
-    while (now() < deadline) {
-      cocinaHit = PRINTER_COCINA.countMarker(`order=${r.orderId}`)
-      barraHit = PRINTER_BARRA.countMarker(`order=${r.orderId}`)
-      if (cocinaHit > 0 && barraHit > 0) break
-      await sleep(400)
+    const rB = await scenarioOrder({
+      pos: cajaPos, mesa: nextMesa(), items: mkItems([cocinaItem]), personas: 1,
+      close: (orderId, total, o) => {
+        o.terminal = 'closed'; o.payments = [{ method: CASH_METHOD, amount: total }]; M.orders_closed++
+        return [cajaPos.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: false }, orderId),
+                sendPrint(cajaPos, ticketStationFor(cajaPos), 'RECIBO', orderId, o.mesa, mkItems([cocinaItem]))]
+      },
+    })
+
+    const cocinaDevs  = printersForStation('cocina')
+    const barraDevs   = printersForStation('barra')
+    const entradaDevs = printersForStation(ticketStationFor(entrada))
+    const cajaDevs    = printersForStation(ticketStationFor(cajaPos))
+    const hits = {}
+    if (MODE === 'spawn') {
+      const deadline = now() + 15_000
+      const check = () => {
+        for (const p of cocinaDevs)  hits[`cocina:${p.printer_id}`]        = p.dev.countMarker(`order=${rA.orderId}`)
+        for (const p of barraDevs)   hits[`barra:${p.printer_id}`]         = p.dev.countMarker(`order=${rA.orderId}`)
+        for (const p of entradaDevs) hits[`ticket-entrada:${p.printer_id}`] = p.dev.countMarker(`order=${rA.orderId}`)
+        for (const p of cajaDevs)    hits[`ticket-caja:${p.printer_id}`]    = p.dev.countMarker(`order=${rB.orderId}`)
+        return Object.values(hits).every(n => n > 0)
+      }
+      while (now() < deadline && !check()) await sleep(400)
     }
     // Byte capture is spawn-only (see print_bytes_capture_spawn_only): the
-    // external asar-node Bridge isn't wired to the harness printers, so
-    // cocina/barra capture is 0 by construction. Routing-to-station is proven
-    // in spawn; external records it NOT-WIRED rather than a false FAIL.
-    scenario('cocina-barra-print-routing',
+    // external asar-node Bridge isn't wired to the harness printers — routing
+    // is proven in spawn; external records NOT-WIRED rather than a false FAIL.
+    const all5 = Object.values(hits).length >= 5 && Object.values(hits).every(n => n > 0)
+    scenario('print-routing-5-destinations',
       MODE !== 'spawn' ? 'NOT-EXERCISABLE-AT-PROTOCOL-LEVEL'
-        : ((r.ok && cocinaHit > 0 && barraHit > 0) ? 'PASS' : 'FAIL'),
+        : ((rA.ok && rB.ok && all5) ? 'PASS' : 'FAIL'),
       MODE !== 'spawn'
-        ? 'external asar-node does not wire the installed Bridge to the harness printers — routing proven in spawn mode'
-        : `raw bytes captured — cocina device jobs for order: ${cocinaHit}, barra device jobs: ${barraHit} (stations from menu fixture)`)
-    LAST_ROUTED_ORDER = r.orderId
+        ? 'external asar-node does not wire the installed Bridge to the harness printers — 5-destination routing proven in spawn mode'
+        : `raw bytes per destination: ${Object.entries(hits).map(([k, v]) => `${k}=${v}`).join(' ')} (cocina fans out to ${cocinaDevs.length} devices; ticket goes to the charging terminal's local printer)`)
+    LAST_ROUTED_ORDER = rA.orderId
+  }
+
+  // 10b. ESCONDITE ticket fallback — PDV1 has NO working local ticket printer
+  // (known physical FAIL, FIELD-NOTES Jul-12). The fixture routes its tickets
+  // to SERVER1's caja ticket station; the twin proves that fallback lands on
+  // PRINTER-CAJA with the origin terminal recorded in the bytes/evidence.
+  {
+    const esc = POS_HOLDERS.find(h => h.local_ticket_printer === false || /escondite/i.test(h.alias || ''))
+    if (!esc) {
+      scenario('escondite-ticket-fallback', 'SKIPPED', 'fixture has no terminal flagged without a local ticket printer')
+    } else if (MODE !== 'spawn') {
+      scenario('escondite-ticket-fallback', 'NOT-EXERCISABLE-AT-PROTOCOL-LEVEL',
+        'external asar-node not wired to the harness printers — fallback proven in spawn mode')
+    } else {
+      const item = FIX.menu.find(m => m.station === 'cocina')
+      const items = [{ id: `i-${crypto.randomBytes(4).toString('hex')}`, menu_id: item.id, name: item.name, cantidad: 1, precio: item.price, station: item.station, comensal: 1, modificadores: [] }]
+      const r = await scenarioOrder({
+        pos: esc, mesa: nextMesa(), items, personas: 1,
+        close: (orderId, total, o) => {
+          o.terminal = 'closed'; o.payments = [{ method: CASH_METHOD, amount: total }]; M.orders_closed++
+          return [esc.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: false }, orderId),
+                  sendPrint(esc, ticketStationFor(esc), 'RECIBO', orderId, o.mesa, items)]
+        },
+      })
+      const fallbackDevs = printersForStation(ticketStationFor(esc))
+      const deadline = now() + 15_000
+      let captured = 0
+      while (now() < deadline) {
+        captured = fallbackDevs.reduce((s, p) => s + p.dev.countMarker(`term=${esc.alias} order=${r.orderId}`), 0)
+        if (captured > 0) break
+        await sleep(400)
+      }
+      scenario('escondite-ticket-fallback', (r.ok && captured > 0) ? 'PASS' : 'FAIL',
+        `ESCONDITE has no local ticket printer (known physical FAIL, PDV1 — represented in fixture). Its RECIBO routed to station "${ticketStationFor(esc)}" and was captured on [${fallbackDevs.map(p => p.printer_id).join(',')}] with origin term=${esc.alias} in the bytes (${captured} job(s))`)
+    }
   }
 
   // 11. KDS receive + status changes — verified via traffic KDS metrics at end;
@@ -1494,7 +1810,7 @@ async function runScenarioSuite() {
         o.payments = [{ method: CARD_METHOD, amount: half }, { method: CASH_METHOD, amount: total - half }]
         M.orders_closed++; M.orders_split++
         return [pos1.t.command('ORDER_CLOSED', { order_id: orderId, mesa: o.mesa, total, payments: o.payments, split: true }, orderId),
-                sendPrint(pos1.t, 'caja', 'RECIBO', orderId, o.mesa, items)]
+                sendPrint(pos1, ticketStationFor(pos1), 'RECIBO', orderId, o.mesa, items)]
       },
     })
     scenario('split-payment', r.ok ? 'PASS' : 'FAIL', `payments tarjeta+efectivo sum exactly to total $${r.total}`)
@@ -1559,10 +1875,16 @@ async function runScenarioSuite() {
       `probes sent=${M.dedup_probe_sent}, confirmed duplicate:true=${M.dedup_probe_confirmed}, violations=${M.dedup_probe_violations}`)
   }
 
+  // 22-24. new probe scenarios (5-printer / restart-dedup / drain-concurrency / staff)
+  await runConcurrentDrainsProbe()
+  await runDedupAfterRestartProbe()
+  await runRevokedStaffOfflineProbe()
+  await runCortePrintOutageProbe()
+
   // 25-27. orchestrator-owned faults
   if (MODE === 'spawn') {
     scenario('wan-loss', 'NOT-EXERCISABLE-AT-PROTOCOL-LEVEL',
-      'spawn-mode twin bridge runs with Supabase disabled — WAN loss is a NO-OP for the Phase-1 command path (LAN-only authority; nothing in the ACK path touches the internet). The sync-inbound-staging scenario covers the only WAN consumer (Supabase poll) in isolation.',
+      'spawn-mode twin bridge runs with Supabase disabled — WAN loss is a NO-OP for the Phase-1 command path (LAN-only authority; nothing in the ACK path touches the internet). The only WAN consumer (Supabase poll) is exercised with a REAL socket-level WAN drop in wan-offline-socket-window (staging listener closed → connection refused), LAN WS kept alive throughout.',
       'outer orchestrator (external mode) / Phase-2 sync engine')
   }
   emitHook('CLOCK-SKEW', {
@@ -1947,20 +2269,29 @@ async function verifyRun(drainMs) {
   // print (proven end-to-end in spawn: soak 478/478, local full cocina 1205 +
   // barra 1087 + caja 993). So the paper-trail gate applies only in spawn mode;
   // external records it as an informational limitation, never a stop condition.
-  let unmatchedNonces = [...printNonces.entries()].filter(([nonce, info]) =>
-    info.rec.acked && (info.device === 'cocina' ? PRINTER_COCINA : PRINTER_BARRA).countMarker(`pn=${nonce}`) === 0)
+  // A print job is "on paper" only when EVERY printer the fixture maps to its
+  // station captured the nonce (cocina comandas must land on COCINA-1 AND
+  // COCINA-2 — the physical array of 2).
+  const missingDevices = ([nonce, info]) =>
+    (info.expected || []).filter(pid => {
+      const p = PRINTERS_BY_ID.get(pid)
+      return !p || !p.dev || p.dev.countMarker(`pn=${nonce}`) === 0
+    })
+  let unmatchedNonces = [...printNonces.entries()].filter((e) => e[1].rec.acked && missingDevices(e).length > 0)
   if (MODE === 'spawn' && unmatchedNonces.length > 0) {
     // give the 60s recoverable-revive interval one more chance before judging
-    progress(`print end-to-end: ${unmatchedNonces.length} acked print jobs not yet on paper — waiting up to 70s for queue recovery`)
+    progress(`print end-to-end: ${unmatchedNonces.length} acked print jobs not yet on paper (all expected devices) — waiting up to 70s for queue recovery`)
     const deadline = now() + 70_000
     while (now() < deadline && unmatchedNonces.length > 0) {
       await sleep(5_000)
-      unmatchedNonces = unmatchedNonces.filter(([nonce, info]) =>
-        (info.device === 'cocina' ? PRINTER_COCINA : PRINTER_BARRA).countMarker(`pn=${nonce}`) === 0)
+      unmatchedNonces = unmatchedNonces.filter((e) => missingDevices(e).length > 0)
     }
   }
   const dupPhysical = [...printNonces.entries()].filter(([nonce, info]) =>
-    (info.device === 'cocina' ? PRINTER_COCINA : PRINTER_BARRA).countMarker(`pn=${nonce}`) > 1).length
+    (info.expected || []).some(pid => {
+      const p = PRINTERS_BY_ID.get(pid)
+      return p && p.dev && p.dev.countMarker(`pn=${nonce}`) > 1
+    })).length
   if (MODE === 'spawn') {
     // Accumulation phases compress 7/30 restaurant-DAYS into minutes: accum30
     // pushes ~10.8k print commands in ~12 min (~15/s) vs a real ~120 tickets/DAY.
@@ -1974,8 +2305,8 @@ async function verifyRun(drainMs) {
       unmatchedNonces.length
         ? { count: unmatchedNonces.length, total_print_jobs: printNonces.size, informational_in_accum: isAccum,
             note: isAccum ? 'accum compresses 7/30 restaurant-days into minutes — print throughput exceeds the fake-printer drain window (pacing artifact). Paper-trail proven at realistic rates (shift/full/soak).' : undefined,
-            sample: unmatchedNonces.slice(0, 10).map(([n, i]) => ({ nonce: n, station: i.station, command: i.rec.command_id })) }
-        : `${printNonces.size} print jobs all captured as raw bytes (duplicate physical prints after crash-replay: ${dupPhysical} — by design, reprint-on-uncertainty)`,
+            sample: unmatchedNonces.slice(0, 10).map(([n, i]) => ({ nonce: n, station: i.station, terminal: i.terminal, missing_devices: missingDevices([n, i]), command: i.rec.command_id })) }
+        : `${printNonces.size} print jobs all captured as raw bytes on EVERY fixture-mapped device (cocina fan-out ×${printersForStation('cocina').length}; duplicate physical prints after crash-replay: ${dupPhysical} — by design, reprint-on-uncertainty)`,
       isAccum ? { gate: 6, informational: true } : { gate: 6, stopClass: 'stuck-print' })
   } else {
     inv('print_bytes_capture_spawn_only', true,
@@ -1984,8 +2315,8 @@ async function verifyRun(drainMs) {
   }
   if (MODE === 'spawn' && !isAccum) {
     scenario('printer-outage-recover',
-      (M.printer_outages_cocina + M.printer_outages_barra) > 0 && unmatchedNonces.length === 0 ? 'PASS' : ((M.printer_outages_cocina + M.printer_outages_barra) === 0 ? 'SKIPPED' : 'FAIL'),
-      `outages: cocina=${M.printer_outages_cocina} barra=${M.printer_outages_barra}; all acked jobs eventually on paper=${unmatchedNonces.length === 0}`)
+      totalPrinterOutages() > 0 && unmatchedNonces.length === 0 ? 'PASS' : (totalPrinterOutages() === 0 ? 'SKIPPED' : 'FAIL'),
+      `outages per printer: ${JSON.stringify(M.printer_outages)}; all acked jobs eventually on paper (every expected device)=${unmatchedNonces.length === 0}`)
   } else if (isAccum) {
     scenario('printer-outage-recover', 'SIMULATED-PARTIAL',
       'accum phase measures accumulation/data-safety at volume, not print throughput — paper-trail proven at realistic rates')
@@ -2040,7 +2371,8 @@ async function verifyRun(drainMs) {
     // all three stations, and the data dir's server-id file must have survived.
     const hFinal = await fetchJson(`${BASE_URL}/health`, 3000)
     const stationsNow = (hFinal.ok && hFinal.body.stations) || []
-    const stationsOk = ['cocina', 'barra', 'caja'].every(s => stationsNow.includes(s))
+    const requiredStations = [...new Set(PRINTERS.flatMap(p => p.station_ids))]
+    const stationsOk = requiredStations.every(s => stationsNow.includes(s))
     const serverIdFileOk = fs.existsSync(path.join(DATA_DIR, 'server-id'))
     inv('printer_routing_survives_restart', stationsOk && serverIdFileOk,
       { stations_after_final_restart: stationsNow, server_id_file_persisted: serverIdFileOk, informational_in_accum: isAccum }, { gate: 12, informational: isAccum })
@@ -2062,10 +2394,10 @@ async function verifyRun(drainMs) {
   // printers — see print_bytes_capture_spawn_only). Proven in spawn: soak
   // 478/478, local full 3285 jobs.
   if (MODE === 'spawn') {
-    inv('both_printers_captured_bytes', PRINTER_COCINA.jobs.length > 0 && PRINTER_BARRA.jobs.length > 0,
-      { cocina_jobs: PRINTER_COCINA.jobs.length, barra_jobs: PRINTER_BARRA.jobs.length })
+    inv('all_5_printers_captured_bytes', PRINTERS.every(p => p.dev && p.dev.jobs.length > 0),
+      Object.fromEntries(PRINTERS.map(p => [p.printer_id, p.dev ? p.dev.jobs.length : 0])))
   } else {
-    inv('both_printers_captured_bytes_spawn_only', true,
+    inv('printers_captured_bytes_spawn_only', true,
       'NOT-WIRED-IN-EXTERNAL-ASAR: byte capture requires the harness to boot the Bridge with printers.json pointed at its fake ESC/POS servers (spawn mode). Proven in spawn.')
   }
   inv('no_unexpected_rejects', M.rejects_unexpected === 0, { rejects_unexpected: M.rejects_unexpected })
@@ -2108,7 +2440,8 @@ function buildReport(verification, exitCode) {
     fixture: { source: FIXTURE_LOAD.source, restaurant_id: RESTAURANT_ID, warnings: FIXTURE_LOAD.warnings },
     config: {
       bridge: `${BRIDGE_HOST}:${BRIDGE_PORT}`, data_dir: DATA_DIR,
-      printer_cocina_port: COCINA_PORT, printer_barra_port: BARRA_PORT,
+      printers: PRINTERS.map(p => ({ printer_id: p.printer_id, name: p.name, port: p.tcp_port, station_ids: p.station_ids })),
+      terminals: POS_HOLDERS.map(h => ({ terminal_id: h.id, alias: h.alias, ticket_station: h.ticket_station })),
       fp_port: ARGS.fpPort, staging_port: ARGS.stagingPort,
       compress: ARGS.compress, node: process.version,
       phase_notes: PHASE_SEQUENCE.map(p => p.note).filter(Boolean),
@@ -2135,10 +2468,9 @@ function buildReport(verification, exitCode) {
       drain_ms: verification ? verification.drain_ms : null,
       command_retries: M.command_retries,
       duplicates_absorbed: M.acks_duplicate + M.dedup_probe_confirmed,
-      print: {
-        cocina: { jobs_captured: PRINTER_COCINA.jobs.length, bytes: PRINTER_COCINA.bytes, connections: PRINTER_COCINA.connections },
-        barra:  { jobs_captured: PRINTER_BARRA.jobs.length,  bytes: PRINTER_BARRA.bytes,  connections: PRINTER_BARRA.connections },
-      },
+      print: Object.fromEntries(PRINTERS.map(p => [p.printer_id, p.dev
+        ? { name: p.name, port: p.tcp_port, stations: p.station_ids, jobs_captured: p.dev.jobs.length, bytes: p.dev.bytes, connections: p.dev.connections, outages: M.printer_outages[p.printer_id] || 0 }
+        : { name: p.name, port: p.tcp_port, stations: p.station_ids, jobs_captured: 0, bytes: 0, connections: 0, outages: 0 }])),
       sync_queue: {
         health_last_value: lastHealth ? lastHealth.sync_queue_size : null,
         file_truth_unsynced: unsyncedFromFile(),
@@ -2165,8 +2497,6 @@ function writeReport(verification, exitCode) {
 
 let T0 = 0
 let DATA_DIR = null
-let PRINTER_COCINA = null
-let PRINTER_BARRA = null
 let FP_MOCK = null
 
 async function main() {
@@ -2174,7 +2504,7 @@ async function main() {
   fs.mkdirSync(EVID_DIR, { recursive: true })
   fs.mkdirSync(HOOKS_DIR, { recursive: true })
   fs.writeFileSync(PROGRESS_LOG, '')
-  for (const d of ['printer-cocina-jobs', 'printer-barra-jobs']) {
+  for (const d of ['printer-cocina-jobs', 'printer-barra-jobs', ...PRINTERS.map(p => `printer-${p.printer_id}-jobs`)]) {
     fs.rmSync(path.join(EVID_DIR, d), { recursive: true, force: true })
   }
   try { fs.rmSync(STOP_PATH, { force: true }) } catch {}
@@ -2189,12 +2519,18 @@ async function main() {
   for (const w of FIXTURE_LOAD.warnings) progress(`  fixture warning: ${w}`)
   for (const p of PHASE_SEQUENCE) if (p.note) progress(`  NOTE: ${p.note}`)
 
-  // Fake printers (both modes — in external mode the installed bridge's
-  // printers.json must point at THIS host's IP on these ports)
-  PRINTER_COCINA = new CapturingPrinter({ station: 'cocina', port: COCINA_PORT, evidenceDir: path.join(EVID_DIR, 'printer-cocina-jobs'), onError: (m) => recordError('fake-printer', m) })
-  PRINTER_BARRA = new CapturingPrinter({ station: 'barra', port: BARRA_PORT, evidenceDir: path.join(EVID_DIR, 'printer-barra-jobs'), onError: (m) => recordError('fake-printer', m) })
-  await PRINTER_COCINA.start()
-  await PRINTER_BARRA.start()
+  // Fake printers — one named CapturingPrinter per fixture printer (5 for the
+  // AMALAY topology). In external mode the installed bridge's printers.json
+  // must point at THIS host's IP on these ports.
+  for (const p of PRINTERS) {
+    p.dev = new CapturingPrinter({
+      id: p.printer_id, name: p.name, station: p.station, port: p.tcp_port,
+      evidenceDir: path.join(EVID_DIR, `printer-${p.printer_id}-jobs`),
+      onError: (m) => recordError('fake-printer', m),
+    })
+    await p.dev.start()
+  }
+  progress(`Printers up: ${PRINTERS.map(p => `${p.printer_id}:${p.tcp_port}[${p.station_ids.join('+')}]`).join(' ')}`)
 
   // Fingerprint mock (spawn mode; the bridge's /fp proxy targets 127.0.0.1:7718)
   if (MODE === 'spawn') {
@@ -2220,25 +2556,29 @@ async function main() {
   }
   startHealthWatcher()
 
-  // Terminals from fixture
+  // Terminals from fixture — the 3 AMALAY POS identities (ENTRADA/ESCONDITE/
+  // CAJA) with per-terminal ticket stations, + the single KDS (COCINA).
   const posDefs = FIX.terminals.filter(t => t.type === 'pos')
-  while (posDefs.length < 2) posDefs.push({ id: `twin-pos-extra-${posDefs.length}`, type: 'pos', name: 'Harness extra POS' })
+  while (posDefs.length < 3) posDefs.push({ id: `twin-pos-extra-${posDefs.length}`, type: 'pos', name: 'Harness extra POS', alias: `EXTRA-${posDefs.length}` })
   for (const d of posDefs.slice(0, 3)) {
-    const t = new Terminal(d.id, 'pos')
-    POS_HOLDERS.push({ id: d.id, t })
+    const alias = d.alias || d.name || d.id
+    const t = new Terminal(d.id, 'pos', { terminal_id: d.id, terminal_alias: alias })
+    POS_HOLDERS.push({ id: d.id, alias, ticket_station: d.ticket_station || 'caja', local_ticket_printer: d.local_ticket_printer !== false, t })
   }
-  const kdsDef = FIX.terminals.find(t => t.type === 'kds') || { id: 'kds-cocina' }
-  KDS_HOLDER = { id: kdsDef.id, t: new Terminal(kdsDef.id, 'kds') }
+  const kdsDef = FIX.terminals.find(t => t.type === 'kds') || { id: 'kds-cocina', alias: 'KDS-COCINA' }
+  KDS_HOLDER = { id: kdsDef.id, alias: kdsDef.alias || kdsDef.id, t: new Terminal(kdsDef.id, 'kds', { terminal_id: kdsDef.id, terminal_alias: kdsDef.alias || kdsDef.id }) }
   wireKds(KDS_HOLDER.t)
+  // NOTE: AMALAY has NO barra KDS/display — barra works from printed comandas.
+  // A barra observer terminal is only created if the fixture declares one.
   const barraDef = FIX.terminals.find(t => t.type === 'barra')
   if (barraDef) {
-    BARRA_HOLDER = { id: barraDef.id, t: new Terminal(barraDef.id, 'barra') }
+    BARRA_HOLDER = { id: barraDef.id, t: new Terminal(barraDef.id, 'barra', { terminal_id: barraDef.id, terminal_alias: barraDef.alias || barraDef.id }) }
     wireBarraObserver(BARRA_HOLDER.t)
   }
   for (const c of activeClients()) c.connect()
   const subDeadline = now() + 12_000
   while (now() < subDeadline && !activeClients().every(c => c.snapshotReady)) await sleep(200)
-  progress(`Clients subscribed: ${activeClients().filter(c => c.snapshotReady).length}/${activeClients().length} (${activeClients().map(c => c.clientId).join(', ')})`)
+  progress(`Clients subscribed: ${activeClients().filter(c => c.snapshotReady).length}/${activeClients().length} (${POS_HOLDERS.map(h => `${h.alias}→tickets@${h.ticket_station}`).join(', ')} + ${KDS_HOLDER.alias})`)
 
   // Background maintenance
   const flushTimer = setInterval(() => { for (const c of activeClients()) c.flush(false) }, 2_000)
@@ -2249,7 +2589,7 @@ async function main() {
     progress(
       `orders=${M.orders_created} closed=${M.orders_closed} cancelled=${M.orders_cancelled} | ` +
       `cmds gen=${M.commands_generated} acked=${M.commands_acked} outbox=${activeClients().reduce((s, c) => s + c.outboxDepth(), 0)} | ` +
-      `prints coc=${PRINTER_COCINA.jobs.length} bar=${PRINTER_BARRA.jobs.length} | dupAcks=${M.acks_duplicate} | ` +
+      `prints ${PRINTERS.map(p => `${p.printer_id.replace(/^twin-/, '')}=${p.dev ? p.dev.jobs.length : 0}`).join(' ')} | dupAcks=${M.acks_duplicate} | ` +
       `restarts=${restarts.length - 1} errors=${M.errors.length}`
     )
   }, 60_000)
@@ -2340,7 +2680,7 @@ async function main() {
     for (const c of activeClients()) c.stop()
     if (healthWatcherTimer) clearInterval(healthWatcherTimer)
     await stopBridge('SIGTERM')
-    await PRINTER_COCINA.stop(); await PRINTER_BARRA.stop()
+    for (const p of PRINTERS) if (p.dev) await p.dev.stop()
     if (FP_MOCK) await FP_MOCK.stop()
     triggerStop(verification.stop_hits.map(s => s.kind).join('+'), verification.stop_hits)
     return
@@ -2349,8 +2689,7 @@ async function main() {
   for (const c of activeClients()) c.stop()
   if (healthWatcherTimer) clearInterval(healthWatcherTimer)
   await stopBridge('SIGTERM')
-  await PRINTER_COCINA.stop()
-  await PRINTER_BARRA.stop()
+  for (const p of PRINTERS) if (p.dev) await p.dev.stop()
   if (FP_MOCK) await FP_MOCK.stop()
 
   const exitCode = verification.pass ? 0 : 1

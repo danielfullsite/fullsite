@@ -4,7 +4,25 @@ Evolution of `tests/soak/soak-harness.js` for the AMALAY digital-twin rehearsal.
 Drives the **real Bridge** (`electron-app/local-server`) over the **real WS
 protocol** with AMALAY-shaped traffic, verifies the founder's invariants from
 the on-disk / REST event log replayed through the **real** `RestaurantState`,
-and captures raw ESC/POS bytes from two fake printers as evidence.
+and captures raw ESC/POS bytes from **five named fake printers** matching the
+physical Jul-12 AMALAY topology:
+
+| Twin printer | Port | Station(s) | Real device |
+|---|---|---|---|
+| `twin-cocina-1` | 19100 | `cocina` | cocina fría TCP 192.168.1.21:9100 |
+| `twin-cocina-2` | 19101 | `cocina` | cocina caliente TCP 192.168.1.40:9100 |
+| `twin-barra` | 19102 | `barra` | barra TCP 192.168.1.30:9100 |
+| `twin-entrada` | 19103 | `tickets-entrada` | PDV3 local USB "TICKET" |
+| `twin-caja` | 19104 | `tickets-caja`,`caja`,`tickets` | SERVER1 local USB "PANADERIA"/"EC01" |
+
+Station `cocina` fans out to **both** cocina devices (array of 2, as in the
+captured `printers.json`). Ticket/receipt jobs route to the printer **local to
+the terminal that charges** (fixture `terminals[].ticket_station`). ESCONDITE
+(PDV1) has **no working local ticket printer** — a known physical FAIL — so its
+tickets fall back to SERVER1's `tickets-caja` station, with origin evidence.
+The three POS carry AMALAY terminal identities (ENTRADA / ESCONDITE / CAJA):
+every command payload records `terminal_id`/`terminal_alias` and every printed
+ticket embeds `term=<alias>`.
 
 Nothing in `electron-app/`, `dashboard-app/` or `tests/soak/` is modified.
 
@@ -34,9 +52,11 @@ node tests/twin/twin-harness.js --phase accum30 --spawn
 node tests/twin/twin-harness.js --phase full   --spawn            # smoke → shift → accum7 → drain → replay
 ```
 
-Useful flags: `--port 17917` (bridge), `--printer-cocina-port 19100`,
-`--printer-barra-port 19101`, `--data-dir <dir>`, `--keep-data`,
+Useful flags: `--port 17917` (bridge), `--data-dir <dir>`, `--keep-data`,
 `--config <path>` (fixture), `--fp-port 7718`, `--staging-port 19200`.
+Printer names/ports/stations come from the fixture `printers_config`
+(`--printer-cocina-port`/`--printer-barra-port` remain as legacy overrides for
+the first printer carrying that station).
 
 ### External mode (already-running Bridge, e.g. canonical installed app on a Windows runner)
 
@@ -57,8 +77,8 @@ External-mode contract:
   `CLOCK-SKEW`, `DISK-PRESSURE`, `FP-STATES`, `FINAL-FLUSH-RESTART`. The
   orchestrator acknowledges with the `ack_file` named inside each hook.
 - Printer capture still works **if** the installed bridge's `printers.json`
-  points its cocina/barra printers at this harness host's IP on
-  19100/19101.
+  points its printers at this harness host's IP on the fixture ports
+  (19100–19104).
 - The harness refuses to run if the external bridge's `/health.restaurant_id`
   differs from the fixture (wrong-install protection).
 - Verification uses `GET /events?since=0` instead of reading `events.ndjson`;
@@ -110,7 +130,7 @@ supports are exercised for real; steps it does not support are recorded as
 
 | Exercised (PASS/FAIL) | Not exercisable at protocol level (owner) |
 |---|---|
-| cold start, discovery (/identity), turno open/close, mesa lock/unlock + conflict, multi-comensal order, multilevel modifiers (payload-opaque), partial kitchen send, add-after-send, cocina/barra print routing (bytes verified), KDS receive + two-step status maps, split payment, cancel w/ authorization fields, cash payment, multi-method + tip, dedup re-sends, client kill + recover, bridge crash + recover, printer outage + recover, sync-inbound vs staging mock (SIMULATED-PARTIAL) | login-PIN (web app UI + fingerprint service), transfer mesa (web app UI; `ORDER_UPSERTED` mesa-change would leak the origin mesa — `state.js` never frees it), retiro/deposito (web app UI + Supabase), corte X computation (web app UI + Supabase), WAN loss in spawn mode (no cloud dependency in Phase-1 command path), clock skew + disk pressure (orchestrator/OS hooks emitted) |
+| cold start, discovery (/identity), turno open/close, mesa lock/unlock + conflict, multi-comensal order, multilevel modifiers (payload-opaque), partial kitchen send, add-after-send, **print routing 5 destinations** (cocina → COCINA-1 AND COCINA-2, barra → BARRA, ticket → the charging terminal's local printer; bytes verified), **escondite-ticket-fallback** (PDV1 sin impresora local → tickets-caja), KDS receive + two-step status maps, split payment, cancel w/ authorization fields, cash payment, multi-method + tip, dedup re-sends, **dedup-after-restart** (pre-crash ACKed ids re-sent after SIGKILL+restart → 0 re-applications), **concurrent-drains** (2 simultaneous drain cycles → no duplicated ACK-applications), **corte-print-outage** (corte print with its printer down → parked visibly, exits on recovery), **wan-offline-socket-window** (staging TCP listener closed → real ECONNREFUSED, LAN WS alive, drain on reopen), client kill + recover, bridge crash + recover, printer outage + recover, sync-inbound vs staging mock (SIMULATED-PARTIAL) | login-PIN (web app UI + fingerprint service), **revoked-staff-offline** (no staff surface in protocol.js — enforcement owner: web app UI pos-manager-auth + Supabase pos_staff; the Bridge ACKs revoked-staff commands opaquely), transfer mesa (web app UI; `ORDER_UPSERTED` mesa-change would leak the origin mesa — `state.js` never frees it), retiro/deposito (web app UI + Supabase), corte X computation (web app UI + Supabase), WAN loss in spawn mode (no cloud dependency in Phase-1 command path), clock skew + disk pressure (orchestrator/OS hooks emitted) |
 
 ## Fixture contract
 
@@ -131,8 +151,9 @@ the `/health.sync_queue_size` value is recorded but **explicitly not trusted**
 (in-memory, misleading across restarts); the file-truth count from
 `events.ndjson` `synced` flags is authoritative.
 
-Printer evidence: `twin-evidence/printer-{cocina,barra}-jobs/NNN.bin` +
-`index.json` (`ts`/`len`/`sha256` per job).
+Printer evidence: `twin-evidence/printer-<printer_id>-jobs/NNN.bin` +
+`index.json` (`ts`/`len`/`sha256` + parsed `pn`/`origin_terminal`/`order`/`kind`
+markers per job — per-printer bytes + origin + timestamp).
 
 ## Honest limitations
 

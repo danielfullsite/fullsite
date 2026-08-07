@@ -40,15 +40,15 @@ const path = require('path')
 const FALLBACK_FIXTURE = {
   restaurantId: 'amalay-twin-fallback',
   terminals: [
-    { id: 'caja-1',     type: 'pos',   name: 'Caja Principal (FALLBACK)' },
-    { id: 'mesero-1',   type: 'pos',   name: 'Tablet Mesero 1 (FALLBACK)' },
-    { id: 'kds-cocina', type: 'kds',   name: 'KDS Cocina (FALLBACK)' },
-    { id: 'barra-1',    type: 'barra', name: 'Pantalla Barra (FALLBACK)' },
+    { id: 'caja-1',     type: 'pos',   name: 'Caja Principal (FALLBACK)',  alias: 'CAJA',    ticket_station: 'caja' },
+    { id: 'mesero-1',   type: 'pos',   name: 'Tablet Mesero 1 (FALLBACK)', alias: 'MESERO1', ticket_station: 'caja' },
+    { id: 'kds-cocina', type: 'kds',   name: 'KDS Cocina (FALLBACK)',      alias: 'KDS-COCINA' },
+    { id: 'barra-1',    type: 'barra', name: 'Pantalla Barra (FALLBACK)',  alias: 'BARRA' },
   ],
   stations: ['cocina', 'barra', 'caja'],
   printers: [
-    { printer_id: 'imp-cocina', name: 'Impresora Cocina (FALLBACK)', station: 'cocina', tcp_port: 19100 },
-    { printer_id: 'imp-barra',  name: 'Impresora Barra (FALLBACK)',  station: 'barra',  tcp_port: 19101 },
+    { printer_id: 'imp-cocina', name: 'Impresora Cocina (FALLBACK)', station_ids: ['cocina'], tcp_port: 19100 },
+    { printer_id: 'imp-barra',  name: 'Impresora Barra (FALLBACK)',  station_ids: ['barra', 'caja', 'tickets'], tcp_port: 19101 },
   ],
   users: [
     { name: 'Gerente Twin',  role: 'gerente', pin: '4321' },
@@ -99,20 +99,29 @@ const FALLBACK_FIXTURE = {
   paymentMethods: ['efectivo', 'tarjeta_credito', 'tarjeta_debito', 'transferencia'],
 }
 
-/** Normalize a printers[] entry (simple or v2 shape) → { printer_id, name, station, tcp_port } */
+/** Normalize a printers[] entry (simple or v2 shape) →
+ *  { printer_id, name, station, station_ids, tcp_port, document_types }.
+ *  `station` stays as station_ids[0] for backwards compatibility; the harness
+ *  routes on the full station_ids array (a station can map to SEVERAL printers
+ *  — e.g. AMALAY cocina fría + caliente — and a printer can carry several
+ *  stations — e.g. SERVER1's ticket printer carrying tickets+caja). */
 function normalizePrinter(p, i, warnings) {
   if (!p || typeof p !== 'object') return null
-  const station = p.station || (Array.isArray(p.station_ids) ? p.station_ids[0] : null)
+  const stationIds = Array.isArray(p.station_ids) && p.station_ids.length
+    ? p.station_ids.slice()
+    : (p.station ? [p.station] : [])
   const tcpPort = p.tcp_port || (p.connection && p.connection.type === 'tcp' ? p.connection.port : null)
-  if (!station || !tcpPort) {
-    warnings.push(`printers[${i}] missing station/tcp_port — entry ignored`)
+  if (!stationIds.length || !tcpPort) {
+    warnings.push(`printers[${i}] missing station(s)/tcp_port — entry ignored`)
     return null
   }
   return {
-    printer_id: p.printer_id || `imp-${station}`,
-    name:       p.name || `Impresora ${station}`,
-    station,
-    tcp_port:   tcpPort,
+    printer_id:     p.printer_id || `imp-${stationIds[0]}`,
+    name:           p.name || `Impresora ${stationIds[0]}`,
+    station:        stationIds[0],
+    station_ids:    stationIds,
+    tcp_port:       tcpPort,
+    document_types: Array.isArray(p.document_types) ? p.document_types.slice() : [],
   }
 }
 
@@ -129,12 +138,15 @@ function adaptRichConfig(raw, warnings) {
   warnings.push('rich AMALAY config shape detected — adapted to canonical fixture shape')
   const out = { restaurantId: raw.restaurantId }
 
-  // terminals: TerminalConfig-style entries → { id, type, name }
+  // terminals: TerminalConfig-style entries → { id, type, name, alias, ticket_station }
   if (Array.isArray(raw.terminals)) {
     out.terminals = raw.terminals.map((t, i) => ({
-      id:   t.terminal_id || t.id || `terminal-${i}`,
-      type: (t.terminal_role === 'server_pos' ? 'pos' : t.terminal_role) || t.type || 'pos',
-      name: t.terminal_name || t.name || t.instance_name || `Terminal ${i}`,
+      id:    t.terminal_id || t.id || `terminal-${i}`,
+      type:  (t.terminal_role === 'server_pos' ? 'pos' : t.terminal_role) || t.type || 'pos',
+      name:  t.terminal_name || t.name || t.instance_name || `Terminal ${i}`,
+      alias: t.alias || t.instance_name || t.terminal_name || t.name || `terminal-${i}`,
+      ...(t.ticket_station ? { ticket_station: t.ticket_station } : {}),
+      ...(t.local_ticket_printer === false ? { local_ticket_printer: false } : {}),
     }))
   }
 
@@ -148,9 +160,12 @@ function adaptRichConfig(raw, warnings) {
     out.printers = raw.printers_config.printers
   }
 
-  // users: already { name, role, pin } (+extras)
+  // users: already { name, role, pin } (+extras). Revoked/inactive staff are
+  // exposed separately — the traffic engine must never use them, but the
+  // revoked-staff-offline probe needs them.
   if (Array.isArray(raw.users)) {
     out.users = raw.users.filter(u => u.active !== false).map(u => ({ name: u.name, role: u.role, pin: u.pin }))
+    out.users_revoked = raw.users.filter(u => u.active === false).map(u => ({ name: u.name, role: u.role, pin: u.pin }))
   }
 
   // mesas: { count: N } → ['1'..'N']
@@ -254,13 +269,16 @@ function loadFixture(configPath) {
   // Normalize printers and guarantee cocina + barra devices
   fx.printers = fx.printers.map((p, i) => normalizePrinter(p, i, warnings)).filter(Boolean)
   for (const station of ['cocina', 'barra']) {
-    if (!fx.printers.some(p => p.station === station)) {
-      const fb = FALLBACK_FIXTURE.printers.find(p => p.station === station)
-      fx.printers.push({ ...fb })
+    if (!fx.printers.some(p => (p.station_ids || []).includes(station))) {
+      const fb = normalizePrinter(FALLBACK_FIXTURE.printers.find(p => p.station_ids.includes(station)), -1, warnings)
+      fx.printers.push(fb)
       warnings.push(`no "${station}" printer in config — added FALLBACK ${station} printer on port ${fb.tcp_port}`)
       filled = true
     }
   }
+
+  // Revoked users ride through (no fallback — default empty)
+  fx.users_revoked = Array.isArray(raw.users_revoked) ? raw.users_revoked : []
 
   // Menu items must have valid stations; coerce unknowns to cocina with a warning
   for (const item of fx.menu) {

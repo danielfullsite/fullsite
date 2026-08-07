@@ -16,9 +16,13 @@ const path = require('path')
 
 class CapturingPrinter {
   /**
-   * @param {{ station: string, port: number, evidenceDir: string, onError?: (msg: string) => void }} opts
+   * @param {{ id?: string, name?: string, station: string, port: number, evidenceDir: string, onError?: (msg: string) => void }} opts
+   *   `station` remains as a legacy label; named instances (5-printer AMALAY
+   *   topology) pass `id`/`name` — used in logs and evidence.
    */
-  constructor({ station, port, evidenceDir, onError }) {
+  constructor({ id, name, station, port, evidenceDir, onError }) {
+    this.id = id || station
+    this.name = name || station
     this.station = station
     this.port = port
     this.evidenceDir = evidenceDir
@@ -50,7 +54,7 @@ class CapturingPrinter {
         })
       })
       server.on('error', (e) => {
-        this.onError(`fake-printer-${this.station}: ${e.message}`)
+        this.onError(`fake-printer-${this.id}: ${e.message}`)
         reject(e)
       })
       server.listen(this.port, '0.0.0.0', () => {
@@ -76,12 +80,21 @@ class CapturingPrinter {
   _captureJob(buf) {
     const n = ++this.jobCount
     const file = `${String(n).padStart(3, '0')}.bin`
+    // Parse the harness's evidence markers out of the ESC/POS payload so the
+    // per-printer index records ORIGIN (terminal), order, kind + timestamp.
+    const text = buf.toString('latin1')
+    const marker = (re) => { const m = text.match(re); return m ? m[1] : null }
     const entry = {
       n,
       file,
       ts: new Date().toISOString(),
       len: buf.length,
       sha256: crypto.createHash('sha256').update(buf).digest('hex'),
+      printer_id: this.id,
+      kind: marker(/TWIN ([A-Z0-9-]+) /),
+      pn: marker(/pn=([0-9a-f]+)/),
+      origin_terminal: marker(/term=([^\s]+)/),
+      order: marker(/order=([^\s]+)/),
     }
     this.jobs.push(entry)
     this.recentBuffers.push(buf)
@@ -90,7 +103,7 @@ class CapturingPrinter {
       fs.writeFileSync(path.join(this.evidenceDir, file), buf)
       fs.writeFileSync(path.join(this.evidenceDir, 'index.json'), JSON.stringify(this.jobs, null, 2))
     } catch (e) {
-      this.onError(`fake-printer-${this.station} evidence write: ${e.message}`)
+      this.onError(`fake-printer-${this.id} evidence write: ${e.message}`)
     }
   }
 
