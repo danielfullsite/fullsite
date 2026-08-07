@@ -93,8 +93,12 @@ declare v text;
 begin
   for v in select table_name from information_schema.views where table_schema='public' loop
     begin
+      -- security_invoker=true: la view aplica la RLS del usuario que consulta
+      -- (tenant-scoped), no la del owner. revoke anon + grant authenticated para
+      -- que los usuarios logueados sigan leyendo (con su RLS), anon no.
       execute format('alter view public.%I set (security_invoker = true)', v);
       execute format('revoke all on public.%I from anon', v);
+      execute format('grant select on public.%I to authenticated', v);
     exception when others then
       raise notice 'view % no ajustada: %', v, sqlerrm;
     end;
