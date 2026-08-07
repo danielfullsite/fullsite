@@ -1,13 +1,17 @@
-// Uber Eats — Order lifecycle API (accept / deny / cancel / ready).
+// Uber Eats — Order lifecycle API (accept / deny / cancel / ready / resolve_fulfillment).
 // POST /api/integrations/uber-eats/order
-//   body: { order_id, action: 'accept'|'deny'|'cancel'|'ready', reason?, minutes_to_ready? }
+//   body: { order_id, action: 'accept'|'deny'|'cancel'|'ready'|'resolve_fulfillment',
+//           reason?, minutes_to_ready?, issues? }
 //
 // Routes to EatsLegacyAdapter or DeliveryV1Adapter based on the channel stored
 // in delivery_orders.raw_payload. Defaults to 'eats' when no record is found
 // so that existing POS integrations continue to work unchanged.
+// resolve_fulfillment goes through the documented PATCH /v2/eats/orders/{id}/cart
+// (see fulfillment.ts for the BLOCKED_EXTERNAL caveat on restaurant stores).
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/adapter-factory'
+import { resolveFulfillmentIssues, type FulfillmentIssue } from '@/lib/integrations/uber-eats/fulfillment'
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 
@@ -32,11 +36,12 @@ async function resolveOrderContext(platformOrderId: string): Promise<{ storeId?:
 export async function POST(request: NextRequest) {
   const correlationId = crypto.randomUUID()
   try {
-    const { order_id, action, reason, minutes_to_ready } = await request.json() as {
+    const { order_id, action, reason, minutes_to_ready, issues } = await request.json() as {
       order_id: string
-      action: 'accept' | 'deny' | 'cancel' | 'ready'
+      action: 'accept' | 'deny' | 'cancel' | 'ready' | 'resolve_fulfillment'
       reason?: string
       minutes_to_ready?: number
+      issues?: FulfillmentIssue[]
     }
     if (!order_id || !action) {
       return NextResponse.json({ error: 'order_id and action required' }, { status: 400 })
@@ -68,8 +73,15 @@ export async function POST(request: NextRequest) {
         const result = await adapter.markOrderReady(order_id, correlationId, storeId)
         return NextResponse.json({ ...result, correlation_id: correlationId, channel }, { status: result.ok ? 200 : 422 })
       }
+      case 'resolve_fulfillment': {
+        if (!issues?.length) {
+          return NextResponse.json({ error: 'issues[] required for resolve_fulfillment' }, { status: 400 })
+        }
+        const result = await resolveFulfillmentIssues(order_id, issues, correlationId)
+        return NextResponse.json({ ...result, correlation_id: correlationId, channel }, { status: result.ok ? 200 : 422 })
+      }
       default:
-        return NextResponse.json({ error: 'action must be accept, deny, cancel, or ready' }, { status: 400 })
+        return NextResponse.json({ error: 'action must be accept, deny, cancel, ready, or resolve_fulfillment' }, { status: 400 })
     }
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e), correlation_id: correlationId }, { status: 500 })

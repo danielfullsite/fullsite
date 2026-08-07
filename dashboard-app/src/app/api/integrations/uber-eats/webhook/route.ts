@@ -208,14 +208,15 @@ async function sendToDLQ(eventId: string, eventType: string, clientId: string, p
 
 async function persistOrder(
   order: ReturnType<typeof normalizeUberOrder>,
-  webhookEventId: string
+  webhookEventId: string,
+  status: 'nueva' | 'programada' = 'nueva'
 ): Promise<{ ok: boolean; was_duplicate: boolean }> {
   const row = {
     id: `uber-${order.provider_order_id}`,
     client_id: order.client_id,
     platform: 'ubereats',
     platform_order_id: order.provider_order_id,
-    status: 'nueva',
+    status,
     customer_name: order.customer_name,
     customer_phone: order.customer_phone ?? null,
     phone: order.customer_phone ?? null,
@@ -329,8 +330,22 @@ export async function POST(request: NextRequest) {
   try {
     if (eventType === 'orders.notification' || eventType === 'orders.created') {
       await handleNewOrder(orderId, storeId, clientId, body, eventRow.id, correlationId)
-    } else if (eventType === 'orders.cancel' || eventType === 'eats.order.order_cancelled') {
+    } else if (eventType === 'orders.scheduled.notification') {
+      // Scheduled order created (API v1.0.0 stores with scheduled orders enabled).
+      // NOT treated as an immediate order: persisted as 'programada', no auto-accept
+      // — accept timing for scheduled orders is pending Uber confirmation (Q4).
+      await handleScheduledOrder(orderId, storeId, clientId, body, eventRow.id, correlationId)
+    } else if (
+      eventType === 'orders.cancel' ||
+      eventType === 'orders.failure' || // same semantics for stores on API v1.0.0
+      eventType === 'eats.order.order_cancelled'
+    ) {
       await handleCancelledOrder(orderId, eventRow.id, correlationId)
+    } else if (
+      eventType === 'order.fulfillment_issues.resolved' ||
+      eventType === 'orders.fulfillment_issues.resolved' // docs show both spellings — accept either
+    ) {
+      await handleFulfillmentResolved(orderId, storeId, clientId, body, eventRow.id, correlationId)
     } else if (eventType === 'orders.ready_for_pickup') {
       await handleReadyForPickup(orderId, eventRow.id, correlationId)
     } else if (eventType === 'store.provisioned') {
@@ -420,6 +435,111 @@ async function handleCancelledOrder(orderId: string, eventId: string, correlatio
     }
   )
   await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'order.cancelled_by_platform', request: { order_id: orderId } })
+  await markEventProcessed(eventId)
+}
+
+// ─── orders.scheduled.notification ───────────────────────────────────────────
+// Scheduled order created on Uber's side ahead of its fire time. Contract:
+//   - Idempotent: dedup at Step 4 + persistOrder ON CONFLICT ignore.
+//   - Persisted with status='programada' — the POS shows it as scheduled, not
+//     as an actionable "nueva" order.
+//   - Scheduled timing is kept in estimated_pickup (from order details when
+//     available) and in raw_payload verbatim for full fidelity.
+//   - NO auto-accept: whether scheduled orders must be accepted at notification
+//     time or at release is not publicly documented — pending Uber (Q4).
+//   - ACK 200 always (contract with Uber's webhook delivery).
+
+async function handleScheduledOrder(
+  orderId: string,
+  storeId: string,
+  clientId: string,
+  rawPayload: unknown,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  const adapter = getOrderAdapterForPayload(rawPayload as Record<string, unknown>)
+
+  // Best-effort order details — generates the Uber-visible GET; the webhook
+  // envelope's meta.resource is the fallback exactly like handleNewOrder.
+  const detailsResult = await adapter.getOrderDetails(orderId, correlationId, storeId)
+  const envelope = rawPayload as Record<string, unknown>
+  const metaResource = ((envelope.meta as Record<string, unknown>)?.resource) as Record<string, unknown> | undefined
+  const orderPayload = (detailsResult.ok && detailsResult.order
+    ? detailsResult.order
+    : metaResource ?? rawPayload) as Record<string, unknown>
+
+  const canonicalOrder = normalizeUberOrder(orderPayload, storeId, clientId, correlationId)
+
+  const persistResult = await persistOrder(canonicalOrder, eventId, 'programada')
+  if (!persistResult.ok && !persistResult.was_duplicate) {
+    throw new Error(`Failed to persist scheduled order ${orderId}`)
+  }
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: clientId,
+    correlation_id: correlationId,
+    action: 'order.scheduled_notification',
+    request: { order_id: orderId, store_id: storeId },
+    response: {
+      persisted: persistResult.ok,
+      was_duplicate: persistResult.was_duplicate,
+      estimated_pickup: canonicalOrder.estimated_pickup_at ?? null,
+      details_fetched: detailsResult.ok,
+    },
+  })
+  console.log(`[uber-webhook-v2] scheduled order ${orderId} persisted as 'programada' correlation=${correlationId}`)
+  await markEventProcessed(eventId)
+}
+
+// ─── order.fulfillment_issues.resolved ───────────────────────────────────────
+// The customer confirmed a proposed change (substitution/removal/adjustment).
+// We re-fetch order details (Uber-visible GET) and refresh the local order's
+// items and totals so the POS reflects the resolved cart. ACK 200 always.
+
+async function handleFulfillmentResolved(
+  orderId: string,
+  storeId: string,
+  clientId: string,
+  rawPayload: unknown,
+  eventId: string,
+  correlationId: string
+): Promise<void> {
+  const adapter = getOrderAdapterForPayload(rawPayload as Record<string, unknown>)
+  const detailsResult = await adapter.getOrderDetails(orderId, correlationId, storeId)
+
+  if (detailsResult.ok && detailsResult.order) {
+    const refreshed = normalizeUberOrder(detailsResult.order as Record<string, unknown>, storeId, clientId, correlationId)
+    await fetch(
+      `${SB_URL()}/rest/v1/delivery_orders?platform_order_id=eq.${encodeURIComponent(orderId)}&platform=eq.ubereats`,
+      {
+        method: 'PATCH',
+        headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          items: JSON.stringify(refreshed.items.map(i => ({
+            name: i.name,
+            qty: i.quantity,
+            price: i.unit_price,
+            notes: i.notes,
+            modifiers: i.modifiers.map(m => m.name).filter(Boolean).join(', '),
+          }))),
+          total: refreshed.total,
+          subtotal: refreshed.subtotal,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    ).catch(() => {})
+  }
+
+  await auditLog({
+    provider: 'ubereats',
+    client_id: clientId,
+    correlation_id: correlationId,
+    action: 'order.fulfillment_resolved',
+    request: { order_id: orderId, store_id: storeId },
+    response: { details_refreshed: detailsResult.ok },
+  })
+  console.log(`[uber-webhook-v2] fulfillment issues resolved for ${orderId} refreshed=${detailsResult.ok} correlation=${correlationId}`)
   await markEventProcessed(eventId)
 }
 

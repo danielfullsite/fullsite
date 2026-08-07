@@ -6,18 +6,21 @@
 //   POST  /v1/eats/stores/{store_id}/pos_data — register / activate integration
 //   PATCH /v1/eats/stores/{store_id}/pos_data — update existing config
 //
-// All three require a USL token obtained via the authorization_code flow with
-// scope eats.pos_provisioning. client_credentials tokens are NOT valid here.
+// Token model (verified against developer.uber.com, 2026-08-06):
+//   GET  pos_data — scope eats.store via client_credentials (public reference).
+//   POST/PATCH    — part of the integration-activation flow, which runs under
+//   the merchant's USL (authorization_code, eats.pos_provisioning) context.
 //
 // getPosData() is called automatically from handleProvisioned() in webhook/route.ts
 // so every store.provisioned event generates a Uber-visible GET with a real timestamp.
+// It is also exposed on demand via GET /api/integrations/uber-eats/pos-data.
 //
 // Bootstrap order: USL flow first (creates integration_store_mappings row and stores
 // the USL token) → Uber sends store.provisioned → handleProvisioned calls getPosData.
 // If store.provisioned arrives before USL completes, the webhook handler quarantines
 // the event in integration_webhook_dlq for manual replay after USL.
 
-import { uberFetch } from './oauth'
+import { uberFetch, SCOPE_STORE } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
@@ -54,7 +57,8 @@ export async function getPosData(
     const r = await withRetry(
       () => uberFetch(`/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`, {
         method: 'GET',
-        storeId,
+        tokenType: 'marketplace',
+        scope: SCOPE_STORE,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -94,9 +98,11 @@ export async function activateIntegration(
   const t0 = Date.now()
   try {
     const r = await withRetry(
+      // Activation runs under the merchant's USL context (eats.pos_provisioning).
       () => uberFetch(`/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`, {
         method: 'POST',
         body: JSON.stringify(config),
+        tokenType: 'provisioning',
         storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 1000 }
@@ -146,6 +152,7 @@ export async function updatePosData(
       () => uberFetch(`/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`, {
         method: 'PATCH',
         body: JSON.stringify(patch),
+        tokenType: 'provisioning',
         storeId,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }

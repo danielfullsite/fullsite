@@ -1,17 +1,25 @@
-// UberEatsAdapter v1.0.0 — canonical entry point for all order lifecycle operations.
+// UberEatsAdapter — canonical entry point for all order lifecycle operations.
 // Every function: retries with backoff, logs to integration_audit_log (redacted).
 // Type A operations (affect Uber state externally) → callers must use RecoverableOperation.
 //
-// Token strategy (per Uber's grant type model):
-//   provisioning (authorization_code / USL) — accept_pos_order, ready_for_pickup
-//   marketplace  (client_credentials, eats.order) — getOrderDetails, deny, cancel
+// Token strategy (verified against developer.uber.com, 2026-08-06):
+//   ALL order lifecycle endpoints use client_credentials:
+//     accept_pos_order / deny_pos_order / cancel  → eats.order
+//     GET /v2/eats/order/{id}                     → eats.order OR eats.store.orders.read
+//   The USL (provisioning) token is only for integration-activation flows —
+//   the previous use of it for accept/ready was the audit's PARTIAL finding #3.
+//
+// markOrderReady: /v1/eats/orders/{id}/ready_for_pickup no longer appears in
+// Uber's public reference (sandbox returns "404 page not found"). Kept as the
+// legacy path until Uber confirms the current endpoint — BLOCKED_EXTERNAL,
+// see docs/integrations/uber-eats/VALIDATION-READINESS.md (question Q3).
 
-import { uberFetch } from './oauth'
+import { uberFetch, SCOPE_ORDER } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 import type { UberDenyReason, UberCancelReason } from './reasons'
 
-export const ADAPTER_VERSION = '1.0.0'
+export const ADAPTER_VERSION = '1.1.0'
 
 export async function getOrderDetails(
   orderId: string,
@@ -21,7 +29,8 @@ export async function getOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/eats/orders/${orderId}`, { method: 'GET', tokenType: 'marketplace' }),
+      // v2 is the current active version (v1 GET is legacy). Note singular 'order'.
+      () => uberFetch(`/v2/eats/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'marketplace' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -46,11 +55,12 @@ export async function acceptOrder(
   const t0 = Date.now()
   try {
     const r = await withRetry(
+      // eats.order via client_credentials — NOT the USL token (audit finding #3).
       () => uberFetch(`/v1/eats/orders/${orderId}/accept_pos_order`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Accepted by Fullsite POS', minutes_to_ready: minutesToReady }),
-        tokenType: 'provisioning',
-        storeId,
+        tokenType: 'marketplace',
+        scope: SCOPE_ORDER,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -118,11 +128,13 @@ export async function markOrderReady(
   const t0 = Date.now()
   try {
     const r = await withRetry(
+      // LEGACY PATH — BLOCKED_EXTERNAL: not in current public reference; kept
+      // until Uber confirms the replacement (see VALIDATION-READINESS.md Q3).
       () => uberFetch(`/v1/eats/orders/${orderId}/ready_for_pickup`, {
         method: 'POST',
         body: JSON.stringify({}),
-        tokenType: 'provisioning',
-        storeId,
+        tokenType: 'marketplace',
+        scope: SCOPE_ORDER,
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
