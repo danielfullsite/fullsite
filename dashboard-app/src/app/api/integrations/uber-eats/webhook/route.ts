@@ -338,6 +338,7 @@ export async function POST(request: NextRequest) {
     } else if (
       eventType === 'orders.cancel' ||
       eventType === 'orders.failure' || // same semantics for stores on API v1.0.0
+      eventType === 'order.failed' || // documented outcome of the resolve-fulfillment lifecycle
       eventType === 'eats.order.order_cancelled'
     ) {
       await handleCancelledOrder(orderId, eventRow.id, correlationId)

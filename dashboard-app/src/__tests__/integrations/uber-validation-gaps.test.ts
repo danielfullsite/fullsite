@@ -70,6 +70,15 @@ function recordingMock(overrides: Record<string, unknown> = {}) {
   const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString()
     calls.push({ url, init })
+    // Default token endpoint echoes the requested scope (mirrors a full grant)
+    // unless the test overrides 'login.uber.com' to simulate a narrowed grant.
+    if (url.includes('login.uber.com') && !('login.uber.com' in overrides)) {
+      const requestedScope = new URLSearchParams((init?.body as string) ?? '').get('scope') ?? ''
+      return Promise.resolve(new Response(
+        JSON.stringify({ access_token: 'tok-m2m-secret-value', expires_in: 3600, scope: requestedScope }),
+        { status: 200 }
+      ))
+    }
     for (const [pattern, body] of Object.entries(routes)) {
       if (url.includes(pattern)) {
         // Supabase PATCH/mutations reply minimal
@@ -91,6 +100,8 @@ beforeEach(() => {
   process.env.UBER_WEBHOOK_SECRET = TEST_SECRET
   process.env.SUPABASE_SERVICE_KEY = TEST_SB_KEY
   process.env.NEXT_PUBLIC_SUPABASE_URL = TEST_SB_URL
+  // Placeholder — real scope pending Uber confirmation (A2); tests validate the mechanism.
+  process.env.UBER_ORDER_FULFILLMENT_SCOPE = 'scope.test.order-fulfillment'
   delete process.env.UBER_PROD_CLIENT_ID
   delete process.env.UBER_PROD_CLIENT_SECRET
   delete process.env.UBER_CLIENT_ID
@@ -107,6 +118,7 @@ afterEach(async () => {
     'UBER_PROD_CLIENT_ID', 'UBER_PROD_CLIENT_SECRET',
     'UBER_CLIENT_ID', 'UBER_CLIENT_SECRET', 'UBER_WEBHOOK_SECRET',
     'SUPABASE_SERVICE_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'INTEGRATION_TOKEN_KEY',
+    'UBER_ORDER_FULFILLMENT_SCOPE',
   ]) delete process.env[k]
 })
 
@@ -357,25 +369,102 @@ describe('GAP-POSDATA: Get Integration Details', () => {
   })
 })
 
-// ─── GAP-FULFILL: resolve fulfillment issues ─────────────────────────────────
+// ─── GAP-FULFILL: resolve fulfillment issues (RESTAURANT contract) ──────────
 
-describe('GAP-FULFILL: Resolve Fulfillment Issues', () => {
-  it('GAP-FULFILL-001: PATCHes the documented /v2/eats/orders/{id}/cart with fulfillment_issues[]', async () => {
-    const { calls, spy } = recordingMock({ 'login.uber.com': { access_token: 'tok-f', expires_in: 3600, scope: 'eats.order' } })
+const RESTAURANT_ISSUE = {
+  issue_type: 'OUT_OF_STOCK',
+  action_type: 'REMOVE_ITEM',
+  item: { id: 'item-77', name: 'Chilaquiles Verdes' },
+  suspend_until: '2026-08-08T15:00:00Z',
+  store_response: 'Agotado hasta las 3pm',
+}
+
+describe('GAP-FULFILL: Resolve Fulfillment Issues (restaurant canonical)', () => {
+  it('GAP-FULFILL-001: POSTs the current /v1/delivery/order/{id}/resolve-fulfillment-issues with the restaurant schema', async () => {
+    const { calls, spy } = recordingMock({ 'resolve-fulfillment-issues': { should_wait_for_customer_response: true } })
     vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
     const { resolveFulfillmentIssues } = await import('@/lib/integrations/uber-eats/fulfillment')
-    const r = await resolveFulfillmentIssues('order-77', [{
-      fulfillment_issue_type: 'OUT_OF_ITEM',
-      fulfillment_action_type: 'REMOVE_ITEM',
-      root_item: { instance_id: 'inst-1' },
-    }], 'corr-ff-1')
+    const r = await resolveFulfillmentIssues('order-77', [RESTAURANT_ISSUE], 'corr-ff-1')
     expect(r.ok).toBe(true)
-    const call = calls.find(c => c.url.includes('/v2/eats/orders/order-77/cart'))
+    const call = calls.find(c => c.url.includes('/v1/delivery/order/order-77/resolve-fulfillment-issues'))
     expect(call).toBeDefined()
-    expect(call!.init?.method).toBe('PATCH')
+    expect(call!.init?.method).toBe('POST')
     const body = JSON.parse(call!.init?.body as string)
     expect(body.fulfillment_issues).toHaveLength(1)
-    expect(body.fulfillment_issues[0].fulfillment_issue_type).toBe('OUT_OF_ITEM')
+    expect(body.fulfillment_issues[0].issue_type).toBe('OUT_OF_STOCK')
+    expect(body.fulfillment_issues[0].action_type).toBe('REMOVE_ITEM')
+    expect(body.fulfillment_issues[0].item.id).toBe('item-77')
+  })
+
+  it('GAP-FULFILL-002: surfaces should_wait_for_customer_response from the documented 200 body', async () => {
+    const { spy } = recordingMock({ 'resolve-fulfillment-issues': { should_wait_for_customer_response: true } })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { resolveFulfillmentIssues } = await import('@/lib/integrations/uber-eats/fulfillment')
+    const r = await resolveFulfillmentIssues('order-78', [RESTAURANT_ISSUE], 'corr-ff-2')
+    expect(r.ok).toBe(true)
+    expect(r.should_wait_for_customer_response).toBe(true)
+  })
+
+  it('GAP-FULFILL-003: no grocery schema and no cart PATCH on the restaurant path', async () => {
+    const { calls, spy } = recordingMock({ 'resolve-fulfillment-issues': { should_wait_for_customer_response: false } })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { resolveFulfillmentIssues } = await import('@/lib/integrations/uber-eats/fulfillment')
+    await resolveFulfillmentIssues('order-79', [RESTAURANT_ISSUE], 'corr-ff-3')
+    expect(calls.some(c => c.url.includes('/cart'))).toBe(false)
+    const call = calls.find(c => c.url.includes('resolve-fulfillment-issues'))
+    const raw = call!.init?.body as string
+    expect(raw).not.toContain('fulfillment_issue_type')
+    expect(raw).not.toContain('root_item')
+    expect(raw).not.toContain('item_availability_info')
+  })
+
+  it('GAP-FULFILL-004: fails closed when the order-fulfillment scope is not configured (A2) — no Uber call attempted', async () => {
+    delete process.env.UBER_ORDER_FULFILLMENT_SCOPE
+    const { calls, spy } = recordingMock()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { resolveFulfillmentIssues } = await import('@/lib/integrations/uber-eats/fulfillment')
+    const r = await resolveFulfillmentIssues('order-80', [RESTAURANT_ISSUE], 'corr-ff-4')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('A2')
+    expect(calls.some(c => c.url.includes('test-api.uber.com'))).toBe(false)
+    expect(calls.some(c => c.url.includes('login.uber.com'))).toBe(false)
+  })
+})
+
+// ─── GAP-READY: mark ready (current endpoint, restaurant default) ────────────
+
+describe('GAP-READY: Mark Order Ready', () => {
+  it('GAP-READY-001: restaurant (eats) default routes to POST /v1/delivery/order/{id}/ready with body {}', async () => {
+    const { calls, spy } = recordingMock({ '/ready': { status: 'ok' } })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { getOrderAdapter } = await import('@/lib/integrations/uber-eats/adapter-factory')
+    const r = await getOrderAdapter('eats').markOrderReady('order-r1', 'corr-r1')
+    expect(r.ok).toBe(true)
+    const call = calls.find(c => c.url.includes('/v1/delivery/order/order-r1/ready'))
+    expect(call).toBeDefined()
+    expect(call!.init?.method).toBe('POST')
+    expect(call!.init?.body).toBe('{}')
+    // the extinct legacy endpoint is never touched by default routing
+    expect(calls.some(c => c.url.includes('ready_for_pickup'))).toBe(false)
+  })
+
+  it('GAP-READY-002: legacy ready_for_pickup is reachable ONLY via the explicit Legacy export', async () => {
+    const { calls, spy } = recordingMock()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { markOrderReadyLegacy } = await import('@/lib/integrations/uber-eats/adapter')
+    await markOrderReadyLegacy('order-r2', 'corr-r2')
+    expect(calls.some(c => c.url.includes('/v1/eats/orders/order-r2/ready_for_pickup'))).toBe(true)
+  })
+
+  it('GAP-READY-003: mark ready fails closed without the order-fulfillment scope (A2)', async () => {
+    delete process.env.UBER_ORDER_FULFILLMENT_SCOPE
+    const { calls, spy } = recordingMock()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { markDeliveryOrderReady } = await import('@/lib/integrations/uber-eats/delivery-adapter')
+    const r = await markDeliveryOrderReady('order-r3', 'corr-r3')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('A2')
+    expect(calls.some(c => c.url.includes('test-api.uber.com'))).toBe(false)
   })
 })
 
@@ -482,6 +571,21 @@ describe('GAP-WH: new webhook events', () => {
     const res = await POST(webhookRequest(SCHEDULED_EVENT, { secret: 'wrong-secret' }))
     expect(res.status).toBe(401)
     expect(calls.some(c => c.url.includes('delivery_orders'))).toBe(false)
+  })
+
+  it('GAP-WH-009: order.failed (resolve-fulfillment lifecycle outcome) cancels the local order', async () => {
+    const { calls, spy } = recordingMock()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(spy)
+    const { POST } = await import('@/app/api/integrations/uber-eats/webhook/route')
+    const res = await POST(webhookRequest({
+      event_type: 'order.failed',
+      event_id: 'failed-evt-1',
+      meta: { resource_id: 'order-failed-1', resource: { store: { store_id: 'store-gap' } } },
+    }))
+    expect(res.status).toBe(200)
+    const patch = calls.find(c => c.url.includes('delivery_orders') && c.init?.method === 'PATCH')
+    expect(patch).toBeDefined()
+    expect(JSON.parse(patch!.init?.body as string).status).toBe('cancelada')
   })
 
   it('GAP-WH-008: webhook processing never logs secrets or tokens', async () => {

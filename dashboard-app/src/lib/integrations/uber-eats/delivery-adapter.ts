@@ -1,22 +1,27 @@
-// Uber Delivery V1 Adapter — order lifecycle operations via the Delivery API.
+// Uber Order Fulfillment Adapter — order lifecycle via the current
+// /v1/delivery/order/* family (Order Fulfillment API Suite, order_suite).
 // Parallel to EatsLegacyAdapter (adapter.ts); same interface, different URL paths.
 //
 //   GET  /v1/delivery/order/{id}         — fetch order details
 //   POST /v1/delivery/order/{id}/accept  — accept order
 //   POST /v1/delivery/order/{id}/deny    — deny order
 //   POST /v1/delivery/order/{id}/cancel  — cancel order
-//   POST /v1/delivery/order/{id}/ready   — mark ready for pickup
+//   POST /v1/delivery/order/{id}/ready   — mark ready for pickup (body {})
 //
-// Token: client_credentials / delivery (eats.deliveries).
-// NOT the USL authorization_code token — eats.deliveries is an M2M scope
-// for the Delivery/Direct API product, separate from the Eats Marketplace product.
+// /ready is the CANONICAL restaurant mark-ready endpoint (reconciled
+// 2026-08-07) — the eats adapter delegates to it; ready_for_pickup is legacy.
+//
+// Token: client_credentials via tokenType 'order-fulfillment'. The scope for
+// this family is not publicly documented (blocker A2) — acquisition fails
+// closed until UBER_ORDER_FULFILLMENT_SCOPE is set. The previous hardcoded
+// eats.deliveries was unverified for this family and was removed.
 
 import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 import type { UberDenyReason, UberCancelReason } from './reasons'
 
-export const DELIVERY_ADAPTER_VERSION = '1.0.0'
+export const DELIVERY_ADAPTER_VERSION = '1.1.0'
 
 export async function getDeliveryOrderDetails(
   orderId: string,
@@ -26,7 +31,7 @@ export async function getDeliveryOrderDetails(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'delivery' }),
+      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}`, { method: 'GET', tokenType: 'order-fulfillment' }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
     if (!r.ok) {
@@ -53,7 +58,7 @@ export async function acceptDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/accept`, {
         method: 'POST',
         body: JSON.stringify({}),
-        tokenType: 'delivery',
+        tokenType: 'order-fulfillment',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )
@@ -77,7 +82,7 @@ export async function denyDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/deny`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        tokenType: 'delivery',
+        tokenType: 'order-fulfillment',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -101,7 +106,7 @@ export async function cancelDeliveryOrder(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
-        tokenType: 'delivery',
+        tokenType: 'order-fulfillment',
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
@@ -124,7 +129,7 @@ export async function markDeliveryOrderReady(
       () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/ready`, {
         method: 'POST',
         body: JSON.stringify({}),
-        tokenType: 'delivery',
+        tokenType: 'order-fulfillment',
       }),
       { maxAttempts: 3, baseDelayMs: 500 }
     )

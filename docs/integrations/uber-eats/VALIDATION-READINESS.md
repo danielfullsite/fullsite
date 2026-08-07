@@ -3,6 +3,7 @@
 > Estado: **CÓDIGO LISTO — SIN DESPLEGAR**. Ninguna llamada real a Uber ni deploy a
 > producción se ejecuta desde esta rama hasta autorización explícita de Daniel.
 > Base: commit desplegado `e104e19` (producción actual). Cero commits ajenos.
+> Reconciliación Req 8/9 contra docs públicos actuales: 2026-08-07.
 
 ## 1. Identidad Test / Prod (implementado en `env.ts`)
 
@@ -11,41 +12,44 @@
 | `sandbox` | **Test Client** `k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq` | `UBER_TEST_CLIENT_ID` / `UBER_TEST_CLIENT_SECRET` | `sandbox-login.uber.com` + `test-api.uber.com` |
 | `production` | **Production Client** `6bHtSqLJsdTZxWvFRt0f1jjv-BzbE92T` | `UBER_PROD_CLIENT_ID` / `UBER_PROD_CLIENT_SECRET` | `auth.uber.com` + `api.uber.com` |
 
-Garantías fail-closed (con tests GAP-ENV-001..009):
-- `UBER_ENV` ausente o inválido → `UberConfigError`.
-- Producción **nunca** acepta el par legacy `UBER_CLIENT_ID/SECRET` ni el par TEST.
-- Sandbox **nunca** usa el par PROD.
-- IDs test y prod idénticos → error de configuración.
-- Par a medias (ID sin SECRET) → error.
-- Logs solo muestran `env=<env> client=<alias>` — jamás IDs ni secretos.
-- Compat temporal: `UBER_CLIENT_ID` legacy solo funciona en sandbox, reportado
-  como `legacy-as-test` con warning (retirar al configurar `UBER_TEST_*`).
+Garantías fail-closed (tests GAP-ENV-001..009): `UBER_ENV` inválido → error;
+producción nunca acepta par test/legacy; sandbox nunca usa el par prod; IDs
+idénticos → error; par a medias → error; logs solo `env=<env> client=<alias>`.
+Legacy `UBER_CLIENT_ID` solo en sandbox como `legacy-as-test` (deprecado).
 
 ## 2. Variables a configurar en Vercel (PENDIENTE — no tocar aún)
 
-### Preview / validación sandbox (environment Preview, branch `uber/validation-ready`)
+> Nota routing (auditado 2026-08-07): el proyecto Vercel `fullsite`
+> (`prj_py3xf0ABQCTfLmvfCjYwFTzH4hUZ`) NO tiene Git integration — deploys son
+> manuales via CLI; `git push` no dispara nada. Las env vars de Preview aplican
+> a todos los previews del proyecto → para la validación sandbox se recomienda
+> un proyecto Vercel separado (`fullsite-uber-sandbox`) con deploy manual CLI.
+
+### Sandbox validation (proyecto separado o Preview dedicado)
 
 ```
-UBER_ENV                 = sandbox
-UBER_TEST_CLIENT_ID      = k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq
-UBER_TEST_CLIENT_SECRET  = <secreto — Uber Developer Dashboard (app de test)>
-UBER_WEBHOOK_SECRET      = <Signing Key de la app de TEST — no el client secret>
-UBER_REDIRECT_URI        = <URL preview>/api/integrations/uber-eats/auth/callback
-NEXT_PUBLIC_SUPABASE_URL = https://jkcnxfbbuyyfhwfjizgw.supabase.co   (STAGING)
-SUPABASE_SERVICE_KEY     = <service key del proyecto STAGING>
-INTEGRATION_TOKEN_KEY    = <base64 de 32 bytes aleatorios — openssl rand -base64 32>
-INTEGRATION_ADMIN_SECRET = <ya existe; reutilizar>
+UBER_ENV                     = sandbox
+UBER_TEST_CLIENT_ID          = k2DPoUeXuBdLd6gV7W5VMFR7fSnmnEaq
+UBER_TEST_CLIENT_SECRET      = <secreto — Uber Developer Dashboard (app de test)>
+UBER_WEBHOOK_SECRET          = <Signing Key de la app de TEST — no el client secret>
+UBER_REDIRECT_URI            = <URL del deployment>/api/integrations/uber-eats/auth/callback
+UBER_ORDER_FULFILLMENT_SCOPE = <scope confirmado por Uber para /v1/delivery/order/* — A2;
+                                sin este valor, ready/resolve fallan cerrado a propósito>
+NEXT_PUBLIC_SUPABASE_URL     = https://jkcnxfbbuyyfhwfjizgw.supabase.co   (STAGING)
+SUPABASE_SERVICE_KEY         = <service key del proyecto STAGING>
+INTEGRATION_TOKEN_KEY        = <base64 de 32 bytes — openssl rand -base64 32>
+INTEGRATION_ADMIN_SECRET     = <ya existe; reutilizar>
 ```
 
 ### Production (solo tras certificación de Uber + autorización)
 
 ```
-UBER_ENV                 = production
-UBER_PROD_CLIENT_ID      = 6bHtSqLJsdTZxWvFRt0f1jjv-BzbE92T
-UBER_PROD_CLIENT_SECRET  = <secreto — app de producción>
-UBER_WEBHOOK_SECRET      = <Signing Key de PRODUCCIÓN — rotado, distinto al de test>
-UBER_REDIRECT_URI        = https://app.fullsite.mx/api/integrations/uber-eats/auth/callback
-INTEGRATION_TOKEN_KEY    = <mismo formato; clave propia de producción>
+UBER_ENV                     = production
+UBER_PROD_CLIENT_ID          = 6bHtSqLJsdTZxWvFRt0f1jjv-BzbE92T
+UBER_PROD_CLIENT_SECRET      = <secreto — app de producción>
+UBER_WEBHOOK_SECRET          = <Signing Key de PRODUCCIÓN — rotado, distinto al de test>
+UBER_ORDER_FULFILLMENT_SCOPE = <mismo scope confirmado>
+INTEGRATION_TOKEN_KEY        = <clave propia de producción>
 (eliminar UBER_CLIENT_ID / UBER_CLIENT_SECRET legacy)
 ```
 
@@ -56,82 +60,96 @@ INTEGRATION_TOKEN_KEY    = <mismo formato; clave propia de producción>
 | Activación / USL | authorization_code | `eats.pos_provisioning offline_access` | `/oauth/v2/authorize` + token |
 | Get Integration Details | client_credentials | `eats.store` | `GET /v1/eats/stores/{id}/pos_data` |
 | Menu upload / Update Item | client_credentials | `eats.store` | `PUT /v2/.../menus` · `POST /v2/.../menus/items/{item}` |
-| Accept | client_credentials | `eats.order` | `POST /v1/eats/orders/{id}/accept_pos_order` |
-| Deny / Cancel | client_credentials | `eats.order` (set marketplace) | `.../deny_pos_order` · `.../cancel` |
+| Accept / Deny / Cancel | client_credentials | `eats.order` | `/v1/eats/orders/{id}/...` (Previous Version — pendiente A3) |
 | Get Order Details | client_credentials | `eats.order` ∨ `eats.store.orders.read` | `GET /v2/eats/order/{id}` |
-| Resolve Fulfillment | client_credentials | `eats.order` | `PATCH /v2/eats/orders/{id}/cart` (ver Q2) |
-| Mark Ready | — | — | **BLOCKED_EXTERNAL** (ver Q3) |
+| **Mark Ready** (canónico) | client_credentials | **`UBER_ORDER_FULFILLMENT_SCOPE` (A2)** | `POST /v1/delivery/order/{id}/ready` body `{}` |
+| **Resolve Fulfillment** (canónico restaurant) | client_credentials | **`UBER_ORDER_FULFILLMENT_SCOPE` (A2)** | `POST /v1/delivery/order/{id}/resolve-fulfillment-issues` |
 
-- `getUberAccessToken` valida el scope otorgado vs solicitado → `UberScopeError` (fail closed).
-- `uberFetch` ya honra `scope` explícito (bug de auditoría cerrado).
-- Refresh token: USL ahora pide `offline_access`; el callback y el refresh persisten
-  rotación de refresh_token. **Requiere re-auth USL** — el token actual de AMALAY
-  (expira 2026-08-31) no tiene refresh token.
+- `getUberAccessToken` valida scope otorgado vs solicitado → `UberScopeError` (fail closed).
+- La familia `/v1/delivery/order/*` usa `tokenType: 'order-fulfillment'`: **sin
+  `UBER_ORDER_FULFILLMENT_SCOPE` la adquisición de token falla cerrado citando A2** —
+  el hardcode previo `eats.deliveries` era no verificado y fue retirado del path.
+- Refresh token: USL pide `offline_access`; callback/refresh persisten rotación sellada.
+  El token actual de AMALAY (expira 2026-08-31) no tiene refresh → requiere re-auth USL.
 
-## 4. Aislamiento de datos test/prod (Fase 5 — diseño, sin migración aún)
+## 4. Requirements 8 y 9 — estado reconciliado
 
-**Principio: el aislamiento es por deployment, no por columna.** Cada deployment
-apunta su `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_KEY` a un proyecto entero.
-
-| Dato | Producción (AMALAY DB) | Staging (jkcnxfbbuyyfhwfjizgw) |
+| Req | Estado | Detalle |
 |---|---|---|
-| `integration_providers` (tokens USL reales) | ✔ merchants reales | tokens del test store |
-| `integration_store_mappings` | ✔ stores reales | test store `633b57d4…` |
-| `integration_webhook_events` / `_dlq` / `_audit_log` | solo tráfico real | **toda la evidencia de validación** |
-| `delivery_orders` | solo órdenes reales | órdenes de test (requiere migración staging) |
-| `integration_menu_cache` | migración pendiente | migración pendiente |
+| **8 Mark Ready** | **CODE READY — external scope validation pending (A2)** | Default restaurante (ambos canales) → `POST /v1/delivery/order/{id}/ready` body `{}`. `ready_for_pickup` (extinto) solo existe como `markOrderReadyLegacy`, sin routing default. Tests GAP-READY-001..003. |
+| **9 Resolve Fulfillment** | **CODE READY — external scope validation pending (A2)** | Contrato RESTAURANT canónico: `POST .../resolve-fulfillment-issues` con `{issue_type, action_type, item{id,name}, suspend_until, store_response}`; respuesta `should_wait_for_customer_response` propagada. El PATCH cart grocery-only fue **eliminado** (sin caso de uso grocery). Webhooks: `order(s).fulfillment_issues.resolved` + `order.failed` → cancelación local. Tests GAP-FULFILL-001..004, GAP-WH-004/005/009. |
 
-Plan (cuando se autorice):
-1. Migración en **staging**: `delivery_orders` (si falta) + `integration_menu_cache`.
-2. Deploy Preview de `uber/validation-ready` con las vars de la sección 2.
-3. Registrar el webhook de la app de TEST hacia la URL del preview (no `app.fullsite.mx`).
-4. Toda la validación sandbox corre contra staging — **cero escrituras en AMALAY**.
-5. Limpieza posterior en prod: 2 filas `CERT-*` en `delivery_orders` + 5 eventos de
-   webhook autofirmados (conservar hasta cerrar la certificación; luego purgar).
-6. Producción se activa después con su propio deployment/env — nunca comparte
-   webhook secret, client ni DB con test.
+**Ninguno se declara REAL UBER VALIDATED hasta ver tráfico real 2xx de Uber en
+`integration_audit_log` del entorno correcto.** Un fixture interno es Cat A.
 
-## 5. Almacenamiento de tokens (SEC-UBER-01)
+## 5. Aislamiento de datos test/prod (diseño, sin migración aún)
+
+Aislamiento por deployment: validación sandbox → deployment dedicado apuntando a
+Supabase **staging** (`jkcnxfbbuyyfhwfjizgw`); producción → AMALAY DB. Pendiente
+cuando se autorice G3: migración staging (`delivery_orders` + `integration_menu_cache`),
+registrar webhook de la app TEST hacia la URL del deployment de validación,
+limpieza posterior de las 2 filas `CERT-*` y 5 eventos autofirmados en prod.
+
+## 6. Almacenamiento de tokens (SEC-UBER-01)
 
 `token-vault.ts`: AES-256-GCM (`enc:v1:iv:ct:tag`) con `INTEGRATION_TOKEN_KEY`.
-- Con clave → tokens cifrados en reposo (callback USL + refresh los sellan).
-- Sin clave → passthrough plaintext con warning único. **Blocker pre-producción:**
-  configurar la clave ANTES de cualquier USL de producción.
-- Filas legacy plaintext se leen transparente; se re-sellan al siguiente refresh.
-- Ningún log/test/audit imprime material de token (test GAP-WH-008).
+Sin clave → passthrough plaintext con warning único. **Blocker pre-producción:**
+configurar la clave ANTES de cualquier USL de producción. Filas legacy se leen
+transparente y se re-sellan al siguiente refresh. Ningún log imprime tokens
+(test GAP-WH-008).
 
-## 6. Preguntas exactas para Uber (BLOCKED_EXTERNAL)
+## 7. Preguntas externas — reconciliadas 2026-08-07
 
-> Enviar citando ticket `#D5FEA8`.
+### MUST ASK UBER NOW (citando ticket #D5FEA8)
 
-- **Q1 (identidad):** Which application do the Basic Production Validation checks
-  monitor — our Test Client (`k2DPoUeX…`) or the Production Client (`6bHtSqLJ…`)?
-  And against which host: `test-api.uber.com`, or `api.uber.com` with an
-  Uber-provisioned test store?
-- **Q2 (fulfillment):** For restaurant (non-grocery) stores, what is the exact
-  current endpoint for Resolve Fulfillment Issues? The public reference documents
-  `PATCH /v2/eats/orders/{order_id}/cart` as Grocery-only; the partner Postman
-  collection references `POST /v1/delivery/order/{order_id}/resolve-fulfillment-issues`.
-- **Q3 (mark ready):** `POST /v1/eats/orders/{order_id}/ready_for_pickup` returns
-  404 and no longer appears in the public reference. What is the current Mark
-  Order as Ready endpoint and its required scope?
-- **Q4 (scheduled):** For `orders.scheduled.notification`, must the POS accept at
-  notification time, or upon release? Which behavior does validation expect?
-- **Q5 (scopes):** Please enable client_credentials scopes `eats.order`,
+- **A1 — Identidad de validación:** *"Which application do the Basic Production
+  Validation checks monitor — our Test Client (`k2DPoUeX…`) or the Production
+  Client (`6bHtSqLJ…`)? And against which host: `test-api.uber.com`, or
+  `api.uber.com` with an Uber-provisioned test store?"* (mecánica de detección
+  no publicada; bloquea los 10).
+- **A2 — Scopes:** *"Please enable the client_credentials scopes `eats.order`,
   `eats.store`, `eats.store.orders.read`, `eats.store.status.write` for the app
-  from Q1 — token requests currently return no granted scopes.
-- **Q6 (cancel webhook):** Is our test store configured on API v1.0.0
-  (`orders.failure`) or newer (`orders.cancel`)?
+  from A1 (token requests currently return no granted scopes — probe corr
+  `83095544…`, 2026-08-03). Also: which scope authorizes the Order Fulfillment
+  family `/v1/delivery/order/*` (ready / resolve-fulfillment-issues)?"* —
+  la parte del scope de esa familia mantiene ready/resolve en fail-closed
+  (`UBER_ORDER_FULFILLMENT_SCOPE` sin valor).
+- **A3 — Generación de API + configuración del store:** *"Should our validation
+  target the current Order Fulfillment API (`/v1/delivery/order/...`) or the
+  Previous Version (`/v1/eats/orders/...`) for accept/deny/cancel? How is
+  webhooks_version configured for our app/test store (orders.cancel vs
+  orders.failure era), and is scheduled-orders enabled on test store
+  `633b57d4-237a-5a32-b249-7ceb795f1d35`?"* (ninguno de estos datos aparece en
+  GET/POST `pos_data` públicos).
+- **A4 — Scheduled lifecycle:** *"For `orders.scheduled.notification`, must the
+  POS accept at notification time or upon release, and which behavior does
+  validation expect?"* (el guide documenta el evento, no la obligación del POS).
 
-## 7. Gates de ejecución
+### CAN VERIFY OURSELVES AFTER SCOPES
+
+- `integration_enabled`, `order_manager_client_id`, `order_release_enabled`,
+  `online_status` → `GET pos_data` (schema público; ruta admin `/pos-data` lista).
+- Scope efectivo de `/v1/delivery/order/*` → probe empírico de tokens contra el
+  test store si A2 no lo responde explícitamente (el 401 de Uber nombra el scope).
+- `orders.cancel` vs `orders.failure` → observable en el primer cancel real
+  (ambos manejados).
+
+### RESOLVED BY PUBLIC DOCS (preguntas eliminadas)
+
+- Mark Ready = `POST /v1/delivery/order/{id}/ready`, body `{}` (order_suite
+  `#tag/OrderReady`).
+- Resolve Fulfillment restaurant = `POST /v1/delivery/order/{id}/resolve-fulfillment-issues`
+  con schema restaurant; `PATCH /v2/eats/orders/{id}/cart` es Grocery-only.
+- Scopes de `pos_data`: GET=`eats.store`, POST=`eats.pos_provisioning`.
+- Webhooks del ciclo de resolución: `order.fulfillment_issues.resolved` /
+  `order.failed`.
+
+## 8. Gates de ejecución
 
 | Gate | Condición | Estado |
 |---|---|---|
-| G1 Código interno | 244 tests Cat A + tsc + build | ✔ CERRADO |
-| G2 Config Uber | Respuestas Q1–Q6 + scopes otorgados | ⏳ UBER |
-| G3 Deploy preview + staging | Autorización de Daniel | ⏳ BLOQUEADO |
+| G1 Código interno | 251 tests Cat A + tsc + build | ✔ CERRADO |
+| G2 Config Uber | Respuestas A1–A4 + scopes otorgados | ⏳ UBER |
+| G3 Deploy validación + staging | Autorización de Daniel | ⏳ BLOQUEADO |
 | G4 Tráfico real (test orders) | Autorización de Daniel + G2 + G3 | ⏳ BLOQUEADO |
 | G5 Producción (Prod Client) | Certificación oficial de Uber | ⏳ BLOQUEADO |
-
-**Regla:** un fixture interno es Cat A. Nada se declara "Uber validated" hasta ver
-el webhook/llamada real con 2xx en `integration_audit_log` del entorno correcto.

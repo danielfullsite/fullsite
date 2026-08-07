@@ -32,11 +32,14 @@ const TEST_SB_KEY = 'test-service-key-day2'
  *   test-api.uber.com → Uber API calls (returns {})
  */
 function makeFetchSpy() {
-  return vi.fn((input: RequestInfo | URL) => {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString()
     if (url.includes('sandbox-login.uber.com') || url.includes('auth.uber.com')) {
+      // Echo the requested scope — mirrors Uber's grant and keeps the
+      // fail-closed grantCoversRequest check satisfied for any scope config.
+      const requestedScope = new URLSearchParams((init?.body as string) ?? '').get('scope') ?? ''
       return Promise.resolve(new Response(
-        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: 'eats.store eats.store.status.write eats.order eats.store.orders.read eats.deliveries' }),
+        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: requestedScope }),
         { status: 200 }
       ))
     }
@@ -71,8 +74,9 @@ function makeFetchSpyWithInit() {
     const url = input.toString()
     calls.push({ url, init })
     if (url.includes('sandbox-login.uber.com') || url.includes('auth.uber.com')) {
+      const requestedScope = new URLSearchParams((init?.body as string) ?? '').get('scope') ?? ''
       return Promise.resolve(new Response(
-        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: 'eats.store eats.store.status.write eats.order eats.deliveries' }),
+        JSON.stringify({ access_token: 'tok-day2-m2m', expires_in: 3600, scope: requestedScope }),
         { status: 200 }
       ))
     }
@@ -103,6 +107,9 @@ beforeEach(() => {
   process.env.UBER_CLIENT_ID = 'test-client-id'
   process.env.UBER_CLIENT_SECRET = 'test-client-secret'
   process.env.UBER_ENV = 'sandbox'
+  // Placeholder config for the /v1/delivery/order/* family — the real scope is
+  // pending Uber confirmation (A2); tests validate the mechanism, not the value.
+  process.env.UBER_ORDER_FULFILLMENT_SCOPE = 'scope.test.order-fulfillment'
 })
 
 afterEach(() => {
@@ -113,6 +120,7 @@ afterEach(() => {
   delete process.env.UBER_CLIENT_ID
   delete process.env.UBER_CLIENT_SECRET
   delete process.env.UBER_ENV
+  delete process.env.UBER_ORDER_FULFILLMENT_SCOPE
 })
 
 // ─── DAY2-001..005: detectChannel ────────────────────────────────────────────
@@ -297,9 +305,10 @@ describe('DAY2-019..020: Delivery adapter contract', () => {
 
 // ─── DAY2-021..024: Grant type validation ────────────────────────────────────
 // Verifies that each operation uses the correct token grant type.
-// provisioning (USL) → supabase integration_providers lookup (not sandbox-login)
-// marketplace  (M2M) → sandbox-login token req with eats.store/eats.order scopes
-// delivery     (M2M) → sandbox-login token req with eats.deliveries scope
+// provisioning       (USL) → supabase integration_providers lookup (not sandbox-login)
+// marketplace        (M2M) → sandbox-login token req with eats.store/eats.order scopes
+// order-fulfillment  (M2M) → sandbox-login token req with UBER_ORDER_FULFILLMENT_SCOPE
+//                            (fail-closed until Uber confirms the scope — A2)
 
 describe('DAY2-021..024: Token grant type routing', () => {
   it('DAY2-021: listDeliveryStores uses marketplace M2M — no integration_providers lookup', async () => {
@@ -317,7 +326,7 @@ describe('DAY2-021..024: Token grant type routing', () => {
     expect(body.get('scope')).not.toContain('eats.deliveries')
   })
 
-  it('DAY2-022: delivery acceptOrder uses delivery M2M — eats.deliveries scope in token request', async () => {
+  it('DAY2-022: delivery acceptOrder uses the configured order-fulfillment scope — never a hardcoded guess', async () => {
     const { spy, calls } = makeFetchSpyWithInit()
     vi.spyOn(globalThis, 'fetch').mockImplementation(spy as unknown as typeof fetch)
     const adapter = getOrderAdapter('delivery')
@@ -325,8 +334,9 @@ describe('DAY2-021..024: Token grant type routing', () => {
     const tokenCall = calls.find(c => c.url.includes('sandbox-login.uber.com'))
     expect(tokenCall).toBeDefined()
     const body = new URLSearchParams(tokenCall!.init?.body as string)
-    expect(body.get('scope')).toContain('eats.deliveries')
-    // No provisioning lookup — delivery is M2M only
+    expect(body.get('scope')).toBe('scope.test.order-fulfillment')
+    expect(body.get('scope')).not.toContain('eats.deliveries')
+    // No provisioning lookup — the order-fulfillment family is M2M only
     expect(calls.some(c => c.url.includes('integration_providers'))).toBe(false)
   })
 

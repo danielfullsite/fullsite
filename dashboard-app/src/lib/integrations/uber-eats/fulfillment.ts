@@ -1,77 +1,86 @@
-// Uber Eats — Resolve Fulfillment Issues.
+// Uber Eats — Resolve Fulfillment Issues (RESTAURANT canonical contract).
 //
-// Official documented mechanism (verified developer.uber.com, 2026-08-06):
-//   PATCH /v2/eats/orders/{order_id}/cart → 204 No Content, scope eats.order.
-//   Body: { fulfillment_issues: FulfillmentIssue[] } — schema below is the
-//   documented one verbatim; do not extend it with invented fields.
+// Endpoint (Order Fulfillment API Suite, developer.uber.com order_suite
+// #tag/ResolveOrderFulfillmentIssue; reconciled 2026-08-07):
+//   POST /v1/delivery/order/{order_id}/resolve-fulfillment-issues
+//   Body:     { "fulfillment_issues": [RestaurantFulfillmentIssue, ...] }
+//   Response: 200 { "should_wait_for_customer_response": boolean }
+//   Lifecycle webhooks: order.fulfillment_issues.resolved (customer confirmed)
+//                       or order.failed — both handled in webhook/route.ts.
 //
-// CAVEAT (BLOCKED_EXTERNAL — VALIDATION-READINESS.md Q2): the public reference
-// restricts this endpoint to stores "configured internally with type Grocery
-// Store". Uber's partner-gated Marketplace Order API lists a newer
-// "ResolveFulfillmentIssues" request for restaurant POS integrations whose
-// exact path is not publicly documented. We implement the documented endpoint
-// and hold the restaurant-surface path until Uber answers Q2.
+// Restaurant vs Retail: the retail variant adds item_availability and
+// item_substitute. AMALAY and all current tenants are restaurants — the
+// restaurant shape is canonical here and no grocery/retail fields are used.
+// The former PATCH /v2/eats/orders/{id}/cart implementation was removed: that
+// endpoint is documented as Grocery-store-only and can never validate the
+// restaurant requirement.
 //
-// Associated webhook: order.fulfillment_issues.resolved — handled in
-// webhook/route.ts (the customer confirmed the proposed change; we refresh
-// the local order from Get Order Details).
+// Auth: client_credentials via tokenType 'order-fulfillment'. The exact scope
+// for this family is NOT publicly documented (blocker A2) — token acquisition
+// fails closed until UBER_ORDER_FULFILLMENT_SCOPE is configured.
+//
+// issue_type / action_type: typed as string with documented examples
+// (OUT_OF_STOCK / REMOVE_ITEM) — the full enum is not public; we do not
+// invent values.
 
-import { uberFetch, SCOPE_ORDER } from './oauth'
+import { uberFetch } from './oauth'
 import { withRetry } from '../retry'
 import { auditLog } from '../audit-logger'
 
-export type FulfillmentIssueType = 'OUT_OF_ITEM' | 'PARTIAL_AVAILABILITY' | 'FOUND_ITEM'
-export type FulfillmentActionType = 'REMOVE_ITEM' | 'REPLACE_FOR_ME' | 'ADJUST_ITEM'
-
-export interface FulfillmentModifierGroup {
-  id: string
-  selected_items: Array<{ id: string; quantity: number }>
+export interface RestaurantFulfillmentIssue {
+  /** Documented example: 'OUT_OF_STOCK'. Full enum not public — pass Uber-documented values only. */
+  issue_type: string
+  /** Documented example: 'REMOVE_ITEM'. */
+  action_type: string
+  /** Affected item — id required; name recommended when available. */
+  item: { id: string; name?: string }
+  /** ISO 8601 — how long the item stays unavailable. */
+  suspend_until?: string
+  /** Merchant note shown in the resolution flow. */
+  store_response?: string
 }
 
-export interface FulfillmentItemSubstitute {
-  id: string
-  quantity: number
-  selected_modifier_groups?: FulfillmentModifierGroup[]
-}
-
-export interface FulfillmentIssue {
-  fulfillment_issue_type: FulfillmentIssueType
-  fulfillment_action_type?: FulfillmentActionType
-  /** The affected cart item — identified by its instance_id from the order payload. */
-  root_item: { instance_id: string }
-  /** Required for REPLACE_FOR_ME. */
-  item_substitute?: FulfillmentItemSubstitute
-  /** Required for PARTIAL_AVAILABILITY. */
-  item_availability_info?: { items_available: number }
+export interface ResolveFulfillmentResult {
+  ok: boolean
+  /** True → Uber is waiting for the customer to confirm; expect
+   *  order.fulfillment_issues.resolved (or order.failed) webhook next. */
+  should_wait_for_customer_response?: boolean
+  error?: string
 }
 
 export async function resolveFulfillmentIssues(
   orderId: string,
-  issues: FulfillmentIssue[],
+  issues: RestaurantFulfillmentIssue[],
   correlationId: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ResolveFulfillmentResult> {
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      () => uberFetch(`/v2/eats/orders/${encodeURIComponent(orderId)}/cart`, {
-        method: 'PATCH',
-        tokenType: 'marketplace',
-        scope: SCOPE_ORDER,
+      () => uberFetch(`/v1/delivery/order/${encodeURIComponent(orderId)}/resolve-fulfillment-issues`, {
+        method: 'POST',
+        tokenType: 'order-fulfillment',
         body: JSON.stringify({ fulfillment_issues: issues }),
       }),
       { maxAttempts: 2, baseDelayMs: 500 }
     )
-    const errText = r.ok ? undefined : await r.text()
+    if (!r.ok) {
+      const errText = await r.text()
+      await auditLog({
+        provider: 'ubereats', correlation_id: correlationId, action: 'order.resolve_fulfillment',
+        request: { order_id: orderId, issues: issues.map(i => ({ type: i.issue_type, action: i.action_type, item_id: i.item.id })) },
+        response: { error: errText },
+        status_code: r.status, duration_ms: Date.now() - t0,
+      })
+      return { ok: false, error: errText }
+    }
+    const body = await r.json().catch(() => ({})) as { should_wait_for_customer_response?: boolean }
     await auditLog({
       provider: 'ubereats', correlation_id: correlationId, action: 'order.resolve_fulfillment',
-      request: {
-        order_id: orderId,
-        issues: issues.map(i => ({ type: i.fulfillment_issue_type, action: i.fulfillment_action_type ?? null })),
-      },
-      response: errText ? { error: errText } : { status: 'resolved' },
+      request: { order_id: orderId, issues: issues.map(i => ({ type: i.issue_type, action: i.action_type, item_id: i.item.id })) },
+      response: { status: 'resolved', should_wait_for_customer_response: body.should_wait_for_customer_response ?? null },
       status_code: r.status, duration_ms: Date.now() - t0,
     })
-    return r.ok ? { ok: true } : { ok: false, error: errText }
+    return { ok: true, should_wait_for_customer_response: body.should_wait_for_customer_response }
   } catch (e) {
     await auditLog({ provider: 'ubereats', correlation_id: correlationId, action: 'order.resolve_fulfillment', request: { order_id: orderId }, response: { error: String(e) }, duration_ms: Date.now() - t0 })
     return { ok: false, error: String(e) }

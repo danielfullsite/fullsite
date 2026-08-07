@@ -247,9 +247,14 @@ describe('UBER-014: Cancel', () => {
 // ─── UBER-015: Mark Ready ─────────────────────────────────────────────────────
 
 describe('UBER-015: Mark Ready', () => {
-  it('markOrderReady is exported from adapter', async () => {
-    const { markOrderReady } = await import('@/lib/integrations/uber-eats/adapter')
-    expect(typeof markOrderReady).toBe('function')
+  it('legacy ready_for_pickup exists only behind the explicit Legacy export', async () => {
+    const adapter = await import('@/lib/integrations/uber-eats/adapter')
+    expect(typeof adapter.markOrderReadyLegacy).toBe('function')
+    // the non-legacy name must NOT exist on the eats adapter module anymore —
+    // canonical mark-ready lives in delivery-adapter (/v1/delivery/order/{id}/ready)
+    expect((adapter as Record<string, unknown>).markOrderReady).toBeUndefined()
+    const { markDeliveryOrderReady } = await import('@/lib/integrations/uber-eats/delivery-adapter')
+    expect(typeof markDeliveryOrderReady).toBe('function')
   })
 })
 

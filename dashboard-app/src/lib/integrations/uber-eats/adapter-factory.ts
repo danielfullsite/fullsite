@@ -1,23 +1,25 @@
 // UberOrderAdapter factory — routes order lifecycle operations to the correct
 // adapter based on the webhook payload's channel field.
 //
-//   EatsLegacyAdapter  → /v1/eats/orders/{id}/...        (Eats Marketplace)
-//   DeliveryV1Adapter  → /v1/delivery/order/{id}/...     (Delivery API)
+//   EatsLegacyAdapter        → /v1/eats/orders/{id}/...      (Order API, Previous Version)
+//   OrderFulfillmentAdapter  → /v1/delivery/order/{id}/...   (current Order Fulfillment API)
 //
 // Channel detection priority:
 //   1. payload.channel field ('eats' | 'delivery')
 //   2. payload.event_type prefix ('delivery.' prefix → delivery)
 //   3. Default: 'eats' (backward compatible with all existing webhooks)
 //
-// Both adapters implement OrderAdapter. All Eats legacy routes are kept intact
-// until Uber confirms which combination passes Basic Production Validation.
+// Reconciliation 2026-08-07: markOrderReady and resolveFulfillmentIssues are
+// restaurant-canonical on the current family and route there on BOTH channels —
+// the extinct ready_for_pickup and the grocery-only cart PATCH are never the
+// default. accept/deny/cancel/get keep per-channel routing until Uber answers
+// the generation-selection question (blocker A3).
 
 import {
   getOrderDetails as eatsGetOrderDetails,
   acceptOrder as eatsAcceptOrder,
   denyOrder as eatsDenyOrder,
   cancelOrder as eatsCancelOrder,
-  markOrderReady as eatsMarkOrderReady,
 } from './adapter'
 
 import {
@@ -28,6 +30,7 @@ import {
   markDeliveryOrderReady,
 } from './delivery-adapter'
 
+import { resolveFulfillmentIssues, type RestaurantFulfillmentIssue } from './fulfillment'
 import type { UberDenyReason, UberCancelReason } from './reasons'
 
 export type UberChannel = 'eats' | 'delivery' | 'unknown'
@@ -40,6 +43,7 @@ export interface OrderAdapter {
   denyOrder(orderId: string, reason: UberDenyReason, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
   cancelOrder(orderId: string, reason: UberCancelReason, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
   markOrderReady(orderId: string, correlationId: string, storeId?: string): Promise<{ ok: boolean; error?: string }>
+  resolveFulfillmentIssues(orderId: string, issues: RestaurantFulfillmentIssue[], correlationId: string): Promise<{ ok: boolean; should_wait_for_customer_response?: boolean; error?: string }>
 }
 
 /** Inspect the webhook payload to determine which API channel the order belongs to. */
@@ -66,8 +70,12 @@ function makeEatsAdapter(): OrderAdapter {
       eatsDenyOrder(orderId, reason, correlationId, storeId),
     cancelOrder: (orderId, reason, correlationId, storeId) =>
       eatsCancelOrder(orderId, reason, correlationId, storeId),
+    // Restaurant default: current POST /v1/delivery/order/{id}/ready — NOT
+    // the extinct ready_for_pickup (markOrderReadyLegacy stays unwired).
     markOrderReady: (orderId, correlationId, storeId) =>
-      eatsMarkOrderReady(orderId, correlationId, storeId),
+      markDeliveryOrderReady(orderId, correlationId, storeId),
+    resolveFulfillmentIssues: (orderId, issues, correlationId) =>
+      resolveFulfillmentIssues(orderId, issues, correlationId),
   }
 }
 
@@ -84,6 +92,8 @@ function makeDeliveryAdapter(): OrderAdapter {
       cancelDeliveryOrder(orderId, reason, correlationId, storeId),
     markOrderReady: (orderId, correlationId, storeId) =>
       markDeliveryOrderReady(orderId, correlationId, storeId),
+    resolveFulfillmentIssues: (orderId, issues, correlationId) =>
+      resolveFulfillmentIssues(orderId, issues, correlationId),
   }
 }
 

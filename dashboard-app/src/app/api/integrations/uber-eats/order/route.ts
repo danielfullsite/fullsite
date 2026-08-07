@@ -6,12 +6,12 @@
 // Routes to EatsLegacyAdapter or DeliveryV1Adapter based on the channel stored
 // in delivery_orders.raw_payload. Defaults to 'eats' when no record is found
 // so that existing POS integrations continue to work unchanged.
-// resolve_fulfillment goes through the documented PATCH /v2/eats/orders/{id}/cart
-// (see fulfillment.ts for the BLOCKED_EXTERNAL caveat on restaurant stores).
+// resolve_fulfillment and ready use the restaurant-canonical
+// /v1/delivery/order/* family on every channel (2026-08-07 reconciliation).
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { getOrderAdapter, type UberChannel } from '@/lib/integrations/uber-eats/adapter-factory'
-import { resolveFulfillmentIssues, type FulfillmentIssue } from '@/lib/integrations/uber-eats/fulfillment'
+import type { RestaurantFulfillmentIssue } from '@/lib/integrations/uber-eats/fulfillment'
 import type { UberDenyReason, UberCancelReason } from '@/lib/integrations/uber-eats/reasons'
 import { UBER_DENY_REASONS, UBER_CANCEL_REASONS } from '@/lib/integrations/uber-eats/reasons'
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       action: 'accept' | 'deny' | 'cancel' | 'ready' | 'resolve_fulfillment'
       reason?: string
       minutes_to_ready?: number
-      issues?: FulfillmentIssue[]
+      issues?: RestaurantFulfillmentIssue[]
     }
     if (!order_id || !action) {
       return NextResponse.json({ error: 'order_id and action required' }, { status: 400 })
@@ -74,10 +74,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ...result, correlation_id: correlationId, channel }, { status: result.ok ? 200 : 422 })
       }
       case 'resolve_fulfillment': {
-        if (!issues?.length) {
-          return NextResponse.json({ error: 'issues[] required for resolve_fulfillment' }, { status: 400 })
+        if (!issues?.length || issues.some(i => !i.issue_type || !i.action_type || !i.item?.id)) {
+          return NextResponse.json(
+            { error: 'issues[] required — each needs issue_type, action_type and item.id (restaurant contract)' },
+            { status: 400 }
+          )
         }
-        const result = await resolveFulfillmentIssues(order_id, issues, correlationId)
+        const result = await adapter.resolveFulfillmentIssues(order_id, issues, correlationId)
         return NextResponse.json({ ...result, correlation_id: correlationId, channel }, { status: result.ok ? 200 : 422 })
       }
       default:

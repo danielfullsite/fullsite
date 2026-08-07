@@ -21,7 +21,7 @@
 // covers every scope requested; a silently-narrowed grant throws instead of
 // letting API calls fail downstream with confusing 401s.
 
-import { resolveUberIdentity, resolveUberEnv, uberDomains, describeUberIdentity, type UberIdentity } from './env'
+import { resolveUberIdentity, resolveUberEnv, uberDomains, describeUberIdentity, UberConfigError, type UberIdentity } from './env'
 import { openToken, sealToken } from '../token-vault'
 
 export class UberScopeError extends Error {
@@ -42,7 +42,26 @@ export const getApiBase = (): string => uberDomains(resolveUberEnv()).apiBase
 // stored merchant connection dies at token_expires_at with no recovery path.
 export const USL_SCOPES = ['eats.pos_provisioning', 'offline_access']
 export const MARKETPLACE_M2M_SCOPES = ['eats.store', 'eats.store.status.write', 'eats.order', 'eats.store.orders.read']
+// eats.deliveries: kept for reference only. The audit reconciliation (2026-08-07)
+// found NO public evidence that it is the scope for the /v1/delivery/order/*
+// Order Fulfillment family — no tokenType consumes it anymore. Blocker A2.
 export const DELIVERY_M2M_SCOPES = ['eats.deliveries']
+
+/**
+ * Scope for the current Order Fulfillment family (/v1/delivery/order/*).
+ * Uber's public docs do not state it (blocker A2) — we refuse to guess.
+ * Set UBER_ORDER_FULFILLMENT_SCOPE once Uber confirms (or once a scope probe
+ * against the test store proves which grant the family accepts).
+ */
+export function getOrderFulfillmentScope(): string {
+  const scope = (process.env.UBER_ORDER_FULFILLMENT_SCOPE ?? '').trim()
+  if (!scope) {
+    throw new UberConfigError(
+      'scope for /v1/delivery/order/* is not confirmed by Uber (blocker A2) — set UBER_ORDER_FULFILLMENT_SCOPE once confirmed; refusing to call with a guessed scope'
+    )
+  }
+  return scope
+}
 
 // Explicit scope constants (kept for audit documentation)
 export const SCOPE_ORDER = 'eats.order'
@@ -52,10 +71,11 @@ export const SCOPE_STORE_ORDERS_READ = 'eats.store.orders.read'
 export const SCOPE_DELIVERIES = 'eats.deliveries'
 
 // Token type for explicit grant type selection in uberFetch.
-//   provisioning → authorization_code (USL, stored per-store in integration_providers)
-//   marketplace  → client_credentials with MARKETPLACE_M2M_SCOPES
-//   delivery     → client_credentials with DELIVERY_M2M_SCOPES
-export type UberTokenType = 'provisioning' | 'marketplace' | 'delivery'
+//   provisioning      → authorization_code (USL, stored per-store in integration_providers)
+//   marketplace       → client_credentials with MARKETPLACE_M2M_SCOPES
+//   order-fulfillment → client_credentials with UBER_ORDER_FULFILLMENT_SCOPE
+//                       (fail-closed until Uber confirms the scope — blocker A2)
+export type UberTokenType = 'provisioning' | 'marketplace' | 'order-fulfillment'
 
 interface CachedToken {
   token: string
@@ -253,9 +273,9 @@ export async function probeM2MToken(scope: string): Promise<{ ok: boolean; grant
 
 /** Authenticated fetch to Uber API.
  *  tokenType drives which token is used — do NOT mix grant types:
- *    provisioning → USL authorization_code (requires storeId for DB lookup)
- *    marketplace  → client_credentials, MARKETPLACE_M2M_SCOPES
- *    delivery     → client_credentials, DELIVERY_M2M_SCOPES
+ *    provisioning      → USL authorization_code (requires storeId for DB lookup)
+ *    marketplace       → client_credentials, MARKETPLACE_M2M_SCOPES
+ *    order-fulfillment → client_credentials, UBER_ORDER_FULFILLMENT_SCOPE (fail-closed, A2)
  *  opts.scope narrows the client_credentials request to exactly that scope
  *  (audit BUG fixed: previous version silently discarded this parameter). */
 export async function uberFetch(
@@ -267,8 +287,8 @@ export async function uberFetch(
   if (tokenType === 'provisioning') {
     if (!storeId) throw new Error('[uber-fetch] storeId required for provisioning token (USL)')
     token = await getStoredTokenForStore(storeId)
-  } else if (tokenType === 'delivery') {
-    token = await getUberAccessToken(scope ?? DELIVERY_M2M_SCOPES.join(' '))
+  } else if (tokenType === 'order-fulfillment') {
+    token = await getUberAccessToken(scope ?? getOrderFulfillmentScope())
   } else {
     token = await getUberAccessToken(scope ?? MARKETPLACE_M2M_SCOPES.join(' '))
   }

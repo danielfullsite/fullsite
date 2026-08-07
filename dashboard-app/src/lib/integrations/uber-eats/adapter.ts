@@ -9,10 +9,11 @@
 //   The USL (provisioning) token is only for integration-activation flows —
 //   the previous use of it for accept/ready was the audit's PARTIAL finding #3.
 //
-// markOrderReady: /v1/eats/orders/{id}/ready_for_pickup no longer appears in
-// Uber's public reference (sandbox returns "404 page not found"). Kept as the
-// legacy path until Uber confirms the current endpoint — BLOCKED_EXTERNAL,
-// see docs/integrations/uber-eats/VALIDATION-READINESS.md (question Q3).
+// Mark ready: the current endpoint is POST /v1/delivery/order/{id}/ready
+// (delivery-adapter.ts) — the eats adapter delegates to it by default.
+// markOrderReadyLegacy below keeps the extinct /v1/eats/orders/{id}/
+// ready_for_pickup path available ONLY as an explicit legacy escape hatch;
+// no default routing reaches it (reconciled 2026-08-07).
 
 import { uberFetch, SCOPE_ORDER } from './oauth'
 import { withRetry } from '../retry'
@@ -120,7 +121,7 @@ export async function cancelOrder(
   }
 }
 
-export async function markOrderReady(
+export async function markOrderReadyLegacy(
   orderId: string,
   correlationId: string,
   storeId?: string
@@ -128,8 +129,8 @@ export async function markOrderReady(
   const t0 = Date.now()
   try {
     const r = await withRetry(
-      // LEGACY PATH — BLOCKED_EXTERNAL: not in current public reference; kept
-      // until Uber confirms the replacement (see VALIDATION-READINESS.md Q3).
+      // EXPLICIT LEGACY ONLY — endpoint extinct in current public reference
+      // (404 in sandbox). Never wired as default; see delivery-adapter /ready.
       () => uberFetch(`/v1/eats/orders/${orderId}/ready_for_pickup`, {
         method: 'POST',
         body: JSON.stringify({}),
