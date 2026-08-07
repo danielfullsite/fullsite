@@ -22,15 +22,20 @@ export function patchSupabaseFetch() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 
-    // Only patch Supabase REST API calls — but NOT from POS pages.
-    // POS uses anon key with RLS policies for anon role. Replacing it
-    // with a user JWT that may be expired causes 401 errors (AUTH-01).
-    const isPosPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/pos')
-    if (!isPosPage && url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
+    // BUG-019: tenant isolation is enforced at the DB with RLS scoped to the
+    // authenticated user's client_users membership. The bare anon key is no
+    // longer allowed on POS tables, so EVERY direct Supabase REST call (dashboard
+    // AND POS) must carry the device's session JWT. We inject it here for any
+    // request that still uses the bare anon key as Bearer.
+    //
+    // Public QR pages (/menu/[mesa]) have NO session and must NOT hit POS tables
+    // directly — they use the get_public_menu() RPC (granted to anon). Those
+    // calls target /rest/v1/rpc/get_public_menu and keep the anon key.
+    if (url.includes(SUPABASE_URL) && url.includes('/rest/v1/')) {
       const headers = new Headers(init?.headers)
       const currentAuth = headers.get('Authorization')
 
-      // If using bare anon key, replace with user's JWT (dashboard pages only)
+      // If using the bare anon key AND a session exists, upgrade to the user JWT.
       if (currentAuth === `Bearer ${SUPABASE_KEY}`) {
         try {
           const hostname = new URL(SUPABASE_URL).hostname.split('.')[0]

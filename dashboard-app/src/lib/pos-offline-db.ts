@@ -308,6 +308,41 @@ export async function clearSyncedItems(): Promise<void> {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// ─── BUG-019 / multi-day offline session refresh ─────────────────────────────
+// Requisito canónico: el restaurante opera días sin WAN y al volver sincroniza
+// TODO automáticamente. Con RLS tenant-scoped, el replay debe ir autenticado. El
+// access token de Supabase (1h) y el shift-token (8h) expiran durante un offline
+// de días; el refresh token de Supabase es de larga vida. Antes de drenar la
+// cola, refrescamos la sesión y usamos el access token fresco para AMBOS
+// transportes. Si el refresh falla (refresh token revocado) → FAIL CLOSED: NO
+// se drena, NO se envía con anon, la cola se preserva intacta y se pide re-login.
+//
+// Devuelve el access_token fresco, o null si no hay sesión válida (fail closed).
+async function getFreshAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const { getSupabase } = await import('./supabase')
+    const supabase = getSupabase()
+    // getSession() refresca el access token usando el refresh token si expiró.
+    const { data, error } = await supabase.auth.getSession()
+    if (error || !data?.session?.access_token) return null
+    // Sanity: el token no debe estar expirado tras el refresh.
+    const exp = data.session.expires_at ? data.session.expires_at * 1000 : 0
+    if (exp && exp < Date.now()) return null
+    return data.session.access_token
+  } catch {
+    return null
+  }
+}
+
+// Señal para la UI: la sesión no pudo renovarse (refresh revocado/ausente) →
+// se requiere login manual. La cola NO se pierde; se reintenta al re-autenticar.
+function emitAuthRequired() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pos-sync-auth-required'))
+  }
+}
+
 // ─── Transport Resolution ──────────────────────────────────────────────────
 // Determines replay transport for a queue item.
 // Priority: explicit transport field > endpoint prefix detection > default SUPABASE_REST
@@ -335,19 +370,23 @@ interface AppApiReplayResult {
   serverRevision?: number     // server revision at conflict time (for STALE_WRITE)
 }
 
-async function replayViaAppApi(item: SyncQueueItem): Promise<AppApiReplayResult> {
+async function replayViaAppApi(item: SyncQueueItem, accessToken: string): Promise<AppApiReplayResult> {
   const apiPath = item.endpoint!
   // In browser: use window.location.origin. In SSR/worker: fall back to relative URL.
   const base = typeof window !== 'undefined' ? window.location.origin : ''
   const url = `${base}${apiPath}`
 
-  // Pass x-client-id so the route's getClientId() returns the correct client,
-  // same as the original saveOrder call. Without this, p_client_id = '' in the RPC.
+  // Pass x-client-id for legacy compatibility, pero el server NUNCA confía en él
+  // para el tenant: withPOSAuth resuelve clientId desde el shift-token o desde
+  // client_users (auth.uid()). BUG-019 / multi-day offline: usamos el access
+  // token de sesión FRESCO como Authorization (el shift-token de 8h pudo expirar
+  // en un offline de días). El path de sesión de withPOSAuth resuelve el tenant
+  // server-side de forma no falsificable; si la membership fue revocada mientras
+  // el device estuvo offline, el server rechaza (fail closed) y la cola se
+  // preserva.
   let clientId = ''
-  let shiftToken = ''
   if (typeof window !== 'undefined') {
     try { clientId = localStorage.getItem('fullsite_client_id') || '' } catch {}
-    try { shiftToken = localStorage.getItem('pos_shift_token') || '' } catch {}
   }
 
   const res = await fetch(url, {
@@ -355,7 +394,7 @@ async function replayViaAppApi(item: SyncQueueItem): Promise<AppApiReplayResult>
     headers: {
       'Content-Type': 'application/json',
       ...(clientId ? { 'x-client-id': clientId } : {}),
-      ...(shiftToken ? { 'Authorization': `Bearer ${shiftToken}` } : {}),
+      'Authorization': `Bearer ${accessToken}`,
     },
     body: item.method !== 'DELETE' ? JSON.stringify(item.data) : undefined,
   })
@@ -463,6 +502,17 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
   let synced = 0
   let failed = 0
 
+  // BUG-019 / multi-day offline: refrescar la sesión ANTES de drenar. Si no hay
+  // sesión válida (refresh token revocado tras días offline, o device sin login),
+  // FAIL CLOSED: no drenar, preservar la cola, pedir re-login. Nunca replay con
+  // anon (RLS lo rechazaría) ni pérdida de datos.
+  const accessToken = queue.length > 0 ? await getFreshAccessToken() : null
+  if (queue.length > 0 && !accessToken) {
+    console.warn('[offline-sync] sesión no renovable — replay pospuesto (fail closed), cola preservada')
+    emitAuthRequired()
+    return { synced: 0, failed: queue.length }
+  }
+
   for (const item of queue) {
     // Skip items in terminal error state — they require operator intervention
     if (item.error_class === 'STALE_WRITE_CONFLICT' || item.error_class === 'TERMINAL_NON_RETRYABLE') {
@@ -479,7 +529,7 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
         if (synced > 0 || failed > 0) {
           await new Promise<void>(r => setTimeout(r, 400))
         }
-        const result = await replayViaAppApi(item)
+        const result = await replayViaAppApi(item, accessToken!)
 
         if (result.ok) {
           await markSynced(item.id)
@@ -528,7 +578,9 @@ async function _syncAllInner(): Promise<{ synced: number; failed: number }> {
           method: item.method,
           headers: {
             apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
+            // BUG-019: token de sesión fresco (no anon) → RLS tenant-scoped valida
+            // que la fila pertenezca al tenant del usuario (WITH CHECK).
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=minimal',
           },
