@@ -1,6 +1,6 @@
 # FULLSITE CLONABLE CORE V1 — Documento Canónico
 
-**v1.0 — 2026-08-07 · Consolidación de la auditoría READ-ONLY de clonabilidad**
+**v1.1 — 2026-08-07 · Consolidación de la auditoría + resolución D1-D5 del founder review**
 **Clasificación: Interno — Fundador / Equipo Técnico**
 **Estado: DISEÑO APROBADO PARA REVISIÓN — SIN IMPLEMENTAR. Cero cambios de runtime, cero migraciones, release 1.3.4 y producción intactos.**
 
@@ -21,6 +21,10 @@
 - **D-C:** `organization` se **MODELA desde el inicio** del Clonable Core; sus
   capacidades avanzadas de grupo se activan después. Grupo Galería es test
   case, no driver del diseño.
+- **D1..D5 (founder review 2026-08-07):** autoridad de configuración de
+  impresión, IDs canónicos opacos, person identity por vínculo, feature flags
+  jerárquicos y timing post-acceptance — resueltas y vinculantes; ver la
+  sección "DECISIONES ARQUITECTÓNICAS — RESUELTAS" al final.
 
 Reglas heredadas: la configuración AMALAY vive en manifest/config/onboarding,
 nunca en branches de runtime (`feedback: provisioning engine direction`).
@@ -183,6 +187,8 @@ KDS remoto adicional: `?bridge=IP` (`app/pos/kds/page.tsx:195-201`).
   desde el día 1 (D-C); capacidades de grupo se activan después.
 - **Crea:** provisioning (paso CREATE GROUP). Para independientes se crea una
   organization implícita 1:1 con el tenant (costo cero, evita backfill futuro).
+  **D2:** ID técnico opaco e inmutable (aplica a organization_id, tenant_id,
+  branch_id, terminal_id, station_id y person_id por igual).
 - **Mutabilidad:** ID inmutable; atributos (razón social del grupo, logo) mutables.
 - **Vive en:** cloud (`organizations`) — Configuration Plane.
 - **Consumen:** Dashboard (consolidación, permisos de grupo). POS/KDS NO la
@@ -196,9 +202,12 @@ KDS remoto adicional: `?bridge=IP` (`app/pos/kds/page.tsx:195-201`).
 ### tenant_id
 - **Representa:** el cliente comercial (hoy `clients.id`, ej. `'amalay'`).
   Contrato, plan, features, facturación de Fullsite.
-- **Crea:** provisioning (CREATE TENANT). Slug en minúsculas — invariante ya
-  forzado en código.
-- **Mutabilidad:** inmutable (renombrar = display_name, nunca el slug/ID).
+- **Crea:** provisioning (CREATE TENANT). **RESUELTO (D2):** la identidad
+  canónica es un ID técnico opaco e inmutable; el slug actual (`'amalay'`,
+  minúsculas — invariante ya forzado en código) pasa a `tenant_slug` legible
+  y se conserva como alias operativo/legacy durante la transición. Nunca usar
+  nombres/slugs como primary identity.
+- **Mutabilidad:** ID inmutable; slug/display_name mutables con historial.
 - **Vive en:** cloud (`clients`, se conserva la tabla). RLS raíz: D-B —
   proyecto Supabase COMPARTIDO multi-tenant por default; `auth_client_id()` +
   membership real; instalación dedicada = excepción enterprise futura.
@@ -211,10 +220,12 @@ KDS remoto adicional: `?bridge=IP` (`app/pos/kds/page.tsx:195-201`).
 ### branch_id
 - **Representa:** la sucursal física — unidad operativa real (timezone,
   horario, fiscal local, fondo, mesas, estaciones, impresoras).
-- **Crea:** provisioning (CREATE BRANCH). Todo tenant nace con ≥1 branch
-  explícita (`{tenant}-main` NO: usar UUID + slug legible; hoy coexisten dos
-  convenciones incompatibles — `'amalay-spgg'` default hardcoded vs
-  `${clientId}-main` del onboarding: unificar en la migración F0).
+- **Crea:** provisioning (CREATE BRANCH). **RESUELTO (D2):** `branch_id` =
+  ID técnico opaco e inmutable; `branch_slug` = legible y mutable;
+  `branch_code` = identificador de negocio opcional; `display_name` mutable;
+  `legacy_alias` para compatibilidad histórica. `'amalay-spgg'` se trata como
+  **legacy alias/mapping**, NUNCA como identidad canónica; `${clientId}-main`
+  NO se adopta como convención canónica.
 - **Mutabilidad:** ID inmutable; atributos mutables versionados.
 - **Vive en:** cloud (`client_locations` se ACTIVA y se vuelve real, no se
   crea tabla nueva).
@@ -261,7 +272,8 @@ KDS remoto adicional: `?bridge=IP` (`app/pos/kds/page.tsx:195-201`).
   extinguir).
 
 ### user/person_id
-- **Representa:** UNA persona. Unifica la bifurcación actual
+- **Representa:** UNA persona. **D3:** vincula (no fusiona en F2) la
+  bifurcación actual
   `pos_staff` (PIN/huella, operación) ↔ `client_users` (auth dashboard):
   `persons {id}` + credenciales como facetas (pin_hash, fingerprint_id,
   auth_user_id) + memberships por tenant/branch con perfil de permisos.
@@ -327,6 +339,10 @@ A. CONFIGURATION PLANE (cloud, versionado, cacheado local)
              ├ service_modes, business_date_rule, tips_policy,
              │   tax_profiles (IVA+IEPS), suggested_tips
              ├ security_matrix + permission_profiles (datos, no código)
+             ├ feature_flags jerárquicos (D4): GLOBAL KILL SWITCH →
+             │   TENANT FEATURE FLAG → ROLE/PERMISSION; el global siempre
+             │   gana (emergency/security/release); cero deploys distintos
+             │   por cliente para exponer módulos diferentes
              ├ incentives (descuentos/cortesías/2x1/promos unificados)
              ├ catálogos de razones (cancelación/cortesía/retiro/merma)
              └ config_versions (todo cambio: autor, ts, payload, rollback)
@@ -356,20 +372,33 @@ D/E/F. POS, KDS, Dashboard: consumidores independientes del plane.
   mixta`); `item.stations[]` ARRAY (Wansoft soporta 5 destinos/ítem);
   `no_print` explícito; el KDS filtra por station_id — muere el enum y los
   tres juegos de keywords.
-- **11. Printer/routing:** impresoras como entidad cloud por branch
-  (conexión tcp/usb/windows, copies, backup_id); routing con herencia 3
-  niveles versionada; el Bridge materializa a printers.json (cache) y reporta
-  la versión aplicada. Resuelve el conflicto RUNTIME-SPEC §3.3 (hardware
-  autoritativo local) a favor del plane con cache local garantizado offline.
+- **11. Printer/routing — RESUELTO (D1), modelo definitivo de autoridad:**
+  - Configuration Plane cloud = **CANONICAL DESIRED CONFIGURATION**; cada
+    cambio genera `config_version`.
+  - Bridge/persistencia local = **DURABLE LAST-ACCEPTED CONFIGURATION CACHE**.
+  - Runtime local = **EXECUTION AUTHORITY** durante el servicio.
+  - POS/KDS/impresión NUNCA requieren cloud para seguir operando; con WAN
+    caída se continúa **indefinidamente** con la última versión aceptada.
+  - Una config nueva NO sustituye a la última válida local hasta haber sido
+    recibida, validada y persistida COMPLETAMENTE (aplicación atómica).
+  - `printers.json` puede existir como bootstrap/cache/materialización local,
+    pero no como única verdad administrativa.
+  Entidades: impresoras cloud por branch (tcp/usb/windows, copies, backup_id);
+  routing con herencia 3 niveles versionada; el Bridge reporta la versión
+  aplicada en `/health`. Cierra el conflicto con RUNTIME-SPEC §3.3.
 - **12. Menu/modifier/recipe:** estructura actual PARITY; se agregan CAMPOS
   día-1: `stations[]`, `price_base + price_overrides{contexto}`,
   `tax_profile{iva,ieps}`, `incentive_flags{descuento,dxu,cortesia}`,
   `availability{horario|dia|turno}`, `modifier.recipe_impact[]`,
   `recipe.yield_factor`, subrecetas, `warehouse_id`. Un solo catálogo
   (market = `item.type`, no módulo espejo).
-- **13. Staff/user identity:** persons + facetas de credencial + memberships;
-  el mecanismo offline actual (PBKDF2, TTL 24h, jerarquía) se conserva tal
-  cual como cache del plane.
+- **13. Staff/user identity — RESUELTO (D3):** en F2 NO se hace full merge de
+  `pos_staff` y `client_users`. Se crea el `person_id` canónico y se VINCULA:
+  `client_users.person_id` → autenticación/membership cloud;
+  `pos_staff.person_id` → identidad operativa POS (PIN/turnos). Una persona
+  conecta ambas identidades sin fusión prematura de modelos; la consolidación
+  total queda como decisión futura. El mecanismo offline actual (PBKDF2, TTL
+  24h, jerarquía de escalation) se conserva tal cual como cache del plane.
 - **14. Business date/timezone:** regla por branch; sellado al crear; muere
   `date-mx.ts` hardcoded y el offset literal.
 - **15. Permission/security:** `permission_profiles` (plantillas) + override
@@ -751,9 +780,19 @@ Casos que más rompen el modelo actual: **#7/#10** (branch), **#5/#6**
   overrides · permission profiles UI · torture test 10/10 automatizado como
   gate de CI. **~8-12 semanas acumuladas.**
 
-## 29. Implementation Phases
+## 29. Implementation Phases — SECUENCIA VINCULANTE (D5)
 
-- **F0 — Sellado de identidad (post-visita AMALAY, D-A):** branch_id +
+```
+1. Field Package 1.3.4 physical acceptance en AMALAY
+2. Preservar ese resultado como BASELINE KNOWN-GOOD
+3. Abrir NUEVO ciclo Clonable Core (nunca mezclado con el release 1.3.4)
+4. Canonical schema/identity foundation (IDs opacos D2, person link D3)
+5. F0
+6. F1 de-AMALAYization
+7. F2 Configuration Plane
+```
+
+- **F0 — Sellado de identidad (post-acceptance, D-A/D5):** branch_id +
   terminal_id + business_date como columnas selladas en NUEVAS escrituras
   (aunque la UI siga single-branch). Detiene la hemorragia del blocker #1 sin
   construir multi-sucursal. Incluye unificar la convención de branch ID.
@@ -769,27 +808,36 @@ Casos que más rompen el modelo actual: **#7/#10** (branch), **#5/#6**
 
 ---
 
-## DECISIONES ARQUITECTÓNICAS ABIERTAS (para revisión del fundador)
+## DECISIONES ARQUITECTÓNICAS — RESUELTAS (founder review 2026-08-07)
 
-1. **Printers: verdad cloud vs autoridad Runtime.** Este doc propone plane
-   cloud + cache local materializado; RUNTIME-SPEC §3.3 hoy declara lo
-   contrario. Requiere resolución formal (propuesta: plane gana; el Bridge
-   opera 100% del turno con su cache aunque cloud no exista).
-2. **Convención de branch ID** para unificar `'amalay-spgg'` (default en
-   datos) vs `${clientId}-main` (onboarding): propuesta UUID + slug legible;
-   decidir el mapeo del histórico AMALAY en F0.
-3. **Alcance de `persons` en F2:** ¿unificación completa pos_staff↔client_users
-   o solo el vínculo (person_id en ambas) dejando la fusión para F3?
-4. **RELEASE_HIDDEN_PAGES:** ¿se convierte en flag per-tenant en F2 o
-   permanece como control global de release?
-5. **Timing de F1 vs certificación AMALAY:** F1 toca POS/KDS runtime — definir
-   si arranca tras el field acceptance (consistente con D-A) o tras la
-   estabilización (+7 días).
+| # | Decisión | Resolución vinculante |
+|---|---|---|
+| **D1** | Autoridad de configuración de impresión | Plane cloud = canonical DESIRED config (+`config_version` por cambio) · Bridge = durable LAST-ACCEPTED cache · Runtime local = EXECUTION AUTHORITY en servicio · nunca se requiere cloud para operar · WAN-down = última versión aceptada indefinidamente · aplicación de config nueva solo tras recibir+validar+persistir completo · `printers.json` = bootstrap/cache/materialización, no verdad administrativa única. (§11 actualizado; cierra el conflicto con RUNTIME-SPEC §3.3.) |
+| **D2** | IDs canónicos | organization/tenant/branch/terminal/station/person = IDs técnicos opacos e inmutables; nombres/slugs NUNCA como primary identity. Patrón: `*_id` inmutable + `*_slug` legible mutable + `*_code` de negocio opcional + `display_name` + `legacy_alias`. AMALAY: `'amalay-spgg'` = legacy alias/mapping, NO identidad canónica; `${clientId}-main` NO se adopta. (Identity Model actualizado.) |
+| **D3** | Person identity | F2 NO fusiona `pos_staff`↔`client_users`; se crea `person_id` canónico y ambos lo referencian (`client_users.person_id` = auth/membership cloud; `pos_staff.person_id` = identidad operativa PIN/turnos). Consolidación total = decisión futura. (§13 actualizado.) |
+| **D4** | Feature / hidden pages | `RELEASE_HIDDEN_PAGES` evoluciona a control per-tenant/config-driven con jerarquía GLOBAL KILL SWITCH → TENANT FEATURE FLAG → ROLE/PERMISSION; el global siempre gana (emergency/security/release). Cero deploys distintos por cliente para exponer módulos diferentes. |
+| **D5** | Timing | F0/F1 NO antes del physical field acceptance de AMALAY. Secuencia vinculante: acceptance 1.3.4 → baseline known-good preservado → nuevo ciclo Clonable Core → canonical schema/identity foundation → F0 → F1 → F2. Clonable Core jamás mezclado con el release congelado 1.3.4. (§29 actualizado.) |
+
+### Decisiones que permanecen abiertas (nuevas, genuinas)
+
+1. **Mapeo de migración del legacy AMALAY:** tabla concreta de
+   `legacy_alias → *_id` opacos (tenant `'amalay'`, branch `'amalay-spgg'`,
+   location `'amalay-main'`) y en qué paso de la foundation se materializa —
+   detalle de datos para el diseño de F0, no de arquitectura.
+2. **Mecánica de convergencia de config:** push (realtime) vs poll del Bridge,
+   ventana de aplicación de una config nueva durante servicio activo
+   (¿aplicar en caliente, al cierre de turno, o configurable por dominio?).
+3. **Templates de giro para provisioning:** catálogo mínimo de stations/
+   routing/roles por template (cafetería/QSR/bar/full-service) — contenido,
+   no estructura.
+4. **OCM v0.2:** alcance exacto de la capa de datos operativos que la IA
+   consumirá para `data_source='fullsite'` (HC-04/05/06) — requiere su propio
+   ciclo de diseño referenciado, fuera de este doc.
 
 ---
 
-*Consolidado 2026-08-07 a partir de: auditoría de hardcodes (30 hallazgos
+*Consolidado 2026-08-07 (v1.1: founder review D1-D5 aplicado) a partir de: auditoría de hardcodes (30 hallazgos
 verificados con archivo:línea), inventario de modelo de datos (75 tablas,
 migración 010 + schemas locales), mapa de paridad Wansoft (~90 conceptos, 14
 dominios, 4 bibles + 41 lecciones NetSilver) y decisiones del fundador D-A/D-B/
-D-C. Documento de DISEÑO: no autoriza implementación por sí mismo.*
+D-C. Documento canónico: fuente de verdad de implementación del Clonable Core una vez cumplida la secuencia D5.*
