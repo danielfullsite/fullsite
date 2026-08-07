@@ -42,6 +42,24 @@ la app siga funcionando (y offline no se rompa), estos cambios de app son
    opcional: que el patch refresque la sesión (`supabase.auth.getSession()`)
    antes de inyectar el token, o mover cash/turnos/cierres a endpoints `APP_API`.
 
+## Alcance real (auditoría de schema 2026-08-07)
+
+La migración NO cubre 12 tablas — la auditoría completa encontró **93 tablas con
+`client_id`** (la mayoría con el mismo patrón permisivo anon), **6 con RLS
+desactivada**, **6 views** que bypassan RLS (security_invoker off, anon-readable),
+y funciones SECURITY DEFINER con EXECUTE para anon (`r1_save_order`,
+`r1_merge_orders`, `r1_reconcile_*`, `r1_adjust_market_stock`, etc.) que permitían
+crear/mutar datos de cualquier tenant vía RPC directo con la anon key. La
+migración ahora es **dinámica**: cubre todas las tablas con `client_id`, habilita
+RLS en las que estaban off, endurece `client_users` (solo lectura de la fila
+propia; escrituras solo por service_role), pone `security_invoker=true` + revoca
+anon en las views, y deja a anon SOLO `EXECUTE get_public_menu`.
+
+Impacto app: sin cambios de código adicionales — la app lee estas tablas vía el
+JWT de sesión (patch) y escribe vía endpoints server (service_role). Flujos
+customer-facing con anon (QR self-order, reservaciones públicas) quedan como
+follow-up (endpoints dedicados), fuera del release operador.
+
 ## Requisito de deploy
 
 - La migración y el bundle de app deben salir **coordinados**. Si la migración
