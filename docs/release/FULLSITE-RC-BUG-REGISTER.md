@@ -80,7 +80,17 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Retest:** E2E-03 (doble clic / reintento) + física lunes
 - **Estado:** OPEN
 
+### BUG-019 · Aislamiento de tenant es solo capa-app, no DB (RLS permisiva anon) · **P1 cloneability** · OPEN
+- **Clasificación:** el usuario pidió reclasificar a P1 "si puede provocar que un tenant nuevo quede con permisos distintos a los esperados o afectar tenant isolation". Este SÍ afecta isolation → P1. Requiere verificación contra la RLS real de producción antes de client #2.
+- **Hallazgo (verificado en staging 2026-08-06):** con la sesión scoped a `demo` y la anon key (que el navegador expone), una lectura REST directa `pos_staff?client_id=eq.vantara` devolvió **200 con 4 filas de otro tenant**. El POS hace lecturas anon directas (`pos_orders`, `pos_turnos`, `pos_staff`, menú) filtrando por `_cid()` que sale de `localStorage['fullsite_client_id']` — **editable por el usuario**. Con RLS `using(true)`/anon-read permisiva, un usuario puede leer datos de OTRO tenant cambiando el client_id.
+- **¿Introducido por mí o pre-existente en prod?** El comentario de `api/pos/pin/route.ts` ("pos_staff has anon_read policy → anon key is sufficient for PIN lookup") indica que **producción tiene una política anon-read permisiva** en pos_staff (si no, el login PIN por anon no funcionaría). Es decir, el modelo permisivo es de PRODUCCIÓN, no sólo de mi staging. La escritura server-side sí usa service key + `withPOSAuth` (clientId resuelto en servidor, no falsificable) — pero las LECTURAS directas del navegador no pasan por ese guard.
+- **Impacto:** un operador/atacante autenticado en un tenant podría leer menú, staff, órdenes y métricas de otro tenant editando su `localStorage`. La escritura cruzada está protegida (withPOSAuth); la LECTURA cruzada no. Bloquea onboarding seguro de client #2 (multi-tenant real).
+- **Acción requerida (NO ejecutable sin acceso a prod / decisión de fundador):** verificar la RLS real de `pos_staff`/`pos_orders`/`pos_turnos`/`pos_menu_*` en producción. Si son `using(true)`/anon-permisivas → implementar RLS tenant-scoped (policy que ate `client_id` al claim del JWT del usuario) o enrutar TODAS las lecturas por un endpoint con `withPOSAuth`. + test de isolation que intente lectura cruzada y espere 0 filas / 403.
+- **Relación:** distinto de BUG-013 (paridad de grants en staging). Este es el modelo de isolation en sí.
+- **Estado:** OPEN — P1 cloneability. NO verificable end-to-end sin acceso a producción (prohibido). Requiere decisión del fundador.
+
 ### BUG-013 · Staging tenant `demo` sin paridad de grants vs producción · P2 (infra) · OPEN
+- **Reclasificación (2026-08-06):** se mantiene **P2**. Las migraciones que apliqué (grants + policies `using(true)`) son a nivel de TABLA (compartidas por todos los tenants), sólo en staging, y NO se despliegan a producción. Un tenant nuevo en prod hereda las policies de prod, no las mías. No provoca que un tenant nuevo quede con permisos "distintos" — todos comparten el mismo modelo. El riesgo de ISOLATION en sí está escalado por separado como **BUG-019 (P1)**.
 - **Origen:** ejecución UI RC 2026-08-06 — el POS daba 401 en login PIN y en cada escritura contra el tenant `demo` de staging
 - **Causa:** staging no tenía los grants/policies que producción aplica: anon read en `pos_staff` y `client_users`, grants+RLS en tablas POS operativas, `execute` en `r1_save_order`/`r1_save_order_idempotent`. Producción los cubre porque las rutas usan `SUPABASE_SERVICE_KEY` (bypassa RLS)
 - **Acción tomada:** espejados en staging vía migraciones (`pos_staff_anon_read_mirror_prod`, `pos_operational_anon_grants_mirror_prod`, `grant_pos_save_rpcs_e2e`, `client_users_anon_read_e2e`, `events_anon_rw_e2e`) para poder ejecutar E2E. NO es cambio de producto ni de producción
@@ -147,15 +157,18 @@ evidencia · repro · causa · fix · tests · retest · estado.
 
 ### BUG-002 · `/encuestas` sin vista de respuestas · P2 · **CERRADO** (fix `8010d9a`) — oculta del release
 ### BUG-003 · `/admin/usuarios` CRUD parcial · P2 · **CERRADO** (fix `8010d9a`) — oculta del release
+### BUG-016 · Ítem cancelado resucita cobrable al reabrir · P1 · **CERRADO** (fix `7435188`) — getActiveItems + activeItems honran flag persistido; merge usa dbKnownIds; cache invalidado al cancelar; +2 regresiones; suite 2150/2150
 
-(ninguno aún en este registro; los P0 pre-RC — PRR-02, PRR-04, save-order 99cdf7a, /identity 29c4b0d — están cerrados en el registro PRR con sus tests de regresión y el ciclo upgrade-rehearsal como retest)
+Los P0 pre-RC — PRR-02, PRR-04, save-order 99cdf7a, /identity 29c4b0d — están cerrados en el registro PRR con tests de regresión + el ciclo upgrade-rehearsal como retest.
 
 ---
 
-## Resumen vivo
+## Resumen vivo (2026-08-06, tras ejecución UI)
 
 | Severidad | Abiertos | Bloquean release |
 |---|---|---|
 | P0 | 0 | — |
-| P1 | 1 (BUG-001) | Sí — hasta reparar u ocultar |
-| P2 | 10 | No (ninguno muestra datos incorrectos confirmados; BUG-003/007 pendientes de verificación runtime que podría subirlos) |
+| P1 | 2 — **BUG-015** (print retry no self-drena, twin), **BUG-019** (tenant isolation capa-app, necesita verificar RLS prod) | **Sí** — gate `P1 BLOCKING = 0` NO se cumple |
+| P2 | 12 — BUG-004..014, 017, 018 (BUG-002/003 cerrados) | No (ninguno muestra información incorrecta confirmada al operador) |
+
+**Cerrados esta sesión:** BUG-001 (P1, ocultar), BUG-016 (P1, sobrecobro). **Nuevos:** BUG-016/017/018/019.
