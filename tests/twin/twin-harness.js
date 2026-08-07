@@ -362,7 +362,14 @@ async function startBridge(kind, downAt) {
   if (h.ok) { rec.server_id = h.body.server_id; serverIdsSeen.add(h.body.server_id) }
   awaitingFirstAck = rec
   restarts.push(rec)
-  for (const cl of activeClients()) cl.sendDedupProbes(3)
+  const _act = activeClients()
+  if (_act.length === 0) {
+    // Quiescent restart (traffic already ended): no client exists to carry an
+    // ACK, so first-ACK is unprovable — validate by ready-state like
+    // 'initial'/'final-flush' instead of failing gate 7 on an artifact.
+    rec.kind = rec.kind + '-quiescent'
+  }
+  for (const cl of _act) cl.sendDedupProbes(3)
   return rec
 }
 
@@ -1100,7 +1107,12 @@ function schedulePhaseFaults(profile, startAt, endAt) {
   } else if (profile.faults === 'periodic') {
     const killEvery = 12 * 60_000, graceEvery = 18 * 60_000, outageEvery = 10 * 60_000
     for (let t = startAt + killEvery; t < endAt - 60_000; t += killEvery) timers.push(setTimeout(() => enqueueFault(doKillRestart), t - now()))
-    for (let t = startAt + graceEvery * 1.5; t < endAt - 60_000; t += graceEvery) timers.push(setTimeout(() => enqueueFault(doGracefulRestart), t - now()))
+    let graceScheduled = 0
+    for (let t = startAt + graceEvery * 1.5; t < endAt - 60_000; t += graceEvery) { timers.push(setTimeout(() => enqueueFault(doGracefulRestart), t - now())); graceScheduled++ }
+    // Deterministic coverage: at high --compress the graceEvery*1.5 offset can
+    // fall past the window and the crash_faults_exercised gate fails on luck,
+    // not on product. Guarantee at least one graceful restart mid-phase.
+    if (graceScheduled === 0) timers.push(setTimeout(() => enqueueFault(doGracefulRestart), Math.max(1000, startAt + (endAt - startAt) * 0.6 - now())))
     let alt = 0
     for (let t = startAt + outageEvery; t < endAt - 90_000; t += outageEvery) {
       const which = rotation[alt++ % rotation.length]
@@ -2332,12 +2344,12 @@ async function verifyRun(drainMs) {
   // with NO traffic after it) are ready-only: there is no post-restart command
   // to ACK, so requiring first_ack_at for them is a false negative (flaky on
   // whether a stray probe happened to fire after the flush).
-  const readyOnlyKinds = new Set(['initial', 'final-flush'])
+  const readyOnlyKinds = new Set(['initial', 'final-flush', 'kill-quiescent', 'graceful-quiescent'])
   const failedRecoveries = restarts.filter(r => !r.ready_at || (!readyOnlyKinds.has(r.kind) && !r.first_ack_at))
   inv('recovery_after_every_restart', failedRecoveries.length === 0,
     failedRecoveries.length ? failedRecoveries : restarts.map(r => ({ kind: r.kind, ready_ms: r.ready_at ? r.ready_at - r.spawn_at : null, first_ack_ms: r.recovery_ms })), { gate: 7 })
-  const killCount = restarts.filter(r => r.kind === 'kill').length
-  const graceCount = restarts.filter(r => r.kind === 'graceful').length
+  const killCount = restarts.filter(r => r.kind.startsWith('kill')).length
+  const graceCount = restarts.filter(r => r.kind.startsWith('graceful')).length
   const extCount = restarts.filter(r => r.kind === 'external-restart-observed').length
   // accum phases inject only light faults (no SIGKILL/graceful) — crash
   // resilience is the job of shift/full + the 4h soak, not accumulation.
