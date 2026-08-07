@@ -104,7 +104,7 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Impacto real:** el paquete demo/clonability depende de que el tenant demo opere; esta deuda debe cerrarse en el provisioning del tenant demo, no en la app
 - **Estado:** OPEN — mitigado en staging; documentar en el runbook de alta de tenant demo
 
-### BUG-015 · Bridge print-queue: jobs `retrying` no se reintentan hasta el próximo restart del Bridge · **P1** · OPEN
+### BUG-015 · Bridge print-queue: jobs `retrying` no se reintentan hasta el próximo restart del Bridge · **P1** · **CERRADO** (fix `64e859a`, v1.3.4)
 - **Clasificación (verificada antes de asignar severidad):** FAIL **real de PRODUCTO** en el pipeline de impresión del Bridge, NO límite de capa/harness. `PRINT_COMMAND` es comando de protocolo soportado (`protocol.js:36` → `command-handler.js:79` → `printer.printToStation`); la sonda ejercita exactamente ese path con un documento tipo corte. (Lo que sí es capa web-UI es el CÓMPUTO del corte — cubierto aparte como `corte-x` NOT-EXERCISABLE.) **No** es pérdida silenciosa: el job queda persistido y visible en `print-queue.json`/`/print-queue` con status `retrying` — por eso P1 y no P0.
 - **Origen:** AMALAY Digital Twin (5 printers / 3 POS), sonda `corte-print-outage`, 2026-08-06
 - **Pasos (repro exacto, spawn mode) con estado de `print-queue.json` en cada paso:**
@@ -156,6 +156,13 @@ evidencia · repro · causa · fix · tests · retest · estado.
 - **Estado:** OPEN — verificar si el shadow-write debe omitir `sequence` o tomarlo del Bridge; no afecta el path operativo
 
 ## CERRADOS
+
+### BUG-015 — cierre (2026-08-06, v1.3.4, commit `64e859a`)
+- **Fix mínimo (solo path retry/recovery):** (1) el ciclo de 60s drena siempre que haya backlog pending/retrying (antes solo con revividos recoverable); (2) intentos agotados con error de infraestructura → `recoverable` re-ciclable indefinidamente (antes `failed` terminal); (3) guard `_retryInFlight` contra drains solapados.
+- **Regresión:** `printer-retry-cycle.test.js` — 5 tests con TCP real y bytes verificados (drain sin restart, exactamente-una-impresión, independencia por impresora, guard concurrente, backlog+job vivo). 5/5 PASS. Suite bridge 175/175 PASS.
+- **Retest twin:** smoke `corte-print-outage` FAIL→**PASS** (self-drain 55s sin restart) · VERDICT PASS. Caso histórico EC TICKET jam: **HISTORICAL BUG RETEST = PASS sin workaround de reinicio**.
+- **Versionado:** 1.3.4 (`C5603EF7A80CCEBDBB5A607DB77C3B119CFAB8B55B87D83BC58ACAE41D7C2E7A`) · Field Package v2 (`8C7CF5A723E95B3C3A713A0732757CC1D5FE7EE1056BBF0FCAB4F38226383448`) · v1 INVALIDADO.
+
 
 ### BUG-001 · `/lealtad` rewards mock visible · P1 · **CERRADO** (fix `8010d9a`)
 - **Fix:** `RELEASE_HIDDEN_PAGES` en `roles.ts` bloquea `/lealtad` (+ `/encuestas`, `/admin/usuarios`, `/internal`) para todos los roles vía `canAccessPage`, aplicado en el middleware `proxy.ts` (edge) y heredado por el Sidebar
