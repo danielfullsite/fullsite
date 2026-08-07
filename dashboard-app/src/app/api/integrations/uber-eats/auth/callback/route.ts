@@ -9,11 +9,13 @@
 //   4. Upsert integration_store_mappings row
 //   5. Redirect to /dashboard/integrations?status=connected
 //
-// NOTE: Tokens stored in _enc columns but NOT yet encrypted at rest.
-//       Implement envelope encryption before production go-live.
+// Tokens are sealed via token-vault (AES-256-GCM with INTEGRATION_TOKEN_KEY).
+// Without the key, sealToken degrades to plaintext with a warning —
+// SEC-UBER-01: the key MUST be configured before production go-live.
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { exchangeUberCode } from '@/lib/integrations/uber-eats/oauth'
+import { sealToken } from '@/lib/integrations/token-vault'
 import { auditLog } from '@/lib/integrations/audit-logger'
 import { ADAPTER_VERSION } from '@/lib/integrations/uber-eats/adapter'
 
@@ -38,7 +40,7 @@ function redirectUri(req: NextRequest): string {
 
 async function upsertProvider(clientId: string, storeId: string, tokens: {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
   expires_in: number
   scope: string
 }): Promise<void> {
@@ -54,9 +56,10 @@ async function upsertProvider(clientId: string, storeId: string, tokens: {
       provider: 'ubereats',
       provider_version: ADAPTER_VERSION,
       provider_account_id: storeId,
-      // NOTE: stored plaintext until encryption layer is implemented
-      access_token_enc: tokens.access_token,
-      refresh_token_enc: tokens.refresh_token,
+      access_token_enc: sealToken(tokens.access_token),
+      // Uber only returns refresh_token when offline_access was requested —
+      // never overwrite an existing one with null.
+      ...(tokens.refresh_token ? { refresh_token_enc: sealToken(tokens.refresh_token) } : {}),
       token_expires_at: expiresAt,
       scopes: tokens.scope.split(' '),
       status: 'active',
