@@ -15,9 +15,6 @@ import {
   saveOrder,
   addOrderItems,
   logAudit,
-  deductIngredientsForOrder,
-  reverseIngredientDeduction,
-  deductMarketStockForOrder,
   getRecipes,
   getIngredients,
   getModifiersForCategory,
@@ -2463,13 +2460,10 @@ function POSContent() {
       before: { qty: cancellingItem.cantidad, subtotal: cancellingItem.subtotal, prepared, voided },
       after: { qty: 0, cancelled: !voided, voided },
     })
-    // R0.5 RESOLVED: Forward deduction is now active, so reversal is safe.
-    // Only reverse if item was prepared (sent to kitchen = stock was deducted).
-    // Voided items that were never sent don't need reversal.
-    if (!voided && prepared) {
-      reverseIngredientDeduction(cancellingItem, loadedOrderId || '', managerName, reason)
-        .catch(err => console.error('[inventory] Reversal error (non-blocking):', err))
-    }
+    // W1-A: la reversa de inventario es propiedad exclusiva de R1 — al persistir la
+    // cancelación y re-guardar la orden, r1_reconcile_item calcula delta negativo y
+    // emite recipe_reversal. La reversa client-side por fuzzy match fue retirada
+    // (además reponía stock que nunca dedujo para items recipe-mode).
     if (voided) {
       setVoidedItems(prev => new Set(prev).add(cancellingItem.id))
     } else {
@@ -2638,15 +2632,9 @@ function POSContent() {
       }
       if (voidResult.revision != null) setOrderRevision(voidResult.revision)
     }
-    // R0.5 RESOLVED: Reverse deductions for items that were sent to kitchen.
-    // Void = entire order cancelled before payment, stock should come back.
-    const sentItems = orderItems.filter(i => sentItemIds.has(i.id) && !cancelledItems.has(i.id) && !voidedItems.has(i.id))
-    if (sentItems.length > 0) {
-      for (const item of sentItems) {
-        reverseIngredientDeduction(item, loadedOrderId || '', managerName, reason)
-          .catch(err => console.error('[inventory] Order void reversal error (non-blocking):', err))
-      }
-    }
+    // W1-A: el void de la orden se persistió arriba vía saveOrder(status='cancelada'),
+    // que dispara r1_reconcile_order → desired=0 → recipe_reversal por cada item R1.
+    // La reversa client-side fue retirada.
     setOrderItems([])
     setCancelledItems(new Set())
     setVoidedItems(new Set())
@@ -3134,14 +3122,9 @@ function POSContent() {
         details: { items_count: activeItems.length, total },
       })
 
-      // Deduct ingredients at kitchen send time (only new items in this batch)
-      if (newItems.length > 0) {
-        try {
-          await deductIngredientsForOrder(newItems, orderId, mesero || 'POS', batchId)
-        } catch (err) {
-          console.error('[inventory] Deduction error (non-blocking):', err)
-        }
-      }
+      // W1-A: la depleción de inventario es propiedad exclusiva de R1 —
+      // r1_reconcile_order corre dentro de /api/pos/save-order (ya invocado arriba
+      // vía saveOrder). Sistema A (deducción client-side por fuzzy match) fue retirado.
 
       setLoadedOrderId(orderId)
       // Read server's actual updated_at + order_number (triggers set these)
@@ -3341,25 +3324,10 @@ function POSContent() {
         order_id: payId, action: 'payment_processed', actor: mesero, mesa,
         details: { method: metodoLabel, pagos, total: payTotal, cuenta: splitPayingCuenta || 'full', propina, cashReceived: method === 'Efectivo' ? cashAmount : undefined },
       })
-      // Market: descuenta stock al COBRAR (retail 1:1, items mkt-*).
-      // Split parejo: todas las cuentas repiten los mismos items → solo cuenta 1 descuenta.
-      // Split por items: cada cuenta descuenta lo suyo (sin dobles).
-      const shouldDeductMarket = splitPayingCuenta === 0 || splitMode !== 'parejo' || splitPayingCuenta === 1
-      if (shouldDeductMarket) {
-        const mkt = await deductMarketStockForOrder(payingItems, payId, mesero)
-        if (mkt.deductions.length > 0) {
-          logAudit({
-            order_id: payId, action: 'payment_processed', actor: 'Sistema',
-            details: { market_deductions: mkt.deductions, market_alerts: mkt.alerts },
-          })
-        }
-        if (mkt.alerts.length > 0) {
-          showToast(`Stock Market bajo: ${mkt.alerts[0]}${mkt.alerts.length > 1 ? ` (+${mkt.alerts.length - 1})` : ''}`)
-        }
-      }
-
-      // Ingredient deduction happens at kitchen send time (not here).
-      // Market stock (retail items) still deducts at payment below.
+      // W1-A: el stock Market (direct_stock) también es propiedad de R1 —
+      // r1_reconcile_item lo descuenta en la reconciliación del save. La ruta legacy
+      // (r1_legacy_sale_deduction) está rechazada server-side desde el cutover de
+      // autoridad a 'r1' (2026-07-14) y su llamada client-side fue retirada.
 
       // Shadow mode (Fullsite OS): pago capturado, fire-and-forget
       publishEvent('payments.payment.captured.v1', 1, { userId: mesero, deviceId: getDeviceId() }, {

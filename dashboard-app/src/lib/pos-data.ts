@@ -268,7 +268,6 @@ export function getModifierTypeFromCategoryName(catName: string): 'none' | 'coff
 // Cache of category id → name (populated by POS on menu load via setCategoryNameCache)
 import { _categoryNameCache } from '@/lib/pos-constants'
 import { getActiveClientSlug } from '@/lib/data'
-import { inventoryPolicyService, logPolicyGateFailure } from '@/lib/inventory-policy'
 import { provisionManagerCredential, verifyPinOffline, meetsMinRole } from '@/lib/pos-manager-auth'
 
 export function getModifiersForCategory(categoryId: string): {
@@ -772,11 +771,8 @@ export const RECIPE_ALIASES: Record<string, string[]> = {
   'te verde': ['te verde'],
 }
 
-// Phase-gate: when set to 'disabled', the fuzzy fallback (RECIPE_ALIASES + name matching)
-// is skipped and only the DB recipe_ref is used. Flip via Vercel env var — no deploy needed.
-// Retirement criteria: 0 fuzzy logs for AMALAY during 7 consecutive days.
-const RECIPE_FALLBACK_ENABLED =
-  (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_RECIPE_FALLBACK : undefined) !== 'disabled'
+// W1-A: el phase-gate RECIPE_FALLBACK_ENABLED se eliminó junto con Sistema A —
+// el fuzzy fallback ya no existe; R1 resuelve por recipe_version_id, nunca por nombre.
 
 /** Un pago dentro de una cuenta (pago mixto multi-forma, estilo Wansoft) */
 export interface PagoForma {
@@ -1907,34 +1903,6 @@ export async function getRecipeForItem(menuItemId: string): Promise<RecipeRow[]>
 }
 
 /**
- * Batch-fetch recipe_ref for a set of menu item IDs.
- * Returns a Map<menuItemId, recipe_ref> containing only items that have a non-null recipe_ref.
- * One DB call for the entire order — does not touch pos_recipes_old.
- */
-async function fetchRecipeRefs(
-  clientId: string,
-  menuItemIds: string[],
-): Promise<Map<string, string>> {
-  if (menuItemIds.length === 0) return new Map()
-  const ids = menuItemIds.map(id => encodeURIComponent(id)).join(',')
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${clientId}&id=in.(${ids})&select=id,recipe_ref`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    if (!res.ok) return new Map()
-    const rows: { id: string; recipe_ref: string | null }[] = await res.json()
-    return new Map(
-      rows
-        .filter(r => r.recipe_ref != null)
-        .map(r => [r.id, r.recipe_ref!])
-    )
-  } catch {
-    return new Map()
-  }
-}
-
-/**
  * Returns recipe_ref coverage stats for a client.
  * Used to decide when to retire the fuzzy fallback.
  */
@@ -2079,318 +2047,37 @@ export async function logInventoryMovement(movement: {
   }
 }
 
-// ─── Auto-deduction: deduct recipe ingredients when order sent to kitchen ───
-
-// Tracks orderIds that have already emitted policy_gate_failure to prevent duplicate events
-// when deductIngredientsForOrder is retried for the same order within a session.
-const _gateFailureOrderIds = new Set<string>()
-
-// Tracks orderIds for which ingredient deduction has already fired in this process.
-// Prevents double-deduction caused by fire-and-forget timing (handlePayment releases
-// operationLock before the deduction Promise resolves) or rapid double-tap on "Cobrar".
-//
-// GROWTH: one 36-byte UUID per paid order. At 200 orders/day ≈ 7 KB/day, ≈ 2.6 MB/year
-// without restart. Lifecycle is bounded by the page/process session. Negligible at
-// current scale. If the process runs weeks without reload, LRU eviction could be added.
-//
-// ERROR BEHAVIOR: if deductIngredientsForOrder() fails after adding orderId here,
-// the catch block removes orderId from this Set so a subsequent retry can proceed.
-// An orderId is only kept permanently after a confirmed successful deduction.
-//
-// SCOPE LIMITS — this Set does NOT protect against:
-//   - Process/tab restart: Set is cleared on page reload.
-//   - Multiple browser tabs or POS terminals on the same order (no shared state).
-//   - Multiple Local Server instances.
-// Distributed idempotency (DB-level check on pos_inventory_movements) is tracked
-// separately as a follow-up after this P0 containment is stable.
-const _deductedOrderIds = new Set<string>()
-
-function _recordGateFailure(orderId: string, items: OrderItem[], actor: string): void {
-  if (_gateFailureOrderIds.has(orderId)) return
-  _gateFailureOrderIds.add(orderId)
-  const policyState = inventoryPolicyService.stats().state
-  console.error('[policy:gate] policy_gate_failure', { orderId, itemCount: items.length, policyState })
-  console.info('[policy:event] policy_gate_failure', {
-    orderId, itemCount: items.length, items: items.map(i => i.nombre), policyState,
-  })
-  logPolicyGateFailure(_getClientId(), orderId, policyState, actor)
-}
-
+// ─── W1-A: Sistema A (deducción client-side) RETIRADO ───────────────────────
+// La depleción de inventario por venta tiene UNA sola autoridad canónica:
+// r1_reconcile_order / r1_reconcile_item (server-side, dentro de /api/pos/save-order),
+// con idempotencia a nivel BD (pos_reconciliation_results: delta por revisión, pinning
+// de modo, locks deterministas) y reversa automática en cancelación. El fuzzy matching
+// por nombre y el Set de idempotencia de sesión fueron eliminados con él.
+// Stub inerte mantenido un ciclo de release por compatibilidad de firma.
 export async function deductIngredientsForOrder(
   items: OrderItem[],
   orderId: string,
-  actor: string,
-  batchId?: string,
+  _actor: string,
+  _batchId?: string,
 ): Promise<{ success: boolean; deductions: { ingredient: string; amount: number; unit: string; newStock: number }[]; alerts: string[]; resolution: { DB_MAPPING: string[]; FUZZY_FALLBACK: string[]; R1_OWNED: string[]; GATE_FAILED: string[]; UNRESOLVED: string[] } }> {
-  try {
-  // Policy must be READY before Sistema A runs.
-  // If policy is UNINITIALIZED/LOADING/FAILED we cannot distinguish recipe items from
-  // unclassified. Skip Sistema A entirely — R1 already fired at Kitchen Send.
-  if (!inventoryPolicyService.isReady()) {
-    _recordGateFailure(orderId, items, actor)
-    console.info(
-      `[deduct:summary] order=${orderId} items=${items.length} gate=FAILED_NO_POLICY ` +
-      `policyState=${inventoryPolicyService.stats().state}`
-    )
-    return {
-      success: true,
-      deductions: [],
-      alerts: [],
-      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: items.map(i => i.nombre), UNRESOLVED: [] },
-    }
-  }
-
-  // Idempotency guard — key is orderId:batchId when batchId is provided (kitchen send)
-  // so that additional items sent in a second batch are not skipped.
-  const deductKey = batchId ? `${orderId}:${batchId}` : orderId
-  if (_deductedOrderIds.has(deductKey)) {
-    console.info(`[deduct:idempotent] key=${deductKey} already deducted this session — skip`)
-    return {
-      success: true,
-      deductions: [],
-      alerts: [],
-      resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] },
-    }
-  }
-  _deductedOrderIds.add(deductKey)
-
-  // 1. Get all recipes and inventory
-  const recipes = await getRecipes()
-  const inventory = await getInventory()
-  const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
-
-  const deductions: { ingredient: string; amount: number; unit: string; newStock: number }[] = []
-  const alerts: string[] = []
-  const resolution = { DB_MAPPING: [] as string[], FUZZY_FALLBACK: [] as string[], R1_OWNED: [] as string[], GATE_FAILED: [] as string[], UNRESOLVED: [] as string[] }
-
-  // 2. Fetch recipe_ref from pos_menu_items for all items in this order (1 DB call)
-  const menuItemIds = [...new Set(items.map(i => i.menuItemId))]
-  const recipeRefMap = await fetchRecipeRefs(_getClientId(), menuItemIds)
-
-  // Observability counters — flushed to console at end of loop
-  const obs = {
-    total: 0, r1Skipped: 0, viaDb: 0, viaFuzzy: 0, miss: 0,
-    fuzzyItems: [] as string[], missItems: [] as string[],
-  }
-
-  // 3. For each order item, find matching recipe and deduct
-  // Normalize: strip prefixes, size suffixes, temperature variants
-  const normalizeRecipeName = (n: string) => n.toLowerCase()
-    .replace(/^sprw\s*-\s*/i, '')
-    .replace(/\s*\(.*?\)\s*/g, ' ')
-    .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
-    .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
-    .replace(/\s*(media porción|para compartir|1\/2)\s*/gi, ' ')
-    .replace(/\s+/g, ' ').trim()
-
-  const recipesByName = new Map<string, typeof recipes>()
-  const recipesByNorm = new Map<string, typeof recipes>()
-  for (const r of recipes) {
-    const key = r.menu_item_name.toLowerCase()
-    if (!recipesByName.has(key)) recipesByName.set(key, [])
-    recipesByName.get(key)!.push(r)
-    const norm = normalizeRecipeName(r.menu_item_name)
-    if (!recipesByNorm.has(norm)) recipesByNorm.set(norm, [])
-    recipesByNorm.get(norm)!.push(r)
-  }
-
-  for (const item of items) {
-    // R1 gate: skip items owned by R1 — deduction handled by r1_reconcile_item.
-    // Defaults to Alternativa A from §8: only 'recipe' items are gated; 'unclassified'
-    // continue through Sistema A unchanged until §8 decision is made.
-    const mode = inventoryPolicyService.getMode(item.menuItemId)
-    if (mode === 'recipe') {
-      obs.r1Skipped++
-      resolution.R1_OWNED.push(item.nombre)
-      continue
-    }
-
-    obs.total++
-    const itemName = item.nombre.toLowerCase()
-    const itemNorm = normalizeRecipeName(item.nombre)
-    let recipeRows: typeof recipes = []
-    let resolvedVia: 'db' | 'fuzzy' | 'miss' = 'miss'
-
-    // Path 1: DB recipe_ref — direct lookup, no text matching
-    const recipeRef = recipeRefMap.get(item.menuItemId)
-    if (recipeRef) {
-      const rows = recipesByName.get(recipeRef)
-      if (rows && rows.length > 0) {
-        recipeRows = rows
-        resolvedVia = 'db'
-      }
-    }
-
-    // Path 2: Fuzzy fallback (RECIPE_ALIASES + name matching)
-    // Active while NEXT_PUBLIC_RECIPE_FALLBACK !== 'disabled'
-    if (recipeRows.length === 0 && RECIPE_FALLBACK_ENABLED) {
-      // Priority 1: alias map
-      const aliases = RECIPE_ALIASES[itemName]
-      if (aliases) {
-        for (const alias of aliases) {
-          const rows = recipesByName.get(alias.toLowerCase())
-          if (rows && rows.length > 0) { recipeRows = rows; break }
-        }
-      }
-      // Priority 2: exact match on recipe name
-      if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
-      // Priority 3: normalized match (strips prefixes, sizes, temperature)
-      if (recipeRows.length === 0) recipeRows = recipesByNorm.get(itemNorm) ?? []
-      // Priority 4: best partial match (normalized)
-      if (recipeRows.length === 0) {
-        let bestMatch: { name: string; rows: typeof recipes } | null = null
-        let bestScore = 0
-        for (const [name, rows] of recipesByNorm) {
-          if (name.length < 3 || itemNorm.length < 3) continue
-          if (name.includes(itemNorm) || itemNorm.includes(name)) {
-            const score = Math.min(name.length, itemNorm.length) / Math.max(name.length, itemNorm.length)
-            if (score > bestScore && score > 0.5) { bestScore = score; bestMatch = { name, rows } }
-          }
-        }
-        if (bestMatch) recipeRows = bestMatch.rows
-      }
-      if (recipeRows.length > 0) resolvedVia = 'fuzzy'
-    }
-
-    // Record resolution path — never skip silently
-    if (resolvedVia === 'db') {
-      obs.viaDb++
-      resolution.DB_MAPPING.push(item.nombre)
-    } else if (resolvedVia === 'fuzzy') {
-      obs.viaFuzzy++
-      obs.fuzzyItems.push(item.nombre)
-      resolution.FUZZY_FALLBACK.push(item.nombre)
-      console.warn(`[deduct:fuzzy] "${item.nombre}" — sin recipe_ref en DB, usando fallback`)
-    } else {
-      obs.miss++
-      obs.missItems.push(item.nombre)
-      resolution.UNRESOLVED.push(item.nombre)
-      console.warn(`[deduct:miss] "${item.nombre}" (id=${item.menuItemId}) — sin receta en DB ni fuzzy`)
-      continue
-    }
-
-    for (const row of recipeRows) {
-      const deductAmount = row.quantity * item.cantidad
-      const inv = invMap.get(row.ingredient_id)
-      if (!inv) continue
-
-      // Skip sub-recipes — they don't carry physical stock
-      if (row.ingredient_id.startsWith('sub_') || inv.ingredient_category === 'subreceta' || inv.ingredient_category === 'SUBRECETA') continue
-
-      const actualDeduction = Math.min(deductAmount, inv.stock) // never deduct more than available
-      const newStock = Math.max(0, inv.stock - deductAmount)
-
-      // Update stock
-      await updateInventoryStock(row.ingredient_id, newStock)
-
-      // Log movement (log actual amount deducted, not requested)
-      await logInventoryMovement({
-        ingredient_id: row.ingredient_id,
-        movement_type: 'deduction',
-        quantity: -actualDeduction,
-        order_id: orderId,
-        actor,
-        notes: `${item.cantidad}x ${item.nombre}${actualDeduction < deductAmount ? ' (stock insuficiente)' : ''}`,
-      })
-
-      deductions.push({
-        ingredient: inv.ingredient_name ?? row.ingredient_id,
-        amount: actualDeduction,
-        unit: row.unit || inv.ingredient_unit || '',
-        newStock,
-      })
-
-      // Check reorder point
-      if (newStock <= inv.reorder_point) {
-        alerts.push(`${inv.ingredient_name}: ${newStock.toFixed(2)} ${inv.ingredient_unit} (punto de reorden: ${inv.reorder_point})`)
-      }
-
-      // Update local map
-      inv.stock = newStock
-    }
-  }
-
-  // Observability summary — one line per order in server logs
-  if (obs.total > 0) {
-    const pDb    = Math.round(obs.viaDb    / obs.total * 100)
-    const pFuzzy = Math.round(obs.viaFuzzy / obs.total * 100)
-    const pMiss  = Math.round(obs.miss     / obs.total * 100)
-    console.info(
-      `[deduct:summary] order=${orderId} items=${obs.total + obs.r1Skipped} gate=ACTIVE r1=${obs.r1Skipped} ` +
-      `db=${obs.viaDb}(${pDb}%) fuzzy=${obs.viaFuzzy}(${pFuzzy}%) miss=${obs.miss}(${pMiss}%)`
-    )
-    if (obs.fuzzyItems.length > 0) console.warn(`[deduct:fuzzy-items] ${obs.fuzzyItems.join(', ')}`)
-    if (obs.missItems.length  > 0) console.warn(`[deduct:miss-items]  ${obs.missItems.join(', ')}`)
-  }
-
-  return { success: true, deductions, alerts, resolution }
-  } catch (err) {
-    // Remove orderId so a subsequent retry is not silently blocked by the idempotency guard.
-    // The guard is meant to prevent double-deduction on success, not to block retries after failure.
-    _deductedOrderIds.delete(orderId)
-    console.warn('[deductIngredientsForOrder] Failed:', err)
-    return { success: false, deductions: [], alerts: ['Error al descontar inventario'], resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: [], GATE_FAILED: [], UNRESOLVED: [] } }
+  console.info(`[w1a] deductIngredientsForOrder retirado — R1 es la única autoridad (order=${orderId})`)
+  return {
+    success: true, deductions: [], alerts: [],
+    resolution: { DB_MAPPING: [], FUZZY_FALLBACK: [], R1_OWNED: items.map(i => i.nombre), GATE_FAILED: [], UNRESOLVED: [] },
   }
 }
 
-/** Reverse ingredient deduction for a cancelled item (return stock) */
+/** W1-A: RETIRADO — la reversa la emite R1 (recipe_reversal / devolucion) cuando la
+ * orden se re-guarda con el item cancelado (desired baja → delta negativo). Este stub
+ * no lee ni escribe nada. La versión anterior reponía stock por fuzzy match sin checar
+ * modo, inflando inventario de items recipe-mode que Sistema A nunca dedujo. */
 export async function reverseIngredientDeduction(
   item: OrderItem,
   orderId: string,
-  actor: string,
-  reason: string,
+  _actor: string,
+  _reason: string,
 ): Promise<void> {
-  try {
-    const recipes = await getRecipes()
-    const inventory = await getInventory()
-    const invMap = new Map(inventory.map(i => [i.ingredient_id, i]))
-
-    const normalizeRecipeName = (n: string) => n.toLowerCase()
-      .replace(/^sprw\s*-\s*/i, '').replace(/\s*\(.*?\)\s*/g, ' ')
-      .replace(/\s*(14oz|16oz|12oz|360\s*ml|240\s*ml|180\s*ml|450\s*ml)\s*/gi, ' ')
-      .replace(/\s*(caliente|frio|fría|helado|servido)\s*/gi, ' ')
-      .replace(/\s+/g, ' ').trim()
-
-    const recipesByName = new Map<string, typeof recipes>()
-    for (const r of recipes) {
-      const key = r.menu_item_name.toLowerCase()
-      if (!recipesByName.has(key)) recipesByName.set(key, [])
-      recipesByName.get(key)!.push(r)
-      const norm = normalizeRecipeName(r.menu_item_name)
-      if (!recipesByName.has(norm)) recipesByName.set(norm, [])
-      recipesByName.get(norm)!.push(r)
-    }
-
-    const itemName = item.nombre.toLowerCase()
-    const aliases = RECIPE_ALIASES[itemName]
-    let recipeRows: typeof recipes = []
-    if (aliases) {
-      for (const alias of aliases) {
-        const rows = recipesByName.get(alias.toLowerCase())
-        if (rows && rows.length > 0) { recipeRows = rows; break }
-      }
-    }
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(itemName) ?? []
-    if (recipeRows.length === 0) recipeRows = recipesByName.get(normalizeRecipeName(item.nombre)) ?? []
-
-    for (const row of recipeRows) {
-      const qty = row.quantity * (item.cantidad || 1)
-      const inv = invMap.get(row.ingredient_id)
-      if (inv) {
-        await updateInventoryStock(row.ingredient_id, inv.stock + qty)
-        await logInventoryMovement({
-          ingredient_id: row.ingredient_id,
-          movement_type: 'adjustment',
-          quantity: qty,
-          order_id: orderId,
-          actor,
-          notes: `Cancelacion: ${item.nombre} — ${reason}`,
-        })
-      }
-    }
-  } catch (err) {
-    console.warn('[reverseIngredientDeduction] Failed:', err)
-  }
+  console.info(`[w1a] reverseIngredientDeduction retirado — R1 emite la reversa (order=${orderId}, item=${item.nombre})`)
 }
 
 export async function getInventoryMovements(limit = 50): Promise<InventoryMovement[]> {
@@ -2606,63 +2293,17 @@ export async function registerMarketMovement(
 }
 
 /** Descuento automático al vender items Market — via serialized authority boundary. */
+/** W1-A: RETIRADO — direct_stock lo descuenta r1_reconcile_item en la reconciliación
+ * del save; la ruta legacy (r1_legacy_sale_deduction) está rechazada server-side desde
+ * el cutover de autoridad a 'r1' (2026-07-14). Stub inerte: no lee ni escribe nada. */
 export async function deductMarketStockForOrder(
   items: OrderItem[],
   orderId: string,
-  actor: string,
+  _actor: string,
 ): Promise<{ success: boolean; deductions: { item: string; cantidad: number; newStock: number }[]; alerts: string[] }> {
-  try {
-    const ids = [...new Set(items.map(i => i.menuItemId).filter(Boolean))]
-    if (ids.length === 0) return { success: true, deductions: [], alerts: [] }
-
-    // 1. Identify direct-stock items by category
-    const catFilter = DIRECT_STOCK_CATEGORIES.map(c => `category_id.eq.${c}`).join(',')
-    const itemsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/pos_menu_items?client_id=eq.${_getClientId()}&id=in.(${ids.join(',')})&or=(${catFilter})&select=id,name`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: 'no-store' }
-    )
-    if (!itemsRes.ok) return { success: false, deductions: [], alerts: [] }
-    const marketItems: { id: string; name: string }[] = await itemsRes.json()
-    if (marketItems.length === 0) return { success: true, deductions: [], alerts: [] }
-    const nameById = new Map(marketItems.map(m => [m.id, m.name]))
-    const marketIdSet = new Set(marketItems.map(m => m.id))
-
-    // 2. Aggregate quantities per menu_item_id
-    const qtyByItem = new Map<string, number>()
-    for (const item of items) {
-      if (!marketIdSet.has(item.menuItemId)) continue
-      qtyByItem.set(item.menuItemId, (qtyByItem.get(item.menuItemId) || 0) + item.cantidad)
-    }
-
-    const rpcItems = Array.from(qtyByItem.entries()).map(([mid, qty]) => ({
-      menu_item_id: mid, cantidad: qty,
-    }))
-
-    // 3. Deduct via serialized authority-aware server RPC
-    const res = await fetch('/api/pos/deduct-market', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getPOSAuthHeaders() },
-      body: JSON.stringify({ order_id: orderId, actor, items: rpcItems }),
-    })
-
-    if (!res.ok) return { success: false, deductions: [], alerts: [] }
-    const result = await res.json()
-    if (!result.ok) {
-      console.warn('[deductMarketStockForOrder] RPC rejected:', result.error)
-      return { success: false, deductions: [], alerts: [] }
-    }
-
-    const deductions = (result.deductions || []).map((d: { menu_item_id: string; cantidad: number; new_stock: number }) => ({
-      item: nameById.get(d.menu_item_id) ?? d.menu_item_id,
-      cantidad: d.cantidad,
-      newStock: d.new_stock,
-    }))
-
-    return { success: true, deductions, alerts: [] }
-  } catch (err) {
-    console.warn('[deductMarketStockForOrder] Failed:', err)
-    return { success: false, deductions: [], alerts: [] }
-  }
+  void items
+  console.info(`[w1a] deductMarketStockForOrder retirado — R1 es la única autoridad (order=${orderId})`)
+  return { success: true, deductions: [], alerts: [] }
 }
 
 // ─── PURCHASE ORDERS & FACTURAS ─────────────────────────────────────────────
