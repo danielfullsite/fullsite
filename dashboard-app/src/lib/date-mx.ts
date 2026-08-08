@@ -1,6 +1,14 @@
 const TZ = 'America/Mexico_City'
 
 /**
+ * ⚠ W1-C: este módulo es SOLO para fechas CALENDARIO (cumpleaños, fechas de
+ * reservación, emisión de facturas, UI genérica). Para semántica OPERATIVA /
+ * contable (agrupación de ventas, pólizas, cierres, "hoy" del restaurante)
+ * usar business-date.ts, que deriva timezone y business_day_start_local de la
+ * configuración del tenant — nunca de esta constante fija.
+ */
+
+/**
  * Returns a Date whose .getFullYear()/.getMonth()/.getDate() reflect
  * current time in Mexico City (UTC-6, no DST since 2022).
  * Use instead of new Date() when you need the local calendar date.

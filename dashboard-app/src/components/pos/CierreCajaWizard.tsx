@@ -5,6 +5,8 @@ import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, Sh
 import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { resolveBusinessDayConfig, getBusinessDate } from '@/lib/business-date'
+import { fetchClientConfig } from '@/lib/client-config'
 import {
   closeCachedTurno,
   queueOperation,
@@ -227,12 +229,23 @@ export default function CierreCajaWizard({
     // Stable UUID — generated once at wizard mount, same across all retries
     const cierreId = cierreIdRef.current
     const now = new Date().toISOString()
+    // W1-C: el cierre se etiqueta con la FECHA OPERATIVA del tenant (misma
+    // semántica que agentes y reportes). El cierre NUNCA se bloquea por config:
+    // si no hay red o el tenant no tiene business_day_start_local, degrada
+    // explícitamente a fecha calendario (conducta previa).
+    let fechaOperativa = now.split('T')[0]
+    try {
+      const bdCfg = resolveBusinessDayConfig(await fetchClientConfig(_cid()))
+      fechaOperativa = getBusinessDate(now, bdCfg.timeZone, bdCfg.boundary)
+    } catch (err) {
+      console.warn('[cierre] business-date config no disponible — usando fecha calendario:', err)
+    }
     const cierreData = withEscalationPayload(
       {
         id: cierreId,
         client_id: _cid(),
         turno_id: turnoId,
-        fecha: now.split('T')[0],
+        fecha: fechaOperativa,
         fondo_inicial: fondoInicial,
         billetes: JSON.stringify({}),
         monedas: JSON.stringify({}),

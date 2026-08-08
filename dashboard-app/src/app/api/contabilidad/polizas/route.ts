@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server'
 import { requireAuth, getClientId } from '@/lib/api-auth'
+import { resolveBusinessDayConfig, getBusinessDayBounds, getCurrentBusinessDate, type ResolvedBusinessDayConfig } from '@/lib/business-date'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -124,41 +125,54 @@ export async function GET(request: NextRequest) {
   const clientId = getClientId(request)
   try {
     const { searchParams } = new URL(request.url)
-    const fecha = searchParams.get('fecha') || new Date().toISOString().slice(0, 10)
     const formato = searchParams.get('formato') || 'json' // json | xml | csv
     const mes = searchParams.get('mes') // YYYY-MM for monthly summary
 
+    // W1-C: la póliza es un documento por DÍA OPERATIVO — config del tenant
+    // (timezone + business_day_start_local), no fecha calendario UTC ni
+    // T00:00:00 naive. Bounds semiabiertos [start, end): el lte.T23:59:59
+    // anterior dejaba un hueco de un segundo y cortaba el día en UTC.
+    const cid = encodeURIComponent(clientId)
+    const clientRowRes = await fetch(
+      `${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc,timezone,business_day_start_local&limit=1`, OPTS
+    )
+    const clientRow = clientRowRes.ok ? ((await clientRowRes.json())[0] ?? {}) : {}
+    const clientRfc: string = clientRow.rfc ?? ''
+    const bdCfg = resolveBusinessDayConfig({
+      id: clientId,
+      timezone: clientRow.timezone || 'America/Mexico_City',
+      business_day_start_local: clientRow.business_day_start_local ?? null,
+    })
+
+    const fecha = searchParams.get('fecha') || getCurrentBusinessDate(bdCfg)
+
     // If requesting monthly summary
     if (mes) {
-      return await getResumenMensual(mes, formato, clientId)
+      return await getResumenMensual(mes, formato, clientId, bdCfg)
     }
 
-    const startOfDay = `${fecha}T00:00:00`
-    const endOfDay = `${fecha}T23:59:59`
+    const { utcStart, utcEnd } = getBusinessDayBounds(fecha, bdCfg.timeZone, bdCfg.boundary)
+    const rangeFilter = `created_at=gte.${encodeURIComponent(utcStart)}&created_at=lt.${encodeURIComponent(utcEnd)}`
 
-    // Fetch POS orders for the day
-    const cid = encodeURIComponent(clientId)
-    const [ordersRes, movementsRes, marketRes, wansoftDay, clientRes] = await Promise.all([
+    const [ordersRes, movementsRes, marketRes, wansoftDay] = await Promise.all([
       fetch(
-        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&${rangeFilter}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&${rangeFilter}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&${rangeFilter}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetchWansoftDaily(fecha),
-      fetch(`${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc&limit=1`, OPTS),
     ])
 
     const orders: PosOrder[] = ordersRes.ok ? await ordersRes.json() : []
     const movements: InventoryMovement[] = movementsRes.ok ? await movementsRes.json() : []
     const marketMovements: InventoryMovement[] = marketRes.ok ? await marketRes.json() : []
-    const clientRfc: string = clientRes?.ok ? ((await clientRes.json())[0]?.rfc ?? '') : ''
 
     const polizas: Poliza[] = []
     let numPoliza = 1
@@ -453,14 +467,21 @@ export async function GET(request: NextRequest) {
 
 // ─── Monthly summary ─────────────────────────────
 
-async function getResumenMensual(mes: string, formato: string, clientId: string) {
+async function getResumenMensual(mes: string, formato: string, clientId: string, bdCfg: ResolvedBusinessDayConfig) {
   const startDate = `${mes}-01`
   const endDate = getLastDayOfMonth(mes)
   const cid = encodeURIComponent(clientId)
 
+  // W1-C: el mes operativo = [bounds(primer día).start, bounds(último día).end)
+  // en UTC. wansoft_daily.fecha ya es business-date-aligned (cierre de Wansoft),
+  // así que ese filtro sigue por fecha.
+  const monthStart = getBusinessDayBounds(startDate, bdCfg.timeZone, bdCfg.boundary).utcStart
+  const monthEnd = getBusinessDayBounds(endDate, bdCfg.timeZone, bdCfg.boundary).utcEnd
+  const rangeFilter = `created_at=gte.${encodeURIComponent(monthStart)}&created_at=lt.${encodeURIComponent(monthEnd)}`
+
   const [ordersRes, wansoftRes, movRes] = await Promise.all([
     fetch(
-      `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
+      `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&${rangeFilter}&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
       OPTS
     ),
     fetch(
@@ -468,7 +489,7 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
       OPTS
     ),
     fetch(
-      `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
+      `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&${rangeFilter}&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
       OPTS
     ),
   ])
