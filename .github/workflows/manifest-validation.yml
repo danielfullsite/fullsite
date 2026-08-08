@@ -1,0 +1,37 @@
+name: Manifest Validation
+
+# Gate R2-G03 / CLON-MANIFEST — todo manifest de cliente debe validar contra
+# scripts/manifests/manifest.schema.json antes de entrar a main.
+
+on:
+  push:
+    paths:
+      - 'scripts/manifests/**'
+      - 'tests/manifest/**'
+      - '.github/workflows/manifest-validation.yml'
+  pull_request:
+    paths:
+      - 'scripts/manifests/**'
+      - 'tests/manifest/**'
+      - '.github/workflows/manifest-validation.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Validate all client manifests against schema
+        run: node scripts/manifests/validate_manifest.mjs
+
+      - name: Install test deps
+        run: npm ci
+
+      - name: Schema + validator test suite
+        run: npx vitest run tests/manifest
