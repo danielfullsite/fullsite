@@ -9,10 +9,19 @@ import shutil
 import subprocess
 
 # ── Paths ────────────────────────────────────────────────────────────────────
+# AGENT_OS_REPO_ROOT / AGENT_OS_STATE_ROOT allow the certification harness to
+# run the full pipeline against a scratch repo without touching real state.
 
-REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-AOS_ROOT    = os.path.join(REPO_ROOT, 'docs', 'agent-os')
-SCRIPTS_ROOT = os.path.join(REPO_ROOT, 'scripts', 'agent-os')
+REPO_ROOT   = os.environ.get('AGENT_OS_REPO_ROOT') or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..'))
+AOS_ROOT    = os.environ.get('AGENT_OS_STATE_ROOT') or os.path.join(REPO_ROOT, 'docs', 'agent-os')
+SCRIPTS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+
+# All autonomous merges land here — never on the checked-out branch (which may
+# be a frozen release) and never on main directly. Humans promote integration → main.
+INTEGRATION_BRANCH = os.environ.get('AGENT_OS_INTEGRATION_BRANCH', 'agent-os/integration')
+WORKTREE_PREFIX    = os.environ.get('AGENT_OS_WORKTREE_PREFIX', '/tmp/fullsite-worker-')
+INTEGRATION_WT     = os.environ.get('AGENT_OS_INTEGRATION_WT', '/tmp/fullsite-agent-os-integration')
 
 INBOX_DIR    = os.path.join(AOS_ROOT, 'inbox')
 ACTIVE_DIR   = os.path.join(AOS_ROOT, 'active')
@@ -233,15 +242,24 @@ def load_task(task_id):
 
 # ── Task CRUD ─────────────────────────────────────────────────────────────────
 
+VALID_EXECUTION_CLASSES = ['AUTO_TECH', 'HUMAN_PHYSICAL', 'FOUNDER_DECISION', 'PRODUCTION_APPROVAL']
+
+
 def create_task(title, objective, role, priority='P1', tags=None, dod=None,
                 dependencies=None, budget_tokens=100_000, max_turns=MAX_TURNS,
-                files_allowed=None, notes=''):
+                files_allowed=None, notes='', execution_class='AUTO_TECH',
+                gate_id=None, domain=None):
     if role not in VALID_ROLES:
         raise ValueError(f'Invalid role: {role}. Must be one of {VALID_ROLES}')
+    if execution_class not in VALID_EXECUTION_CLASSES:
+        raise ValueError(f'Invalid execution_class: {execution_class}')
     task_id = new_task_id()
     ts = now_iso()
     task = {
         'id':             task_id,
+        'execution_class': execution_class,
+        'gate_id':        gate_id,
+        'domain':         domain,
         'title':          title,
         'objective':      objective,
         'role':           role,
@@ -687,16 +705,45 @@ def ensure_dirs():
 
 # ── Worktree management ───────────────────────────────────────────────────────
 
-def create_task_worktree(task_id: str) -> tuple:
-    """Create isolated git branch + worktree for a task. Returns (branch, worktree_path)."""
-    branch = f'agent-os/{task_id}'
-    worktree_path = f'/tmp/fullsite-worker-{task_id}'
+def ensure_integration_branch():
+    """Ensure the integration branch and its worktree exist. Returns worktree path.
 
-    # Create branch from current HEAD if it doesn't exist
+    Integration is created once from current HEAD; afterwards it evolves only by
+    task merges. The checked-out branch of REPO_ROOT is never mutated.
+    """
+    r = subprocess.run(['git', 'show-ref', '--verify', '--quiet',
+                        f'refs/heads/{INTEGRATION_BRANCH}'],
+                       cwd=REPO_ROOT, capture_output=True)
+    if r.returncode != 0:
+        subprocess.run(['git', 'branch', INTEGRATION_BRANCH, 'HEAD'],
+                       cwd=REPO_ROOT, capture_output=True, check=True)
+        audit('INTEGRATION_BRANCH_CREATED', {'branch': INTEGRATION_BRANCH})
+
+    if not os.path.isdir(os.path.join(INTEGRATION_WT, '.git')) and not os.path.isfile(os.path.join(INTEGRATION_WT, '.git')):
+        subprocess.run(['git', 'worktree', 'prune'], cwd=REPO_ROOT, capture_output=True)
+        r = subprocess.run(['git', 'worktree', 'add', INTEGRATION_WT, INTEGRATION_BRANCH],
+                           cwd=REPO_ROOT, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(f'integration worktree add failed: {r.stderr.strip()}')
+    return INTEGRATION_WT
+
+
+def create_task_worktree(task_id: str) -> tuple:
+    """Create isolated git branch + worktree for a task. Returns (branch, worktree_path).
+
+    Task branches fork from INTEGRATION_BRANCH so closed work compounds and
+    the frozen release / main branches are never written by agents.
+    """
+    branch = f'agent-os/{task_id}'
+    worktree_path = f'{WORKTREE_PREFIX}{task_id}'
+
+    ensure_integration_branch()
+
+    # Create branch from integration HEAD if it doesn't exist
     r = subprocess.run(['git', 'show-ref', '--verify', '--quiet', f'refs/heads/{branch}'],
                       cwd=REPO_ROOT, capture_output=True)
     if r.returncode != 0:
-        subprocess.run(['git', 'branch', branch, 'HEAD'],
+        subprocess.run(['git', 'branch', branch, INTEGRATION_BRANCH],
                       cwd=REPO_ROOT, capture_output=True, check=True)
 
     # Remove stale worktree if present
@@ -720,9 +767,9 @@ def cleanup_task_worktree(task_id: str):
     """Remove worktree (branch preserved for audit trail)."""
     try:
         task = load_task(task_id)
-        path = task.get('worktree_path', f'/tmp/fullsite-worker-{task_id}')
+        path = task.get('worktree_path', f'{WORKTREE_PREFIX}{task_id}')
     except Exception:
-        path = f'/tmp/fullsite-worker-{task_id}'
+        path = f'{WORKTREE_PREFIX}{task_id}'
     if os.path.exists(path):
         subprocess.run(['git', 'worktree', 'remove', '--force', path],
                       cwd=REPO_ROOT, capture_output=True)
@@ -741,11 +788,11 @@ def get_task_diff(task_id: str) -> tuple:
     # Exclude agent-os state/script dirs so verifier sees only task-relevant changes
     exclude = [':(exclude)docs/agent-os/', ':(exclude)scripts/agent-os/']
     stat = subprocess.run(
-        ['git', 'diff', f'main..{branch}', '--stat', '--'] + exclude,
+        ['git', 'diff', f'{INTEGRATION_BRANCH}..{branch}', '--stat', '--'] + exclude,
         cwd=REPO_ROOT, capture_output=True, text=True,
     ).stdout
     patch = subprocess.run(
-        ['git', 'diff', f'main..{branch}', '--unified=3', '--'] + exclude,
+        ['git', 'diff', f'{INTEGRATION_BRANCH}..{branch}', '--unified=3', '--'] + exclude,
         cwd=REPO_ROOT, capture_output=True, text=True,
     ).stdout
     return stat[:3000], patch[:10000]
@@ -803,30 +850,31 @@ def _clear_branch_conflicts(branch: str):
 
 def merge_and_close_task(task_id: str, evidence: str) -> str:
     """
-    Merge task branch into main, transition to CLOSED, update gates.
-    Returns merge commit hash.
-    Only for R3 (non-gate) tasks. R1 gate tasks go through Founder Decision.
+    Merge task branch into INTEGRATION_BRANCH (via its own worktree), transition
+    to CLOSED, update gates. Returns merge commit hash.
+
+    Never touches the checked-out branch of REPO_ROOT (may be a frozen release)
+    and never touches main. Humans promote integration → main with normal review.
     """
     task = load_task(task_id)
     branch = task.get('branch', f'agent-os/{task_id}')
     title = task.get('title', task_id)[:60]
     tags = task.get('tags', [])
 
-    # Clear staging conflicts from old pre-worktree workers before merging.
-    # Do NOT stash: stash pops corrupt agent-os task JSON files (state regression).
-    _clear_branch_conflicts(branch)
+    merge_cwd = ensure_integration_branch()
 
     r = subprocess.run(
-        ['git', 'merge', '--no-ff', '-X', 'ours', branch,
+        ['git', 'merge', '--no-ff', branch,
          '-m', f'merge({task_id}): {title}'],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        cwd=merge_cwd, capture_output=True, text=True,
     )
     if r.returncode != 0:
-        raise RuntimeError(f'Merge failed for {task_id}/{branch}: {r.stderr.strip()}')
+        subprocess.run(['git', 'merge', '--abort'], cwd=merge_cwd, capture_output=True)
+        raise RuntimeError(f'Merge failed for {task_id}/{branch}: {r.stderr.strip()[:300]}')
 
     commit = subprocess.run(
         ['git', 'rev-parse', 'HEAD'],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        cwd=merge_cwd, capture_output=True, text=True,
     ).stdout.strip()
 
     transition_task(task_id, 'CLOSED', by='SUPERVISOR',
@@ -842,6 +890,16 @@ def merge_and_close_task(task_id: str, evidence: str) -> str:
         mark_gate_completed(tag)
     _write_gate_status_entries(tags, task_id, commit, evidence)
     cleanup_task_worktree(task_id)
+
+    # Propagate PASS to the pipeline gate this task implements (if any)
+    gate_id = task.get('gate_id')
+    if gate_id:
+        try:
+            import pipeline as _pipeline
+            _pipeline.mark_gate_from_task(gate_id, task_id, commit, evidence)
+        except Exception as e:
+            audit('PIPELINE_PROPAGATION_ERROR', {'task_id': task_id, 'gate_id': gate_id,
+                                                 'error': str(e)[:200]})
 
     audit('TASK_CLOSED', {'task_id': task_id, 'commit': commit, 'gates': tags,
                           'evidence': evidence[:200]})

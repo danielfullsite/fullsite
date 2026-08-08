@@ -1,0 +1,145 @@
+{
+  "id": "TSK-005",
+  "title": "DEMO-FOUNDATION — Tenant demo, seed, reset e isolation gates",
+  "objective": "Crear la capa base del entorno demo aislado: tenant 'demo' en supabase-fullsite-staging, seed sintético determinista (menu 30 ítems, 10 mesas, 5 meseros), reset idempotente con fail-closed ante tenant no-demo, y tests de aislamiento completos contra AMALAY.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "CLOSED",
+  "tags": [
+    "demo",
+    "foundation",
+    "staging",
+    "isolation"
+  ],
+  "isolation_gates": [
+    "IG-01: Ningún dato, credential, client_id, restaurant_id ni secreto de AMALAY en ningún archivo del scope demo. El código que accede a la BD demo no puede importar ni referenciar el proyecto qjiomlvudfmzuvqvhwpk.",
+    "IG-02: Tenant y environment marcados explícitamente: clients.environment='DEMO', todos los rows con source='SIMULATED'. El campo environment es obligatorio — no opcional.",
+    "IG-03: Un solo core configurable activado por data_source='demo'. No crear fork del POS, no crear branches especiales por cliente. La configuración es el único cambio.",
+    "IG-04: Seed completamente sintético y determinista. random.seed(N) obligatorio. Dos runs con el mismo seed producen bit-a-bit el mismo estado en la BD.",
+    "IG-05: Reset idempotente. Dos runs consecutivos dejan la BD en estado idéntico (hash de rows igual).",
+    "IG-06: Reset fail-closed. demo_reset(client_slug) lanza IsolationError inmediatamente si client_slug != 'demo'. Cero writes antes o después del check.",
+    "IG-07: Test automático de rechazo: test_non_demo_reset_rejected() llama demo_reset('amalay') y demo_reset('production') → assert IsolationError en ambos casos, assert 0 rows escritos en staging post-llamada.",
+    "IG-08: Test de aislamiento demo ↔ AMALAY: test_demo_amalay_isolation() — (a) 0 filas source='SIMULATED' en proyecto AMALAY, (b) 0 requests HTTP a qjiomlvudfmzuvqvhwpk durante seed/reset, interceptados con unittest.mock.patch.",
+    "IG-09: No usar production service-role keys. El runtime demo usa exclusivamente SUPABASE_STAGING_URL + SUPABASE_STAGING_SERVICE_KEY. Guard al startup: assert 'qjiomlvudfmzuvqvhwpk' not in os.environ.get('SUPABASE_STAGING_URL','') — si falla, abort con mensaje explícito."
+  ],
+  "dod": [
+    "F-01: Tenant reproducible — clients record {slug:'demo', name:'El Molcajete Demo', data_source:'demo', environment:'DEMO'} creado por demo_seed.py, reproducible en cualquier staging limpio.",
+    "F-02: Seed repetible — demo_seed.py --seed 42 es idempotente: dos runs dejan exactamente los mismos rows (mismo ID, mismo contenido). Verificado por test_seed_idempotence.",
+    "F-03: Teardown/reset repetible — demo_reset.py termina en < 30s. Dos runs consecutivos: hash MD5 del estado de la BD es idéntico tras ambos runs.",
+    "F-04: Datos etiquetados — todos los rows tienen source='SIMULATED' y environment='DEMO'. Test: assert 0 rows con source != 'SIMULATED' en esquema demo tras seed.",
+    "F-05: Provenance registrada — scripts/demo/PROVENANCE.md documenta: origen de cada dataset sintético, algoritmo de generación, seed usado, rango de fechas, y cómo regenerar desde cero.",
+    "F-06: Cero acceso a producción — test_demo_amalay_isolation (IG-08) pasa. Log de seed/reset no contiene ninguna URL de producción. unittest.mock intercepta 100% de calls HTTP durante tests.",
+    "F-07: Logs y evidencia de aislamiento — cada script imprime [DEMO][ISOLATED] como primer token de cada línea de log. test_log_prefix_present verifica el formato en stdout capturado.",
+    "F-08: Verificación independiente — RUNTIME_VERIFICATION ejecuta todos los tests de forma independiente (sin reutilizar el entorno del Engineer) antes de emitir veredicto VERIFIED.",
+    "F-09: Todos los isolation gates IG-01..IG-09 tienen al menos un test automatizado que pasa en CI."
+  ],
+  "dependencies": [],
+  "constraints": [
+    "No modificar electron-app/, docs/agent-os/field/FULLSITE-DIAGNOSTIC/, ni ningún script de producción en .github/scripts/",
+    "No tocar proyecto Supabase AMALAY (qjiomlvudfmzuvqvhwpk) bajo ninguna circunstancia",
+    "Usar exclusivamente supabase-fullsite-staging para escrituras",
+    "No crear fork del POS ni branches de git especiales por cliente — configuración únicamente",
+    "Si algún isolation gate no puede implementarse sin modificar producción, escalar a FOUNDER antes de proceder"
+  ],
+  "files_allowed": [
+    "scripts/demo/__init__.py",
+    "scripts/demo/demo_client.py",
+    "scripts/demo/demo_seed.py",
+    "scripts/demo/demo_reset.py",
+    "scripts/demo/PROVENANCE.md",
+    "scripts/demo/tests/__init__.py",
+    "scripts/demo/tests/test_demo_isolation.py",
+    "scripts/demo/tests/test_seed_idempotence.py",
+    "scripts/demo/tests/test_non_demo_reset_rejected.py",
+    "scripts/demo/.env.demo.example"
+  ],
+  "files_forbidden": [
+    "electron-app/",
+    "docs/agent-os/field/FULLSITE-DIAGNOSTIC/",
+    ".github/scripts/",
+    ".github/workflows/",
+    "dashboard-app/",
+    ".env",
+    ".env.local"
+  ],
+  "budget_tokens": 100000,
+  "max_turns": 20,
+  "max_retries": 2,
+  "retry_count": 0,
+  "notes": "Phase 0 del epic DEMO ENVIRONMENT v0. Bloqueante para TSK-006..TSK-009. El contrato de aislamiento es estricto: cualquier ambigüedad entre demo y producción debe resolverse rechazando la operación (fail-closed), nunca permitiéndola. RUNTIME_VERIFICATION debe ejecutar tests en entorno limpio independiente.",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-05T01:21:41Z",
+  "updated_at": "2026-08-05T01:40:00Z",
+  "history": [
+    {
+      "from": null,
+      "to": "DRAFT",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-05T01:21:41Z",
+      "note": "Epic DEMO ENVIRONMENT v0 — Phase 0. Pendiente revisión del Founder."
+    },
+    {
+      "from": "DRAFT",
+      "to": "READY",
+      "by": "FOUNDER",
+      "at": "2026-08-05T01:26:55Z",
+      "note": "Plan aprobado con cambios de precisión. Contrato actualizado con isolation gates IG-01..IG-09 y foundation DoD F-01..F-09. Promovida a READY. TSK-006..TSK-009 permanecen en DRAFT hasta que TSK-005 esté CLOSED por Verification."
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-05T01:29:16Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-05T01:29:16Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-05T01:37:50Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-05T01:37:59Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-05T01:39:47Z",
+      "note": "Read demo_seed.py (357 lines), demo_reset.py (151 lines), and test_demo_isolation.py (584 lines) directly from branch agent-os/TSK-005 via git show. Extracted all 6 files to a clean temp directory (/var/folders/.../tmp.067PkD32Vu) with no shared state from the engineer's run. Ran `python3 -m pytest "
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-05T01:40:00Z",
+      "note": "Pipeline complete. Merge commit: 90dc366c4fde338287eecd6dc97a71fbb4ec4c86"
+    }
+  ],
+  "branch": "agent-os/TSK-005",
+  "worktree_path": "/tmp/fullsite-worker-TSK-005",
+  "closed_at": "2026-08-05T01:40:00Z",
+  "merge_commit": "90dc366c4fde338287eecd6dc97a71fbb4ec4c86",
+  "close_evidence": "Implemented TSK-005 DEMO-FOUNDATION in 6 files under scripts/demo/: demo_seed.py (deterministic seed with seed=42 producing exactly 30 menu items, 10 tables, 5 staff; fail-closed guards for non-demo tenants and production URLs; all rows tagged source=SIMULATED/environment=DEMO; [DEMO][ISOLATED] log prefix on every line), demo_reset.py (teardown in FK-safe order + reseed; two runs yield identical state MD5; completes in <30s), PROVENANCE.md (origin, algorithm, seed value, date ranges, regeneratio",
+  "gate_updated": [
+    "demo",
+    "foundation",
+    "staging",
+    "isolation"
+  ]
+}

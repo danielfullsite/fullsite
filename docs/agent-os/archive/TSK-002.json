@@ -4,7 +4,7 @@
   "objective": "Crear contract tests que validen el protocolo Bridge WS y los endpoints REST del local server",
   "role": "RUNTIME_ENGINEER",
   "priority": "P1",
-  "status": "IN_PROGRESS",
+  "status": "CLOSED",
   "tags": [
     "http-contracts",
     "r3",
@@ -28,7 +28,7 @@
   "submitted_at": null,
   "verified_at": null,
   "created_at": "2026-08-04T15:26:38Z",
-  "updated_at": "2026-08-04T18:49:02Z",
+  "updated_at": "2026-08-04T19:38:03Z",
   "history": [
     {
       "from": null,
@@ -71,8 +71,44 @@
       "by": "RUNTIME_ENGINEER",
       "at": "2026-08-04T18:49:02Z",
       "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T19:29:07Z",
+      "note": "Re-submitted: engineer commit exists on branch, result file present"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T19:29:30Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T19:37:37Z",
+      "note": "Independently ran `npx vitest run tests/bridge/contract.test.js` on /private/tmp/fullsite-worker-TSK-002 (git worktree of agent-os/TSK-002 at commit a9116c5). Result: 20/20 tests pass in 476ms. Read full 631-line test file: covers SUBSCRIBE (happy path + missing client_id 1008 + wrong restaurant_id "
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T19:38:03Z",
+      "note": "Pipeline complete. Merge commit: d758835e8c09a616deec4780740f7b127e0e61e7"
     }
   ],
   "branch": "agent-os/TSK-002",
-  "worktree_path": "/tmp/fullsite-worker-TSK-002"
+  "worktree_path": "/tmp/fullsite-worker-TSK-002",
+  "closed_at": "2026-08-04T19:38:03Z",
+  "merge_commit": "d758835e8c09a616deec4780740f7b127e0e61e7",
+  "close_evidence": "feat(TSK-002): HTTP contract tests for Bridge WS + REST API. Created electron-app/local-server/tests/http-contract.test.js with tests for SUBSCRIBE, COMMAND, ACK, REJECT, DELTA protocol messages and /health, /state REST endpoints. All tests pass.",
+  "gate_updated": [
+    "http-contracts",
+    "r3",
+    "testing"
+  ]
 }

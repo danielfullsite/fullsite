@@ -62,3 +62,111 @@
 {"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
 {"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
 {"ts": "2026-08-04T18:49:03Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T19:11:10Z", "type": "CLAUDE_DONE", "task_id": "TSK-002", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-04T19:11:10Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-002", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T19:11:27Z", "type": "WORKER_DONE", "key": "TSK-002_verify", "phase": "verify", "pid": 51553, "rc": 1}
+{"ts": "2026-08-04T19:29:07Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Re-submitted: engineer commit exists on branch, result file present"}
+{"ts": "2026-08-04T19:29:07Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Re-submitted: engineer commit exists on branch, result file present"}
+{"ts": "2026-08-04T19:29:30Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-04T19:29:30Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-002", "phase": "verify", "pid": 52554}
+{"ts": "2026-08-04T19:29:30Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "verify", "pid": 52554}
+{"ts": "2026-08-04T19:29:30Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "verify", "budget_usd": 3.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-04T19:30:00Z", "type": "SUPERVISOR_STOPPED", "pid": 51552}
+{"ts": "2026-08-04T19:30:00Z", "type": "SUPERVISOR_STARTED", "pid": 52693}
+{"ts": "2026-08-04T19:30:00Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-04T19:30:00Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-003", "phase": "verify", "pid": 52694}
+{"ts": "2026-08-04T19:30:00Z", "type": "WORKER_STARTED", "task_id": "TSK-003", "phase": "verify", "pid": 52694}
+{"ts": "2026-08-04T19:30:00Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "verify", "budget_usd": 3.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-04T19:31:54Z", "type": "CLAUDE_DONE", "task_id": "TSK-003", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-04T19:31:54Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-003", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T19:31:54Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Read logger.js, index.js, main.js from agent-os/TSK-003 branch. Ran tests in existing worktree /private/tmp/fullsite-worker-TSK-003: 9/9 passed (init+write, log format, getLastEntry, getLogPath, all levels, restart persistence, rotation threshold, max-5-archives, archive size). DoD 1: fs.appendFileS"}
+{"ts": "2026-08-04T19:32:00Z", "type": "WORKER_DONE", "key": "TSK-003_verify", "phase": "verify", "pid": 52694, "rc": 0}
+{"ts": "2026-08-04T19:32:01Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: 5c3149a065ead5936d549c4c8fab2fa1d8468884"}
+{"ts": "2026-08-04T19:32:01Z", "type": "GATE_COMPLETED", "gate_tag": "logging"}
+{"ts": "2026-08-04T19:32:01Z", "type": "GATE_COMPLETED", "gate_tag": "r3"}
+{"ts": "2026-08-04T19:32:01Z", "type": "GATE_COMPLETED", "gate_tag": "observability"}
+{"ts": "2026-08-04T19:32:02Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-003", "path": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T19:32:02Z", "type": "TASK_CLOSED", "task_id": "TSK-003", "commit": "5c3149a065ead5936d549c4c8fab2fa1d8468884", "gates": ["logging", "r3", "observability"], "evidence": "feat(TSK-003): persistent rotating file logs + /health last_log_entry. Created electron-app/local-server/logger.js (init, patchConsole, getLastEntry, getLogPath) with 5MB rotation, 5 archived files. T"}
+{"ts": "2026-08-04T19:32:02Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-003", "commit": "5c3149a065ead5936d549c4c8fab2fa1d8468884", "gates": ["logging", "r3", "observability"]}
+{"ts": "2026-08-04T19:34:09Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "verify", "pid": 53363}
+{"ts": "2026-08-04T19:34:09Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "verify", "budget_usd": 3.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-04T19:37:37Z", "type": "CLAUDE_DONE", "task_id": "TSK-002", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-04T19:37:37Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-002", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T19:37:37Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Independently ran `npx vitest run tests/bridge/contract.test.js` on /private/tmp/fullsite-worker-TSK-002 (git worktree of agent-os/TSK-002 at commit a9116c5). Result: 20/20 tests pass in 476ms. Read full 631-line test file: covers SUBSCRIBE (happy path + missing client_id 1008 + wrong restaurant_id "}
+{"ts": "2026-08-04T19:38:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: d758835e8c09a616deec4780740f7b127e0e61e7"}
+{"ts": "2026-08-04T19:38:03Z", "type": "GATE_COMPLETED", "gate_tag": "http-contracts"}
+{"ts": "2026-08-04T19:38:03Z", "type": "GATE_COMPLETED", "gate_tag": "r3"}
+{"ts": "2026-08-04T19:38:03Z", "type": "GATE_COMPLETED", "gate_tag": "testing"}
+{"ts": "2026-08-04T19:38:05Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-002", "path": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T19:38:05Z", "type": "TASK_CLOSED", "task_id": "TSK-002", "commit": "d758835e8c09a616deec4780740f7b127e0e61e7", "gates": ["http-contracts", "r3", "testing"], "evidence": "feat(TSK-002): HTTP contract tests for Bridge WS + REST API. Created electron-app/local-server/tests/http-contract.test.js with tests for SUBSCRIBE, COMMAND, ACK, REJECT, DELTA protocol messages and /"}
+{"ts": "2026-08-04T19:38:05Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-002", "commit": "d758835e8c09a616deec4780740f7b127e0e61e7", "gates": ["http-contracts", "r3", "testing"]}
+{"ts": "2026-08-04T19:45:22Z", "type": "SUPERVISOR_STARTED", "pid": 42110}
+{"ts": "2026-08-04T20:05:55Z", "type": "SUPERVISOR_STOPPED", "pid": 42110}
+{"ts": "2026-08-04T20:05:55Z", "type": "SUPERVISOR_STARTED", "pid": 42854}
+{"ts": "2026-08-04T20:07:35Z", "type": "SUPERVISOR_STARTED", "pid": 42943}
+{"ts": "2026-08-04T20:08:57Z", "type": "SUPERVISOR_STARTED", "pid": 43078}
+{"ts": "2026-08-04T20:09:38Z", "type": "SUPERVISOR_STARTED", "pid": 43135}
+{"ts": "2026-08-04T20:12:19Z", "type": "SUPERVISOR_STARTED", "pid": 43225}
+{"ts": "2026-08-04T20:12:29Z", "type": "SUPERVISOR_STARTED", "pid": 43249}
+{"ts": "2026-08-04T21:01:26Z", "type": "TASK_CREATED", "task_id": "TSK-004", "title": "Build Windows installer v1.3.3 desde HEAD 7f4c998", "role": "FIELD_CERTIFICATION", "priority": "P0"}
+{"ts": "2026-08-04T21:01:31Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "READY", "to": "CLAIMED", "by": "FIELD_CERTIFICATION", "note": "Disparando electron-build.yml sobre 7f4c998"}
+{"ts": "2026-08-04T21:02:17Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "FIELD_CERTIFICATION", "note": "GHA run 30950581003 en curso — windows-latest electron-builder --win"}
+{"ts": "2026-08-04T21:14:13Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-004", "verdict": "VERIFIED", "by": "FIELD_CERTIFICATION"}
+{"ts": "2026-08-04T21:14:13Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "FIELD_CERTIFICATION", "note": "Result: VERIFIED"}
+{"ts": "2026-08-04T21:14:19Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "FIELD_CERTIFICATION", "note": "Self-review: GHA logs + artifact match all DoD criteria"}
+{"ts": "2026-08-04T21:14:19Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "IN_REVIEW", "to": "VERIFIED", "by": "FIELD_CERTIFICATION", "note": "VERIFIED: installer name, version, SHA-256, commit binding, not-1.2.0 all confirmed"}
+{"ts": "2026-08-04T21:14:29Z", "type": "TASK_TRANSITION", "task_id": "TSK-004", "from": "VERIFIED", "to": "CLOSED", "by": "FIELD_CERTIFICATION", "note": "Build artifact verified. No code merge — FIELD_CERTIFICATION task. Commit 6b4a1c3 ya en main."}
+{"ts": "2026-08-05T01:29:16Z", "type": "WORKTREE_CREATED", "task_id": "TSK-005", "branch": "agent-os/TSK-005", "path": "/tmp/fullsite-worker-TSK-005"}
+{"ts": "2026-08-05T01:29:16Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-005", "phase": "engineer", "pid": 48583}
+{"ts": "2026-08-05T01:29:16Z", "type": "WORKER_STARTED", "task_id": "TSK-005", "phase": "engineer", "pid": 48583}
+{"ts": "2026-08-05T01:29:16Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-05T01:29:16Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-05T01:29:16Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-005", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-005"}
+{"ts": "2026-08-05T01:37:50Z", "type": "CLAUDE_DONE", "task_id": "TSK-005", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-05T01:37:50Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-005", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-05T01:37:50Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-05T01:37:59Z", "type": "WORKER_DONE", "key": "TSK-005", "phase": "engineer", "pid": 48583, "rc": 0}
+{"ts": "2026-08-05T01:37:59Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-05T01:37:59Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-005", "phase": "verify", "pid": 48968}
+{"ts": "2026-08-05T01:38:00Z", "type": "WORKER_STARTED", "task_id": "TSK-005", "phase": "verify", "pid": 48968}
+{"ts": "2026-08-05T01:38:00Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-005", "phase": "verify", "budget_usd": 3.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-05T01:39:47Z", "type": "CLAUDE_DONE", "task_id": "TSK-005", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-05T01:39:47Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-005", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-05T01:39:47Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Read demo_seed.py (357 lines), demo_reset.py (151 lines), and test_demo_isolation.py (584 lines) directly from branch agent-os/TSK-005 via git show. Extracted all 6 files to a clean temp directory (/var/folders/.../tmp.067PkD32Vu) with no shared state from the engineer's run. Ran `python3 -m pytest "}
+{"ts": "2026-08-05T01:40:00Z", "type": "WORKER_DONE", "key": "TSK-005_verify", "phase": "verify", "pid": 48968, "rc": 0}
+{"ts": "2026-08-05T01:40:00Z", "type": "TASK_TRANSITION", "task_id": "TSK-005", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: 90dc366c4fde338287eecd6dc97a71fbb4ec4c86"}
+{"ts": "2026-08-05T01:40:00Z", "type": "GATE_COMPLETED", "gate_tag": "demo"}
+{"ts": "2026-08-05T01:40:00Z", "type": "GATE_COMPLETED", "gate_tag": "foundation"}
+{"ts": "2026-08-05T01:40:00Z", "type": "GATE_COMPLETED", "gate_tag": "staging"}
+{"ts": "2026-08-05T01:40:00Z", "type": "GATE_COMPLETED", "gate_tag": "isolation"}
+{"ts": "2026-08-05T01:40:01Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-005", "path": "/tmp/fullsite-worker-TSK-005"}
+{"ts": "2026-08-05T01:40:01Z", "type": "TASK_CLOSED", "task_id": "TSK-005", "commit": "90dc366c4fde338287eecd6dc97a71fbb4ec4c86", "gates": ["demo", "foundation", "staging", "isolation"], "evidence": "Implemented TSK-005 DEMO-FOUNDATION in 6 files under scripts/demo/: demo_seed.py (deterministic seed with seed=42 producing exactly 30 menu items, 10 tables, 5 staff; fail-closed guards for non-demo t"}
+{"ts": "2026-08-05T01:40:01Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-005", "commit": "90dc366c4fde338287eecd6dc97a71fbb4ec4c86", "gates": ["demo", "foundation", "staging", "isolation"]}
+{"ts": "2026-08-08T21:59:03Z", "type": "SUPERVISOR_STOPPED", "pid": 43249}
+{"ts": "2026-08-08T21:59:03Z", "type": "SUPERVISOR_STARTED", "pid": 82649}
+{"ts": "2026-08-08T21:59:03Z", "type": "HUMAN_TASK_CREATED", "gate_id": "REL-OFFLINE-FIELD", "location": "AMALAY"}
+{"ts": "2026-08-08T21:59:05Z", "type": "DECISION_CREATED", "decision_id": "D-003", "task_id": null}
+{"ts": "2026-08-08T21:59:05Z", "type": "GATE_STATUS", "gate_id": "REL-INSTALLER", "from": "BLOCKED_DECISION", "to": "BLOCKED_DECISION", "by": "ORCHESTRATOR", "note": "Decision D-003 created"}
+{"ts": "2026-08-08T21:59:05Z", "type": "TASK_CREATED", "task_id": "TSK-010", "title": "CLON-MANIFEST — manifest.json con schema estricto + validación en CI (R2-G03)", "role": "RUNTIME_ENGINEER", "priority": "P0"}
+{"ts": "2026-08-08T21:59:05Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "clonability", "owner": "AGENT:TSK-010", "task_id": "TSK-010", "kind": "AGENT"}
+{"ts": "2026-08-08T21:59:05Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "READY", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-010 created"}
+{"ts": "2026-08-08T21:59:05Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-010", "gate": "CLON-MANIFEST", "domain": "clonability"}
+{"ts": "2026-08-08T21:59:05Z", "type": "TASK_CREATED", "task_id": "TSK-011", "title": "OBS-HEALTH — Monitoreo crítico por cliente: /health completo + heartbeat + alerta", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-08T21:59:05Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "observability-release", "owner": "AGENT:TSK-011", "task_id": "TSK-011", "kind": "AGENT"}
+{"ts": "2026-08-08T21:59:05Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "READY", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-011 created"}
+{"ts": "2026-08-08T21:59:05Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-011", "gate": "OBS-HEALTH", "domain": "observability-release"}
+{"ts": "2026-08-08T21:59:05Z", "type": "INTEGRATION_BRANCH_CREATED", "branch": "agent-os/integration"}
+{"ts": "2026-08-08T21:59:07Z", "type": "WORKTREE_CREATED", "task_id": "TSK-010", "branch": "agent-os/TSK-010", "path": "/tmp/fullsite-worker-TSK-010"}
+{"ts": "2026-08-08T21:59:07Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-010", "phase": "engineer", "pid": 82667}
+{"ts": "2026-08-08T21:59:07Z", "type": "WORKER_STARTED", "task_id": "TSK-010", "phase": "engineer", "pid": 82667}
+{"ts": "2026-08-08T21:59:07Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-08T21:59:07Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-08T21:59:07Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-010", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-010"}
+{"ts": "2026-08-08T21:59:08Z", "type": "WORKTREE_CREATED", "task_id": "TSK-011", "branch": "agent-os/TSK-011", "path": "/tmp/fullsite-worker-TSK-011"}
+{"ts": "2026-08-08T21:59:08Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-011", "phase": "engineer", "pid": 82700}
+{"ts": "2026-08-08T21:59:08Z", "type": "WORKER_STARTED", "task_id": "TSK-011", "phase": "engineer", "pid": 82700}
+{"ts": "2026-08-08T21:59:08Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-08T21:59:08Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-08T21:59:08Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-011", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-011"}
+{"ts": "2026-08-08T21:59:18Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-010 is IN_PROGRESS"}
+{"ts": "2026-08-08T21:59:18Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-011 is IN_PROGRESS"}

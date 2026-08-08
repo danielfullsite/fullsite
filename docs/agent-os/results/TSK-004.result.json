@@ -1,0 +1,13 @@
+{
+  "task_id": "TSK-004",
+  "submitted_by": "FIELD_CERTIFICATION",
+  "submitted_at": "2026-08-04T21:14:13Z",
+  "verdict": "VERIFIED",
+  "summary": "Windows installer v1.3.3 generado y verificado desde HEAD. GHA run 30951027443 (push trigger). Artifact: Fullsite POS Setup 1.3.3.exe, SHA-256: 47462a64c4abcd5fdb22d9503ceee14afc4ce48ffa1841160e6a19aaba2266f2, 81191116 bytes, build config fix (mx.fullsite.pos / Fullsite POS) incluido en commit 6b4a1c3.",
+  "evidence": "GHA run 30951027443 success in 2m2s. electron-builder log: 'building target=nsis file=dist\\Fullsite POS Setup 1.3.3.exe'. Artifact dir: fullsite-pos-win-6b4a1c30d1b155b434c2e31f1628a1aeb11e6ed2. Diferencia con 1.2.0: nombre, SHA-256 y tamaño distintos (81191116 vs 87458681 bytes). fullsite-web/ no incluido en build (no extraFiles/extraResources config, working-dir=electron-app/).",
+  "commit": "6b4a1c30d1b155b434c2e31f1628a1aeb11e6ed2",
+  "tests_passed": null,
+  "tests_total": null,
+  "gaps_found": [],
+  "next_steps": []
+}

@@ -33,8 +33,9 @@ WORKERS_LOG_DIR = os.path.join(LOGS_DIR, 'workers')
 
 LOOP_IDLE_S      = 30     # sleep when no work
 LOOP_ACTIVE_S    = 10     # sleep after dispatching work
-WORKER_TIMEOUT_S = 600    # max seconds a worker can run
+WORKER_TIMEOUT_S = 1800   # max ACTIVE seconds a worker can run (sleep-adjusted)
 MAX_BACKOFF_S    = 300    # max error backoff
+WAKE_GAP_S       = 120    # loop gap beyond expected sleep ⇒ Mac slept / process froze
 
 MAX_ENGINEERS    = 2
 MAX_VERIFIERS    = 1
@@ -103,7 +104,7 @@ def _write_heartbeat(status: str = None, next_action: str = ''):
     # Determine status
     if status is None:
         if is_killed():
-            status = 'KILLED'
+            status = 'PAUSED'
         elif _workers:
             status = 'RUNNING'
         elif pending:
@@ -168,7 +169,21 @@ def main():
     _write_heartbeat('STARTING', 'Initializing')
 
     backoff = LOOP_ACTIVE_S
+    last_wall = time.time()
     while not _shutdown:
+        # ── Sleep/wake correctness ────────────────────────────────────────────
+        # macOS freezes this process during sleep with no chance to clean up.
+        # On resume, wall-clock jumped but nothing actually ran. Detect the gap
+        # and shift worker start times forward so healthy workers are NOT
+        # falsely timed out, then reconcile real process state.
+        gap = time.time() - last_wall
+        if gap > backoff + WAKE_GAP_S:
+            slept_s = gap - backoff
+            _log(f'WAKE detected — clock jumped {slept_s:.0f}s. Reconciling workers.')
+            audit('WAKE_DETECTED', {'slept_s': int(slept_s), 'workers': list(_workers.keys())})
+            _adjust_workers_after_wake(slept_s)
+        last_wall = time.time()
+
         try:
             did_work = _loop_once()
             _errors.clear()
@@ -259,19 +274,34 @@ def _maybe_notify_waiting_field(index: dict):
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
+def _adjust_workers_after_wake(slept_s: float):
+    """Shift worker 'started' timestamps forward by the sleep gap so the
+    active-time timeout only counts awake time. Dead workers are reaped
+    normally; a wake NEVER spawns a duplicate worker for the same task
+    because dispatch checks _workers and task status on disk."""
+    for key, w in _workers.items():
+        try:
+            started_dt = datetime.datetime.fromisoformat(w['started'].replace('Z', '+00:00'))
+            adjusted = started_dt + datetime.timedelta(seconds=slept_s)
+            w['started'] = adjusted.strftime('%Y-%m-%dT%H:%M:%SZ')
+        except Exception:
+            pass
+
+
 def _loop_once() -> bool:
     global _last_completed, _notified_waiting_field
 
     if is_killed():
+        # PAUSED — stay alive and idle. Exiting here would make launchd
+        # (KeepAlive=true) restart us every ThrottleInterval, an infinite
+        # restart loop. Workers drain; no new claims; state preserved.
         if _workers:
-            _log(f'Kill switch ON — waiting for {len(_workers)} workers to finish cleanly')
+            _log(f'Paused — draining {len(_workers)} active workers')
             _reap_workers()
-            _write_heartbeat('KILL_PENDING',
-                             f'Draining {len(_workers)} workers before exit')
-            return False
-        _log('Kill switch ON, no active workers — exiting cleanly')
-        _write_heartbeat('KILLED', 'Kill switch activated, state preserved')
-        sys.exit(0)
+            _write_heartbeat('PAUSED', f'Draining {len(_workers)} workers')
+        else:
+            _write_heartbeat('PAUSED', 'Paused by operator — resume: agent_company.py resume')
+        return False
 
     # 1. Reap finished workers
     _reap_workers()
@@ -379,8 +409,11 @@ def _dispatch_workers() -> int:
     dispatched = 0
 
     priority_order = {'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3}
+    # CHANGES_REQUESTED must be re-dispatched too — otherwise the
+    # FAIL → fix → retry loop dead-ends after the first failed verification.
     sorted_tasks = sorted(
-        [(tid, m) for tid, m in index.items() if m['status'] == 'READY'],
+        [(tid, m) for tid, m in index.items()
+         if m['status'] in ('READY', 'CHANGES_REQUESTED')],
         key=lambda x: priority_order.get(x[1].get('priority', 'P3'), 99)
     )
 
@@ -518,8 +551,14 @@ def _maybe_create_founder_decision(task_id: str):
 def _launch_worker(task_id: str, phase: str):
     ts = _ts_label()
     log_path = os.path.join(WORKERS_LOG_DIR, f'{task_id}-{phase}-{ts}.log')
-    worker_script = os.path.join(SCRIPTS_ROOT, 'worker.py')
-    cmd = [sys.executable, worker_script, task_id, phase]
+    # AGENT_OS_WORKER_CMD lets the certification harness substitute a stub
+    # worker (no tokens, no product code) while exercising the full pipeline.
+    override = os.environ.get('AGENT_OS_WORKER_CMD')
+    if override:
+        cmd = override.split() + [task_id, phase]
+    else:
+        worker_script = os.path.join(SCRIPTS_ROOT, 'worker.py')
+        cmd = [sys.executable, worker_script, task_id, phase]
 
     _log(f'Launching worker: {" ".join(cmd)} → {log_path}')
     log_f = open(log_path, 'w')

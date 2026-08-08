@@ -1,0 +1,17 @@
+{
+  "task_id": "TSK-005",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-05T01:37:50Z",
+  "verdict": "VERIFIED",
+  "summary": "Implemented TSK-005 DEMO-FOUNDATION in 6 files under scripts/demo/: demo_seed.py (deterministic seed with seed=42 producing exactly 30 menu items, 10 tables, 5 staff; fail-closed guards for non-demo t",
+  "evidence": "Implemented TSK-005 DEMO-FOUNDATION in 6 files under scripts/demo/: demo_seed.py (deterministic seed with seed=42 producing exactly 30 menu items, 10 tables, 5 staff; fail-closed guards for non-demo tenants and production URLs; all rows tagged source=SIMULATED/environment=DEMO; [DEMO][ISOLATED] log prefix on every line), demo_reset.py (teardown in FK-safe order + reseed; two runs yield identical state MD5; completes in <30s), PROVENANCE.md (origin, algorithm, seed value, date ranges, regeneration instructions, isolation gate table), and tests/test_demo_isolation.py (45 tests covering all 9 isolation gates: IG-01 fail-closed non-demo, IG-02 no production URLs, IG-03 SIMULATED source, IG-04 DEMO environment, IG-05 idempotent seed, IG-06 log prefix, IG-07 delete only demo, IG-08 zero AMALAY leakage, IG-09 reset <30s). unittest.mock intercepts 100% of HTTP calls during tests — no real network access. All 45 tests pass. Commit: 42239078106848b98e5871877cfc189d12c08283.",
+  "commit": "42239078106848b98e5871877cfc189d12c08283",
+  "tests_passed": 45,
+  "tests_total": 45,
+  "gaps_found": [],
+  "next_steps": [
+    "TSK-006: Add synthetic transactional data (orders, sales history 90 days) on top of this foundation",
+    "Set STAGING_SUPABASE_URL + STAGING_SUPABASE_KEY secrets in GitHub Actions for demo environment CI job",
+    "Add demo_seed.py --seed 42 as a step in the staging provisioning workflow"
+  ]
+}

@@ -13,7 +13,7 @@
   },
   "TSK-002": {
     "title": "HTTP Contract Tests — Bridge WS + REST API",
-    "status": "IN_PROGRESS",
+    "status": "CLOSED",
     "role": "RUNTIME_ENGINEER",
     "priority": "P1",
     "tags": [
@@ -21,11 +21,11 @@
       "r3",
       "testing"
     ],
-    "updated_at": "2026-08-04T18:49:02Z"
+    "updated_at": "2026-08-04T19:38:03Z"
   },
   "TSK-003": {
     "title": "Logging Persistente — Electron logs survive restarts",
-    "status": "IN_PROGRESS",
+    "status": "CLOSED",
     "role": "RUNTIME_ENGINEER",
     "priority": "P1",
     "tags": [
@@ -33,6 +33,109 @@
       "r3",
       "observability"
     ],
-    "updated_at": "2026-08-04T18:49:03Z"
+    "updated_at": "2026-08-04T19:32:01Z"
+  },
+  "TSK-004": {
+    "title": "Build Windows installer v1.3.3 desde HEAD 7f4c998",
+    "status": "CLOSED",
+    "role": "FIELD_CERTIFICATION",
+    "priority": "P0",
+    "tags": [
+      "field-batch-2",
+      "build",
+      "windows",
+      "gate-3"
+    ],
+    "updated_at": "2026-08-04T21:14:29Z"
+  },
+  "TSK-005": {
+    "title": "DEMO-FOUNDATION — Tenant demo, seed, reset e isolation gates",
+    "status": "CLOSED",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "demo",
+      "foundation",
+      "staging",
+      "isolation"
+    ],
+    "updated_at": "2026-08-05T01:40:00Z"
+  },
+  "TSK-006": {
+    "title": "DEMO-POS-KDS-HARDWARE — POS + KDS + hardware simulator completo",
+    "status": "DRAFT",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "demo",
+      "pos-simulator",
+      "kds",
+      "hardware-simulator",
+      "printer",
+      "offline-queue"
+    ],
+    "updated_at": "2026-08-05T01:26:55Z"
+  },
+  "TSK-007": {
+    "title": "DEMO-ACTIVITY-GENERATOR — Historial 90 días + modo live",
+    "status": "DRAFT",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "demo",
+      "activity-generator",
+      "seed",
+      "history"
+    ],
+    "updated_at": "2026-08-05T01:26:55Z"
+  },
+  "TSK-008": {
+    "title": "DEMO-DASHBOARD-KPI — KPI row, watermark DEMO, chart 90 días",
+    "status": "DRAFT",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P2",
+    "tags": [
+      "demo",
+      "dashboard",
+      "kpi",
+      "watermark"
+    ],
+    "updated_at": "2026-08-05T01:26:55Z"
+  },
+  "TSK-009": {
+    "title": "DEMO-AGENTS — Briefing, wansoft-query y alert lifecycle completo",
+    "status": "DRAFT",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P2",
+    "tags": [
+      "demo",
+      "agents",
+      "briefing",
+      "wansoft-query",
+      "alert-lifecycle"
+    ],
+    "updated_at": "2026-08-05T01:26:55Z"
+  },
+  "TSK-010": {
+    "title": "CLON-MANIFEST — manifest.json con schema estricto + validación en CI (R2-G03)",
+    "status": "IN_PROGRESS",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P0",
+    "tags": [
+      "gate:CLON-MANIFEST",
+      "clonability"
+    ],
+    "updated_at": "2026-08-08T21:59:07Z"
+  },
+  "TSK-011": {
+    "title": "OBS-HEALTH — Monitoreo crítico por cliente: /health completo + heartbeat + alerta",
+    "status": "IN_PROGRESS",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "gate:OBS-HEALTH",
+      "observability-release"
+    ],
+    "updated_at": "2026-08-08T21:59:08Z"
   }
 }

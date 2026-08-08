@@ -29,10 +29,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-_REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
+_REPO_ROOT = pathlib.Path(os.environ.get('AGENT_OS_REPO_ROOT')
+                          or pathlib.Path(__file__).parent.parent.parent)
 # Persistent dedup — survives supervisor restarts and machine reboots.
 # Previously used /tmp/ which was cleared between restarts, bypassing dedup.
-_DEDUP_FILE = _REPO_ROOT / 'docs' / 'agent-os' / '.notified.json'
+_DEDUP_FILE = pathlib.Path(os.environ.get('AGENT_OS_STATE_ROOT')
+                           or (_REPO_ROOT / 'docs' / 'agent-os')) / '.notified.json'
 _SECRETS_FILE = pathlib.Path.home() / '.agent-os.env'
 
 ALLOWED_EVENTS = frozenset({
@@ -41,6 +43,8 @@ ALLOWED_EVENTS = frozenset({
     'DECISION_REQUIRED',
     'SUPERVISOR_CRASH',
     'WAITING_FIELD',
+    'FIELD_ACTION',      # 🔵 Daniel must physically do something (batched pack)
+    'TARGET_COMPLETE',   # 🏁 all required gates PASS
 })
 
 
@@ -168,8 +172,9 @@ def notify(event_type: str, details: dict = None, dedup_ttl_s: int = 3600) -> bo
     if event_type not in ALLOWED_EVENTS:
         return False
 
-    token, chat_id = _load_secrets()
-    if not token or not chat_id:
+    dryrun = bool(os.environ.get('AGENT_OS_TELEGRAM_DRYRUN'))
+    token, chat_id = ('', '') if dryrun else _load_secrets()
+    if not dryrun and (not token or not chat_id):
         return False
 
     details = details or {}
@@ -183,6 +188,15 @@ def notify(event_type: str, details: dict = None, dedup_ttl_s: int = 3600) -> bo
     text = _format_message(event_type, details)
     if not text:
         return False
+
+    if dryrun:
+        # Certification mode: record instead of sending; dedup still applies.
+        out = pathlib.Path(os.environ['AGENT_OS_TELEGRAM_DRYRUN'])
+        with open(out, 'a') as f:
+            f.write(json.dumps({'ts': now, 'event': event_type, 'text': text[:200]}) + '\n')
+        dedup[dedup_key] = now
+        _save_dedup(dedup)
+        return True
 
     # Try direct HTTP first; fall back to gh workflow run if token invalid/missing
     ok = False
@@ -282,6 +296,23 @@ def _format_message(event_type: str, d: dict) -> str:
             f"🔄 <b>Agent OS reiniciado (crash recovery)</b>\n"
             f"PID nuevo: <code>{pid}</code> · reinicios launchd: {runs}\n"
             f"Estado recuperado — esperando tareas"
+        )
+
+    if event_type == 'FIELD_ACTION':
+        summary = d.get('summary', '')
+        return (
+            f"🔵 <b>DANIEL — ACCIÓN FÍSICA REQUERIDA</b>\n"
+            f"{summary}\n"
+            f"Pack completo: <code>docs/agent-os/FIELD-VISIT-PACK.md</code>\n"
+            f"Todo el software está preparado. Responde con evidencia al terminar."
+        )
+
+    if event_type == 'TARGET_COMPLETE':
+        return (
+            f"🏁 <b>TARGET COMPLETO</b>\n"
+            f"<code>{tid}</code>\n"
+            f"Gates requeridos: {d.get('pass', '?')}/{d.get('total', '?')} PASS\n"
+            f"Esperando aprobación final de producción."
         )
 
     if event_type == 'WAITING_FIELD':

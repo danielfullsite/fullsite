@@ -1,0 +1,92 @@
+{
+  "id": "TSK-006",
+  "title": "DEMO-POS-KDS-HARDWARE — POS + KDS + hardware simulator completo",
+  "objective": "Implementar todos los simuladores de hardware y el ciclo operativo completo del restaurante demo: POS (orden open→close→pago mock), KDS (flujo WS cocina→listo), e impresoras simuladas (kitchen, bar, caja) con cola offline, retry y recovery. Sin cambios al Electron app ni al instalador NSIS.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "DRAFT",
+  "tags": ["demo", "pos-simulator", "kds", "hardware-simulator", "printer", "offline-queue"],
+
+  "scope": {
+    "pos": "Ciclo completo: orden open → add items → discount → close → mock payment → receipt en demo_print_log",
+    "kds": "Órdenes POS → ticket kitchen → KDS via WebSocket → mark-ready → cleared from queue",
+    "printers": {
+      "kitchen": "Impresora cocina simulada — genera kitchen ticket en demo_print_log tipo=kitchen",
+      "bar": "Impresora bar simulada — genera ticket bebidas en demo_print_log tipo=bar",
+      "cash": "Impresora caja simulada — genera receipt en demo_print_log tipo=receipt"
+    },
+    "offline_queue": "Si la BD staging no es alcanzable: cola local en memoria, retry con backoff, recovery al reconectar",
+    "mock_payment": "Terminal simulada: retorna {status:approved, auth_code:DEMO-XXXX, amount:N} sin llamar MP Point API"
+  },
+
+  "dod": [
+    "Tabla demo_print_log en staging: id, terminal_id, type (ticket|receipt|kitchen|bar), content_json, source='SIMULATED', created_at",
+    "demo_hardware.py: DemoPrinter(type) con método print(content) → inserta en demo_print_log cuando data_source=='demo'. Tipos: kitchen, bar, receipt.",
+    "DemoPrinter.print() encola localmente si staging no alcanzable, reintenta con backoff exponencial (1s, 2s, 4s, max 3 retries), registra recovery en log con [DEMO][RECOVERED].",
+    "test_printer_offline_queue: simular BD unreachable → print() encola → BD vuelve → cola se drena → assert todos los items en demo_print_log.",
+    "demo_payment.py: mock_payment(amount, client_slug) retorna {status:'approved', auth_code:'DEMO-'+uuid4()[:8], amount:amount} inmediatamente. Lanza IsolationError si client_slug != 'demo'.",
+    "KDS demo: órdenes creadas por POS llegan al KDS via WebSocket (flujo existente sin modificar). test_kds_order_flow verifica que orden abierta aparece en KDS y mark-ready actualiza status en staging.",
+    "test_demo_full_cycle: open order → 3 items → kitchen ticket (demo_print_log kitchen) → close → mock payment → receipt (demo_print_log receipt). Assert 5 rows totales: 1 kitchen + 1 bar + 1 receipt + orden CLOSED + payment DEMO.",
+    "0 llamadas a hardware físico (impresora ESC/POS, MP Point API, lector de huella) durante cualquier test.",
+    "Activación exclusiva por data_source=='demo'. Flujo AMALAY no es afectado — verificado por test_production_path_unchanged que importa client_config para AMALAY y assert no DemoPrinter instanciado."
+  ],
+
+  "dependencies": ["TSK-005"],
+
+  "constraints": [
+    "No modificar electron-app/ ni el instalador NSIS",
+    "No modificar flujo de pago de producción (AMALAY)",
+    "DemoPrinter es una capa adicional — no reemplaza ESC/POS de producción",
+    "La cola offline usa in-memory list — no requiere Redis ni base de datos secundaria",
+    "mock_payment falla cerrado (IsolationError) si client_slug != 'demo'"
+  ],
+
+  "files_allowed": [
+    "scripts/demo/demo_hardware.py",
+    "scripts/demo/demo_payment.py",
+    "scripts/demo/demo_kds.py",
+    "scripts/demo/tests/test_printer_offline_queue.py",
+    "scripts/demo/tests/test_demo_full_cycle.py",
+    "scripts/demo/tests/test_kds_order_flow.py",
+    "scripts/demo/tests/test_production_path_unchanged.py"
+  ],
+
+  "files_forbidden": [
+    "electron-app/",
+    "electron-app/local-server/",
+    "docs/agent-os/field/FULLSITE-DIAGNOSTIC/",
+    ".github/scripts/client_config.py",
+    ".github/scripts/daily_briefing.py"
+  ],
+
+  "budget_tokens": 120000,
+  "max_turns": 20,
+  "max_retries": 2,
+  "retry_count": 0,
+
+  "notes": "Phase 1. Scope ampliado para incluir KDS + hardware simulators completos (kitchen/bar/cash) + offline queue/retry/recovery. No inicia hasta que TSK-005 esté CLOSED. Si implementar KDS sin modificar electron-app requiere un workaround mayor, escalar a FOUNDER antes de proceder.",
+
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-05T01:21:41Z",
+  "updated_at": "2026-08-05T01:26:55Z",
+
+  "history": [
+    {
+      "from": null,
+      "to": "DRAFT",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-05T01:21:41Z",
+      "note": "Epic DEMO ENVIRONMENT v0 — Phase 1. Bloqueada por TSK-005."
+    },
+    {
+      "from": "DRAFT",
+      "to": "DRAFT",
+      "by": "FOUNDER",
+      "at": "2026-08-05T01:26:55Z",
+      "note": "Scope ampliado: POS + KDS + hardware simulator (kitchen/bar/cash) + offline queue/retry/recovery. Permanece DRAFT hasta CLOSED de TSK-005."
+    }
+  ]
+}

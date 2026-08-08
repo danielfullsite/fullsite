@@ -1,0 +1,21 @@
+{
+  "id": "D-003",
+  "task_id": null,
+  "status": "AWAITING_FOUNDER",
+  "created_at": "2026-08-08T21:59:05Z",
+  "updated_at": "2026-08-08T21:59:05Z",
+  "objective": "🟡 Windows installer v1.3.4 build verificado (GHA) + preflight en hardware",
+  "what_changed": "Push autorizado por Founder → GHA build green → SHA-256 registrado → preflight físico (ver TSK-BUILD-01)",
+  "why_it_matters": "Gate REL-INSTALLER (PHYSICAL) bloquea el target CLIENT_2_READY",
+  "commit": null,
+  "tests_summary": "",
+  "verification": "PHYSICAL",
+  "risk": "MEDIO",
+  "rollback": "No aplica",
+  "runtime_health_delta": "Sin cambio",
+  "action_requested": "APROBAR",
+  "response": null,
+  "response_at": null,
+  "response_notes": null,
+  "gate_id": "REL-INSTALLER"
+}

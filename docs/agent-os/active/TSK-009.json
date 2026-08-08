@@ -1,0 +1,100 @@
+{
+  "id": "TSK-009",
+  "title": "DEMO-AGENTS — Briefing, wansoft-query y alert lifecycle completo",
+  "objective": "Adaptar agentes demo (daily-briefing, wansoft-query) para operar sobre datos demo en staging sin tocar AMALAY, e implementar el lifecycle completo de alertas: alert_shown → alert_viewed → alert_accepted | alert_rejected → executed → measured. 0 queries a producción verificado por audit de requests.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P2",
+  "status": "DRAFT",
+  "tags": ["demo", "agents", "briefing", "wansoft-query", "alert-lifecycle"],
+
+  "alert_lifecycle": {
+    "states": [
+      "alert_shown",
+      "alert_viewed",
+      "alert_accepted",
+      "alert_rejected",
+      "executed",
+      "measured"
+    ],
+    "table": "demo_alert_lifecycle",
+    "fields": "id, alert_id, alert_type, state, transitioned_at, agent_id, payload_json, source='SIMULATED'",
+    "machine": "alert_shown → alert_viewed → (alert_accepted | alert_rejected). alert_accepted → executed → measured. alert_rejected → terminal. Transiciones inválidas lanzan AlertLifecycleError.",
+    "test_coverage": "test por cada transición válida + test por cada transición inválida (assert AlertLifecycleError)"
+  },
+
+  "dod": [
+    "demo_briefing.py --client demo lee de supabase-fullsite-staging (demo_sales_history, demo_reservations) y genera briefing con footer '[DATOS SIMULADOS — DEMO]'.",
+    "demo_wansoft_query.py --client demo responde preguntas sobre ventas demo (ej. '¿cuánto vendimos ayer?') usando demo_sales_history. Respuesta incluye '[SIMULATED DATA]'.",
+    "test_demo_agents_isolation: ejecutar demo_briefing con unittest.mock patcheando urllib/requests — assert 0 requests a qjiomlvudfmzuvqvhwpk durante la ejecución completa.",
+    "Tabla demo_alert_lifecycle en staging con campos: id, alert_id, alert_type, state, transitioned_at, agent_id, payload_json, source='SIMULATED'.",
+    "demo_alert_manager.py: clase DemoAlertManager con métodos transition(alert_id, new_state), get_state(alert_id), history(alert_id). Implementa máquina de estados estricta — transiciones inválidas lanzan AlertLifecycleError.",
+    "Tests de lifecycle — uno por transición válida (6 tests): shown→viewed, viewed→accepted, viewed→rejected, accepted→executed, executed→measured, rejected→terminal.",
+    "Tests de transición inválida (4 tests): shown→executed (skip states), measured→accepted (retroceso), rejected→executed (post-rejection), alert_shown sin alert previo.",
+    "demo_briefing.py genera alertas (ej. 'ventas bajas', 'mesa sin cerrar') y las registra en demo_alert_lifecycle con state=alert_shown al crearlas.",
+    "Cuando el gerente demo 'acepta' una alerta vía API demo: transition → alert_accepted → executed → measured. Medición registra outcome_value (ej. delta de ventas post-acción).",
+    "GitHub Actions: demo-briefing.yml (workflow_dispatch) y demo-reset.yml ya incluye teardown de demo_alert_lifecycle.",
+    "Sin modificar los workflows de producción (daily-briefing.yml, wansoft-query.yml, orquestador.yml)."
+  ],
+
+  "dependencies": ["TSK-008"],
+
+  "constraints": [
+    "No modificar daily_briefing.py ni wansoft_query.py de producción",
+    "0 queries a proyecto AMALAY desde cualquier path de código demo",
+    "Footer/label DEMO no-negociable en toda salida de agentes demo",
+    "No usar tokens de producción (SUPABASE_SERVICE_KEY, GROQ_API_KEY de producción) en scripts demo",
+    "AlertLifecycleError se lanza, no se silencia — fail-closed en transiciones inválidas"
+  ],
+
+  "files_allowed": [
+    "scripts/demo/demo_briefing.py",
+    "scripts/demo/demo_wansoft_query.py",
+    "scripts/demo/demo_alert_manager.py",
+    "scripts/demo/tests/test_demo_agents_isolation.py",
+    "scripts/demo/tests/test_alert_lifecycle_valid.py",
+    "scripts/demo/tests/test_alert_lifecycle_invalid.py",
+    ".github/workflows/demo-briefing.yml",
+    ".github/workflows/demo-reset.yml"
+  ],
+
+  "files_forbidden": [
+    "electron-app/",
+    "docs/agent-os/field/FULLSITE-DIAGNOSTIC/",
+    ".github/scripts/daily_briefing.py",
+    ".github/scripts/wansoft_query.py",
+    ".github/scripts/orquestador.py",
+    ".github/workflows/daily-briefing.yml",
+    ".github/workflows/wansoft-query.yml"
+  ],
+
+  "budget_tokens": 120000,
+  "max_turns": 20,
+  "max_retries": 2,
+  "retry_count": 0,
+
+  "notes": "Phase 4 — cierre del epic. El lifecycle de alertas es el componente nuevo principal: alert_shown → alert_viewed → alert_accepted|rejected → executed → measured. No es solo generación de tarjetas — cada transición tiene test, cada transición inválida falla cerrado. El audit de 0 queries a prod es el cierre definitivo del contrato de aislamiento.",
+
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-05T01:21:41Z",
+  "updated_at": "2026-08-05T01:26:55Z",
+
+  "history": [
+    {
+      "from": null,
+      "to": "DRAFT",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-05T01:21:41Z",
+      "note": "Epic DEMO ENVIRONMENT v0 — Phase 4. Bloqueada por TSK-008."
+    },
+    {
+      "from": "DRAFT",
+      "to": "DRAFT",
+      "by": "FOUNDER",
+      "at": "2026-08-05T01:26:55Z",
+      "note": "Scope ampliado: lifecycle completo de alertas (alert_shown → alert_viewed → alert_accepted|rejected → executed → measured), tabla demo_alert_lifecycle, DemoAlertManager, 10 tests de máquina de estados. Permanece DRAFT hasta CLOSED de TSK-008."
+    }
+  ]
+}

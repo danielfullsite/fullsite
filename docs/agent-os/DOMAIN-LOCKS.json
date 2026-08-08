@@ -1,0 +1,50 @@
+{
+  "security-multitenant": {
+    "owner": "EXTERNAL:bug-019-session",
+    "kind": "EXTERNAL",
+    "task_id": null,
+    "branch": "bug-019/security-consolidation",
+    "locked_at": "2026-08-08T22:30:00Z",
+    "note": "BUG-019 tiene owner externo activo (worktrees fullsite-bug019*). No asignar writers. Liberar solo cuando el owner cierre."
+  },
+  "ops-truth": {
+    "owner": "EXTERNAL:wave1-session",
+    "kind": "EXTERNAL",
+    "task_id": null,
+    "branch": "wave1/inventory-truth",
+    "locked_at": "2026-08-08T22:30:00Z",
+    "note": "Wave 1 inventory truth-chain con owner externo activo (fullsite-wave1)."
+  },
+  "offline-runtime": {
+    "owner": "FROZEN:release/offline-field-2026-08-06",
+    "kind": "FROZEN",
+    "task_id": null,
+    "branch": "release/offline-field-2026-08-06",
+    "locked_at": "2026-08-08T22:30:00Z",
+    "note": "Release offline congelado (Protocolo Offline v1.0). Solo evoluciona con evidencia de campo. Reapertura requiere Founder Decision."
+  },
+  "production": {
+    "owner": "FOUNDER",
+    "kind": "FROZEN",
+    "task_id": null,
+    "branch": null,
+    "locked_at": "2026-08-08T22:30:00Z",
+    "note": "Toda mutación de producción requiere PRODUCTION_APPROVAL explícita de Daniel. Autonomía de prod: DISABLED."
+  },
+  "clonability": {
+    "owner": "AGENT:TSK-010",
+    "kind": "AGENT",
+    "task_id": "TSK-010",
+    "branch": "agent-os/TSK-010",
+    "locked_at": "2026-08-08T21:59:05Z",
+    "note": ""
+  },
+  "observability-release": {
+    "owner": "AGENT:TSK-011",
+    "kind": "AGENT",
+    "task_id": "TSK-011",
+    "branch": "agent-os/TSK-011",
+    "locked_at": "2026-08-08T21:59:05Z",
+    "note": ""
+  }
+}

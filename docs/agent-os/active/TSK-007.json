@@ -1,0 +1,55 @@
+{
+  "id": "TSK-007",
+  "title": "DEMO-ACTIVITY-GENERATOR — Historial 90 días + modo live",
+  "objective": "Crear activity_generator.py con modo seed (90 días de historial wansoft_daily compatible, reproducible con --seed N) y modo live (órdenes periódicas durante horario de negocio). Verificar row counts post-seed.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "DRAFT",
+  "tags": ["demo", "activity-generator", "seed", "history"],
+  "dod": [
+    "scripts/demo/activity_generator.py con CLI: --mode seed|live, --speed 1|5|10, --seed N, --client demo",
+    "Modo seed: inserta 90 filas en demo_sales_history (wansoft_daily compatible): fecha, ventas_dia, tickets_count, meseros JSONB, platillos_top JSONB, source=SIMULATED",
+    "Distribución realista: Tue–Fri $8K–$14K MXN, Sat–Sun $16K–$22K MXN, Lun $6K–$10K MXN",
+    "Reproducible: mismo --seed produce mismos valores en cualquier máquina",
+    "test_activity_generator.py: seed con --seed 42 → assert row_count == 90 y suma de ventas en rango esperado",
+    "Modo live: crea 1 orden demo cada ~2 min durante 8am–10pm MX (sin insertar fuera de horario)",
+    "Guard: falla si --client != 'demo'"
+  ],
+  "dependencies": ["TSK-005"],
+  "constraints": [
+    "No escribir en tablas AMALAY ni en proyecto producción",
+    "RNG seed hace el output 100% reproducible",
+    "Modo live no interfiere con flujo de producción",
+    "Sin llamadas a Groq ni a APIs externas — generación puramente local"
+  ],
+  "files_allowed": [
+    "scripts/demo/activity_generator.py",
+    "scripts/demo/tests/test_activity_generator.py"
+  ],
+  "files_forbidden": [
+    "electron-app/",
+    "docs/agent-os/field/FULLSITE-DIAGNOSTIC/",
+    ".github/scripts/daily_briefing.py",
+    ".github/scripts/wansoft_query.py"
+  ],
+  "budget_tokens": 80000,
+  "max_turns": 15,
+  "max_retries": 2,
+  "retry_count": 0,
+  "notes": "Phase 2. La historia de 90 días es el input principal para el dashboard y para los agentes en Phase 3 y 4. La distribución semanal debe ser realista para que las demos sean creíbles.",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-05T01:21:41Z",
+  "updated_at": "2026-08-05T01:21:41Z",
+  "history": [
+    {
+      "from": null,
+      "to": "DRAFT",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-05T01:21:41Z",
+      "note": "Epic DEMO ENVIRONMENT v0 — Phase 2. Bloqueada por TSK-005."
+    }
+  ]
+}

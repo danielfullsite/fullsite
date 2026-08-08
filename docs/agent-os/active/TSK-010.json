@@ -1,0 +1,58 @@
+{
+  "id": "TSK-010",
+  "execution_class": "AUTO_TECH",
+  "gate_id": "CLON-MANIFEST",
+  "domain": "clonability",
+  "title": "CLON-MANIFEST — manifest.json con schema estricto + validación en CI (R2-G03)",
+  "objective": "JSON Schema estricto para el manifest de cliente + validador ejecutable + test que rechaza manifests inválidos\n\nGATE: CLON-MANIFEST · dominio: clonability · cert level objetivo: SOFTWARE\nContexto: este task implementa un gate del pipeline CLIENT_2_READY. Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P0",
+  "status": "IN_PROGRESS",
+  "tags": [
+    "gate:CLON-MANIFEST",
+    "clonability"
+  ],
+  "dod": [
+    "JSON Schema estricto para el manifest de cliente + validador ejecutable + test que rechaza manifests inválidos",
+    "Tests deterministas incluidos y en verde",
+    "Commit en el branch del task (nunca push, nunca merge manual)"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-08T21:59:05Z",
+  "updated_at": "2026-08-08T21:59:07Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-08T21:59:05Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T21:59:07Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T21:59:07Z",
+      "note": "Engineering started"
+    }
+  ],
+  "branch": "agent-os/TSK-010",
+  "worktree_path": "/tmp/fullsite-worker-TSK-010"
+}

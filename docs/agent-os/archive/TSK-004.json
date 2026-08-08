@@ -1,0 +1,86 @@
+{
+  "id": "TSK-004",
+  "title": "Build Windows installer v1.3.3 desde HEAD 7f4c998",
+  "objective": "Disparar electron-build.yml sobre commit 7f4c998eec207dfd62576941e0e3b334c16fd9a4, descargar artifact Windows, verificar versión 1.3.3, SHA-256, y metadata que vincula el .exe con HEAD. Prerequisito para PRE-FIELD-BATCH-02 Gate 3.",
+  "role": "FIELD_CERTIFICATION",
+  "priority": "P0",
+  "status": "CLOSED",
+  "tags": [
+    "field-batch-2",
+    "build",
+    "windows",
+    "gate-3"
+  ],
+  "dod": [
+    "electron-build.yml completado en GHA",
+    "artifact fullsite-pos-win-7f4c998* descargado",
+    "ProductVersion=1.3.3 verificado",
+    "SHA-256 registrado",
+    "artifact no es 1.2.0.exe",
+    "resultado archivado"
+  ],
+  "dependencies": [],
+  "budget_tokens": 100000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": "2026-08-04T21:14:13Z",
+  "verified_at": null,
+  "created_at": "2026-08-04T21:01:26Z",
+  "updated_at": "2026-08-04T21:14:29Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-04T21:01:26Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:01:31Z",
+      "note": "Disparando electron-build.yml sobre 7f4c998"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:02:17Z",
+      "note": "GHA run 30950581003 en curso — windows-latest electron-builder --win"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:14:13Z",
+      "note": "Result: VERIFIED"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:14:19Z",
+      "note": "Self-review: GHA logs + artifact match all DoD criteria"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:14:19Z",
+      "note": "VERIFIED: installer name, version, SHA-256, commit binding, not-1.2.0 all confirmed"
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "FIELD_CERTIFICATION",
+      "at": "2026-08-04T21:14:29Z",
+      "note": "Build artifact verified. No code merge — FIELD_CERTIFICATION task. Commit 6b4a1c3 ya en main."
+    }
+  ]
+}

@@ -1,234 +1,333 @@
 #!/usr/bin/env python3
 """
-Agent OS Orchestrator — selects the highest-priority executable work and creates tasks.
+Agent OS Orchestrator v2 — pipeline-driven work selection.
 
-Priority order:
-  1. Risks blocking production (P0 Runtime Gaps)
-  2. Risks blocking Client #2 (R2 gates)
-  3. R1 gates (AMALAY Production Ready)
-  4. R3 work (scale)
-  5. Deferred R2/R4 work
-  6. Tech debt with measurable impact
+Source of truth: docs/agent-os/PIPELINE.json (TARGET → GATES → EVIDENCE).
+This module no longer hardcodes workqueues. Each cycle it:
 
-Rules:
-  - Never creates tasks beyond MAX_CONCURRENT_ENGINEERS at once
-  - Checks for task collision on files before parallelizing
-  - Enters WAITING if nothing executable exists
-  - Updates HEARTBEAT.json after each decision
-  - Respects kill_switch
+  1. Reaps stale AGENT domain locks (sleep/crash safe — locks live on disk).
+  2. Syncs gate status from task state (RUNNING/REVIEW/BLOCKED_TECH).
+  3. Selects actionable gates (deps PASS, domain unlocked, retry budget left).
+  4. Routes by execution class:
+       AUTO_TECH           → create task + acquire domain lock (one writer/domain)
+       HUMAN_PHYSICAL      → human queue + field visit pack (batched per location)
+       FOUNDER_DECISION    → decision card (approval = gate PASS)
+       PRODUCTION_APPROVAL → decision card; NEVER auto-executed
+  5. Declares TARGET COMPLETE only when all REQUIRED gates = PASS (deterministic).
+
+Never touches: frozen branches, externally-owned domains, production.
 """
-import sys, os, json, datetime
-sys.path.insert(0, __file__.rsplit('/', 1)[0])
+import sys, os, json
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from shared import (
     load_state, is_killed, load_tasks_index, load_pending_decisions,
-    create_task, transition_task, update_state, audit, ensure_dirs,
-    is_gate_completed,
-    ACTIVE_DIR, INBOX_DIR, now_iso,
+    create_task, update_state, audit, ensure_dirs, now_iso,
+    TERMINAL_STATUSES, DECISIONS_DIR, read_json,
 )
+import pipeline
+import locks
+import human_queue
+from telegram_notify import notify as _tg
 
 MAX_CONCURRENT_ENGINEERS = 2
-MAX_CONCURRENT_VERIFICATION = 1
 
-HEARTBEAT_FILE = os.path.join(os.path.dirname(__file__), '../../docs/agent-os/HEARTBEAT.json')
+TASK_ACTIVE_STATUSES = {'READY', 'CLAIMED', 'IN_PROGRESS', 'SUBMITTED',
+                        'IN_REVIEW', 'CHANGES_REQUESTED', 'VERIFIED', 'AWAITING_FOUNDER'}
 
-# ── Readiness contract state ──────────────────────────────────────────────────
-# These are the executable gates for R1. Updated as work is completed.
 
-R1_WORKQUEUE = [
-    {
-        'gate': 'R1-G02',
-        'title': 'Field Batch #2 — Code Readiness for OCS-P2.5.9',
-        'objective': 'Preparar todo el trabajo de código ejecutable antes de la visita física a AMALAY para que la visita sea exclusivamente de certificación',
-        'role': 'RUNTIME_VERIFICATION',
-        'priority': 'P0',
-        'tags': ['field-batch-2', 'r1', 'offline-sync'],
-        'dod': [
-            # Audit findings (AUDIT-FINDINGS.md)
-            'AF-001 verificado y documentado en AUDIT-FINDINGS o RESOLVED',
-            'AF-002 verificado y documentado',
-            'AF-003 verificado y documentado',
-            'AF-004 verificado y documentado',
-            'AF-005 (re-auditoría módulos no cubiertos) revisado o diferido con justificación',
-            # Runtime gaps (RUNTIME-GAP-REGISTER.md) — mandatory cross-check
-            'RUNTIME-GAP-REGISTER.md leído completo — listar todos los gaps abiertos',
-            'Todo gap abierto P0/P1 en RUNTIME-GAP-REGISTER: corregido o diferido con aprobación explícita del Founder',
-            'AUTH-OFFLINE-02 (GAP-A): verificar meetsMinRole enforcement en PBKDF2 + btoa offline paths en pos-data.ts',
-            # OC-09 specific
-            'OC-09 Auth offline: cada path (online→PBKDF2→btoa) verificado con tests; resultado CODE VERIFIED o CODE PARTIAL con evidencia',
-            # Docs & runtime health
-            'Runtime Health ORS recalculado con evidencia del día',
-            'RUNTIME-HEALTH.md actualizado (módulo Manager PIN offline)',
-            'Preflight checklist PRE-01..PRE-12 revisado — ítems ajustables marcados',
-            # Decision gate
-            'FIELD BATCH #2 decision card creada en FOUNDER-INBOX solo si: 0 gaps P0, OC-09 CODE VERIFIED, ORS ≥ 80',
-        ],
-        'budget_tokens': 150_000,
-        'notes': (
-            'No declara ninguna prueba física como completada. Solo prepara el trabajo de código. '
-            'OBLIGATORIO: cruzar RUNTIME-GAP-REGISTER.md además de AUDIT-FINDINGS.md. '
-            'Una decisión de readiness que omite gaps abiertos en el register es inválida — ver POLICIES.md §GAP-GATE.'
-        ),
-    },
-]
+def _gate_tag(gate_id: str) -> str:
+    return f'gate:{gate_id}'
 
-R3_WORKQUEUE = [
-    {
-        'gate': 'R3-G01',
-        'title': 'HTTP Contract Tests — Bridge WS + REST API',
-        'objective': 'Crear contract tests que validen el protocolo Bridge WS y los endpoints REST del local server',
-        'role': 'RUNTIME_ENGINEER',
-        'priority': 'P1',
-        'tags': ['http-contracts', 'r3', 'testing'],
-        'dod': [
-            'Tests para SUBSCRIBE, COMMAND, ACK, REJECT, DELTA protocol messages',
-            'Tests para /health, /state REST endpoints',
-            'Tests pasan en CI (npm test o bun test)',
-            'Coverage de happy path + error cases',
-        ],
-        'budget_tokens': 120_000,
-        'notes': '',
-    },
-    {
-        'gate': 'R3-G02',
-        'title': 'Logging Persistente — Electron logs survive restarts',
-        'objective': 'Verificar y mejorar que los logs del servidor Electron sobreviven reinicios y tienen rotación',
-        'role': 'RUNTIME_ENGINEER',
-        'priority': 'P1',
-        'tags': ['logging', 'r3', 'observability'],
-        'dod': [
-            'Logs escritos a archivo con winston o pino, no solo stdout',
-            'Rotación automática (max 5MB por archivo, 5 archivos)',
-            '/health incluye last_log_entry',
-            'Diagnóstico remoto posible sin SSH',
-        ],
-        'budget_tokens': 80_000,
-        'notes': '',
-    },
-]
 
-# ── Heartbeat ─────────────────────────────────────────────────────────────────
+def _tasks_for_gate(index: dict, gate_id: str) -> list:
+    tag = _gate_tag(gate_id)
+    return [(tid, m) for tid, m in index.items() if tag in m.get('tags', [])]
 
-def _update_heartbeat(status, current_task=None, next_action='', errors=None):
-    hb = {
-        'ts':           now_iso(),
-        'status':       status,
-        'current_task': current_task,
-        'next_action':  next_action,
-        'errors':       errors or [],
-    }
-    tmp = HEARTBEAT_FILE + '.tmp'
-    with open(tmp, 'w') as f:
-        json.dump(hb, f, indent=2)
-    os.replace(tmp, HEARTBEAT_FILE)
 
-# ── Task counting ─────────────────────────────────────────────────────────────
+def _active_task_for_gate(index: dict, gate_id: str):
+    for tid, m in _tasks_for_gate(index, gate_id):
+        if m['status'] in TASK_ACTIVE_STATUSES:
+            return tid, m
+    return None, None
 
-def _count_active(role=None):
-    index = load_tasks_index()
-    active_statuses = {'CLAIMED', 'IN_PROGRESS', 'SUBMITTED', 'IN_REVIEW', 'CHANGES_REQUESTED'}
-    count = 0
-    for tid, meta in index.items():
-        if meta['status'] in active_statuses:
-            if role is None or meta['role'] == role:
-                count += 1
-    return count
 
-def _task_exists_for_gate(gate_tag):
-    # Gate permanently completed (task MERGED) — don't recreate
-    if is_gate_completed(gate_tag):
-        return True
-    index = load_tasks_index()
-    terminal = {'MERGED', 'CANCELLED', 'REJECTED', 'APPROVED'}
-    for tid, meta in index.items():
-        if gate_tag in meta.get('tags', []) and meta['status'] not in terminal:
-            return True
+def _count_active_engineers(index: dict) -> int:
+    return sum(1 for m in index.values()
+               if m['status'] in ('READY', 'CLAIMED', 'IN_PROGRESS', 'CHANGES_REQUESTED')
+               and m.get('role') == 'RUNTIME_ENGINEER')
+
+
+# ── Gate ↔ task status sync ───────────────────────────────────────────────────
+
+def _sync_gates_from_tasks(index: dict):
+    p = pipeline.load_pipeline()
+    _, target = pipeline.active_target(p)
+    if not target:
+        return
+    for gid, gate in target.get('gates', {}).items():
+        if gate.get('status') in ('PASS', 'DEFERRED'):
+            continue
+        tid, meta = _active_task_for_gate(index, gid)
+        if meta:
+            desired = None
+            if meta['status'] in ('READY', 'CLAIMED'):
+                desired = 'CLAIMED'
+            elif meta['status'] in ('IN_PROGRESS', 'CHANGES_REQUESTED'):
+                desired = 'RUNNING'
+            elif meta['status'] in ('SUBMITTED', 'IN_REVIEW', 'VERIFIED', 'AWAITING_FOUNDER'):
+                desired = 'REVIEW'
+            if desired and gate.get('status') != desired:
+                pipeline.set_gate_status(gid, desired, by='ORCHESTRATOR',
+                                         note=f'task {tid} is {meta["status"]}')
+        else:
+            # No active task. If a task for this gate ended BLOCKED → BLOCKED_TECH.
+            blocked = [tid for tid, m in _tasks_for_gate(index, gid)
+                       if m['status'] == 'BLOCKED']
+            if blocked and gate.get('status') not in ('BLOCKED_TECH', 'FAIL'):
+                pipeline.set_gate_status(gid, 'BLOCKED_TECH', by='ORCHESTRATOR',
+                                         note=f'task {blocked[-1]} blocked after max retries')
+                pipeline.record_gate_failure(gid, f'task_blocked:{blocked[-1]}')
+            # If gate was CLAIMED/RUNNING/REVIEW but its task vanished/cancelled → back to READY
+            elif gate.get('status') in ('CLAIMED', 'RUNNING', 'REVIEW'):
+                if gate.get('execution_class', 'AUTO_TECH') == 'AUTO_TECH' and \
+                   gate.get('owner') is None or (gate.get('owner') or '').startswith('AGENT'):
+                    pipeline.set_gate_status(gid, 'READY', by='ORCHESTRATOR',
+                                             note='no active task — re-eligible')
+
+
+# ── Decision cards for FOUNDER_DECISION / PRODUCTION_APPROVAL gates ───────────
+
+def _decision_exists_for_gate(gate_id: str) -> bool:
+    if not os.path.isdir(DECISIONS_DIR):
+        return False
+    for fn in os.listdir(DECISIONS_DIR):
+        if fn.startswith('D-') and fn.endswith('.json'):
+            d = read_json(os.path.join(DECISIONS_DIR, fn), {})
+            if d.get('gate_id') == gate_id and d.get('status') == 'AWAITING_FOUNDER':
+                return True
     return False
 
-# ── Main orchestration loop ───────────────────────────────────────────────────
+
+def _ensure_gate_decision(gate: dict):
+    gid = gate['id']
+    if _decision_exists_for_gate(gid):
+        return
+    from shared import create_decision, write_json, read_json as _rj
+    icon = '🔴' if gate.get('execution_class') == 'PRODUCTION_APPROVAL' else '🟡'
+    d = create_decision(
+        task_id=None,
+        objective=f'{icon} {gate["title"]}',
+        what_changed=gate.get('evidence_required', ''),
+        why_it_matters=f'Gate {gid} ({gate.get("cert_level")}) bloquea el target CLIENT_2_READY',
+        verification=gate.get('cert_level', ''),
+        risk='ALTO' if gate.get('execution_class') == 'PRODUCTION_APPROVAL' else 'MEDIO',
+        action_requested='APROBAR' if gate.get('execution_class') == 'FOUNDER_DECISION'
+                         else 'APROBAR EJECUCIÓN EN PRODUCCIÓN',
+        skip_gap_gate=True,
+    )
+    # Tag the decision with its gate so approval propagates to the pipeline
+    from shared import _decision_path
+    path = _decision_path(d['id'])
+    dd = _rj(path)
+    dd['gate_id'] = gid
+    write_json(path, dd)
+    pipeline.set_gate_status(gid, 'BLOCKED_DECISION', by='ORCHESTRATOR',
+                             note=f'Decision {d["id"]} created')
+    _tg('DECISION_REQUIRED', {'task_id': gid, 'title': gate['title'],
+                              'decision_id': d['id']})
+
+
+def reconcile_gate_decisions():
+    """Propagate archived/answered gate decisions to gate status.
+    Called by supervisor after decision reconciliation."""
+    from shared import ARCHIVE_DIR
+    if not os.path.isdir(ARCHIVE_DIR):
+        return
+    p = pipeline.load_pipeline()
+    _, target = pipeline.active_target(p)
+    if not target:
+        return
+    for fn in os.listdir(ARCHIVE_DIR):
+        if not (fn.startswith('D-') and fn.endswith('.json')):
+            continue
+        d = read_json(os.path.join(ARCHIVE_DIR, fn), {})
+        gid = d.get('gate_id')
+        if not gid or gid not in target.get('gates', {}):
+            continue
+        gate = target['gates'][gid]
+        if gate.get('status') in ('PASS', 'DEFERRED'):
+            continue
+        if d.get('response') == 'APPROVED':
+            pipeline.set_gate_status(gid, 'PASS', by='FOUNDER',
+                                     note=f'Decision {d["id"]} approved',
+                                     evidence={'decision_id': d['id'],
+                                               'note': 'Founder approval'})
+        elif d.get('response') == 'REJECTED':
+            pipeline.set_gate_status(gid, 'DEFERRED', by='FOUNDER',
+                                     note=f'Decision {d["id"]} rejected — deferred')
+
+
+# ── Human physical gates ──────────────────────────────────────────────────────
+
+HUMAN_SPECS = {
+    'REL-OFFLINE-FIELD': {
+        'title': 'Certificación física offline OCS-P2.5.9 en AMALAY',
+        'location': 'AMALAY',
+        'why': 'Único gate que valida offline real en hardware real; bloquea GO-LIVE Client #2',
+        'estimated_time': '90 min',
+        'preparation_completed': 'Field Package v2 canónico (v1.3.4), THURSDAY-RUNBOOK.md, OFFLINE-TEST-MATRIX.md, FIELD-KIT scripts listos',
+        'do_exactly': [
+            'Lleva laptop + USB con FULLSITE-FIELD-KIT (docs/agent-os/field/)',
+            'Sigue docs/agent-os/field/THURSDAY-RUNBOOK.md paso a paso',
+            'Ejecuta cada escenario de OFFLINE-TEST-MATRIX.md y anota PASS/FAIL',
+            'Ante un FAIL: detén el caso, captura evidencia (RUN-CERT-CAPTURE.cmd) y continúa con el siguiente escenario independiente',
+        ],
+        'expected_result': 'Matriz completa con PASS/FAIL por escenario + capturas',
+        'return_evidence': 'Fotos de tickets, archivo de captura del FIELD-KIT, matriz marcada',
+        'safe_failure': 'ROLLBACK.ps1 del FIELD-KIT restaura el estado previo; el POS de AMALAY sigue en su versión actual si no instalas',
+    },
+}
+
+
+def _ensure_human_gates(gates: list):
+    created = False
+    for g in gates:
+        if g.get('execution_class') != 'HUMAN_PHYSICAL':
+            continue
+        spec = HUMAN_SPECS.get(g['id'], {
+            'title': g['title'],
+            'location': g.get('location', 'AMALAY'),
+            'why': g.get('evidence_required', ''),
+            'do_exactly': ['Ver evidencia requerida del gate'],
+            'expected_result': g.get('evidence_required', ''),
+            'return_evidence': 'Evidencia descrita en el gate',
+            'safe_failure': 'No destructivo',
+        })
+        if human_queue.ensure_human_task(g['id'], spec):
+            created = True
+        if g.get('status') != 'BLOCKED_HUMAN':
+            pipeline.set_gate_status(g['id'], 'BLOCKED_HUMAN', by='ORCHESTRATOR',
+                                     note='Queued in human queue / field visit pack')
+    summary = human_queue.render_field_visit_pack()
+    if summary and created:
+        _tg('FIELD_ACTION', {'task_id': 'FIELD-PACK', 'summary': summary},
+            dedup_ttl_s=6 * 3600)
+
+
+# ── AUTO_TECH task creation ───────────────────────────────────────────────────
+
+def _create_gate_task(gate: dict):
+    gid = gate['id']
+    domain = gate.get('domain')
+    # One writer per domain: if another agent task holds the domain, wait.
+    if domain and domain in locks.load_locks():
+        return None
+    task = create_task(
+        title=f'{gid} — {gate["title"]}',
+        objective=(
+            f'{gate.get("evidence_required", "")}\n\n'
+            f'GATE: {gid} · dominio: {domain} · cert level objetivo: {gate.get("cert_level")}\n'
+            'Contexto: este task implementa un gate del pipeline CLIENT_2_READY. '
+            'Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. '
+            'NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.'
+        ),
+        role='RUNTIME_ENGINEER',
+        priority=gate.get('priority', 'P1'),
+        tags=[_gate_tag(gid), domain or 'general'],
+        dod=[gate.get('evidence_required', 'Evidencia verificable del gate'),
+             'Tests deterministas incluidos y en verde',
+             'Commit en el branch del task (nunca push, nunca merge manual)'],
+        budget_tokens=150_000,
+        execution_class='AUTO_TECH',
+        gate_id=gid,
+        domain=domain,
+        notes=gate.get('notes', ''),
+    )
+    ok = locks.acquire(domain, owner=f'AGENT:{task["id"]}', task_id=task['id'],
+                       branch=f'agent-os/{task["id"]}') if domain else True
+    if not ok:
+        # Someone else holds the domain — cancel and retry next cycle
+        from shared import transition_task
+        transition_task(task['id'], 'CANCELLED', by='ORCHESTRATOR',
+                        note=f'Domain {domain} locked — will retry')
+        return None
+    pipeline.set_gate_status(gid, 'CLAIMED', by='ORCHESTRATOR',
+                             note=f'Task {task["id"]} created')
+    audit('ORCHESTRATOR_CREATED_TASK', {'task_id': task['id'], 'gate': gid,
+                                        'domain': domain})
+    print(f'Created task {task["id"]} for gate {gid}')
+    return task
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def run():
     ensure_dirs()
 
     if is_killed():
-        print('Kill switch is ON. Orchestrator will not run.')
-        _update_heartbeat('KILLED', next_action='Activate kill switch removed in STATE.json')
+        print('Kill switch ON — orchestrator paused.')
         return
 
-    pending_decisions = load_pending_decisions()
-    if len(pending_decisions) >= 3:
-        print(f'⏸ {len(pending_decisions)} pending decisions. Waiting for Founder.')
-        _update_heartbeat('AWAITING_FOUNDER',
-                          next_action='Founder must respond to pending decisions')
+    locks.reap_stale_agent_locks()
+    index = load_tasks_index()
+    _sync_gates_from_tasks(index)
+    reconcile_gate_decisions()
+
+    r = pipeline.readiness()
+    if r['target'] is None:
+        print('No active target — idle.')
         return
 
-    engineers_busy = _count_active('RUNTIME_ENGINEER')
-    verifiers_busy = _count_active('RUNTIME_VERIFICATION')
+    if r.get('complete'):
+        state = load_state()
+        if state.get('notes') != f'TARGET_COMPLETE:{r["target"]}':
+            _tg('TARGET_COMPLETE', {'task_id': r['target'],
+                                    'pass': r['required_pass'],
+                                    'total': r['required_total']},
+                dedup_ttl_s=86400)
+            update_state({'notes': f'TARGET_COMPLETE:{r["target"]}'})
+            audit('TARGET_COMPLETE', r)
+        print(f'🏁 TARGET {r["target"]} COMPLETE ({r["required_pass"]}/{r["required_total"]})')
+        return
 
-    created = []
+    actionable = pipeline.actionable_gates(locked_domains=locks.locked_domains())
 
-    # Priority 1: R1 work (Field Batch #2 — most critical)
-    for item in R1_WORKQUEUE:
-        if _task_exists_for_gate(item['tags'][0]):
+    # Human/decision gates are actionable regardless of engineer capacity
+    p = pipeline.load_pipeline()
+    _, target = pipeline.active_target(p)
+    gates_all = target.get('gates', {})
+    human_gates = [{**g, 'id': gid} for gid, g in gates_all.items()
+                   if g.get('execution_class') == 'HUMAN_PHYSICAL'
+                   and g.get('status') in ('BACKLOG', 'READY', 'BLOCKED_HUMAN')
+                   and pipeline.deps_met(g, gates_all)]
+    _ensure_human_gates(human_gates)
+
+    decision_gates = [{**g, 'id': gid} for gid, g in gates_all.items()
+                      if g.get('execution_class') in ('FOUNDER_DECISION', 'PRODUCTION_APPROVAL')
+                      and g.get('status') in ('BACKLOG', 'READY', 'BLOCKED_DECISION')
+                      and pipeline.deps_met(g, gates_all)]
+    for g in decision_gates:
+        _ensure_gate_decision(g)
+
+    # AUTO_TECH gates → tasks, bounded by engineer capacity
+    capacity = MAX_CONCURRENT_ENGINEERS - _count_active_engineers(index)
+    created = 0
+    for g in actionable:
+        if capacity <= 0:
+            break
+        if g.get('execution_class', 'AUTO_TECH') != 'AUTO_TECH':
             continue
-        task = create_task(
-            title=item['title'],
-            objective=item['objective'],
-            role=item['role'],
-            priority=item['priority'],
-            tags=item['tags'],
-            dod=item['dod'],
-            budget_tokens=item['budget_tokens'],
-            notes=item['notes'],
-        )
-        created.append(task)
-        audit('ORCHESTRATOR_CREATED_TASK', {
-            'task_id': task['id'], 'gate': item['gate'], 'reason': 'R1 blocker'
-        })
-        print(f'Created R1 task: {task["id"]} — {task["title"]}')
+        tid, _m = _active_task_for_gate(index, g['id'])
+        if tid:
+            continue
+        if _create_gate_task(g):
+            created += 1
+            capacity -= 1
 
-    # Priority 2: R3 work (if engineers available and no R1 tasks pending)
-    r1_pending = any(_task_exists_for_gate(item['tags'][0]) for item in R1_WORKQUEUE)
-    if not r1_pending or engineers_busy < MAX_CONCURRENT_ENGINEERS:
-        for item in R3_WORKQUEUE:
-            if engineers_busy >= MAX_CONCURRENT_ENGINEERS:
-                break
-            if _task_exists_for_gate(item['tags'][0]):
-                continue
-            # Only start R3 if R1 verification is underway (parallel, not blocking)
-            task = create_task(
-                title=item['title'],
-                objective=item['objective'],
-                role=item['role'],
-                priority=item['priority'],
-                tags=item['tags'],
-                dod=item['dod'],
-                budget_tokens=item['budget_tokens'],
-                notes=item['notes'],
-            )
-            created.append(task)
-            engineers_busy += 1
-            audit('ORCHESTRATOR_CREATED_TASK', {
-                'task_id': task['id'], 'gate': item['gate'], 'reason': 'R3 parallel work'
-            })
-            print(f'Created R3 task: {task["id"]} — {task["title"]}')
+    print(f'Readiness {r["required_pass"]}/{r["required_total"]} '
+          f'({r["pct"]}%) · actionable={len(actionable)} · created={created}')
 
-    if not created:
-        index = load_tasks_index()
-        terminal = {'MERGED', 'CANCELLED', 'REJECTED', 'APPROVED'}
-        active = [v for v in index.values() if v['status'] not in terminal]
-        if active:
-            print(f'All eligible work is in progress ({len(active)} active tasks). Monitoring.')
-            _update_heartbeat('RUNNING', next_action='Waiting for tasks to complete')
-        else:
-            print('WAITING — no executable work. All remaining blockers require field/founder/external.')
-            _update_heartbeat('WAITING',
-                              next_action='Field execution or Founder decision required',
-                              errors=['No internal work remaining for current sprint'])
-        return
-
-    _update_heartbeat('RUNNING',
-                      current_task=created[0]['id'] if created else None,
-                      next_action=f'Tasks created: {[t["id"] for t in created]}')
 
 if __name__ == '__main__':
     run()

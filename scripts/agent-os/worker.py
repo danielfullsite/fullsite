@@ -23,8 +23,8 @@ from shared import (
 )
 
 CLAUDE_BIN       = '/usr/local/bin/claude'
-MAX_BUDGET_USD   = 3.0
-WORKER_TIMEOUT_S = 570    # slightly under supervisor's 600s
+MAX_BUDGET_USD   = 5.0
+WORKER_TIMEOUT_S = 1740   # slightly under supervisor's 1800s active-time cap
 
 SAFETY_CONSTRAINTS = """
 SAFETY CONSTRAINTS (non-negotiable — violations cause immediate FAIL verdict):

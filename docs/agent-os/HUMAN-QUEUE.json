@@ -1,0 +1,25 @@
+{
+  "REL-OFFLINE-FIELD": {
+    "gate_id": "REL-OFFLINE-FIELD",
+    "title": "Certificación física offline OCS-P2.5.9 en AMALAY",
+    "location": "AMALAY",
+    "why": "Único gate que valida offline real en hardware real; bloquea GO-LIVE Client #2",
+    "gate_blocked": "REL-OFFLINE-FIELD",
+    "actionable_now": true,
+    "estimated_time": "90 min",
+    "preparation_completed": "Field Package v2 canónico (v1.3.4), THURSDAY-RUNBOOK.md, OFFLINE-TEST-MATRIX.md, FIELD-KIT scripts listos",
+    "do_exactly": [
+      "Lleva laptop + USB con FULLSITE-FIELD-KIT (docs/agent-os/field/)",
+      "Sigue docs/agent-os/field/THURSDAY-RUNBOOK.md paso a paso",
+      "Ejecuta cada escenario de OFFLINE-TEST-MATRIX.md y anota PASS/FAIL",
+      "Ante un FAIL: detén el caso, captura evidencia (RUN-CERT-CAPTURE.cmd) y continúa con el siguiente escenario independiente"
+    ],
+    "expected_result": "Matriz completa con PASS/FAIL por escenario + capturas",
+    "return_evidence": "Fotos de tickets, archivo de captura del FIELD-KIT, matriz marcada",
+    "safe_failure": "ROLLBACK.ps1 del FIELD-KIT restaura el estado previo; el POS de AMALAY sigue en su versión actual si no instalas",
+    "status": "PENDING",
+    "created_at": "2026-08-08T21:59:03Z",
+    "done_at": null,
+    "evidence": null
+  }
+}

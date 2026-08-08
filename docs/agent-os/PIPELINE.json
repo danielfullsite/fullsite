@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-08T21:59:18Z",
+  "active_target": "CLIENT_2_READY",
+  "targets": {
+    "CLIENT_2_READY": {
+      "title": "Client #2 puede ser provisionado, entrenado y operar desde Día 0 sin que Daniel escriba código",
+      "target_date": "2026-08-22",
+      "source_contract": "docs/agent-os/FULLSITE-READINESS-CONTRACT.md (R2) — reconciliado 2026-08-08",
+      "gates": {
+        "SEC-BUG019": {
+          "title": "BUG-019 — Tenant isolation a nivel DB (consolidación de seguridad)",
+          "domain": "security-multitenant",
+          "status": "RUNNING",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": "EXTERNAL:bug-019-session",
+          "execution_class": "AUTO_TECH",
+          "cert_level": "STAGING",
+          "evidence_required": "Batch certifications en branch bug-019/security-consolidation; BATCH A CERTIFIED commit 41eebde",
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:30:00Z",
+              "note": "BATCH A CERTIFIED (public table token on pos_mesas, commit 41eebde); resto en curso por owner externo",
+              "commit": "41eebde"
+            }
+          ],
+          "requires_human": false,
+          "notes": "Dominio LOCKED por sesión externa. El Agent Company NO toca este branch. El lock se libera cuando el owner cierre.",
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "SEC-ADV-ISO": {
+          "title": "Test adversarial de tenant isolation PASS en staging (R2-G01)",
+          "domain": "security-multitenant",
+          "status": "BACKLOG",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "SEC-BUG019"
+          ],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "STAGING",
+          "evidence_required": "isolation_test adversarial: tenant A no puede leer/escribir datos de tenant B por ninguna superficie pública; test ejecutable en CI",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "SEC-RLS-PROD": {
+          "title": "Activación de RLS estricta en producción",
+          "domain": "production",
+          "status": "BACKLOG",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "SEC-ADV-ISO"
+          ],
+          "owner": "FOUNDER",
+          "execution_class": "PRODUCTION_APPROVAL",
+          "cert_level": "PRODUCTION",
+          "evidence_required": "Plan de activación + rollback READY + certificación staging PASS + aprobación explícita de Daniel",
+          "evidence": [],
+          "requires_human": true,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "REL-OFFLINE-FIELD": {
+          "title": "Certificación física offline OCS-P2.5.9 en AMALAY (R1-G02)",
+          "domain": "offline-runtime",
+          "status": "BLOCKED_HUMAN",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": "FOUNDER",
+          "execution_class": "HUMAN_PHYSICAL",
+          "location": "AMALAY",
+          "cert_level": "PHYSICAL",
+          "evidence_required": "OFFLINE-TEST-MATRIX ejecutada en hardware físico; evidencia por escenario (fotos, tickets, logs). Software prep ya completo (Field Package v2, THURSDAY-RUNBOOK).",
+          "evidence": [],
+          "requires_human": true,
+          "notes": "Release congelado — solo certificación, cero cambios de código offline.",
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "REL-INSTALLER": {
+          "title": "Windows installer v1.3.4 build verificado (GHA) + preflight en hardware",
+          "domain": "offline-runtime",
+          "status": "BLOCKED_DECISION",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": "FOUNDER",
+          "execution_class": "FOUNDER_DECISION",
+          "cert_level": "PHYSICAL",
+          "evidence_required": "Push autorizado por Founder → GHA build green → SHA-256 registrado → preflight físico (ver TSK-BUILD-01)",
+          "evidence": [],
+          "requires_human": true,
+          "updated_at": "2026-08-08T21:59:05Z",
+          "last_note": "Decision D-003 created"
+        },
+        "REL-PRINT-EXACTLY-ONCE": {
+          "title": "Print exactly-once — BUG-015 cerrado (retrying auto-reintenta en caliente)",
+          "domain": "offline-runtime",
+          "status": "PASS",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "IMPLEMENTATION",
+          "evidence_required": "BUG-015 fix + tests deterministas",
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:30:00Z",
+              "commit": "64e859a",
+              "note": "fix(BUG-015) v1.3.4 — IMPLEMENTATION CERTIFIED; certificación PHYSICAL pendiente vía REL-OFFLINE-FIELD"
+            }
+          ],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "OPS-W1-TRUTH-CHAIN": {
+          "title": "Wave 1 — Cadena de verdad de inventario (depleción, ledger, business date)",
+          "domain": "ops-truth",
+          "status": "RUNNING",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": "EXTERNAL:wave1-session",
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "Batches W1-A..E aplicados y verificados en branch wave1/inventory-truth",
+          "evidence": [],
+          "requires_human": false,
+          "notes": "Dominio LOCKED por sesión externa (wave1/inventory-truth).",
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-MANIFEST": {
+          "title": "manifest.json con schema estricto + validación en CI (R2-G03)",
+          "domain": "clonability",
+          "status": "RUNNING",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "JSON Schema estricto para el manifest de cliente + validador ejecutable + test que rechaza manifests inválidos",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T21:59:18Z",
+          "last_note": "task TSK-010 is IN_PROGRESS"
+        },
+        "CLON-IMPORTS": {
+          "title": "menu_import + staff_import ejecutados y verificados contra tenant sandbox (R2-G05)",
+          "domain": "clonability",
+          "status": "READY",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "STAGING",
+          "evidence_required": "Import idempotente con validación y reporte de errores; test con datos sintéticos (no AMALAY)",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-HARDCODES": {
+          "title": "Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)",
+          "domain": "clonability",
+          "status": "READY",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "check_hardcodes ejecutable en CI; HARDCODE-ISSUES-REGISTRY reconciliado; P0/P1 en cero",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-ONBOARD": {
+          "title": "Onboarding automatizado <20 min sin pasos manuales (R2-G02)",
+          "domain": "clonability",
+          "status": "BACKLOG",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "CLON-MANIFEST",
+            "CLON-IMPORTS"
+          ],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "STAGING",
+          "evidence_required": "provision run end-to-end contra tenant sandbox, tiempo medido, cero intervención manual (lecciones vantara aplicadas)",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-TERMINALS": {
+          "title": "POS, KDS e impresora configurables desde manifest (R2-G04)",
+          "domain": "clonability",
+          "status": "BACKLOG",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "CLON-MANIFEST"
+          ],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "Terminales provisionables desde manifest sin edición de código; test de config",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-SMOKE": {
+          "title": "Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
+          "domain": "clonability",
+          "status": "BACKLOG",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "CLON-ONBOARD"
+          ],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "STAGING",
+          "evidence_required": "smoke_test.py PASS contra tenant recién provisionado; flows críticos POS cubiertos",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-RUNBOOK": {
+          "title": "Runbook de instalación ejecutable por Eduardo sin Daniel (R2-G07)",
+          "domain": "clonability",
+          "status": "BACKLOG",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "CLON-ONBOARD"
+          ],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "Runbook paso a paso validado contra el flujo real de provisioning; sin conocimiento técnico asumido",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-INV05-CI": {
+          "title": "INV-05 gate en CI — bloquea accesos directos no anotados a Supabase (R2-G10)",
+          "domain": "clonability",
+          "status": "PASS",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "CI gate activo",
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:30:00Z",
+              "note": "ACTIVE según FULLSITE-READINESS-CONTRACT v1.0 (R2-G10)"
+            }
+          ],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "CLON-SHADOW-DAY": {
+          "title": "Shadow Day Client #2 — protocolo + cliente identificado (R2-G08)",
+          "domain": "field",
+          "status": "BLOCKED_DECISION",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "CLON-ONBOARD",
+            "CLON-RUNBOOK"
+          ],
+          "owner": "FOUNDER",
+          "execution_class": "FOUNDER_DECISION",
+          "cert_level": "PHYSICAL",
+          "evidence_required": "Cliente #2 identificado por Daniel + Shadow Day ejecutado con evidencia",
+          "evidence": [],
+          "requires_human": true,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "OBS-HEALTH": {
+          "title": "Monitoreo crítico por cliente: /health completo + heartbeat + alerta",
+          "domain": "observability-release",
+          "status": "RUNNING",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "Health/heartbeat por terminal + señal accionable cuando un cliente está caído; tests",
+          "evidence": [],
+          "requires_human": false,
+          "updated_at": "2026-08-08T21:59:18Z",
+          "last_note": "task TSK-011 is IN_PROGRESS"
+        },
+        "REL-ROLLBACK": {
+          "title": "Rollback runbook ejecutable por Eduardo (R1-G08)",
+          "domain": "observability-release",
+          "status": "PASS",
+          "priority": "P1",
+          "criticality": "REQUIRED",
+          "dependencies": [],
+          "owner": null,
+          "execution_class": "AUTO_TECH",
+          "cert_level": "SOFTWARE",
+          "evidence_required": "Runbook existe (ROLLBACK.ps1 + docs field kit)",
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:30:00Z",
+              "note": "EXISTS según contrato R1-G08; ROLLBACK.ps1 en FULLSITE-FIELD-KIT"
+            }
+          ],
+          "requires_human": false,
+          "updated_at": "2026-08-08T22:30:00Z"
+        },
+        "GO-LIVE-CLIENT2": {
+          "title": "GO-LIVE Client #2 — aprobación final de producción",
+          "domain": "production",
+          "status": "BACKLOG",
+          "priority": "P0",
+          "criticality": "REQUIRED",
+          "dependencies": [
+            "SEC-RLS-PROD",
+            "REL-OFFLINE-FIELD",
+            "REL-INSTALLER",
+            "OPS-W1-TRUTH-CHAIN",
+            "CLON-SMOKE",
+            "CLON-RUNBOOK",
+            "CLON-HARDCODES",
+            "CLON-TERMINALS",
+            "CLON-SHADOW-DAY",
+            "OBS-HEALTH",
+            "REL-ROLLBACK",
+            "REL-PRINT-EXACTLY-ONCE",
+            "CLON-INV05-CI"
+          ],
+          "owner": "FOUNDER",
+          "execution_class": "PRODUCTION_APPROVAL",
+          "cert_level": "PRODUCTION",
+          "evidence_required": "Todos los gates REQUIRED en PASS + rollback READY + aprobación explícita de Daniel",
+          "evidence": [],
+          "requires_human": true,
+          "updated_at": "2026-08-08T22:30:00Z"
+        }
+      }
+    }
+  }
+}

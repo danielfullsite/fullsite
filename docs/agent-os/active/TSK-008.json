@@ -1,0 +1,55 @@
+{
+  "id": "TSK-008",
+  "title": "DEMO-DASHBOARD-KPI — KPI row, watermark DEMO, chart 90 días",
+  "objective": "Conectar el dashboard al cliente demo en staging: fila demo_kpis en tiempo real, chart de 90 días desde demo_sales_history, y watermark DEMO visible en header. Sin tocar datos AMALAY.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P2",
+  "status": "DRAFT",
+  "tags": ["demo", "dashboard", "kpi", "watermark"],
+  "dod": [
+    "Fila demo_kpis en staging con todos los campos de wansoft_kpis, source=SIMULATED, actualizada por activity_generator en modo live",
+    "Dashboard en modo demo lee de supabase-fullsite-staging con client_slug='demo'",
+    "Banner/watermark 'DEMO — DATOS SIMULADOS' visible en header cuando NEXT_PUBLIC_CLIENT_SLUG=demo",
+    "Chart de 90 días renderiza con datos de demo_sales_history sin error",
+    "test_demo_dashboard_isolation.py: assert que 0 queries tocan tablas AMALAY cuando NEXT_PUBLIC_CLIENT_SLUG=demo",
+    "Sin cambios al dashboard para clientes no-demo (feature flag por env var)"
+  ],
+  "dependencies": ["TSK-007"],
+  "constraints": [
+    "Feature flag por NEXT_PUBLIC_CLIENT_SLUG=demo — no afecta AMALAY dashboard",
+    "No cambiar configuración de producción de Vercel",
+    "Watermark debe ser visualmente prominente (no un tooltip oculto)",
+    "No inventar que impresora física funcionó"
+  ],
+  "files_allowed": [
+    "dashboard-app/src/",
+    "dashboard-app/.env.demo",
+    "scripts/demo/"
+  ],
+  "files_forbidden": [
+    "electron-app/",
+    "docs/agent-os/field/FULLSITE-DIAGNOSTIC/",
+    ".env",
+    ".env.local"
+  ],
+  "budget_tokens": 100000,
+  "max_turns": 20,
+  "max_retries": 2,
+  "retry_count": 0,
+  "notes": "Phase 3. El watermark es no-negociable para la demo — sin él, un prospecto podría confundir datos simulados con datos reales de AMALAY. El banner debe ser el primer elemento visible en el layout.",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-05T01:21:41Z",
+  "updated_at": "2026-08-05T01:21:41Z",
+  "history": [
+    {
+      "from": null,
+      "to": "DRAFT",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-05T01:21:41Z",
+      "note": "Epic DEMO ENVIRONMENT v0 — Phase 3. Bloqueada por TSK-007."
+    }
+  ]
+}
