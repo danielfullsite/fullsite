@@ -64,7 +64,9 @@ interface ResumenMensual {
   ventasNetas: number
   ivaTrasladadoMes: number
   costoVentas: number
-  costoVentasEstimado?: boolean
+  /** W1-E: true si hay eventos de costo con cobertura desconocida/parcial —
+   *  el margen mostrado es parcial, no verdad completa. */
+  cogsParcial?: boolean
   margenBruto: number
   margenPct: number
   entradasInventario: number
@@ -242,12 +244,12 @@ export default function ContabilidadPage() {
           index={1}
         />
         <KPICard
-          label={resumenMes?.costoVentasEstimado ? 'Costo de Ventas (est.)' : 'Costo de Ventas'}
+          label={resumenMes?.cogsParcial ? 'Costo de Ventas (parcial)' : 'Costo de Ventas'}
           value={resumenMes ? formatCurrency(resumenMes.costoVentas) : '--'}
           icon={Calculator}
           accentClass="kpi-accent-pink"
           index={2}
-          subtitle={resumenMes ? `${resumenMes.margenPct.toFixed(1)}% margen${resumenMes.costoVentasEstimado ? ' · estimado 35%' : ''}` : ''}
+          subtitle={resumenMes ? `${resumenMes.margenPct.toFixed(1)}% margen${resumenMes.cogsParcial ? ' · cobertura parcial' : ''}` : ''}
         />
         <KPICard
           label="Margen Bruto"
@@ -420,8 +422,8 @@ export default function ContabilidadPage() {
                   { label: 'Ventas Brutas', value: resumenMes.ventasBrutas, color: 'text-[var(--text-1)]' },
                   { label: 'IVA Trasladado', value: -resumenMes.ivaTrasladadoMes, color: 'text-amber-400' },
                   { label: 'Ventas Netas', value: resumenMes.ventasNetas, color: 'text-blue-400', bold: true },
-                  { label: resumenMes.costoVentasEstimado ? 'Costo de Ventas (est. 35%)' : 'Costo de Ventas', value: -resumenMes.costoVentas, color: 'text-pink-400' },
-                  { label: resumenMes.costoVentasEstimado ? 'Margen Bruto (est.)' : 'Margen Bruto', value: resumenMes.margenBruto, color: 'text-emerald-400', bold: true },
+                  { label: resumenMes.cogsParcial ? 'Costo de Ventas (parcial)' : 'Costo de Ventas', value: -resumenMes.costoVentas, color: 'text-pink-400' },
+                  { label: resumenMes.cogsParcial ? 'Margen Bruto (parcial)' : 'Margen Bruto', value: resumenMes.margenBruto, color: 'text-emerald-400', bold: true },
                   { label: 'Merma/Desperdicios', value: -resumenMes.merma, color: 'text-red-400' },
                   { label: 'Compras (entradas)', value: resumenMes.entradasInventario, color: 'text-cyan-400' },
                 ].map((row, i) => (

@@ -255,23 +255,33 @@ export async function GET(request: NextRequest) {
     // ───────────────────────────────────────────────
     // PÓLIZA 2: COSTO DE VENTAS (COGS)
     // ───────────────────────────────────────────────
+    // W1-E: el COGS histórico sale EXCLUSIVAMENTE de pos_cost_events — el
+    // reconocimiento inmutable sellado en el momento canónico del consumo
+    // (r1_reconcile_item), con receta pinneada y costo weighted-average de
+    // ESE instante. Nunca se recalcula con precios/recetas actuales, nunca
+    // se usa items[].recipe_cost (campo de navegador, no confiable) y nunca
+    // se fabrica un 35% estimado como si fuera real. Cobertura explícita:
+    // eventos UNKNOWN/PARTIAL se reportan — un margen parcial se marca parcial.
+    let cogsCoverage: { events: number; full: number; partial: number; unknown: number; reversal: number } = {
+      events: 0, full: 0, partial: 0, unknown: 0, reversal: 0,
+    }
     {
       let totalCOGS = 0
 
-      if (orders.length > 0) {
-        for (const order of orders) {
-          const items = order.items || []
-          for (const item of items) {
-            totalCOGS += (item.recipe_cost || 0) * (item.quantity || 1)
-          }
+      const costEventsRes = await fetch(
+        `${SB_URL}/rest/v1/pos_cost_events?client_id=eq.${cid}&${rangeFilter}&select=total_cost,cost_coverage&limit=10000`,
+        OPTS
+      )
+      if (costEventsRes.ok) {
+        const events: { total_cost: number | null; cost_coverage: string }[] = await costEventsRes.json()
+        for (const ev of events) {
+          cogsCoverage.events++
+          if (ev.cost_coverage === 'FULL') cogsCoverage.full++
+          else if (ev.cost_coverage === 'PARTIAL') cogsCoverage.partial++
+          else if (ev.cost_coverage === 'UNKNOWN') cogsCoverage.unknown++
+          else if (ev.cost_coverage === 'REVERSAL') cogsCoverage.reversal++
+          if (ev.total_cost != null) totalCOGS += Number(ev.total_cost)
         }
-        // If no recipe costs, estimate from food cost ratio (35%)
-        if (totalCOGS === 0) {
-          const totalSales = orders.reduce((s, o) => s + (o.subtotal || o.total || 0), 0)
-          totalCOGS = totalSales * 0.35
-        }
-      } else if (wansoftDay) {
-        totalCOGS = (wansoftDay.ventas_dia || 0) * 0.35
       }
 
       if (totalCOGS > 0) {
@@ -437,6 +447,11 @@ export async function GET(request: NextRequest) {
         balanceado: Math.abs(totalDebe - totalHaber) < 0.01,
         ordenesPOS: orders.length,
         movimientosInventario: allMovements.length,
+        // W1-E: procedencia y cobertura del COGS — si hay eventos UNKNOWN o
+        // PARTIAL, el margen del día es PARCIAL y se declara como tal.
+        cogsSource: 'pos_cost_events',
+        cogsCoverage: cogsCoverage,
+        cogsParcial: cogsCoverage.unknown > 0 || cogsCoverage.partial > 0,
       },
     }
 
@@ -505,6 +520,25 @@ async function getResumenMensual(mes: string, formato: string, clientId: string,
   let costoVentas = 0
   const byPayment = new Map<string, number>()
 
+  // W1-E: el COGS mensual sale de pos_cost_events (reconocimiento inmutable),
+  // nunca de items[].recipe_cost (navegador) ni de un 35% presentado como real.
+  let costEventCount = 0
+  let costUnknownCount = 0
+  {
+    const ceRes = await fetch(
+      `${SB_URL}/rest/v1/pos_cost_events?client_id=eq.${cid}&${rangeFilter}&select=total_cost,cost_coverage&limit=50000`,
+      OPTS
+    )
+    if (ceRes.ok) {
+      const events: { total_cost: number | null; cost_coverage: string }[] = await ceRes.json()
+      for (const ev of events) {
+        costEventCount++
+        if (ev.cost_coverage === 'UNKNOWN' || ev.cost_coverage === 'PARTIAL') costUnknownCount++
+        if (ev.total_cost != null) costoVentas += Number(ev.total_cost)
+      }
+    }
+  }
+
   if (orders.length > 0) {
     for (const o of orders) {
       ventasBrutas += (o.total || 0)
@@ -512,15 +546,11 @@ async function getResumenMensual(mes: string, formato: string, clientId: string,
       totalIVA += (o.tax || 0)
       const method = mapPaymentLabel(o.payment_method || 'efectivo')
       byPayment.set(method, (byPayment.get(method) || 0) + (o.total || 0))
-      for (const item of (o.items || [])) {
-        costoVentas += (item.recipe_cost || 0) * (item.quantity || 1)
-      }
     }
     if (totalIVA === 0) {
       totalIVA = ventasBrutas - (ventasBrutas / 1.16)
       ventasNetas = ventasBrutas / 1.16
     }
-    if (costoVentas === 0) costoVentas = ventasNetas * 0.35
   } else {
     for (const day of wansoftDays) {
       ventasBrutas += (day.ventas_brutas || day.ventas_dia || 0)
@@ -531,7 +561,6 @@ async function getResumenMensual(mes: string, formato: string, clientId: string,
     }
     totalIVA = ventasNetas - (ventasNetas / 1.16)
     ventasNetas = ventasNetas / 1.16
-    costoVentas = ventasNetas * 0.35
   }
 
   const totalEntradas = movements
@@ -542,11 +571,11 @@ async function getResumenMensual(mes: string, formato: string, clientId: string,
     .filter(m => m.type === 'merma' || m.type === 'waste' || m.type === 'adjustment')
     .reduce((s, m) => s + Math.abs(m.total_cost || (m.quantity * m.cost_per_unit) || 0), 0)
 
+  // W1-E: el margen solo se calcula donde la cobertura lo permite; si hay
+  // eventos sin costo conocido (o cero eventos con ventas), es PARCIAL.
+  const cogsParcial = costUnknownCount > 0 || (costEventCount === 0 && ventasNetas > 0)
   const margenBruto = ventasNetas - costoVentas
   const margenPct = ventasNetas > 0 ? (margenBruto / ventasNetas) * 100 : 0
-
-  // Track whether costo de ventas is estimated or from real recipe costs
-  const costoVentasReal = orders.length > 0 && orders.some(o => (o.items || []).some(item => (item.recipe_cost || 0) > 0))
 
   const resumen = {
     mes,
@@ -554,7 +583,9 @@ async function getResumenMensual(mes: string, formato: string, clientId: string,
     ventasNetas: round2(ventasNetas),
     ivaTrasladadoMes: round2(totalIVA),
     costoVentas: round2(costoVentas),
-    costoVentasEstimado: !costoVentasReal,
+    cogsSource: 'pos_cost_events',
+    cogsEventos: costEventCount,
+    cogsParcial,
     margenBruto: round2(margenBruto),
     margenPct: round2(margenPct),
     entradasInventario: round2(totalEntradas),
