@@ -463,11 +463,26 @@ def step_client_create(ctx, dry_run):
     t0   = time.time()
     m    = ctx["manifest"]
     tmpl = TEMPLATES[m["template"]]
+    # W1-D onboarding gate: un tenant production-ready DEBE tener semántica de
+    # día operativo explícita. Sin business_day_start_local en el manifest, el
+    # onboarding FALLA (no se hereda un default silencioso — el corte del día
+    # es una decisión del restaurante, no de Fullsite).
+    if not m.get("business_day_start_local"):
+        return _contract("client_create", t0, errors=[
+            "manifest sin business_day_start_local — requerido para Client #2+ "
+            "(ej. '04:00:00'). El día operativo debe ser configuración explícita del tenant."
+        ])
+    if not m.get("timezone"):
+        return _contract("client_create", t0, errors=[
+            "manifest sin timezone — requerido (IANA, ej. 'America/Monterrey')."
+        ])
+
     st   = _upsert(ctx["rest"], "clients", {
         "id":             m["client_id"],
         "display_name":   m["name"],
         "city":           m.get("city", "Monterrey"),
-        "timezone":       m.get("timezone", "America/Monterrey"),
+        "timezone":       m["timezone"],
+        "business_day_start_local": m["business_day_start_local"],
         "data_source":    "fullsite",
         "active":         True,
         "default_theme":  "dark",
@@ -720,9 +735,17 @@ def step_smoke_check(ctx, dry_run):
         s, r = _get(f"{rest}/{table}?{flt}&select=id", sh)
         return len(r) if s == 200 and isinstance(r, list) else 0
 
+    def field_set(table, flt, field):
+        s, r = _get(f"{rest}/{table}?{flt}&select={field}", sh)
+        return s == 200 and isinstance(r, list) and len(r) == 1 and bool(r[0].get(field))
+
     enc = urllib.parse.quote(cid)
     checks = [
         ("clients row existe",      count("clients",            f"id=eq.{enc}") == 1),
+        # W1-D: semántica de día operativo obligatoria para tenants nuevos
+        ("timezone configurada",    field_set("clients", f"id=eq.{enc}", "timezone")),
+        ("business_day_start_local configurado",
+                                    field_set("clients", f"id=eq.{enc}", "business_day_start_local")),
         ("menu_categories ≥ 1",     count("pos_menu_categories",f"client_id=eq.{enc}") >= 1),
         ("menu_items ≥ 1",          count("pos_menu_items",     f"client_id=eq.{enc}") >= 1),
         ("payment_methods ≥ 1",     count("pos_payment_methods",f"client_id=eq.{enc}&active=eq.true") >= 1),
