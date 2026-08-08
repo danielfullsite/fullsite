@@ -25,11 +25,29 @@ export interface PrintJob {
   createdAt: string
   lastAttempt: string | null
   error: string | null
+  // BUG-019-E: print-intent identity. comanda_batch_id + reprint_seq make a comanda
+  // job's identity semantic (order/station/batch/reprint) rather than timestamp-random,
+  // so reload/retry/reconnect/replay regenerate the SAME job.id (idempotent cloud upsert).
+  comanda_batch_id?: string | null
+  reprint_seq?: number
   meta?: {
     mesa?: number
     mesero?: string
     orderId?: string
   }
+}
+
+// BUG-019-E: deterministic id for a canonical comanda print intent. order_id and
+// comanda_batch_id are UUIDs (opaque, not sensitive) so the exact tuple is used —
+// collision-free by construction, unlike a hash. reprint_seq differs for reprints,
+// yielding a distinct id. Non-comanda / batch-less jobs keep timestamp ids.
+export function comandaJobId(orderId: string, station: string, comandaBatchId: string, reprintSeq: number): string {
+  return `pjc-${orderId}-${station}-${comandaBatchId}-${reprintSeq}`
+}
+
+// BUG-019-E: next reprint sequence for an existing (order,station,batch) — pure helper.
+export function nextReprintSeq(existingSeqs: number[]): number {
+  return existingSeqs.length === 0 ? 1 : Math.max(...existingSeqs) + 1
 }
 
 const STORAGE_KEY = 'pos_print_queue'
@@ -112,9 +130,21 @@ export async function recoverFromIDB(): Promise<void> {
 
 export function enqueue(job: Omit<PrintJob, 'id' | 'status' | 'retries' | 'maxRetries' | 'createdAt' | 'lastAttempt' | 'error'>): PrintJob {
   const queue = loadQueue()
+  // BUG-019-E: canonical comanda intents get a deterministic id; a re-enqueue of the
+  // same intent (reload/retry/replay) collapses onto the same row instead of creating
+  // a duplicate. If that intent is already queued locally, return the existing job.
+  const canonical = job.type === 'comanda' && job.meta?.orderId && job.comanda_batch_id
+  const id = canonical
+    ? comandaJobId(job.meta!.orderId!, job.station, job.comanda_batch_id!, job.reprint_seq ?? 0)
+    : `pj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  if (canonical) {
+    const existing = queue.find(j => j.id === id)
+    if (existing) { console.log(`[print-queue] Idempotent comanda intent, reusing ${id}`); return existing }
+  }
   const newJob: PrintJob = {
     ...job,
-    id: `pj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id,
+    reprint_seq: job.reprint_seq ?? 0,
     status: 'pending',
     retries: 0,
     maxRetries: MAX_RETRIES,
@@ -206,7 +236,7 @@ async function syncJobToCloud(job: PrintJob) {
     const sbKey = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined
     if (!sbUrl || !sbKey) return
 
-    await fetch(`${sbUrl}/rest/v1/pos_print_jobs`, {
+    const res = await fetch(`${sbUrl}/rest/v1/pos_print_jobs`, {
       method: 'POST',
       headers: {
         apikey: sbKey,
@@ -222,12 +252,18 @@ async function syncJobToCloud(job: PrintJob) {
         status: job.status,
         retries: job.retries,
         error: job.error,
+        // BUG-019-E: carry the intent identity so DB uniqueness is the final boundary.
+        comanda_batch_id: job.comanda_batch_id ?? null,
+        reprint_seq: job.reprint_seq ?? 0,
         meta: job.meta || null,
         created_at: job.createdAt,
         printed_at: job.status === 'printed' ? job.lastAttempt : null,
         updated_at: new Date().toISOString(),
       }),
     })
+    // BUG-019-E: a 409 means the canonical print intent already exists (another writer
+    // won the race). That is idempotent SUCCESS, not an operational failure.
+    if (res.status === 409) console.log(`[print-queue] Print intent already exists (idempotent) ${job.id}`)
   } catch {
     console.warn(`[print-queue] Cloud sync failed for ${job.id}`)
   }
@@ -427,10 +463,30 @@ export function enqueueFailedPrint(
   station: string,
   type: PrintJob['type'],
   meta?: PrintJob['meta'],
+  // BUG-019-E: for comanda jobs, the intent identity. reprintSeq defaults to 0
+  // (automatic send); technical retries reuse the same values → same job id.
+  comandaBatchId?: string | null,
+  reprintSeq: number = 0,
 ) {
   const data = typeof btoa !== 'undefined'
     ? btoa(String.fromCharCode(...bytes))
     : Buffer.from(bytes).toString('base64')
 
-  return enqueue({ station, data, type, meta })
+  return enqueue({ station, data, type, meta, comanda_batch_id: comandaBatchId ?? null, reprint_seq: reprintSeq })
+}
+
+// BUG-019-E: underlying audited operator reprint of a comanda. Produces a NEW row
+// with reprint_seq = previous max + 1 (distinct deterministic id), so it prints again
+// intentionally without violating the automatic-send uniqueness. Visible UX is
+// deferred; call sites should emit an audit event (action: 'comanda_reprinted').
+export function enqueueComandaReprint(
+  bytes: Uint8Array,
+  station: string,
+  orderId: string,
+  comandaBatchId: string,
+  existingReprintSeqs: number[],
+  meta?: PrintJob['meta'],
+): PrintJob {
+  const seq = nextReprintSeq(existingReprintSeqs)
+  return enqueueFailedPrint(bytes, station, 'comanda', { ...meta, orderId }, comandaBatchId, seq)
 }

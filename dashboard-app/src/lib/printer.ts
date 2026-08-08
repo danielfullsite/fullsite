@@ -1583,7 +1583,10 @@ export async function printByStation(order: Order): Promise<{ printed: boolean; 
     // Don't start retry loop here — it runs from layout mount to avoid
     // race conditions with page navigation (window.location.href kills pending writes)
     console.warn(`[printer] ${station}: no bridge, no BT — comanda NOT printed`)
-    enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda', { mesa: order.mesa, mesero: order.mesero, orderId: order.id })
+    // BUG-019-E: stamp the print intent with the send's comanda_batch_id (all items of
+    // one send share it) so retries/reload/replay collapse to one row per (order,station,batch).
+    const comandaBatchId = items.find(i => i.comanda_batch_id)?.comanda_batch_id ?? null
+    enqueueFailedPrint(buildStationTicketBytes(order, station, items, COLS_BRIDGE), station, 'comanda', { mesa: order.mesa, mesero: order.mesero, orderId: order.id }, comandaBatchId)
     failedStations.push(station)
   }
 
