@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Search, Save, Trash2, Plus, Loader2, PackageX, ChevronDown, AlertTriangle, RotateCcw, Clock, DollarSign } from 'lucide-react'
-import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getActiveClientSlug } from '@/lib/data'
+import { recordMovement, loadInventoryWithStock, makeIdempotencyKey } from '@/lib/inventory'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost } from '@/lib/supabase-helpers'
@@ -161,21 +162,20 @@ export default function DevolucionesPage() {
           )
         }
 
-        // Load inventory
+        // W1-B: catálogo canónico (pos_ingredients + pos_inventory), como merma.
+        // El snapshot Wansoft (inventory_parsed) usaba códigos que no son
+        // ingredient_id — por eso las devoluciones nunca llegaban al ledger.
         promises.push(
-          getWansoftDataLatest('inventory_parsed').then(invResult => {
-            if (invResult?.data) {
-              const raw = Array.isArray(invResult.data) ? invResult.data : (invResult.data as any)?.items || []
-              setInventoryItems(raw.map((r: any) => ({
-                almacen: r.almacen || '',
-                codigo: r.codigo || '',
-                producto: r.producto || '',
-                departamento: r.departamento || '',
-                inv_final_qty: Number(r.inv_final_qty) || 0,
-                inv_final_val: Number(r.inv_final_val) || 0,
-                costo_promedio: Number(r.costo_promedio) || 0,
-              })))
-            }
+          loadInventoryWithStock(getActiveClientSlug()).then(invRows => {
+            setInventoryItems(invRows.map(r => ({
+              almacen: '',
+              codigo: r.ingredient_id,
+              producto: r.name,
+              departamento: r.category || 'Sin categoría',
+              inv_final_qty: r.stock,
+              inv_final_val: r.stock * r.cost_per_unit,
+              costo_promedio: r.cost_per_unit,
+            })))
           })
         )
 
@@ -325,10 +325,32 @@ export default function DevolucionesPage() {
 
     try {
       const clientId = getActiveClientSlug()
+
+      // W1-B: la devolución a proveedor SALE del stock por el ledger canónico
+      // (movement_type 'return', cantidades negativas, idempotente). El blob
+      // wansoft_data se conserva como respaldo histórico con detalle de proveedor.
+      const idempotencyKey = makeIdempotencyKey('return', 'dashboard', new Date().toISOString(), selectedSupplier.id)
+      const movResult = await recordMovement({
+        client_id: clientId,
+        movement_type: 'return',
+        actor: 'dashboard',
+        idempotency_key: idempotencyKey,
+        metadata: { supplier_id: selectedSupplier.id, supplier_name: selectedSupplier.name },
+        lines: items.map(i => ({
+          ingredient_id: i.codigo,
+          quantity: -Math.abs(i.cantidad),
+          notes: `Devolución a ${selectedSupplier.name}: ${i.motivo}${i.referencia ? ` (ref ${i.referencia})` : ''}`,
+        })),
+      })
+      if (!movResult.success && !movResult.was_duplicate) {
+        setSaveMessage({ type: 'error', text: `Error en ledger: ${movResult.errors.join('; ')}` })
+        return
+      }
+
       const ok = await sbPost('wansoft_data', clientId, {
         data_key: `inventory_return_${nowKey()}`,
         fecha: todayISO(),
-        data: payload,
+        data: { ...payload, idempotency_key: idempotencyKey, ledger: 'pos_inventory_movements' },
       })
       if (ok) {
         setSaveMessage({ type: 'success', text: `Devolucion registrada: ${items.length} productos por ${formatCurrency(grandTotal)}` })

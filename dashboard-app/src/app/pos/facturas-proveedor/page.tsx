@@ -6,6 +6,7 @@ import { getIngredients } from '@/lib/pos-data'
 import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { recordMovement, makeIdempotencyKey } from '@/lib/inventory'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -109,48 +110,24 @@ export default function FacturasProveedorPage() {
         }),
       })
 
-      // Update ingredient costs if price changed
-      for (const item of items) {
-        if (Math.abs(item.variance_pct) > 0.1) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${item.ingredient_id}&client_id=eq.${_cid()}`, {
-            method: 'PATCH',
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify({ cost_per_unit: item.unit_price }),
-          })
-        }
-      }
-
-      // Add inventory (restock)
-      for (const item of items) {
-        await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            client_id: _cid(),
-            ingredient_id: item.ingredient_id,
-            movement_type: 'restock',
-            quantity: item.quantity,
-            actor: 'almacén',
-            notes: `Factura ${numFactura || today} — ${proveedor}`,
-          }),
-        })
-
-        // Update stock
-        const invRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${item.ingredient_id}&select=id,stock`,
-          { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-        )
-        if (invRes.ok) {
-          const rows = await invRes.json()
-          if (rows.length > 0) {
-            const newStock = Number(rows[0].stock || 0) + item.quantity
-            await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${rows[0].id}`, {
-              method: 'PATCH',
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-              body: JSON.stringify({ stock: newStock }),
-            })
-          }
-        }
+      // W1-B: captura de factura vía recordMovement — ledger idempotente +
+      // stock + costo por PROMEDIO PONDERADO en un solo camino canónico.
+      // El PATCH directo de cost_per_unit al precio de factura fue eliminado.
+      const movResult = await recordMovement({
+        client_id: _cid(),
+        movement_type: 'restock',
+        actor: 'almacén',
+        idempotency_key: makeIdempotencyKey('restock', 'almacen', new Date().toISOString(), numFactura || proveedor),
+        metadata: { supplier: proveedor, folio: numFactura || null },
+        lines: items.map(item => ({
+          ingredient_id: item.ingredient_id,
+          quantity: item.quantity,
+          unit_cost: item.unit_price,
+          notes: `Factura ${numFactura || today} — ${proveedor}`,
+        })),
+      })
+      if (!movResult.success && !movResult.was_duplicate) {
+        throw new Error(`Ledger: ${movResult.errors.join('; ')}`)
       }
 
       setSaved(true)

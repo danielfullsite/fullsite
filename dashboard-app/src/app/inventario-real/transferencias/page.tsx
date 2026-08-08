@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Search, Trash2, Save, ArrowRight, Loader2, PackageCheck, Plus, Clock } from 'lucide-react'
-import { getWansoftDataLatest, getActiveClientSlug } from '@/lib/data'
+import { getActiveClientSlug } from '@/lib/data'
 import { formatCurrency } from '@/lib/format'
 import PageHeader from '@/components/PageHeader'
 import { sbPost, sbGet } from '@/lib/supabase-helpers'
+import { recordTransfer, loadInventoryWithStock } from '@/lib/inventory'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -108,19 +109,19 @@ export default function TransferenciasPage() {
   useEffect(() => {
     async function load() {
       try {
-        const result = await getWansoftDataLatest('inventory_parsed')
-        if (result?.data) {
-          const parsed = deepParse(result.data)
-          const arr = Array.isArray(parsed) ? parsed : []
-          setInventory(arr.map((item: any) => ({
-            almacen: item.almacen || '',
-            codigo: item.codigo || '',
-            producto: item.producto || '',
-            departamento: item.departamento || '',
-            inv_final_qty: parseFloat(item.inv_final_qty) || 0,
-            costo_promedio: parseFloat(item.costo_promedio) || 0,
-          })))
-        }
+        // W1-B: catálogo canónico (pos_ingredients + pos_inventory), mismo patrón
+        // que merma. Antes se usaba el snapshot Wansoft (inventory_parsed), cuyo
+        // `codigo` no es ingredient_id — por eso las transferencias nunca
+        // llegaban al ledger.
+        const invRows = await loadInventoryWithStock(getActiveClientSlug())
+        setInventory(invRows.map(r => ({
+          almacen: '',
+          codigo: r.ingredient_id,
+          producto: r.name,
+          departamento: r.category || 'Sin categoría',
+          inv_final_qty: r.stock,
+          costo_promedio: r.cost_per_unit,
+        })))
       } catch (err) {
         console.error('[Transferencias] Error loading inventory:', err)
       } finally {
@@ -249,10 +250,30 @@ export default function TransferenciasPage() {
 
     try {
       const clientId = getActiveClientSlug()
+
+      // W1-B: las dos piernas van al ledger canónico (transfer_out + transfer_in,
+      // idempotentes por pierna). El blob wansoft_data se conserva como metadata
+      // histórica de almacenes (el modelo canónico es single-bucket).
+      // Key base del par; recordTransfer deriva `${key}_out` / `${key}_in`.
+      const idempotencyKey = `transfer_dashboard_${new Date().toISOString()}_${source}-${destination}`.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const transfer = await recordTransfer({
+        client_id: clientId,
+        source_warehouse: source,
+        destination_warehouse: destination,
+        lines: items.map(i => ({ ingredient_id: i.codigo, quantity: i.cantidad })),
+        actor: 'dashboard',
+        idempotency_key: idempotencyKey,
+      })
+      if (!transfer.success) {
+        console.error('[Transferencias] Ledger error:', transfer.errors)
+        setSaveResult('error')
+        return
+      }
+
       const ok = await sbPost('wansoft_data', clientId, {
         data_key: `inventory_transfer_${nowKey()}`,
         fecha: todayStr(),
-        data: payload,
+        data: { ...payload, idempotency_key: idempotencyKey, ledger: 'pos_inventory_movements' },
       })
       setSaveResult(ok ? 'ok' : 'error')
       if (ok) {
