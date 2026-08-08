@@ -20,7 +20,8 @@
 --   - anon SIN acceso a tablas/views/funciones tenant. El navegador usa el JWT
 --     de sesión (authenticated). Las escrituras del kiosko van por endpoints
 --     server (service_role, bypassa RLS, resuelve tenant con withPOSAuth).
---   - Menú público (QR) vía RPC SECURITY DEFINER get_public_menu().
+--   - Menú público (QR) server-side vía /api/public/menu (service_role, token de
+--     mesa) — SIN RPC anon (BUG-019-B). Cero superficie anon en DB.
 --
 -- IDEMPOTENTE. Transaccional. DINÁMICO (se adapta a las tablas que existan).
 -- ============================================================================
@@ -105,19 +106,21 @@ begin
   end loop;
 end $$;
 
--- ── 5. Funciones SECURITY DEFINER: anon SOLO puede ejecutar get_public_menu ────
---    El resto (r1_save_order, r1_merge_orders, r1_reconcile_*, r1_adjust_market_
---    stock, r1_legacy_sale_deduction, auth_client_id, rls_auto_enable, etc.)
---    bypassan RLS (SECURITY DEFINER) y varias toman client_id como parámetro →
---    anon podía escribir/leer datos de cualquier tenant vía RPC directo. Se
---    revoca EXECUTE a public+anon y se concede solo a authenticated+service_role.
+-- ── 5. Funciones SECURITY DEFINER: NINGUNA ejecutable por anon ─────────────────
+--    r1_save_order, r1_merge_orders, r1_reconcile_*, r1_adjust_market_stock,
+--    r1_legacy_sale_deduction, auth_client_id, rls_auto_enable, etc. bypassan RLS
+--    (SECURITY DEFINER) y varias toman client_id como parámetro → anon podía
+--    escribir/leer datos de cualquier tenant vía RPC directo. Se revoca EXECUTE a
+--    public+anon y se concede solo a authenticated+service_role. Sin excepciones:
+--    el menú público ya NO se sirve por RPC anon (BUG-019-B lo sirve server-side
+--    con service_role; no existe función de menú ejecutable por anon).
 do $$
 declare r record;
 begin
   for r in
     select p.proname, pg_get_function_identity_arguments(p.oid) as args
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace and n.nspname='public'
-    where p.prosecdef and p.proname <> 'get_public_menu'
+    where p.prosecdef
       and has_function_privilege('anon', p.oid, 'execute')
   loop
     execute format('revoke execute on function public.%I(%s) from public, anon', r.proname, r.args);
@@ -125,18 +128,14 @@ begin
   end loop;
 end $$;
 
--- ── 6. Menú público (QR, sin login) — RPC SECURITY DEFINER, único acceso anon ─
-create or replace function public.get_public_menu(p_client_id text)
-returns table (category_id text, category_name text, category_sort int, item_id text, item_name text, item_price numeric, item_active boolean)
-language sql stable security definer set search_path to 'public' as $$
-  select c.id::text, c.name, coalesce(c.sort_order,0), i.id::text, i.name, i.price, coalesce(i.active, true)
-  from public.pos_menu_categories c
-  join public.pos_menu_items i on i.category_id = c.id and i.client_id = c.client_id
-  where c.client_id = p_client_id and coalesce(c.active,true)
-  order by coalesce(c.sort_order,0), i.name
-$$;
-revoke all on function public.get_public_menu(text) from public;
-grant execute on function public.get_public_menu(text) to anon, authenticated;
+-- ── 6. Menú público (QR, sin login) — SIN RPC anon ────────────────────────────
+--    BUG-019-B: el menú público se sirve exclusivamente server-side vía
+--    /api/public/menu (service_role, tenant resuelto por token de mesa). NO se
+--    crea get_public_menu ni ninguna función de menú ejecutable por anon: la
+--    superficie anon en DB queda en cero. Si get_public_menu existía de un ensayo
+--    previo (p.ej. staging), la sección 5 ya le revocó EXECUTE a anon; aquí se
+--    elimina para no dejar SECURITY DEFINER muerto.
+drop function if exists public.get_public_menu(text);
 
 drop function private._drop_all_policies(text);
 
