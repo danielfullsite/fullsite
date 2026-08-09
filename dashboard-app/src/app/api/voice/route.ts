@@ -51,6 +51,12 @@ export async function POST(request: NextRequest) {
     const sbKey = process.env.SUPABASE_SERVICE_KEY
     if (!sbKey) return new Response('server misconfigured', { status: 503 })
 
+    // BUG-019: wansoft_daily/wansoft_waiter_categories are AMALAY-legacy tables WITHOUT a
+    // client_id column. Only the configured legacy owner may read them; every other tenant
+    // fails closed (empty), so no one sees another tenant's aggregate sales. (Serving other
+    // tenants from pos_orders is a separate feature decision.)
+    const canWansoft = auth.clientId === (process.env.WANSOFT_LEGACY_CLIENT_ID || 'amalay')
+
     const q = message.toLowerCase()
 
     // 1. Recent daily data — OPTIMIZED: 14 days default, 90 for history questions
@@ -61,11 +67,11 @@ export async function POST(request: NextRequest) {
     const selectCols = wantsDetail
       ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
       : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
-    const dailyRes = await fetch(
+    const dailyRes = canWansoft ? await fetch(
       `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-    )
-    const recentDays = dailyRes.ok ? await dailyRes.json() : []
+    ) : null
+    const recentDays = dailyRes?.ok ? await dailyRes.json() : []
 
     // 2. Detect date from question
     const now = new Date()
@@ -139,13 +145,13 @@ export async function POST(request: NextRequest) {
       wcParams += '&limit=7'
     }
 
-    const wcRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
+    const wcRes = canWansoft ? await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
       cache: 'no-store',
-    })
-    const waiterRows: Array<{ fecha: string; data: unknown }> = wcRes.ok ? await wcRes.json() : []
+    }) : null
+    const waiterRows: Array<{ fecha: string; data: unknown }> = wcRes?.ok ? await wcRes.json() : []
 
-    if (waiterRows.length === 0 && dateFilter) {
+    if (canWansoft && waiterRows.length === 0 && dateFilter) {
       const fallbackRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=1`, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
         cache: 'no-store',

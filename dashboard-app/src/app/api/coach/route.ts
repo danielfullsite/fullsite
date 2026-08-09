@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
     if (!auth) return unauthorized()
     const clientId = auth.clientId
 
+    // BUG-019: coach reads only AMALAY-legacy wansoft_daily (no client_id). Only the
+    // configured legacy owner may read it — every other tenant gets no insights (fail
+    // closed), so no one receives another tenant's aggregate sales.
+    if (clientId !== (process.env.WANSOFT_LEGACY_CLIENT_ID || 'amalay')) {
+      return Response.json({ insights: [] }, { status: 200 })
+    }
+
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
       return Response.json({ insights: [] }, { status: 200 })
     }
