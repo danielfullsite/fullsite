@@ -4,24 +4,41 @@ Production activation requires explicit founder approval. This is the package to
 gate; nothing here has been run against production.
 
 ## Migration / policy set
-- `docs/release/BUG-019-tenant-rls-fix.sql` — dynamic, idempotent, transactional. For every
-  base table with `client_id` (except client_users/clients): `revoke all from anon` + 4
-  authenticated policies scoped by `private.user_has_client_access(client_id)` + a
-  service_role bypass policy. All views: anon revoked, security_invoker=true. All SECURITY
-  DEFINER functions: anon EXECUTE revoked (no exceptions — `get_public_menu` dropped, menu is
-  server-side now). client_users/clients: anon revoked, tenant-scoped.
-- Rollback: `docs/release/BUG-019-ROLLBACK.sql` (restores permissive state; rehearsed
-  fix→rollback→reapply on staging). Pre-deploy snapshot: `docs/release/rollback-snapshots/`.
+- `docs/release/BUG-019-tenant-rls-fix.sql` — dynamic, idempotent, transactional.
+  - **§1** every base table with `client_id` (except client_users/clients): `revoke all from
+    anon` + 4 authenticated policies scoped by `private.user_has_client_access(client_id)` +
+    service_role bypass.
+  - **Views:** anon revoked, security_invoker=true. **SECDEF functions:** anon EXECUTE revoked
+    (no exceptions — `get_public_menu` dropped, menu is server-side). client_users/clients: anon
+    revoked, tenant-scoped.
+  - **§7a** legacy tables with NO `client_id` and no parent (`wansoft_daily`, `wansoft_kpis`,
+    `amalay_reservaciones`): revoke anon; authenticated read-only + service_role. (`wansoft_*`
+    additionally behind the voice/coach ownership gate.)
+  - **§7b** CHILD tables with NO `client_id` — tenant-scoped via the real parent relation:
+    `pos_purchase_order_items.order_id → pos_purchase_orders.id` and
+    `pos_sub_recipe_ingredients.sub_recipe_id → pos_sub_recipes.id` (parents carry `client_id`;
+    no formal FK in schema → link column verified). SELECT/INSERT/UPDATE/DELETE policies with
+    `USING`+`WITH CHECK` = `exists(select 1 from parent p where p.id=child.<fk> and
+    user_has_client_access(p.client_id))`. Prevents cross-tenant read, insert-under, update,
+    delete AND move. Revoke anon; service_role bypass.
+- **Rollback (SECURE): `docs/release/BUG-019-ROLLBACK.sql`** — emergency revert of strict tenant
+  isolation to permissive-**authenticated** so the app recovers, but **anon stays revoked and NO
+  insecure public/anon policy is restored** (wansoft/PII/child/pos_staff stay closed). Recover the
+  secure state by re-applying the migration. Pre-deploy snapshot: `docs/release/rollback-snapshots/`.
 
 ## Deployment order (must be exact)
-1. Deploy the app build from this branch (JWT fetch-patch + service-key server routes + the
-   server-mediated public surfaces A/B/C/F/G). App works while RLS is still permissive.
-2. Smoke: POS / KDS / dashboard / printing / public menu+order+survey+reservation.
-3. Apply `BUG-019-tenant-rls-fix.sql` to prod.
-4. Two-tenant isolation checks on prod (see evidence).
-5. Post-RLS smoke (service_role + background agents keep working).
-6. Rollback trigger: any 401/403 on a legitimate path or broken public flow →
-   `BUG-019-ROLLBACK.sql` + revert app; snapshot available.
+1. **Env:** set `WANSOFT_LEGACY_CLIENT_ID=amalay` and `SUPABASE_SERVICE_KEY` in the prod app
+   env. (No fallback: without `WANSOFT_LEGACY_CLIENT_ID`, voice/coach deny ALL tenants — fail
+   closed by design.)
+2. Deploy the app build from this branch (JWT fetch-patch + service-key/authenticated server
+   routes + server-mediated public surfaces A/B/C/F/G). App works while RLS is still permissive.
+3. Smoke: POS / KDS / dashboard / printing / public menu+order+survey+reservation; voice/coach
+   for AMALAY (allowed) and a non-AMALAY tenant (expect 403 feature_unavailable, no data).
+4. Apply `BUG-019-tenant-rls-fix.sql` to prod.
+5. Two-tenant isolation checks on prod incl. child tables (see evidence).
+6. Post-RLS smoke (service_role + background agents keep working).
+7. Rollback trigger: any 401/403 on a legitimate path or broken public flow →
+   `BUG-019-ROLLBACK.sql` (secure: does NOT re-open anon) + revert app; snapshot available.
 
 ## Compatibility evidence
 - **Public/anonymous surfaces:** fully server-mediated, zero anon DB, zero browser tenant
@@ -37,39 +54,42 @@ gate; nothing here has been run against production.
   `withPOSAuth` and use the server-resolved `auth.clientId`. `api/voice`/`api/coach` also went
   from anonymous → authenticated + service key. A regression test
   (`bug019-no-browser-tenant.test.ts`) blocks reintroduction of `getClientId` in any route.
-- **Private non-client_id tables (D, migration section 7):** permissive `public`/`anon` read
-  policies on `wansoft_daily`/`wansoft_kpis` (AMALAY financials), `amalay_reservaciones`
-  (customer PII), `pos_purchase_order_items`, `pos_sub_recipe_ingredients` exposed private data
-  to anonymous. Section 7 revokes anon (authenticated + service_role only). `content`/`reviews`
-  left public (marketing site). Child tables lack `client_id` → authenticated-only (see residual).
+- **Private non-client_id tables (D, migration §7):** permissive `public`/`anon` read policies
+  exposed private data to anonymous. §7a revokes anon on `wansoft_daily`/`wansoft_kpis` (AMALAY
+  financials) + `amalay_reservaciones` (customer PII) → authenticated + service_role. §7b makes
+  the CHILD tables (`pos_purchase_order_items`, `pos_sub_recipe_ingredients`) **tenant-scoped via
+  the parent** (SELECT/INSERT/UPDATE/DELETE with USING+WITH CHECK) — cross-tenant read/insert/
+  update/delete/move blocked (certified below). `content`/`reviews` left public (marketing site).
 - **`lib/client-config.ts`:** `clients` read now prefers service key server-side (survives RLS),
   anon fallback client-side (JWT-patched); service key never ships to the client bundle.
 
-## Two-tenant isolation evidence
-Synthetic reproduction of Supabase's role model (anon/authenticated/service_role + auth.uid())
-applying the EXACT migration policy pattern to `pos_orders`. 7/7:
-A reads only A; A cannot INSERT/UPDATE/DELETE B; A full CRUD on own; B symmetric; anon SELECT
-& INSERT denied (revoked); service_role full (server-scoped by code). Harness:
-scratchpad `bug019_cert/iso_{prelude,cert}.sql`. Staging already runs the strict migration
-(read-only confirmation available).
+## Two-tenant isolation evidence (SYNTHETIC POLICY ISOLATION)
+Synthetic reproduction of Supabase's role model (anon/authenticated/service_role + `auth.uid()`)
+applying the EXACT migration policy DDL. Not production-live certification.
+- **Parent/`client_id` tables (7/7)** — pattern on `pos_orders`: A reads only A; A cannot
+  INSERT/UPDATE/DELETE B; A full CRUD on own; B symmetric; anon SELECT & INSERT denied;
+  service_role full. Harness `bug019_cert/iso_{prelude,cert}.sql`.
+- **Child parent-join tables (9/9)** — EXACT §7b policies on
+  `pos_purchase_orders`→`pos_purchase_order_items`: A reads/writes own child; **B cannot read A's
+  child; B cannot INSERT a child under A's parent (WITH CHECK); B cannot UPDATE/DELETE A's child
+  (0 rows); B cannot MOVE its child under A's parent**; A unaffected; anon denied; service_role
+  full. Harness `bug019_cert/iso_child_{prelude,cert}.sql`.
+Staging already runs the strict migration (read-only complementary evidence).
 
 ## Residual risks
-1. **RESOLVED — explicit ownership gate (commit c602f29):** `api/voice` + `api/coach` read
-   `wansoft_daily`/`wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (921 rows;
-   multiple tenants already live: amalay/coffee-shop/nomada/sushi-zen/demo). Per the approved product
-   decision, voice/coach are DISABLED for any non-owner tenant. Ownership gate (`lib/wansoft-owner.ts`):
-   requires (1) valid `withPOSAuth`, (2) server-resolved `auth.clientId`, (3) exact match to the owner
-   tenant (`WANSOFT_LEGACY_CLIENT_ID`, default `amalay`), (5) default deny. It does NOT use
-   `data_source` (a second `data_source='wansoft'` tenant is still denied) or any browser value, and
-   runs BEFORE the service-role key/query. Non-owner → `403 feature_unavailable`, no data. No-auth →
-   401. **Set `WANSOFT_LEGACY_CLIENT_ID=amalay` in prod env.** UI should hide voice/coach for non-owner
-   tenants (UX defense-in-depth, not the security control — the 403 is). Migrating voice/coach to
-   tenant-scoped `pos_orders` is deferred, separate product work (non-blocking).
-2. Child tables without `client_id` (`pos_purchase_order_items`, `pos_sub_recipe_ingredients`):
-   authenticated-only after section 7, but not tenant-scoped (cross-tenant among *authenticated*
-   users). Full scoping needs a `client_id` column or a parent-join policy — deferred (low severity,
-   authenticated-only, recipe/PO line items).
-3. Non-blocking: survey opaque token (F), Bridge E2 physical dedup, floor QR badge (C).
+1. **RESOLVED — ownership gate, FAIL-CLOSED (commits c602f29 → this closure):** voice/coach read
+   `wansoft_daily`/`wansoft_waiter_categories` (AMALAY-legacy, NO `client_id`; multiple tenants live).
+   Gate (`lib/wansoft-owner.ts`): requires valid `withPOSAuth` + server-resolved `auth.clientId` +
+   **exact** match to `WANSOFT_LEGACY_CLIENT_ID` + **default deny with NO fallback** (missing/blank var →
+   deny ALL, incl. AMALAY). Not `data_source`, not any browser value. Runs BEFORE the service-role
+   key/query. Non-owner → `403 feature_unavailable`, no data, no owner/record disclosure; no-auth → 401.
+   Migrating voice/coach to tenant-scoped `pos_orders` is deferred (separate product work). UI hiding for
+   non-owner tenants is a UX task (defense-in-depth, not the control — the 403 is).
+2. **RESOLVED — child tables tenant-scoped (§7b):** `pos_purchase_order_items`,
+   `pos_sub_recipe_ingredients` now enforce tenant access via the parent (SELECT/INSERT/UPDATE/DELETE,
+   USING+WITH CHECK). Cross-tenant read/insert/update/delete/move blocked (9/9 isolation cert).
+3. Non-blocking: survey opaque token (F), Bridge E2 physical dedup, floor QR badge (C), voice/coach
+   UI hiding for non-owner tenants.
 
 ## Expected user/restaurant impact
 None for legitimate authenticated same-tenant use (POS/dashboard/public flows unchanged). Post-RLS,
