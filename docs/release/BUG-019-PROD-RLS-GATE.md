@@ -29,12 +29,21 @@ gate; nothing here has been run against production.
 - **Client-side authenticated libs** (`pos-data.ts`, `inventory.ts`, …): use anon key but the
   `supabase-fetch-patch` injects the session JWT into `/rest/v1/` calls → RLS `authenticated`
   policies apply. Compatible with a session.
-- **Server API routes:** 27 follow the ef989c3 pattern (service key for tenant tables, anon
-  only for `/auth/v1/user` validation — verified in `lib/api-auth.ts`). Residual to fix
-  before the gate: `api/voice` reads `pos_staff` (client_id table) with anon → returns 0
-  post-RLS (mesero list). `api/coach` reads `wansoft_daily` (no client_id, public policy →
-  survives) so it is unaffected. Non-client_id tables (`wansoft_daily`,
-  `wansoft_waiter_categories`) are outside the migration and keep current behavior.
+- **Server API routes (D, commit 8a71306):** deterministic sweep complete — **UNSAFE 0,
+  UNKNOWN 0**. Fixed a real cross-tenant bypass: 16 routes resolved the tenant from a
+  browser-supplied `client_id` (`getClientId` reads `x-client-id`/`?client_id=`) and queried
+  with the service key — a forged header read/wrote any tenant's recipes/presentations/
+  inventory/food-cost/accounting/invoices (no auth middleware exists). All now authenticate via
+  `withPOSAuth` and use the server-resolved `auth.clientId`. `api/voice`/`api/coach` also went
+  from anonymous → authenticated + service key. A regression test
+  (`bug019-no-browser-tenant.test.ts`) blocks reintroduction of `getClientId` in any route.
+- **Private non-client_id tables (D, migration section 7):** permissive `public`/`anon` read
+  policies on `wansoft_daily`/`wansoft_kpis` (AMALAY financials), `amalay_reservaciones`
+  (customer PII), `pos_purchase_order_items`, `pos_sub_recipe_ingredients` exposed private data
+  to anonymous. Section 7 revokes anon (authenticated + service_role only). `content`/`reviews`
+  left public (marketing site). Child tables lack `client_id` → authenticated-only (see residual).
+- **`lib/client-config.ts`:** `clients` read now prefers service key server-side (survives RLS),
+  anon fallback client-side (JWT-patched); service key never ships to the client bundle.
 
 ## Two-tenant isolation evidence
 Synthetic reproduction of Supabase's role model (anon/authenticated/service_role + auth.uid())
@@ -44,12 +53,25 @@ A reads only A; A cannot INSERT/UPDATE/DELETE B; A full CRUD on own; B symmetric
 scratchpad `bug019_cert/iso_{prelude,cert}.sql`. Staging already runs the strict migration
 (read-only confirmation available).
 
-## Residual risks / remaining before gate
-1. `api/voice` `pos_staff` read → switch to service key (client_id-filtered) [confirmed break].
-2. Full per-route sweep of the 27 service+anon routes to confirm no stray anon tenant read.
-3. `lib/client-config.ts` reads `clients` with anon — confirm it only runs client-side (JWT) or
-   switch to service key if server-invoked.
-4. Non-blocking: survey opaque token (F), Bridge E2 physical dedup, floor QR badge (C).
+## Residual risks
+1. **PRODUCT DECISION (the one open item):** `api/voice` + `api/coach` read `wansoft_daily`/
+   `wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (single-tenant Wansoft-
+   scraper data). Both now require authentication, but because the tables lack a tenant column, an
+   authenticated user of a *different* tenant would receive AMALAY's aggregate sales. Not a public
+   leak and not Client #2's own data (Client #2 is `data_source='fullsite'` → data lives in
+   `pos_orders`, tenant-scoped). Determined minimal fix available (gate voice/coach to clients with
+   `data_source='wansoft'`, using existing config, no schema change) — but the feature's multi-tenant
+   data strategy (gate vs migrate to `pos_orders`) is a product/data-model decision for Daniel.
+2. Child tables without `client_id` (`pos_purchase_order_items`, `pos_sub_recipe_ingredients`):
+   authenticated-only after section 7, but not tenant-scoped (cross-tenant among *authenticated*
+   users). Full scoping needs a `client_id` column or a parent-join policy — deferred (low severity,
+   authenticated-only, recipe/PO line items).
+3. Non-blocking: survey opaque token (F), Bridge E2 physical dedup, floor QR badge (C).
+
+## Expected user/restaurant impact
+None for legitimate authenticated same-tenant use (POS/dashboard/public flows unchanged). Post-RLS,
+anonymous callers lose all tenant DB access (intended). voice/coach now require login.
 
 ## State
-PROD untouched. STRICT PROD RLS: NOT APPLIED. Execution gated on founder approval.
+PROD untouched. STRICT PROD RLS: NOT APPLIED. Execution gated on founder approval + the one
+product decision above.
