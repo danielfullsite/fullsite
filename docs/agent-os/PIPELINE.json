@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-08-09T01:30:28Z",
+  "updated_at": "2026-08-09T04:25:28Z",
   "active_target": "CLIENT_2_READY",
   "targets": {
     "CLIENT_2_READY": {
@@ -129,18 +129,24 @@
         "OPS-W1-TRUTH-CHAIN": {
           "title": "Wave 1 — Cadena de verdad de inventario (depleción, ledger, business date)",
           "domain": "ops-truth",
-          "status": "RUNNING",
+          "status": "PASS",
           "priority": "P1",
           "criticality": "REQUIRED",
           "dependencies": [],
-          "owner": "EXTERNAL:wave1-session",
+          "owner": null,
           "execution_class": "AUTO_TECH",
           "cert_level": "SOFTWARE",
           "evidence_required": "Batches W1-A..E aplicados y verificados en branch wave1/inventory-truth",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-09T04:25:28Z",
+              "commit": "72748b2",
+              "note": "SOFTWARE CERTIFIED: W1-A..E aplicados; consumido en integration/client2-rc1 (4da2206); candidato combinado certificado con 2,251 tests. DOMAIN_HANDOFF registrado."
+            }
+          ],
           "requires_human": false,
-          "notes": "Dominio LOCKED por sesión externa (wave1/inventory-truth).",
-          "updated_at": "2026-08-08T22:30:00Z"
+          "notes": "Handoff explícito completado. wave1/inventory-truth@72748b2 = insumo certificado PROTEGIDO (no reabrir proactivamente; regresión → task aislado nuevo). Integrado en integration/client2-rc1.",
+          "updated_at": "2026-08-09T04:25:28Z"
         },
         "CLON-MANIFEST": {
           "title": "manifest.json con schema estricto + validación en CI (R2-G03)",
@@ -193,7 +199,7 @@
         "CLON-HARDCODES": {
           "title": "Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)",
           "domain": "clonability",
-          "status": "READY",
+          "status": "RUNNING",
           "priority": "P1",
           "criticality": "REQUIRED",
           "dependencies": [],
@@ -203,7 +209,8 @@
           "evidence_required": "check_hardcodes ejecutable en CI; HARDCODE-ISSUES-REGISTRY reconciliado; P0/P1 en cero",
           "evidence": [],
           "requires_human": false,
-          "updated_at": "2026-08-08T22:30:00Z"
+          "updated_at": "2026-08-09T04:21:23Z",
+          "last_note": "task TSK-015 is IN_PROGRESS"
         },
         "CLON-ONBOARD": {
           "title": "Onboarding automatizado <20 min sin pasos manuales (R2-G02)",
@@ -252,7 +259,7 @@
         "CLON-SMOKE": {
           "title": "Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
           "domain": "clonability",
-          "status": "RUNNING",
+          "status": "PASS",
           "priority": "P0",
           "criticality": "REQUIRED",
           "dependencies": [
@@ -262,10 +269,18 @@
           "execution_class": "AUTO_TECH",
           "cert_level": "STAGING",
           "evidence_required": "smoke_test.py PASS contra tenant recién provisionado; flows críticos POS cubiertos",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-09T04:20:37Z",
+              "task_id": "TSK-014",
+              "commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61",
+              "note": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provisión íntegra sin AMALAY (F1), menú con precios (F2), staff/PINs únicos (F3), métodos de pago (F4), l",
+              "cert_output": "no cert_command (task pipeline verdict is the cert)"
+            }
+          ],
           "requires_human": false,
-          "updated_at": "2026-08-09T01:29:12Z",
-          "last_note": "task TSK-014 is IN_PROGRESS"
+          "updated_at": "2026-08-09T04:20:37Z",
+          "last_note": "cert ok: no cert_command (task pipeline verdict is the cert)"
         },
         "CLON-RUNBOOK": {
           "title": "Runbook de instalación ejecutable por Eduardo sin Daniel (R2-G07)",
@@ -307,12 +322,13 @@
         "CLON-SHADOW-DAY": {
           "title": "Shadow Day Client #2 — protocolo + cliente identificado (R2-G08)",
           "domain": "field",
-          "status": "BLOCKED_DECISION",
+          "status": "BACKLOG",
           "priority": "P1",
           "criticality": "REQUIRED",
           "dependencies": [
             "CLON-ONBOARD",
-            "CLON-RUNBOOK"
+            "CLON-RUNBOOK",
+            "CLIENT2-IDENTIFIED"
           ],
           "owner": "FOUNDER",
           "execution_class": "FOUNDER_DECISION",
@@ -320,7 +336,8 @@
           "evidence_required": "Cliente #2 identificado por Daniel + Shadow Day ejecutado con evidencia",
           "evidence": [],
           "requires_human": true,
-          "updated_at": "2026-08-08T22:30:00Z"
+          "updated_at": "2026-08-09T04:25:28Z",
+          "notes": "CLIENT2-IDENTIFIED es dependencia-marcador (gate inexistente a propósito → deps_met=False → WAITING_DEPENDENCY). Regla founder: si Daniel no puede actuar AHORA, no entra a su cola. Se promueve a decisión solo cuando exista cliente/contexto concreto."
         },
         "OBS-HEALTH": {
           "title": "Monitoreo crítico por cliente: /health completo + heartbeat + alerta",

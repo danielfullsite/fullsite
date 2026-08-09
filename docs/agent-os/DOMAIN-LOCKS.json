@@ -7,14 +7,6 @@
     "locked_at": "2026-08-08T22:30:00Z",
     "note": "BUG-019 tiene owner externo activo (worktrees fullsite-bug019*). No asignar writers. Liberar solo cuando el owner cierre."
   },
-  "ops-truth": {
-    "owner": "EXTERNAL:wave1-session",
-    "kind": "EXTERNAL",
-    "task_id": null,
-    "branch": "wave1/inventory-truth",
-    "locked_at": "2026-08-08T22:30:00Z",
-    "note": "Wave 1 inventory truth-chain con owner externo activo (fullsite-wave1)."
-  },
   "offline-runtime": {
     "owner": "FROZEN:release/offline-field-2026-08-06",
     "kind": "FROZEN",
@@ -32,11 +24,11 @@
     "note": "Toda mutación de producción requiere PRODUCTION_APPROVAL explícita de Daniel. Autonomía de prod: DISABLED."
   },
   "clonability": {
-    "owner": "AGENT:TSK-014",
+    "owner": "AGENT:TSK-015",
     "kind": "AGENT",
-    "task_id": "TSK-014",
-    "branch": "agent-os/TSK-014",
-    "locked_at": "2026-08-09T01:29:01Z",
+    "task_id": "TSK-015",
+    "branch": "agent-os/TSK-015",
+    "locked_at": "2026-08-09T04:21:12Z",
     "note": ""
   }
 }

@@ -162,13 +162,24 @@
   },
   "TSK-014": {
     "title": "CLON-SMOKE — Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
-    "status": "IN_PROGRESS",
+    "status": "CLOSED",
     "role": "RUNTIME_ENGINEER",
     "priority": "P0",
     "tags": [
       "gate:CLON-SMOKE",
       "clonability"
     ],
-    "updated_at": "2026-08-09T01:29:02Z"
+    "updated_at": "2026-08-09T04:20:37Z"
+  },
+  "TSK-015": {
+    "title": "CLON-HARDCODES — Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)",
+    "status": "IN_PROGRESS",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "gate:CLON-HARDCODES",
+      "clonability"
+    ],
+    "updated_at": "2026-08-09T04:21:13Z"
   }
 }

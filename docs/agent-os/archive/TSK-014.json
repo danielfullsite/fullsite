@@ -1,0 +1,114 @@
+{
+  "id": "TSK-014",
+  "execution_class": "AUTO_TECH",
+  "gate_id": "CLON-SMOKE",
+  "domain": "clonability",
+  "title": "CLON-SMOKE — Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
+  "objective": "smoke_test.py PASS contra tenant recién provisionado; flows críticos POS cubiertos\n\nGATE: CLON-SMOKE · dominio: clonability · cert level objetivo: STAGING\nContexto: este task implementa un gate del pipeline CLIENT_2_READY. Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P0",
+  "status": "CLOSED",
+  "tags": [
+    "gate:CLON-SMOKE",
+    "clonability"
+  ],
+  "dod": [
+    "smoke_test.py PASS contra tenant recién provisionado; flows críticos POS cubiertos",
+    "Tests deterministas incluidos y en verde",
+    "Commit en el branch del task (nunca push, nunca merge manual)"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-09T01:29:01Z",
+  "updated_at": "2026-08-09T04:20:37Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-09T01:29:01Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T01:29:02Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T01:29:02Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "READY",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T02:31:19Z",
+      "note": "Recovered: stuck IN_PROGRESS for 62m, no active worker"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T02:31:20Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T02:31:20Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T03:09:40Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T03:09:47Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-09T04:20:19Z",
+      "note": "Leí smoke_test.py (376 líneas), test_clon_smoke.py (285 líneas), diff de fake_supabase.py (+pos_orders/pos_turnos) y contract.py en worktree limpio de agent-os/TSK-014 @ 4398473. Flows F1-F7 implementados de verdad (turno→orden→cobro→cierre→aislamiento→cleanup en finally), guardas AMALAY/SANDBOX_ENV"
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T04:20:37Z",
+      "note": "Pipeline complete. Merge commit: daee66975c1c566cb90f2a69fd404c8c4536ac61"
+    }
+  ],
+  "branch": "agent-os/TSK-014",
+  "worktree_path": "/tmp/fullsite-worker-TSK-014",
+  "closed_at": "2026-08-09T04:20:37Z",
+  "merge_commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61",
+  "close_evidence": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provisión íntegra sin AMALAY (F1), menú con precios (F2), staff/PINs únicos (F3), métodos de pago (F4), login real del dueño vía GoTrue (F5), flow completo turno→orden con items reales→cobro→cierre→totales persistidos→aislamiento (F6) y cleanup sin rastro con --keep opcional (F7); guardas SANDBOX_ENV/AMA",
+  "gate_updated": [
+    "gate:CLON-SMOKE",
+    "clonability"
+  ]
+}

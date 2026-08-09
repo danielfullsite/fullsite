@@ -350,3 +350,63 @@
 {"ts": "2026-08-09T01:32:59Z", "type": "HUMAN_TASK_CREATED", "gate_id": "TELEGRAM-CHANNEL", "location": "Remoto — tu teléfono (5 min)"}
 {"ts": "2026-08-09T01:32:59Z", "type": "CRITICAL_CHANNEL_DOWN", "channel": "telegram", "cause": "401 token revoked", "since": "unknown", "mitigation": "founder task queued"}
 {"ts": "2026-08-09T01:40:52Z", "type": "TELEGRAM_OPTIONAL_DISABLED", "by": "FOUNDER", "note": "Mission Control es la interfaz canónica"}
+{"ts": "2026-08-09T02:02:45Z", "type": "WAKE_DETECTED", "slept_s": 912, "workers": []}
+{"ts": "2026-08-09T02:09:10Z", "type": "WAKE_DETECTED", "slept_s": 354, "workers": []}
+{"ts": "2026-08-09T02:18:15Z", "type": "WAKE_DETECTED", "slept_s": 352, "workers": []}
+{"ts": "2026-08-09T02:31:19Z", "type": "WAKE_DETECTED", "slept_s": 184, "workers": []}
+{"ts": "2026-08-09T02:31:19Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "IN_PROGRESS", "to": "READY", "by": "SUPERVISOR", "note": "Recovered: stuck IN_PROGRESS for 62m, no active worker"}
+{"ts": "2026-08-09T02:31:19Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-014", "path": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T02:31:19Z", "type": "TASK_RECOVERED", "task_id": "TSK-014", "from": "IN_PROGRESS", "age_min": 62.28775268333333}
+{"ts": "2026-08-09T02:31:19Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "RUNNING", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "task TSK-014 is READY"}
+{"ts": "2026-08-09T02:31:20Z", "type": "WORKTREE_CREATED", "task_id": "TSK-014", "branch": "agent-os/TSK-014", "path": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T02:31:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-014", "phase": "engineer", "pid": 90210}
+{"ts": "2026-08-09T02:31:20Z", "type": "WORKER_STARTED", "task_id": "TSK-014", "phase": "engineer", "pid": 90210}
+{"ts": "2026-08-09T02:31:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-09T02:31:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-09T02:31:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-014", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T02:31:30Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-014 is IN_PROGRESS"}
+{"ts": "2026-08-09T02:37:56Z", "type": "WAKE_DETECTED", "slept_s": 224, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T02:43:19Z", "type": "WAKE_DETECTED", "slept_s": 172, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T02:46:40Z", "type": "WAKE_DETECTED", "slept_s": 171, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T02:53:26Z", "type": "WAKE_DETECTED", "slept_s": 345, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T02:57:59Z", "type": "WAKE_DETECTED", "slept_s": 124, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T03:09:17Z", "type": "WAKE_DETECTED", "slept_s": 648, "workers": ["TSK-014"]}
+{"ts": "2026-08-09T03:09:40Z", "type": "CLAUDE_DONE", "task_id": "TSK-014", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-09T03:09:40Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-014", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-09T03:09:40Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-09T03:09:47Z", "type": "WORKER_DONE", "key": "TSK-014", "phase": "engineer", "pid": 90210, "rc": 0}
+{"ts": "2026-08-09T03:09:47Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-014 is SUBMITTED"}
+{"ts": "2026-08-09T03:09:47Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-09T03:09:47Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-014", "phase": "verify", "pid": 91291}
+{"ts": "2026-08-09T03:09:47Z", "type": "WORKER_STARTED", "task_id": "TSK-014", "phase": "verify", "pid": 91291}
+{"ts": "2026-08-09T03:09:47Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-014", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-09T03:45:43Z", "type": "WAKE_DETECTED", "slept_s": 2035, "workers": ["TSK-014_verify"]}
+{"ts": "2026-08-09T04:00:15Z", "type": "WAKE_DETECTED", "slept_s": 812, "workers": ["TSK-014_verify"]}
+{"ts": "2026-08-09T04:20:06Z", "type": "WAKE_DETECTED", "slept_s": 1131, "workers": ["TSK-014_verify"]}
+{"ts": "2026-08-09T04:20:19Z", "type": "CLAUDE_DONE", "task_id": "TSK-014", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-09T04:20:19Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-014", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-09T04:20:19Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Leí smoke_test.py (376 líneas), test_clon_smoke.py (285 líneas), diff de fake_supabase.py (+pos_orders/pos_turnos) y contract.py en worktree limpio de agent-os/TSK-014 @ 4398473. Flows F1-F7 implementados de verdad (turno→orden→cobro→cierre→aislamiento→cleanup en finally), guardas AMALAY/SANDBOX_ENV"}
+{"ts": "2026-08-09T04:20:36Z", "type": "WORKER_DONE", "key": "TSK-014_verify", "phase": "verify", "pid": 91291, "rc": 0}
+{"ts": "2026-08-09T04:20:37Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: daee66975c1c566cb90f2a69fd404c8c4536ac61"}
+{"ts": "2026-08-09T04:20:37Z", "type": "GATE_COMPLETED", "gate_tag": "gate:CLON-SMOKE"}
+{"ts": "2026-08-09T04:20:37Z", "type": "GATE_COMPLETED", "gate_tag": "clonability"}
+{"ts": "2026-08-09T04:20:37Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-014", "path": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T04:20:37Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "REVIEW", "to": "CERTIFYING", "by": "SUPERVISOR", "note": "Task TSK-014 merged; running deterministic cert"}
+{"ts": "2026-08-09T04:20:37Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "CERTIFYING", "to": "PASS", "by": "CERT", "note": "cert ok: no cert_command (task pipeline verdict is the cert)"}
+{"ts": "2026-08-09T04:20:37Z", "type": "TASK_CLOSED", "task_id": "TSK-014", "commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61", "gates": ["gate:CLON-SMOKE", "clonability"], "evidence": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provi"}
+{"ts": "2026-08-09T04:20:37Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-014", "commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61", "engineer_commit": "43984739fd02ef81e3898e821ee644f0112dee67", "gates": ["gate:CLON-SMOKE", "clonability"]}
+{"ts": "2026-08-09T04:21:12Z", "type": "DOMAIN_LOCK_REAPED", "domain": "clonability"}
+{"ts": "2026-08-09T04:21:12Z", "type": "TASK_CREATED", "task_id": "TSK-015", "title": "CLON-HARDCODES — Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-09T04:21:12Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "clonability", "owner": "AGENT:TSK-015", "task_id": "TSK-015", "kind": "AGENT"}
+{"ts": "2026-08-09T04:21:12Z", "type": "GATE_STATUS", "gate_id": "CLON-HARDCODES", "from": "READY", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-015 created"}
+{"ts": "2026-08-09T04:21:12Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-015", "gate": "CLON-HARDCODES", "domain": "clonability"}
+{"ts": "2026-08-09T04:21:13Z", "type": "WORKTREE_CREATED", "task_id": "TSK-015", "branch": "agent-os/TSK-015", "path": "/tmp/fullsite-worker-TSK-015"}
+{"ts": "2026-08-09T04:21:13Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-015", "phase": "engineer", "pid": 92025}
+{"ts": "2026-08-09T04:21:13Z", "type": "WORKER_STARTED", "task_id": "TSK-015", "phase": "engineer", "pid": 92025}
+{"ts": "2026-08-09T04:21:13Z", "type": "TASK_TRANSITION", "task_id": "TSK-015", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-09T04:21:13Z", "type": "TASK_TRANSITION", "task_id": "TSK-015", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-09T04:21:13Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-015", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-015"}
+{"ts": "2026-08-09T04:21:23Z", "type": "GATE_STATUS", "gate_id": "CLON-HARDCODES", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-015 is IN_PROGRESS"}
+{"ts": "2026-08-09T04:25:28Z", "type": "DOMAIN_LOCK_RELEASED", "domain": "ops-truth", "by": "FOUNDER(handoff-confirmed)", "force": true}
+{"ts": "2026-08-09T04:25:28Z", "type": "DOMAIN_HANDOFF", "domain": "ops-truth", "from": "EXTERNAL:wave1-session", "to": "AGENT_COMPANY", "input_branch": "wave1/inventory-truth", "input_commit": "72748b2", "rc_branch": "integration/client2-rc1", "tests": 2251, "note": "wave1/inventory-truth@72748b2 = insumo certificado protegido; sin más writes casuales. Regresión futura → task aislado nuevo con un owner."}
+{"ts": "2026-08-09T04:25:28Z", "type": "GATE_STATUS", "gate_id": "OPS-W1-TRUTH-CHAIN", "from": "RUNNING", "to": "PASS", "by": "FOUNDER(handoff)", "note": "Wave1 SOFTWARE certified, 2251 tests"}

@@ -71,10 +71,10 @@
   },
   "clonability": {
     "status": "CLOSED",
-    "task_id": "TSK-013",
-    "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
-    "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no",
-    "closed_at": "2026-08-09T01:28:28Z"
+    "task_id": "TSK-014",
+    "commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61",
+    "evidence": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provisión íntegra sin AMALAY (F1), menú con precios (F2), staff/PINs únicos (F3), métodos de pago (F4), l",
+    "closed_at": "2026-08-09T04:20:37Z"
   },
   "gate:OBS-HEALTH": {
     "status": "CLOSED",
@@ -103,5 +103,12 @@
     "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
     "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no",
     "closed_at": "2026-08-09T01:28:28Z"
+  },
+  "gate:CLON-SMOKE": {
+    "status": "CLOSED",
+    "task_id": "TSK-014",
+    "commit": "daee66975c1c566cb90f2a69fd404c8c4536ac61",
+    "evidence": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provisión íntegra sin AMALAY (F1), menú con precios (F2), staff/PINs únicos (F3), métodos de pago (F4), l",
+    "closed_at": "2026-08-09T04:20:37Z"
   }
 }

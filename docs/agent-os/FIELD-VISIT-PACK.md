@@ -1,6 +1,6 @@
 # FIELD VISIT PACK
 
-*Actualizado: 2026-08-09T01:46:03Z*
+*Actualizado: 2026-08-09T04:25:24Z*
 
 ## LOCATION: AMALAY
 **Tiempo total estimado:** ~120 min · **Tareas:** 2 · **Gates desbloqueados:** REL-OFFLINE-FIELD, REL-INSTALLER

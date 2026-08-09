@@ -1,0 +1,10 @@
+{
+  "task_id": "TSK-014",
+  "reviewed_by": "RUNTIME_VERIFICATION",
+  "reviewed_at": "2026-08-09T04:20:19Z",
+  "verdict": "VERIFIED",
+  "findings": [],
+  "return_to_engineer": false,
+  "return_reason": null,
+  "notes": "Leí smoke_test.py (376 líneas), test_clon_smoke.py (285 líneas), diff de fake_supabase.py (+pos_orders/pos_turnos) y contract.py en worktree limpio de agent-os/TSK-014 @ 4398473. Flows F1-F7 implementados de verdad (turno→orden→cobro→cierre→aislamiento→cleanup en finally), guardas AMALAY/SANDBOX_ENV/confirm_ref antes de cualquier escritura, sin stubs ni TODOs. Corrí las suites yo mismo: test_clon_smoke 12/12 OK (9.4s), test_clon_onboard 9/9 OK, test_clon_imports 16/16 OK = 37/37, coincide con lo reportado. Commit solo en branch local (no existe origin/agent-os/TSK-014), scope limitado a 3 archivos del gate. Sin gaps de DoD; evidencia STAGING contra sandbox real queda como next step ya declarado."
+}

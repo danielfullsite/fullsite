@@ -1,0 +1,16 @@
+{
+  "task_id": "TSK-014",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-09T03:09:40Z",
+  "verdict": "VERIFIED",
+  "summary": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provi",
+  "evidence": "Implementé el gate CLON-SMOKE (R2-G06): scripts/onboarding/smoke_test.py (nuevo, stdlib puro, contrato contract.Result) que corre contra un tenant recién provisionado y cubre flows críticos POS: provisión íntegra sin AMALAY (F1), menú con precios (F2), staff/PINs únicos (F3), métodos de pago (F4), login real del dueño vía GoTrue (F5), flow completo turno→orden con items reales→cobro→cierre→totales persistidos→aislamiento (F6) y cleanup sin rastro con --keep opcional (F7); guardas SANDBOX_ENV/AMALAY-ref/client_id/confirm_ref con cero escrituras. tests/onboarding/test_clon_smoke.py provisiona con onboard_client.py real contra FakeSupabase (extendido con pos_orders/pos_turnos) y valida PASS en tenant fresco, repetibilidad, FAILs correctos (tenant vacío, menú vaciado, fallo inyectado con cleanup) y guardas: 12/12 verde. Sin regresiones: test_clon_onboard 9/9, test_clon_imports 16/16. Commit 4398473 en agent-os/TSK-014.",
+  "commit": "43984739fd02ef81e3898e821ee644f0112dee67",
+  "tests_passed": 37,
+  "tests_total": 37,
+  "gaps_found": [],
+  "next_steps": [
+    "Ejecutar smoke_test.py contra el sandbox real (sandbox.app.fullsite.mx / proyecto Supabase sandbox) tras el próximo provision para evidencia STAGING",
+    "Integrar smoke_test.py como paso post-pipeline opcional de onboard_client.py si el gate lo pide"
+  ]
+}
