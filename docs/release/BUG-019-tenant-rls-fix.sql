@@ -137,6 +137,37 @@ end $$;
 --    elimina para no dejar SECURITY DEFINER muerto.
 drop function if exists public.get_public_menu(text);
 
+-- ── 7. Deuda permisiva histórica: tablas SIN client_id con lectura anon ────────
+--    BUG-019-CD: estas tablas base carecen de client_id (por eso la sección 1 no
+--    las tocó) pero exponían datos PRIVADos a anon vía policies `public`/`anon`:
+--    finanzas (wansoft_daily/kpis), PII de clientes (amalay_reservaciones), y
+--    operativo/IP (líneas de OC y de sub-recetas). Se revoca anon y se concede solo
+--    a authenticated/service_role. Sus consumidores ya son server-mediated
+--    (coach/voice autenticados + service_role) o dashboard autenticado (JWT).
+--    NOTA: las tablas hijas sin client_id (pos_purchase_order_items,
+--    pos_sub_recipe_ingredients) quedan authenticated-only; su scoping por tenant
+--    depende del padre — cross-tenant entre authenticated es un residual conocido
+--    (requiere client_id o policy con join al padre; fuera de scope de seguridad anon).
+--    content y reviews se dejan públicas a propósito (las lee el sitio de marketing).
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'wansoft_daily','wansoft_kpis','amalay_reservaciones',
+    'pos_purchase_order_items','pos_sub_recipe_ingredients'
+  ] loop
+    if exists (select 1 from information_schema.tables where table_schema='public' and table_name=t) then
+      -- Drop permissive anon/public read policies, revoke anon, grant authenticated+service_role.
+      perform private._drop_all_policies(t);
+      execute format('alter table public.%I enable row level security', t);
+      execute format('revoke all on public.%I from anon', t);
+      execute format('grant select on public.%I to authenticated, service_role', t);
+      execute format($p$create policy %1$I_auth_read on public.%1$I for select to authenticated using (true)$p$, t);
+      execute format($p$create policy %1$I_svc on public.%1$I for all to service_role using (true) with check (true)$p$, t);
+    end if;
+  end loop;
+end $$;
+
 drop function private._drop_all_policies(text);
 
 commit;
