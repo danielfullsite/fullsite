@@ -1,6 +1,6 @@
 # FIELD VISIT PACK
 
-*Actualizado: 2026-08-09T01:32:59Z*
+*Actualizado: 2026-08-09T01:46:03Z*
 
 ## LOCATION: AMALAY
 **Tiempo total estimado:** ~120 min · **Tareas:** 2 · **Gates desbloqueados:** REL-OFFLINE-FIELD, REL-INSTALLER
@@ -30,27 +30,6 @@
 - **Resultado esperado:** Installer v1.3.4 instalado y preflight PASS en hardware real
 - **Evidencia a regresar:** SHA-256 verificado + resultado por escenario + foto de ticket de prueba
 - **Fallback seguro:** ROLLBACK.ps1 + PRE-INSTALL-BACKUP.ps1 del FIELD-KIT restauran el estado previo
-
-Para marcar completada:
-```
-python3 scripts/agent-os/agent_company.py human-done <GATE-ID> "evidencia"
-```
-
-## LOCATION: Remoto — tu teléfono (5 min)
-**Tiempo total estimado:** ~5 min · **Tareas:** 1 · **Gates desbloqueados:** TELEGRAM-CHANNEL
-
-### 1. Restaurar canal Telegram del Agent Company (token revocado)  (`TELEGRAM-CHANNEL`)
-- **Por qué:** El bot token local devuelve 401 Unauthorized: TODAS las notificaciones del Agent OS (decisiones, field packs, blockers) están cayendo en silencio desde hace días. SSL ya corregido; solo falta token válido.
-- **Tiempo:** 5 min
-- **Preparación de agentes:** Diagnóstico completo: SSL fix aplicado (certifi); canal probado end-to-end; falla exactamente en 401
-- **Haz exactamente:**
-  1. Abre @BotFather en Telegram → /mybots → tu bot del War Room → API Token (o Revoke para rotar)
-  2. Edita ~/.agent-os.env y reemplaza el valor de TELEGRAM_BOT_TOKEN por el token vigente
-  3. Si rotaste el token: actualiza también el secret en GitHub → gh secret set TELEGRAM_BOT_TOKEN --repo danielfullsite/fullsite
-  4. Verifica: python3 -c "import sys; sys.path.insert(0,'scripts/agent-os'); from telegram_notify import notify; print(notify('WAITING_FIELD', {'completed': ['canal-test']}, dedup_ttl_s=0))" → debe imprimir True y llegarte el mensaje
-- **Resultado esperado:** Mensaje de prueba llega a tu Telegram; notify() regresa True
-- **Evidencia a regresar:** Screenshot del mensaje o confirmación verbal
-- **Fallback seguro:** Sin efecto en orquestación: mientras tanto todo sigue visible en FOUNDER-INBOX.md, FIELD-VISIT-PACK.md y agent_company.py status
 
 Para marcar completada:
 ```

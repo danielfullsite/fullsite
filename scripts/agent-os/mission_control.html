@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fullsite Mission Control</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151d; --panel2:#171b26; --border:#212736;
+    --text:#e8ebf2; --muted:#8a93a8; --dim:#5c6478;
+    --blue:#5b8cff; --green:#31d08c; --amber:#f5b843; --red:#f87171;
+    --purple:#a78bfa; --cyan:#4dd0e1;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,sans-serif;
+    padding-bottom:60px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  a{color:var(--blue)}
+
+  header{position:sticky;top:0;z-index:50;background:rgba(11,13,18,.85);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  .hrow{display:flex;align-items:center;gap:14px;padding:14px 0;flex-wrap:wrap}
+  .brand{font-weight:700;font-size:15px;letter-spacing:.4px}
+  .brand span{color:var(--muted);font-weight:500}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+    font-size:11.5px;font-weight:600;letter-spacing:.4px;border:1px solid var(--border)}
+  .dot{width:7px;height:7px;border-radius:50%}
+  .st-ACTIVE{color:var(--green)} .st-ACTIVE .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .st-PAUSED{color:var(--amber)} .st-PAUSED .dot{background:var(--amber)}
+  .st-DEGRADED{color:var(--red)} .st-DEGRADED .dot{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .spacer{flex:1}
+  button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--border);
+    background:var(--panel2);color:var(--text);padding:6px 14px;font-size:12.5px;font-weight:600}
+  button:hover{border-color:var(--blue)}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.danger{color:var(--red)}
+  button.ok{background:var(--green);border-color:var(--green);color:#06281a}
+  .meta{font-size:11px;color:var(--dim)}
+
+  .banner{margin:14px 0 0;padding:12px 16px;border-radius:var(--radius);font-weight:600;display:none}
+  .banner.deg{display:block;background:#2a1d0c;border:1px solid #6b4c14;color:var(--amber)}
+  .banner.err{display:block;background:#2a1113;border:1px solid #7a2e33;color:var(--red)}
+
+  .hero{margin-top:22px;padding:22px 24px;background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--border);border-radius:var(--radius)}
+  .hero .top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .hero h1{font-size:20px;font-weight:700}
+  .hero .date{color:var(--muted);font-size:12.5px}
+  .hero .metric-label{margin-top:16px;font-size:11px;font-weight:700;letter-spacing:1.2px;
+    color:var(--muted);text-transform:uppercase}
+  .hero .metric{display:flex;align-items:baseline;gap:10px;margin-top:2px}
+  .hero .big{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+  .hero .pct{color:var(--muted);font-size:15px}
+  .bar{height:9px;background:#0e1118;border:1px solid var(--border);border-radius:999px;
+    overflow:hidden;margin-top:12px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green));
+    border-radius:999px;transition:width .6s ease}
+  .hero .disclaimer{margin-top:8px;font-size:11px;color:var(--dim)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .card .k{font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase}
+  .card .v{font-size:24px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .card.alert .v{color:var(--amber)}
+  .card.bad .v{color:var(--red)}
+
+  section{margin-top:28px}
+  h2{font-size:12px;font-weight:700;letter-spacing:1.4px;color:var(--muted);
+    text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius)}
+
+  .noaction{padding:26px;text-align:center;color:var(--green);font-weight:700;font-size:15px}
+  .action{border-left:3px solid var(--blue);padding:16px 18px;border-bottom:1px solid var(--border)}
+  .action:last-child{border-bottom:none}
+  .action.prod{border-left-color:var(--red)}
+  .action.dec{border-left-color:var(--amber)}
+  .action .t{font-weight:700;font-size:14.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .action .sub{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .action .btns{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  .tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;letter-spacing:.5px}
+  .tag.now{background:#0d2b1e;color:var(--green);border:1px solid #1d5c40}
+  .tag.wait{background:#2a2410;color:var(--amber);border:1px solid #5c4d1d}
+
+  .fieldpack{display:none;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px}
+  .fieldpack.open{display:block}
+  .ftask{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+    padding:14px 16px;margin-bottom:12px}
+  .ftask .name{font-weight:700}
+  .ftask .row{margin-top:6px;font-size:12.5px;color:var(--muted)}
+  .ftask .row b{color:var(--text);font-weight:600}
+  .ftask ol{margin:6px 0 0 20px;font-size:12.5px}
+  .ftask li{margin-top:3px}
+  .evid{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .evid input{flex:1;min-width:200px;background:#0e1118;border:1px solid var(--border);
+    border-radius:8px;color:var(--text);padding:7px 10px;font:inherit;font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--dim);font-weight:700;padding:10px 16px;border-bottom:1px solid var(--border)}
+  td{padding:10px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+
+  .status{font-size:10.5px;font-weight:700;letter-spacing:.5px;padding:2.5px 9px;
+    border-radius:6px;white-space:nowrap;display:inline-block}
+  .s-PASS{background:#0d2b1e;color:var(--green)}
+  .s-RUNNING,.s-CLAIMED,.s-IN_PROGRESS,.s-IMPLEMENTING{background:#101d38;color:var(--blue)}
+  .s-REVIEW,.s-IN_REVIEW,.s-SUBMITTED,.s-VERIFIED,.s-CERTIFYING{background:#12203a;color:var(--cyan)}
+  .s-READY{background:#1a1f2c;color:var(--text)}
+  .s-BLOCKED_TECH,.s-FAIL,.s-BLOCKED{background:#2a1113;color:var(--red)}
+  .s-BLOCKED_HUMAN{background:#101d38;color:var(--blue)}
+  .s-BLOCKED_DECISION{background:#2a2410;color:var(--amber)}
+  .s-WAITING_DEPENDENCY,.s-BACKLOG{background:#161923;color:var(--dim)}
+  .s-DEFERRED{background:#161923;color:var(--dim);text-decoration:line-through}
+  .s-EXTERNAL{background:#231a38;color:var(--purple)}
+  .s-IDLE{background:#161923;color:var(--dim)}
+  .s-CHANGES_REQUESTED{background:#2a2410;color:var(--amber)}
+
+  .domain{padding:14px 16px;border-bottom:1px solid var(--border)}
+  .domain:last-child{border-bottom:none}
+  .domain h3{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)}
+  .gates{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px}
+  .gate{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .gate .gid{font-weight:700;font-size:12.5px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .gate .gt{color:var(--muted);font-size:12px;margin-top:3px}
+  .gate .gmeta{margin-top:6px;font-size:10.5px;color:var(--dim);display:flex;gap:10px;flex-wrap:wrap}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+
+  .lockrow .kind{font-size:10.5px;font-weight:700}
+  .k-EXTERNAL{color:var(--purple)} .k-FROZEN{color:var(--cyan)} .k-AGENT{color:var(--blue)}
+
+  .act{display:flex;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:13px}
+  .act:last-child{border-bottom:none}
+  .act .tm{color:var(--dim);font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .act.pass .ln::before{content:"✓ ";color:var(--green)}
+  .act.fail .ln::before{content:"✕ ";color:var(--red)}
+  .act.decision .ln::before{content:"◆ ";color:var(--amber)}
+  .act.target .ln::before{content:"🏁 "}
+  .act.info .ln::before{content:"· ";color:var(--dim)}
+
+  details.adv{margin-top:28px;color:var(--dim)}
+  details.adv summary{cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+  details.adv pre{margin-top:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;color:var(--muted)}
+  .relrow td:first-child{color:var(--muted);font-size:12px;white-space:nowrap}
+  .certlvl{font-size:10px;color:var(--dim);letter-spacing:.5px}
+  footer{margin-top:36px;text-align:center;font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header><div class="wrap hrow">
+  <div class="brand">FULLSITE <span>MISSION CONTROL</span></div>
+  <div id="companyPill" class="pill st-ACTIVE"><span class="dot"></span><span id="companyStatus">…</span></div>
+  <div class="spacer"></div>
+  <span id="hbMeta" class="meta"></span>
+  <button id="btnPause">Pausar</button>
+  <button id="btnResume" class="primary" style="display:none">Reanudar</button>
+</div></header>
+
+<div class="wrap">
+  <div id="degBanner" class="banner"></div>
+
+  <div class="hero">
+    <div class="top">
+      <h1 id="targetTitle">…</h1>
+      <span class="date">Target: <b id="targetName"></b> · fecha objetivo <b id="targetDate"></b></span>
+    </div>
+    <div class="metric-label">Client #2 Pipeline Gate Completion</div>
+    <div class="metric">
+      <span class="big" id="gatesBig">–/–</span>
+      <span class="pct" id="gatesPct"></span>
+      <span class="pct">gates requeridos en PASS</span>
+    </div>
+    <div class="bar"><i id="bar" style="width:0%"></i></div>
+    <div class="disclaimer">Métrica determinista de gates del pipeline — no representa completitud del producto Fullsite.</div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="k">Required Gates</div><div class="v" id="cGates">–</div></div>
+    <div class="card"><div class="k">Agentes activos</div><div class="v" id="cAgents">–</div></div>
+    <div class="card alert"><div class="k">Necesita a Daniel</div><div class="v" id="cDaniel">–</div></div>
+    <div class="card bad"><div class="k">Blockers técnicos</div><div class="v" id="cTech">–</div></div>
+    <div class="card bad"><div class="k">Aprobaciones prod</div><div class="v" id="cProd">–</div></div>
+  </div>
+
+  <section>
+    <h2>Daniel — acción requerida</h2>
+    <div class="panel" id="actions"></div>
+  </section>
+
+  <section>
+    <h2>Trabajando ahora</h2>
+    <div class="panel"><table id="working">
+      <thead><tr><th>Task</th><th>Dominio</th><th>Estado</th><th>Detalle</th><th>Hace</th></tr></thead>
+      <tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Pipeline — Client #2</h2>
+    <div class="panel" id="pipeline"></div>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>Agentes</h2>
+      <div class="panel"><table id="agents">
+        <thead><tr><th>Rol</th><th>Estado</th><th>Actividad</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section>
+      <h2>Domain locks</h2>
+      <div class="panel"><table id="locks">
+        <thead><tr><th>Dominio</th><th>Owner</th><th>Tipo</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Release</h2>
+    <div class="panel"><table id="release"><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Actividad reciente</h2>
+    <div class="panel" id="activity"></div>
+  </section>
+
+  <details class="adv"><summary>Advanced / Diagnostics</summary><pre id="diag"></pre></details>
+  <footer>Local · 127.0.0.1 · proyección de estado canónico Agent OS · Telegram: OPTIONAL_DISABLED · cero tokens</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let PAUSED = false, openPacks = new Set(), lastGood = null;
+
+function statusPill(s){ return `<span class="status s-${esc(String(s).replace(/ /g,'_'))}">${esc(s)}</span>`; }
+
+async function post(path, body){
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})});
+  const j = await r.json().catch(()=>({ok:false}));
+  if(!j.ok && j.error) alert('Error: ' + j.error);
+  refresh();
+}
+
+function renderActions(a){
+  const el = $('actions');
+  if(a.none){ el.innerHTML = '<div class="noaction">✓ NO ACTION REQUIRED</div>'; return; }
+  let h = '';
+  for(const d of (a.production||[])){
+    h += `<div class="action prod">
+      <div class="t">🔴 PRODUCTION APPROVAL — ${esc(d.objective)}</div>
+      <div class="sub"><b>Verificación:</b> ${esc(d.verification||'—')} · <b>Riesgo:</b> ${esc(d.risk||'—')} · <b>Bloquea:</b> ${esc(d.blocks)}</div>
+      <div class="sub">${esc(d.what_changed)}</div>
+      <div class="btns">
+        <button class="ok" onclick="if(confirm('¿Aprobar ${esc(d.id)}? Se registra como evento de gobernanza; el Agent Company ejecuta según los gates existentes.'))post('/api/decision',{decision_id:'${esc(d.id)}',response:'APPROVED'})">APPROVE</button>
+        <button class="danger" onclick="if(confirm('¿Rechazar ${esc(d.id)}?'))post('/api/decision',{decision_id:'${esc(d.id)}',response:'REJECTED'})">REJECT</button>
+      </div></div>`;
+  }
+  for(const d of (a.decisions||[])){
+    h += `<div class="action dec">
+      <div class="t">🟡 DECISIÓN — ${esc(d.objective)}</div>
+      <div class="sub"><b>Por qué ahora:</b> ${esc(d.why||d.what_changed||'—')}</div>
+      <div class="sub"><b>Bloquea:</b> ${esc(d.blocks)} · creada hace ${esc(d.created)}</div>
+      <div class="btns">
+        <button class="ok" onclick="post('/api/decision',{decision_id:'${esc(d.id)}',response:'APPROVED'})">APROBAR</button>
+        <button class="danger" onclick="post('/api/decision',{decision_id:'${esc(d.id)}',response:'REJECTED'})">RECHAZAR</button>
+        <button onclick="post('/api/decision',{decision_id:'${esc(d.id)}',response:'CHANGES_REQUESTED',notes:prompt('¿Qué cambios pides?')||''})">PEDIR CAMBIOS</button>
+      </div></div>`;
+  }
+  for(const p of (a.field_packs||[])){
+    const key = p.location, open = openPacks.has(key);
+    h += `<div class="action">
+      <div class="t">🔵 FIELD VISIT — ${esc(p.location)}
+        <span class="tag ${p.actionable_now?'now':'wait'}">${p.actionable_now?'ACTIONABLE NOW':'EN PREPARACIÓN'}</span></div>
+      <div class="sub">~${p.minutes} min · ${p.tasks.length} tarea(s) · desbloquea: ${esc(p.gates_unlocked.join(', '))}</div>
+      <div class="btns"><button class="primary" onclick="togglePack('${esc(key)}')">${open?'CERRAR':'ABRIR'} FIELD PACK</button></div>
+      <div class="fieldpack ${open?'open':''}">${p.tasks.map(t=>`
+        <div class="ftask">
+          <div class="name">${esc(t.title)} <span class="mono">(${esc(t.gate_id)})</span></div>
+          <div class="row"><b>Por qué:</b> ${esc(t.why)}</div>
+          <div class="row"><b>Tiempo:</b> ${esc(t.estimated_time)} · <b>Preparación:</b> ${esc(t.preparation_completed||'completa')}</div>
+          <div class="row"><b>Haz exactamente:</b></div>
+          <ol>${(t.do_exactly||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+          <div class="row"><b>Resultado esperado:</b> ${esc(t.expected_result)}</div>
+          <div class="row"><b>Evidencia a regresar:</b> ${esc(t.return_evidence)}</div>
+          <div class="row"><b>Fallback seguro:</b> ${esc(t.safe_failure)}</div>
+          <div class="evid">
+            <input id="ev-${esc(t.gate_id)}" placeholder="Evidencia (qué pasó, PASS/FAIL por escenario, referencias a fotos)…">
+            <button class="ok" onclick="submitEvidence('${esc(t.gate_id)}')">MARCAR COMPLETADA</button>
+          </div>
+        </div>`).join('')}
+      </div></div>`;
+  }
+  el.innerHTML = h;
+}
+
+function togglePack(k){ openPacks.has(k) ? openPacks.delete(k) : openPacks.add(k); render(lastGood); }
+function submitEvidence(gid){
+  const v = $('ev-'+gid).value.trim();
+  if(!v) return alert('Describe la evidencia primero.');
+  if(confirm('Registrar evidencia y marcar '+gid+' como completada?'))
+    post('/api/human-done',{gate_id:gid, evidence:v});
+}
+
+function render(s){
+  if(!s) return;
+  const c = s.company||{};
+  $('companyStatus').textContent = c.status||'?';
+  $('companyPill').className = 'pill st-' + (c.status||'DEGRADED');
+  PAUSED = c.status==='PAUSED';
+  $('btnPause').style.display = PAUSED?'none':'';
+  $('btnResume').style.display = PAUSED?'':'none';
+  $('hbMeta').textContent = `supervisor ${esc(c.supervisor_status||'?')} · hb ${esc(c.heartbeat_age||'?')} · ${new Date().toLocaleTimeString()}`;
+
+  const deg = $('degBanner');
+  if(!s.ok){ deg.className='banner err'; deg.textContent = '🔴 ESTADO ILEGIBLE — ' + (s.errors||[]).join(' · '); }
+  else if((s.errors||[]).length){ deg.className='banner deg'; deg.textContent = '🟡 DEGRADED — ' + s.errors.join(' · '); }
+  else deg.className='banner';
+  if(!s.ok) return;
+
+  const t = s.target||{};
+  $('targetTitle').textContent = t.title || t.name || '—';
+  $('targetName').textContent = t.name||'—';
+  $('targetDate').textContent = t.date||'—';
+  $('gatesBig').textContent = `${t.pass}/${t.total}`;
+  $('gatesPct').textContent = `(${t.pct}%)`;
+  $('bar').style.width = (t.pct||0)+'%';
+
+  const cd = s.cards||{};
+  $('cGates').textContent = cd.gates||'–';
+  $('cAgents').textContent = cd.active_agents??'–';
+  $('cDaniel').textContent = cd.needs_daniel??'–';
+  $('cTech').textContent = cd.tech_blockers??'–';
+  $('cProd').textContent = cd.prod_approvals??'–';
+
+  renderActions(s.actions||{none:true});
+
+  $('working').tBodies[0].innerHTML = (s.working||[]).map(w=>`<tr>
+    <td class="mono">${esc(w.task)}</td><td>${esc(w.domain||'')}</td>
+    <td>${statusPill(w.state)}</td><td>${esc(w.title)}</td><td class="meta">${esc(w.elapsed)}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="meta">Sin trabajo activo — IDLE</td></tr>';
+
+  $('pipeline').innerHTML = Object.entries(s.pipeline||{}).map(([dom,gs])=>`
+    <div class="domain"><h3>${esc(dom)}</h3><div class="gates">${gs.map(g=>`
+      <div class="gate">
+        <div class="gid"><span class="mono">${esc(g.id)}${g.required?'':' <span class="certlvl">(OPTIONAL)</span>'}</span>${statusPill(g.status)}</div>
+        <div class="gt">${esc(g.title)}</div>
+        <div class="gmeta">
+          <span class="certlvl">CERT: ${esc(g.cert_level||'—')}</span>
+          ${g.owner?`<span>owner: ${esc(g.owner)}</span>`:''}
+          ${g.deps.length?`<span>deps: ${esc(g.deps.join(', '))}</span>`:''}
+          ${g.human?'<span>👤 humano</span>':''}
+          ${g.has_evidence?'<span>📎 evidencia</span>':''}
+        </div>
+      </div>`).join('')}</div></div>`).join('');
+
+  $('agents').tBodies[0].innerHTML = (s.agents||[]).map(a=>`<tr>
+    <td><b>${esc(a.role)}</b></td><td>${statusPill(a.state)}</td>
+    <td class="meta">${esc(a.task||'')}${a.branch?` · <span class="mono">${esc(a.branch)}</span>`:''}</td></tr>`).join('');
+
+  $('locks').tBodies[0].innerHTML = (s.locks||[]).map(l=>`<tr class="lockrow">
+    <td><b>${esc(l.label)}</b></td>
+    <td class="meta">${l.kind==='FROZEN'?'🔒 ':l.kind==='EXTERNAL'?'🔒 ':''}${esc(l.owner)}${l.branch?`<br><span class="mono">${esc(l.branch)}</span>`:''}</td>
+    <td><span class="kind k-${esc(l.kind)}">${esc(l.kind)}</span></td></tr>`).join('');
+
+  const r = s.release||{};
+  const rrow = (label, g) => g && g.id ? `<tr class="relrow"><td>${esc(label)}</td>
+      <td>${statusPill(g.status||'—')} <span class="certlvl">${esc(g.cert_level||'')} </span></td>
+      <td class="meta">${esc(g.note||'')}</td></tr>` : '';
+  $('release').tBodies[0].innerHTML =
+    `<tr class="relrow"><td>Release congelado</td><td colspan="2" class="mono">${esc(r.frozen_release||'—')} 🔒</td></tr>` +
+    `<tr class="relrow"><td>Integración Agent OS</td><td colspan="2" class="meta"><span class="mono">${esc((r.integration||{}).head||'—')}</span> · ${esc((r.integration||{}).commits_ahead||'0')} commits sobre checkout — promoción a main = revisión humana</td></tr>` +
+    rrow('Installer v1.3.4', r.installer) + rrow('Offline field cert', r.offline_field) +
+    rrow('Print exactly-once', r.print_once) + rrow('BUG-019 (Security)', r.bug019) +
+    rrow('Wave1 (Ops Truth)', r.wave1) + rrow('Rollback', r.rollback) +
+    rrow('GO-LIVE Client #2', r.go_live);
+
+  $('activity').innerHTML = (s.activity||[]).map(a=>`
+    <div class="act ${esc(a.kind)}"><span class="tm">${esc(a.time)}</span><span class="ln">${esc(a.line)}</span></div>`).join('')
+    || '<div class="act info"><span class="ln">Sin actividad reciente</span></div>';
+
+  $('diag').textContent = JSON.stringify({company:c, errors:s.errors, generated_at:s.generated_at, telegram:s.telegram}, null, 2);
+}
+
+async function refresh(){
+  try{
+    const r = await fetch('/api/state', {cache:'no-store'});
+    const s = await r.json();
+    lastGood = s; render(s);
+  }catch(e){
+    const deg = $('degBanner');
+    deg.className='banner err';
+    deg.textContent='🔴 Mission Control sin conexión con el estado local — ¿servicio caído? Reintentando…';
+  }
+}
+$('btnPause').onclick = ()=>{ if(confirm('¿Pausar Agent Company? (los workers activos terminan, no se toma trabajo nuevo)')) post('/api/pause'); };
+$('btnResume').onclick = ()=> post('/api/resume');
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>

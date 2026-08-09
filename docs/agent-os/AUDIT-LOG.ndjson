@@ -349,3 +349,4 @@
 {"ts": "2026-08-09T01:31:31Z", "type": "SUPERVISOR_STARTED", "pid": 88325}
 {"ts": "2026-08-09T01:32:59Z", "type": "HUMAN_TASK_CREATED", "gate_id": "TELEGRAM-CHANNEL", "location": "Remoto — tu teléfono (5 min)"}
 {"ts": "2026-08-09T01:32:59Z", "type": "CRITICAL_CHANNEL_DOWN", "channel": "telegram", "cause": "401 token revoked", "since": "unknown", "mitigation": "founder task queued"}
+{"ts": "2026-08-09T01:40:52Z", "type": "TELEGRAM_OPTIONAL_DISABLED", "by": "FOUNDER", "note": "Mission Control es la interfaz canónica"}

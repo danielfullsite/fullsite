@@ -1,0 +1,6 @@
+{
+  "port": 8890,
+  "bind": "127.0.0.1",
+  "note": "8787 evitado (default de wrangler dev; sin owner activo al resolver 2026-08-08)",
+  "updated_at": "2026-08-09T01:40:52Z"
+}

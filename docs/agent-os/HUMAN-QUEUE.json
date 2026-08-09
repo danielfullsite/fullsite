@@ -44,28 +44,5 @@
     "created_at": "2026-08-09T01:28:29Z",
     "done_at": null,
     "evidence": null
-  },
-  "TELEGRAM-CHANNEL": {
-    "gate_id": "TELEGRAM-CHANNEL",
-    "title": "Restaurar canal Telegram del Agent Company (token revocado)",
-    "location": "Remoto — tu teléfono (5 min)",
-    "why": "El bot token local devuelve 401 Unauthorized: TODAS las notificaciones del Agent OS (decisiones, field packs, blockers) están cayendo en silencio desde hace días. SSL ya corregido; solo falta token válido.",
-    "gate_blocked": "TELEGRAM-CHANNEL",
-    "actionable_now": true,
-    "estimated_time": "5 min",
-    "preparation_completed": "Diagnóstico completo: SSL fix aplicado (certifi); canal probado end-to-end; falla exactamente en 401",
-    "do_exactly": [
-      "Abre @BotFather en Telegram → /mybots → tu bot del War Room → API Token (o Revoke para rotar)",
-      "Edita ~/.agent-os.env y reemplaza el valor de TELEGRAM_BOT_TOKEN por el token vigente",
-      "Si rotaste el token: actualiza también el secret en GitHub → gh secret set TELEGRAM_BOT_TOKEN --repo danielfullsite/fullsite",
-      "Verifica: python3 -c \"import sys; sys.path.insert(0,'scripts/agent-os'); from telegram_notify import notify; print(notify('WAITING_FIELD', {'completed': ['canal-test']}, dedup_ttl_s=0))\" → debe imprimir True y llegarte el mensaje"
-    ],
-    "expected_result": "Mensaje de prueba llega a tu Telegram; notify() regresa True",
-    "return_evidence": "Screenshot del mensaje o confirmación verbal",
-    "safe_failure": "Sin efecto en orquestación: mientras tanto todo sigue visible en FOUNDER-INBOX.md, FIELD-VISIT-PACK.md y agent_company.py status",
-    "status": "PENDING",
-    "created_at": "2026-08-09T01:32:59Z",
-    "done_at": null,
-    "evidence": null
   }
 }

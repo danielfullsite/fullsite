@@ -183,6 +183,15 @@ def notify(event_type: str, details: dict = None, dedup_ttl_s: int = 3600) -> bo
     if event_type not in ALLOWED_EVENTS:
         return False
 
+    # Founder decision 2026-08-08: Telegram is OPTIONAL_DISABLED — Mission Control
+    # is the canonical founder interface. No retries against a known-revoked token.
+    try:
+        cfg = json.loads((_DEDUP_FILE.parent / 'NOTIFY-CONFIG.json').read_text())
+        if cfg.get('telegram') == 'OPTIONAL_DISABLED':
+            return False
+    except Exception:
+        pass
+
     dryrun = bool(os.environ.get('AGENT_OS_TELEGRAM_DRYRUN'))
     token, chat_id = ('', '') if dryrun else _load_secrets()
     if not dryrun and (not token or not chat_id):
