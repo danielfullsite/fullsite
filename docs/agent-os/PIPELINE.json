@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-08-08T21:59:18Z",
+  "updated_at": "2026-08-09T01:30:28Z",
   "active_target": "CLIENT_2_READY",
   "targets": {
     "CLIENT_2_READY": {
@@ -84,18 +84,26 @@
         "REL-INSTALLER": {
           "title": "Windows installer v1.3.4 build verificado (GHA) + preflight en hardware",
           "domain": "offline-runtime",
-          "status": "BLOCKED_DECISION",
+          "status": "BLOCKED_HUMAN",
           "priority": "P0",
           "criticality": "REQUIRED",
           "dependencies": [],
-          "owner": "FOUNDER",
-          "execution_class": "FOUNDER_DECISION",
+          "owner": null,
+          "execution_class": "HUMAN_PHYSICAL",
           "cert_level": "PHYSICAL",
           "evidence_required": "Push autorizado por Founder → GHA build green → SHA-256 registrado → preflight físico (ver TSK-BUILD-01)",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-09T01:30:28Z",
+              "commit": "678d7d47e49cf57c7ff7a2d0e84de0bb6f8a80a7",
+              "note": "Build autónomo via branch aislado build/installer-v1.3.4 + workflow_dispatch. Run https://github.com/danielfullsite/fullsite/actions/runs/31288311728 · artifact fullsite-pos-win-678d7d47e49cf57c7ff7a2d0e84de0bb6f8a80a7 (contiene .exe + SHA256.txt, retención 30d). verify-install: silent install/uninstall PASS en windows-latest limpio."
+            }
+          ],
           "requires_human": true,
-          "updated_at": "2026-08-08T21:59:05Z",
-          "last_note": "Decision D-003 created"
+          "updated_at": "2026-08-09T01:30:28Z",
+          "last_note": "Build v1.3.4 GREEN (GHA 31288311728, build-win + verify-install success). Falta solo preflight físico — batcheado en visita AMALAY.",
+          "location": "AMALAY",
+          "notes": "Reclasificado 2026-08-08: build v1.3.4 ejecutado por Agent Company (branch aislado build/installer-v1.3.4, GHA run 31288311728). Restante: preflight físico en hardware Windows — batcheado en el AMALAY field pack junto con REL-OFFLINE-FIELD."
         },
         "REL-PRINT-EXACTLY-ONCE": {
           "title": "Print exactly-once — BUG-015 cerrado (retrying auto-reintenta en caliente)",
@@ -137,7 +145,7 @@
         "CLON-MANIFEST": {
           "title": "manifest.json con schema estricto + validación en CI (R2-G03)",
           "domain": "clonability",
-          "status": "RUNNING",
+          "status": "PASS",
           "priority": "P0",
           "criticality": "REQUIRED",
           "dependencies": [],
@@ -145,15 +153,23 @@
           "execution_class": "AUTO_TECH",
           "cert_level": "SOFTWARE",
           "evidence_required": "JSON Schema estricto para el manifest de cliente + validador ejecutable + test que rechaza manifests inválidos",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:09:57Z",
+              "task_id": "TSK-010",
+              "commit": "fa840d1f9ccf0849922381c7c2f3f8c41c2283a4",
+              "note": "Implemented gate CLON-MANIFEST (R2-G03): strict JSON Schema draft 2020-12 for client manifests (scripts/manifests/manifest.schema.json, additionalProperties:false, mirrors RestaurantManifest interface in dashboard-app/src/lib/restaurant-manifest.ts and bootstrap_client.py field usage; accepts real a",
+              "cert_output": "no cert_command (task pipeline verdict is the cert)"
+            }
+          ],
           "requires_human": false,
-          "updated_at": "2026-08-08T21:59:18Z",
-          "last_note": "task TSK-010 is IN_PROGRESS"
+          "updated_at": "2026-08-08T22:09:57Z",
+          "last_note": "cert ok: no cert_command (task pipeline verdict is the cert)"
         },
         "CLON-IMPORTS": {
           "title": "menu_import + staff_import ejecutados y verificados contra tenant sandbox (R2-G05)",
           "domain": "clonability",
-          "status": "READY",
+          "status": "PASS",
           "priority": "P1",
           "criticality": "REQUIRED",
           "dependencies": [],
@@ -161,9 +177,18 @@
           "execution_class": "AUTO_TECH",
           "cert_level": "STAGING",
           "evidence_required": "Import idempotente con validación y reporte de errores; test con datos sintéticos (no AMALAY)",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:34:48Z",
+              "task_id": "TSK-012",
+              "commit": "4998cef122f31bd23e857b94ade671aac3f5d833",
+              "note": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contadores de escritura) y una suite de 16 tests deterministas (tests/onboarding/test_clon_imports.py) que ",
+              "cert_output": "no cert_command (task pipeline verdict is the cert)"
+            }
+          ],
           "requires_human": false,
-          "updated_at": "2026-08-08T22:30:00Z"
+          "updated_at": "2026-08-08T22:34:48Z",
+          "last_note": "cert ok: no cert_command (task pipeline verdict is the cert)"
         },
         "CLON-HARDCODES": {
           "title": "Cero hardcodes AMALAY — checker ejecutable PASS (R2-G09)",
@@ -183,7 +208,7 @@
         "CLON-ONBOARD": {
           "title": "Onboarding automatizado <20 min sin pasos manuales (R2-G02)",
           "domain": "clonability",
-          "status": "BACKLOG",
+          "status": "PASS",
           "priority": "P0",
           "criticality": "REQUIRED",
           "dependencies": [
@@ -194,9 +219,18 @@
           "execution_class": "AUTO_TECH",
           "cert_level": "STAGING",
           "evidence_required": "provision run end-to-end contra tenant sandbox, tiempo medido, cero intervención manual (lecciones vantara aplicadas)",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-09T01:28:29Z",
+              "task_id": "TSK-013",
+              "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
+              "note": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no",
+              "cert_output": "no cert_command (task pipeline verdict is the cert)"
+            }
+          ],
           "requires_human": false,
-          "updated_at": "2026-08-08T22:30:00Z"
+          "updated_at": "2026-08-09T01:28:29Z",
+          "last_note": "cert ok: no cert_command (task pipeline verdict is the cert)"
         },
         "CLON-TERMINALS": {
           "title": "POS, KDS e impresora configurables desde manifest (R2-G04)",
@@ -218,7 +252,7 @@
         "CLON-SMOKE": {
           "title": "Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
           "domain": "clonability",
-          "status": "BACKLOG",
+          "status": "RUNNING",
           "priority": "P0",
           "criticality": "REQUIRED",
           "dependencies": [
@@ -230,7 +264,8 @@
           "evidence_required": "smoke_test.py PASS contra tenant recién provisionado; flows críticos POS cubiertos",
           "evidence": [],
           "requires_human": false,
-          "updated_at": "2026-08-08T22:30:00Z"
+          "updated_at": "2026-08-09T01:29:12Z",
+          "last_note": "task TSK-014 is IN_PROGRESS"
         },
         "CLON-RUNBOOK": {
           "title": "Runbook de instalación ejecutable por Eduardo sin Daniel (R2-G07)",
@@ -290,7 +325,7 @@
         "OBS-HEALTH": {
           "title": "Monitoreo crítico por cliente: /health completo + heartbeat + alerta",
           "domain": "observability-release",
-          "status": "RUNNING",
+          "status": "PASS",
           "priority": "P1",
           "criticality": "REQUIRED",
           "dependencies": [],
@@ -298,10 +333,18 @@
           "execution_class": "AUTO_TECH",
           "cert_level": "SOFTWARE",
           "evidence_required": "Health/heartbeat por terminal + señal accionable cuando un cliente está caído; tests",
-          "evidence": [],
+          "evidence": [
+            {
+              "ts": "2026-08-08T22:27:15Z",
+              "task_id": "TSK-011",
+              "commit": "d2914a2695a39cc0f430a34a696a12da5b247705",
+              "note": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New pure deterministic module dashboard-app/src/lib/client-health.ts (terminal online/stale/offline, cli",
+              "cert_output": "no cert_command (task pipeline verdict is the cert)"
+            }
+          ],
           "requires_human": false,
-          "updated_at": "2026-08-08T21:59:18Z",
-          "last_note": "task TSK-011 is IN_PROGRESS"
+          "updated_at": "2026-08-08T22:27:15Z",
+          "last_note": "cert ok: no cert_command (task pipeline verdict is the cert)"
         },
         "REL-ROLLBACK": {
           "title": "Rollback runbook ejecutable por Eduardo (R1-G08)",

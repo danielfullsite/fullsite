@@ -38,7 +38,8 @@ def status():
     print(f'Kill switch/pause:  {load_state().get("kill_switch", False)}')
     print()
     print(f'Target activo:      {r["target"]} (fecha: {r.get("target_date", "?")})')
-    print(f'Gates requeridos:   {r["required_pass"]}/{r["required_total"]} PASS ({r["pct"]}%)')
+    print(f'CLIENT #2 PIPELINE GATE COMPLETION: {r["required_pass"]}/{r["required_total"]} PASS ({r["pct"]}%)')
+    print('                    (métrica de gates del pipeline — NO es completitud del producto Fullsite)')
     if r.get('blocked_human'):
         print(f'  🔵 Bloqueados en Daniel (físico): {", ".join(r["blocked_human"])}')
     if r.get('blocked_decision'):

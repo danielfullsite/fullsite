@@ -1,0 +1,149 @@
+{
+  "id": "TSK-013",
+  "execution_class": "AUTO_TECH",
+  "gate_id": "CLON-ONBOARD",
+  "domain": "clonability",
+  "title": "CLON-ONBOARD — Onboarding automatizado <20 min sin pasos manuales (R2-G02)",
+  "objective": "provision run end-to-end contra tenant sandbox, tiempo medido, cero intervención manual (lecciones vantara aplicadas)\n\nGATE: CLON-ONBOARD · dominio: clonability · cert level objetivo: STAGING\nContexto: este task implementa un gate del pipeline CLIENT_2_READY. Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P0",
+  "status": "CLOSED",
+  "tags": [
+    "gate:CLON-ONBOARD",
+    "clonability"
+  ],
+  "dod": [
+    "provision run end-to-end contra tenant sandbox, tiempo medido, cero intervención manual (lecciones vantara aplicadas)",
+    "Tests deterministas incluidos y en verde",
+    "Commit en el branch del task (nunca push, nunca merge manual)"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 2,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-08T22:35:20Z",
+  "updated_at": "2026-08-09T01:28:28Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-08T22:35:20Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T22:35:21Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T22:35:21Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T23:07:10Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-08T23:07:36Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "CHANGES_REQUESTED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-08T23:18:12Z",
+      "note": "Engineer session died mid-response (API Error: Connection closed — verbatim in results/TSK-013.result.json). Independently verified: branch agent-os/TSK-013 exists but `git rev-list --count agent-os/integration..agent-os/TSK-013` = 0 (HEAD is 4998cef, the TSK-012 merge); `git log --all --grep=TSK-01"
+    },
+    {
+      "from": "CHANGES_REQUESTED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T23:18:16Z",
+      "note": "Repair attempt after verification failure"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T01:17:12Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T01:17:15Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "CHANGES_REQUESTED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-09T01:20:08Z",
+      "note": "Commit 03255da EXISTS on agent-os/TSK-013 (engineer result wrongly reported commit:null after budget exhaustion). Read diff: onboard_client.py adds slug/name to clients row, app_metadata.client_id+role on auth user create, backfill for pre-existing users (vantara lessons present); fake_supabase.py a"
+    },
+    {
+      "from": "CHANGES_REQUESTED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T01:20:17Z",
+      "note": "Repair attempt after verification failure"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-09T01:25:33Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T01:25:58Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-09T01:28:15Z",
+      "note": "Worktree limpio en f489a3b (head de agent-os/TSK-013, local-only, sin push). Corrí independientemente: python3 -m pytest tests/onboarding/test_clon_onboard.py tests/onboarding/test_clon_imports.py -v → 25/25 PASS en 16.1s, deterministas (loopback FakeSupabase con GoTrue sintético, sin red, sin sleep"
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-09T01:28:28Z",
+      "note": "Pipeline complete. Merge commit: 31afc4e1582ec70dd531d600e1c5981c2758e8b7"
+    }
+  ],
+  "branch": "agent-os/TSK-013",
+  "worktree_path": "/tmp/fullsite-worker-TSK-013",
+  "closed_at": "2026-08-09T01:28:28Z",
+  "merge_commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
+  "close_evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no existe en BD; (3) segunda corrida idempotente — auth user existente sincroniza password+app_metadata vía admin PUT y diff_report (solo lectura) ya no suma a totals.created; (4) suite verde de verdad:",
+  "gate_updated": [
+    "gate:CLON-ONBOARD",
+    "clonability"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "task_id": "TSK-012",
+  "reviewed_by": "RUNTIME_VERIFICATION",
+  "reviewed_at": "2026-08-08T22:34:40Z",
+  "verdict": "VERIFIED",
+  "findings": [],
+  "return_to_engineer": false,
+  "return_reason": null,
+  "notes": "Inspeccioné commit 84eb67a en agent-os/TSK-012 (solo 4 archivos: clon-imports.yml, menu_import.py fix, fake_supabase.py, test_clon_imports.py — las eliminaciones de TSK-011 en el diff provisto son artefacto del branch base, no del commit). Leí completos fake_supabase.py (PostgREST falso stdlib/loopback con contadores de escritura e inyección de fallos) y test_clon_imports.py (16 tests que ejecutan los scripts reales como subprocesos con datos sintéticos, no AMALAY). Corrí la suite dos veces en el worktree del branch: 16/16 OK en 9.5s y 9.6s — determinista. Idempotencia verificada server-side (2a corrida = 0 POSTs nuevos, 0 duplicados, created=0); validación CSV, contrato JSON de errores, guard AMALAY prod (menu_import.py:346), confirm-ref mismatch, dry-runs sin escrituras, fallo inyectado + --resume sin duplicar: todo pasa. Fix de menu_import.py correcto (created ya no cuenta ALREADY_EXISTS; dry-run conserva cat_ids). Sin branch remoto = sin push. DoD 1, 2 y 3 cumplidos en código real. Cero gaps."
+}

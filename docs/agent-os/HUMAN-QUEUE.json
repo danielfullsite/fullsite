@@ -21,5 +21,28 @@
     "created_at": "2026-08-08T21:59:03Z",
     "done_at": null,
     "evidence": null
+  },
+  "REL-INSTALLER": {
+    "gate_id": "REL-INSTALLER",
+    "title": "Preflight físico del installer v1.3.4 en hardware Windows",
+    "location": "AMALAY",
+    "why": "El build GHA verifica silent-install en runner limpio, pero la certificación requiere hardware real (impresora, cold start, offline)",
+    "gate_blocked": "REL-INSTALLER",
+    "actionable_now": true,
+    "estimated_time": "30 min",
+    "preparation_completed": "Build GREEN run 31288311728; artifact fullsite-pos-win-678d7d47e49cf57c7ff7a2d0e84de0bb6f8a80a7 listo para descarga (gh run download 31288311728 -n fullsite-pos-win-678d7d47e49cf57c7ff7a2d0e84de0bb6f8a80a7); SHA256.txt incluido",
+    "do_exactly": [
+      "Descarga el artifact del run 31288311728 (o el que indique el gate) y cópialo al USB del FIELD-KIT",
+      "Verifica SHA-256 contra SHA256.txt antes de instalar",
+      "Instala en la terminal Windows de AMALAY siguiendo INSTALLER-VERIFICATION.md",
+      "Ejecuta escenarios de preflight: cold start, restart, offline, sync, sin duplicados, logs"
+    ],
+    "expected_result": "Installer v1.3.4 instalado y preflight PASS en hardware real",
+    "return_evidence": "SHA-256 verificado + resultado por escenario + foto de ticket de prueba",
+    "safe_failure": "ROLLBACK.ps1 + PRE-INSTALL-BACKUP.ps1 del FIELD-KIT restauran el estado previo",
+    "status": "PENDING",
+    "created_at": "2026-08-09T01:28:29Z",
+    "done_at": null,
+    "evidence": null
   }
 }

@@ -75,8 +75,19 @@ def _load_secrets() -> tuple:
 
 # ── HTTP send ─────────────────────────────────────────────────────────────────
 
-_REPO = 'ramonfaurdaniel-png/fullsite'
+_REPO = 'danielfullsite/fullsite'
 _NOTIFY_WORKFLOW = 'agent-os-notify.yml'
+
+
+def _ssl_context():
+    """Framework Python on this Mac lacks system CA certs (SSL verify fails).
+    Use certifi's bundle when available; never disable verification."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
 
 
 def _send_raw(token: str, chat_id: str, text: str) -> bool:
@@ -93,7 +104,7 @@ def _send_raw(token: str, chat_id: str, text: str) -> bool:
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=_ssl_context()) as resp:
             body = json.loads(resp.read())
             return resp.status == 200 and body.get('ok', False)
     except urllib.error.HTTPError as e:

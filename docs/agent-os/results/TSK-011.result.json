@@ -1,0 +1,16 @@
+{
+  "task_id": "TSK-011",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-08T22:04:29Z",
+  "verdict": "VERIFIED",
+  "summary": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New ",
+  "evidence": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New pure deterministic module dashboard-app/src/lib/client-health.ts (terminal online/stale/offline, client up/degraded/down/inactive/no_terminals with injectable thresholds and Spanish actionable alerts), new endpoint GET /api/health/terminals (per-client status, ?client_id filter, 503 + critical alert when a client that was operating stops reporting), and a 'terminals' check integrated into the existing /api/health. 20 new deterministic vitest tests (fixed clock, mocked fetch, threshold edges, clock skew, multi-client aggregation, full route handler incl. 503 path); full dashboard-app suite passes 2170/2170 and tsc --noEmit is clean. Committed to agent-os/TSK-011 at 2766c0532887d81572bc37e5ba15ea9abd5a068c; no push, no merge.",
+  "commit": "2766c0532887d81572bc37e5ba15ea9abd5a068c",
+  "tests_passed": 2170,
+  "tests_total": 2170,
+  "gaps_found": [],
+  "next_steps": [
+    "Optional: wire /api/health/terminals alerts into the Telegram monitor cron (ops tentacle) so critical client-down alerts push proactively",
+    "Optional: run supabase/pos_sessions cleanup cron noted in create_pos_sessions.sql if session table growth becomes an issue"
+  ]
+}

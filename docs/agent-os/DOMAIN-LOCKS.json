@@ -32,19 +32,11 @@
     "note": "Toda mutación de producción requiere PRODUCTION_APPROVAL explícita de Daniel. Autonomía de prod: DISABLED."
   },
   "clonability": {
-    "owner": "AGENT:TSK-010",
+    "owner": "AGENT:TSK-014",
     "kind": "AGENT",
-    "task_id": "TSK-010",
-    "branch": "agent-os/TSK-010",
-    "locked_at": "2026-08-08T21:59:05Z",
-    "note": ""
-  },
-  "observability-release": {
-    "owner": "AGENT:TSK-011",
-    "kind": "AGENT",
-    "task_id": "TSK-011",
-    "branch": "agent-os/TSK-011",
-    "locked_at": "2026-08-08T21:59:05Z",
+    "task_id": "TSK-014",
+    "branch": "agent-os/TSK-014",
+    "locked_at": "2026-08-09T01:29:01Z",
     "note": ""
   }
 }

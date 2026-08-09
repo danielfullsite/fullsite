@@ -170,3 +170,180 @@
 {"ts": "2026-08-08T21:59:08Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-011", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-011"}
 {"ts": "2026-08-08T21:59:18Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-010 is IN_PROGRESS"}
 {"ts": "2026-08-08T21:59:18Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-011 is IN_PROGRESS"}
+{"ts": "2026-08-08T22:04:29Z", "type": "CLAUDE_DONE", "task_id": "TSK-011", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:04:29Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-011", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-08T22:04:29Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-08T22:04:39Z", "type": "CLAUDE_DONE", "task_id": "TSK-010", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:04:39Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-010", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-08T22:04:39Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-08T22:04:49Z", "type": "WORKER_DONE", "key": "TSK-010", "phase": "engineer", "pid": 82667, "rc": 0}
+{"ts": "2026-08-08T22:04:49Z", "type": "WORKER_DONE", "key": "TSK-011", "phase": "engineer", "pid": 82700, "rc": 0}
+{"ts": "2026-08-08T22:04:49Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-010 is SUBMITTED"}
+{"ts": "2026-08-08T22:04:49Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-011 is SUBMITTED"}
+{"ts": "2026-08-08T22:04:49Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-08T22:04:49Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-010", "phase": "verify", "pid": 83964}
+{"ts": "2026-08-08T22:04:50Z", "type": "WORKER_STARTED", "task_id": "TSK-010", "phase": "verify", "pid": 83964}
+{"ts": "2026-08-08T22:04:50Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-010", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-08T22:09:14Z", "type": "WAKE_DETECTED", "slept_s": 144, "workers": ["TSK-010_verify"]}
+{"ts": "2026-08-08T22:09:42Z", "type": "CLAUDE_DONE", "task_id": "TSK-010", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:09:42Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-010", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-08T22:09:42Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Read all 4 files in worktree /private/tmp/fullsite-worker-TSK-010 at commit d1bfc71 (clean, correct HEAD). DoD-1: schema is strict draft 2020-12 (additionalProperties:false at root/features/staff/station_routing/reviews), plan and staff.role enums match restaurant-manifest.ts:37 and :16 exactly; val"}
+{"ts": "2026-08-08T22:09:55Z", "type": "WORKER_DONE", "key": "TSK-010_verify", "phase": "verify", "pid": 83964, "rc": 0}
+{"ts": "2026-08-08T22:09:55Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-08T22:09:55Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-011", "phase": "verify", "pid": 84194}
+{"ts": "2026-08-08T22:09:56Z", "type": "WORKER_STARTED", "task_id": "TSK-011", "phase": "verify", "pid": 84194}
+{"ts": "2026-08-08T22:09:56Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-011", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-08T22:09:57Z", "type": "TASK_TRANSITION", "task_id": "TSK-010", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: fa840d1f9ccf0849922381c7c2f3f8c41c2283a4"}
+{"ts": "2026-08-08T22:09:57Z", "type": "GATE_COMPLETED", "gate_tag": "gate:CLON-MANIFEST"}
+{"ts": "2026-08-08T22:09:57Z", "type": "GATE_COMPLETED", "gate_tag": "clonability"}
+{"ts": "2026-08-08T22:09:57Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-010", "path": "/tmp/fullsite-worker-TSK-010"}
+{"ts": "2026-08-08T22:09:57Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "REVIEW", "to": "CERTIFYING", "by": "SUPERVISOR", "note": "Task TSK-010 merged; running deterministic cert"}
+{"ts": "2026-08-08T22:09:57Z", "type": "GATE_STATUS", "gate_id": "CLON-MANIFEST", "from": "CERTIFYING", "to": "PASS", "by": "CERT", "note": "cert ok: no cert_command (task pipeline verdict is the cert)"}
+{"ts": "2026-08-08T22:09:57Z", "type": "TASK_CLOSED", "task_id": "TSK-010", "commit": "fa840d1f9ccf0849922381c7c2f3f8c41c2283a4", "gates": ["gate:CLON-MANIFEST", "clonability"], "evidence": "Implemented gate CLON-MANIFEST (R2-G03): strict JSON Schema draft 2020-12 for client manifests (scripts/manifests/manifest.schema.json, additionalProperties:false, mirrors RestaurantManifest interface"}
+{"ts": "2026-08-08T22:09:57Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-010", "commit": "fa840d1f9ccf0849922381c7c2f3f8c41c2283a4", "engineer_commit": "d1bfc71b2a0fcfb5249d2d5e35663e22e4a59de5", "gates": ["gate:CLON-MANIFEST", "clonability"]}
+{"ts": "2026-08-08T22:10:29Z", "type": "DOMAIN_LOCK_REAPED", "domain": "clonability"}
+{"ts": "2026-08-08T22:10:29Z", "type": "TASK_CREATED", "task_id": "TSK-012", "title": "CLON-IMPORTS — menu_import + staff_import ejecutados y verificados contra tenant sandbox (R2-G05)", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-08T22:10:29Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "clonability", "owner": "AGENT:TSK-012", "task_id": "TSK-012", "kind": "AGENT"}
+{"ts": "2026-08-08T22:10:29Z", "type": "GATE_STATUS", "gate_id": "CLON-IMPORTS", "from": "READY", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-012 created"}
+{"ts": "2026-08-08T22:10:29Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-012", "gate": "CLON-IMPORTS", "domain": "clonability"}
+{"ts": "2026-08-08T22:10:30Z", "type": "WORKTREE_CREATED", "task_id": "TSK-012", "branch": "agent-os/TSK-012", "path": "/tmp/fullsite-worker-TSK-012"}
+{"ts": "2026-08-08T22:10:30Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-012", "phase": "engineer", "pid": 84344}
+{"ts": "2026-08-08T22:10:30Z", "type": "WORKER_STARTED", "task_id": "TSK-012", "phase": "engineer", "pid": 84344}
+{"ts": "2026-08-08T22:10:30Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-08T22:10:30Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-08T22:10:30Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-012", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-012"}
+{"ts": "2026-08-08T22:10:40Z", "type": "GATE_STATUS", "gate_id": "CLON-IMPORTS", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-012 is IN_PROGRESS"}
+{"ts": "2026-08-08T22:26:08Z", "type": "WAKE_DETECTED", "slept_s": 898, "workers": ["TSK-011_verify", "TSK-012"]}
+{"ts": "2026-08-08T22:26:46Z", "type": "CLAUDE_DONE", "task_id": "TSK-011", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:26:46Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-011", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-08T22:26:46Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Read all 4 changed files in full from commit 2766c05 (tip of agent-os/TSK-011). client-health.ts is pure/deterministic with injectable thresholds; down vs inactive distinction prevents false positives when the restaurant is closed; alerts are actionable (severity, Spanish message, action, terminals_"}
+{"ts": "2026-08-08T22:27:08Z", "type": "WORKER_DONE", "key": "TSK-011_verify", "phase": "verify", "pid": 84194, "rc": 0}
+{"ts": "2026-08-08T22:27:08Z", "type": "TASK_TRANSITION", "task_id": "TSK-011", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: d2914a2695a39cc0f430a34a696a12da5b247705"}
+{"ts": "2026-08-08T22:27:08Z", "type": "GATE_COMPLETED", "gate_tag": "gate:OBS-HEALTH"}
+{"ts": "2026-08-08T22:27:08Z", "type": "GATE_COMPLETED", "gate_tag": "observability-release"}
+{"ts": "2026-08-08T22:27:15Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-011", "path": "/tmp/fullsite-worker-TSK-011"}
+{"ts": "2026-08-08T22:27:15Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "REVIEW", "to": "CERTIFYING", "by": "SUPERVISOR", "note": "Task TSK-011 merged; running deterministic cert"}
+{"ts": "2026-08-08T22:27:15Z", "type": "GATE_STATUS", "gate_id": "OBS-HEALTH", "from": "CERTIFYING", "to": "PASS", "by": "CERT", "note": "cert ok: no cert_command (task pipeline verdict is the cert)"}
+{"ts": "2026-08-08T22:27:15Z", "type": "TASK_CLOSED", "task_id": "TSK-011", "commit": "d2914a2695a39cc0f430a34a696a12da5b247705", "gates": ["gate:OBS-HEALTH", "observability-release"], "evidence": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New "}
+{"ts": "2026-08-08T22:27:15Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-011", "commit": "d2914a2695a39cc0f430a34a696a12da5b247705", "engineer_commit": "2766c0532887d81572bc37e5ba15ea9abd5a068c", "gates": ["gate:OBS-HEALTH", "observability-release"]}
+{"ts": "2026-08-08T22:27:46Z", "type": "DOMAIN_LOCK_REAPED", "domain": "observability-release"}
+{"ts": "2026-08-08T22:32:27Z", "type": "CLAUDE_DONE", "task_id": "TSK-012", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:32:27Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-012", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-08T22:32:27Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-08T22:32:47Z", "type": "WORKER_DONE", "key": "TSK-012", "phase": "engineer", "pid": 84344, "rc": 0}
+{"ts": "2026-08-08T22:32:47Z", "type": "GATE_STATUS", "gate_id": "CLON-IMPORTS", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-012 is SUBMITTED"}
+{"ts": "2026-08-08T22:32:47Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-08T22:32:47Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-012", "phase": "verify", "pid": 84907}
+{"ts": "2026-08-08T22:32:47Z", "type": "WORKER_STARTED", "task_id": "TSK-012", "phase": "verify", "pid": 84907}
+{"ts": "2026-08-08T22:32:47Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-012", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-08T22:34:40Z", "type": "CLAUDE_DONE", "task_id": "TSK-012", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-08T22:34:40Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-012", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-08T22:34:40Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Inspeccioné commit 84eb67a en agent-os/TSK-012 (solo 4 archivos: clon-imports.yml, menu_import.py fix, fake_supabase.py, test_clon_imports.py — las eliminaciones de TSK-011 en el diff provisto son artefacto del branch base, no del commit). Leí completos fake_supabase.py (PostgREST falso stdlib/loopb"}
+{"ts": "2026-08-08T22:34:48Z", "type": "WORKER_DONE", "key": "TSK-012_verify", "phase": "verify", "pid": 84907, "rc": 0}
+{"ts": "2026-08-08T22:34:48Z", "type": "TASK_TRANSITION", "task_id": "TSK-012", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: 4998cef122f31bd23e857b94ade671aac3f5d833"}
+{"ts": "2026-08-08T22:34:48Z", "type": "GATE_COMPLETED", "gate_tag": "gate:CLON-IMPORTS"}
+{"ts": "2026-08-08T22:34:48Z", "type": "GATE_COMPLETED", "gate_tag": "clonability"}
+{"ts": "2026-08-08T22:34:48Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-012", "path": "/tmp/fullsite-worker-TSK-012"}
+{"ts": "2026-08-08T22:34:48Z", "type": "GATE_STATUS", "gate_id": "CLON-IMPORTS", "from": "REVIEW", "to": "CERTIFYING", "by": "SUPERVISOR", "note": "Task TSK-012 merged; running deterministic cert"}
+{"ts": "2026-08-08T22:34:48Z", "type": "GATE_STATUS", "gate_id": "CLON-IMPORTS", "from": "CERTIFYING", "to": "PASS", "by": "CERT", "note": "cert ok: no cert_command (task pipeline verdict is the cert)"}
+{"ts": "2026-08-08T22:34:48Z", "type": "TASK_CLOSED", "task_id": "TSK-012", "commit": "4998cef122f31bd23e857b94ade671aac3f5d833", "gates": ["gate:CLON-IMPORTS", "clonability"], "evidence": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contado"}
+{"ts": "2026-08-08T22:34:48Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-012", "commit": "4998cef122f31bd23e857b94ade671aac3f5d833", "engineer_commit": "84eb67a95a94b8d0778d59cf88e4cb92787235e8", "gates": ["gate:CLON-IMPORTS", "clonability"]}
+{"ts": "2026-08-08T22:35:20Z", "type": "DOMAIN_LOCK_REAPED", "domain": "clonability"}
+{"ts": "2026-08-08T22:35:20Z", "type": "TASK_CREATED", "task_id": "TSK-013", "title": "CLON-ONBOARD — Onboarding automatizado <20 min sin pasos manuales (R2-G02)", "role": "RUNTIME_ENGINEER", "priority": "P0"}
+{"ts": "2026-08-08T22:35:20Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "clonability", "owner": "AGENT:TSK-013", "task_id": "TSK-013", "kind": "AGENT"}
+{"ts": "2026-08-08T22:35:20Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "BACKLOG", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-013 created"}
+{"ts": "2026-08-08T22:35:20Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-013", "gate": "CLON-ONBOARD", "domain": "clonability"}
+{"ts": "2026-08-08T22:35:20Z", "type": "WORKTREE_CREATED", "task_id": "TSK-013", "branch": "agent-os/TSK-013", "path": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-08T22:35:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "engineer", "pid": 85177}
+{"ts": "2026-08-08T22:35:21Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "engineer", "pid": 85177}
+{"ts": "2026-08-08T22:35:21Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-08T22:35:21Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-08T22:35:21Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-08T22:35:31Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-013 is IN_PROGRESS"}
+{"ts": "2026-08-08T22:43:41Z", "type": "WAKE_DETECTED", "slept_s": 220, "workers": ["TSK-013"]}
+{"ts": "2026-08-08T23:03:32Z", "type": "WAKE_DETECTED", "slept_s": 1131, "workers": ["TSK-013"]}
+{"ts": "2026-08-08T23:07:10Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "engineer", "verdict": "PARTIAL"}
+{"ts": "2026-08-08T23:07:10Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-013", "verdict": "PARTIAL", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-08T23:07:10Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-08T23:07:36Z", "type": "WAKE_DETECTED", "slept_s": 183, "workers": ["TSK-013"]}
+{"ts": "2026-08-08T23:07:36Z", "type": "WORKER_DONE", "key": "TSK-013", "phase": "engineer", "pid": 85177, "rc": 0}
+{"ts": "2026-08-08T23:07:36Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-013 is SUBMITTED"}
+{"ts": "2026-08-08T23:07:36Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-08T23:07:36Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "verify", "pid": 85486}
+{"ts": "2026-08-08T23:07:36Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "verify", "pid": 85486}
+{"ts": "2026-08-08T23:07:36Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-08T23:16:44Z", "type": "WAKE_DETECTED", "slept_s": 388, "workers": ["TSK-013_verify"]}
+{"ts": "2026-08-08T23:18:12Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "verify", "verdict": "FAILED"}
+{"ts": "2026-08-08T23:18:12Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-013", "verdict": "FAILED", "return": true, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-08T23:18:12Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_REVIEW", "to": "CHANGES_REQUESTED", "by": "RUNTIME_VERIFICATION", "note": "Engineer session died mid-response (API Error: Connection closed — verbatim in results/TSK-013.result.json). Independently verified: branch agent-os/TSK-013 exists but `git rev-list --count agent-os/integration..agent-os/TSK-013` = 0 (HEAD is 4998cef, the TSK-012 merge); `git log --all --grep=TSK-01"}
+{"ts": "2026-08-08T23:18:15Z", "type": "WORKER_DONE", "key": "TSK-013_verify", "phase": "verify", "pid": 85486, "rc": 0}
+{"ts": "2026-08-08T23:18:15Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "REVIEW", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-013 is CHANGES_REQUESTED"}
+{"ts": "2026-08-08T23:18:16Z", "type": "WORKTREE_CREATED", "task_id": "TSK-013", "branch": "agent-os/TSK-013", "path": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-08T23:18:16Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "engineer", "pid": 85665}
+{"ts": "2026-08-08T23:18:16Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "engineer", "pid": 85665}
+{"ts": "2026-08-08T23:18:16Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "CHANGES_REQUESTED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Repair attempt after verification failure"}
+{"ts": "2026-08-08T23:18:16Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-09T00:23:14Z", "type": "WAKE_DETECTED", "slept_s": 3468, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T00:32:16Z", "type": "WAKE_DETECTED", "slept_s": 360, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T00:36:41Z", "type": "WAKE_DETECTED", "slept_s": 235, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T00:54:29Z", "type": "WAKE_DETECTED", "slept_s": 906, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T01:07:18Z", "type": "WAKE_DETECTED", "slept_s": 556, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T01:13:11Z", "type": "WAKE_DETECTED", "slept_s": 229, "workers": ["TSK-013"]}
+{"ts": "2026-08-09T01:17:12Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "engineer", "verdict": "FAILED"}
+{"ts": "2026-08-09T01:17:12Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-013", "verdict": "FAILED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-09T01:17:12Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-09T01:17:15Z", "type": "WORKER_DONE", "key": "TSK-013", "phase": "engineer", "pid": 85665, "rc": 0}
+{"ts": "2026-08-09T01:17:15Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-013 is SUBMITTED"}
+{"ts": "2026-08-09T01:17:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-09T01:17:15Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "verify", "pid": 86093}
+{"ts": "2026-08-09T01:17:15Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "verify", "pid": 86093}
+{"ts": "2026-08-09T01:17:15Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-09T01:20:08Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "verify", "verdict": "FAILED"}
+{"ts": "2026-08-09T01:20:08Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-013", "verdict": "FAILED", "return": true, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-09T01:20:08Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_REVIEW", "to": "CHANGES_REQUESTED", "by": "RUNTIME_VERIFICATION", "note": "Commit 03255da EXISTS on agent-os/TSK-013 (engineer result wrongly reported commit:null after budget exhaustion). Read diff: onboard_client.py adds slug/name to clients row, app_metadata.client_id+role on auth user create, backfill for pre-existing users (vantara lessons present); fake_supabase.py a"}
+{"ts": "2026-08-09T01:20:16Z", "type": "WORKER_DONE", "key": "TSK-013_verify", "phase": "verify", "pid": 86093, "rc": 0}
+{"ts": "2026-08-09T01:20:16Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "REVIEW", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-013 is CHANGES_REQUESTED"}
+{"ts": "2026-08-09T01:20:17Z", "type": "WORKTREE_CREATED", "task_id": "TSK-013", "branch": "agent-os/TSK-013", "path": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-09T01:20:17Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "engineer", "pid": 86416}
+{"ts": "2026-08-09T01:20:17Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "engineer", "pid": 86416}
+{"ts": "2026-08-09T01:20:17Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "CHANGES_REQUESTED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Repair attempt after verification failure"}
+{"ts": "2026-08-09T01:20:17Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-09T01:25:33Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "engineer", "verdict": "VERIFIED"}
+{"ts": "2026-08-09T01:25:33Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-013", "verdict": "VERIFIED", "by": "RUNTIME_ENGINEER"}
+{"ts": "2026-08-09T01:25:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_ENGINEER", "note": "Submitted for verification"}
+{"ts": "2026-08-09T01:25:58Z", "type": "WORKER_DONE", "key": "TSK-013", "phase": "engineer", "pid": 86416, "rc": 0}
+{"ts": "2026-08-09T01:25:58Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "RUNNING", "to": "REVIEW", "by": "ORCHESTRATOR", "note": "task TSK-013 is SUBMITTED"}
+{"ts": "2026-08-09T01:25:58Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "SUPERVISOR", "note": "Auto-transitioned by supervisor"}
+{"ts": "2026-08-09T01:25:58Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-013", "phase": "verify", "pid": 87151}
+{"ts": "2026-08-09T01:25:58Z", "type": "WORKER_STARTED", "task_id": "TSK-013", "phase": "verify", "pid": 87151}
+{"ts": "2026-08-09T01:25:58Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-013", "phase": "verify", "budget_usd": 5.0, "cwd": "/Users/danielrg/fullsite"}
+{"ts": "2026-08-09T01:28:15Z", "type": "CLAUDE_DONE", "task_id": "TSK-013", "phase": "verify", "verdict": "VERIFIED"}
+{"ts": "2026-08-09T01:28:15Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-013", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-09T01:28:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "Worktree limpio en f489a3b (head de agent-os/TSK-013, local-only, sin push). Corrí independientemente: python3 -m pytest tests/onboarding/test_clon_onboard.py tests/onboarding/test_clon_imports.py -v → 25/25 PASS en 16.1s, deterministas (loopback FakeSupabase con GoTrue sintético, sin red, sin sleep"}
+{"ts": "2026-08-09T01:28:28Z", "type": "WORKER_DONE", "key": "TSK-013_verify", "phase": "verify", "pid": 87151, "rc": 0}
+{"ts": "2026-08-09T01:28:28Z", "type": "TASK_TRANSITION", "task_id": "TSK-013", "from": "VERIFIED", "to": "CLOSED", "by": "SUPERVISOR", "note": "Pipeline complete. Merge commit: 31afc4e1582ec70dd531d600e1c5981c2758e8b7"}
+{"ts": "2026-08-09T01:28:28Z", "type": "GATE_COMPLETED", "gate_tag": "gate:CLON-ONBOARD"}
+{"ts": "2026-08-09T01:28:28Z", "type": "GATE_COMPLETED", "gate_tag": "clonability"}
+{"ts": "2026-08-09T01:28:29Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-013", "path": "/tmp/fullsite-worker-TSK-013"}
+{"ts": "2026-08-09T01:28:29Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "REVIEW", "to": "CERTIFYING", "by": "SUPERVISOR", "note": "Task TSK-013 merged; running deterministic cert"}
+{"ts": "2026-08-09T01:28:29Z", "type": "GATE_STATUS", "gate_id": "CLON-ONBOARD", "from": "CERTIFYING", "to": "PASS", "by": "CERT", "note": "cert ok: no cert_command (task pipeline verdict is the cert)"}
+{"ts": "2026-08-09T01:28:29Z", "type": "TASK_CLOSED", "task_id": "TSK-013", "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7", "gates": ["gate:CLON-ONBOARD", "clonability"], "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pw"}
+{"ts": "2026-08-09T01:28:29Z", "type": "PIPELINE_COMPLETE", "task_id": "TSK-013", "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7", "engineer_commit": "f489a3b84db3d15948745649e14d34229aaa0507", "gates": ["gate:CLON-ONBOARD", "clonability"]}
+{"ts": "2026-08-09T01:28:29Z", "type": "DECISION_RECLASSIFIED", "decision_id": "D-003", "to": "AUTO_TECH"}
+{"ts": "2026-08-09T01:28:29Z", "type": "GATE_RECLASSIFIED", "gate_id": "REL-INSTALLER", "from": "FOUNDER_DECISION", "to": "HUMAN_PHYSICAL(build=AUTO_TECH)"}
+{"ts": "2026-08-09T01:28:29Z", "type": "HUMAN_TASK_CREATED", "gate_id": "REL-INSTALLER", "location": "AMALAY"}
+{"ts": "2026-08-09T01:29:01Z", "type": "DOMAIN_LOCK_REAPED", "domain": "clonability"}
+{"ts": "2026-08-09T01:29:01Z", "type": "TASK_CREATED", "task_id": "TSK-014", "title": "CLON-SMOKE — Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)", "role": "RUNTIME_ENGINEER", "priority": "P0"}
+{"ts": "2026-08-09T01:29:01Z", "type": "DOMAIN_LOCK_ACQUIRED", "domain": "clonability", "owner": "AGENT:TSK-014", "task_id": "TSK-014", "kind": "AGENT"}
+{"ts": "2026-08-09T01:29:01Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "BACKLOG", "to": "CLAIMED", "by": "ORCHESTRATOR", "note": "Task TSK-014 created"}
+{"ts": "2026-08-09T01:29:01Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-014", "gate": "CLON-SMOKE", "domain": "clonability"}
+{"ts": "2026-08-09T01:29:02Z", "type": "WORKTREE_CREATED", "task_id": "TSK-014", "branch": "agent-os/TSK-014", "path": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T01:29:02Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-014", "phase": "engineer", "pid": 87880}
+{"ts": "2026-08-09T01:29:02Z", "type": "WORKER_STARTED", "task_id": "TSK-014", "phase": "engineer", "pid": 87880}
+{"ts": "2026-08-09T01:29:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-09T01:29:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-014", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-09T01:29:02Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-014", "phase": "engineer", "budget_usd": 5.0, "cwd": "/tmp/fullsite-worker-TSK-014"}
+{"ts": "2026-08-09T01:29:12Z", "type": "GATE_STATUS", "gate_id": "CLON-SMOKE", "from": "CLAIMED", "to": "RUNNING", "by": "ORCHESTRATOR", "note": "task TSK-014 is IN_PROGRESS"}
+{"ts": "2026-08-09T01:30:28Z", "type": "GATE_STATUS", "gate_id": "REL-INSTALLER", "from": "BLOCKED_HUMAN", "to": "BLOCKED_HUMAN", "by": "AGENT_COMPANY", "note": "Build v1.3.4 GREEN (GHA 31288311728, build-win + verify-install success). Falta solo preflight físico — batcheado en visita AMALAY."}
+{"ts": "2026-08-09T01:30:28Z", "type": "FIELD_PACK_FINALIZED", "summary": "AMALAY: 2 tareas (~120 min)", "tasks": 2}
+{"ts": "2026-08-09T01:31:31Z", "type": "SUPERVISOR_STARTED", "pid": 88325}

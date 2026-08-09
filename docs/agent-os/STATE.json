@@ -1,8 +1,8 @@
 {
   "version": 1,
   "created_at": "2026-08-04T15:26:38Z",
-  "updated_at": "2026-08-08T21:59:05Z",
-  "last_task_seq": 11,
+  "updated_at": "2026-08-09T01:29:01Z",
+  "last_task_seq": 14,
   "last_decision_seq": 3,
   "kill_switch": false,
   "active_workstream": null,
@@ -20,6 +20,12 @@
     "demo",
     "foundation",
     "staging",
-    "isolation"
+    "isolation",
+    "gate:CLON-MANIFEST",
+    "clonability",
+    "gate:OBS-HEALTH",
+    "observability-release",
+    "gate:CLON-IMPORTS",
+    "gate:CLON-ONBOARD"
   ]
 }

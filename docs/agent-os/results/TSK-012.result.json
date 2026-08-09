@@ -1,0 +1,16 @@
+{
+  "task_id": "TSK-012",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-08T22:32:27Z",
+  "verdict": "VERIFIED",
+  "summary": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contado",
+  "evidence": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contadores de escritura) y una suite de 16 tests deterministas (tests/onboarding/test_clon_imports.py) que ejecuta los scripts reales scripts/onboarding/menu_import.py y staff_import.py como subprocesos con datos 100% sintéticos (no AMALAY). Verifica idempotencia (segunda corrida = 0 escrituras nuevas y 0 duplicados, medido servidor-side), validación de CSV (columnas/precio/rol/PIN), reporte de errores vía contrato JSON, guard anti-AMALAY-producción, confirm-ref mismatch, dry-runs sin escrituras, y fallo parcial inyectado + --resume sin duplicar. Fix en menu_import.py: 'created' ahora cuenta solo creaciones reales (antes contaba ALREADY_EXISTS, imposibilitando verificar idempotencia por el contrato) y el dry-run ya no pierde los cat_id simulados. CI agregado en .github/workflows/clon-imports.yml. Suite en verde en dos corridas consecutivas (16/16, ~10s). Commit 84eb67a95a94b8d0778d59cf88e4cb92787235e8 en agent-os/TSK-012, sin push.",
+  "commit": "84eb67a95a94b8d0778d59cf88e4cb92787235e8",
+  "tests_passed": 16,
+  "tests_total": 16,
+  "gaps_found": [],
+  "next_steps": [
+    "Ejecutar los imports contra el sandbox real (sandbox.app.fullsite.mx / proyecto Supabase sandbox) con credenciales cuando el milestone de sandbox lo permita — la suite actual certifica la lógica a nivel STAGING con sandbox sintético",
+    "Considerar diff_report.py como siguiente gate de verificación post-import (el propio script lo sugiere como paso siguiente)"
+  ]
+}

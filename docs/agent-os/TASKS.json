@@ -118,24 +118,57 @@
   },
   "TSK-010": {
     "title": "CLON-MANIFEST — manifest.json con schema estricto + validación en CI (R2-G03)",
-    "status": "IN_PROGRESS",
+    "status": "CLOSED",
     "role": "RUNTIME_ENGINEER",
     "priority": "P0",
     "tags": [
       "gate:CLON-MANIFEST",
       "clonability"
     ],
-    "updated_at": "2026-08-08T21:59:07Z"
+    "updated_at": "2026-08-08T22:09:57Z"
   },
   "TSK-011": {
     "title": "OBS-HEALTH — Monitoreo crítico por cliente: /health completo + heartbeat + alerta",
-    "status": "IN_PROGRESS",
+    "status": "CLOSED",
     "role": "RUNTIME_ENGINEER",
     "priority": "P1",
     "tags": [
       "gate:OBS-HEALTH",
       "observability-release"
     ],
-    "updated_at": "2026-08-08T21:59:08Z"
+    "updated_at": "2026-08-08T22:27:08Z"
+  },
+  "TSK-012": {
+    "title": "CLON-IMPORTS — menu_import + staff_import ejecutados y verificados contra tenant sandbox (R2-G05)",
+    "status": "CLOSED",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P1",
+    "tags": [
+      "gate:CLON-IMPORTS",
+      "clonability"
+    ],
+    "updated_at": "2026-08-08T22:34:48Z"
+  },
+  "TSK-013": {
+    "title": "CLON-ONBOARD — Onboarding automatizado <20 min sin pasos manuales (R2-G02)",
+    "status": "CLOSED",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P0",
+    "tags": [
+      "gate:CLON-ONBOARD",
+      "clonability"
+    ],
+    "updated_at": "2026-08-09T01:28:28Z"
+  },
+  "TSK-014": {
+    "title": "CLON-SMOKE — Smoke test automatizado PASS en cliente nuevo sin datos AMALAY (R2-G06)",
+    "status": "IN_PROGRESS",
+    "role": "RUNTIME_ENGINEER",
+    "priority": "P0",
+    "tags": [
+      "gate:CLON-SMOKE",
+      "clonability"
+    ],
+    "updated_at": "2026-08-09T01:29:02Z"
   }
 }

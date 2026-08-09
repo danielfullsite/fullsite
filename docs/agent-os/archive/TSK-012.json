@@ -1,0 +1,93 @@
+{
+  "id": "TSK-012",
+  "execution_class": "AUTO_TECH",
+  "gate_id": "CLON-IMPORTS",
+  "domain": "clonability",
+  "title": "CLON-IMPORTS — menu_import + staff_import ejecutados y verificados contra tenant sandbox (R2-G05)",
+  "objective": "Import idempotente con validación y reporte de errores; test con datos sintéticos (no AMALAY)\n\nGATE: CLON-IMPORTS · dominio: clonability · cert level objetivo: STAGING\nContexto: este task implementa un gate del pipeline CLIENT_2_READY. Reconcilia SIEMPRE contra el estado actual del repo antes de asumir docs como verdad. NO toques: branches bug-019/*, wave1/*, release/offline-field-*, producción, secretos.",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "CLOSED",
+  "tags": [
+    "gate:CLON-IMPORTS",
+    "clonability"
+  ],
+  "dod": [
+    "Import idempotente con validación y reporte de errores; test con datos sintéticos (no AMALAY)",
+    "Tests deterministas incluidos y en verde",
+    "Commit en el branch del task (nunca push, nunca merge manual)"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-08T22:10:29Z",
+  "updated_at": "2026-08-08T22:34:48Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-08T22:10:29Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T22:10:30Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T22:10:30Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-08T22:32:27Z",
+      "note": "Submitted for verification"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "SUPERVISOR",
+      "at": "2026-08-08T22:32:47Z",
+      "note": "Auto-transitioned by supervisor"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-08T22:34:40Z",
+      "note": "Inspeccioné commit 84eb67a en agent-os/TSK-012 (solo 4 archivos: clon-imports.yml, menu_import.py fix, fake_supabase.py, test_clon_imports.py — las eliminaciones de TSK-011 en el diff provisto son artefacto del branch base, no del commit). Leí completos fake_supabase.py (PostgREST falso stdlib/loopb"
+    },
+    {
+      "from": "VERIFIED",
+      "to": "CLOSED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-08T22:34:48Z",
+      "note": "Pipeline complete. Merge commit: 4998cef122f31bd23e857b94ade671aac3f5d833"
+    }
+  ],
+  "branch": "agent-os/TSK-012",
+  "worktree_path": "/tmp/fullsite-worker-TSK-012",
+  "closed_at": "2026-08-08T22:34:48Z",
+  "merge_commit": "4998cef122f31bd23e857b94ade671aac3f5d833",
+  "close_evidence": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contadores de escritura) y una suite de 16 tests deterministas (tests/onboarding/test_clon_imports.py) que ejecuta los scripts reales scripts/onboarding/menu_import.py y staff_import.py como subprocesos con datos 100% sintéticos (no AMALAY). Verifica idempotencia (segunda corrida = 0 escrituras nuevas y 0 ",
+  "gate_updated": [
+    "gate:CLON-IMPORTS",
+    "clonability"
+  ]
+}

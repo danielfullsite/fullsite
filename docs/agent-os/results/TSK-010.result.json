@@ -1,0 +1,17 @@
+{
+  "task_id": "TSK-010",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-08T22:04:39Z",
+  "verdict": "VERIFIED",
+  "summary": "Implemented gate CLON-MANIFEST (R2-G03): strict JSON Schema draft 2020-12 for client manifests (scripts/manifests/manifest.schema.json, additionalProperties:false, mirrors RestaurantManifest interface",
+  "evidence": "Implemented gate CLON-MANIFEST (R2-G03): strict JSON Schema draft 2020-12 for client manifests (scripts/manifests/manifest.schema.json, additionalProperties:false, mirrors RestaurantManifest interface in dashboard-app/src/lib/restaurant-manifest.ts and bootstrap_client.py field usage; accepts real amalay.json and nomada-mini.json unchanged), dependency-free executable Node validator (scripts/manifests/validate_manifest.mjs, exit 1 on invalid, per-field path errors, throws on unimplemented schema keywords to keep schema/validator in sync), 40 deterministic vitest tests all green (2 real manifests valid, minimal valid manifest, 33 invalid-manifest rejection cases, 3 schema-sync checks), and CI workflow .github/workflows/manifest-validation.yml running validator + suite on manifest-touching pushes/PRs. Verified: validator passes 2/2 real manifests, rejects corrupt manifest with exit 1, vitest 40/40 passed in 141ms. Commit d1bfc71b2a0fcfb5249d2d5e35663e22e4a59de5 on agent-os/TSK-010, not pushed.",
+  "commit": "d1bfc71b2a0fcfb5249d2d5e35663e22e4a59de5",
+  "tests_passed": 40,
+  "tests_total": 40,
+  "gaps_found": [],
+  "next_steps": [
+    "Flip R2-G03 to ACTIVE in docs/agent-os/FULLSITE-READINESS-CONTRACT.md after pipeline certification",
+    "Reconcile data_source union in restaurant-manifest.ts ('supabase' used by amalay.json but absent from the TS type)",
+    "Consider a separate schema for the onboarding manifest (scripts/onboarding/manifest.example.json) consumed by onboard_client.py — different shape, out of R2-G03 scope"
+  ]
+}

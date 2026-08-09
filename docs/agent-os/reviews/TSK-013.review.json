@@ -1,0 +1,10 @@
+{
+  "task_id": "TSK-013",
+  "reviewed_by": "RUNTIME_VERIFICATION",
+  "reviewed_at": "2026-08-09T01:28:15Z",
+  "verdict": "VERIFIED",
+  "findings": [],
+  "return_to_engineer": false,
+  "return_reason": null,
+  "notes": "Worktree limpio en f489a3b (head de agent-os/TSK-013, local-only, sin push). Corrí independientemente: python3 -m pytest tests/onboarding/test_clon_onboard.py tests/onboarding/test_clon_imports.py -v → 25/25 PASS en 16.1s, deterministas (loopback FakeSupabase con GoTrue sintético, sin red, sin sleeps). Leí onboard_client.py: lecciones vantara reales en código (app_metadata.client_id+role al crear user :655-662, backfill+password sync vía admin PUT :684-698, client_users sin duplicar), checkpoint 0600 con owner_pwd, env_validation nunca saltado en --resume, external steps SKIP en dry-run sin cliente en BD, diff_report zeroed en totals. Los 4 hallazgos del review previo (KeyError 'rest' en resume, dry-run exit 1, 2a corrida no idempotente, suite roja) están corregidos y cubiertos por tests que fallaban antes y ahora pasan. E2E timed <1200s con stdin=DEVNULL (cero intervención manual), guardas anti-AMALAY-prod con cero escrituras verificadas. Sin stubs, sin secretos en stdout. Nota no bloqueante: el E2E es contra tenant sandbox sintético (mismo estándar certificado en TSK-012); corrida contra el proyecto sandbox vivo pendiente para elevar a STAGING pleno."
+}

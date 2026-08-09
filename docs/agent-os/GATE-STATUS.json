@@ -61,5 +61,47 @@
     "commit": "90dc366c4fde338287eecd6dc97a71fbb4ec4c86",
     "evidence": "Implemented TSK-005 DEMO-FOUNDATION in 6 files under scripts/demo/: demo_seed.py (deterministic seed with seed=42 producing exactly 30 menu items, 10 tables, 5 staff; fail-closed guards for non-demo tenants and production URLs; all rows tagged source=SIMULATED/environment=DEMO; [DEMO][ISOLATED] log ",
     "closed_at": "2026-08-05T01:40:00Z"
+  },
+  "gate:CLON-MANIFEST": {
+    "status": "CLOSED",
+    "task_id": "TSK-010",
+    "commit": "fa840d1f9ccf0849922381c7c2f3f8c41c2283a4",
+    "evidence": "Implemented gate CLON-MANIFEST (R2-G03): strict JSON Schema draft 2020-12 for client manifests (scripts/manifests/manifest.schema.json, additionalProperties:false, mirrors RestaurantManifest interface in dashboard-app/src/lib/restaurant-manifest.ts and bootstrap_client.py field usage; accepts real a",
+    "closed_at": "2026-08-08T22:09:57Z"
+  },
+  "clonability": {
+    "status": "CLOSED",
+    "task_id": "TSK-013",
+    "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
+    "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no",
+    "closed_at": "2026-08-09T01:28:28Z"
+  },
+  "gate:OBS-HEALTH": {
+    "status": "CLOSED",
+    "task_id": "TSK-011",
+    "commit": "d2914a2695a39cc0f430a34a696a12da5b247705",
+    "evidence": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New pure deterministic module dashboard-app/src/lib/client-health.ts (terminal online/stale/offline, cli",
+    "closed_at": "2026-08-08T22:27:08Z"
+  },
+  "observability-release": {
+    "status": "CLOSED",
+    "task_id": "TSK-011",
+    "commit": "d2914a2695a39cc0f430a34a696a12da5b247705",
+    "evidence": "Implemented OBS-HEALTH gate: heartbeat per terminal already existed via pos_sessions.last_heartbeat (POS sends every 2 min), so added the missing per-client evaluation and actionable down signal. New pure deterministic module dashboard-app/src/lib/client-health.ts (terminal online/stale/offline, cli",
+    "closed_at": "2026-08-08T22:27:08Z"
+  },
+  "gate:CLON-IMPORTS": {
+    "status": "CLOSED",
+    "task_id": "TSK-012",
+    "commit": "4998cef122f31bd23e857b94ade671aac3f5d833",
+    "evidence": "Gate CLON-IMPORTS (R2-G05): construí un tenant sandbox sintético (tests/onboarding/fake_supabase.py, servidor PostgREST falso in-process en loopback, stdlib sin deps, con inyección de fallos y contadores de escritura) y una suite de 16 tests deterministas (tests/onboarding/test_clon_imports.py) que ",
+    "closed_at": "2026-08-08T22:34:48Z"
+  },
+  "gate:CLON-ONBOARD": {
+    "status": "CLOSED",
+    "task_id": "TSK-013",
+    "commit": "31afc4e1582ec70dd531d600e1c5981c2758e8b7",
+    "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no",
+    "closed_at": "2026-08-09T01:28:28Z"
   }
 }

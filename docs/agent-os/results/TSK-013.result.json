@@ -1,0 +1,13 @@
+{
+  "task_id": "TSK-013",
+  "submitted_by": "RUNTIME_ENGINEER",
+  "submitted_at": "2026-08-09T01:25:33Z",
+  "verdict": "VERIFIED",
+  "summary": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pw",
+  "evidence": "Corregidos los 4 fallos de verificación de CLON-ONBOARD en scripts/onboarding/onboard_client.py: (1) --resume ya no truena con KeyError 'rest' — env_validation nunca se salta por checkpoint y owner_pwd persiste en el checkpoint 0600; (2) dry-run sale 0 — pasos externos se omiten cuando el cliente no existe en BD; (3) segunda corrida idempotente — auth user existente sincroniza password+app_metadata vía admin PUT y diff_report (solo lectura) ya no suma a totals.created; (4) suite verde de verdad: tests/onboarding/test_clon_onboard.py 9/9 OK más regresión test_clon_imports.py 16/16 OK. Commit f489a3b84db3d15948745649e14d34229aaa0507 en agent-os/TSK-013, sin push.",
+  "commit": "f489a3b84db3d15948745649e14d34229aaa0507",
+  "tests_passed": 25,
+  "tests_total": 25,
+  "gaps_found": [],
+  "next_steps": []
+}
