@@ -1,0 +1,20 @@
+{
+  "type": "DOMAIN_HANDOFF",
+  "domain": "ops-truth",
+  "from": "external Wave1 owner",
+  "to": "Agent Company / integration orchestration",
+  "date": "2026-08-08",
+  "evidence": {
+    "branch": "wave1/inventory-truth",
+    "head": "72748b2",
+    "chain": ["54f6c28","358d38a","796b7a6","c0b9511","63faea9","72748b2"],
+    "report": "READY_FOR_INTEGRATION",
+    "working_tree": "CLEAN"
+  },
+  "artifact_policy": "wave1/inventory-truth@72748b2 es INSUMO CERTIFICADO — no rama de desarrollo. Regresiones atribuibles: task específico + owner único + worktree aislado + cert independiente + reintegración.",
+  "accepted_truths": {
+    "amalay_business_day_start_local": "05:00 (04:00 superado por evidencia — NO preparar cambio)",
+    "amalay_opening_balance": "HUMAN + PRODUCTION GATE (stock almacenado no es evidencia suficiente; requiere conteo físico o aceptación explícita de cutover)",
+    "client2_config": "timezone + business_day_start_local propios, obligatorios en onboarding"
+  }
+}
