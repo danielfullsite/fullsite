@@ -54,13 +54,17 @@ scratchpad `bug019_cert/iso_{prelude,cert}.sql`. Staging already runs the strict
 (read-only confirmation available).
 
 ## Residual risks
-1. **RESOLVED (fail-closed, commit d78d4cf):** `api/voice` + `api/coach` read `wansoft_daily`/
-   `wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (921 rows, AMALAY sales
-   history; multiple tenants already live). Now only the configured legacy owner
-   (`WANSOFT_LEGACY_CLIENT_ID`, default `amalay`) reads them; every other tenant fails closed (empty /
-   no insights). voice still serves each tenant's own `pos_staff`. **Set `WANSOFT_LEGACY_CLIENT_ID`
-   in prod env (defaults to `amalay`).** Non-blocking feature enhancement (not a security item):
-   serve other tenants' voice/coach from `pos_orders` for parity — product decision, deferred.
+1. **RESOLVED — explicit ownership gate (commit c602f29):** `api/voice` + `api/coach` read
+   `wansoft_daily`/`wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (921 rows;
+   multiple tenants already live: amalay/coffee-shop/nomada/sushi-zen/demo). Per the approved product
+   decision, voice/coach are DISABLED for any non-owner tenant. Ownership gate (`lib/wansoft-owner.ts`):
+   requires (1) valid `withPOSAuth`, (2) server-resolved `auth.clientId`, (3) exact match to the owner
+   tenant (`WANSOFT_LEGACY_CLIENT_ID`, default `amalay`), (5) default deny. It does NOT use
+   `data_source` (a second `data_source='wansoft'` tenant is still denied) or any browser value, and
+   runs BEFORE the service-role key/query. Non-owner → `403 feature_unavailable`, no data. No-auth →
+   401. **Set `WANSOFT_LEGACY_CLIENT_ID=amalay` in prod env.** UI should hide voice/coach for non-owner
+   tenants (UX defense-in-depth, not the security control — the 403 is). Migrating voice/coach to
+   tenant-scoped `pos_orders` is deferred, separate product work (non-blocking).
 2. Child tables without `client_id` (`pos_purchase_order_items`, `pos_sub_recipe_ingredients`):
    authenticated-only after section 7, but not tenant-scoped (cross-tenant among *authenticated*
    users). Full scoping needs a `client_id` column or a parent-join policy — deferred (low severity,
