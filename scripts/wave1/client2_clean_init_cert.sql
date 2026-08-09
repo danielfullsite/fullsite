@@ -1,0 +1,41 @@
+-- ═════════════════════════════════════════════════════════════════════════════
+-- W1 RELEASE · Client #2 CLEAN-START certification (reusable, staging)
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Prueba que un tenant NUEVO arranca CANÓNICO sin ningún backfill legacy:
+-- config obligatoria (timezone + business_day_start_local), policy 100%
+-- clasificada día 0, receta versionada, costos inicializados, SALDO INICIAL
+-- EXPLÍCITO (capturado, no inferido de drift), venta→R1→costo inmutable→
+-- cierre sellado→orden tardía como ajuste→reconstrucción drift=0→aislamiento.
+--
+-- ⚠ OPERATIVO: ejecutar los pasos como STATEMENTS SEPARADOS. NO encadenar
+-- r1_save_order_idempotent + r1_reconcile_order en un solo statement con CTEs:
+-- el orden de evaluación de CTEs volátiles no está garantizado y el reconcile
+-- puede correr antes de que el save sea visible ("Order not found") abortando
+-- todo. La app no sufre esto (la ruta /api/pos/save-order es secuencial);
+-- aplica a scripts SQL manuales y certs.
+--
+-- ⚠ Los cleanups de fixtures requieren SET LOCAL app.cierre_admin_unlock='on'
+-- (el guard de inmutabilidad W1-D bloquea DELETE incluso a service_role) y el
+-- registro de save-operations NO se limpia — usar save_operation_id frescos.
+--
+-- Certificado en staging 2026-08-08 (tenant cl2clean):
+--   cost events: o1 FULL $26.50 (2×[2pz bolillo@4 + 0.15kg frijol@35]) +
+--   agua UNKNOWN (retail sin base de costo — fail-closed visible) ·
+--   cogs_sealed 26.50 / cogs_post_close 13.25 · ajuste late_order 139.20 ·
+--   drift 0 · stocks exactos (44 / 7.55 / agua 23) · contaminación cruzada 0.
+--
+-- Pasos (ver docs/wave1/W1-RELEASE-RUNBOOK.md §Client2):
+--   1. INSERT clients (timezone, business_day_start_local) — OBLIGATORIOS
+--   2. INSERT pos_mutation_authority (sale_authority='r1')
+--   3. Catálogo: categorías, items, ingredientes CON cost_per_unit real
+--   4. pos_inventory + movimientos opening_balance EXPLÍCITOS (key estable)
+--   5. pos_recipe_versions + lines (activa) · pos_market_stock con conteo real
+--   6. pos_item_inventory_policy: TODO clasificado (recipe/direct_stock/
+--      non_inventory) — CERO unclassified
+--   7. Venta: r1_save_order_idempotent  →  (statement separado)
+--      r1_reconcile_order  →  verificar pos_cost_events
+--   8. Cierre: INSERT pos_cierres con snapshot w1d.v1 + business date del
+--      primitivo W1-C
+--   9. Orden tardía → ajuste automático + cogs_post_close; sello intacto
+--  10. Drift check: stored == opening + SUM(post) → 0 filas
+-- ═════════════════════════════════════════════════════════════════════════════
