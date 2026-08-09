@@ -54,14 +54,13 @@ scratchpad `bug019_cert/iso_{prelude,cert}.sql`. Staging already runs the strict
 (read-only confirmation available).
 
 ## Residual risks
-1. **PRODUCT DECISION (the one open item):** `api/voice` + `api/coach` read `wansoft_daily`/
-   `wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (single-tenant Wansoft-
-   scraper data). Both now require authentication, but because the tables lack a tenant column, an
-   authenticated user of a *different* tenant would receive AMALAY's aggregate sales. Not a public
-   leak and not Client #2's own data (Client #2 is `data_source='fullsite'` → data lives in
-   `pos_orders`, tenant-scoped). Determined minimal fix available (gate voice/coach to clients with
-   `data_source='wansoft'`, using existing config, no schema change) — but the feature's multi-tenant
-   data strategy (gate vs migrate to `pos_orders`) is a product/data-model decision for Daniel.
+1. **RESOLVED (fail-closed, commit d78d4cf):** `api/voice` + `api/coach` read `wansoft_daily`/
+   `wansoft_waiter_categories` — AMALAY-legacy tables with NO `client_id` (921 rows, AMALAY sales
+   history; multiple tenants already live). Now only the configured legacy owner
+   (`WANSOFT_LEGACY_CLIENT_ID`, default `amalay`) reads them; every other tenant fails closed (empty /
+   no insights). voice still serves each tenant's own `pos_staff`. **Set `WANSOFT_LEGACY_CLIENT_ID`
+   in prod env (defaults to `amalay`).** Non-blocking feature enhancement (not a security item):
+   serve other tenants' voice/coach from `pos_orders` for parity — product decision, deferred.
 2. Child tables without `client_id` (`pos_purchase_order_items`, `pos_sub_recipe_ingredients`):
    authenticated-only after section 7, but not tenant-scoped (cross-tenant among *authenticated*
    users). Full scoping needs a `client_id` column or a parent-join policy — deferred (low severity,
@@ -73,5 +72,6 @@ None for legitimate authenticated same-tenant use (POS/dashboard/public flows un
 anonymous callers lose all tenant DB access (intended). voice/coach now require login.
 
 ## State
-PROD untouched. STRICT PROD RLS: NOT APPLIED. Execution gated on founder approval + the one
-product decision above.
+PROD untouched. STRICT PROD RLS: NOT APPLIED. All security residuals closed; no product decision
+blocks the gate. **READY for the founder-approved production activation.** Set
+`WANSOFT_LEGACY_CLIENT_ID=amalay` in the prod app env before/at deploy.
