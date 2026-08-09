@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { ownsLegacyWansoft } from '@/lib/wansoft-owner'
 
 // Simple rate limiting — max 15 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -46,16 +47,21 @@ export async function POST(request: NextRequest) {
     const auth = await withPOSAuth(request)
     if (!auth) return unauthorized()
 
+    // BUG-019: voice is served ONLY to the exact owner of the AMALAY legacy Wansoft dataset
+    // (wansoft_daily/wansoft_waiter_categories have no client_id). Ownership is a server-side
+    // identifier via auth.clientId — never a browser value, never data_source. Any other
+    // tenant (incl. a hypothetical data_source='wansoft' one) is denied. This authorization
+    // runs BEFORE the service-role key is set up or any legacy table is queried.
+    if (!ownsLegacyWansoft(auth.clientId)) {
+      return new Response(JSON.stringify({ error: 'feature_unavailable' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     // Privileged server read (survives strict RLS). Fail closed if not configured.
     const sbKey = process.env.SUPABASE_SERVICE_KEY
     if (!sbKey) return new Response('server misconfigured', { status: 503 })
-
-    // BUG-019: wansoft_daily/wansoft_waiter_categories are AMALAY-legacy tables WITHOUT a
-    // client_id column. Only the configured legacy owner may read them; every other tenant
-    // fails closed (empty), so no one sees another tenant's aggregate sales. (Serving other
-    // tenants from pos_orders is a separate feature decision.)
-    const canWansoft = auth.clientId === (process.env.WANSOFT_LEGACY_CLIENT_ID || 'amalay')
 
     const q = message.toLowerCase()
 
@@ -67,11 +73,11 @@ export async function POST(request: NextRequest) {
     const selectCols = wantsDetail
       ? 'fecha,ventas_dia,ventas_brutas,descuentos,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta,meseros,ventas_por_grupo,pago_métodos,platillos_top'
       : 'fecha,ventas_dia,tickets_count,personas_restaurant,ticket_promedio_restaurant,efectivo,tarjeta'
-    const dailyRes = canWansoft ? await fetch(
+    const dailyRes = await fetch(
       `${sbUrl}/rest/v1/wansoft_daily?select=${selectCols}&ventas_dia=gt.0&order=fecha.desc&limit=${histLimit}`,
       { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' }
-    ) : null
-    const recentDays = dailyRes?.ok ? await dailyRes.json() : []
+    )
+    const recentDays = dailyRes.ok ? await dailyRes.json() : []
 
     // 2. Detect date from question
     const now = new Date()
@@ -145,13 +151,13 @@ export async function POST(request: NextRequest) {
       wcParams += '&limit=7'
     }
 
-    const wcRes = canWansoft ? await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
+    const wcRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?${wcParams}`, {
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
       cache: 'no-store',
-    }) : null
-    const waiterRows: Array<{ fecha: string; data: unknown }> = wcRes?.ok ? await wcRes.json() : []
+    })
+    const waiterRows: Array<{ fecha: string; data: unknown }> = wcRes.ok ? await wcRes.json() : []
 
-    if (canWansoft && waiterRows.length === 0 && dateFilter) {
+    if (waiterRows.length === 0 && dateFilter) {
       const fallbackRes = await fetch(`${sbUrl}/rest/v1/wansoft_waiter_categories?select=fecha,data&order=fecha.desc&limit=1`, {
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
         cache: 'no-store',

@@ -1,20 +1,19 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { ownsLegacyWansoft } from '@/lib/wansoft-owner'
 
 export async function POST(request: NextRequest) {
   try {
-    // BUG-019: authenticate + resolve authoritative tenant server-side. coach reads
-    // restaurant financial/operational data, so it must not be anonymous and must not
-    // trust a browser-supplied client_id.
+    // BUG-019: authenticate + resolve authoritative tenant server-side (never a browser
+    // client_id). coach is built entirely on the AMALAY legacy wansoft_daily (no client_id),
+    // so it is served ONLY to the exact dataset owner (server-side identifier). Every other
+    // tenant is denied (403, no data). Authorization runs BEFORE the service-role key/query.
     const auth = await withPOSAuth(request)
     if (!auth) return unauthorized()
     const clientId = auth.clientId
 
-    // BUG-019: coach reads only AMALAY-legacy wansoft_daily (no client_id). Only the
-    // configured legacy owner may read it — every other tenant gets no insights (fail
-    // closed), so no one receives another tenant's aggregate sales.
-    if (clientId !== (process.env.WANSOFT_LEGACY_CLIENT_ID || 'amalay')) {
-      return Response.json({ insights: [] }, { status: 200 })
+    if (!ownsLegacyWansoft(clientId)) {
+      return Response.json({ error: 'feature_unavailable' }, { status: 403 })
     }
 
     if (!process.env.GROQ_API_KEY && !process.env.GROQ) {
