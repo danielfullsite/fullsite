@@ -347,3 +347,5 @@
 {"ts": "2026-08-09T01:30:28Z", "type": "GATE_STATUS", "gate_id": "REL-INSTALLER", "from": "BLOCKED_HUMAN", "to": "BLOCKED_HUMAN", "by": "AGENT_COMPANY", "note": "Build v1.3.4 GREEN (GHA 31288311728, build-win + verify-install success). Falta solo preflight físico — batcheado en visita AMALAY."}
 {"ts": "2026-08-09T01:30:28Z", "type": "FIELD_PACK_FINALIZED", "summary": "AMALAY: 2 tareas (~120 min)", "tasks": 2}
 {"ts": "2026-08-09T01:31:31Z", "type": "SUPERVISOR_STARTED", "pid": 88325}
+{"ts": "2026-08-09T01:32:59Z", "type": "HUMAN_TASK_CREATED", "gate_id": "TELEGRAM-CHANNEL", "location": "Remoto — tu teléfono (5 min)"}
+{"ts": "2026-08-09T01:32:59Z", "type": "CRITICAL_CHANNEL_DOWN", "channel": "telegram", "cause": "401 token revoked", "since": "unknown", "mitigation": "founder task queued"}
