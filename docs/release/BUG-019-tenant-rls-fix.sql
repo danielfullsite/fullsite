@@ -137,33 +137,71 @@ end $$;
 --    elimina para no dejar SECURITY DEFINER muerto.
 drop function if exists public.get_public_menu(text);
 
--- ── 7. Deuda permisiva histórica: tablas SIN client_id con lectura anon ────────
---    BUG-019-CD: estas tablas base carecen de client_id (por eso la sección 1 no
---    las tocó) pero exponían datos PRIVADos a anon vía policies `public`/`anon`:
---    finanzas (wansoft_daily/kpis), PII de clientes (amalay_reservaciones), y
---    operativo/IP (líneas de OC y de sub-recetas). Se revoca anon y se concede solo
---    a authenticated/service_role. Sus consumidores ya son server-mediated
---    (coach/voice autenticados + service_role) o dashboard autenticado (JWT).
---    NOTA: las tablas hijas sin client_id (pos_purchase_order_items,
---    pos_sub_recipe_ingredients) quedan authenticated-only; su scoping por tenant
---    depende del padre — cross-tenant entre authenticated es un residual conocido
---    (requiere client_id o policy con join al padre; fuera de scope de seguridad anon).
+-- ── 7a. Deuda permisiva histórica: tablas legacy SIN client_id NI padre ────────
+--    BUG-019-CD: base tables sin client_id (sección 1 no las tocó) que exponían datos
+--    PRIVADos a anon vía policies `public`/`anon`: finanzas (wansoft_daily/kpis) y PII
+--    (amalay_reservaciones). Son AMALAY-legacy single-tenant sin relación a un padre.
+--    Se revoca anon; lectura solo authenticated + service_role. wansoft_* además queda
+--    detrás del ownership gate server-side de voice/coach (WANSOFT_LEGACY_CLIENT_ID).
 --    content y reviews se dejan públicas a propósito (las lee el sitio de marketing).
 do $$
 declare t text;
 begin
-  foreach t in array array[
-    'wansoft_daily','wansoft_kpis','amalay_reservaciones',
-    'pos_purchase_order_items','pos_sub_recipe_ingredients'
-  ] loop
+  foreach t in array array['wansoft_daily','wansoft_kpis','amalay_reservaciones'] loop
     if exists (select 1 from information_schema.tables where table_schema='public' and table_name=t) then
-      -- Drop permissive anon/public read policies, revoke anon, grant authenticated+service_role.
       perform private._drop_all_policies(t);
       execute format('alter table public.%I enable row level security', t);
       execute format('revoke all on public.%I from anon', t);
       execute format('grant select on public.%I to authenticated, service_role', t);
       execute format($p$create policy %1$I_auth_read on public.%1$I for select to authenticated using (true)$p$, t);
       execute format($p$create policy %1$I_svc on public.%1$I for all to service_role using (true) with check (true)$p$, t);
+    end if;
+  end loop;
+end $$;
+
+-- ── 7b. Tablas HIJAS sin client_id: scope por tenant vía la relación real al PADRE ─
+--    pos_purchase_order_items.order_id      -> pos_purchase_orders.id      (client_id)
+--    pos_sub_recipe_ingredients.sub_recipe_id -> pos_sub_recipes.id        (client_id)
+--    (Sin FK formal en el schema; el join usa la columna de enlace real verificada.)
+--    Un usuario accede a un hijo SOLO si tiene acceso al tenant del padre. USING (lectura/
+--    update/delete) y WITH CHECK (insert/update) impiden leer, insertar o MOVER cross-tenant.
+--    No basta revocar anon ni dejar authenticated general.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select * from (values
+      ('pos_purchase_order_items','order_id','pos_purchase_orders'),
+      ('pos_sub_recipe_ingredients','sub_recipe_id','pos_sub_recipes')
+    ) as v(child, fk_col, parent)
+  loop
+    if exists (select 1 from information_schema.tables where table_schema='public' and table_name=r.child)
+       and exists (select 1 from information_schema.tables where table_schema='public' and table_name=r.parent) then
+      perform private._drop_all_policies(r.child);
+      execute format('alter table public.%I enable row level security', r.child);
+      execute format('revoke all on public.%I from anon', r.child);
+      execute format('grant select, insert, update, delete on public.%I to authenticated', r.child);
+      execute format('grant all on public.%I to service_role', r.child);
+      -- parent-access predicate reused across the 4 authenticated policies
+      execute format(
+        $p$create policy %1$I_sel on public.%1$I for select to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_ins on public.%1$I for insert to authenticated
+             with check (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_upd on public.%1$I for update to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))
+             with check (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format(
+        $p$create policy %1$I_del on public.%1$I for delete to authenticated
+             using (exists (select 1 from public.%3$I p where p.id = %1$I.%2$I and private.user_has_client_access(p.client_id)))$p$,
+        r.child, r.fk_col, r.parent);
+      execute format($p$create policy %1$I_svc on public.%1$I for all to service_role using (true) with check (true)$p$, r.child);
     end if;
   end loop;
 end $$;
