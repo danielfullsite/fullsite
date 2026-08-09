@@ -1,0 +1,15 @@
+{
+  "task_id": "TSK-001",
+  "submitted_by": "RUNTIME_VERIFICATION",
+  "submitted_at": "2026-08-04T15:42:33Z",
+  "verdict": "VERIFIED",
+  "summary": "AUTH-OFFLINE-02 (GAP-A) corregido. verifyPinWithMinRole llama meetsMinRole() en PBKDF2 y btoa offline paths. 54 tests PASS.",
+  "evidence": "pos-data.ts:1797-1803: pbkdf2 path calls meetsMinRole(pbkdf2.role, minRole) before return. pos-data.ts:1805-1810: btoa path calls meetsMinRole(legacy.role, minRole) before return. Empty/unknown role → meetsMinRole returns false (fail-closed). commit 72625e7: capitan PASS + cajero REJECT regression tests. commit c2e4770: OC-09 CODE VERIFIED, GAP-A CLOSED in RUNTIME-GAP-REGISTER.",
+  "commit": "c2e4770",
+  "tests_passed": 54,
+  "tests_total": 54,
+  "gaps_found": [],
+  "next_steps": [
+    "Física: ejecutar OCS-P2.5.9 Fases A-D en AMALAY (90-120 min)"
+  ]
+}

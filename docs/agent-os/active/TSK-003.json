@@ -1,0 +1,78 @@
+{
+  "id": "TSK-003",
+  "title": "Logging Persistente — Electron logs survive restarts",
+  "objective": "Verificar y mejorar que los logs del servidor Electron sobreviven reinicios y tienen rotación",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P1",
+  "status": "IN_PROGRESS",
+  "tags": [
+    "logging",
+    "r3",
+    "observability"
+  ],
+  "dod": [
+    "Logs escritos a archivo con winston o pino, no solo stdout",
+    "Rotación automática (max 5MB por archivo, 5 archivos)",
+    "/health incluye last_log_entry",
+    "Diagnóstico remoto posible sin SSH"
+  ],
+  "dependencies": [],
+  "budget_tokens": 80000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "",
+  "claimed_by": null,
+  "claimed_at": null,
+  "submitted_at": null,
+  "verified_at": null,
+  "created_at": "2026-08-04T15:26:38Z",
+  "updated_at": "2026-08-04T18:49:03Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-04T15:26:38Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T16:11:20Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T16:11:20Z",
+      "note": "Engineering started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "READY",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T18:48:58Z",
+      "note": "Worker PID confirmed dead post-supervisor-restart. Recovered for full pipeline cycle."
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T18:49:03Z",
+      "note": "Worker claimed task"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_ENGINEER",
+      "at": "2026-08-04T18:49:03Z",
+      "note": "Engineering started"
+    }
+  ],
+  "branch": "agent-os/TSK-003",
+  "worktree_path": "/tmp/fullsite-worker-TSK-003"
+}

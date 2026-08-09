@@ -351,7 +351,7 @@ export default function AdminUsuariosPage() {
                 type="email"
                 value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="juan@amalay.mx"
+                placeholder="juan@mirestaurante.mx"
                 className="w-full border border-[var(--line)] bg-[var(--surface)] rounded-lg px-3 py-2.5 text-sm text-[var(--text-1)]"
               />
             </div>

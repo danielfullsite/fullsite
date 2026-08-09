@@ -19,8 +19,8 @@
     "electron-builder": "^25.0.0"
   },
   "build": {
-    "appId": "mx.fullsite.kds",
-    "productName": "Fullsite KDS",
+    "appId": "mx.fullsite.pos",
+    "productName": "Fullsite POS",
     "directories": {
       "output": "dist"
     },

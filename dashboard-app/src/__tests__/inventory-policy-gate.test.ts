@@ -1,6 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock inventory-policy BEFORE importing pos-data ──────────────────────────
+// ─── W1-A — el gate de policy en Sistema A fue retirado junto con Sistema A ──
+//
+// Este archivo probaba que deductIngredientsForOrder respetara el gate de
+// pos_item_inventory_policy (READY / no-READY, modo recipe vs unclassified).
+// Con W1-A ese gate cliente desapareció: la policy la resuelve y PINNEA
+// r1_reconcile_item server-side (fail-closed: unclassified → BLOCKED_UNCLASSIFIED,
+// visible en inventory_status del save). El servicio de policy en sí se sigue
+// probando en inventory-policy.test.ts (LKG cache, hash, estados).
+//
+// Aquí queda el invariante post-retiro: el stub NO consulta la policy, NO llama
+// telemetría de gate y NO toca la red, en ningún estado de policy.
+
+const store: Record<string, string> = {}
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => store[k] ?? null,
+  setItem: (k: string, v: string) => { store[k] = v },
+  removeItem: (k: string) => { delete store[k] },
+  clear: () => { for (const k of Object.keys(store)) delete store[k] },
+})
+
 const { mockIsReady, mockGetMode, mockStats, mockLogPolicyGateFailure } = vi.hoisted(() => ({
   mockIsReady: vi.fn(),
   mockGetMode: vi.fn(),
@@ -18,94 +37,41 @@ vi.mock('@/lib/inventory-policy', () => ({
   InventoryPolicyService: class {},
 }))
 
-// ── Global stubs ──────────────────────────────────────────────────────────────
-const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
-vi.stubGlobal('performance', { now: vi.fn(() => 0) })
-vi.stubGlobal('localStorage', {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-})
+import { deductIngredientsForOrder, type OrderItem } from '@/lib/pos-data'
 
-// ── Import after mocks ────────────────────────────────────────────────────────
-import { deductIngredientsForOrder } from '@/lib/pos-data'
+const item: OrderItem = {
+  id: 'i1', menuItemId: 'menu-1', nombre: 'Chilaquiles', precio: 185,
+  cantidad: 1, modificadores: [], notas: '', precioExtra: 0, subtotal: 185,
+} as OrderItem
 
-// ── Test helpers ──────────────────────────────────────────────────────────────
-const makeItem = (menuItemId: string, nombre: string) => ({
-  id: `${menuItemId}-order-item`,
-  menuItemId,
-  nombre,
-  precio: 80,
-  cantidad: 1,
-  precioExtra: 0,
-  subtotal: 80,
-  modificadores: [],
-  notas: '',
-})
-const recipeItem   = makeItem('item-latte', 'Café Latte')
-const nonRecipeItem = makeItem('item-croissant', 'Croissant')
-const okEmpty = () => ({ ok: true, json: () => Promise.resolve([]) })
+describe('W1-A — stub no consulta policy ni red, en ningún estado', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>
 
-beforeEach(() => {
-  vi.resetAllMocks()
-  mockStats.mockReturnValue({ state: 'READY' })
-})
+  beforeEach(() => {
+    vi.clearAllMocks()
+    store['fullsite_client_id'] = 'test-client'
+    fetchSpy = vi.fn(() => { throw new Error('W1-A violation: network call from retired stub') })
+    vi.stubGlobal('fetch', fetchSpy)
+  })
 
-describe('inventory gate in deductIngredientsForOrder', () => {
-  it('política READY: filtra recipe y permite Sistema A solo para no-recipe', async () => {
+  it('policy READY: no llama isReady/getMode ni fetch — todo es R1_OWNED', async () => {
     mockIsReady.mockReturnValue(true)
-    mockGetMode.mockImplementation((id: string) =>
-      id === 'item-latte' ? 'recipe' : null
-    )
-    mockFetch.mockResolvedValue(okEmpty())
+    mockGetMode.mockReturnValue('recipe')
+    const r = await deductIngredientsForOrder([item], 'o-ready', 'Mesero')
+    expect(r.success).toBe(true)
+    expect(r.resolution.R1_OWNED).toEqual(['Chilaquiles'])
+    expect(mockIsReady).not.toHaveBeenCalled()
+    expect(mockGetMode).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 
-    const result = await deductIngredientsForOrder(
-      [recipeItem, nonRecipeItem], 'pay-001', 'Omar'
-    )
-
-    expect(result.resolution.R1_OWNED).toContain('Café Latte')
-    expect(result.resolution.R1_OWNED).not.toContain('Croissant')
+  it('policy no disponible: tampoco registra policy_gate_failure ni bloquea', async () => {
+    mockIsReady.mockReturnValue(false)
+    mockStats.mockReturnValue({ state: 'FAILED' })
+    const r = await deductIngredientsForOrder([item], 'o-failed', 'Mesero')
+    expect(r.success).toBe(true)
+    expect(r.resolution.GATE_FAILED).toHaveLength(0)
     expect(mockLogPolicyGateFailure).not.toHaveBeenCalled()
-    expect(mockFetch).toHaveBeenCalled()
-  })
-
-  it('política no disponible: no llama Sistema A', async () => {
-    mockIsReady.mockReturnValue(false)
-    mockStats.mockReturnValue({ state: 'FAILED' })
-
-    const result = await deductIngredientsForOrder(
-      [recipeItem, nonRecipeItem], 'pay-002', 'Omar'
-    )
-
-    expect(result).toMatchObject({ success: true, deductions: [], alerts: [] })
-    expect(result.resolution.GATE_FAILED).toHaveLength(2)
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it('política no disponible: intenta registrar policy_gate_failure', async () => {
-    mockIsReady.mockReturnValue(false)
-    mockStats.mockReturnValue({ state: 'FAILED' })
-
-    await deductIngredientsForOrder([recipeItem], 'pay-003', 'Omar')
-
-    expect(mockLogPolicyGateFailure).toHaveBeenCalledOnce()
-    expect(mockLogPolicyGateFailure).toHaveBeenCalledWith(
-      expect.any(String),
-      'pay-003',
-      'FAILED',
-      'Omar',
-    )
-  })
-
-  it('fallo de telemetría: el flujo no lanza ni bloquea', async () => {
-    const { logPolicyGateFailure: realFn } =
-      await vi.importActual<typeof import('@/lib/inventory-policy')>('@/lib/inventory-policy')
-
-    mockFetch.mockRejectedValue(new Error('network refused'))
-
-    expect(() => realFn('amalay', 'pay-004', 'FAILED', 'test')).not.toThrow()
-    await new Promise(r => setTimeout(r, 0))
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

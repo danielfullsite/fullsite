@@ -1,0 +1,19 @@
+{
+  "id": "TSK-BUILD-01",
+  "title": "Windows Installer Build \u2014 Fullsite POS v1.3.3",
+  "role": "RUNTIME_ENGINEER",
+  "priority": "P0",
+  "status": "IN_PROGRESS",
+  "gate": "field-batch-2-build",
+  "source_commit": "80a8d7d",
+  "objective": "Build signed Windows NSIS installer for electron-app v1.3.3 from canonical commit 80a8d7d (supersedes ed19c9f: adds 6b4a1c3 build-config fix + 80a8d7d print-queue crash recovery) via GHA electron-build.yml. BLOCKED: main is ahead of origin/main — founder must authorize push to trigger build. verify-install CI job now silent-installs/uninstalls on clean windows-latest. Verify artifact name, version, SHA-256, size, and HEAD linkage. Lab preflight on physical Windows hardware required before PRE-FIELD-BATCH-02 = PASS.",
+  "dod": [
+    "GHA build completes green on windows-latest",
+    "Artifact name matches fullsite-pos-win-<push sha> pattern (canonical content = 80a8d7d)",
+    "ProductVersion and FileVersion = 1.3.3",
+    "SHA-256 recorded and linkable to HEAD ed19c9f",
+    "Packaged lab preflight executed on physical Windows hardware (not emulated)",
+    "All preflight scenarios pass (cold start, restart, offline, sync, no duplicates, logs)"
+  ],
+  "created_at": "2026-08-04T21:20:07.291402Z"
+}

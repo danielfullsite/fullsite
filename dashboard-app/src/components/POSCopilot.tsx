@@ -65,9 +65,10 @@ const COMBO_RULES: Array<{
   items: string[] // need all of these
   name: string
   discount: number
+  clientId?: string // if set, only suggest for this tenant
 }> = [
   { items: ['cafe', 'croissant'], name: 'Combo Croissant + Cafe', discount: 15 },
-  { items: ['chilaquiles', 'jugo'], name: 'Combo Desayuno AMALAY', discount: 20 },
+  { items: ['chilaquiles', 'jugo'], name: 'Combo Desayuno AMALAY', discount: 20, clientId: 'amalay' },
 ]
 
 // ── Time-based suggestions ───────────────────────────────────────────────
@@ -158,6 +159,7 @@ export default function POSCopilot({ orderItems, mesa, personas, mesero, onAddIt
 
     // -- Combo detection --
     for (const combo of COMBO_RULES) {
+      if (combo.clientId && combo.clientId !== _cid()) continue
       const hasAll = combo.items.every(item => orderNames.some(n => n.includes(item)))
       if (hasAll) {
         all.push({

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentOS Task",
+  "type": "object",
+  "required": ["id","title","objective","role","priority","status","created_at","updated_at","history"],
+  "properties": {
+    "id":             {"type": "string", "pattern": "^TSK-\\d{3,}$"},
+    "title":          {"type": "string", "maxLength": 120},
+    "objective":      {"type": "string"},
+    "role":           {"type": "string", "enum": ["ORCHESTRATOR","RUNTIME_ENGINEER","RUNTIME_VERIFICATION","KNOWLEDGE_ENGINEER","FIELD_CERTIFICATION","FOUNDER"]},
+    "priority":       {"type": "string", "enum": ["P0","P1","P2","P3"]},
+    "status":         {"type": "string", "enum": ["DRAFT","READY","CLAIMED","IN_PROGRESS","SUBMITTED","IN_REVIEW","CHANGES_REQUESTED","VERIFIED","AWAITING_FOUNDER","APPROVED","REJECTED","MERGED","BLOCKED","CANCELLED"]},
+    "tags":           {"type": "array", "items": {"type": "string"}},
+    "dod":            {"type": "array", "items": {"type": "string"}},
+    "dependencies":   {"type": "array", "items": {"type": "string", "pattern": "^TSK-\\d+$"}},
+    "budget_tokens":  {"type": "integer", "minimum": 1000},
+    "max_turns":      {"type": "integer", "minimum": 1, "maximum": 50},
+    "max_retries":    {"type": "integer", "minimum": 0, "maximum": 10},
+    "retry_count":    {"type": "integer", "minimum": 0},
+    "files_allowed":  {"type": "array", "items": {"type": "string"}},
+    "notes":          {"type": "string"},
+    "claimed_by":     {"type": ["string","null"]},
+    "claimed_at":     {"type": ["string","null"]},
+    "submitted_at":   {"type": ["string","null"]},
+    "verified_at":    {"type": ["string","null"]},
+    "created_at":     {"type": "string"},
+    "updated_at":     {"type": "string"},
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["to","by","at"],
+        "properties": {
+          "from": {"type": ["string","null"]},
+          "to":   {"type": "string"},
+          "by":   {"type": "string"},
+          "at":   {"type": "string"},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  }
+}

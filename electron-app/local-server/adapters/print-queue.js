@@ -42,8 +42,32 @@ let _jobs     = []  // in-memory mirror
 function init({ filePath }) {
   _filePath = filePath
   _jobs = _load()
+  _recoverCrashedJobs()
   _gcOld()
   console.log(`[print-queue] Loaded ${_jobs.length} jobs from disk (${_getPending().length} pending/retrying)`)
+}
+
+// A job found in 'printing' at startup means the bridge died mid-print. We
+// can't know if paper came out — reprinting a ticket is recoverable by the
+// operator, losing it is not, so revive the job instead of stranding it in
+// 'printing' (which no retry loop ever picks up). Jobs out of attempts go to
+// 'recoverable' so health-restore re-queues them with operator visibility.
+function _recoverCrashedJobs() {
+  let recovered = 0
+  _jobs = _jobs.map(j => {
+    if (j.status !== 'printing') return j
+    recovered++
+    return {
+      ...j,
+      status: j.attempts >= MAX_ATTEMPTS ? 'recoverable' : 'retrying',
+      last_error: 'Bridge restarted mid-print — job revived on startup',
+      updated_at: new Date().toISOString(),
+    }
+  })
+  if (recovered > 0) {
+    _persist()
+    console.warn(`[print-queue] Crash recovery: revived ${recovered} job(s) stuck in 'printing'`)
+  }
 }
 
 // ── Enqueue ───────────────────────────────────────────────────────────────────
@@ -266,5 +290,5 @@ module.exports = {
   canRetry,
   MAX_ATTEMPTS,
   VALID_STATUSES,
-  _forTesting: { _load, _persist, _gcOld, _getPending },
+  _forTesting: { _load, _persist, _gcOld, _getPending, _recoverCrashedJobs },
 }

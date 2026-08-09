@@ -5,11 +5,14 @@ import { X, ArrowRight, ArrowLeft, Check, AlertTriangle, Printer, DollarSign, Sh
 import { formatMXN, verifyManagerPinWithRole, logAudit } from '@/lib/pos-data'
 import { hasPermission } from '@/lib/pos-permissions'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { resolveBusinessDayConfig, getBusinessDate } from '@/lib/business-date'
+import { fetchClientConfig } from '@/lib/client-config'
 import {
   closeCachedTurno,
   queueOperation,
   getCachedOrdersByTurno,
   getCachedCashMovsByTurno,
+  getPendingQueue,
 } from '@/lib/pos-offline-db'
 import { getPosConfigSync } from '@/lib/pos-config'
 import { computeOrderSummary, summaryToArqueoInput, calcEfectivoEsperado } from '@/lib/pos-arqueo'
@@ -227,12 +230,36 @@ export default function CierreCajaWizard({
     // Stable UUID — generated once at wizard mount, same across all retries
     const cierreId = cierreIdRef.current
     const now = new Date().toISOString()
+    // W1-C: el cierre se etiqueta con la FECHA OPERATIVA del tenant (misma
+    // semántica que agentes y reportes). El cierre NUNCA se bloquea por config:
+    // si no hay red o el tenant no tiene business_day_start_local, degrada
+    // explícitamente a fecha calendario (conducta previa).
+    let fechaOperativa = now.split('T')[0]
+    let bdConfigUsed: { timezone: string; boundary: string; degraded: boolean } | null = null
+    try {
+      const bdCfg = resolveBusinessDayConfig(await fetchClientConfig(_cid()))
+      fechaOperativa = getBusinessDate(now, bdCfg.timeZone, bdCfg.boundary)
+      bdConfigUsed = { timezone: bdCfg.timeZone, boundary: bdCfg.boundary, degraded: bdCfg.degraded }
+    } catch (err) {
+      console.warn('[cierre] business-date config no disponible — usando fecha calendario:', err)
+    }
+
+    // W1-D close gate — WARN, no bloquea: una caída de red no puede impedir
+    // cerrar; el backlog queda registrado en el snapshot y cualquier orden que
+    // sincronice después del sello se representa como ajuste compensatorio
+    // (trigger w1d_orders_post_close), nunca reescribiendo el cierre.
+    let pendingSyncCount = 0
+    try { pendingSyncCount = (await getPendingQueue(true)).length } catch { /* IDB no disponible */ }
+    if (pendingSyncCount > 0) {
+      console.warn(`[cierre] ${pendingSyncCount} operaciones pendientes de sync al sellar — se reconciliarán como ajustes post-cierre`)
+    }
+
     const cierreData = withEscalationPayload(
       {
         id: cierreId,
         client_id: _cid(),
         turno_id: turnoId,
-        fecha: now.split('T')[0],
+        fecha: fechaOperativa,
         fondo_inicial: fondoInicial,
         billetes: JSON.stringify({}),
         monedas: JSON.stringify({}),
@@ -250,6 +277,18 @@ export default function CierreCajaWizard({
         closed_by: manager,
         approved_by: manager,
         created_at: now,
+        // W1-D: sello — el snapshot hace el cierre económicamente
+        // reconstruible sin depender de datos mutables futuros.
+        sealed_at: now,
+        snapshot: {
+          version: 'w1d.v1',
+          source: 'CierreCajaWizard',
+          business_date: fechaOperativa,
+          business_date_config: bdConfigUsed,
+          pending_sync_count: pendingSyncCount,
+          open_orders_escaladas: openOrders.length,
+          escalation_authorized_by: escalationAuthorizedBy || null,
+        },
       },
       openOrders,
       escalationAuthorizedBy,
@@ -292,8 +331,12 @@ export default function CierreCajaWizard({
           signal: AbortSignal.timeout(6000),
         }),
       ])
-      // If both succeeded, the sync queue items will be deduplicated on next sync
-      if (!cierreRes.ok || !turnoRes.ok) { /* queued — will sync later */ }
+      // W1-D: 409 = el turno YA tiene cierre sellado (UNIQUE uq_cierres_turno_id)
+      // — reintento idempotente, el cierre existente es la verdad; no es error.
+      if (cierreRes.status === 409) {
+        console.info(`[cierre] turno ${turnoId} ya sellado — reintento idempotente, sin duplicado`)
+      }
+      if ((!cierreRes.ok && cierreRes.status !== 409) || !turnoRes.ok) { /* queued — will sync later */ }
     } catch { /* offline — queued */ }
 
     // 4. Audit log (best-effort)

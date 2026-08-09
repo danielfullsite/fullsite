@@ -27,6 +27,10 @@ export interface ClientConfig {
   display_name: string
   city: string
   timezone: string
+  /** W1-C: hora local de inicio del día operativo ('HH:MM:SS'). NULL = tenant
+   *  aún sin configurar → las superficies degradan explícitamente a fecha
+   *  calendario (resolveBusinessDayConfig). Nunca hardcodear un valor aquí. */
+  business_day_start_local: string | null
   type: string
   default_theme: 'light' | 'dark'
   accent_color: string
@@ -94,6 +98,7 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
           display_name: row.display_name || row.id,
           city: row.city || '',
           timezone: row.timezone || 'America/Mexico_City',
+          business_day_start_local: row.business_day_start_local || null,
           type: row.type || '',
           default_theme: row.default_theme || 'light',
           accent_color: row.accent_color || 'emerald',
@@ -148,6 +153,7 @@ function getClientConfigFallback(clientId: string): ClientConfig {
     display_name: fb.display_name || clientId,
     city: fb.city || '',
     timezone: 'America/Mexico_City',
+    business_day_start_local: null,
     type: fb.type || '',
     default_theme: 'light',
     accent_color: 'emerald',

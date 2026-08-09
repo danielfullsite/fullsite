@@ -72,7 +72,7 @@ function buildOrderPayload(orderId: string, storeId: string): object {
         id: orderId,
         current_state: 'CREATED',
         type: 'PICK_UP',
-        store: { store_id: storeId, name: 'AMALAY Coffee & Market' },
+        store: { store_id: storeId, name: 'Demo Restaurant' },
         eater: { first_name: 'Test', last_name: 'Certification' },
         cart: {
           items: [{
@@ -108,7 +108,7 @@ function buildDeliveryOrderPayload(orderId: string, storeId: string): object {
         current_state: 'CREATED',
         type: 'DELIVERY',
         channel: 'delivery',
-        store: { store_id: storeId, name: 'AMALAY Coffee & Market' },
+        store: { store_id: storeId, name: 'Demo Restaurant' },
         eater: { first_name: 'Test', last_name: 'Delivery Cert' },
         cart: {
           items: [{

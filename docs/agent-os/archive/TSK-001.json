@@ -1,0 +1,143 @@
+{
+  "id": "TSK-001",
+  "title": "Field Batch #2 — Code Readiness for OCS-P2.5.9",
+  "objective": "Preparar todo el trabajo de código ejecutable antes de la visita física a AMALAY para que la visita sea exclusivamente de certificación",
+  "role": "RUNTIME_VERIFICATION",
+  "priority": "P0",
+  "status": "MERGED",
+  "tags": [
+    "field-batch-2",
+    "r1",
+    "offline-sync"
+  ],
+  "dod": [
+    "AF-001 verificado y documentado en AUDIT-FINDINGS o RESOLVED",
+    "AF-002 verificado y documentado",
+    "AF-003 verificado y documentado",
+    "AF-004 verificado y documentado",
+    "GAP-A documentado con prioridad correcta en RUNTIME-HEALTH",
+    "Runtime Health actualizado con resultados",
+    "Preflight checklist PRE-01..PRE-12 revisado — ítems ajustables marcados",
+    "FIELD BATCH #2 decision card creada en FOUNDER-INBOX"
+  ],
+  "dependencies": [],
+  "budget_tokens": 150000,
+  "max_turns": 20,
+  "max_retries": 3,
+  "retry_count": 0,
+  "files_allowed": [],
+  "notes": "No declara ninguna prueba física como completada. Solo prepara el trabajo de código.",
+  "claimed_by": "RUNTIME_VERIFICATION",
+  "claimed_at": "2026-08-04T15:27:15Z",
+  "submitted_at": "2026-08-04T15:29:53Z",
+  "verified_at": "2026-08-04T15:30:03Z",
+  "created_at": "2026-08-04T15:26:38Z",
+  "updated_at": "2026-08-04T16:04:10Z",
+  "history": [
+    {
+      "from": null,
+      "to": "READY",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-04T15:26:38Z",
+      "note": "Task created"
+    },
+    {
+      "from": "READY",
+      "to": "CLAIMED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:27:15Z",
+      "note": "Claimed by runner"
+    },
+    {
+      "from": "CLAIMED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:27:15Z",
+      "note": "Work started"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:29:53Z",
+      "note": "Result: VERIFIED"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:30:03Z",
+      "note": "Review started"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:30:03Z",
+      "note": "VERIFIED"
+    },
+    {
+      "from": "VERIFIED",
+      "to": "AWAITING_FOUNDER",
+      "by": "ORCHESTRATOR",
+      "at": "2026-08-04T15:30:03Z",
+      "note": "Decision D-001 created"
+    },
+    {
+      "from": "AWAITING_FOUNDER",
+      "to": "CHANGES_REQUESTED",
+      "by": "FOUNDER",
+      "at": "2026-08-04T15:40:32Z",
+      "note": "D-001 CHANGES_REQUESTED: AUTH-OFFLINE-02 missing from verification scope"
+    },
+    {
+      "from": "CHANGES_REQUESTED",
+      "to": "IN_PROGRESS",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:40:32Z",
+      "note": "Incorporating AUTH-OFFLINE-02 evidence from commits 72625e7+c2e4770"
+    },
+    {
+      "from": "IN_PROGRESS",
+      "to": "SUBMITTED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:42:33Z",
+      "note": "AUTH-OFFLINE-02 fixed in 72625e7+c2e4770. Resubmitting with complete evidence."
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "IN_REVIEW",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:42:33Z",
+      "note": "Complete evidence submitted — AUTH-OFFLINE-02 fixed, OC-09 CODE VERIFIED"
+    },
+    {
+      "from": "IN_REVIEW",
+      "to": "VERIFIED",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:42:33Z",
+      "note": "AUTH-OFFLINE-02 incorporated. All gaps checked including RUNTIME-GAP-REGISTER."
+    },
+    {
+      "from": "VERIFIED",
+      "to": "AWAITING_FOUNDER",
+      "by": "RUNTIME_VERIFICATION",
+      "at": "2026-08-04T15:42:33Z",
+      "note": "D-002 created — complete Field Batch #2 evidence"
+    },
+    {
+      "from": "AWAITING_FOUNDER",
+      "to": "APPROVED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T16:04:10Z",
+      "note": "Decision D-002 approved by Founder"
+    },
+    {
+      "from": "APPROVED",
+      "to": "MERGED",
+      "by": "SUPERVISOR",
+      "at": "2026-08-04T16:04:10Z",
+      "note": "Auto-merged after Founder approval"
+    }
+  ]
+}

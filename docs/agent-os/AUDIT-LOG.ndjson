@@ -1,0 +1,64 @@
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-001", "title": "Field Batch #2 — Code Readiness for OCS-P2.5.9", "role": "RUNTIME_VERIFICATION", "priority": "P0"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-001", "gate": "R1-G02", "reason": "R1 blocker"}
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-002", "title": "HTTP Contract Tests — Bridge WS + REST API", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-002", "gate": "R3-G01", "reason": "R3 parallel work"}
+{"ts": "2026-08-04T15:26:38Z", "type": "TASK_CREATED", "task_id": "TSK-003", "title": "Logging Persistente — Electron logs survive restarts", "role": "RUNTIME_ENGINEER", "priority": "P1"}
+{"ts": "2026-08-04T15:26:38Z", "type": "ORCHESTRATOR_CREATED_TASK", "task_id": "TSK-003", "gate": "R3-G02", "reason": "R3 parallel work"}
+{"ts": "2026-08-04T15:27:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_VERIFICATION", "note": "Claimed by runner"}
+{"ts": "2026-08-04T15:27:15Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_VERIFICATION", "note": "Work started"}
+{"ts": "2026-08-04T15:29:53Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:29:53Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_VERIFICATION", "note": "Result: VERIFIED"}
+{"ts": "2026-08-04T15:30:03Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "RUNTIME_VERIFICATION", "note": "Review started"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "VERIFIED"}
+{"ts": "2026-08-04T15:30:03Z", "type": "DECISION_CREATED", "decision_id": "D-001", "task_id": "TSK-001"}
+{"ts": "2026-08-04T15:30:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "ORCHESTRATOR", "note": "Decision D-001 created"}
+{"ts": "2026-08-04T15:40:27Z", "type": "DECISION_RESPONSE", "decision_id": "D-001", "response": "CHANGES_REQUESTED", "by": "FOUNDER"}
+{"ts": "2026-08-04T15:40:32Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "AWAITING_FOUNDER", "to": "CHANGES_REQUESTED", "by": "FOUNDER", "note": "D-001 CHANGES_REQUESTED: AUTH-OFFLINE-02 missing from verification scope"}
+{"ts": "2026-08-04T15:40:32Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "CHANGES_REQUESTED", "to": "IN_PROGRESS", "by": "RUNTIME_VERIFICATION", "note": "Incorporating AUTH-OFFLINE-02 evidence from commits 72625e7+c2e4770"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_PROGRESS", "to": "SUBMITTED", "by": "RUNTIME_VERIFICATION", "note": "AUTH-OFFLINE-02 fixed in 72625e7+c2e4770. Resubmitting with complete evidence."}
+{"ts": "2026-08-04T15:42:33Z", "type": "RESULT_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "SUBMITTED", "to": "IN_REVIEW", "by": "RUNTIME_VERIFICATION", "note": "Complete evidence submitted — AUTH-OFFLINE-02 fixed, OC-09 CODE VERIFIED"}
+{"ts": "2026-08-04T15:42:33Z", "type": "REVIEW_SUBMITTED", "task_id": "TSK-001", "verdict": "VERIFIED", "return": false, "by": "RUNTIME_VERIFICATION"}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "IN_REVIEW", "to": "VERIFIED", "by": "RUNTIME_VERIFICATION", "note": "AUTH-OFFLINE-02 incorporated. All gaps checked including RUNTIME-GAP-REGISTER."}
+{"ts": "2026-08-04T15:42:33Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "VERIFIED", "to": "AWAITING_FOUNDER", "by": "RUNTIME_VERIFICATION", "note": "D-002 created — complete Field Batch #2 evidence"}
+{"ts": "2026-08-04T15:42:33Z", "type": "DECISION_CREATED", "decision_id": "D-002", "task_id": "TSK-001"}
+{"ts": "2026-08-04T15:45:41Z", "type": "DECISION_RESPONSE", "decision_id": "D-002", "response": "APPROVED", "by": "FOUNDER"}
+{"ts": "2026-08-04T16:04:10Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "AWAITING_FOUNDER", "to": "APPROVED", "by": "SUPERVISOR", "note": "Decision D-002 approved by Founder"}
+{"ts": "2026-08-04T16:04:10Z", "type": "TASK_TRANSITION", "task_id": "TSK-001", "from": "APPROVED", "to": "MERGED", "by": "SUPERVISOR", "note": "Auto-merged after Founder approval"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "field-batch-2"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "r1"}
+{"ts": "2026-08-04T16:04:10Z", "type": "GATE_COMPLETED", "gate_tag": "offline-sync"}
+{"ts": "2026-08-04T16:04:10Z", "type": "DECISION_PROPAGATED", "decision_id": "D-002", "task_id": "TSK-001", "task_final": "MERGED", "response": "APPROVED"}
+{"ts": "2026-08-04T16:11:20Z", "type": "SUPERVISOR_STARTED", "pid": 45257}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-002", "phase": "engineer", "pid": 45258}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-003", "phase": "engineer", "pid": 45259}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_STARTED", "task_id": "TSK-003", "phase": "engineer", "pid": 45259}
+{"ts": "2026-08-04T16:11:20Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "engineer", "pid": 45258}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T16:11:20Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T16:11:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "engineer", "budget_usd": 3.0}
+{"ts": "2026-08-04T16:11:20Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0}
+{"ts": "2026-08-04T16:13:56Z", "type": "SUPERVISOR_STARTED", "pid": 46612}
+{"ts": "2026-08-04T16:14:07Z", "type": "SUPERVISOR_STARTED", "pid": 46625}
+{"ts": "2026-08-04T18:48:58Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-002", "path": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "IN_PROGRESS", "to": "READY", "by": "SUPERVISOR", "note": "Worker PID confirmed dead post-supervisor-restart. Recovered for full pipeline cycle."}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_RECOVERED_MANUAL", "task_id": "TSK-002", "reason": "Worker PIDs 45258/45259 confirmed dead via kill -0"}
+{"ts": "2026-08-04T18:48:58Z", "type": "WORKTREE_REMOVED", "task_id": "TSK-003", "path": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "IN_PROGRESS", "to": "READY", "by": "SUPERVISOR", "note": "Worker PID confirmed dead post-supervisor-restart. Recovered for full pipeline cycle."}
+{"ts": "2026-08-04T18:48:58Z", "type": "TASK_RECOVERED_MANUAL", "task_id": "TSK-003", "reason": "Worker PIDs 45258/45259 confirmed dead via kill -0"}
+{"ts": "2026-08-04T18:49:01Z", "type": "SUPERVISOR_STARTED", "pid": 49962}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKTREE_CREATED", "task_id": "TSK-002", "branch": "agent-os/TSK-002", "path": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-002", "phase": "engineer", "pid": 49969}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_STARTED", "task_id": "TSK-002", "phase": "engineer", "pid": 49969}
+{"ts": "2026-08-04T18:49:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T18:49:02Z", "type": "TASK_TRANSITION", "task_id": "TSK-002", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T18:49:02Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-002", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-002"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKTREE_CREATED", "task_id": "TSK-003", "branch": "agent-os/TSK-003", "path": "/tmp/fullsite-worker-TSK-003"}
+{"ts": "2026-08-04T18:49:02Z", "type": "WORKER_LAUNCHED", "task_id": "TSK-003", "phase": "engineer", "pid": 49976}
+{"ts": "2026-08-04T18:49:03Z", "type": "WORKER_STARTED", "task_id": "TSK-003", "phase": "engineer", "pid": 49976}
+{"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "READY", "to": "CLAIMED", "by": "RUNTIME_ENGINEER", "note": "Worker claimed task"}
+{"ts": "2026-08-04T18:49:03Z", "type": "TASK_TRANSITION", "task_id": "TSK-003", "from": "CLAIMED", "to": "IN_PROGRESS", "by": "RUNTIME_ENGINEER", "note": "Engineering started"}
+{"ts": "2026-08-04T18:49:03Z", "type": "CLAUDE_INVOKE", "task_id": "TSK-003", "phase": "engineer", "budget_usd": 3.0, "cwd": "/tmp/fullsite-worker-TSK-003"}

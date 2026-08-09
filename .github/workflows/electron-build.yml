@@ -29,9 +29,68 @@ jobs:
       - name: Build Windows installer
         run: npx electron-builder --win --publish never
 
+      - name: Record installer SHA-256
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash
+          "installer=$($exe.Name)"          | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "sha256=$hash"                    | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "source_commit=${{ github.sha }}" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $hash | Out-File dist\SHA256.txt
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: fullsite-pos-win-${{ github.sha }}
-          path: electron-app/dist/*.exe
+          path: |
+            electron-app/dist/*.exe
+            electron-app/dist/SHA256.txt
           retention-days: 30
+
+  # Clean-Windows install verification: silent-install the just-built NSIS
+  # installer on a fresh windows-latest runner, verify installed files,
+  # uninstall registry entry, and clean uninstall. Catches installer-level
+  # regressions without physical hardware (does not replace field cert).
+  verify-install:
+    needs: build-win
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fullsite-pos-win-${{ github.sha }}
+          path: installer
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem installer\*.exe | Select-Object -First 1
+          Start-Process -FilePath $exe.FullName -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+
+      - name: Verify installed files + uninstall entry
+        shell: pwsh
+        run: |
+          $installDir = "$env:ProgramFiles\Fullsite POS"
+          if (-not (Test-Path "$installDir\Fullsite POS.exe")) {
+            Write-Error "FAIL: Fullsite POS.exe not found in $installDir"; exit 1
+          }
+          $uninstall = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -like 'Fullsite POS*' }
+          if (-not $uninstall) {
+            Write-Error 'FAIL: no uninstall registry entry for Fullsite POS'; exit 1
+          }
+          "PASS: installed at $installDir, uninstaller: $($uninstall.UninstallString)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Silent uninstall + verify cleanup
+        shell: pwsh
+        run: |
+          $uninstall = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
+            Where-Object { $_.DisplayName -like 'Fullsite POS*' }
+          $cmd = $uninstall.UninstallString.Trim('"')
+          Start-Process -FilePath $cmd -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path "$env:ProgramFiles\Fullsite POS\Fullsite POS.exe") {
+            Write-Error 'FAIL: exe still present after uninstall'; exit 1
+          }
+          'PASS: clean uninstall' | Out-File -Append $env:GITHUB_STEP_SUMMARY

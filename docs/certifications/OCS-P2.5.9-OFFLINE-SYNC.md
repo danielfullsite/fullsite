@@ -1,6 +1,8 @@
 # OCS P2.5.9 — Offline / Sync: Plan de Certificación Física
 
-> **Status:** PENDIENTE EJECUCIÓN FÍSICA  
+> **Status:** PENDIENTE EJECUCIÓN FÍSICA
+>
+> **NOTA 2026-08-04 — OC-09 INTEGRADO:** `pos-manager-auth.ts` (PBKDF2) ahora conectado al production path en `pos-data.ts`. Las tres funciones `verifyManagerPin`, `verifyManagerPinWithRole`, `verifyPinWithMinRole` usan PBKDF2 offline; fallback a btoa legacy para migración. 23 tests en `pos-manager-auth.test.ts` PASS. OC-09 listo para ejecución física.  
 > **Suite:** Operational Certification Suite v1  
 > **Módulo:** Offline / Sync — E4 campo en AMALAY  
 > **Bloquea:** P0-4 · Golden Skeleton · Cliente #2  
@@ -16,7 +18,8 @@
 | Offline queue (`queueOperation`, `APP_API`) | CODE ONLY | `pos-offline-db.ts` |
 | Registro auto-sync al reconectar | CODE ONLY | `registerAutoSync()` |
 | Print queue con retry loop | CODE ONLY | `startRetryLoop()` |
-| Auth offline PBKDF2 | PASS (código) | `pos-manager-auth.ts`, 13 tests |
+| Auth offline — Manager PIN | ✅ CODE VERIFIED | PBKDF2 activo + `meetsMinRole` enforcement offline (AUTH-OFFLINE-02 fix): PIN auth ✅ · jerarquía offline ✅ · btoa fallback con role check ✅ · fail-closed para rol ausente/desconocido ✅. Fuente canónica: `ROLE_HIERARCHY` + `meetsMinRole` en `pos-manager-auth.ts:66-84`. 54 tests PASS (pos-manager-auth: 30, pos-data-auth: 24). Pendiente: ejecución física OC-09. |
+| Auth offline — Staff Login (lockscreen) | ⚠️ DEUDA SEPARADA | `layout.tsx` usa `SHA-256(pin:staffId)` + `pos_staff_cache`. TTL 8h. No usa PBKDF2. **Fuera de scope de OC-09 en este PR.** Fix programado como workstream independiente. |
 | Menú offline (IDB cache) | PASS (código) | `pos-offline-db.ts` |
 | KDS broadcast LAN (127.0.0.1:7717) | CODE ONLY | `page.tsx:2973` |
 | MP recovery en reload | CODE ONLY | `mp-payment-recovery.ts` |

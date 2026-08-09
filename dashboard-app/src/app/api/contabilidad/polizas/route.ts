@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server'
 import { requireAuth, getClientId } from '@/lib/api-auth'
+import { resolveBusinessDayConfig, getBusinessDayBounds, getCurrentBusinessDate, type ResolvedBusinessDayConfig } from '@/lib/business-date'
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -124,41 +125,54 @@ export async function GET(request: NextRequest) {
   const clientId = getClientId(request)
   try {
     const { searchParams } = new URL(request.url)
-    const fecha = searchParams.get('fecha') || new Date().toISOString().slice(0, 10)
     const formato = searchParams.get('formato') || 'json' // json | xml | csv
     const mes = searchParams.get('mes') // YYYY-MM for monthly summary
 
+    // W1-C: la póliza es un documento por DÍA OPERATIVO — config del tenant
+    // (timezone + business_day_start_local), no fecha calendario UTC ni
+    // T00:00:00 naive. Bounds semiabiertos [start, end): el lte.T23:59:59
+    // anterior dejaba un hueco de un segundo y cortaba el día en UTC.
+    const cid = encodeURIComponent(clientId)
+    const clientRowRes = await fetch(
+      `${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc,timezone,business_day_start_local&limit=1`, OPTS
+    )
+    const clientRow = clientRowRes.ok ? ((await clientRowRes.json())[0] ?? {}) : {}
+    const clientRfc: string = clientRow.rfc ?? ''
+    const bdCfg = resolveBusinessDayConfig({
+      id: clientId,
+      timezone: clientRow.timezone || 'America/Mexico_City',
+      business_day_start_local: clientRow.business_day_start_local ?? null,
+    })
+
+    const fecha = searchParams.get('fecha') || getCurrentBusinessDate(bdCfg)
+
     // If requesting monthly summary
     if (mes) {
-      return await getResumenMensual(mes, formato, clientId)
+      return await getResumenMensual(mes, formato, clientId, bdCfg)
     }
 
-    const startOfDay = `${fecha}T00:00:00`
-    const endOfDay = `${fecha}T23:59:59`
+    const { utcStart, utcEnd } = getBusinessDayBounds(fecha, bdCfg.timeZone, bdCfg.boundary)
+    const rangeFilter = `created_at=gte.${encodeURIComponent(utcStart)}&created_at=lt.${encodeURIComponent(utcEnd)}`
 
-    // Fetch POS orders for the day
-    const cid = encodeURIComponent(clientId)
-    const [ordersRes, movementsRes, marketRes, wansoftDay, clientRes] = await Promise.all([
+    const [ordersRes, movementsRes, marketRes, wansoftDay] = await Promise.all([
       fetch(
-        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&${rangeFilter}&status=neq.cancelled&select=id,created_at,total,subtotal,tax,payment_method,status,items,source&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&${rangeFilter}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetch(
-        `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&created_at=gte.${startOfDay}&created_at=lte.${endOfDay}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
+        `${SB_URL}/rest/v1/pos_market_movements?client_id=eq.${cid}&${rangeFilter}&select=id,created_at,type,product_name,quantity,cost_per_unit,total_cost,reason&order=created_at.asc&limit=500`,
         OPTS
       ),
       fetchWansoftDaily(fecha),
-      fetch(`${SB_URL}/rest/v1/clients?id=eq.${cid}&select=rfc&limit=1`, OPTS),
     ])
 
     const orders: PosOrder[] = ordersRes.ok ? await ordersRes.json() : []
     const movements: InventoryMovement[] = movementsRes.ok ? await movementsRes.json() : []
     const marketMovements: InventoryMovement[] = marketRes.ok ? await marketRes.json() : []
-    const clientRfc: string = clientRes?.ok ? ((await clientRes.json())[0]?.rfc ?? '') : ''
 
     const polizas: Poliza[] = []
     let numPoliza = 1
@@ -241,23 +255,33 @@ export async function GET(request: NextRequest) {
     // ───────────────────────────────────────────────
     // PÓLIZA 2: COSTO DE VENTAS (COGS)
     // ───────────────────────────────────────────────
+    // W1-E: el COGS histórico sale EXCLUSIVAMENTE de pos_cost_events — el
+    // reconocimiento inmutable sellado en el momento canónico del consumo
+    // (r1_reconcile_item), con receta pinneada y costo weighted-average de
+    // ESE instante. Nunca se recalcula con precios/recetas actuales, nunca
+    // se usa items[].recipe_cost (campo de navegador, no confiable) y nunca
+    // se fabrica un 35% estimado como si fuera real. Cobertura explícita:
+    // eventos UNKNOWN/PARTIAL se reportan — un margen parcial se marca parcial.
+    let cogsCoverage: { events: number; full: number; partial: number; unknown: number; reversal: number } = {
+      events: 0, full: 0, partial: 0, unknown: 0, reversal: 0,
+    }
     {
       let totalCOGS = 0
 
-      if (orders.length > 0) {
-        for (const order of orders) {
-          const items = order.items || []
-          for (const item of items) {
-            totalCOGS += (item.recipe_cost || 0) * (item.quantity || 1)
-          }
+      const costEventsRes = await fetch(
+        `${SB_URL}/rest/v1/pos_cost_events?client_id=eq.${cid}&${rangeFilter}&select=total_cost,cost_coverage&limit=10000`,
+        OPTS
+      )
+      if (costEventsRes.ok) {
+        const events: { total_cost: number | null; cost_coverage: string }[] = await costEventsRes.json()
+        for (const ev of events) {
+          cogsCoverage.events++
+          if (ev.cost_coverage === 'FULL') cogsCoverage.full++
+          else if (ev.cost_coverage === 'PARTIAL') cogsCoverage.partial++
+          else if (ev.cost_coverage === 'UNKNOWN') cogsCoverage.unknown++
+          else if (ev.cost_coverage === 'REVERSAL') cogsCoverage.reversal++
+          if (ev.total_cost != null) totalCOGS += Number(ev.total_cost)
         }
-        // If no recipe costs, estimate from food cost ratio (35%)
-        if (totalCOGS === 0) {
-          const totalSales = orders.reduce((s, o) => s + (o.subtotal || o.total || 0), 0)
-          totalCOGS = totalSales * 0.35
-        }
-      } else if (wansoftDay) {
-        totalCOGS = (wansoftDay.ventas_dia || 0) * 0.35
       }
 
       if (totalCOGS > 0) {
@@ -423,6 +447,11 @@ export async function GET(request: NextRequest) {
         balanceado: Math.abs(totalDebe - totalHaber) < 0.01,
         ordenesPOS: orders.length,
         movimientosInventario: allMovements.length,
+        // W1-E: procedencia y cobertura del COGS — si hay eventos UNKNOWN o
+        // PARTIAL, el margen del día es PARCIAL y se declara como tal.
+        cogsSource: 'pos_cost_events',
+        cogsCoverage: cogsCoverage,
+        cogsParcial: cogsCoverage.unknown > 0 || cogsCoverage.partial > 0,
       },
     }
 
@@ -453,14 +482,21 @@ export async function GET(request: NextRequest) {
 
 // ─── Monthly summary ─────────────────────────────
 
-async function getResumenMensual(mes: string, formato: string, clientId: string) {
+async function getResumenMensual(mes: string, formato: string, clientId: string, bdCfg: ResolvedBusinessDayConfig) {
   const startDate = `${mes}-01`
   const endDate = getLastDayOfMonth(mes)
   const cid = encodeURIComponent(clientId)
 
+  // W1-C: el mes operativo = [bounds(primer día).start, bounds(último día).end)
+  // en UTC. wansoft_daily.fecha ya es business-date-aligned (cierre de Wansoft),
+  // así que ese filtro sigue por fecha.
+  const monthStart = getBusinessDayBounds(startDate, bdCfg.timeZone, bdCfg.boundary).utcStart
+  const monthEnd = getBusinessDayBounds(endDate, bdCfg.timeZone, bdCfg.boundary).utcEnd
+  const rangeFilter = `created_at=gte.${encodeURIComponent(monthStart)}&created_at=lt.${encodeURIComponent(monthEnd)}`
+
   const [ordersRes, wansoftRes, movRes] = await Promise.all([
     fetch(
-      `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
+      `${SB_URL}/rest/v1/pos_orders?client_id=eq.${cid}&${rangeFilter}&status=neq.cancelled&select=total,subtotal,tax,payment_method,items&limit=5000`,
       OPTS
     ),
     fetch(
@@ -468,7 +504,7 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
       OPTS
     ),
     fetch(
-      `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&created_at=gte.${startDate}T00:00:00&created_at=lte.${endDate}T23:59:59&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
+      `${SB_URL}/rest/v1/pos_inventory_movements?client_id=eq.${cid}&${rangeFilter}&select=type,total_cost,quantity,cost_per_unit&limit=5000`,
       OPTS
     ),
   ])
@@ -484,6 +520,25 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
   let costoVentas = 0
   const byPayment = new Map<string, number>()
 
+  // W1-E: el COGS mensual sale de pos_cost_events (reconocimiento inmutable),
+  // nunca de items[].recipe_cost (navegador) ni de un 35% presentado como real.
+  let costEventCount = 0
+  let costUnknownCount = 0
+  {
+    const ceRes = await fetch(
+      `${SB_URL}/rest/v1/pos_cost_events?client_id=eq.${cid}&${rangeFilter}&select=total_cost,cost_coverage&limit=50000`,
+      OPTS
+    )
+    if (ceRes.ok) {
+      const events: { total_cost: number | null; cost_coverage: string }[] = await ceRes.json()
+      for (const ev of events) {
+        costEventCount++
+        if (ev.cost_coverage === 'UNKNOWN' || ev.cost_coverage === 'PARTIAL') costUnknownCount++
+        if (ev.total_cost != null) costoVentas += Number(ev.total_cost)
+      }
+    }
+  }
+
   if (orders.length > 0) {
     for (const o of orders) {
       ventasBrutas += (o.total || 0)
@@ -491,15 +546,11 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
       totalIVA += (o.tax || 0)
       const method = mapPaymentLabel(o.payment_method || 'efectivo')
       byPayment.set(method, (byPayment.get(method) || 0) + (o.total || 0))
-      for (const item of (o.items || [])) {
-        costoVentas += (item.recipe_cost || 0) * (item.quantity || 1)
-      }
     }
     if (totalIVA === 0) {
       totalIVA = ventasBrutas - (ventasBrutas / 1.16)
       ventasNetas = ventasBrutas / 1.16
     }
-    if (costoVentas === 0) costoVentas = ventasNetas * 0.35
   } else {
     for (const day of wansoftDays) {
       ventasBrutas += (day.ventas_brutas || day.ventas_dia || 0)
@@ -510,7 +561,6 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
     }
     totalIVA = ventasNetas - (ventasNetas / 1.16)
     ventasNetas = ventasNetas / 1.16
-    costoVentas = ventasNetas * 0.35
   }
 
   const totalEntradas = movements
@@ -521,11 +571,11 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
     .filter(m => m.type === 'merma' || m.type === 'waste' || m.type === 'adjustment')
     .reduce((s, m) => s + Math.abs(m.total_cost || (m.quantity * m.cost_per_unit) || 0), 0)
 
+  // W1-E: el margen solo se calcula donde la cobertura lo permite; si hay
+  // eventos sin costo conocido (o cero eventos con ventas), es PARCIAL.
+  const cogsParcial = costUnknownCount > 0 || (costEventCount === 0 && ventasNetas > 0)
   const margenBruto = ventasNetas - costoVentas
   const margenPct = ventasNetas > 0 ? (margenBruto / ventasNetas) * 100 : 0
-
-  // Track whether costo de ventas is estimated or from real recipe costs
-  const costoVentasReal = orders.length > 0 && orders.some(o => (o.items || []).some(item => (item.recipe_cost || 0) > 0))
 
   const resumen = {
     mes,
@@ -533,7 +583,9 @@ async function getResumenMensual(mes: string, formato: string, clientId: string)
     ventasNetas: round2(ventasNetas),
     ivaTrasladadoMes: round2(totalIVA),
     costoVentas: round2(costoVentas),
-    costoVentasEstimado: !costoVentasReal,
+    cogsSource: 'pos_cost_events',
+    cogsEventos: costEventCount,
+    cogsParcial,
     margenBruto: round2(margenBruto),
     margenPct: round2(margenPct),
     entradasInventario: round2(totalEntradas),

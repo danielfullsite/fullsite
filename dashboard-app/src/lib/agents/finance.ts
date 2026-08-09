@@ -6,8 +6,8 @@
  *
  * Inputs:  wansoft_daily (last 28 days), wansoft_kpis
  *
- * NOTA: wansoft_daily y wansoft_kpis son tablas globales sin client_id.
- * No filtrar por cliente — son exclusivas de AMALAY.
+ * NOTA: wansoft_daily y wansoft_kpis son tablas globales sin client_id,
+ * exclusivas de AMALAY — el agente solo corre para clientId === 'amalay'.
  */
 import type { AgentEvent } from './types'
 
@@ -45,6 +45,9 @@ export async function runFinanceAgent(
   sbGet: <T>(table: string, query: string) => Promise<T[]>,
 ): Promise<AgentEvent[]> {
   const events: AgentEvent[] = []
+  // wansoft_daily y wansoft_kpis son tablas globales exclusivas de AMALAY —
+  // ningún otro tenant tiene esta fuente de datos
+  if (clientId !== 'amalay') return events
   const now = Date.now()
   const today = todayStr()
   const todayDOW = dayOfWeek(today)

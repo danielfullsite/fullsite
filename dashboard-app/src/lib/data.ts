@@ -1,6 +1,8 @@
 import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
 import { nowMX, fmtDateMX } from './date-mx'
+import { resolveBusinessDayConfig, getBusinessDate, getBusinessDayBounds, getCurrentBusinessDate } from './business-date'
+import { fetchClientConfig } from './client-config'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -431,20 +433,27 @@ function classifyItemGroup(lower: string): string {
 }
 
 export async function getDashboardFromPosOrders(days: number = 30, clientId: string = getActiveClientSlug()): Promise<WansoftDaily[]> {
-  const cutoff = nowMX()
-  cutoff.setDate(cutoff.getDate() - days)
-  const cutoffStr = fmtDateMX(cutoff)
+  // W1-C: fecha OPERATIVA canónica por configuración del tenant (espejo de los
+  // agentes Python). Sin -06:00 hardcodeado; el rango se deriva de los bounds
+  // UTC del business day. Tenant sin business_day_start_local → degradación
+  // explícita a medianoche (conducta previa) vía resolveBusinessDayConfig.
+  const bdCfg = resolveBusinessDayConfig(await fetchClientConfig(clientId))
+  const todayFecha = getCurrentBusinessDate(bdCfg)
+  const cutoffDate = new Date(`${todayFecha}T00:00:00Z`)
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - days)
+  const cutoffFecha = cutoffDate.toISOString().slice(0, 10)
+  const { utcStart } = getBusinessDayBounds(cutoffFecha, bdCfg.timeZone, bdCfg.boundary)
 
   const orders = await sbFetch('pos_orders',
-    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${cutoffStr}T00:00:00-06:00&order=created_at.asc&limit=5000`
+    `select=mesa,mesero,personas,total,subtotal,iva,descuento,propina,metodo_pago,pagos,items,status,created_at&client_id=eq.${clientId}&status=eq.cerrada&created_at=gte.${encodeURIComponent(utcStart)}&order=created_at.asc&limit=5000`
   ) as { mesa: number; mesero: string; personas: number; total: number; subtotal: number; iva: number; descuento: number; propina: number; metodo_pago: string; pagos: { metodo: string; monto: number }[] | null; items: { nombre: string; precio: number; cantidad: number }[] | null; status: string; created_at: string }[]
 
   if (orders.length === 0) return []
 
-  // Group by date
+  // W1-C: agrupar por BUSINESS DATE (no por fecha calendario del timestamp)
   const byDate = new Map<string, typeof orders>()
   for (const o of orders) {
-    const fecha = o.created_at.slice(0, 10)
+    const fecha = getBusinessDate(o.created_at, bdCfg.timeZone, bdCfg.boundary)
     if (!byDate.has(fecha)) byDate.set(fecha, [])
     byDate.get(fecha)!.push(o)
   }

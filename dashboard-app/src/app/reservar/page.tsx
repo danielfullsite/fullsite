@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { notFound } from 'next/navigation'
 import { Calendar, Users, MapPin, Clock, ChefHat, CreditCard, Check, ArrowRight, ArrowLeft, Phone, User, AlertTriangle, Cake } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -113,6 +114,9 @@ function getHorarios(espacio: EspacioId): string[] {
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function ReservarPage() {
+  // Página de reservas exclusiva de AMALAY — 404 en deployments de otros tenants
+  if ((process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID || '') !== 'amalay') notFound()
+
   const [step, setStep] = useState<Step>(1)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)

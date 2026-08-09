@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Upload, FileText, CheckCircle, AlertTriangle, XCircle, Package, ArrowRight, Zap } from 'lucide-react'
 import { parseCfdiXml, matchConceptToIngredient, type CfdiParsed, type CfdiConcept } from '@/lib/cfdi-xml-parser'
 import { getActiveClientSlug as _cid } from '@/lib/data'
+import { recordMovement } from '@/lib/inventory'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -143,48 +144,28 @@ export default function RecepcionFacturaPage() {
         }),
       })
 
-      // 2. Update ingredient costs + restock
-      for (const line of matched) {
-        if (!line.ingredient) continue
-
-        // Update cost if changed
-        if (line.priceDiff !== null && Math.abs(line.priceDiff) > 0.1) {
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_ingredients?id=eq.${line.ingredient.id}&client_id=eq.${_cid()}`, {
-            method: 'PATCH', headers,
-            body: JSON.stringify({ cost_per_unit: line.concepto.valorUnitario }),
-          })
-        }
-
-        // Restock inventory
-        if (line.includeInRestock) {
-          // Get current stock
-          const invRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/pos_inventory?client_id=eq.${_cid()}&ingredient_id=eq.${line.ingredient.id}&select=id,stock`,
-            { headers: H }
-          )
-          if (invRes.ok) {
-            const rows = await invRes.json()
-            if (rows.length > 0) {
-              const newStock = Number(rows[0].stock || 0) + line.concepto.cantidad
-              await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory?id=eq.${rows[0].id}`, {
-                method: 'PATCH', headers,
-                body: JSON.stringify({ stock: newStock, last_restock: new Date().toISOString() }),
-              })
-            }
-          }
-
-          // Log movement
-          await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
-            method: 'POST', headers,
-            body: JSON.stringify({
-              client_id: _cid(),
-              ingredient_id: line.ingredient.id,
-              movement_type: 'restock',
-              quantity: line.concepto.cantidad,
-              actor: 'XML Factura',
-              notes: `${cfdi.emisorNombre} — ${cfdi.serie}${cfdi.folio}`,
-            }),
-          })
+      // 2. W1-B: recepción vía recordMovement — un solo camino canónico:
+      // ledger idempotente (key cfdi_{UUID}) + stock + costo por PROMEDIO
+      // PONDERADO. El PATCH directo de cost_per_unit al precio de factura
+      // (violación del contrato de costeo) fue eliminado: el costo solo cambia
+      // con la entrada, ponderado por el stock existente.
+      const restockLines = matched.filter(l => l.ingredient && l.includeInRestock)
+      if (restockLines.length > 0) {
+        const movResult = await recordMovement({
+          client_id: _cid(),
+          movement_type: 'restock',
+          actor: 'XML Factura',
+          idempotency_key: `cfdi_restock_${cfdi.uuid || Date.now()}`,
+          metadata: { supplier: cfdi.emisorNombre, folio: `${cfdi.serie}${cfdi.folio}` },
+          lines: restockLines.map(l => ({
+            ingredient_id: l.ingredient!.id,
+            quantity: l.concepto.cantidad,
+            unit_cost: l.concepto.valorUnitario,
+            notes: `${cfdi.emisorNombre} — ${cfdi.serie}${cfdi.folio}`,
+          })),
+        })
+        if (!movResult.success && !movResult.was_duplicate) {
+          throw new Error(`Ledger: ${movResult.errors.join('; ')}`)
         }
       }
 

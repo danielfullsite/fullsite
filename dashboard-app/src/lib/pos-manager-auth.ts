@@ -30,7 +30,7 @@
  */
 
 const PBKDF2_ITERATIONS = 10_000
-const CREDENTIAL_TTL_MS = 8 * 60 * 60 * 1000  // 8 hours
+const CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1000  // 24h — full overnight shift (AUTH-01)
 const CREDENTIALS_KEY = 'pos_manager_credentials_v2'
 const DEVICE_SALT_KEY = 'pos_pin_device_salt'
 const OFFLINE_LOG_KEY = 'pos_offline_auth_log'
@@ -57,6 +57,30 @@ export interface OfflineAuthLogEntry {
   action: string               // 'auth_success' | 'auth_failed' | 'auth_expired' | 'auth_disabled'
   context?: string             // e.g. 'cierre_caja', 'retiro', 'descuento'
   synced?: boolean
+}
+
+// ── Role hierarchy — single source of truth for offline permission checks ────
+// Must mirror the server-side definition in /api/pos/pin/route.ts.
+// Unknown roles are treated as level 0 (fail-safe: always rejected).
+
+export const ROLE_HIERARCHY: Record<string, number> = {
+  mesero: 1,
+  cajero:  2,
+  capitan: 3,
+  gerente: 4,
+  admin:   5,
+}
+
+/**
+ * Returns true iff `role` meets or exceeds `minRole` in the hierarchy.
+ * Fails safe: undefined, empty, or unknown roles always return false.
+ */
+export function meetsMinRole(role: string | undefined | null, minRole: string): boolean {
+  if (!role) return false
+  const level = ROLE_HIERARCHY[role]
+  const minLevel = ROLE_HIERARCHY[minRole]
+  if (!level || !minLevel) return false
+  return level >= minLevel
 }
 
 // ── Device salt (singleton per install) ──────────────────────────────────────

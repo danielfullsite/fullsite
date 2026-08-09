@@ -22,6 +22,7 @@ const os      = require('os')
 
 const { PROTOCOL_VERSION, EVENT, parseClientMessage } = require('./protocol')
 const processAdapter = require('./adapters/process')
+const logger         = require('./logger')
 const printerAdapter = require('./adapters/printer')
 const networkAdapter = require('./adapters/network')
 const { NdjsonEventStore }  = require('./adapters/storage/ndjson')
@@ -172,6 +173,8 @@ function buildHttpRouter({ state, eventStore, wsHub, cmdHandler, printer, versio
         staged_update:    updater.getStagedUpdate(),
         update_channel:   updater.getChannel(),
         stations:         Object.keys(printer.getStations()),
+        last_log_entry:   logger.getLastEntry(),
+        log_file:         logger.getLogPath(),
       })
       return
     }
@@ -336,6 +339,10 @@ async function startLocalServer({ dataDir, port = 7717, config = {} }) {
 
   // ── Init adapters ────────────────────────────────────────────────────────
   processAdapter.init({ dataDir })
+  // Initialize file logger if not already done by Electron main.js.
+  // patchConsole() is intentionally NOT called here — only main.js does that
+  // so tests importing this module keep their normal console output.
+  if (!logger.getLogPath()) logger.init(processAdapter.getLogDir())
   printerAdapter.init({ printersConfig, configPath: printerConfigPath, queueFilePath })
 
   const version  = processAdapter.getVersion()

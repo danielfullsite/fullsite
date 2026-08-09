@@ -44,9 +44,10 @@ export type MovementType =
   | 'restock'        // Recepción de factura (POS)
   | 'transfer_out'   // Transferencia entre almacenes (salida)
   | 'transfer_in'    // Transferencia entre almacenes (entrada)
-  | 'return'         // Devolución a proveedor
+  | 'return'         // Devolución a proveedor (stock baja)
   | 'reversal'       // Reversa de un movimiento anterior
-  | 'underflow_prevented'  // Alert: stock would have gone negative
+  | 'opening_balance'      // W1-B: saldo inicial — punto de partida de reconstrucción
+  | 'underflow_prevented'  // Alert: stock crossed below zero (detección, no bloqueo)
 
 export interface MovementLine {
   ingredient_id: string       // FK to pos_ingredients.id
@@ -94,7 +95,7 @@ interface IngredientRow {
   product_type?: string
 }
 
-const ENTRY_TYPES: MovementType[] = ['entry', 'invoice_entry', 'restock', 'transfer_in']
+const ENTRY_TYPES: MovementType[] = ['entry', 'invoice_entry', 'restock', 'transfer_in', 'opening_balance']
 
 // ── Core function ─────────────────────────────────────────────────────
 
@@ -139,10 +140,13 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     }
   }
 
-  // ── 1. Idempotency check ────────────────────────────────────────
+  // ── 1. Idempotency check (W1-B: columna dedicada, match exacto) ─────
+  // Además del pre-check, el UNIQUE (client_id, idempotency_key, ingredient_id)
+  // en BD rechaza duplicados que el pre-check no vea (carrera entre procesos);
+  // el 409 del INSERT se trata como duplicado exitoso más abajo.
 
   const dupeCheck = await fetch(
-    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.${req.client_id}&notes=like.*${encodeURIComponent(req.idempotency_key)}*&limit=1`,
+    `${SUPABASE_URL}/rest/v1/pos_inventory_movements?client_id=eq.${req.client_id}&idempotency_key=eq.${encodeURIComponent(req.idempotency_key)}&limit=1`,
     { headers: headers() }
   )
   if (dupeCheck.ok) {
@@ -220,13 +224,9 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
       }
     }
 
-    if (current.stock < 0) {
-      result.errors.push(
-        `ANOMALY: ${line.ingredient_id} has negative stock (${current.stock}). ` +
-        `Fix via manual adjustment before recording new movements.`
-      )
-      return result
-    }
+    // W1-B: el stock negativo es verdad operativa permitida (semántica R1) —
+    // ya no bloquea movimientos. Se detecta vía underflow alerts y drift report.
+    void current
   }
 
   // ── 4. Calculate new stock and cost per line ────────────────────
@@ -270,18 +270,19 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
       }
       // Rule 3: purchaseCost=0, cost unchanged (costAfter = costBefore)
     } else {
-      // Waste, deduction, return, etc.: stock goes down (quantity is negative)
-      const rawAfter = stockBefore + line.quantity
-      stockAfter = Math.max(0, rawAfter)
+      // Waste, deduction, return, adjustment: stock sigue la cantidad EXACTA.
+      // W1-B: sin clamp a cero — el stock almacenado debe igualar
+      // opening_balance + SUM(movimientos) siempre (reconstruibilidad).
+      // Cruzar debajo de cero emite alerta de detección, no bloqueo.
+      stockAfter = stockBefore + line.quantity
 
-      // UNDERFLOW_PREVENTED: log when floor to 0 was applied
-      if (rawAfter < 0) {
+      if (stockBefore >= 0 && stockAfter < 0) {
         underflows.push({
           ingredient_id: line.ingredient_id,
           stock_before: stockBefore,
           attempted: line.quantity,
-          would_be: rawAfter,
-          floored_to: 0,
+          would_be: stockAfter,
+          floored_to: stockAfter,
         })
       }
     }
@@ -306,11 +307,11 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     movement_type: req.movement_type,
     quantity: c.quantity,
     actor: req.actor,
+    idempotency_key: req.idempotency_key,
     notes: [
       c.notes,
       `stock:${c.stock_before}→${c.stock_after}`,
       c.unit_cost > 0 ? `cost:${c.cost_before}→${c.cost_after}@${c.unit_cost}` : null,
-      `[key:${req.idempotency_key}]`,
     ].filter(Boolean).join(' '),
   }))
 
@@ -319,6 +320,14 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
     headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
     body: JSON.stringify(movementRows),
   })
+
+  if (insertRes.status === 409) {
+    // UNIQUE (client_id, idempotency_key, ingredient_id) — otro proceso ganó
+    // la carrera con la misma key: duplicado exitoso, sin mutación de estado.
+    result.success = true
+    result.was_duplicate = true
+    return result
+  }
 
   if (!insertRes.ok) {
     const text = await insertRes.text()
@@ -337,9 +346,9 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
       movement_type: 'underflow_prevented',
       quantity: 0,
       actor: 'system',
-      notes: `UNDERFLOW_PREVENTED: ${req.movement_type} would set stock to ${u.would_be.toFixed(4)} ` +
-             `(before=${u.stock_before} qty=${u.attempted}). Floored to 0. ` +
-             `Original key: ${req.idempotency_key}`,
+      notes: `UNDERFLOW: ${req.movement_type} cruzó a stock negativo ${u.would_be.toFixed(4)} ` +
+             `(before=${u.stock_before} qty=${u.attempted}). Aplicado sin clamp (W1-B) — ` +
+             `requiere conteo/clasificación. Original key: ${req.idempotency_key}`,
     }))
 
     await fetch(`${SUPABASE_URL}/rest/v1/pos_inventory_movements`, {
@@ -399,6 +408,76 @@ export async function recordMovement(req: MovementRequest): Promise<MovementResu
 
   result.success = result.movements_created > 0
   return result
+}
+
+// ── W1-B: Transferencia entre almacenes (dos piernas balanceadas) ─────
+//
+// El modelo canónico de stock es single-bucket por ingrediente (pos_inventory
+// no tiene dimensión de almacén), así que las dos piernas netean cero sobre el
+// stock; el valor del par es la AUDITORÍA en el ledger canónico (antes las
+// transferencias solo existían como blob en wansoft_data). Las keys derivadas
+// (`_out`/`_in`) hacen cada pierna idempotente por separado: un retry tras
+// falla parcial completa la pierna faltante sin duplicar la otra.
+
+export interface TransferResult {
+  success: boolean
+  out: MovementResult
+  in: MovementResult | null
+  errors: string[]
+}
+
+export async function recordTransfer(params: {
+  client_id: string
+  source_warehouse: string
+  destination_warehouse: string
+  lines: { ingredient_id: string; quantity: number; notes?: string }[]  // quantity > 0
+  actor: string
+  idempotency_key: string
+}): Promise<TransferResult> {
+  const meta = `transfer ${params.source_warehouse}→${params.destination_warehouse}`
+
+  const outResult = await recordMovement({
+    client_id: params.client_id,
+    movement_type: 'transfer_out',
+    lines: params.lines.map(l => ({
+      ingredient_id: l.ingredient_id,
+      quantity: -Math.abs(l.quantity),
+      notes: [meta, `salida:${params.source_warehouse}`, l.notes].filter(Boolean).join(' '),
+    })),
+    actor: params.actor,
+    idempotency_key: `${params.idempotency_key}_out`,
+  })
+
+  if (!outResult.success && !outResult.was_duplicate) {
+    return { success: false, out: outResult, in: null, errors: outResult.errors }
+  }
+
+  const inResult = await recordMovement({
+    client_id: params.client_id,
+    movement_type: 'transfer_in',
+    lines: params.lines.map(l => ({
+      ingredient_id: l.ingredient_id,
+      quantity: Math.abs(l.quantity),
+      notes: [meta, `entrada:${params.destination_warehouse}`, l.notes].filter(Boolean).join(' '),
+    })),
+    actor: params.actor,
+    idempotency_key: `${params.idempotency_key}_in`,
+  })
+
+  const errors = [...outResult.errors, ...inResult.errors]
+  if (!inResult.success && !inResult.was_duplicate) {
+    errors.push(
+      `TRANSFER UNBALANCED: pierna de salida registrada pero la de entrada falló. ` +
+      `Reintenta con la misma key (${params.idempotency_key}) — la salida no se duplicará.`
+    )
+  }
+
+  return {
+    success: (outResult.success || outResult.was_duplicate) && (inResult.success || inResult.was_duplicate),
+    out: outResult,
+    in: inResult,
+    errors,
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

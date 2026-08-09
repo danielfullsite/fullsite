@@ -1,0 +1,22 @@
+{
+  "id": "D-001",
+  "task_id": "TSK-001",
+  "status": "CHANGES_REQUESTED",
+  "created_at": "2026-08-04T15:30:03Z",
+  "updated_at": "2026-08-04T15:40:27Z",
+  "objective": "Field Batch #2 — Preparar visita de certificación OCS-P2.5.9",
+  "what_changed": "AF-002/003/004 refutados (RAF-006..008). AF-001 confirmado P2 LOW RISK. ORS 94/100 (+4 vs 90). Docs actualizados.",
+  "why_it_matters": "El código está listo. Solo falta la ejecución física de la prueba en AMALAY. La visita puede ser exclusivamente de certificación sin trabajo técnico adicional.",
+  "commit": null,
+  "tests_summary": "4/4 audit findings verificados mediante lectura directa de código",
+  "verification": "VERIFIED",
+  "risk": "BAJO",
+  "rollback": "No aplica — solo docs actualizados",
+  "runtime_health_delta": "ORS: 90 → 94/100 (+4). Continuidad restaurada a 30/30 (AF-004 falso). AF-002/003/004 cerrados.",
+  "action_requested": "APROBAR VISITA DE CERTIFICACIÓN",
+  "response": "CHANGES_REQUESTED",
+  "response_at": "2026-08-04T15:40:27Z",
+  "response_notes": "D-001 omite AUTH-OFFLINE-02 (GAP-A abierto en RUNTIME-GAP-REGISTER al momento de TSK-001). Verification cruzó AUDIT-FINDINGS.md pero no RUNTIME-GAP-REGISTER. OC-09 era CODE PARTIAL cuando se emitió D-001. Fix llegó en commits 72625e7+c2e4770 post-decisión. Requiere D-002 con evidencia completa de ambos commits.",
+  "archived_at": "2026-08-04T16:04:10Z",
+  "archive_reason": "Superseded by D-002 after CHANGES_REQUESTED"
+}
