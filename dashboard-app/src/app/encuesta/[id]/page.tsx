@@ -37,9 +37,6 @@ const DEFAULT_CONFIG: SurveyConfig = {
   ],
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
 // ═════════════════════════════════════════════════════════════════════
 export default function PublicSurveyPage() {
   const params = useParams()
@@ -51,23 +48,15 @@ export default function PublicSurveyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // ─── Load survey config from Supabase ────────────────────────────
+  // ─── Load survey config (server-mediated, BUG-019-F) ─────────────
   useEffect(() => {
     async function loadConfig() {
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/wansoft_data?client_id=eq.${clientId}&data_key=eq.survey_config&order=fecha.desc&limit=1&select=data`,
-          {
-            headers: {
-              apikey: SUPABASE_KEY,
-              Authorization: `Bearer ${SUPABASE_KEY}`,
-            },
-          }
-        )
+        const res = await fetch(`/api/public/survey?id=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
         if (res.ok) {
-          const rows = await res.json()
-          if (rows.length > 0 && rows[0].data) {
-            setConfig(rows[0].data)
+          const json = await res.json()
+          if (json?.config) {
+            setConfig(json.config)
             setLoading(false)
             return
           }
@@ -94,37 +83,20 @@ export default function PublicSurveyPage() {
     setSubmitting(true)
 
     const now = new Date()
-    const dataKey = `survey_response_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}`
-    const payload = {
-      survey_id: clientId,
-      timestamp: now.toISOString(),
-      answers,
-      user_agent: navigator.userAgent,
-    }
-
-    // Save to Supabase
+    // BUG-019-F: server-mediated. No anon key, no browser-written client_id.
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/wansoft_data`, {
+      await fetch('/api/public/survey', {
         method: 'POST',
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          data_key: dataKey,
-          fecha: now.toISOString().slice(0, 10),
-          data: payload,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: clientId, answers }),
       })
     } catch {}
 
-    // Also save to localStorage for the admin to see
+    // Also keep a local copy for the admin preview (unchanged, client-side only).
     try {
+      const dataKey = `survey_response_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}`
       const existing = JSON.parse(localStorage.getItem('survey_responses') || '[]')
-      existing.unshift({ id: dataKey, ...payload })
+      existing.unshift({ id: dataKey, survey_id: clientId, timestamp: now.toISOString(), answers })
       localStorage.setItem('survey_responses', JSON.stringify(existing.slice(0, 500)))
     } catch {}
 
