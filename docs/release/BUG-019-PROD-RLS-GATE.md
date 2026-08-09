@@ -21,15 +21,29 @@ gate; nothing here has been run against production.
     `USING`+`WITH CHECK` = `exists(select 1 from parent p where p.id=child.<fk> and
     user_has_client_access(p.client_id))`. Prevents cross-tenant read, insert-under, update,
     delete AND move. Revoke anon; service_role bypass.
-- **Rollback (SECURE): `docs/release/BUG-019-ROLLBACK.sql`** — emergency revert of strict tenant
-  isolation to permissive-**authenticated** so the app recovers, but **anon stays revoked and NO
-  insecure public/anon policy is restored** (wansoft/PII/child/pos_staff stay closed). Recover the
-  secure state by re-applying the migration. Pre-deploy snapshot: `docs/release/rollback-snapshots/`.
+- **FORWARD-ONLY security migration.** The prior baseline was insecure (anon CRUD + cross-tenant
+  among authenticated + public reads of private data). There is NO safe reversion to it. Normal
+  recovery from a bad apply = **forward-fix** (populate `client_users` / fix
+  `user_has_client_access`) then re-apply the idempotent migration.
+- **Compensating fail-closed lockdown: `docs/release/BUG-019-ROLLBACK.sql`** — last-resort emergency
+  only. It does NOT restore prior access; it **locks tenant/legacy/child tables to `service_role`
+  ONLY** (revoke anon AND authenticated; no `USING(true)`/authenticated policy). anon and authenticated
+  client-direct access are denied; server-mediated/service-role paths keep working; NO cross-tenant
+  path is created. The client app is degraded to server-mediated until the forward-fix (deliberate
+  broken-but-secure > operational-but-cross-tenant). Certified fail-closed (R0–R4 below).
+  Pre-deploy snapshot: `docs/release/rollback-snapshots/`.
 
 ## Deployment order (must be exact)
-1. **Env:** set `WANSOFT_LEGACY_CLIENT_ID=amalay` and `SUPABASE_SERVICE_KEY` in the prod app
-   env. (No fallback: without `WANSOFT_LEGACY_CLIENT_ID`, voice/coach deny ALL tenants — fail
-   closed by design.)
+0. **Preflight (canonical read):** confirm AMALAY's server-resolved `clientId` before configuring
+   the owner var — do NOT assume it from the commercial name. Verified: `clients.id='amalay'`
+   exists and `client_users` has rows with `client_id='amalay'` (the value `withPOSAuth` resolves).
+   ```sql
+   select (select exists(select 1 from clients where id='amalay')) as clients_ok,
+          (select count(*) from client_users where client_id='amalay') as client_users_rows;
+   ```
+1. **Env:** set `WANSOFT_LEGACY_CLIENT_ID=amalay` (exactly the value verified in step 0) and
+   `SUPABASE_SERVICE_KEY` in the prod app env. (No fallback: without `WANSOFT_LEGACY_CLIENT_ID`,
+   voice/coach deny ALL tenants — fail closed by design.)
 2. Deploy the app build from this branch (JWT fetch-patch + service-key/authenticated server
    routes + server-mediated public surfaces A/B/C/F/G). App works while RLS is still permissive.
 3. Smoke: POS / KDS / dashboard / printing / public menu+order+survey+reservation; voice/coach
@@ -74,6 +88,12 @@ applying the EXACT migration policy DDL. Not production-live certification.
   child; B cannot INSERT a child under A's parent (WITH CHECK); B cannot UPDATE/DELETE A's child
   (0 rows); B cannot MOVE its child under A's parent**; A unaffected; anon denied; service_role
   full. Harness `bug019_cert/iso_child_{prelude,cert}.sql`.
+- **Compensating rollback fail-closed (R0–R4)** — after applying `BUG-019-ROLLBACK.sql` to the
+  parent/child pair: **R0** zero authenticated policies (no `USING(true)`, no cross-tenant path);
+  **R1** authenticated A denied read/insert/update/delete; **R2** authenticated B cannot
+  read/insert/update/delete/**move** A's records; **R3** anon denied; **R4** service_role retains.
+  Harness `bug019_cert/iso_rollback_cert.sql`. Proves the emergency lockdown never reopens
+  cross-tenant access.
 Staging already runs the strict migration (read-only complementary evidence).
 
 ## Residual risks
