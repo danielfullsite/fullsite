@@ -24,7 +24,7 @@ INSERT INTO clients (
   'Monterrey',
   'America/Mexico_City',
   15,
-  'supabase',
+  'fullsite',
   'supabase',
   'cafe',
   'Gracias por visitarnos.',
