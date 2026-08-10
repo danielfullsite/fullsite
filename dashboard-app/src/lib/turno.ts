@@ -31,17 +31,21 @@ export type TurnoResolution =
  */
 export async function resolveOpenTurno(
   sbUrl: string,
-  sbKey: string,
+  key: string | { apikey: string; token: string },
   clientId: string,
   staffId?: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<TurnoResolution> {
+  // Accept a single key (legacy service_role) OR distinct {apikey, token} so DB reads
+  // can run under the caller's Supabase JWT (RLS-scoped) with the anon apikey.
+  const apikey = typeof key === 'string' ? key : key.apikey
+  const token = typeof key === 'string' ? key : key.token
   const ecid = encodeURIComponent(clientId)
   let rows: Array<{ id: string; opened_by: string }>
   try {
     const res = await fetchFn(
       `${sbUrl}/rest/v1/pos_turnos?client_id=eq.${ecid}&closed_at=is.null&select=id,opened_by,opened_at&order=opened_at.desc`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }, cache: 'no-store' as RequestCache },
+      { headers: { apikey, Authorization: `Bearer ${token}` }, cache: 'no-store' as RequestCache },
     )
     if (!res.ok) return { ok: false, reason: 'error' }
     const j = await res.json().catch(() => null)

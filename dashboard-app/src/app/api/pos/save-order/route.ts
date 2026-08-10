@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { withPOSAuth, unauthorized, posDbAuth } from '@/lib/api-auth'
 import { isQrDraftId, resolveOpenTurno } from '@/lib/turno'
 
 /**
@@ -48,14 +48,17 @@ export async function POST(request: NextRequest) {
     }
 
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const sbKey = process.env.SUPABASE_SERVICE_KEY
-    if (!sbKey) {
-      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 500 })
+    // Clonable path: run DB access under the caller's Supabase JWT (RLS) — falls back
+    // to the service_role key only for legacy kiosks with no Supabase session. The RPCs
+    // (r1_save_order*, r1_reconcile_order) are SECURITY DEFINER granted to authenticated,
+    // and p_client_id is the SERVER-resolved tenant (withPOSAuth), never a browser value.
+    const db = posDbAuth(auth, request)
+    if (!db) {
+      return Response.json({ ok: false, error: 'SERVER_CONFIG_ERROR' } satisfies SaveResult, { status: 503 })
     }
-
+    const readHeaders = { apikey: db.apikey, Authorization: `Bearer ${db.token}` }
     const headers = {
-      'apikey': sbKey,
-      'Authorization': `Bearer ${sbKey}`,
+      ...readHeaders,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     }
@@ -101,7 +104,7 @@ export async function POST(request: NextRequest) {
     if (isQrDraftId(order_id)) {
       const movingToEffects = typeof body.status === 'string' && body.status !== 'abierta'
       if (movingToEffects) {
-        const t = await resolveOpenTurno(sbUrl, sbKey, clientId, auth.staffId)
+        const t = await resolveOpenTurno(sbUrl, { apikey: db.apikey, token: db.token }, clientId, auth.staffId)
         if (!t.ok) {
           // Fail closed: no open turno, or ambiguous (>1 eligible) — never guess the corte.
           const [error, status] = t.reason === 'ambiguous'
@@ -162,7 +165,7 @@ export async function POST(request: NextRequest) {
       try {
         const lineageRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: readHeaders }
         )
         if (lineageRes.ok) {
           const lineageRows = await lineageRes.json()
@@ -225,7 +228,7 @@ export async function POST(request: NextRequest) {
       try {
         const statusRes = await fetch(
           `${sbUrl}/rest/v1/pos_orders?id=eq.${order_id}&client_id=eq.${clientId}&select=last_inventory_processed_revision,last_inventory_complete_revision`,
-          { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+          { headers: readHeaders }
         )
         if (statusRes.ok) {
           const statusRows = await statusRes.json()
