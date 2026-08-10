@@ -12,6 +12,7 @@ import { initStationRouting } from '@/lib/pos-constants'
 import { inventoryPolicyService } from '@/lib/inventory-policy'
 import { getFingerprintUrl } from '@/lib/fingerprint-url'
 import { POSLockContext } from './pos-lock-context'
+import { useAuth } from '@/contexts/AuthContext'
 
 async function hashPin(pin: string, staffId: string): Promise<string> {
   try {
@@ -65,6 +66,8 @@ const KDS_PATHS = ['/pos/cocina', '/pos/barra', '/pos/panaderia', '/pos/kds']
 
 export default function POSLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const router = useRouter()
+  const { clientConfig } = useAuth()
+  const restaurantName = clientConfig?.display_name || clientConfig?.id || ''
 
   // KDS screens bypass auth entirely — no PIN, no turno gate
   const isKDS = typeof window !== 'undefined' && KDS_PATHS.some(p => window.location.pathname.startsWith(p))
@@ -609,7 +612,7 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
         '--text-1':'#fff','--text-2':'rgba(255,255,255,0.7)','--text-3':'rgba(255,255,255,0.45)',
         '--text-4':'rgba(255,255,255,0.25)',
       }}>
-        <TurnoGate staff={staff!}>
+        <TurnoGate staff={staff!} restaurantName={restaurantName}>
           {children}
         </TurnoGate>
       </div>
@@ -648,6 +651,11 @@ export default function POSLayout({ children }: Readonly<{ children: React.React
               }
             }}
           />
+          {restaurantName ? (
+            <p data-testid="pos-tenant-name" className="text-white text-lg font-bold">
+              {restaurantName}
+            </p>
+          ) : null}
           <p className="text-slate-400 text-sm mt-2">
             {biometricAvailable ? 'Huella digital o PIN para abrir' : 'Ingresa tu PIN para abrir'}
           </p>
