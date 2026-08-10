@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native'
-import { supabase } from '@/lib/supabase'
+import { CLIENT_ID, supabase } from '@/lib/supabase'
 import { usePOSStore } from '@/lib/store'
 
 const MAX_ATTEMPTS = 5
@@ -29,7 +29,7 @@ export default function LoginScreen() {
         .select('id, name, role, pin, active')
         .eq('pin', pin)
         .eq('active', true)
-        .eq('client_id', 'amalay')
+        .eq('client_id', CLIENT_ID)
         .limit(1)
 
       if (!error && data && data.length > 0) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { MessageCircle, AlertTriangle, Clock, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react'
+import { MessageCircle, AlertTriangle, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -32,6 +32,7 @@ export default function ChatLogsPage() {
     async function fetchLogs() {
       setLoading(true)
       const params = new URLSearchParams({
+        client_id: `eq.${clientId}`,
         order: 'created_at.desc',
         limit: String(limit),
       })
@@ -156,9 +157,7 @@ export default function ChatLogsPage() {
                         <Clock size={12} />
                         {formatTime(log.created_at)}
                       </span>
-                      {log.client_id !== 'amalay' && (
-                        <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full">{log.client_id}</span>
-                      )}
+                      <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full">{log.client_id}</span>
                       {log.had_error && log.error_type && (
                         <span className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full">{log.error_type}</span>
                       )}

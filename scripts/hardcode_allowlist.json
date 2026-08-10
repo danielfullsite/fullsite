@@ -1,0 +1,154 @@
+{
+  "entries": [
+    {
+      "path": "dashboard-app/next.config.ts",
+      "rule": "production_project_ref",
+      "reason": "Fail-closed deployment guard that rejects the AMALAY production project in sandbox mode."
+    },
+    {
+      "path": "dashboard-app/src/app/reservar/page.tsx",
+      "rule": "amalay_tenant_comparison",
+      "reason": "Explicit AMALAY-only legacy reservation UI; all writes are server-mediated and owner-gated."
+    },
+    {
+      "path": "dashboard-app/src/app/pos/mesas/page.tsx",
+      "rule": "amalay_tenant_comparison",
+      "reason": "AMALAY-only custom floor-plan presentation; every other tenant uses the generic grid."
+    },
+    {
+      "path": "dashboard-app/src/lib/pos-data.ts",
+      "rule": "amalay_tenant_comparison",
+      "reason": "AMALAY-only custom floor-plan data; all other tenants load their generic table records."
+    },
+    {
+      "path": "dashboard-app/src/lib/agents/finance.ts",
+      "rule": "amalay_tenant_comparison",
+      "reason": "Legacy Wansoft dataset is AMALAY-owned and unavailable by default to every other tenant."
+    },
+    {
+      "path": "dashboard-app/src/components/POSCopilot.tsx",
+      "rule": "amalay_tenant_assignment",
+      "reason": "Tenant-qualified AMALAY-specific promotional combo; it is not a tenant default."
+    },
+    {
+      "path": "scripts/onboarding/contract.py",
+      "rule": "production_project_ref",
+      "reason": "Canonical production-ref safety guard."
+    },
+    {
+      "path": "scripts/onboarding/menu_import.py",
+      "rule": "production_project_ref",
+      "reason": "Production-ref safety guard for menu imports."
+    },
+    {
+      "path": "scripts/onboarding/onboard_client.py",
+      "rule": "production_project_ref",
+      "reason": "Production-ref safety guard for provisioning."
+    },
+    {
+      "path": "scripts/onboarding/smoke_test.py",
+      "rule": "production_project_ref",
+      "reason": "Production-ref safety guard for destructive smoke fixtures."
+    },
+    {
+      "path": "scripts/onboarding/vercel_provision.py",
+      "rule": "production_project_ref",
+      "reason": "Production-ref safety guard for deployment configuration."
+    },
+    {
+      "path": "scripts/check_hardcodes.py",
+      "rule": "production_project_ref",
+      "reason": "The scanner must contain the forbidden literal it detects."
+    },
+    {
+      "path": "scripts/check_hardcodes.py",
+      "rule": "amalay_tenant_assignment",
+      "reason": "The scanner must contain the forbidden pattern it detects."
+    },
+    {
+      "path": "scripts/check_hardcodes.py",
+      "rule": "amalay_tenant_fallback",
+      "reason": "The scanner must contain the forbidden pattern it detects."
+    },
+    {
+      "path": "scripts/check_hardcodes.py",
+      "rule": "amalay_tenant_comparison",
+      "reason": "The scanner must contain the forbidden pattern it detects."
+    },
+    {
+      "path": "scripts/check_hardcodes.py",
+      "rule": "amalay_static_option",
+      "reason": "The scanner must contain the forbidden pattern it detects."
+    },
+    {
+      "path": ".github/workflows/**",
+      "rule": "amalay_tenant_fallback",
+      "reason": "Legacy AMALAY-only agent schedules; multi-tenant agents are tracked separately and are not part of cloneable POS core."
+    },
+    {
+      "path": ".github/scripts/cutover_inventory_sync.py",
+      "rule": "production_project_ref",
+      "reason": "AMALAY-specific physical cutover utility, excluded from tenant onboarding runtime."
+    },
+    {
+      "path": "agents/wansoft/backfill_platillos_full.py",
+      "rule": "production_project_ref",
+      "reason": "AMALAY-owned Wansoft one-off backfill, excluded from tenant onboarding runtime."
+    },
+    {
+      "path": "dashboard-app/scripts/sandbox-dev.sh",
+      "rule": "production_project_ref",
+      "reason": "Fail-closed sandbox guard that rejects the AMALAY production project."
+    },
+    {
+      "path": "scripts/sql/sandbox/**",
+      "rule": "production_project_ref",
+      "reason": "Legacy sandbox safety guards; current onboarding lives in scripts/onboarding."
+    },
+    {
+      "path": "scripts/sql/sandbox/**",
+      "rule": "amalay_tenant_assignment",
+      "reason": "Legacy sandbox scanner descriptions and explicit forbidden-tenant checks."
+    },
+    {
+      "path": "scripts/migrate-wansoft-to-supabase.py",
+      "rule": "amalay_tenant_assignment",
+      "reason": "AMALAY-only historical Wansoft migration generator, not a tenant onboarding path."
+    },
+    {
+      "path": "scripts/smoke_test_nomada.py",
+      "rule": "production_project_ref",
+      "reason": "Negative smoke assertion that detects forbidden AMALAY project references."
+    },
+    {
+      "path": "fullsite.html",
+      "rule": "production_project_ref",
+      "reason": "Legacy Agent Company War Room artifact, not deployed with the cloneable restaurant app."
+    },
+    {
+      "path": "fullsite.html",
+      "rule": "amalay_tenant_fallback",
+      "reason": "Legacy Agent Company task-label default, not restaurant tenant resolution."
+    },
+    {
+      "path": "warroom-dashboard.html",
+      "rule": "production_project_ref",
+      "reason": "Legacy Agent Company War Room artifact, outside restaurant runtime."
+    },
+    {
+      "path": "warroom.html",
+      "rule": "production_project_ref",
+      "reason": "Legacy Agent Company War Room artifact, outside restaurant runtime."
+    },
+    {
+      "path": "scripts/client2/nomada_verify.mjs",
+      "rule": "amalay_tenant_assignment",
+      "reason": "Explicit adversarial cross-tenant read probe; never used as tenant resolution or a default."
+    },
+    {
+      "path": "scripts/client2/nomada_verify.mjs",
+      "rule": "production_project_ref",
+      "reason": "Fail-closed guard that refuses to run isolation probes against AMALAY production."
+    }
+  ]
+}

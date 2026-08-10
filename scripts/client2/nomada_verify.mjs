@@ -1,8 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
-const URL='https://jkcnxfbbuyyfhwfjizgw.supabase.co'
-const ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprY254ZmJidXl5Zmh3Zmppemd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTM4NDUsImV4cCI6MjEwMDc4OTg0NX0.knHVqpjSG_IY0aqrYp7mU-FQD6frWn5xpSlzH5xOjws'
+const URL=process.env.SUPABASE_URL
+const ANON=process.env.SUPABASE_ANON_KEY
+const EMAIL=process.env.OWNER_EMAIL
+const PASSWORD=process.env.OWNER_PASSWORD
+if(!URL||!ANON||!EMAIL||!PASSWORD){
+  console.error('SUPABASE_URL, SUPABASE_ANON_KEY, OWNER_EMAIL and OWNER_PASSWORD are required')
+  process.exit(1)
+}
+if(URL.includes('qjiomlvudfmzuvqvhwpk')){
+  console.error('Refusing to run Client #2 isolation probes against AMALAY production')
+  process.exit(1)
+}
 const c=createClient(URL,ANON,{auth:{persistSession:false,autoRefreshToken:false}})
-const {data:l,error}=await c.auth.signInWithPassword({email:'owner@nomada.staging',password:'CafeNomada#2026'})
+const {data:l,error}=await c.auth.signInWithPassword({email:EMAIL,password:PASSWORD})
 if(error||!l?.session){console.log('LOGIN FAIL',error?.message);process.exit(1)}
 const role=JSON.parse(Buffer.from(l.session.access_token.split('.')[1],'base64').toString()).role
 console.log('LOGIN ok role='+role+' user='+l.user.email)
