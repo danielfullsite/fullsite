@@ -30,6 +30,13 @@ CHILD = {
 # §7a legacy sin client_id ni padre
 LEGACY = {'wansoft_daily', 'wansoft_kpis', 'amalay_reservaciones'}
 SPECIAL = {'client_users', 'clients'}
+# Tablas con forma NO-genérica que la migración necesita (columnas extra referenciadas
+# por bloques específicos). pos_orders: §1b añade el CHECK sobre id(text)/status/turno_id.
+SPECIAL_SHAPE = {
+    'pos_orders': "create table if not exists public.pos_orders "
+                  "(id text primary key default gen_random_uuid()::text, client_id text not null, "
+                  "status text not null default 'abierta', turno_id text, data text);",
+}
 
 
 def parse_tables(sql):
@@ -62,7 +69,10 @@ def main():
     for t in cid_tables:
         if t in CHILD or t in LEGACY:
             continue
-        print(f"create table if not exists public.{t} (id bigserial primary key, client_id text not null, data text);")
+        if t in SPECIAL_SHAPE:
+            print(SPECIAL_SHAPE[t])
+        else:
+            print(f"create table if not exists public.{t} (id bigserial primary key, client_id text not null, data text);")
 
     # §7a legacy
     print("create table if not exists public.wansoft_daily (fecha date primary key, ventas_dia numeric);")

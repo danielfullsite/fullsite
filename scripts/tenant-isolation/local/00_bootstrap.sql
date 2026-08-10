@@ -43,9 +43,23 @@ $$;
 revoke all on function private.user_has_client_access(text) from public, anon;
 grant execute on function private.user_has_client_access(text) to authenticated;
 
-create table public.pos_orders (id bigserial primary key, client_id text not null, total numeric, mesero text);
+-- pos_orders con la forma REAL relevante a BUG-019-C: id text (namespace 'qr-'),
+-- status, turno_id. La migración §1b añade el CHECK pos_orders_turno_id_check.
+create table public.pos_orders (
+  id text primary key default gen_random_uuid()::text,
+  client_id text not null,
+  status text not null default 'abierta',
+  turno_id text,
+  total numeric, mesero text
+);
 create table public.pos_menu_categories (id text primary key, client_id text not null, name text);
 create table public.pos_staff (id text primary key, client_id text not null, name text, pin text);
+-- pos_turnos: caja/turno por tenant (tiene client_id -> §1 la aísla automáticamente).
+create table public.pos_turnos (
+  id text primary key, client_id text not null, opened_by text not null,
+  opened_at timestamptz default now(), closed_at timestamptz, closed_by text,
+  fondo_inicial numeric default 0 not null
+);
 
 -- §1 + §2: audit log con client_id, inmutable (la migración le quita update/delete)
 create table public.pos_audit_log (id bigserial primary key, client_id text not null, action text, actor text, created_at timestamptz default now());
@@ -61,6 +75,7 @@ create table public.pos_purchase_order_items (id bigserial primary key, order_id
 alter table public.clients enable row level security;
 alter table public.client_users enable row level security;
 alter table public.pos_orders enable row level security;
+alter table public.pos_turnos enable row level security;
 alter table public.pos_menu_categories enable row level security;
 alter table public.pos_staff enable row level security;
 alter table public.pos_audit_log enable row level security;
@@ -73,9 +88,15 @@ insert into public.clients values ('amalay','AMALAY'),('nomada','Café Nómada')
 insert into public.client_users values
   ('11111111-1111-1111-1111-111111111111','amalay','dueño'),
   ('22222222-2222-2222-2222-222222222222','nomada','dueño');
-insert into public.pos_orders (client_id,total,mesero) values
-  ('amalay',185,'Omar'),('amalay',240,'Hector'),
-  ('nomada',95,'Ana'),('nomada',120,'Carlos');
+-- turnos abiertos (uno por tenant) — de aquí el server resuelve el turno de la sesión
+insert into public.pos_turnos (id,client_id,opened_by) values
+  ('t-amalay','amalay','amalay-s1'),('t-nomada','nomada','nomada-s1');
+-- órdenes normales: id uuid, turno NOT NULL (el CHECK lo exige a las no-qr)
+insert into public.pos_orders (id,client_id,status,turno_id,total,mesero) values
+  ('o-amalay-1','amalay','enviada','t-amalay',185,'Omar'),
+  ('o-amalay-2','amalay','enviada','t-amalay',240,'Hector'),
+  ('o-nomada-1','nomada','enviada','t-nomada',95,'Ana'),
+  ('o-nomada-2','nomada','enviada','t-nomada',120,'Carlos');
 insert into public.pos_menu_categories values
   ('amalay-des','amalay','Desayunos'),('nomada-caf','nomada','Cafés');
 insert into public.pos_staff values

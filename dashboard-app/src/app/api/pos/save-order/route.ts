@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { isQrDraftId, resolveOpenTurnoId } from '@/lib/turno'
 
 /**
  * R2D1 + R2 Final + R2D — Revision-aware order save + R1 reconciliation boundary
@@ -87,6 +88,27 @@ export async function POST(request: NextRequest) {
 
     if (hasOperationId) {
       rpcParams.p_save_operation_id = body.save_operation_id
+    }
+
+    // ── BUG-019-C: server-mediated turno for server-owned QR drafts ──
+    // A QR draft (id 'qr-…') is born turno_id=NULL. The browser controls nothing
+    // authoritative here either: the server resolves the turno, never body.turno_id.
+    // - Transition out of 'abierta' (enviar/cobrar/imprimir/inventario): resolve the
+    //   caller's OPEN turno server-side and assign it atomically in this save. No open
+    //   turno → refuse, so nothing is sent/charged/printed off the books.
+    // - Still 'abierta' (draft edit): keep it turno-null (server-owned draft).
+    // Normal POS orders (uuid id) are unchanged — the DB check already forbids their NULL.
+    if (isQrDraftId(order_id)) {
+      const movingToEffects = typeof body.status === 'string' && body.status !== 'abierta'
+      if (movingToEffects) {
+        const turnoId = await resolveOpenTurnoId(sbUrl, sbKey, clientId, auth.staffId)
+        if (!turnoId) {
+          return Response.json({ ok: false, error: 'NO_OPEN_TURNO' } satisfies SaveResult, { status: 409 })
+        }
+        rpcParams.p_turno_id = turnoId
+      } else {
+        rpcParams.p_turno_id = null
+      }
     }
 
     const saveRes = await fetch(`${sbUrl}/rest/v1/rpc/${rpcName}`, {

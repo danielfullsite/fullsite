@@ -29,9 +29,15 @@ $PSQL -f "$HERE/00_bootstrap.sql" >/dev/null || { echo "bootstrap FAIL"; exit 2;
 echo "== aplica migración REAL: $(basename "$MIGRATION") =="
 $PSQL -f "$MIGRATION" >/dev/null || { echo "MIGRACIÓN FAIL (revisar deps)"; exit 1; }
 
-echo "== assertions =="
+echo "== assertions (aislamiento A/B/anon/service_role) =="
 OUT="$($PSQL -f "$HERE/10_assertions.sql" 2>&1)"
 echo "$OUT"
+
+echo "== provenance del turno (BUG-019-C: 6 casos) =="
+OUT2="$($PSQL -f "$HERE/11_turno_provenance.sql" 2>&1)"
+echo "$OUT2"
+OUT="$OUT
+$OUT2"
 
 # Veredicto: ningún pass = f, ningún DO-FAIL, y CERO errores SQL inesperados.
 FAILS=$(echo "$OUT" | grep -E "\| f$" | wc -l | tr -d ' ')
